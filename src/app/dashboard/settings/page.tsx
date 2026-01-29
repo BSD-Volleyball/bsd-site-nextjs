@@ -3,7 +3,7 @@ import {
     ChangePasswordCard,
     DeleteAccountCard,
     SessionsCard,
-    UpdateNameCard,
+    UpdateFieldCard,
     UpdateAvatarCard,
     ProvidersCard
 } from "@daveyplate/better-auth-ui"
@@ -58,7 +58,8 @@ export default function SettingsPage() {
                     <TabsContent id="account" value="account">
                         <div className="space-y-4 sm:space-y-6">
                             <UpdateAvatarCard />
-                            <UpdateNameCard />
+                            <UpdateFieldCard name="firstName" label="First Name" />
+                            <UpdateFieldCard name="lastName" label="Last Name" />
                             <ChangeEmailCard />
                         </div>
                     </TabsContent>

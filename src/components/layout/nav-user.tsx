@@ -38,6 +38,7 @@ interface Profile {
     isAnonymous?: boolean | null
     fullName?: string | null
     firstName?: string | null
+    lastName?: string | null
     displayName?: string | null
     username?: string | null
     displayUsername?: string | null
@@ -94,12 +95,12 @@ export function NavUser() {
     const user = session.user as Profile
 
     // Get user's display name with fallbacks
+    const fullName =
+        user.firstName && user.lastName
+            ? `${user.firstName} ${user.lastName}`.trim()
+            : null
     const displayName =
-        user.displayName ||
-        user.fullName ||
-        user.name ||
-        user.firstName ||
-        "User"
+        user.displayName || user.fullName || fullName || user.firstName || "User"
 
     // Get user's avatar with fallbacks
     const avatarSrc = user.avatarUrl || user.avatar || user.image

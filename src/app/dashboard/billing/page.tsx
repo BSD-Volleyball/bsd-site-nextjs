@@ -77,7 +77,7 @@ export default async function Plans() {
                                     <p className="text-muted-foreground text-sm">
                                         Logged in as:{" "}
                                         <span className="font-medium text-foreground">
-                                            {session?.user?.email}
+                                            {(session?.user as { email?: string })?.email}
                                         </span>
                                     </p>
                                 </CardContent>
@@ -189,18 +189,19 @@ export default async function Plans() {
                         <div className="mx-auto mb-6 max-w-3xl rounded-lg border bg-muted/50 p-4 ">
                             <p className="font-medium">This is a demo app.</p>
                             <p className="mt-1 text-muted-foreground">
-                                This is a demo app that uses Stripe test
-                                environment. You can find a list of test card
-                                numbers on the{" "}
+                                This is a demo app that uses Square sandbox
+                                environment. You can use test card number 4111
+                                1111 1111 1111 with any future date and any CVV.
+                                See the{" "}
                                 <a
-                                    href="https://docs.stripe.com/testing#cards"
+                                    href="https://developer.squareup.com/docs/testing/test-values"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline hover:no-underline"
                                 >
-                                    Stripe docs
-                                </a>
-                                .
+                                    Square testing docs
+                                </a>{" "}
+                                for more information.
                             </p>
                         </div>
                         <PlanSelector activeSub={activeSub} session={session} />
