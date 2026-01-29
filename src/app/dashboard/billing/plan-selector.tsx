@@ -134,7 +134,7 @@ export default function PlanSelector({
                             buttonText={buttonText}
                             plan={currentPlan}
                             activeSub={activeSub}
-                            subId={activeSub?.stripeSubscriptionId as string}
+                            subId={activeSub?.squareSubscriptionId as string}
                         />
                     ) : null}
                 </div>

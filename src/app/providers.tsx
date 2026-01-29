@@ -34,7 +34,9 @@ export function Providers({ children }: { children: ReactNode }) {
                 social={{
                     providers: ["github", "google", "twitter"]
                 }}
-                
+                signUp={{
+                    fields: ["firstName", "lastName"]
+                }}
                 avatar={{
                     upload: async (file: File) => {
                         const uploadRes = await startUpload([file])

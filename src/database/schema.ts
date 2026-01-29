@@ -1,8 +1,9 @@
-import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, serial, numeric, primaryKey } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
     id: text("id").primaryKey(),
-    name: text("name").notNull(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified")
         .$defaultFn(() => false)
@@ -16,10 +17,25 @@ export const users = pgTable("users", {
     updatedAt: timestamp("updated_at")
         .$defaultFn(() => /* @__PURE__ */ new Date())
         .notNull(),
-    stripeCustomerId: text("stripe_customer_id")
-});
-
-
+    squareCustomerId: text("square_customer_id"),
+    old_id: integer("old_id"),
+    picture: text("picture"),
+    age: text("age"),
+    phone: text("phone"),
+    experience: text("experience"),
+    assessment: text("assessment"),
+    height: integer("height"),
+    positions: text("positions"),
+    skill_setter: boolean("skill_setter"),
+    skill_hitter: boolean("skill_hitter"),
+    skill_passer: boolean("skill_passer"),
+    skill_other: boolean("skill_other"),
+    emergency_contact: text("emergency_contact"),
+    referred_by: text("referred_by"),
+    pronouns: text("pronouns"),
+    role: text("role"),
+    gender: text("gender")
+})
 
 export const sessions = pgTable("sessions", {
     id: text("id").primaryKey(),
@@ -69,8 +85,8 @@ export const subscriptions = pgTable("subscriptions", {
 	id: text('id').primaryKey(),
 	plan: text('plan').notNull(),
 	referenceId: text('reference_id').notNull(),
-	stripeCustomerId: text('stripe_customer_id'),
-	stripeSubscriptionId: text('stripe_subscription_id'),
+	squareCustomerId: text('square_customer_id'),
+	squareSubscriptionId: text('square_subscription_id'),
 	status: text('status').default("incomplete"),
 	periodStart: timestamp('period_start'),
     periodEnd: timestamp("period_end"),
@@ -78,4 +94,68 @@ export const subscriptions = pgTable("subscriptions", {
     seats: integer("seats"),
     trialStart: timestamp('trial_start'),
     trialEnd: timestamp('trial_end')
+})
+
+export const seasons = pgTable("seasons", {
+	id: serial('id').primaryKey(),
+	code: text('code').notNull(),
+	year: integer('year').notNull(),
+	season: text('season').notNull()
+})
+
+export const divisions = pgTable("divisions", {
+	id: serial('id').primaryKey(),
+	name: text('name').notNull(),
+	level: integer('level').notNull()
+})
+
+export const signups = pgTable("signups", {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull().references(() => seasons.id),
+  player: text('player').notNull().references(() => users.id),
+  captain: text('captain'),
+  pair: boolean('pair'),
+  pair_pick: text('pair_pick').references(() => users.id),
+  pair_reason: text('pair_reason'),
+  dates_missing: text('dates_missing'),
+  play_1st_week: boolean('play_1st_week'),
+  order_id: text('order_id'),
+  amount_paid: numeric('amount_paid'),
+  created_at: timestamp('created_at').notNull()
+})
+
+export const teams = pgTable("teams", {
+	id: serial('id').primaryKey(),
+	season: integer('season').notNull().references(() => seasons.id),
+	captain: text('captain').notNull().references(() => users.id),
+	division: integer('division').notNull().references(() => divisions.id),
+	name: text('name').notNull()
+})
+
+export const players = pgTable("players", {
+	player: text('player').notNull().references(() => users.id),
+	team: integer('team').notNull().references(() => teams.id)
+}, (table) => [
+	primaryKey({ columns: [table.player, table.team] })
+])
+
+export const matchs = pgTable("matchs", {
+	id: serial('id').primaryKey(),
+	season: integer('season').notNull().references(() => seasons.id),
+	division: integer('division').notNull().references(() => divisions.id),
+	week: integer('week').notNull(),
+	date: timestamp('date'),
+	time: text('time'),
+	home_team: integer('home_team').notNull().references(() => teams.id),
+	away_team: integer('away_team').notNull().references(() => teams.id),
+	home_score: integer('home_score'),
+	away_score: integer('away_score'),
+	winner: integer('winner').references(() => teams.id)
+})
+
+export const champions = pgTable("champions", {
+	id: serial('id').primaryKey(),
+	team: integer('team').notNull().references(() => teams.id),
+	season: integer('season').notNull().references(() => seasons.id),
+	division: integer('division').notNull().references(() => divisions.id)
 });

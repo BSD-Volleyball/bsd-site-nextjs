@@ -1,8 +1,10 @@
 "use client"
 import { Button } from "@/components/ui/button"
 import type { Plan } from "@/lib/payments/plans"
-import { authClient } from "@/lib/auth-client"
-import { updateExistingSubscription } from "@/lib/payments/actions"
+import {
+    createSubscriptionCheckout,
+    updateExistingSubscription
+} from "@/lib/payments/actions"
 import { toast } from "sonner"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -28,10 +30,9 @@ export default function SubscriptionButton({
             setIsPending(true)
 
             if (activeSub && subId) {
-                // Update existing subscription
                 const loadingToast = toast.loading("Updating subscription...")
-                
-                const result = await updateExistingSubscription(subId, plan.priceId)
+
+                const result = await updateExistingSubscription(subId, plan.name)
                 console.log({ result })
 
                 toast.dismiss(loadingToast)
@@ -47,16 +48,16 @@ export default function SubscriptionButton({
                     toast.error(result.message || "Failed to update subscription")
                 }
             } else {
-                // Create new subscription
-                const { error } = await authClient.subscription.upgrade({
-                    plan: plan.name,
-                    successUrl: "/dashboard/billing",
-                    cancelUrl: "/dashboard/billing"
-                })
-                
-                if (error) {
-                    console.log(error)
-                    toast.error("Failed to create subscription")
+                const loadingToast = toast.loading("Preparing checkout...")
+
+                const result = await createSubscriptionCheckout(plan.name)
+
+                toast.dismiss(loadingToast)
+
+                if (result.status && result.checkoutUrl) {
+                    window.location.href = result.checkoutUrl
+                } else {
+                    toast.error(result.message || "Failed to create checkout")
                 }
             }
         } catch (err) {
@@ -68,11 +69,8 @@ export default function SubscriptionButton({
     }
 
     return (
-        <Button
-            onClick={handleSubscription}
-            disabled={isPending}
-        >
+        <Button onClick={handleSubscription} disabled={isPending}>
             {isPending ? "Processing..." : buttonText}
         </Button>
     )
-} 
+}
