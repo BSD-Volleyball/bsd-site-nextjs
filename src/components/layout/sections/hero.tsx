@@ -11,7 +11,6 @@ export const HeroSection = () => {
                 <div className="mx-auto max-w-4xl space-y-8 text-center">
                     <div className="font-bold text-4xl md:text-5xl lg:text-6xl">
                         <h1>
-                            Welcome to
                             <span className="bg-gradient-to-r from-[#7033ff] to-primary bg-clip-text px-2 text-transparent">
                                 Bump Set Drink
                             </span>
