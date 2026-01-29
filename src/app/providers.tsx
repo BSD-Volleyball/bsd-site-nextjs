@@ -32,7 +32,21 @@ export function Providers({ children }: { children: ReactNode }) {
                     url: "/dashboard/settings"
                 }}
                 social={{
-                    providers: ["github", "google", "twitter"]
+                    providers: ["google"]
+                }}
+                additionalFields={{
+                    firstName: {
+                        label: "First Name",
+                        placeholder: "Enter your first name",
+                        type: "string",
+                        required: true
+                    },
+                    lastName: {
+                        label: "Last Name",
+                        placeholder: "Enter your last name",
+                        type: "string",
+                        required: true
+                    }
                 }}
                 signUp={{
                     fields: ["firstName", "lastName"]

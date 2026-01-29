@@ -1,7 +1,4 @@
-import { Mail } from "lucide-react"
-import XIcon from "@/components/icons/x-icon"
-import GithubIcon from "@/components/icons/github-icon"
-import LinkedInIcon from "@/components/icons/linkedin-icon"
+import { Mail, MapPin } from "lucide-react"
 
 import Image from "next/image"
 import Link from "next/link"
@@ -23,57 +20,37 @@ interface FooterSectionProps {
 
 const footerSections: FooterSectionProps[] = [
     {
-        title: "Product",
+        title: "League Info",
         links: [
-            { href: "#features", label: "Features" },
-            { href: "#pricing", label: "Pricing" },
-            { href: "#integrations", label: "Integrations" },
-            { href: "#api", label: "API" }
+            { href: "/faq", label: "FAQ" },
+            { href: "/history", label: "League History" },
+            { href: "/player-experience", label: "Skill Levels" },
+            { href: "/gender-policy", label: "Gender Policy" }
         ]
     },
     {
-        title: "Company",
+        title: "For Players",
         links: [
-            { href: "#about", label: "About Us" },
-            { href: "#careers", label: "Careers" },
-            { href: "#blog", label: "Blog" }
+            { href: "/captain-expectations", label: "Captain Guidelines" },
+            { href: "/referee-expectations", label: "Referee Guidelines" },
+            { href: "/BSD-Volleyball-Rules.pdf", label: "Official Rules" },
+            { href: "/HandSignals.pdf", label: "Hand Signals" }
         ]
     },
     {
         title: "Resources",
         links: [
-            { href: "#documentation", label: "Documentation" },
-            { href: "#help", label: "Help Center" },
-            { href: "#status", label: "Status" }
-        ]
-    },
-    {
-        title: "Legal",
-        links: [
-            { href: "#privacy", label: "Privacy Policy" },
-            { href: "#terms", label: "Terms of Service" },
-            { href: "#cookies", label: "Cookie Policy" }
+            { href: "https://www.mdsoccerplex.org", label: "MD Soccerplex", external: true },
+            { href: "/auth/sign-up", label: "Register" },
+            { href: "/auth/sign-in", label: "Sign In" }
         ]
     }
 ]
 
 const socialLinks: FooterLinkProps[] = [
     {
-        href: site.links.github,
-        label: "GitHub",
-        icon: <GithubIcon className="size-5 fill-foreground" />,
-        external: true
-    },
-    {
-        href: site.links.twitter,
-        label: "Twitter",
-        icon: <XIcon className="size-5 fill-foreground" />,
-        external: true
-    },
-    {
-        href: "https://linkedin.com",
-        label: "LinkedIn",
-        icon: <LinkedInIcon className="size-5 fill-foreground" />,
+        href: site.links.facebook,
+        label: "Facebook",
         external: true
     },
     {
@@ -92,7 +69,7 @@ export const FooterSection = () => {
                         {/* Main Footer Content */}
                         <div className="space-y-8 lg:space-y-0">
                             {/* Desktop Layout: Side by side */}
-                            <div className="hidden gap-12 lg:grid lg:grid-cols-6">
+                            <div className="hidden gap-12 lg:grid lg:grid-cols-5">
                                 {/* Brand Section */}
                                 <div className="col-span-2">
                                     <Link
@@ -100,22 +77,31 @@ export const FooterSection = () => {
                                         className="group mb-4 flex gap-2 font-bold"
                                     >
                                         <Image
-                                                src={site.logo}
-                                                alt={site.name}
-                                                width={30}
-                                                height={30}
-                                            />
+                                            src={site.logo}
+                                            alt={site.name}
+                                            width={30}
+                                            height={30}
+                                        />
                                         <h3 className="font-bold text-2xl">
-                                            {site.name}
+                                            BSD Volleyball
                                         </h3>
                                     </Link>
                                     <p className="mb-6 text-muted-foreground leading-relaxed">
-                                        Build and scale your SaaS faster with
-                                        our Starter Kit. From authentication to
-                                        payments, we've got you covered.
+                                        A recreational co-ed volleyball league in the
+                                        Washington DC metro area. Join us for competitive
+                                        play, meet new people, and have fun!
                                     </p>
 
-                                    {/* Social Links */}
+                                    <div className="mb-4 flex items-start gap-2 text-muted-foreground text-sm">
+                                        <MapPin className="mt-0.5 size-4 shrink-0" />
+                                        <span>
+                                            Maryland SoccerPlex<br />
+                                            18031 Central Park Circle<br />
+                                            Boyds, MD 20841
+                                        </span>
+                                    </div>
+
+                                    {/* Contact */}
                                     <div className="flex gap-2">
                                         {socialLinks.map((social) => (
                                             <Button
@@ -139,7 +125,7 @@ export const FooterSection = () => {
                                                     }
                                                     aria-label={social.label}
                                                 >
-                                                    {social.icon}
+                                                    {social.icon || social.label}
                                                 </Link>
                                             </Button>
                                         ))}
@@ -160,9 +146,12 @@ export const FooterSection = () => {
                                                 <li key={link.label}>
                                                     <Link
                                                         href={link.href}
+                                                        target={link.external ? "_blank" : undefined}
+                                                        rel={link.external ? "noopener noreferrer" : undefined}
                                                         className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
                                                     >
                                                         {link.label}
+                                                        {link.external && " ↗"}
                                                     </Link>
                                                 </li>
                                             ))}
@@ -188,16 +177,15 @@ export const FooterSection = () => {
                                             />
                                         </div>
                                         <h3 className="font-bold text-2xl">
-                                            {site.name}
+                                            BSD Volleyball
                                         </h3>
                                     </Link>
                                     <p className="mb-6 max-w-sm text-muted-foreground text-sm leading-relaxed">
-                                        Build and scale your SaaS faster with
-                                        our Starter Kit. From authentication to
-                                        payments, we've got you covered.
+                                        A recreational co-ed volleyball league in the
+                                        Washington DC metro area.
                                     </p>
 
-                                    {/* Social Links Mobile */}
+                                    {/* Contact Mobile */}
                                     <div className="flex gap-2">
                                         {socialLinks.map((social) => (
                                             <Button
@@ -221,7 +209,7 @@ export const FooterSection = () => {
                                                     }
                                                     aria-label={social.label}
                                                 >
-                                                    {social.icon}
+                                                    {social.icon || social.label}
                                                 </Link>
                                             </Button>
                                         ))}
@@ -229,7 +217,7 @@ export const FooterSection = () => {
                                 </div>
 
                                 {/* Footer Links Mobile - Grid */}
-                                <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+                                <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
                                     {footerSections.map((section) => (
                                         <div
                                             key={section.title}
@@ -243,9 +231,12 @@ export const FooterSection = () => {
                                                     <li key={link.label}>
                                                         <Link
                                                             href={link.href}
+                                                            target={link.external ? "_blank" : undefined}
+                                                            rel={link.external ? "noopener noreferrer" : undefined}
                                                             className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
                                                         >
                                                             {link.label}
+                                                            {link.external && " ↗"}
                                                         </Link>
                                                     </li>
                                                 ))}
@@ -262,30 +253,8 @@ export const FooterSection = () => {
                         <div className="flex flex-col justify-between gap-4 lg:flex-row">
                             <div className="flex flex-col items-center gap-4 text-muted-foreground text-sm sm:flex-row">
                                 <p>
-                                    &copy; 2025 {site.name}. All rights reserved.
+                                    &copy; {new Date().getFullYear()} Bump, Set, Drink, Inc. All rights reserved.
                                 </p>
-                            </div>
-
-                            <div className="flex flex-col items-center gap-3 lg:flex-row lg:gap-6">
-                               
-                                
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                    <span>This SaaS Starter is built by</span>
-                                    <Link
-                                        target="_blank"
-                                        href="https://indietech.dev/?utm_source=indiesaas"
-                                        className="flex items-center gap-1 font-semibold"
-                                    >
-                                        <Image
-                                            src="https://indietech.dev/logo.svg"
-                                            alt="Indietech"
-                                            width={16}
-                                            height={16}
-                                            className="inline-block"
-                                        />
-                                        Indietech
-                                    </Link>
-                                </div>
                             </div>
                         </div>
                     </div>

@@ -18,18 +18,30 @@ export const auth = betterAuth({
     }),
     user: {
         additionalFields: {
-            firstName: {
+            first_name: {
                 type: "string",
                 required: true,
                 fieldName: "first_name"
             },
-            lastName: {
+            last_name: {
                 type: "string",
                 required: true,
                 fieldName: "last_name"
             }
         }
     },
+
+  advanced: {
+    database: {
+      // Do NOT set useNumberId - it's global and affects all tables
+      generateId: (options) => {
+        if (options.model === "user" || options.model === "users") {
+          return false; // Let PostgreSQL serial generate it
+        }
+        return crypto.randomUUID(); // UUIDs for session, account, verification
+      },
+    },
+  },
     emailAndPassword: {
         enabled: true,
         sendResetPassword: async ({ user, url, token }, request) => {
@@ -69,17 +81,9 @@ export const auth = betterAuth({
         }
     },
     socialProviders: {
-        github: {
-            clientId: process.env.GITHUB_CLIENT_ID as string,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET as string
-        },
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID as string,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string
-        },
-        twitter: {
-            clientId: process.env.TWITTER_CLIENT_ID as string,
-            clientSecret: process.env.TWITTER_CLIENT_SECRET as string
         }
     },
     plugins: []

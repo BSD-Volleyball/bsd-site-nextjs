@@ -1,7 +1,6 @@
 "use client"
-import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui"
+import { SignedIn, SignedOut } from "@daveyplate/better-auth-ui"
 import { Menu, X } from "lucide-react"
-import { RiGithubFill } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
 import React from "react"
@@ -29,48 +28,61 @@ import { site } from "@/config/site"
 interface RouteProps {
     href: string
     label: string
+    external?: boolean
 }
 
-interface FeatureProps {
+interface InfoPageProps {
     title: string
+    href: string
     description: string
 }
 
 const routeList: RouteProps[] = [
     {
-        href: "#features",
-        label: "Features"
+        href: "/faq",
+        label: "FAQ"
     },
     {
-        href: "#testimonials",
-        label: "Testimonials"
+        href: "/history",
+        label: "History"
     },
     {
-        href: "#pricing",
-        label: "Pricing"
-    },
-    {
-        href: "#contact",
-        label: "Contact"
+        href: "/player-experience",
+        label: "Skill Levels"
     }
 ]
 
-const featureList: FeatureProps[] = [
+const infoPages: InfoPageProps[] = [
     {
-        title: "Showcase Your Value",
-        description:
-            "Highlight how your product solves user problems effectively."
+        title: "Captain Expectations",
+        href: "/captain-expectations",
+        description: "Guidelines for team captains"
     },
     {
-        title: "Build Trust",
-        description:
-            "Leverage social proof elements to establish trust and credibility."
+        title: "Referee Expectations",
+        href: "/referee-expectations",
+        description: "Guidelines for referees"
     },
+    {
+        title: "Gender Policy",
+        href: "/gender-policy",
+        description: "Co-rec play and inclusion policies"
+    }
+]
 
+const resourceLinks: RouteProps[] = [
     {
-        title: "Scale Fast",
-        description:
-            "Built-in tools and integrations to help you scale your business."
+        href: "/BSD-Volleyball-Rules.pdf",
+        label: "Official League Rules"
+    },
+    {
+        href: "/HandSignals.pdf",
+        label: "Hand Signals"
+    },
+    {
+        href: "https://www.mdsoccerplex.org",
+        label: "Maryland Soccerplex",
+        external: true
     }
 ]
 
@@ -94,8 +106,11 @@ export const Navbar = () => {
                                 height={30}
                             />
                         </div>
-                        <h3 className="font-bold text-xl lg:text-2xl">
+                        <h3 className="hidden font-bold text-xl sm:block lg:text-2xl">
                             {site.name}
+                        </h3>
+                        <h3 className="font-bold text-xl sm:hidden">
+                            BSD
                         </h3>
                     </Link>
 
@@ -105,49 +120,65 @@ export const Navbar = () => {
                             <NavigationMenuList className="space-x-2">
                                 <NavigationMenuItem>
                                     <NavigationMenuTrigger className="h-auto bg-transparent px-4 py-2 font-medium text-foreground hover:bg-accent/50">
-                                        Solutions
+                                        League Info
                                     </NavigationMenuTrigger>
                                     <NavigationMenuContent>
-                                        <div className="grid w-[600px] grid-cols-2 gap-6 p-6">
-                                            <div className="relative overflow-hidden rounded-lg">
-                                                <Image
-                                                    src="/demo-img.png"
-                                                    alt="Product Demo"
-                                                    className="h-full w-full object-cover"
-                                                    width={300}
-                                                    height={200}
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                                            </div>
-                                            <ul className="flex flex-col gap-3">
-                                                {featureList.map(
-                                                    ({
-                                                        title,
-                                                        description
-                                                    }) => (
-                                                        <li key={title}>
-                                                            <NavigationMenuLink
-                                                                asChild
+                                        <ul className="grid w-[400px] gap-3 p-4">
+                                            {infoPages.map(
+                                                ({
+                                                    title,
+                                                    href,
+                                                    description
+                                                }) => (
+                                                    <li key={title}>
+                                                        <NavigationMenuLink
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={href}
+                                                                className="group block rounded-lg p-3 text-sm transition-colors hover:bg-accent/50"
                                                             >
-                                                                <Link
-                                                                    href="#features"
-                                                                    className="group block rounded-lg p-3 text-sm transition-colors hover:bg-accent/50"
-                                                                >
-                                                                    <p className="mb-1 font-semibold text-foreground leading-none group-hover:text-primary">
-                                                                        {title}
-                                                                    </p>
-                                                                    <p className="line-clamp-2 text-muted-foreground text-xs">
-                                                                        {
-                                                                            description
-                                                                        }
-                                                                    </p>
-                                                                </Link>
-                                                            </NavigationMenuLink>
-                                                        </li>
-                                                    )
-                                                )}
-                                            </ul>
-                                        </div>
+                                                                <p className="mb-1 font-semibold text-foreground leading-none group-hover:text-primary">
+                                                                    {title}
+                                                                </p>
+                                                                <p className="line-clamp-2 text-muted-foreground text-xs">
+                                                                    {description}
+                                                                </p>
+                                                            </Link>
+                                                        </NavigationMenuLink>
+                                                    </li>
+                                                )
+                                            )}
+                                        </ul>
+                                    </NavigationMenuContent>
+                                </NavigationMenuItem>
+
+                                <NavigationMenuItem>
+                                    <NavigationMenuTrigger className="h-auto bg-transparent px-4 py-2 font-medium text-foreground hover:bg-accent/50">
+                                        Resources
+                                    </NavigationMenuTrigger>
+                                    <NavigationMenuContent>
+                                        <ul className="grid w-[300px] gap-3 p-4">
+                                            {resourceLinks.map(
+                                                ({ href, label, external }) => (
+                                                    <li key={label}>
+                                                        <NavigationMenuLink
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={href}
+                                                                target={external ? "_blank" : undefined}
+                                                                rel={external ? "noopener noreferrer" : undefined}
+                                                                className="group block rounded-lg p-3 text-sm font-medium transition-colors hover:bg-accent/50 hover:text-primary"
+                                                            >
+                                                                {label}
+                                                                {external && " ↗"}
+                                                            </Link>
+                                                        </NavigationMenuLink>
+                                                    </li>
+                                                )
+                                            )}
+                                        </ul>
                                     </NavigationMenuContent>
                                 </NavigationMenuItem>
 
@@ -169,22 +200,8 @@ export const Navbar = () => {
 
                     {/* Desktop Actions */}
                     <div className="hidden items-center gap-2 lg:flex">
-                    <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="size-10 rounded-full"
-                        >
-                            <Link
-                                href={site.links.github}
-                                target="_blank"
-                                aria-label="View on GitHub"
-                            >
-                                <RiGithubFill className="size-5 fill-foreground" />
-                            </Link>
-                        </Button>
                         <ModeToggle />
-                        
+
                         <SignedOut>
                             <Button
                                 asChild
@@ -202,7 +219,7 @@ export const Navbar = () => {
                                 className="bg-primary hover:bg-primary/90"
                             >
                                 <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                    Get Started
+                                    Register
                                 </Link>
                             </Button>
                         </SignedOut>
@@ -220,20 +237,6 @@ export const Navbar = () => {
 
                     {/* Mobile Menu Button */}
                     <div className="flex items-center gap-2 lg:hidden">
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="size-10 rounded-full"
-                        >
-                            <Link
-                                href={site.links.github}
-                                target="_blank"
-                                aria-label="View on GitHub"
-                            >
-                                <RiGithubFill className="size-5 fill-foreground" />
-                            </Link>
-                        </Button>
                         <ModeToggle />
                         <Sheet open={isOpen} onOpenChange={setIsOpen}>
                             <SheetTrigger asChild>
@@ -270,7 +273,7 @@ export const Navbar = () => {
                                                     height={32}
                                                 />
                                                 <span className="font-bold text-lg">
-                                                    {site.name}
+                                                    BSD Volleyball
                                                 </span>
                                             </Link>
                                         </SheetTitle>
@@ -279,7 +282,7 @@ export const Navbar = () => {
                                     <Separator className="mb-4" />
 
                                     {/* Mobile Navigation Links */}
-                                    <div className="flex flex-1 flex-col">
+                                    <div className="flex flex-1 flex-col overflow-y-auto">
                                         <div className="space-y-1">
                                             {routeList.map(
                                                 ({ href, label }) => (
@@ -294,6 +297,61 @@ export const Navbar = () => {
                                                     >
                                                         <Link href={href}>
                                                             {label}
+                                                        </Link>
+                                                    </Button>
+                                                )
+                                            )}
+                                        </div>
+
+                                        <Separator className="my-4" />
+
+                                        <p className="mb-2 px-3 font-semibold text-muted-foreground text-xs uppercase">
+                                            League Info
+                                        </p>
+                                        <div className="space-y-1">
+                                            {infoPages.map(
+                                                ({ href, title }) => (
+                                                    <Button
+                                                        key={href}
+                                                        onClick={() =>
+                                                            setIsOpen(false)
+                                                        }
+                                                        asChild
+                                                        variant="ghost"
+                                                        className="h-auto w-full justify-start px-3 py-2.5 font-medium hover:bg-accent/50"
+                                                    >
+                                                        <Link href={href}>
+                                                            {title}
+                                                        </Link>
+                                                    </Button>
+                                                )
+                                            )}
+                                        </div>
+
+                                        <Separator className="my-4" />
+
+                                        <p className="mb-2 px-3 font-semibold text-muted-foreground text-xs uppercase">
+                                            Resources
+                                        </p>
+                                        <div className="space-y-1">
+                                            {resourceLinks.map(
+                                                ({ href, label, external }) => (
+                                                    <Button
+                                                        key={href}
+                                                        onClick={() =>
+                                                            setIsOpen(false)
+                                                        }
+                                                        asChild
+                                                        variant="ghost"
+                                                        className="h-auto w-full justify-start px-3 py-2.5 font-medium hover:bg-accent/50"
+                                                    >
+                                                        <Link
+                                                            href={href}
+                                                            target={external ? "_blank" : undefined}
+                                                            rel={external ? "noopener noreferrer" : undefined}
+                                                        >
+                                                            {label}
+                                                            {external && " ↗"}
                                                         </Link>
                                                     </Button>
                                                 )
@@ -320,7 +378,7 @@ export const Navbar = () => {
                                                 onClick={() => setIsOpen(false)}
                                             >
                                                 <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                                    Get Started
+                                                    Register
                                                 </Link>
                                             </Button>
                                         </SignedOut>
@@ -335,9 +393,6 @@ export const Navbar = () => {
                                                     Dashboard
                                                 </Link>
                                             </Button>
-                                            <div className="flex justify-end pt-2">
-                                                <UserButton size="icon" />
-                                            </div>
                                         </SignedIn>
                                     </SheetFooter>
                                 </div>

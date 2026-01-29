@@ -1,14 +1,16 @@
+import { serial } from "drizzle-orm/mysql-core";
 import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
-					id: text('id').primaryKey(),
+					id: serial('id').primaryKey(),
 					name: text('name').notNull(),
  email: text('email').notNull().unique(),
  emailVerified: boolean('email_verified').$defaultFn(() => false).notNull(),
  image: text('image'),
  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date()).notNull(),
- stripeCustomerId: text('stripe_customer_id')
+ first_name: text('first_name').notNull(),
+ last_name: text('last_name').notNull()
 				});
 
 export const sessions = pgTable("sessions", {
@@ -19,14 +21,14 @@ export const sessions = pgTable("sessions", {
  updatedAt: timestamp('updated_at').notNull(),
  ipAddress: text('ip_address'),
  userAgent: text('user_agent'),
- userId: text('user_id').notNull().references(()=> users.id, { onDelete: 'cascade' })
+ userId: integer('user_id').notNull().references(()=> users.id, { onDelete: 'cascade' })
 				});
 
 export const accounts = pgTable("accounts", {
 					id: text('id').primaryKey(),
 					accountId: text('account_id').notNull(),
  providerId: text('provider_id').notNull(),
- userId: text('user_id').notNull().references(()=> users.id, { onDelete: 'cascade' }),
+ userId: integer('user_id').notNull().references(()=> users.id, { onDelete: 'cascade' }),
  accessToken: text('access_token'),
  refreshToken: text('refresh_token'),
  idToken: text('id_token'),
@@ -45,17 +47,4 @@ export const verifications = pgTable("verifications", {
  expiresAt: timestamp('expires_at').notNull(),
  createdAt: timestamp('created_at').$defaultFn(() => /* @__PURE__ */ new Date()),
  updatedAt: timestamp('updated_at').$defaultFn(() => /* @__PURE__ */ new Date())
-				});
-
-export const subscriptions = pgTable("subscriptions", {
-					id: text('id').primaryKey(),
-					plan: text('plan').notNull(),
- referenceId: text('reference_id').notNull(),
- stripeCustomerId: text('stripe_customer_id'),
- stripeSubscriptionId: text('stripe_subscription_id'),
- status: text('status').default("incomplete"),
- periodStart: timestamp('period_start'),
- periodEnd: timestamp('period_end'),
- cancelAtPeriodEnd: boolean('cancel_at_period_end'),
- seats: integer('seats')
 				});

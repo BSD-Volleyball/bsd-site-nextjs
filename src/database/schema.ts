@@ -1,9 +1,10 @@
 import { pgTable, text, timestamp, boolean, integer, serial, numeric, primaryKey } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
-    id: text("id").primaryKey(),
-    firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
+    id: serial("id").primaryKey(),
+    name: text("name"),
+    first_name: text("first_name").notNull(),
+    last_name: text("last_name").notNull(),
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified")
         .$defaultFn(() => false)
@@ -54,7 +55,7 @@ export const accounts = pgTable("accounts", {
     id: text("id").primaryKey(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
-    userId: text("user_id")
+    userId: integer("user_id")
         .notNull()
         .references(() => users.id, { onDelete: "cascade" }),
     accessToken: text("access_token"),
@@ -110,12 +111,12 @@ export const divisions = pgTable("divisions", {
 })
 
 export const signups = pgTable("signups", {
-  id: text('id').primaryKey(),
+  id: serial('id').primaryKey(),
   season: integer('season').notNull().references(() => seasons.id),
-  player: text('player').notNull().references(() => users.id),
+  player: integer('player').notNull().references(() => users.id),
   captain: text('captain'),
   pair: boolean('pair'),
-  pair_pick: text('pair_pick').references(() => users.id),
+  pair_pick: integer('pair_pick').references(() => users.id),
   pair_reason: text('pair_reason'),
   dates_missing: text('dates_missing'),
   play_1st_week: boolean('play_1st_week'),
@@ -127,13 +128,13 @@ export const signups = pgTable("signups", {
 export const teams = pgTable("teams", {
 	id: serial('id').primaryKey(),
 	season: integer('season').notNull().references(() => seasons.id),
-	captain: text('captain').notNull().references(() => users.id),
+	captain: integer('captain').notNull().references(() => users.id),
 	division: integer('division').notNull().references(() => divisions.id),
 	name: text('name').notNull()
 })
 
 export const players = pgTable("players", {
-	player: text('player').notNull().references(() => users.id),
+	player: integer('player').notNull().references(() => users.id),
 	team: integer('team').notNull().references(() => teams.id)
 }, (table) => [
 	primaryKey({ columns: [table.player, table.team] })
