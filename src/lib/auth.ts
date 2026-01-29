@@ -34,7 +34,7 @@ export const auth = betterAuth({
         enabled: true,
         sendResetPassword: async ({ user, url, token }, request) => {
             const name =
-                (user as { firstName?: string }).firstName ||
+                (user as { first_name?: string }).first_name ||
                 user.email.split("@")[0]
 
             await resend.emails.send({

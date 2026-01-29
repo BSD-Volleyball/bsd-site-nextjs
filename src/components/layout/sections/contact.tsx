@@ -25,8 +25,8 @@ import { site } from "@/config/site"
 import { Textarea } from "@/components/ui/textarea"
 
 const formSchema = z.object({
-    firstName: z.string().min(2).max(255),
-    lastName: z.string().min(2).max(255),
+    first_name: z.string().min(2).max(255),
+    last_name: z.string().min(2).max(255),
     email: z.string().email(),
     subject: z.string().min(2).max(255),
     message: z.string()
@@ -36,8 +36,8 @@ export const ContactSection = () => {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            firstName: "",
-            lastName: "",
+            first_name: "",
+            last_name: "",
             email: "",
             subject: "Web Development",
             message: ""
@@ -45,10 +45,10 @@ export const ContactSection = () => {
     })
 
     function onSubmit(values: z.infer<typeof formSchema>) {
-        const { firstName, lastName, email, subject, message } = values
+        const { first_name, last_name, email, subject, message } = values
         console.log(values)
 
-        const mailToLink = `mailto:${site.mailSupport}?subject=${subject}&body=Hello I am ${firstName} ${lastName}, my Email is ${email}. %0D%0A${message}`
+        const mailToLink = `mailto:${site.mailSupport}?subject=${subject}&body=Hello I am ${first_name} ${last_name}, my Email is ${email}. %0D%0A${message}`
 
         window.location.href = mailToLink
     }
@@ -125,7 +125,7 @@ export const ContactSection = () => {
                                 <div className="md:!flex-row flex flex-col gap-8">
                                     <FormField
                                         control={form.control}
-                                        name="firstName"
+                                        name="first_name"
                                         render={({ field }) => (
                                             <FormItem className="w-full">
                                                 <FormLabel>
@@ -133,7 +133,7 @@ export const ContactSection = () => {
                                                 </FormLabel>
                                                 <FormControl>
                                                     <Input
-                                                        placeholder="Indie"
+                                                        placeholder="Jane"
                                                         {...field}
                                                     />
                                                 </FormControl>
@@ -143,13 +143,13 @@ export const ContactSection = () => {
                                     />
                                     <FormField
                                         control={form.control}
-                                        name="lastName"
+                                        name="last_name"
                                         render={({ field }) => (
                                             <FormItem className="w-full">
                                                 <FormLabel>Last Name</FormLabel>
                                                 <FormControl>
                                                     <Input
-                                                        placeholder="CEO"
+                                                        placeholder="Smith"
                                                         {...field}
                                                     />
                                                 </FormControl>

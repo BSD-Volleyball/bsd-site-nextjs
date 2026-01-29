@@ -58,8 +58,8 @@ export default function SettingsPage() {
                     <TabsContent id="account" value="account">
                         <div className="space-y-4 sm:space-y-6">
                             <UpdateAvatarCard />
-                            <UpdateFieldCard name="firstName" label="First Name" />
-                            <UpdateFieldCard name="lastName" label="Last Name" />
+                            <UpdateFieldCard name="first_name" label="First Name" />
+                            <UpdateFieldCard name="last_name" label="Last Name" />
                             <ChangeEmailCard />
                         </div>
                     </TabsContent>

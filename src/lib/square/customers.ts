@@ -7,14 +7,14 @@ import { randomUUID } from "crypto"
 export async function createSquareCustomer(
     userId: string,
     email: string,
-    firstName?: string,
-    lastName?: string
+    first_name?: string,
+    last_name?: string
 ): Promise<string> {
     const response = await squareClient.customers.create({
         idempotencyKey: randomUUID(),
         emailAddress: email,
-        givenName: firstName || undefined,
-        familyName: lastName || undefined,
+        givenName: first_name || undefined,
+        familyName: last_name || undefined,
         referenceId: userId
     })
 
@@ -34,8 +34,8 @@ export async function createSquareCustomer(
 export async function getOrCreateSquareCustomer(
     userId: string,
     email: string,
-    firstName?: string,
-    lastName?: string
+    first_name?: string,
+    last_name?: string
 ): Promise<string> {
     const [user] = await db
         .select({ squareCustomerId: users.squareCustomerId })
@@ -47,7 +47,7 @@ export async function getOrCreateSquareCustomer(
         return user.squareCustomerId
     }
 
-    return createSquareCustomer(userId, email, firstName, lastName)
+    return createSquareCustomer(userId, email, first_name, last_name)
 }
 
 export async function getSquareCustomer(customerId: string) {

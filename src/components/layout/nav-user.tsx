@@ -37,8 +37,8 @@ interface Profile {
     emailVerified?: boolean | null
     isAnonymous?: boolean | null
     fullName?: string | null
-    firstName?: string | null
-    lastName?: string | null
+    first_name?: string | null
+    last_name?: string | null
     displayName?: string | null
     username?: string | null
     displayUsername?: string | null
@@ -96,12 +96,11 @@ export function NavUser() {
 
     // Get user's display name with fallbacks
     const fullName =
-        user.firstName && user.lastName
-            ? `${user.firstName} ${user.lastName}`.trim()
+        user.first_name && user.last_name
+            ? `${user.first_name} ${user.last_name}`.trim()
             : null
     const displayName =
-        user.displayName || user.fullName || fullName || user.firstName || "User"
-
+        user.displayName || user.fullName || fullName || user.first_name || "User"
     // Get user's avatar with fallbacks
     const avatarSrc = user.avatarUrl || user.avatar || user.image
 

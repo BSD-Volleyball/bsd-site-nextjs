@@ -35,13 +35,13 @@ export function Providers({ children }: { children: ReactNode }) {
                     providers: ["google"]
                 }}
                 additionalFields={{
-                    firstName: {
+                    first_name: {
                         label: "First Name",
                         placeholder: "Enter your first name",
                         type: "string",
                         required: true
                     },
-                    lastName: {
+                    last_name: {
                         label: "Last Name",
                         placeholder: "Enter your last name",
                         type: "string",
@@ -49,7 +49,7 @@ export function Providers({ children }: { children: ReactNode }) {
                     }
                 }}
                 signUp={{
-                    fields: ["firstName", "lastName"]
+                    fields: ["first_name", "last_name"]
                 }}
                 avatar={{
                     upload: async (file: File) => {

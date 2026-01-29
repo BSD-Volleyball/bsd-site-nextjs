@@ -17,8 +17,8 @@ import { plans } from "./plans"
 interface SessionUser {
     id: string
     email: string
-    firstName: string
-    lastName: string
+    first_name: string
+    last_name: string
 }
 
 export interface Subscription {
@@ -125,8 +125,8 @@ export async function createSubscriptionCheckout(
         await getOrCreateSquareCustomer(
             user.id,
             user.email,
-            user.firstName,
-            user.lastName
+            user.first_name,
+            user.last_name
         )
 
         const checkoutUrl = await createSubscriptionCheckoutLink({
