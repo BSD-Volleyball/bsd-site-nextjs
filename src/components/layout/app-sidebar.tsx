@@ -39,7 +39,6 @@ const data = {
                 {title: "Integrations",url: "/dashboard/integrations",icon: RiToolsFill},
                 {title: "Settings",url: "/dashboard/settings",icon: RiSettingsLine},
                 {title: "Billing",url: "/dashboard/billing",icon: RiBankCardLine},
-                {title: "API",url: "/dashboard/api",icon: RiCodeSSlashLine},
             ]
         }
     ]
