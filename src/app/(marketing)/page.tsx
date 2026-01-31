@@ -114,7 +114,7 @@ export default function Home() {
                                 teammates every season.
                             </p>
                             <p className="text-muted-foreground leading-relaxed">
-                                We offer five skill divisions from AA (advanced) to BB (beginner), ensuring
+                                We offer six skill divisions from AA (advanced) to BB (beginner), ensuring
                                 players of all abilities can find their perfect competitive level. Every player
                                 receives guaranteed playing time rotating through all positions.
                             </p>

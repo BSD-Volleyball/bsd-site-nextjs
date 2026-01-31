@@ -55,7 +55,7 @@ export const HeroSection = () => {
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
                             <Users className="size-6 text-primary" />
                         </div>
-                        <h3 className="font-semibold text-lg">5 Skill Divisions</h3>
+                        <h3 className="font-semibold text-lg">6 Skill Divisions</h3>
                         <p className="text-muted-foreground text-sm">
                             From beginners to advanced, find your perfect level
                         </p>

@@ -5,6 +5,7 @@ export const users = pgTable("users", {
     name: text("name"),
     first_name: text("first_name").notNull(),
     last_name: text("last_name").notNull(),
+    preffered_name: text("preffered_name"),
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified")
         .$defaultFn(() => false)
@@ -21,12 +22,10 @@ export const users = pgTable("users", {
     squareCustomerId: text("square_customer_id"),
     old_id: integer("old_id"),
     picture: text("picture"),
-    age: text("age"),
     phone: text("phone"),
     experience: text("experience"),
     assessment: text("assessment"),
     height: integer("height"),
-    positions: text("positions"),
     skill_setter: boolean("skill_setter"),
     skill_hitter: boolean("skill_hitter"),
     skill_passer: boolean("skill_passer"),
@@ -35,7 +34,7 @@ export const users = pgTable("users", {
     referred_by: text("referred_by"),
     pronouns: text("pronouns"),
     role: text("role"),
-    gender: text("gender")
+    male: boolean("male")
 })
 
 export const sessions = pgTable("sessions", {
@@ -114,6 +113,7 @@ export const signups = pgTable("signups", {
   id: serial('id').primaryKey(),
   season: integer('season').notNull().references(() => seasons.id),
   player: text('player').notNull().references(() => users.id),
+  age: text("age"),
   captain: text('captain'),
   pair: boolean('pair'),
   pair_pick: text('pair_pick').references(() => users.id),
