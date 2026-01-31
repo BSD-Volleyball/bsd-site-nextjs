@@ -10,12 +10,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RiUser3Line, RiShieldLine, RiAlarmWarningLine } from "@remixicon/react"
 import { PageHeader } from "@/components/layout/page-header"
+import { getAccountProfile } from "./actions"
+import { AccountFieldCard } from "./account-field-card"
 
 export const metadata = {
     title: "Settings"
 }
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+    const { profile } = await getAccountProfile()
+
     return (
         <div className="space-y-6">
             <PageHeader
@@ -44,23 +48,55 @@ export default function SettingsPage() {
                         <span className="hidden sm:inline">Security</span>
                         <span className="sm:hidden">Security</span>
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="danger"
-                        className="flex-1 justify-center gap-2 rounded-lg px-3 py-2 text-center text-sm data-[state=active]:bg-secondary lg:flex-none lg:justify-start lg:text-left lg:text-base"
-                    >
-                        <RiAlarmWarningLine className="h-4 w-4" />
-                        <span className="hidden sm:inline">Danger Zone</span>
-                        <span className="sm:hidden">Danger</span>
-                    </TabsTrigger>
                 </TabsList>
 
                 <div className="min-w-0 max-w-2xl flex-1">
                     <TabsContent id="account" value="account">
                         <div className="space-y-4 sm:space-y-6">
                             <UpdateAvatarCard />
-                            <UpdateFieldCard name="first_name" label="First Name" />
-                            <UpdateFieldCard name="last_name" label="Last Name" />
+                            <AccountFieldCard
+                                name="first_name"
+                                label="First Name"
+                                description="Your first name."
+                                initialValue={profile?.first_name ?? null}
+                                placeholder="Enter your first name"
+                            />
+                            <AccountFieldCard
+                                name="last_name"
+                                label="Last Name"
+                                description="Your last name."
+                                initialValue={profile?.last_name ?? null}
+                                placeholder="Enter your last name"
+                            />
+                            <AccountFieldCard
+                                name="preffered_name"
+                                label="Preferred Name"
+                                description="The name you'd like to be called."
+                                initialValue={profile?.preffered_name ?? null}
+                                placeholder="Enter your preferred name"
+                            />
                             <ChangeEmailCard />
+                            <AccountFieldCard
+                                name="phone"
+                                label="Phone Number"
+                                description="Your contact phone number."
+                                initialValue={profile?.phone ?? null}
+                                placeholder="Enter your phone number"
+                            />
+                            <AccountFieldCard
+                                name="pronouns"
+                                label="Pronouns"
+                                description="Your preferred pronouns."
+                                initialValue={profile?.pronouns ?? null}
+                                placeholder="e.g., they/them, she/her, he/him"
+                            />
+                            <AccountFieldCard
+                                name="emergency_contact"
+                                label="Emergency Contact"
+                                description="Name and phone number of someone we can contact in case of emergency."
+                                initialValue={profile?.emergency_contact ?? null}
+                                placeholder="e.g., Jane Doe (wife) - 555-123-4567"
+                            />
                         </div>
                     </TabsContent>
 
@@ -69,12 +105,6 @@ export default function SettingsPage() {
                             <ChangePasswordCard />
                             <ProvidersCard />
                             <SessionsCard />
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="danger">
-                        <div className="space-y-4 sm:space-y-6">
-                            <DeleteAccountCard />
                         </div>
                     </TabsContent>
                 </div>

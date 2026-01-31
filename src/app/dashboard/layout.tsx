@@ -40,21 +40,6 @@ export default function ProtectedPage({
                                         </div>
                                     </div>
                                     {/* Right side */}
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        size="sm"
-                                        className="font-semibold"
-                                    >
-                                        <Link
-                                            href="https://github.com/indieceo/Indiesaas"
-                                            target="_blank"
-                                            aria-label="Clone Now"
-                                        >
-                                            <GithubIcon className="mr-2 size-4 fill-foreground" />
-                                            Clone
-                                        </Link>
-                                    </Button>
                                     <ModeToggle />
                                 </header>
                                 <div className="overflow-hidden">
