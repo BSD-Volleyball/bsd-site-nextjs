@@ -4,10 +4,16 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 import { updateVolleyballProfile, type VolleyballProfileData } from "./actions"
 
 interface VolleyballProfileFormProps {
@@ -84,19 +90,32 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="height">Height (inches)</Label>
-                        <Input
-                            id="height"
-                            type="number"
-                            placeholder="e.g., 72"
-                            value={formData.height ?? ""}
-                            onChange={(e) =>
+                        <Label htmlFor="height">Height</Label>
+                        <Select
+                            value={formData.height?.toString() ?? ""}
+                            onValueChange={(value) =>
                                 setFormData({
                                     ...formData,
-                                    height: e.target.value ? parseInt(e.target.value, 10) : null
+                                    height: value ? parseInt(value, 10) : null
                                 })
                             }
-                        />
+                        >
+                            <SelectTrigger id="height">
+                                <SelectValue placeholder="Select your height" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Array.from({ length: 25 }, (_, i) => {
+                                    const inches = 58 + i // 4'10" = 58 inches to 6'10" = 82 inches
+                                    const feet = Math.floor(inches / 12)
+                                    const remainingInches = inches % 12
+                                    return (
+                                        <SelectItem key={inches} value={inches.toString()}>
+                                            {feet}'{remainingInches}"
+                                        </SelectItem>
+                                    )
+                                })}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <div className="space-y-3">
