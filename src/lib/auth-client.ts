@@ -12,6 +12,10 @@ export const authClient = createAuthClient({
                 last_name: {
                     type: "string",
                     required: true
+                },
+                onboarding_completed: {
+                    type: "boolean",
+                    required: false
                 }
             }
         })

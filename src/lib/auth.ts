@@ -28,6 +28,11 @@ export const auth = betterAuth({
                 type: "string",
                 required: true,
                 fieldName: "last_name"
+            },
+            onboarding_completed: {
+                type: "boolean",
+                required: false,
+                fieldName: "onboarding_completed"
             }
         }
     },

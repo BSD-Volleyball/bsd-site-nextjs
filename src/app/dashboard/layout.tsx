@@ -15,12 +15,15 @@ import Link from "next/link"
 import GithubIcon from "@/components/icons/github-icon"
 
 export default function ProtectedPage({
-    children
+    children,
+    onboardingCheck
 }: {
     children: React.ReactNode
+    onboardingCheck: React.ReactNode
 }) {
     return (
         <>
+            {onboardingCheck}
             <RedirectToSignUp />
             <SignedIn>
                 <SidebarProvider defaultOpen={false}>

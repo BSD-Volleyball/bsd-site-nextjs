@@ -33,7 +33,8 @@ export const users = pgTable("users", {
     referred_by: text("referred_by"),
     pronouns: text("pronouns"),
     role: text("role"),
-    male: boolean("male")
+    male: boolean("male"),
+    onboarding_completed: boolean("onboarding_completed").$defaultFn(() => false)
 })
 
 export const sessions = pgTable("sessions", {

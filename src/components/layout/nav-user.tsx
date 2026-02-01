@@ -55,7 +55,7 @@ export function NavUser() {
             await authClient.signOut({
                 fetchOptions: {
                     onSuccess: () => {
-                        // The session will automatically update due to the reactive nature of useSession
+                        window.location.href = "/"
                     }
                 }
             })
