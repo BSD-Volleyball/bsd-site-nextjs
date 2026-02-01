@@ -7,6 +7,8 @@ import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 
 export interface AccountProfileData {
+    first_name: string | null
+    last_name: string | null
     preffered_name: string | null
     phone: string | null
     emergency_contact: string | null
@@ -30,6 +32,8 @@ export async function getAccountProfile(): Promise<{
     try {
         const [user] = await db
             .select({
+                first_name: users.first_name,
+                last_name: users.last_name,
                 preffered_name: users.preffered_name,
                 phone: users.phone,
                 emergency_contact: users.emergency_contact,
@@ -63,6 +67,8 @@ export async function updateAccountField(
     }
 
     const allowedFields: (keyof AccountProfileData)[] = [
+        "first_name",
+        "last_name",
         "preffered_name",
         "phone",
         "emergency_contact",
