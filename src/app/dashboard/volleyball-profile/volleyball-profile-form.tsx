@@ -120,7 +120,7 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
 
                     <div className="space-y-3">
                         <Label>Skills</Label>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                             Select the positions/skills you are comfortable playing.
                         </p>
                         <div className="grid gap-3 sm:grid-cols-2">
@@ -132,7 +132,7 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                         setFormData({ ...formData, skill_passer: checked === true })
                                     }
                                 />
-                                <Label htmlFor="skill_passer" className="font-normal cursor-pointer">
+                                <Label htmlFor="skill_passer" className="cursor-pointer font-normal">
                                     Passer
                                 </Label>
                             </div>
@@ -144,7 +144,7 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                         setFormData({ ...formData, skill_setter: checked === true })
                                     }
                                 />
-                                <Label htmlFor="skill_setter" className="font-normal cursor-pointer">
+                                <Label htmlFor="skill_setter" className="cursor-pointer font-normal">
                                     Setter
                                 </Label>
                             </div>
@@ -156,7 +156,7 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                         setFormData({ ...formData, skill_hitter: checked === true })
                                     }
                                 />
-                                <Label htmlFor="skill_hitter" className="font-normal cursor-pointer">
+                                <Label htmlFor="skill_hitter" className="cursor-pointer font-normal">
                                     Hitter
                                 </Label>
                             </div>
@@ -168,7 +168,7 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                         setFormData({ ...formData, skill_other: checked === true })
                                     }
                                 />
-                                <Label htmlFor="skill_other" className="font-normal cursor-pointer">
+                                <Label htmlFor="skill_other" className="cursor-pointer font-normal">
                                     Other
                                 </Label>
                             </div>
