@@ -32,12 +32,6 @@ const serviceList: ServiceProps[] = [
         description:
             "Secure file uploads with UploadThing integration for user content and avatars.",
         pro: 0
-    },
-    {
-        title: "Payment Integration",
-        description:
-            "Stripe payment integration for your SaaS subscriptions.",
-        pro: 1
     }
 ]
 

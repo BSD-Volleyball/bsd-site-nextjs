@@ -1,13 +1,12 @@
 "use client"
 
 import {
-    RiCodeSSlashLine,
     RiLineChartLine,
     RiToolsFill,
     RiSettingsLine,
     RiSpeedUpLine,
-    RiBankCardLine,
-    RiBasketballLine
+    RiBasketballLine,
+    RiBankCardLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -35,10 +34,10 @@ const data = {
             items: [
                 {title: "Dashboard",url: "/dashboard",icon: RiSpeedUpLine},
                 {title: "Volleyball Profile",url: "/dashboard/volleyball-profile",icon: RiBasketballLine},
+                {title: "Pay for Season",url: "/dashboard/pay-season",icon: RiBankCardLine},
                 {title: "Analytics",url: "/dashboard/analytics",icon: RiLineChartLine},
                 {title: "Integrations",url: "/dashboard/integrations",icon: RiToolsFill},
                 {title: "Settings",url: "/dashboard/settings",icon: RiSettingsLine},
-                {title: "Billing",url: "/dashboard/billing",icon: RiBankCardLine},
             ]
         }
     ]

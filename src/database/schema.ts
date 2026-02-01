@@ -19,7 +19,6 @@ export const users = pgTable("users", {
     updatedAt: timestamp("updated_at")
         .$defaultFn(() => /* @__PURE__ */ new Date())
         .notNull(),
-    squareCustomerId: text("square_customer_id"),
     old_id: integer("old_id"),
     picture: text("picture"),
     phone: text("phone"),
@@ -79,21 +78,6 @@ export const verifications = pgTable("verifications", {
     updatedAt: timestamp("updated_at").$defaultFn(
         () => /* @__PURE__ */ new Date()
     )
-})
-
-export const subscriptions = pgTable("subscriptions", {
-	id: text('id').primaryKey(),
-	plan: text('plan').notNull(),
-	referenceId: text('reference_id').notNull(),
-	squareCustomerId: text('square_customer_id'),
-	squareSubscriptionId: text('square_subscription_id'),
-	status: text('status').default("incomplete"),
-	periodStart: timestamp('period_start'),
-    periodEnd: timestamp("period_end"),
-    cancelAtPeriodEnd: boolean("cancel_at_period_end"),
-    seats: integer("seats"),
-    trialStart: timestamp('trial_start'),
-    trialEnd: timestamp('trial_end')
 })
 
 export const seasons = pgTable("seasons", {
