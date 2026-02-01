@@ -8,7 +8,7 @@ export const site = {
   ogImage: `${site_url}/og.jpg`,
   logo: "/logo.svg",
   mailSupport: "info@bumpsetdrink.com",
-  mailFrom: process.env.MAIL_FROM || "noreply@bumpsetdrink.com",
+  mailFrom: process.env.MAIL_FROM || "noreply@mail.bumpsetdrink.com",
   links: {
     soccerplex: "https://www.mdsoccerplex.org",
     facebook: "https://www.facebook.com/bumpsetdrink",
