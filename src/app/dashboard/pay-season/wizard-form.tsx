@@ -1,0 +1,501 @@
+"use client"
+
+import { useState } from "react"
+import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
+import { submitSeasonPayment, type PaymentResult, type SignupFormData } from "./actions"
+import { UserCombobox } from "./user-combobox"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
+import { RiCheckLine, RiErrorWarningLine, RiArrowRightLine } from "@remixicon/react"
+import type { SeasonConfig } from "@/lib/site-config"
+import Link from "next/link"
+
+interface User {
+    id: string
+    name: string
+}
+
+interface WizardFormProps {
+    amount: string
+    users: User[]
+    config: SeasonConfig
+}
+
+const TABS = ["info", "pairing", "schedule", "payment"] as const
+type TabValue = (typeof TABS)[number]
+
+export function WizardForm({ amount, users, config }: WizardFormProps) {
+    const [activeTab, setActiveTab] = useState<TabValue>("info")
+    const [formData, setFormData] = useState<SignupFormData>({
+        age: "20+",
+        captain: "no",
+        pair: false,
+        pairPick: null,
+        pairReason: "",
+        datesMissing: "",
+        play1stWeek: false
+    })
+    const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
+
+    const toggleDate = (date: string) => {
+        setSelectedDates(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(date)) {
+                newSet.delete(date)
+            } else {
+                newSet.add(date)
+            }
+            // Update formData with comma-separated list
+            setFormData(f => ({ ...f, datesMissing: Array.from(newSet).join(", ") }))
+            return newSet
+        })
+    }
+
+    const tryoutDates = [
+        { key: "tryout1", label: config.tryout1Date },
+        { key: "tryout2", label: config.tryout2Date },
+        { key: "tryout3", label: config.tryout3Date }
+    ].filter(d => d.label)
+
+    const seasonDates = [
+        { key: "season1", label: config.season1Date },
+        { key: "season2", label: config.season2Date },
+        { key: "season3", label: config.season3Date },
+        { key: "season4", label: config.season4Date },
+        { key: "season5", label: config.season5Date },
+        { key: "season6", label: config.season6Date }
+    ].filter(d => d.label)
+
+    const playoffDates = [
+        { key: "playoff1", label: config.playoff1Date },
+        { key: "playoff2", label: config.playoff2Date },
+        { key: "playoff3", label: config.playoff3Date }
+    ].filter(d => d.label)
+    const [isProcessing, setIsProcessing] = useState(false)
+    const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
+
+    const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID!
+    const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
+
+    const goToNextTab = () => {
+        const currentIndex = TABS.indexOf(activeTab)
+        if (currentIndex < TABS.length - 1) {
+            setActiveTab(TABS[currentIndex + 1])
+        }
+    }
+
+    if (paymentResult?.success) {
+        return (
+            <Card className="max-w-md">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                            <RiCheckLine className="h-6 w-6 text-green-600 dark:text-green-400" />
+                        </div>
+                        <CardTitle>Registration Complete!</CardTitle>
+                    </div>
+                    <CardDescription>
+                        Thank you for registering for the volleyball season.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-muted-foreground text-sm">
+                        {paymentResult.message}
+                    </p>
+                    {paymentResult.receiptUrl && (
+                        <a
+                            href={paymentResult.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary text-sm underline"
+                        >
+                            View Receipt
+                        </a>
+                    )}
+                    <p className="text-sm">
+                        Now head over and make sure your{" "}
+                        <Link
+                            href="/dashboard/volleyball-profile"
+                            className="text-primary font-medium underline"
+                        >
+                            Volleyball Profile
+                        </Link>{" "}
+                        is up-to-date so you get placed appropriately during tryouts.
+                    </p>
+
+                </CardContent>
+                <CardFooter>
+                    <Button asChild className="w-full">
+                        <Link href="/dashboard/volleyball-profile">
+                            Continue to Volleyball Profile
+                        </Link>
+                    </Button>
+                </CardFooter>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="max-w-2xl">
+            <CardContent>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="info">Info</TabsTrigger>
+                        <TabsTrigger value="pairing">Pairing</TabsTrigger>
+                        <TabsTrigger value="schedule">Schedule</TabsTrigger>
+                        <TabsTrigger value="payment">Payment</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="info" className="space-y-6 pt-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="age">Age at beginning of the season:</Label>
+                            <Select
+                                value={formData.age}
+                                onValueChange={(value) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        age: value,
+                                        // Auto-enable pairing for players aged 15-14
+                                        ...(value === "15-14" ? { pair: true } : {})
+                                    }))
+                                }
+                            >
+                                <SelectTrigger id="age">
+                                    <SelectValue placeholder="Select your age range" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="20+">20 or older</SelectItem>
+                                    <SelectItem value="19-18">19-18</SelectItem>
+                                    <SelectItem value="17-16">17-16</SelectItem>
+                                    <SelectItem value="15-14">15-14</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {formData.age === "17-16" && (
+                                <p className="text-sm text-amber-600 dark:text-amber-400">
+                                    Players this age MUST have a parent/guardian present.
+                                </p>
+                            )}
+                            {formData.age === "15-14" && (
+                                <p className="text-sm text-amber-600 dark:text-amber-400">
+                                    Players this age MUST pair with another player.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label>Interested in being a Captain?</Label>
+                            <RadioGroup
+                                value={formData.captain}
+                                onValueChange={(value) =>
+                                    setFormData((prev) => ({ ...prev, captain: value }))
+                                }
+                                className="flex flex-col gap-2"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="yes" id="captain-yes" />
+                                    <Label htmlFor="captain-yes" className="font-normal cursor-pointer">
+                                        Yes
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="only_if_needed" id="captain-only" />
+                                    <Label htmlFor="captain-only" className="font-normal cursor-pointer">
+                                        Only if Needed
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="no" id="captain-no" />
+                                    <Label htmlFor="captain-no" className="font-normal cursor-pointer">
+                                        No
+                                    </Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+
+                        <div className="pt-4">
+                            <Button onClick={goToNextTab} className="gap-2">
+                                Next
+                                <RiArrowRightLine className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="pairing" className="space-y-6 pt-4">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                            <p>
+                                As a draft leauge we strongly discourage requests to pair with another player and will
+                                only accept them under very limited circumstances (significant other,
+                                direct relative, and in rare circumstances carpooling). If requesting to
+                                pair, specify with whom to pair and the reason for pairing.  If you
+                                can not find your pair below, have them to register on the site before either
+                                of you sign up for the season.{" "}
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="pair-toggle" className="cursor-pointer">
+                                Request to pair for the season:
+                            </Label>
+                            <Switch
+                                id="pair-toggle"
+                                checked={formData.pair}
+                                onCheckedChange={(checked: boolean) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        pair: checked,
+                                        // Clear pair fields when turning off
+                                        ...(checked ? {} : { pairPick: null, pairReason: "" })
+                                    }))
+                                }
+                            />
+                        </div>
+
+                        {formData.pair && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Pair</Label>
+                                    <UserCombobox
+                                        users={users}
+                                        value={formData.pairPick}
+                                        onChange={(userId) =>
+                                            setFormData((prev) => ({ ...prev, pairPick: userId }))
+                                        }
+                                        placeholder="Select a player to pair with..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="pair-reason">Reason for pairing</Label>
+                                    <Textarea
+                                        id="pair-reason"
+                                        value={formData.pairReason}
+                                        onChange={(e) =>
+                                            setFormData((prev) => ({ ...prev, pairReason: e.target.value }))
+                                        }
+                                        placeholder="Why would you like to be paired with this player?"
+                                        rows={3}
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        <div className="pt-4">
+                            <Button onClick={goToNextTab} className="gap-2">
+                                Next
+                                <RiArrowRightLine className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="schedule" className="space-y-8 pt-4">
+                        {/* Section 1: Dates Missing */}
+                        <div className="space-y-4">
+                            <h3 className="font-medium text-base">
+                                Select which dates you will <strong>NOT</strong> be able to play this season:
+                            </h3>
+
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                                {tryoutDates.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium text-muted-foreground">Tryouts</h4>
+                                        <div className="space-y-2">
+                                            {tryoutDates.map(({ key, label }) => (
+                                                <div key={key} className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={key}
+                                                        checked={selectedDates.has(label)}
+                                                        onCheckedChange={() => toggleDate(label)}
+                                                    />
+                                                    <Label htmlFor={key} className="font-normal cursor-pointer">
+                                                        {label}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {seasonDates.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium text-muted-foreground">Regular Season</h4>
+                                        <div className="space-y-2">
+                                            {seasonDates.map(({ key, label }) => (
+                                                <div key={key} className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={key}
+                                                        checked={selectedDates.has(label)}
+                                                        onCheckedChange={() => toggleDate(label)}
+                                                    />
+                                                    <Label htmlFor={key} className="font-normal cursor-pointer">
+                                                        {label}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {playoffDates.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium text-muted-foreground">Playoffs</h4>
+                                        <div className="space-y-2">
+                                            {playoffDates.map(({ key, label }) => (
+                                                <div key={key} className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id={key}
+                                                        checked={selectedDates.has(label)}
+                                                        onCheckedChange={() => toggleDate(label)}
+                                                    />
+                                                    <Label htmlFor={key} className="font-normal cursor-pointer">
+                                                        {label}
+                                                    </Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Section 2: Week 1 Participation */}
+                        <div className="space-y-3">
+                            <h3 className="font-medium text-base">
+                                Want to Play Tryouts Week 1?
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                                Week 1 of the tryouts is limited to 96 players and will be
+                                mostly focused on skills drills for <strong>NEW</strong> players.
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Returning players who check here will be considered for any
+                                available slots that week but should NOT assume they will get to play.
+                                We will contact all players directly who are requested to attend the
+                                first week. You should consider selecting this option if your skills
+                                have changed significantly since last season you played or have not 
+                                played in more than 2 seasons.
+                            </p>
+                            <div className="flex items-center gap-2 pt-2">
+                                <Checkbox
+                                    id="play-1st-week"
+                                    checked={formData.play1stWeek}
+                                    onCheckedChange={(checked: boolean | "indeterminate") =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            play1stWeek: checked === true
+                                        }))
+                                    }
+                                />
+                                <Label htmlFor="play-1st-week" className="font-normal cursor-pointer">
+                                    Request to participate in week 1
+                                </Label>
+                            </div>
+                        </div>
+
+                        <div className="pt-4">
+                            <Button onClick={goToNextTab} className="gap-2">
+                                Next
+                                <RiArrowRightLine className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="payment" className="space-y-6 pt-4">
+                        <div className="rounded-lg bg-muted p-4">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Volleyball Season Fee</span>
+                                <span className="font-semibold">${amount}</span>
+                            </div>
+                        </div>
+
+                        {paymentResult && !paymentResult.success && (
+                            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-destructive">
+                                <RiErrorWarningLine className="h-5 w-5" />
+                                <span className="text-sm">{paymentResult.message}</span>
+                            </div>
+                        )}
+
+                        <PaymentForm
+                            applicationId={appId}
+                            locationId={locationId}
+                            cardTokenizeResponseReceived={async (tokenResult) => {
+                                if (tokenResult.status !== "OK") {
+                                    setPaymentResult({
+                                        success: false,
+                                        message: "Failed to process card. Please try again."
+                                    })
+                                    return
+                                }
+
+                                setIsProcessing(true)
+                                setPaymentResult(null)
+
+                                try {
+                                    const result = await submitSeasonPayment(
+                                        tokenResult.token,
+                                        formData
+                                    )
+                                    setPaymentResult(result)
+                                } catch (error) {
+                                    setPaymentResult({
+                                        success: false,
+                                        message: "An unexpected error occurred. Please try again."
+                                    })
+                                } finally {
+                                    setIsProcessing(false)
+                                }
+                            }}
+                            createPaymentRequest={() => ({
+                                countryCode: "US",
+                                currencyCode: "USD",
+                                total: {
+                                    amount,
+                                    label: "Volleyball Season Registration"
+                                }
+                            })}
+                        >
+                            <CreditCard
+                                buttonProps={{
+                                    isLoading: isProcessing,
+                                    css: {
+                                        backgroundColor: "var(--primary)",
+                                        color: "var(--primary-foreground)",
+                                        fontSize: "14px",
+                                        fontWeight: "500",
+                                        "&:hover": {
+                                            backgroundColor: "var(--primary)"
+                                        }
+                                    }
+                                }}
+                            />
+                        </PaymentForm>
+                    </TabsContent>
+                </Tabs>
+            </CardContent>
+            <CardFooter>
+                <p className="text-muted-foreground text-xs">
+                    Your payment is securely processed by Square. We do not store your card details.
+                </p>
+            </CardFooter>
+        </Card>
+    )
+}

@@ -144,3 +144,9 @@ export const champions = pgTable("champions", {
 	season: integer('season').notNull().references(() => seasons.id),
 	division: integer('division').notNull().references(() => divisions.id)
 });
+
+export const siteConfig = pgTable("site_config", {
+	key: text('key').primaryKey(),
+	value: text('value').notNull(),
+	updated_at: timestamp('updated_at').$defaultFn(() => new Date()).notNull()
+});

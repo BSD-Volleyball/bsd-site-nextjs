@@ -5,8 +5,19 @@ import { randomUUID } from "crypto"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { seasons, signups } from "@/database/schema"
+import { seasons, signups, users } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
+import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+
+export interface SignupFormData {
+    age: string
+    captain: string
+    pair: boolean
+    pairPick: string | null
+    pairReason: string
+    datesMissing: string
+    play1stWeek: boolean
+}
 
 const getSquareClient = () => {
     return new SquareClient({
@@ -25,7 +36,22 @@ export interface PaymentResult {
     receiptUrl?: string
 }
 
-export async function submitSeasonPayment(sourceId: string): Promise<PaymentResult> {
+export async function fetchSeasonConfig(): Promise<SeasonConfig> {
+    return getSeasonConfig()
+}
+
+export async function getUsers(): Promise<{ id: string; name: string }[]> {
+    const allUsers: { id: string; name: string | null }[] = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+    return allUsers
+        .filter((u): u is { id: string; name: string } => u.name !== null)
+}
+
+export async function submitSeasonPayment(
+    sourceId: string,
+    formData: SignupFormData
+): Promise<PaymentResult> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session) {
         return {
@@ -35,13 +61,9 @@ export async function submitSeasonPayment(sourceId: string): Promise<PaymentResu
     }
 
     try {
-        // Get amount from environment variable (in dollars), convert to cents
-        const amountDollars = process.env.NEXT_PUBLIC_SEASON_AMOUNT || "100.00"
-        const amountCents = BigInt(Math.round(parseFloat(amountDollars) * 100))
-
-        // Get season configuration from environment
-        const seasonYear = parseInt(process.env.SEASON_YEAR || "2005", 10)
-        const seasonName = process.env.SEASON_NAME || "Fall"
+        // Get config from database
+        const config = await getSeasonConfig()
+        const amountCents = BigInt(Math.round(parseFloat(config.seasonAmount) * 100))
 
         const client = getSquareClient()
         const response = await client.payments.create({
@@ -52,15 +74,15 @@ export async function submitSeasonPayment(sourceId: string): Promise<PaymentResu
                 amount: amountCents
             },
             buyerEmailAddress: session.user.email,
-            note: `Volleyball ${seasonName} ${seasonYear} Season Payment - ${session.user.name || session.user.email}`
+            note: `Volleyball ${config.seasonName} ${config.seasonYear} Season Payment - ${session.user.name || session.user.email}`
         })
 
         if (response.payment) {
-            // Look up the season from environment variables
+            // Look up the season from database config
             const [season] = await db
                 .select({ id: seasons.id })
                 .from(seasons)
-                .where(and(eq(seasons.year, seasonYear), eq(seasons.season, seasonName)))
+                .where(and(eq(seasons.year, config.seasonYear), eq(seasons.season, config.seasonName)))
                 .limit(1)
 
             if (season) {
@@ -69,7 +91,14 @@ export async function submitSeasonPayment(sourceId: string): Promise<PaymentResu
                     season: season.id,
                     player: session.user.id,
                     order_id: response.payment.id,
-                    amount_paid: amountDollars,
+                    amount_paid: config.seasonAmount,
+                    age: formData.age,
+                    captain: formData.captain,
+                    pair: formData.pair,
+                    pair_pick: formData.pairPick,
+                    pair_reason: formData.pairReason,
+                    dates_missing: formData.datesMissing,
+                    play_1st_week: formData.play1stWeek,
                     created_at: new Date()
                 })
             }

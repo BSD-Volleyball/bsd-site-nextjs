@@ -9,7 +9,7 @@ export default function AnalyticsPage() {
         <div className="space-y-6">
             <PageHeader 
                 title="Analytics page"
-                description="View detailed analytics and insights about your data."
+                description="Coming Soon.  Analytics about your previous volleyball seasons."
             />
         </div>
     )

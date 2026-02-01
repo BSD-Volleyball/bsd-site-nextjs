@@ -1,12 +1,13 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
     RiLineChartLine,
     RiToolsFill,
     RiSettingsLine,
     RiSpeedUpLine,
     RiBasketballLine,
-    RiBankCardLine
+    RiEditLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -26,24 +27,21 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { site } from "@/config/site"
+import { getSignupEligibility } from "@/app/dashboard/actions"
 
-const data = {
-    navMain: [
-        {
-            title: "General",
-            items: [
-                {title: "Dashboard",url: "/dashboard",icon: RiSpeedUpLine},
-                {title: "Volleyball Profile",url: "/dashboard/volleyball-profile",icon: RiBasketballLine},
-                {title: "Pay for Season",url: "/dashboard/pay-season",icon: RiBankCardLine},
-                {title: "Analytics",url: "/dashboard/analytics",icon: RiLineChartLine},
-                {title: "Integrations",url: "/dashboard/integrations",icon: RiToolsFill},
-                {title: "Settings",url: "/dashboard/settings",icon: RiSettingsLine},
-            ]
-        }
-    ]
+const baseNavItems = [
+    { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
+    { title: "Volleyball Profile", url: "/dashboard/volleyball-profile", icon: RiBasketballLine },
+    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine },
+    { title: "Integrations", url: "/dashboard/integrations", icon: RiToolsFill },
+    { title: "Settings", url: "/dashboard/settings", icon: RiSettingsLine }
+]
+
+const signupNavItem = {
+    title: "Sign-up for Season",
+    url: "/dashboard/pay-season",
+    icon: RiEditLine
 }
-
-
 
 function SidebarLogo() {
     return (
@@ -70,6 +68,30 @@ function SidebarLogo() {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
+    const [showSignupLink, setShowSignupLink] = useState(false)
+
+    useEffect(() => {
+        getSignupEligibility().then(setShowSignupLink)
+    }, [])
+
+    // Build nav items dynamically - insert signup after Volleyball Profile if eligible
+    const navItems = showSignupLink
+        ? [
+              baseNavItems[0],
+              baseNavItems[1],
+              signupNavItem,
+              ...baseNavItems.slice(2)
+          ]
+        : baseNavItems
+
+    const data = {
+        navMain: [
+            {
+                title: "General",
+                items: navItems
+            }
+        ]
+    }
 
     return (
         <Sidebar collapsible="icon" variant="inset" {...props}>
@@ -77,21 +99,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarLogo />
             </SidebarHeader>
             <SidebarContent className="-mt-2">
-                {data.navMain.map((item) => (
-                    <SidebarGroup key={item.title}>
+                {data.navMain.map((group) => (
+                    <SidebarGroup key={group.title}>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            {item.title}
+                            {group.title}
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {item.items.map((item) => {
+                                {group.items.map((item) => {
                                     const isActive = pathname === item.url
 
                                     return (
                                         <SidebarMenuItem key={item.title}>
                                             <SidebarMenuButton
                                                 asChild
-                                                className="group/menu-button group-data-[collapsible=icon]:!px-[5px] h-9 gap-3 font-medium transition-all duration-300 ease-out [&>svg]:size-auto"
+                                                className="group/menu-button group-data-[collapsible=icon]:px-1.25! h-9 gap-3 font-medium transition-all duration-300 ease-out [&>svg]:size-auto"
                                                 tooltip={item.title}
                                                 isActive={isActive}
                                             >

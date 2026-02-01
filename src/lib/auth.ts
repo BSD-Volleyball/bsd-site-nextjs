@@ -11,6 +11,7 @@ import { site } from "@/config/site"
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 export const auth = betterAuth({
+    baseURL: process.env.BETTER_AUTH_BASE_URL,
     database: drizzleAdapter(db, {
         provider: "pg",
         usePlural: true,
