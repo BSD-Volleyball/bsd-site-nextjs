@@ -8,11 +8,9 @@ import type { ReactNode } from "react"
 import NextTopLoader from 'nextjs-toploader';
 import { Toaster } from "sonner"
 import { authClient } from "@/lib/auth-client"
-import { useUploadThing } from "@/lib/uploadthing"
 
 export function Providers({ children }: { children: ReactNode }) {
     const router = useRouter()
-    const { startUpload } = useUploadThing("avatarUploader")
 
     return (
         <ThemeProvider
@@ -29,7 +27,7 @@ export function Providers({ children }: { children: ReactNode }) {
                     router.refresh()
                 }}
                 settings={{
-                    url: "/dashboard/settings"
+                    url: "/dashboard/account"
                 }}
                 social={{
                     providers: ["google"]
@@ -50,13 +48,6 @@ export function Providers({ children }: { children: ReactNode }) {
                 }}
                 signUp={{
                     fields: ["first_name", "last_name"]
-                }}
-                avatar={{
-                    upload: async (file: File) => {
-                        const uploadRes = await startUpload([file])
-                        if (!uploadRes?.[0]) throw new Error("Upload failed")
-                        return uploadRes[0].ufsUrl
-                    }
                 }}
                 Link={Link}
             >

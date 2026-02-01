@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -30,9 +30,6 @@ import { authClient } from "@/lib/auth-client"
 
 // Better Auth UI Profile types
 interface Profile {
-    avatarUrl?: string | null
-    avatar?: string | null
-    image?: string | null
     emailVerified?: boolean | null
     isAnonymous?: boolean | null
     fullName?: string | null
@@ -100,10 +97,8 @@ export function NavUser() {
             : null
     const displayName =
         user.displayName || user.fullName || fullName || user.first_name || "User"
-    // Get user's avatar with fallbacks
-    const avatarSrc = user.avatarUrl || user.avatar || user.image
 
-    // Generate initials for fallback
+    // Generate initials
     const initials =
         displayName
             .split(" ")
@@ -122,10 +117,6 @@ export function NavUser() {
                             className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:active:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent"
                         >
                             <Avatar className="in-data-[state=expanded]:size-6 transition-[width,height] duration-200 ease-in-out group-data-[collapsible=icon]:size-8">
-                                <AvatarImage
-                                    src={avatarSrc || undefined}
-                                    alt={displayName}
-                                />
                                 <AvatarFallback>{initials}</AvatarFallback>
                             </Avatar>
                             <div className="ms-1 grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
@@ -162,7 +153,7 @@ export function NavUser() {
                                 <span>Dashboard</span>
                             </DropdownMenuItem>
                         </Link>
-                        <Link href="/dashboard/settings">
+                        <Link href="/dashboard/account">
                             <DropdownMenuItem className="gap-3 px-1">
                                 <RiUserLine
                                     size={20}
@@ -172,14 +163,16 @@ export function NavUser() {
                                 <span>Account</span>
                             </DropdownMenuItem>
                         </Link>
-                        <DropdownMenuItem className="gap-3 px-1">
-                            <RiLockLine
-                                size={20}
-                                className="text-muted-foreground/70"
-                                aria-hidden="true"
-                            />
-                            <span>Security</span>
-                        </DropdownMenuItem>
+                        <Link href="/dashboard/security">
+                            <DropdownMenuItem className="gap-3 px-1">
+                                <RiLockLine
+                                    size={20}
+                                    className="text-muted-foreground/70"
+                                    aria-hidden="true"
+                                />
+                                <span>Security</span>
+                            </DropdownMenuItem>
+                        </Link>
                         <DropdownMenuItem className="gap-3 px-1">
                             <RiFindReplaceLine
                                 size={20}

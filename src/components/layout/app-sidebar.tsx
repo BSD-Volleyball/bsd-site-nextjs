@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react"
 import {
     RiLineChartLine,
-    RiToolsFill,
-    RiSettingsLine,
+    RiUser3Line,
+    RiShieldLine,
     RiSpeedUpLine,
     RiBasketballLine,
     RiEditLine
@@ -32,9 +32,9 @@ import { getSignupEligibility } from "@/app/dashboard/actions"
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
     { title: "Volleyball Profile", url: "/dashboard/volleyball-profile", icon: RiBasketballLine },
-    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine },
-    { title: "Integrations", url: "/dashboard/integrations", icon: RiToolsFill },
-    { title: "Settings", url: "/dashboard/settings", icon: RiSettingsLine }
+    { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
+    { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
+    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine }
 ]
 
 const signupNavItem = {
@@ -58,8 +58,10 @@ function SidebarLogo() {
                     height={30}
                     className="transition-transform duration-300 ease-out group-data-[collapsible=icon]:scale-110"
                 />
-                <span className="group-data-[collapsible=icon]:-ml-2 truncate font-bold text-lg transition-[margin,opacity,transform,width] duration-300 ease-out group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0">
-                    {site.name}
+                <span className="group-data-[collapsible=icon]:-ml-2 font-bold text-sm leading-tight transition-[margin,opacity,transform,width] duration-300 ease-out group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0">
+                    Bump Set Drink
+                    <br />
+                    Volleyball
                 </span>
             </Link>
         </div>
@@ -72,15 +74,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
-    }, [])
+    }, [pathname])
 
-    // Build nav items dynamically - insert signup after Volleyball Profile if eligible
+    // Build nav items dynamically - insert signup after Dashboard if eligible
     const navItems = showSignupLink
         ? [
               baseNavItems[0],
-              baseNavItems[1],
               signupNavItem,
-              ...baseNavItems.slice(2)
+              ...baseNavItems.slice(1)
           ]
         : baseNavItems
 

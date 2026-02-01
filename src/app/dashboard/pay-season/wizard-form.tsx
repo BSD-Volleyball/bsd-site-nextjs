@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
 import { submitSeasonPayment, type PaymentResult, type SignupFormData } from "./actions"
 import { UserCombobox } from "./user-combobox"
@@ -45,6 +46,7 @@ const TABS = ["info", "pairing", "schedule", "payment"] as const
 type TabValue = (typeof TABS)[number]
 
 export function WizardForm({ amount, users, config }: WizardFormProps) {
+    const router = useRouter()
     const [activeTab, setActiveTab] = useState<TabValue>("info")
     const [formData, setFormData] = useState<SignupFormData>({
         age: "20+",
@@ -93,6 +95,13 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
     ].filter(d => d.label)
     const [isProcessing, setIsProcessing] = useState(false)
     const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null)
+
+    // Refresh the page data when payment succeeds to update sidebar
+    useEffect(() => {
+        if (paymentResult?.success) {
+            router.refresh()
+        }
+    }, [paymentResult?.success, router])
 
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID!
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
