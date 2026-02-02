@@ -90,7 +90,7 @@ export function UserCombobox({
                     </div>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+            <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
                 <Input
                     placeholder="Search players..."
                     value={search}

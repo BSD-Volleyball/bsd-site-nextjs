@@ -130,7 +130,7 @@ export function PlayerLookupForm({ players }: PlayerLookupFormProps) {
                         </div>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
+                <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
                     <Input
                         placeholder="Search by name or old ID..."
                         value={search}
