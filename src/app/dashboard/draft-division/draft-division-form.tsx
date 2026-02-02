@@ -138,6 +138,7 @@ function UserCombobox({
                     placeholder="Search players..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    autoCorrect="off"
                     className="mb-2 h-8 text-sm"
                 />
                 <div className="max-h-60 overflow-y-auto">

@@ -137,6 +137,7 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
                         placeholder="Search by name or old ID..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        autoCorrect="off"
                         className="mb-2"
                     />
                     <div className="max-h-60 overflow-y-auto">
