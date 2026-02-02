@@ -3,6 +3,8 @@ import { WizardForm } from "./wizard-form"
 import { getUsers } from "./actions"
 import type { Metadata } from "next"
 import { getSeasonConfig } from "@/lib/site-config"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -16,10 +18,18 @@ export default async function PaySeasonPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader
-                title="Season Registration"
-                description="Complete the form below to register for the upcoming volleyball season."
-            />
+            <div>
+                <PageHeader
+                    title="Season Registration"
+                    description="Complete the form below to register for the upcoming volleyball season."
+                    className="mb-2"
+                />
+                <Button asChild size="sm">
+                    <Link href="/spring-2026-season-info">
+                        View Spring 2026 Season Info
+                    </Link>
+                </Button>
+            </div>
             <WizardForm amount={config.seasonAmount} users={users} config={config} />
         </div>
     )

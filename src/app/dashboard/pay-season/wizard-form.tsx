@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useTheme } from "next-themes"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
 import { submitSeasonPayment, type PaymentResult, type SignupFormData } from "./actions"
 import { UserCombobox } from "./user-combobox"
@@ -47,6 +48,8 @@ type TabValue = (typeof TABS)[number]
 
 export function WizardForm({ amount, users, config }: WizardFormProps) {
     const router = useRouter()
+    const { resolvedTheme } = useTheme()
+    const isDark = resolvedTheme === "dark"
     const [activeTab, setActiveTab] = useState<TabValue>("info")
     const [formData, setFormData] = useState<SignupFormData>({
         age: "20+",
@@ -429,6 +432,10 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                     </TabsContent>
 
                     <TabsContent value="payment" className="space-y-6 pt-4">
+                        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-center text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                            Reminder: NO REFUNDS for any reason
+                        </div>
+
                         <div className="rounded-lg bg-muted p-4">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Volleyball Season Fee</span>
@@ -483,15 +490,27 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                             })}
                         >
                             <CreditCard
+                                style={{
+                                    input: {
+                                        color: isDark ? "#fafafa" : "#09090b",
+                                        fontSize: "14px"
+                                    },
+                                    "input::placeholder": {
+                                        color: isDark ? "#a1a1aa" : "#71717a"
+                                    },
+                                    ".message-text": {
+                                        color: isDark ? "#a1a1aa" : "#71717a"
+                                    }
+                                }}
                                 buttonProps={{
                                     isLoading: isProcessing,
                                     css: {
-                                        backgroundColor: "var(--primary)",
-                                        color: "var(--primary-foreground)",
+                                        backgroundColor: "#7c3aed",
+                                        color: "#ffffff",
                                         fontSize: "14px",
                                         fontWeight: "500",
                                         "&:hover": {
-                                            backgroundColor: "var(--primary)"
+                                            backgroundColor: "#6d28d9"
                                         }
                                     }
                                 }}
