@@ -10,6 +10,7 @@ export interface AccountProfileData {
     first_name: string | null
     last_name: string | null
     preffered_name: string | null
+    email: string | null
     phone: string | null
     emergency_contact: string | null
     pronouns: string | null
@@ -35,6 +36,7 @@ export async function getAccountProfile(): Promise<{
                 first_name: users.first_name,
                 last_name: users.last_name,
                 preffered_name: users.preffered_name,
+                email: users.email,
                 phone: users.phone,
                 emergency_contact: users.emergency_contact,
                 pronouns: users.pronouns
@@ -117,6 +119,47 @@ export async function updateAccountField(
         return { status: true, message: "Updated successfully!" }
     } catch (error) {
         console.error("Error updating account field:", error)
+        return { status: false, message: "Something went wrong." }
+    }
+}
+
+export async function updateAccountProfile(
+    data: AccountProfileData
+): Promise<{ status: boolean; message: string }> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session) {
+        return { status: false, message: "You need to be logged in." }
+    }
+
+    try {
+        // Validate email if provided
+        if (data.email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(data.email)) {
+                return { status: false, message: "Please enter a valid email address." }
+            }
+        }
+
+        const fullName = `${data.first_name || ""} ${data.last_name || ""}`.trim()
+
+        await db
+            .update(users)
+            .set({
+                first_name: data.first_name || "",
+                last_name: data.last_name || "",
+                preffered_name: data.preffered_name,
+                email: data.email || "",
+                phone: data.phone,
+                emergency_contact: data.emergency_contact,
+                pronouns: data.pronouns,
+                name: fullName,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, session.user.id))
+
+        return { status: true, message: "Profile updated successfully!" }
+    } catch (error) {
+        console.error("Error updating account profile:", error)
         return { status: false, message: "Something went wrong." }
     }
 }
