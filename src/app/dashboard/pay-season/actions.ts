@@ -41,11 +41,23 @@ export async function fetchSeasonConfig(): Promise<SeasonConfig> {
 }
 
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
-    const allUsers: { id: string; name: string | null }[] = await db
-        .select({ id: users.id, name: users.name })
+    const allUsers = await db
+        .select({
+            id: users.id,
+            first_name: users.first_name,
+            last_name: users.last_name,
+            preffered_name: users.preffered_name
+        })
         .from(users)
-    return allUsers
-        .filter((u): u is { id: string; name: string } => u.name !== null)
+        .orderBy(users.last_name, users.first_name)
+
+    return allUsers.map(u => {
+        const preferredPart = u.preffered_name ? ` (${u.preffered_name})` : ""
+        return {
+            id: u.id,
+            name: `${u.first_name}${preferredPart} ${u.last_name}`
+        }
+    })
 }
 
 export async function submitSeasonPayment(
