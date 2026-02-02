@@ -8,7 +8,9 @@ import {
     RiSpeedUpLine,
     RiBasketballLine,
     RiEditLine,
-    RiSearchLine
+    RiSearchLine,
+    RiTeamLine,
+    RiFileList3Line
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -44,11 +46,11 @@ const signupNavItem = {
     icon: RiEditLine
 }
 
-const playerLookupNavItem = {
-    title: "Player Lookup",
-    url: "/dashboard/player-lookup",
-    icon: RiSearchLine
-}
+const adminNavItems = [
+    { title: "Player Lookup", url: "/dashboard/player-lookup", icon: RiSearchLine },
+    { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
+    { title: "Draft Division", url: "/dashboard/draft-division", icon: RiFileList3Line }
+]
 
 function SidebarLogo() {
     return (
@@ -93,18 +95,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
     }
 
-    // Add Player Lookup at the end for admins/commish
-    if (isAdmin) {
-        navItems = [...navItems, playerLookupNavItem]
-    }
+    // Build nav groups
+    const navGroups = [
+        {
+            title: "General",
+            items: navItems
+        }
+    ]
 
-    const data = {
-        navMain: [
-            {
-                title: "General",
-                items: navItems
-            }
-        ]
+    // Add Admin section for admins/directors
+    if (isAdmin) {
+        navGroups.push({
+            title: "Admin",
+            items: adminNavItems
+        })
     }
 
     return (
@@ -113,7 +117,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarLogo />
             </SidebarHeader>
             <SidebarContent className="-mt-2">
-                {data.navMain.map((group) => (
+                {navGroups.map((group) => (
                     <SidebarGroup key={group.title}>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
                             {group.title}
