@@ -20,6 +20,7 @@ import { getPlayerDetails, type PlayerListItem, type PlayerDetails, type PlayerS
 
 interface PlayerLookupFormProps {
     players: PlayerListItem[]
+    playerPicUrl: string
 }
 
 function formatHeight(inches: number | null): string {
@@ -29,7 +30,7 @@ function formatHeight(inches: number | null): string {
     return `${feet}'${remainingInches}"`
 }
 
-export function PlayerLookupForm({ players }: PlayerLookupFormProps) {
+export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProps) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState("")
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export function PlayerLookupForm({ players }: PlayerLookupFormProps) {
     const [signupHistory, setSignupHistory] = useState<PlayerSignup[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [showImageModal, setShowImageModal] = useState(false)
 
     const selectedPlayer = useMemo(
         () => players.find(p => p.id === selectedPlayerId),
@@ -174,14 +176,29 @@ export function PlayerLookupForm({ players }: PlayerLookupFormProps) {
             {playerDetails && !isLoading && (
                 <Card className="max-w-2xl">
                     <CardHeader>
-                        <CardTitle>
-                            {playerDetails.first_name} {playerDetails.last_name}
-                            {playerDetails.preffered_name && (
-                                <span className="text-muted-foreground font-normal text-base ml-2">
-                                    ({playerDetails.preffered_name})
-                                </span>
+                        <div className="flex items-start gap-4">
+                            {playerPicUrl && playerDetails.picture && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowImageModal(true)}
+                                    className="shrink-0 cursor-pointer hover:opacity-90 transition-opacity"
+                                >
+                                    <img
+                                        src={`${playerPicUrl}${playerDetails.picture}`}
+                                        alt={`${playerDetails.first_name} ${playerDetails.last_name}`}
+                                        className="w-48 h-72 rounded-md object-cover"
+                                    />
+                                </button>
                             )}
-                        </CardTitle>
+                            <CardTitle className="pt-1">
+                                {playerDetails.first_name} {playerDetails.last_name}
+                                {playerDetails.preffered_name && (
+                                    <span className="text-muted-foreground font-normal text-base ml-2">
+                                        ({playerDetails.preffered_name})
+                                    </span>
+                                )}
+                            </CardTitle>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         {/* Basic Info */}
@@ -386,6 +403,34 @@ export function PlayerLookupForm({ players }: PlayerLookupFormProps) {
 
             {playerDetails && signupHistory.length === 0 && !isLoading && (
                 <p className="text-muted-foreground text-sm">No signup history found for this player.</p>
+            )}
+
+            {/* Image Modal */}
+            {showImageModal && playerDetails?.picture && playerPicUrl && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+                    onClick={() => setShowImageModal(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") setShowImageModal(false)
+                    }}
+                    role="button"
+                    tabIndex={0}
+                >
+                    <div className="relative max-h-[90vh] max-w-[90vw]">
+                        <img
+                            src={`${playerPicUrl}${playerDetails.picture}`}
+                            alt={`${playerDetails.first_name} ${playerDetails.last_name}`}
+                            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowImageModal(false)}
+                            className="absolute -top-3 -right-3 rounded-full bg-white p-1 text-black hover:bg-gray-200"
+                        >
+                            <RiCloseLine className="h-6 w-6" />
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     )

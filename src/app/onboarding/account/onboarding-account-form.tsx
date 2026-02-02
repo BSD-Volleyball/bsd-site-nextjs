@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import {
     Card,
     CardContent,
@@ -20,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { updateOnboardingAccount, type OnboardingAccountData } from "./actions"
 
 const PRESET_PRONOUNS = ["He/Him", "She/Her", "They/Them"] as const
@@ -51,7 +53,8 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
         preffered_name: initialData?.preffered_name ?? "",
         phone: initialData?.phone ?? "",
         pronouns: initialData?.pronouns ?? "",
-        emergency_contact: initialData?.emergency_contact ?? ""
+        emergency_contact: initialData?.emergency_contact ?? "",
+        male: initialData?.male ?? null as boolean | null
     })
 
     async function handleSubmit(e: React.FormEvent) {
@@ -67,6 +70,10 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
             setError("Emergency contact is required.")
             return
         }
+        if (formData.male === null) {
+            setError("Please select Yes or No for 'Male? (why)'.")
+            return
+        }
 
         setIsLoading(true)
 
@@ -74,7 +81,8 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
             preffered_name: formData.preffered_name || null,
             phone: formData.phone || null,
             pronouns: formData.pronouns || null,
-            emergency_contact: formData.emergency_contact || null
+            emergency_contact: formData.emergency_contact || null,
+            male: formData.male
         })
 
         if (result.status) {
@@ -89,10 +97,9 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
         <form onSubmit={handleSubmit}>
             <Card>
                 <CardHeader>
-                    <CardTitle>Contact Information</CardTitle>
+                    <CardTitle>Basic Information</CardTitle>
                     <CardDescription>
-                        This information helps us reach you and ensures safety during
-                        events.
+                        Gathering this information now so you don't have to enter it every season.  You can update it at any time on the Account page.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -125,6 +132,32 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                             placeholder="Your contact phone number"
                             required
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>
+                            Male? (<Link href="/gender-policy" className="underline hover:text-primary" target="_blank">why</Link>) <span className="text-destructive">*</span>
+                        </Label>
+                        <RadioGroup
+                            value={formData.male === null ? "" : formData.male ? "yes" : "no"}
+                            onValueChange={(value) =>
+                                setFormData({ ...formData, male: value === "yes" })
+                            }
+                            className="flex gap-4"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="yes" id="male-yes" />
+                                <Label htmlFor="male-yes" className="font-normal cursor-pointer">
+                                    Yes
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="no" id="male-no" />
+                                <Label htmlFor="male-no" className="font-normal cursor-pointer">
+                                    No
+                                </Label>
+                            </div>
+                        </RadioGroup>
                     </div>
 
                     <div className="space-y-2">
