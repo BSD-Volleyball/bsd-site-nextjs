@@ -11,6 +11,7 @@ export interface OnboardingAccountData {
     phone: string | null
     pronouns: string | null
     emergency_contact: string | null
+    male: boolean | null
 }
 
 export async function getOnboardingAccountData(): Promise<OnboardingAccountData | null> {
@@ -24,7 +25,8 @@ export async function getOnboardingAccountData(): Promise<OnboardingAccountData 
             preffered_name: users.preffered_name,
             phone: users.phone,
             pronouns: users.pronouns,
-            emergency_contact: users.emergency_contact
+            emergency_contact: users.emergency_contact,
+            male: users.male
         })
         .from(users)
         .where(eq(users.id, session.user.id))
@@ -49,6 +51,7 @@ export async function updateOnboardingAccount(
                 phone: data.phone || null,
                 pronouns: data.pronouns || null,
                 emergency_contact: data.emergency_contact || null,
+                male: data.male,
                 updatedAt: new Date()
             })
             .where(eq(users.id, session.user.id))

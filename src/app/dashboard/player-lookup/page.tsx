@@ -60,7 +60,7 @@ export default async function PlayerLookupPage() {
                 title="Player Lookup"
                 description="Search and view player information."
             />
-            <PlayerLookupForm players={result.players} />
+            <PlayerLookupForm players={result.players} playerPicUrl={process.env.PLAYER_PIC_URL || ""} />
         </div>
     )
 }
