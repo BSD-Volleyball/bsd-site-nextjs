@@ -7,7 +7,8 @@ import {
     RiShieldLine,
     RiSpeedUpLine,
     RiBasketballLine,
-    RiEditLine
+    RiEditLine,
+    RiSearchLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -27,7 +28,7 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { site } from "@/config/site"
-import { getSignupEligibility } from "@/app/dashboard/actions"
+import { getSignupEligibility, getIsAdminOrDirector } from "@/app/dashboard/actions"
 
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
@@ -41,6 +42,12 @@ const signupNavItem = {
     title: "Sign-up for Season",
     url: "/dashboard/pay-season",
     icon: RiEditLine
+}
+
+const playerLookupNavItem = {
+    title: "Player Lookup",
+    url: "/dashboard/player-lookup",
+    icon: RiSearchLine
 }
 
 function SidebarLogo() {
@@ -71,19 +78,25 @@ function SidebarLogo() {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
+    const [isAdmin, setIsAdmin] = useState(false)
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
+        getIsAdminOrDirector().then(setIsAdmin)
     }, [pathname])
 
-    // Build nav items dynamically - insert signup after Dashboard if eligible
-    const navItems = showSignupLink
-        ? [
-              baseNavItems[0],
-              signupNavItem,
-              ...baseNavItems.slice(1)
-          ]
-        : baseNavItems
+    // Build nav items dynamically
+    let navItems = [...baseNavItems]
+
+    // Insert signup after Dashboard if eligible
+    if (showSignupLink) {
+        navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
+    }
+
+    // Add Player Lookup at the end for admins/commish
+    if (isAdmin) {
+        navItems = [...navItems, playerLookupNavItem]
+    }
 
     const data = {
         navMain: [
