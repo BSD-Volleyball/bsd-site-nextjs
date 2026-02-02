@@ -3,15 +3,15 @@ import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { seasons, signups, users } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { seasons, signups, users, drafts, teams, divisions } from "@/database/schema"
+import { eq, and, desc } from "drizzle-orm"
 import {
     Card,
     CardContent,
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import { RiCheckLine, RiCalendarLine } from "@remixicon/react"
+import { RiCheckLine, RiCalendarLine, RiHistoryLine } from "@remixicon/react"
 import Link from "next/link"
 import { getSeasonConfig } from "@/lib/site-config"
 
@@ -60,14 +60,54 @@ async function getSeasonSignup(userId: string) {
     return { season, signup, pairPickName, config }
 }
 
+interface PreviousSeason {
+    year: number
+    season: string
+    divisionName: string
+    teamName: string
+    captainName: string
+}
+
+async function getPreviousSeasonsPlayed(userId: string): Promise<PreviousSeason[]> {
+    const results = await db
+        .select({
+            year: seasons.year,
+            season: seasons.season,
+            divisionName: divisions.name,
+            teamName: teams.name,
+            captainFirstName: users.first_name,
+            captainLastName: users.last_name,
+            captainPreferredName: users.preffered_name
+        })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .innerJoin(users, eq(teams.captain, users.id))
+        .where(eq(drafts.user, userId))
+        .orderBy(desc(seasons.year), desc(seasons.id))
+
+    return results.map(r => ({
+        year: r.year,
+        season: r.season,
+        divisionName: r.divisionName,
+        teamName: r.teamName,
+        captainName: r.captainPreferredName
+            ? `${r.captainFirstName} (${r.captainPreferredName}) ${r.captainLastName}`
+            : `${r.captainFirstName} ${r.captainLastName}`
+    }))
+}
+
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
 
     let signupStatus = null
     let userName: string | null = null
+    let previousSeasons: PreviousSeason[] = []
 
     if (session?.user) {
         signupStatus = await getSeasonSignup(session.user.id)
+        previousSeasons = await getPreviousSeasonsPlayed(session.user.id)
 
         // Get user's preferred name or first name for greeting
         const [user] = await db
@@ -182,6 +222,43 @@ export default async function DashboardPage() {
                                 Registration for the {seasonLabel} season is currently closed.
                             </p>
                         )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {previousSeasons.length > 0 && (
+                <Card className="max-w-2xl">
+                    <CardHeader>
+                        <div className="flex items-center gap-2">
+                            <RiHistoryLine className="h-5 w-5 text-muted-foreground" />
+                            <CardTitle className="text-lg">Previous Seasons Played</CardTitle>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b">
+                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Season</th>
+                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Division</th>
+                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Team</th>
+                                        <th className="text-left py-2 font-medium text-muted-foreground">Captain</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {previousSeasons.map((ps, idx) => (
+                                        <tr key={idx} className="border-b last:border-0">
+                                            <td className="py-2 pr-4">
+                                                {ps.season.charAt(0).toUpperCase() + ps.season.slice(1)} {ps.year}
+                                            </td>
+                                            <td className="py-2 pr-4">{ps.divisionName}</td>
+                                            <td className="py-2 pr-4">{ps.teamName}</td>
+                                            <td className="py-2">{ps.captainName}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </CardContent>
                 </Card>
             )}
