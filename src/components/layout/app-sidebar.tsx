@@ -48,7 +48,7 @@ function SidebarLogo() {
         <div className="flex gap-2 px-2 transition-[padding] duration-300 ease-out group-data-[collapsible=icon]:px-0">
             <Link
                 className="group/logo inline-flex items-center gap-2 transition-all duration-300 ease-out"
-                href="/dashboard"
+                href="/"
             >
                 <span className="sr-only">{site.name}</span>
                 <Image

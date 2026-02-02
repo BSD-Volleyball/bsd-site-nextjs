@@ -22,7 +22,8 @@ import {
 } from "@/components/ui/select"
 import { updateOnboardingAccount, type OnboardingAccountData } from "./actions"
 
-const PRONOUN_OPTIONS = ["He/Him", "She/Her", "They/Them", "Other"] as const
+const PRESET_PRONOUNS = ["He/Him", "She/Her", "They/Them"] as const
+const BLANK_VALUE = "none"
 
 interface OnboardingAccountFormProps {
     initialData: OnboardingAccountData | null
@@ -35,9 +36,13 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
 
     // Determine if initial pronouns match a preset option
     const initialPronouns = initialData?.pronouns ?? ""
-    const isPresetPronoun = PRONOUN_OPTIONS.slice(0, 3).includes(initialPronouns as typeof PRONOUN_OPTIONS[number])
-    const initialPronounSelection = isPresetPronoun ? initialPronouns : (initialPronouns ? "Other" : "")
-    const initialCustomPronouns = isPresetPronoun ? "" : initialPronouns
+    const isPresetPronoun = PRESET_PRONOUNS.includes(initialPronouns as typeof PRESET_PRONOUNS[number])
+    const initialPronounSelection = !initialPronouns
+        ? BLANK_VALUE
+        : isPresetPronoun
+          ? initialPronouns
+          : "Other"
+    const initialCustomPronouns = isPresetPronoun || !initialPronouns ? "" : initialPronouns
 
     const [pronounSelection, setPronounSelection] = useState(initialPronounSelection)
     const [customPronouns, setCustomPronouns] = useState(initialCustomPronouns)
@@ -131,7 +136,10 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                             value={pronounSelection}
                             onValueChange={(value) => {
                                 setPronounSelection(value)
-                                if (value === "Other") {
+                                if (value === BLANK_VALUE) {
+                                    setFormData({ ...formData, pronouns: "" })
+                                    setCustomPronouns("")
+                                } else if (value === "Other") {
                                     setFormData({ ...formData, pronouns: customPronouns })
                                 } else {
                                     setFormData({ ...formData, pronouns: value })
@@ -143,11 +151,15 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                                 <SelectValue placeholder="Select your pronouns" />
                             </SelectTrigger>
                             <SelectContent>
-                                {PRONOUN_OPTIONS.map((option) => (
+                                <SelectItem value={BLANK_VALUE}>
+                                    <span className="text-muted-foreground">—</span>
+                                </SelectItem>
+                                {PRESET_PRONOUNS.map((option) => (
                                     <SelectItem key={option} value={option}>
                                         {option}
                                     </SelectItem>
                                 ))}
+                                <SelectItem value="Other">Other</SelectItem>
                             </SelectContent>
                         </Select>
                         {pronounSelection === "Other" && (
