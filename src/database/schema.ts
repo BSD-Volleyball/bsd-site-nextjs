@@ -115,7 +115,8 @@ export const teams = pgTable("teams", {
 	season: integer('season').notNull().references(() => seasons.id),
 	captain: text('captain').notNull().references(() => users.id),
 	division: integer('division').notNull().references(() => divisions.id),
-	name: text('name').notNull()
+	name: text('name').notNull(),
+	number: integer('number')
 })
 
 export const players = pgTable("players", {
@@ -151,3 +152,11 @@ export const siteConfig = pgTable("site_config", {
 	value: text('value').notNull(),
 	updated_at: timestamp('updated_at').$defaultFn(() => new Date()).notNull()
 });
+
+export const drafts = pgTable("drafts", {
+	id: serial('id').primaryKey(),
+	team: integer('team').notNull().references(() => teams.id),
+	user: text('user').notNull().references(() => users.id),
+	round: integer('round').notNull(),
+    overall: integer('overall').notNull()
+})

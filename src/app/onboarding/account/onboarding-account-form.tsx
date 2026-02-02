@@ -54,7 +54,8 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
         phone: initialData?.phone ?? "",
         pronouns: initialData?.pronouns ?? "",
         emergency_contact: initialData?.emergency_contact ?? "",
-        male: initialData?.male ?? null as boolean | null
+        male: initialData?.male ?? null as boolean | null,
+        referred_by: initialData?.referred_by ?? ""
     })
 
     async function handleSubmit(e: React.FormEvent) {
@@ -82,7 +83,8 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
             phone: formData.phone || null,
             pronouns: formData.pronouns || null,
             emergency_contact: formData.emergency_contact || null,
-            male: formData.male
+            male: formData.male,
+            referred_by: formData.referred_by || null
         })
 
         if (result.status) {
@@ -224,6 +226,24 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                             }
                             placeholder="e.g., Jane Doe (wife) - 555-123-4567"
                             required
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="referred_by">
+                            Referred By{" "}
+                            <span className="text-muted-foreground">(optional)</span>
+                        </Label>
+                        <Input
+                            id="referred_by"
+                            value={formData.referred_by}
+                            onChange={(e) =>
+                                setFormData({
+                                    ...formData,
+                                    referred_by: e.target.value
+                                })
+                            }
+                            placeholder="Who referred you to the league?"
                         />
                     </div>
 

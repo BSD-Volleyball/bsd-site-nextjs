@@ -26,7 +26,8 @@ export default async function OnboardingAccountPage() {
             phone: users.phone,
             pronouns: users.pronouns,
             emergency_contact: users.emergency_contact,
-            male: users.male
+            male: users.male,
+            referred_by: users.referred_by
         })
         .from(users)
         .where(eq(users.id, session.user.id))
@@ -52,7 +53,8 @@ export default async function OnboardingAccountPage() {
                               phone: user.phone,
                               pronouns: user.pronouns,
                               emergency_contact: user.emergency_contact,
-                              male: user.male
+                              male: user.male,
+                              referred_by: user.referred_by
                           }
                         : null
                 }
