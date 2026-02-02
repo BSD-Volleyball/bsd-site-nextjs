@@ -107,7 +107,7 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="preffered_name">
-                            Preferred Name{" "}
+                            Preferred First Name (if different){" "}
                             <span className="text-muted-foreground">(optional)</span>
                         </Label>
                         <Input

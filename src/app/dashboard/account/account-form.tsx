@@ -90,7 +90,7 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="preffered_name">Preferred First Name</Label>
+                        <Label htmlFor="preffered_name">Preferred First Name (if different than above)</Label>
                         <Input
                             id="preffered_name"
                             value={formData.preffered_name ?? ""}
@@ -98,7 +98,7 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             placeholder="The name you'd like to be called"
                         />
                         <p className="text-sm text-muted-foreground">
-                            If different than above. This is how your name will appear to others.
+                            This is how your name will appear to others.
                         </p>
                     </div>
 
