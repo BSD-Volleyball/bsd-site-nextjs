@@ -28,6 +28,16 @@ export const HeroSection = () => {
                         <Button
                             asChild
                             size="lg"
+                            className="rounded-full bg-amber-600 hover:bg-amber-700"
+                        >
+                            <Link href="/spring-2026-season-info">
+                                Spring 2026 Season Info
+                            </Link>
+                        </Button>
+
+                        <Button
+                            asChild
+                            size="lg"
                             className="group/arrow rounded-full"
                         >
                             <Link href="/auth/sign-up">

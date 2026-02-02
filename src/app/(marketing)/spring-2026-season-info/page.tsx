@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export const metadata = {
     title: "Spring 2026 Season Info - Bump Set Drink Volleyball",
@@ -112,6 +113,15 @@ export default function Spring2026SeasonInfoPage() {
                             It is important for you to provide as much information as possible about your skill level on the registration form (leagues and levels played, clinics, tournaments, and any other information). It is also important that you be there for the first night of preseason if possible (as well as the other nights)! Doing so will help captains draft you at a division suitable for your skill level.
                         </p>
                     </div>
+                </section>
+
+                <section className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                    <Button asChild size="lg">
+                        <Link href="/auth/sign-up">Register Now</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="lg">
+                        <Link href="/auth/sign-in">Sign In</Link>
+                    </Button>
                 </section>
             </div>
         </div>
