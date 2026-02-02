@@ -13,7 +13,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select"
 import { updateOnboardingAccount, type OnboardingAccountData } from "./actions"
+
+const PRONOUN_OPTIONS = ["He/Him", "She/Her", "They/Them", "Other"] as const
 
 interface OnboardingAccountFormProps {
     initialData: OnboardingAccountData | null
@@ -23,6 +32,15 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+
+    // Determine if initial pronouns match a preset option
+    const initialPronouns = initialData?.pronouns ?? ""
+    const isPresetPronoun = PRONOUN_OPTIONS.slice(0, 3).includes(initialPronouns as typeof PRONOUN_OPTIONS[number])
+    const initialPronounSelection = isPresetPronoun ? initialPronouns : (initialPronouns ? "Other" : "")
+    const initialCustomPronouns = isPresetPronoun ? "" : initialPronouns
+
+    const [pronounSelection, setPronounSelection] = useState(initialPronounSelection)
+    const [customPronouns, setCustomPronouns] = useState(initialCustomPronouns)
 
     const [formData, setFormData] = useState({
         preffered_name: initialData?.preffered_name ?? "",
@@ -109,14 +127,41 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                             Pronouns{" "}
                             <span className="text-muted-foreground">(optional)</span>
                         </Label>
-                        <Input
-                            id="pronouns"
-                            value={formData.pronouns}
-                            onChange={(e) =>
-                                setFormData({ ...formData, pronouns: e.target.value })
-                            }
-                            placeholder="e.g., they/them, she/her, he/him"
-                        />
+                        <Select
+                            value={pronounSelection}
+                            onValueChange={(value) => {
+                                setPronounSelection(value)
+                                if (value === "Other") {
+                                    setFormData({ ...formData, pronouns: customPronouns })
+                                } else {
+                                    setFormData({ ...formData, pronouns: value })
+                                    setCustomPronouns("")
+                                }
+                            }}
+                        >
+                            <SelectTrigger id="pronouns">
+                                <SelectValue placeholder="Select your pronouns" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PRONOUN_OPTIONS.map((option) => (
+                                    <SelectItem key={option} value={option}>
+                                        {option}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {pronounSelection === "Other" && (
+                            <Input
+                                id="custom_pronouns"
+                                value={customPronouns}
+                                onChange={(e) => {
+                                    setCustomPronouns(e.target.value)
+                                    setFormData({ ...formData, pronouns: e.target.value })
+                                }}
+                                placeholder="Enter your pronouns"
+                                className="mt-2"
+                            />
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -138,7 +183,7 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                     </div>
 
                     {error && (
-                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
                             {error}
                         </div>
                     )}

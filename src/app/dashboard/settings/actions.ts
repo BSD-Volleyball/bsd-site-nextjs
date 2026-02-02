@@ -80,13 +80,39 @@ export async function updateAccountField(
     }
 
     try {
-        await db
-            .update(users)
-            .set({
-                [field]: value,
-                updatedAt: new Date()
-            })
-            .where(eq(users.id, session.user.id))
+        // If updating first_name or last_name, also update the name field
+        if (field === "first_name" || field === "last_name") {
+            // Fetch current values
+            const [currentUser] = await db
+                .select({
+                    first_name: users.first_name,
+                    last_name: users.last_name
+                })
+                .from(users)
+                .where(eq(users.id, session.user.id))
+                .limit(1)
+
+            const firstName = field === "first_name" ? (value || "") : (currentUser?.first_name || "")
+            const lastName = field === "last_name" ? (value || "") : (currentUser?.last_name || "")
+            const fullName = `${firstName} ${lastName}`.trim()
+
+            await db
+                .update(users)
+                .set({
+                    [field]: value,
+                    name: fullName,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, session.user.id))
+        } else {
+            await db
+                .update(users)
+                .set({
+                    [field]: value,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, session.user.id))
+        }
 
         return { status: true, message: "Updated successfully!" }
     } catch (error) {
