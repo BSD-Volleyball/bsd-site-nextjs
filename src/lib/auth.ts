@@ -1,6 +1,5 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { headers } from "next/headers"
 import { Resend } from "resend"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
@@ -17,6 +16,22 @@ export const auth = betterAuth({
         usePlural: true,
         schema
     }),
+    databaseHooks: {
+        user: {
+            create: {
+                before: async (user) => {
+                    const firstName = (user as { first_name?: string }).first_name || ""
+                    const lastName = (user as { last_name?: string }).last_name || ""
+                    return {
+                        data: {
+                            ...user,
+                            name: `${firstName} ${lastName}`.trim()
+                        }
+                    }
+                }
+            }
+        }
+    },
     user: {
         additionalFields: {
             first_name: {
@@ -43,7 +58,7 @@ export const auth = betterAuth({
 		minPasswordLength: 10,
 		maxPasswordLength: 128,
 		autoSignIn: true,
-        sendResetPassword: async ({ user, url, token }, request) => {
+        sendResetPassword: async ({ user, url }) => {
             const name =
                 (user as { first_name?: string }).first_name ||
                 user.email.split("@")[0]
