@@ -54,6 +54,11 @@ const routeList: RouteProps[] = [
 
 const infoPages: InfoPageProps[] = [
     {
+        title: "Spring 2026 Season Info",
+        href: "/spring-2026-season-info",
+        description: "Registration, schedule, and format details"
+    },
+    {
         title: "Captain Expectations",
         href: "/captain-expectations",
         description: "Guidelines for team captains"

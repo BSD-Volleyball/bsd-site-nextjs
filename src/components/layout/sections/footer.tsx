@@ -22,6 +22,7 @@ const footerSections: FooterSectionProps[] = [
     {
         title: "League Info",
         links: [
+            { href: "/spring-2026-season-info", label: "Spring 2026 Season" },
             { href: "/faq", label: "FAQ" },
             { href: "/history", label: "League History" },
             { href: "/player-experience", label: "Skill Levels" },
