@@ -24,6 +24,15 @@ export const HeroSection = () => {
                         and have fun!
                     </p>
 
+                    <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
+                        <p className="mb-3 font-bold text-lg">
+                            Played with us before? You already have an account!
+                        </p>
+                        <Button asChild size="lg">
+                            <Link href="/auth/forgot-password">Set Password</Link>
+                        </Button>
+                    </div>
+
                     <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
                         <Button
                             asChild

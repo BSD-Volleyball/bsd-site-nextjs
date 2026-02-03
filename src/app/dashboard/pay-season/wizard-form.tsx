@@ -43,7 +43,7 @@ interface WizardFormProps {
     config: SeasonConfig
 }
 
-const TABS = ["info", "pairing", "schedule", "payment"] as const
+const TABS = ["info", "pairing", "schedule", "waivers", "payment"] as const
 type TabValue = (typeof TABS)[number]
 
 export function WizardForm({ amount, users, config }: WizardFormProps) {
@@ -61,6 +61,7 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
         play1stWeek: false
     })
     const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
+    const [waiverAgreed, setWaiverAgreed] = useState(false)
 
     const toggleDate = (date: string) => {
         setSelectedDates(prev => {
@@ -139,12 +140,12 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                             href={paymentResult.receiptUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary text-sm underline"
+                            className="text-primary text-sm underline block"
                         >
                             View Receipt
                         </a>
                     )}
-                    <p className="text-sm">
+                    <p className="text-sm pt-2">
                         Now head over and make sure your{" "}
                         <Link
                             href="/dashboard/volleyball-profile"
@@ -171,11 +172,12 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
         <Card className="max-w-2xl">
             <CardContent>
                 <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="info">Info</TabsTrigger>
                         <TabsTrigger value="pairing">Pairing</TabsTrigger>
                         <TabsTrigger value="schedule">Schedule</TabsTrigger>
-                        <TabsTrigger value="payment">Payment</TabsTrigger>
+                        <TabsTrigger value="waivers">Waivers</TabsTrigger>
+                        <TabsTrigger value="payment" disabled={!waiverAgreed}>Payment</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="info" className="space-y-6 pt-4">
@@ -387,6 +389,24 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                                     </div>
                                 )}
                             </div>
+
+                            {tryoutDates.length > 0 && tryoutDates.every(({ label }) => selectedDates.has(label)) && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                                    Are you sure you want to play this season? Missing all 3 tryouts makes it very hard for you to be placed on an appropriate team and you&apos;re very likely to end up on a team in a lower division.
+                                </div>
+                            )}
+
+                            {selectedDates.size >= 4 && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                                    Are you sure you want to play this season? You&apos;ve listed quite a few dates that you will miss.
+                                </div>
+                            )}
+
+                            {playoffDates.length > 0 && playoffDates.every(({ label }) => selectedDates.has(label)) && (
+                                <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                                    Are you really going to miss all of the playoff matches? Captains have requested we only accept players who plan to play at least 1 match of the playoffs.
+                                </div>
+                            )}
                         </div>
 
                         {/* Section 2: Week 1 Participation */}
@@ -431,6 +451,60 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                         </div>
                     </TabsContent>
 
+                    <TabsContent value="waivers" className="space-y-6 pt-4">
+                        <h3 className="font-medium text-base">Liability and Conduct Waiver</h3>
+
+                        <div className="max-h-64 overflow-y-auto rounded-lg border p-4 text-sm text-muted-foreground leading-relaxed">
+                            <p>
+                                By checking the &quot;I Agree&quot; box below, I hereby release, waive, discharge,
+                                and covenant not to sue Bump Set Drink, Inc. (BSD), referees, other participants,
+                                and any persons in a playing area, from all liability to you, your personal
+                                representatives, assigned heirs, and next of kin for any and all damage, and any
+                                claim or demands thereof on account of injury to you or your property or resulting
+                                in your death, whether caused by the negligence or otherwise while you are
+                                participating or working for or observing BSD events. You expressly acknowledge and
+                                agree that the activities at the event and in the playing areas are dangerous and
+                                involve the risk of serious injury and/or death and/or property damage. You
+                                expressly acknowledge that the activities at the event may involve the risk of
+                                exposure to Covid-19 or other harmful viruses. You consent to and will permit
+                                emergency medical treatment if required. You agree to allow your image to be used
+                                in promotional and informational material. You have read and agree to abide by the
+                                behavioral policies stated on the BSD website. You understand that this waiver may
+                                serve as the only warning to action being taken for improper behavior. You have
+                                read and voluntarily sign this release and waiver of liability and indemnity
+                                agreement which embraces each and every event sanctioned, authorized or promoted by
+                                the Bump Set Drink, Inc. league.
+                            </p>
+                            <p className="mt-4">
+                                Submitting this online registration implies compliance with the waiver and your
+                                agreement to adhere to league rules as stated on the website. This statement
+                                qualifies as the only warning given — violations of the rules will not be
+                                tolerated. By registering for this league you will be held accountable for all
+                                league policies and procedures.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="waiver-agree"
+                                checked={waiverAgreed}
+                                onCheckedChange={(checked: boolean | "indeterminate") =>
+                                    setWaiverAgreed(checked === true)
+                                }
+                            />
+                            <Label htmlFor="waiver-agree" className="font-medium cursor-pointer">
+                                I Agree
+                            </Label>
+                        </div>
+
+                        <div className="pt-4">
+                            <Button onClick={goToNextTab} disabled={!waiverAgreed} className="gap-2">
+                                Next
+                                <RiArrowRightLine className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </TabsContent>
+
                     <TabsContent value="payment" className="space-y-6 pt-4">
                         <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-center text-sm font-semibold text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
                             Reminder: NO REFUNDS for any reason
@@ -450,7 +524,8 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                             </div>
                         )}
 
-                        <PaymentForm
+                        {resolvedTheme == null ? null : <PaymentForm
+                            key={resolvedTheme}
                             applicationId={appId}
                             locationId={locationId}
                             cardTokenizeResponseReceived={async (tokenResult) => {
@@ -491,15 +566,26 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                         >
                             <CreditCard
                                 style={{
+                                    ".input-container": {
+                                        borderColor: "#e4e4e7",
+                                        borderRadius: "6px"
+                                    },
+                                    ".input-container.is-focus": {
+                                        borderColor: "#7c3aed"
+                                    },
                                     input: {
-                                        color: isDark ? "#fafafa" : "#09090b",
+                                        backgroundColor: "#ffffff",
+                                        color: "#09090b",
                                         fontSize: "14px"
                                     },
                                     "input::placeholder": {
-                                        color: isDark ? "#a1a1aa" : "#71717a"
+                                        color: "#71717a"
                                     },
                                     ".message-text": {
-                                        color: isDark ? "#a1a1aa" : "#71717a"
+                                        color: "#71717a"
+                                    },
+                                    ".message-icon": {
+                                        color: "#71717a"
                                     }
                                 }}
                                 buttonProps={{
@@ -515,7 +601,7 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                                     }
                                 }}
                             />
-                        </PaymentForm>
+                        </PaymentForm>}
                     </TabsContent>
                 </Tabs>
             </CardContent>
