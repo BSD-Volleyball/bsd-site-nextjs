@@ -10,7 +10,10 @@ import {
     RiEditLine,
     RiSearchLine,
     RiTeamLine,
-    RiFileList3Line
+    RiFileList3Line,
+    RiSettings3Line,
+    RiGroupLine,
+    RiTimeLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -30,11 +33,18 @@ import {
     SidebarMenuItem
 } from "@/components/ui/sidebar"
 import { site } from "@/config/site"
-import { getSignupEligibility, getIsAdminOrDirector } from "@/app/dashboard/actions"
+import {
+    getSignupEligibility,
+    getIsAdminOrDirector
+} from "@/app/dashboard/actions"
 
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
-    { title: "Volleyball Profile", url: "/dashboard/volleyball-profile", icon: RiBasketballLine },
+    {
+        title: "Volleyball Profile",
+        url: "/dashboard/volleyball-profile",
+        icon: RiBasketballLine
+    },
     { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
     { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
     { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine }
@@ -47,9 +57,32 @@ const signupNavItem = {
 }
 
 const adminNavItems = [
-    { title: "Admin Player Lookup", url: "/dashboard/player-lookup", icon: RiSearchLine },
+    {
+        title: "Admin Player Lookup",
+        url: "/dashboard/player-lookup",
+        icon: RiSearchLine
+    },
+    {
+        title: "View Signups",
+        url: "/dashboard/view-signups",
+        icon: RiGroupLine
+    },
+    {
+        title: "View Waitlist",
+        url: "/dashboard/view-waitlist",
+        icon: RiTimeLine
+    },
     { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
-    { title: "Draft Division", url: "/dashboard/draft-division", icon: RiFileList3Line }
+    {
+        title: "Draft Division",
+        url: "/dashboard/draft-division",
+        icon: RiFileList3Line
+    },
+    {
+        title: "Site Config",
+        url: "/dashboard/site-config",
+        icon: RiSettings3Line
+    }
 ]
 
 function SidebarLogo() {
@@ -131,7 +164,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         <SidebarMenuItem key={item.title}>
                                             <SidebarMenuButton
                                                 asChild
-                                                className="group/menu-button group-data-[collapsible=icon]:px-1.25! h-9 gap-3 font-medium transition-all duration-300 ease-out [&>svg]:size-auto"
+                                                className="group/menu-button h-9 gap-3 font-medium transition-all duration-300 ease-out group-data-[collapsible=icon]:px-1.25! [&>svg]:size-auto"
                                                 tooltip={item.title}
                                                 isActive={isActive}
                                             >

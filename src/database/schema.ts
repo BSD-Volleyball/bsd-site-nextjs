@@ -163,3 +163,10 @@ export const drafts = pgTable("drafts", {
 	round: integer('round').notNull(),
     overall: integer('overall').notNull()
 })
+
+export const waitlist = pgTable("waitlist", {
+    id: serial('id').primaryKey(),
+    season: integer('season').notNull().references(() => seasons.id),
+    user: text('user').notNull().references(() => users.id),
+    created_at: timestamp('created_at').notNull()
+})

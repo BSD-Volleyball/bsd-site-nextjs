@@ -3,17 +3,25 @@ import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { seasons, signups, users, drafts, teams, divisions } from "@/database/schema"
-import { eq, and, desc } from "drizzle-orm"
 import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle
-} from "@/components/ui/card"
+    seasons,
+    signups,
+    users,
+    drafts,
+    teams,
+    divisions,
+    waitlist
+} from "@/database/schema"
+import { eq, and, desc, count } from "drizzle-orm"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RiCheckLine, RiCalendarLine, RiHistoryLine } from "@remixicon/react"
 import Link from "next/link"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getCurrentSeasonAmount,
+    isLatePricing
+} from "@/lib/site-config"
+import { WaitlistButton } from "./waitlist-button"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -26,11 +34,23 @@ async function getSeasonSignup(userId: string) {
     const [season] = await db
         .select({ id: seasons.id, code: seasons.code })
         .from(seasons)
-        .where(and(eq(seasons.year, config.seasonYear), eq(seasons.season, config.seasonName)))
+        .where(
+            and(
+                eq(seasons.year, config.seasonYear),
+                eq(seasons.season, config.seasonName)
+            )
+        )
         .limit(1)
 
     if (!season) {
-        return { season: null, signup: null, pairPickName: null, config }
+        return {
+            season: null,
+            signup: null,
+            pairPickName: null,
+            config,
+            seasonFull: false,
+            onWaitlist: false
+        }
     }
 
     // Check if user has a signup for this season
@@ -53,11 +73,42 @@ async function getSeasonSignup(userId: string) {
             .limit(1)
 
         if (pairUser) {
-            pairPickName = [pairUser.first_name, pairUser.last_name].filter(Boolean).join(" ") || null
+            pairPickName =
+                [pairUser.first_name, pairUser.last_name]
+                    .filter(Boolean)
+                    .join(" ") || null
         }
     }
 
-    return { season, signup, pairPickName, config }
+    // Check if season is full
+    let seasonFull = false
+    const maxPlayers = parseInt(config.maxPlayers, 10)
+    if (maxPlayers > 0 && !signup) {
+        const [result] = await db
+            .select({ total: count() })
+            .from(signups)
+            .where(eq(signups.season, season.id))
+
+        if (result && result.total >= maxPlayers) {
+            seasonFull = true
+        }
+    }
+
+    // Check if user is on the waitlist
+    let onWaitlist = false
+    if (seasonFull) {
+        const [waitlistEntry] = await db
+            .select({ id: waitlist.id })
+            .from(waitlist)
+            .where(
+                and(eq(waitlist.season, season.id), eq(waitlist.user, userId))
+            )
+            .limit(1)
+
+        onWaitlist = !!waitlistEntry
+    }
+
+    return { season, signup, pairPickName, config, seasonFull, onWaitlist }
 }
 
 interface PreviousSeason {
@@ -68,7 +119,9 @@ interface PreviousSeason {
     captainName: string
 }
 
-async function getPreviousSeasonsPlayed(userId: string): Promise<PreviousSeason[]> {
+async function getPreviousSeasonsPlayed(
+    userId: string
+): Promise<PreviousSeason[]> {
     const results = await db
         .select({
             year: seasons.year,
@@ -87,7 +140,7 @@ async function getPreviousSeasonsPlayed(userId: string): Promise<PreviousSeason[
         .where(eq(drafts.user, userId))
         .orderBy(desc(seasons.year), desc(seasons.id))
 
-    return results.map(r => ({
+    return results.map((r) => ({
         year: r.year,
         season: r.season,
         divisionName: r.divisionName,
@@ -124,7 +177,11 @@ export default async function DashboardPage() {
         ? `${signupStatus.config.seasonName.charAt(0).toUpperCase() + signupStatus.config.seasonName.slice(1)} ${signupStatus.config.seasonYear}`
         : null
 
-    const greeting = userName ? `Hi ${userName}, Welcome back 👋` : "Hi, Welcome back 👋"
+    const waitlistSeasonId = signupStatus?.season?.id ?? null
+
+    const greeting = userName
+        ? `Hi ${userName}, Welcome back 👋`
+        : "Hi, Welcome back 👋"
 
     return (
         <div className="space-y-6">
@@ -138,7 +195,9 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <RiCalendarLine className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle className="text-lg">{seasonLabel} Season</CardTitle>
+                            <CardTitle className="text-lg">
+                                {seasonLabel} Season
+                            </CardTitle>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -153,63 +212,145 @@ export default async function DashboardPage() {
                                             You're registered!
                                         </p>
                                         <p className="text-muted-foreground text-sm">
-                                            Paid ${signupStatus.signup.amount_paid} on{" "}
-                                            {new Date(signupStatus.signup.created_at).toLocaleDateString()}
+                                            Paid $
+                                            {signupStatus.signup.amount_paid} on{" "}
+                                            {new Date(
+                                                signupStatus.signup.created_at
+                                            ).toLocaleDateString()}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="border-t pt-4 space-y-2 text-sm">
+                                <div className="space-y-2 border-t pt-4 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Captain Interest:</span>
+                                        <span className="text-muted-foreground">
+                                            Captain Interest:
+                                        </span>
                                         <span className="font-medium capitalize">
-                                            {signupStatus.signup.captain === "yes"
+                                            {signupStatus.signup.captain ===
+                                            "yes"
                                                 ? "Yes"
-                                                : signupStatus.signup.captain === "only_if_needed"
+                                                : signupStatus.signup
+                                                        .captain ===
+                                                    "only_if_needed"
                                                   ? "Only if needed"
                                                   : "No"}
                                         </span>
                                     </div>
 
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Week 1 Tryouts:</span>
+                                        <span className="text-muted-foreground">
+                                            Week 1 Tryouts:
+                                        </span>
                                         <span className="font-medium">
-                                            {signupStatus.signup.play_1st_week ? "Requested" : "Not requested"}
+                                            {signupStatus.signup.play_1st_week
+                                                ? "Requested"
+                                                : "Not requested"}
                                         </span>
                                     </div>
 
                                     {signupStatus.pairPickName && (
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Pair Request:</span>
-                                            <span className="font-medium">{signupStatus.pairPickName}</span>
+                                            <span className="text-muted-foreground">
+                                                Pair Request:
+                                            </span>
+                                            <span className="font-medium">
+                                                {signupStatus.pairPickName}
+                                            </span>
                                         </div>
                                     )}
 
                                     {signupStatus.signup.dates_missing && (
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-muted-foreground">Dates Missing:</span>
+                                            <span className="text-muted-foreground">
+                                                Dates Missing:
+                                            </span>
                                             <span className="font-medium text-xs">
-                                                {signupStatus.signup.dates_missing}
+                                                {
+                                                    signupStatus.signup
+                                                        .dates_missing
+                                                }
                                             </span>
                                         </div>
                                     )}
                                 </div>
                             </div>
+                        ) : signupStatus.config.registrationOpen &&
+                          signupStatus.seasonFull &&
+                          signupStatus.season ? (
+                            <div className="space-y-3">
+                                <p className="text-muted-foreground">
+                                    The {seasonLabel} season is currently full.
+                                </p>
+                                {signupStatus.onWaitlist ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                                            <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                        </div>
+                                        <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                                            You've expressed interest in
+                                            playing. We'll reach out if a spot
+                                            opens up!
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <p className="text-muted-foreground text-sm">
+                                            Express your interest in case a spot
+                                            opens up due to a drop or injury.
+                                        </p>
+                                        <WaitlistButton
+                                            seasonId={waitlistSeasonId!}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         ) : signupStatus.config.registrationOpen ? (
                             <div className="space-y-3">
                                 <p className="text-muted-foreground">
-                                    You haven't signed up for the {seasonLabel} season yet.
+                                    You haven't signed up for the {seasonLabel}{" "}
+                                    season yet.
                                 </p>
+                                <div className="space-y-1 rounded-lg bg-muted p-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-muted-foreground">
+                                            Season Fee:
+                                        </span>
+                                        <span className="font-semibold">
+                                            $
+                                            {getCurrentSeasonAmount(
+                                                signupStatus.config
+                                            )}
+                                        </span>
+                                    </div>
+                                    {signupStatus.config.lateDate &&
+                                        signupStatus.config.lateAmount &&
+                                        (isLatePricing(signupStatus.config) ? (
+                                            <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                Late registration pricing in
+                                                effect
+                                            </p>
+                                        ) : (
+                                            <p className="text-muted-foreground text-xs">
+                                                Price increases to $
+                                                {signupStatus.config.lateAmount}{" "}
+                                                after{" "}
+                                                {new Date(
+                                                    signupStatus.config.lateDate
+                                                ).toLocaleDateString()}
+                                            </p>
+                                        ))}
+                                </div>
                                 <div className="flex gap-2">
                                     <Link
                                         href="/dashboard/pay-season"
-                                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
                                     >
                                         Sign-up Now
                                     </Link>
                                     <Link
                                         href="/spring-2026-season-info"
-                                        className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                                        className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 font-medium text-sm hover:bg-accent hover:text-accent-foreground"
                                     >
                                         More Info
                                     </Link>
@@ -217,7 +358,8 @@ export default async function DashboardPage() {
                             </div>
                         ) : (
                             <p className="text-muted-foreground">
-                                Registration for the {seasonLabel} season is currently closed.
+                                Registration for the {seasonLabel} season is
+                                currently closed.
                             </p>
                         )}
                     </CardContent>
@@ -229,7 +371,9 @@ export default async function DashboardPage() {
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <RiHistoryLine className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle className="text-lg">Previous Seasons Played</CardTitle>
+                            <CardTitle className="text-lg">
+                                Previous Seasons Played
+                            </CardTitle>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -237,21 +381,42 @@ export default async function DashboardPage() {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b">
-                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Season</th>
-                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Division</th>
-                                        <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Team</th>
-                                        <th className="text-left py-2 font-medium text-muted-foreground">Captain</th>
+                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
+                                            Season
+                                        </th>
+                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
+                                            Division
+                                        </th>
+                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
+                                            Team
+                                        </th>
+                                        <th className="py-2 text-left font-medium text-muted-foreground">
+                                            Captain
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {previousSeasons.map((ps, idx) => (
-                                        <tr key={idx} className="border-b last:border-0">
+                                        <tr
+                                            key={idx}
+                                            className="border-b last:border-0"
+                                        >
                                             <td className="py-2 pr-4">
-                                                {ps.season.charAt(0).toUpperCase() + ps.season.slice(1)} {ps.year}
+                                                {ps.season
+                                                    .charAt(0)
+                                                    .toUpperCase() +
+                                                    ps.season.slice(1)}{" "}
+                                                {ps.year}
                                             </td>
-                                            <td className="py-2 pr-4">{ps.divisionName}</td>
-                                            <td className="py-2 pr-4">{ps.teamName}</td>
-                                            <td className="py-2">{ps.captainName}</td>
+                                            <td className="py-2 pr-4">
+                                                {ps.divisionName}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {ps.teamName}
+                                            </td>
+                                            <td className="py-2">
+                                                {ps.captainName}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

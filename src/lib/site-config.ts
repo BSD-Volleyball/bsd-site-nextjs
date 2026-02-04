@@ -4,6 +4,9 @@ import { eq, inArray } from "drizzle-orm"
 
 export interface SeasonConfig {
     seasonAmount: string
+    lateAmount: string
+    lateDate: string
+    maxPlayers: string
     seasonYear: number
     seasonName: string
     registrationOpen: boolean
@@ -28,6 +31,9 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         .where(
             inArray(siteConfig.key, [
                 "season_amount",
+                "late_amount",
+                "late_date",
+                "max_players",
                 "season_year",
                 "season_name",
                 "registration_open",
@@ -52,6 +58,9 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
 
     return {
         seasonAmount: configMap.get("season_amount") || "",
+        lateAmount: configMap.get("late_amount") || "",
+        lateDate: configMap.get("late_date") || "",
+        maxPlayers: configMap.get("max_players") || "",
         seasonYear: parseInt(configMap.get("season_year") || "", 10),
         seasonName: configMap.get("season_name") || "",
         registrationOpen: configMap.get("registration_open") === "true",
@@ -70,6 +79,24 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
     }
 }
 
+export function getCurrentSeasonAmount(config: SeasonConfig): string {
+    if (config.lateDate && config.lateAmount) {
+        const now = new Date()
+        const lateDate = new Date(config.lateDate)
+        if (now >= lateDate) {
+            return config.lateAmount
+        }
+    }
+    return config.seasonAmount
+}
+
+export function isLatePricing(config: SeasonConfig): boolean {
+    if (config.lateDate && config.lateAmount) {
+        return new Date() >= new Date(config.lateDate)
+    }
+    return false
+}
+
 export async function getConfigValue(key: string): Promise<string | null> {
     const [row] = await db
         .select()
@@ -82,7 +109,7 @@ export async function getConfigValue(key: string): Promise<string | null> {
 
 export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const { seasons, signups } = await import("@/database/schema")
-    const { and } = await import("drizzle-orm")
+    const { and, count } = await import("drizzle-orm")
 
     const config = await getSeasonConfig()
 
@@ -95,7 +122,12 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const [season] = await db
         .select({ id: seasons.id })
         .from(seasons)
-        .where(and(eq(seasons.year, config.seasonYear), eq(seasons.season, config.seasonName)))
+        .where(
+            and(
+                eq(seasons.year, config.seasonYear),
+                eq(seasons.season, config.seasonName)
+            )
+        )
         .limit(1)
 
     if (!season) {
@@ -109,6 +141,22 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
         .where(and(eq(signups.season, season.id), eq(signups.player, userId)))
         .limit(1)
 
-    // Eligible if no existing signup
-    return !existingSignup
+    if (existingSignup) {
+        return false
+    }
+
+    // Check if season is full
+    const maxPlayers = parseInt(config.maxPlayers, 10)
+    if (maxPlayers > 0) {
+        const [result] = await db
+            .select({ total: count() })
+            .from(signups)
+            .where(eq(signups.season, season.id))
+
+        if (result && result.total >= maxPlayers) {
+            return false
+        }
+    }
+
+    return true
 }
