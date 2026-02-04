@@ -116,7 +116,8 @@ export const teams = pgTable("teams", {
 	captain: text('captain').notNull().references(() => users.id),
 	division: integer('division').notNull().references(() => divisions.id),
 	name: text('name').notNull(),
-	number: integer('number')
+	number: integer('number'),
+    rank: integer('rank')
 })
 
 export const players = pgTable("players", {
@@ -144,7 +145,9 @@ export const champions = pgTable("champions", {
 	id: serial('id').primaryKey(),
 	team: integer('team').notNull().references(() => teams.id),
 	season: integer('season').notNull().references(() => seasons.id),
-	division: integer('division').notNull().references(() => divisions.id)
+	division: integer('division').notNull().references(() => divisions.id),
+    picture: text("picture"),
+    caption: text("caption")
 });
 
 export const siteConfig = pgTable("site_config", {
