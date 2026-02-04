@@ -47,7 +47,7 @@ const signupNavItem = {
 }
 
 const adminNavItems = [
-    { title: "Player Lookup", url: "/dashboard/player-lookup", icon: RiSearchLine },
+    { title: "Admin Player Lookup", url: "/dashboard/player-lookup", icon: RiSearchLine },
     { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
     { title: "Draft Division", url: "/dashboard/draft-division", icon: RiFileList3Line }
 ]

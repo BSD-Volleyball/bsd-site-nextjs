@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import { getPlayerDetails, type PlayerListItem, type PlayerDetails, type PlayerSignup } from "./actions"
+import { getPlayerDetails, type PlayerListItem, type PlayerDetails, type PlayerSignup, type PlayerDraftHistory } from "./actions"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
 interface PlayerLookupFormProps {
     players: PlayerListItem[]
@@ -36,6 +37,7 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
     const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(null)
     const [signupHistory, setSignupHistory] = useState<PlayerSignup[]>([])
+    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [showImageModal, setShowImageModal] = useState(false)
@@ -67,10 +69,12 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
         if (result.status && result.player) {
             setPlayerDetails(result.player)
             setSignupHistory(result.signupHistory)
+            setDraftHistory(result.draftHistory)
         } else {
             setError(result.message || "Failed to load player details")
             setPlayerDetails(null)
             setSignupHistory([])
+            setDraftHistory([])
         }
 
         setIsLoading(false)
@@ -80,6 +84,7 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
         setSelectedPlayerId(null)
         setPlayerDetails(null)
         setSignupHistory([])
+        setDraftHistory([])
         setSearch("")
         setError(null)
     }
@@ -400,6 +405,53 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
                         </Card>
                     ))}
                 </div>
+            )}
+
+            {/* Draft Pick History Chart */}
+            {draftHistory.length > 0 && !isLoading && (
+                <Card className="max-w-2xl">
+                    <CardHeader>
+                        <CardTitle className="text-base">Draft Pick History</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart
+                                data={draftHistory.map(d => ({
+                                    ...d,
+                                    label: `${d.seasonName.charAt(0).toUpperCase() + d.seasonName.slice(1)} ${d.seasonYear}`
+                                }))}
+                                margin={{ top: 5, right: 20, bottom: 5, left: 0 }}
+                            >
+                                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                                <YAxis
+                                    reversed
+                                    tick={{ fontSize: 12 }}
+                                    label={{ value: "Overall Pick", angle: -90, position: "insideLeft", style: { fontSize: 12 } }}
+                                />
+                                <Tooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null
+                                        const d = payload[0].payload
+                                        return (
+                                            <div className="rounded-md border bg-background p-3 text-sm shadow-md">
+                                                <p className="font-medium">{d.label}</p>
+                                                <p className="text-muted-foreground">Division: {d.divisionName}</p>
+                                                <p className="text-muted-foreground">Team: {d.teamName}</p>
+                                                <p className="text-muted-foreground">Round: {d.round}</p>
+                                                <p className="text-muted-foreground">Overall Pick: {d.overall}</p>
+                                            </div>
+                                        )
+                                    }}
+                                />
+                                <Bar dataKey="overall" radius={[4, 4, 0, 0]}>
+                                    {draftHistory.map((_, index) => (
+                                        <Cell key={index} className="fill-primary" />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
             )}
 
             {playerDetails && signupHistory.length === 0 && !isLoading && (

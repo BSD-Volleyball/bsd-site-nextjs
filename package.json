@@ -45,6 +45,7 @@
     "react-hook-form": "^7.60.0",
     "react-square-web-payments-sdk": "^3.3.0",
     "react-use-measure": "^2.1.7",
+    "recharts": "^3.7.0",
     "resend": "^4.7.0",
     "sonner": "^2.0.5",
     "square": "^44.0.0",

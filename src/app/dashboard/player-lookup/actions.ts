@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, seasons } from "@/database/schema"
+import { users, signups, seasons, drafts, teams, divisions } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 
 export interface PlayerListItem {
@@ -58,6 +58,15 @@ export interface PlayerSignup {
     orderId: string | null
     amountPaid: string | null
     createdAt: Date
+}
+
+export interface PlayerDraftHistory {
+    seasonYear: number
+    seasonName: string
+    divisionName: string
+    teamName: string
+    round: number
+    overall: number
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -118,6 +127,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
     message?: string
     player: PlayerDetails | null
     signupHistory: PlayerSignup[]
+    draftHistory: PlayerDraftHistory[]
 }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -125,7 +135,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             status: false,
             message: "You don't have permission to access this page.",
             player: null,
-            signupHistory: []
+            signupHistory: [],
+            draftHistory: []
         }
     }
 
@@ -166,7 +177,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 status: false,
                 message: "Player not found.",
                 player: null,
-                signupHistory: []
+                signupHistory: [],
+                draftHistory: []
             }
         }
 
@@ -220,10 +232,28 @@ export async function getPlayerDetails(playerId: string): Promise<{
             })
         )
 
+        // Fetch draft history
+        const draftData = await db
+            .select({
+                seasonYear: seasons.year,
+                seasonName: seasons.season,
+                divisionName: divisions.name,
+                teamName: teams.name,
+                round: drafts.round,
+                overall: drafts.overall
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .innerJoin(seasons, eq(teams.season, seasons.id))
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(eq(drafts.user, playerId))
+            .orderBy(seasons.year, seasons.id)
+
         return {
             status: true,
             player,
-            signupHistory
+            signupHistory,
+            draftHistory: draftData
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -231,7 +261,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             status: false,
             message: "Something went wrong.",
             player: null,
-            signupHistory: []
+            signupHistory: [],
+            draftHistory: []
         }
     }
 }

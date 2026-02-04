@@ -10,7 +10,7 @@ import { getPlayersForLookup } from "./actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Player Lookup"
+    title: "Admin Player Lookup"
 }
 
 export const dynamic = "force-dynamic"
@@ -44,7 +44,7 @@ export default async function PlayerLookupPage() {
         return (
             <div className="space-y-6">
                 <PageHeader
-                    title="Player Lookup"
+                    title="Admin Player Lookup"
                     description="Search and view player information."
                 />
                 <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
@@ -57,7 +57,7 @@ export default async function PlayerLookupPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Player Lookup"
+                title="Admin Player Lookup"
                 description="Search and view player information."
             />
             <PlayerLookupForm players={result.players} playerPicUrl={process.env.PLAYER_PIC_URL || ""} />
