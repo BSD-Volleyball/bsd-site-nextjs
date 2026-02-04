@@ -7,7 +7,11 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { seasons, signups, users } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
-import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getCurrentSeasonAmount,
+    type SeasonConfig
+} from "@/lib/site-config"
 
 export interface SignupFormData {
     age: string
@@ -51,7 +55,7 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
         .from(users)
         .orderBy(users.last_name, users.first_name)
 
-    return allUsers.map(u => {
+    return allUsers.map((u) => {
         const preferredPart = u.preffered_name ? ` (${u.preffered_name})` : ""
         return {
             id: u.id,
@@ -75,7 +79,8 @@ export async function submitSeasonPayment(
     try {
         // Get config from database
         const config = await getSeasonConfig()
-        const amountCents = BigInt(Math.round(parseFloat(config.seasonAmount) * 100))
+        const amount = getCurrentSeasonAmount(config)
+        const amountCents = BigInt(Math.round(parseFloat(amount) * 100))
 
         const client = getSquareClient()
         const response = await client.payments.create({
@@ -94,7 +99,12 @@ export async function submitSeasonPayment(
             const [season] = await db
                 .select({ id: seasons.id })
                 .from(seasons)
-                .where(and(eq(seasons.year, config.seasonYear), eq(seasons.season, config.seasonName)))
+                .where(
+                    and(
+                        eq(seasons.year, config.seasonYear),
+                        eq(seasons.season, config.seasonName)
+                    )
+                )
                 .limit(1)
 
             if (season) {
@@ -103,7 +113,7 @@ export async function submitSeasonPayment(
                     season: season.id,
                     player: session.user.id,
                     order_id: response.payment.id,
-                    amount_paid: config.seasonAmount,
+                    amount_paid: amount,
                     age: formData.age,
                     captain: formData.captain,
                     pair: formData.pair,
@@ -117,7 +127,8 @@ export async function submitSeasonPayment(
 
             return {
                 success: true,
-                message: "Payment successful! You are now registered for the season.",
+                message:
+                    "Payment successful! You are now registered for the season.",
                 paymentId: response.payment.id,
                 receiptUrl: response.payment.receiptUrl
             }
@@ -131,7 +142,8 @@ export async function submitSeasonPayment(
         console.error("Payment error:", error)
         return {
             success: false,
-            message: "An error occurred while processing your payment. Please try again."
+            message:
+                "An error occurred while processing your payment. Please try again."
         }
     }
 }

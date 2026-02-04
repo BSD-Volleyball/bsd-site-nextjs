@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { WizardForm } from "./wizard-form"
 import { getUsers } from "./actions"
 import type { Metadata } from "next"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, getCurrentSeasonAmount } from "@/lib/site-config"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -30,7 +30,11 @@ export default async function PaySeasonPage() {
                     </Link>
                 </Button>
             </div>
-            <WizardForm amount={config.seasonAmount} users={users} config={config} />
+            <WizardForm
+                amount={getCurrentSeasonAmount(config)}
+                users={users}
+                config={config}
+            />
         </div>
     )
 }
