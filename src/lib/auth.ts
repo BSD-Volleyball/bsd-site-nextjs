@@ -44,6 +44,11 @@ export const auth = betterAuth({
                 required: true,
                 fieldName: "last_name"
             },
+            preffered_name: {
+                type: "string",
+                required: false,
+                fieldName: "preffered_name"
+            },
             onboarding_completed: {
                 type: "boolean",
                 required: false,

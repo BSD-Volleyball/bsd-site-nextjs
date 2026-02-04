@@ -457,9 +457,10 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                         <div className="max-h-64 overflow-y-auto rounded-lg border p-4 text-sm text-muted-foreground leading-relaxed">
                             <p>
                                 By checking the &quot;I Agree&quot; box below, I hereby release, waive, discharge,
-                                and covenant not to sue Bump Set Drink, Inc. (BSD), referees, other participants,
-                                and any persons in a playing area, from all liability to you, your personal
-                                representatives, assigned heirs, and next of kin for any and all damage, and any
+                                and covenant not to sue, or hold responsible, Bump Set Drink, Inc. (BSD), Adventist
+                                HealthCare Fieldhouse referees, other participants, and any persons in
+                                a playing area, from all liability to you, your personal representatives,
+                                assigned heirs, and next of kin for any and all damage, and any
                                 claim or demands thereof on account of injury to you or your property or resulting
                                 in your death, whether caused by the negligence or otherwise while you are
                                 participating or working for or observing BSD events. You expressly acknowledge and

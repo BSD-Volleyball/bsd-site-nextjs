@@ -35,6 +35,7 @@ interface Profile {
     fullName?: string | null
     first_name?: string | null
     last_name?: string | null
+    preffered_name?: string | null
     displayName?: string | null
     username?: string | null
     displayUsername?: string | null
@@ -91,12 +92,13 @@ export function NavUser() {
     const user = session.user as Profile
 
     // Get user's display name with fallbacks
+    const firstName = user.preffered_name || user.first_name
     const fullName =
-        user.first_name && user.last_name
-            ? `${user.first_name} ${user.last_name}`.trim()
+        firstName && user.last_name
+            ? `${firstName} ${user.last_name}`.trim()
             : null
     const displayName =
-        user.displayName || user.fullName || fullName || user.first_name || "User"
+        fullName || firstName || "User"
 
     // Generate initials
     const initials =

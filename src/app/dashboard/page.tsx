@@ -92,9 +92,7 @@ async function getPreviousSeasonsPlayed(userId: string): Promise<PreviousSeason[
         season: r.season,
         divisionName: r.divisionName,
         teamName: r.teamName,
-        captainName: r.captainPreferredName
-            ? `${r.captainFirstName} (${r.captainPreferredName}) ${r.captainLastName}`
-            : `${r.captainFirstName} ${r.captainLastName}`
+        captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`
     }))
 }
 
