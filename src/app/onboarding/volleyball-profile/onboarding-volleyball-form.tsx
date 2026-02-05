@@ -70,10 +70,11 @@ export function OnboardingVolleyballForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label htmlFor="experience">Experience</Label>
+                        <Label htmlFor="experience">Experience <span className="text-destructive">*</span></Label>
                         <Textarea
                             id="experience"
                             placeholder="Describe your volleyball experience..."
+                            required
                             value={formData.experience ?? ""}
                             onChange={(e) =>
                                 setFormData({
@@ -102,8 +103,9 @@ export function OnboardingVolleyballForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="height">Height</Label>
+                        <Label htmlFor="height">Height <span className="text-destructive">*</span></Label>
                         <Select
+                            required
                             value={formData.height?.toString() ?? ""}
                             onValueChange={(value) =>
                                 setFormData({
