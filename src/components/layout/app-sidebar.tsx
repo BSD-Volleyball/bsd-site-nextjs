@@ -14,7 +14,10 @@ import {
     RiSettings3Line,
     RiGroupLine,
     RiTimeLine,
-    RiCoupon3Line
+    RiCoupon3Line,
+    RiStarLine,
+    RiCalendarLine,
+    RiArrowDownSLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -31,12 +34,22 @@ import {
     SidebarHeader,
     SidebarMenu,
     SidebarMenuButton,
-    SidebarMenuItem
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubItem,
+    SidebarMenuSubButton
 } from "@/components/ui/sidebar"
+import {
+    Collapsible,
+    CollapsibleTrigger,
+    CollapsibleContent
+} from "@/components/ui/collapsible"
 import { site } from "@/config/site"
 import {
     getSignupEligibility,
-    getIsAdminOrDirector
+    getIsAdminOrDirector,
+    getRecentSeasonsNav,
+    type SeasonNavItem
 } from "@/app/dashboard/actions"
 
 const baseNavItems = [
@@ -78,6 +91,11 @@ const adminNavItems = [
         url: "/dashboard/manage-discounts",
         icon: RiCoupon3Line
     },
+    {
+        title: "Evaluate New Players",
+        url: "/dashboard/evaluate-players",
+        icon: RiStarLine
+    },
     { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
     {
         title: "Draft Division",
@@ -89,6 +107,12 @@ const adminNavItems = [
         url: "/dashboard/site-config",
         icon: RiSettings3Line
     }
+]
+
+const seasonCategories = [
+    { key: "rosters", label: "Rosters", basePath: "/dashboard/rosters" },
+    { key: "schedule", label: "Season", basePath: "/dashboard/schedule" },
+    { key: "playoffs", label: "Playoffs", basePath: "/dashboard/playoffs" }
 ]
 
 function SidebarLogo() {
@@ -116,14 +140,141 @@ function SidebarLogo() {
     )
 }
 
+function NavItems({
+    items,
+    pathname
+}: {
+    items: typeof baseNavItems
+    pathname: string
+}) {
+    return (
+        <>
+            {items.map((item) => {
+                const isActive = pathname === item.url
+
+                return (
+                    <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                            asChild
+                            className="group/menu-button h-9 gap-3 font-medium transition-all duration-300 ease-out group-data-[collapsible=icon]:px-1.25! [&>svg]:size-auto"
+                            tooltip={item.title}
+                            isActive={isActive}
+                        >
+                            <Link
+                                href={item.url}
+                                className="flex items-center gap-3"
+                            >
+                                {item.icon && (
+                                    <item.icon
+                                        className="text-muted-foreground/65 group-data-[active=true]/menu-button:text-primary"
+                                        size={22}
+                                        aria-hidden="true"
+                                    />
+                                )}
+                                <span>{item.title}</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )
+            })}
+        </>
+    )
+}
+
+function SeasonNavMenuItem({
+    season,
+    pathname
+}: {
+    season: SeasonNavItem
+    pathname: string
+}) {
+    const seasonLabel = `${season.season.charAt(0).toUpperCase() + season.season.slice(1)} ${season.year}`
+
+    return (
+        <Collapsible asChild className="group/season">
+            <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                        className="group/menu-button h-9 gap-3 font-medium transition-all duration-300 ease-out group-data-[collapsible=icon]:px-1.25! [&>svg]:size-auto"
+                        tooltip={seasonLabel}
+                    >
+                        <RiCalendarLine
+                            className="text-muted-foreground/65"
+                            size={22}
+                            aria-hidden="true"
+                        />
+                        <span>{seasonLabel}</span>
+                        <RiArrowDownSLine
+                            className="ml-auto transition-transform duration-200 group-data-[state=open]/season:rotate-180"
+                            size={16}
+                        />
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <SidebarMenuSub>
+                        {seasonCategories.map((cat) => (
+                            <Collapsible
+                                key={cat.key}
+                                asChild
+                                className="group/category"
+                            >
+                                <SidebarMenuSubItem>
+                                    <CollapsibleTrigger asChild>
+                                        <SidebarMenuSubButton className="cursor-pointer">
+                                            <span>{cat.label}</span>
+                                            <RiArrowDownSLine
+                                                className="ml-auto transition-transform duration-200 group-data-[state=open]/category:rotate-180"
+                                                size={14}
+                                            />
+                                        </SidebarMenuSubButton>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            {season.divisions.map((div) => {
+                                                const href = `${cat.basePath}/${season.id}/${div.id}`
+                                                return (
+                                                    <SidebarMenuSubItem
+                                                        key={div.id}
+                                                    >
+                                                        <SidebarMenuSubButton
+                                                            asChild
+                                                            size="sm"
+                                                            isActive={
+                                                                pathname ===
+                                                                href
+                                                            }
+                                                        >
+                                                            <Link href={href}>
+                                                                <span>
+                                                                    {div.name}
+                                                                </span>
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                )
+                                            })}
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </SidebarMenuSubItem>
+                            </Collapsible>
+                        ))}
+                    </SidebarMenuSub>
+                </CollapsibleContent>
+            </SidebarMenuItem>
+        </Collapsible>
+    )
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
         getIsAdminOrDirector().then(setIsAdmin)
+        getRecentSeasonsNav().then(setSeasonNav)
     }, [pathname])
 
     // Build nav items dynamically
@@ -134,67 +285,60 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
     }
 
-    // Build nav groups
-    const navGroups = [
-        {
-            title: "General",
-            items: navItems
-        }
-    ]
-
-    // Add Admin section for admins/directors
-    if (isAdmin) {
-        navGroups.push({
-            title: "Admin",
-            items: adminNavItems
-        })
-    }
-
     return (
         <Sidebar collapsible="icon" variant="inset" {...props}>
             <SidebarHeader className="mb-4 h-13 justify-center max-md:mt-2">
                 <SidebarLogo />
             </SidebarHeader>
             <SidebarContent className="-mt-2">
-                {navGroups.map((group) => (
-                    <SidebarGroup key={group.title}>
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                        General
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <NavItems
+                                items={navItems}
+                                pathname={pathname}
+                            />
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                {seasonNav.length > 0 && (
+                    <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            {group.title}
+                            Recent Seasons
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
-                                {group.items.map((item) => {
-                                    const isActive = pathname === item.url
-
-                                    return (
-                                        <SidebarMenuItem key={item.title}>
-                                            <SidebarMenuButton
-                                                asChild
-                                                className="group/menu-button h-9 gap-3 font-medium transition-all duration-300 ease-out group-data-[collapsible=icon]:px-1.25! [&>svg]:size-auto"
-                                                tooltip={item.title}
-                                                isActive={isActive}
-                                            >
-                                                <Link
-                                                    href={item.url}
-                                                    className="flex items-center gap-3"
-                                                >
-                                                    {item.icon && (
-                                                        <item.icon
-                                                            className="text-muted-foreground/65 group-data-[active=true]/menu-button:text-primary"
-                                                            size={22}
-                                                            aria-hidden="true"
-                                                        />
-                                                    )}
-                                                    <span>{item.title}</span>
-                                                </Link>
-                                            </SidebarMenuButton>
-                                        </SidebarMenuItem>
-                                    )
-                                })}
+                                {seasonNav.map((season) => (
+                                    <SeasonNavMenuItem
+                                        key={season.id}
+                                        season={season}
+                                        pathname={pathname}
+                                    />
+                                ))}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
-                ))}
+                )}
+
+                {isAdmin && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Admin
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={adminNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
             </SidebarContent>
             <SidebarFooter>
                 <NavUser />
