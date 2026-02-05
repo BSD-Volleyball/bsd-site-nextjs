@@ -1,4 +1,5 @@
 "use client"
+import { SignedOut } from "@daveyplate/better-auth-ui"
 import { ArrowRight, MapPin, Users, Trophy } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -19,19 +20,21 @@ export const HeroSection = () => {
                     </div>
 
                     <p className="mx-auto max-w-2xl text-muted-foreground text-lg leading-relaxed lg:text-xl">
-                        A recreational co-ed volleyball league in the Washington DC metro area.
-                        Join us for competitive play across five skill divisions, meet new people,
+                        A recreational co-ed volleyball league that plays on Thursday nights in the Washington DC metro area.
+                        Join us for competitive play across six skill divisions, meet new people,
                         and have fun!
                     </p>
 
-                    <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
-                        <p className="mb-3 font-bold text-lg">
-                            Played with us before? You already have an account!
-                        </p>
-                        <Button asChild size="lg">
-                            <Link href="/auth/forgot-password">Set Password</Link>
-                        </Button>
-                    </div>
+                    <SignedOut>
+                        <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
+                            <p className="mb-3 font-bold text-lg">
+                                Played with us before? You already have an account!
+                            </p>
+                            <Button asChild size="lg">
+                                <Link href="/auth/forgot-password">Set Password</Link>
+                            </Button>
+                        </div>
+                    </SignedOut>
 
                     <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
                         <Button
@@ -44,16 +47,18 @@ export const HeroSection = () => {
                             </Link>
                         </Button>
 
-                        <Button
-                            asChild
-                            size="lg"
-                            className="group/arrow rounded-full"
-                        >
-                            <Link href="/auth/sign-up">
-                                Register Now
-                                <ArrowRight className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
-                            </Link>
-                        </Button>
+                        <SignedOut>
+                            <Button
+                                asChild
+                                size="lg"
+                                className="group/arrow rounded-full"
+                            >
+                                <Link href="/auth/sign-up">
+                                    Register Now
+                                    <ArrowRight className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
+                                </Link>
+                            </Button>
+                        </SignedOut>
 
                         <Button
                             asChild

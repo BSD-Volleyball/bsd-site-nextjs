@@ -1,6 +1,8 @@
 import { HeroSection } from "@/components/layout/sections/hero"
 import { site } from "@/config/site"
+import { auth } from "@/lib/auth"
 import Link from "next/link"
+import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText, Users, Gavel, Shield } from "lucide-react"
@@ -65,7 +67,8 @@ const quickLinks = [
     }
 ]
 
-export default function Home() {
+export default async function Home() {
+    const session = await auth.api.getSession({ headers: await headers() })
     return (
         <>
             <HeroSection />
@@ -133,23 +136,25 @@ export default function Home() {
             </section>
 
             {/* CTA Section */}
-            <section className="container mx-auto px-4 py-24">
-                <div className="mx-auto max-w-4xl text-center">
-                    <h2 className="mb-4 font-bold text-3xl">Ready to Play?</h2>
-                    <p className="mb-8 text-muted-foreground text-lg">
-                        Join our community of volleyball enthusiasts. Register today to be included
-                        in our next season&apos;s draft.
-                    </p>
-                    <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                        <Button asChild size="lg">
-                            <Link href="/auth/sign-up">Register Now</Link>
-                        </Button>
-                        <Button asChild variant="outline" size="lg">
-                            <Link href="/player-experience">Check Skill Levels</Link>
-                        </Button>
+            {!session && (
+                <section className="container mx-auto px-4 py-24">
+                    <div className="mx-auto max-w-4xl text-center">
+                        <h2 className="mb-4 font-bold text-3xl">Ready to Play?</h2>
+                        <p className="mb-8 text-muted-foreground text-lg">
+                            Join our community of volleyball enthusiasts. Register today to be included
+                            in our next season&apos;s draft.
+                        </p>
+                        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+                            <Button asChild size="lg">
+                                <Link href="/auth/sign-up">Register Now</Link>
+                            </Button>
+                            <Button asChild variant="outline" size="lg">
+                                <Link href="/player-experience">Check Skill Levels</Link>
+                            </Button>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            )}
         </>
     )
 }
