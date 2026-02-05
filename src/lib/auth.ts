@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { readFileSync } from "fs"
+import { join } from "path"
 import { Resend } from "resend"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
@@ -8,6 +10,7 @@ import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_BASE_URL,
@@ -106,8 +109,14 @@ export const auth = betterAuth({
                     url,
                     siteName: site.name,
                     baseUrl: site.url,
-                    imageUrl: `${site.url}/logo.png`
-                })
+                    imageUrl: "cid:logo"
+                }),
+                attachments: [{
+                    filename: "logo.png",
+                    content: logoContent,
+                    contentType: "image/png",
+                    inlineContentId: "logo"
+                }]
             })
         }
     },
