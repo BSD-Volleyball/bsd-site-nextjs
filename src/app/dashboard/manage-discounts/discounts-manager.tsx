@@ -442,13 +442,8 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                                                 onClick={() =>
                                                     handleStartEdit(discount)
                                                 }
-                                                disabled={discount.used}
                                                 className="h-8 w-8 p-0"
-                                                title={
-                                                    discount.used
-                                                        ? "Cannot edit used discount"
-                                                        : "Edit"
-                                                }
+                                                title="Edit"
                                             >
                                                 <RiEditLine className="h-4 w-4" />
                                             </Button>

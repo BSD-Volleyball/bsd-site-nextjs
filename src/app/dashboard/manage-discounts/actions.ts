@@ -172,7 +172,8 @@ export async function updateDiscount(data: {
             .set({
                 percentage: data.percentage,
                 expiration: data.expiration ? new Date(data.expiration) : null,
-                reason: data.reason || null
+                reason: data.reason || null,
+                used: false
             })
             .where(eq(discounts.id, data.id))
 
