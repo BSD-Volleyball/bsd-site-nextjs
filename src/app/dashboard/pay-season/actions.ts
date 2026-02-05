@@ -2,6 +2,8 @@
 
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
+import { readFileSync } from "fs"
+import { join } from "path"
 import { Resend } from "resend"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
@@ -23,6 +25,7 @@ import {
 import { site } from "@/config/site"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
 
 export interface SignupFormData {
     age: string
@@ -133,8 +136,14 @@ async function sendSignupConfirmationEmail(
                 url: receiptUrl || `${site.url}/dashboard`,
                 siteName: site.name,
                 baseUrl: site.url,
-                imageUrl: `${site.url}/logo.png`
-            })
+                imageUrl: "cid:logo"
+            }),
+            attachments: [{
+                filename: "logo.png",
+                content: logoContent,
+                contentType: "image/png",
+                inlineContentId: "logo"
+            }]
         })
     } catch (error) {
         console.error("Failed to send signup confirmation email:", error)
