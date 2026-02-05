@@ -6,6 +6,7 @@ import { useTheme } from "next-themes"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
 import {
     submitSeasonPayment,
+    submitFreeSignup,
     type PaymentResult,
     type SignupFormData
 } from "./actions"
@@ -49,15 +50,21 @@ interface WizardFormProps {
     amount: string
     users: User[]
     config: SeasonConfig
+    discount: { id: number; percentage: string } | null
 }
 
 const TABS = ["info", "pairing", "schedule", "waivers", "payment"] as const
 type TabValue = (typeof TABS)[number]
 
-export function WizardForm({ amount, users, config }: WizardFormProps) {
+export function WizardForm({
+    amount,
+    users,
+    config,
+    discount
+}: WizardFormProps) {
     const router = useRouter()
     const { resolvedTheme } = useTheme()
-    const isDark = resolvedTheme === "dark"
+    const _isDark = resolvedTheme === "dark"
     const [activeTab, setActiveTab] = useState<TabValue>("info")
     const [formData, setFormData] = useState<SignupFormData>({
         age: "20+",
@@ -122,6 +129,16 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
 
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID!
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
+
+    // Calculate discounted amount
+    const discountPercentage = discount ? parseFloat(discount.percentage) : 0
+    const discountedAmount = discount
+        ? (parseFloat(amount) * (1 - discountPercentage / 100)).toFixed(2)
+        : amount
+    const discountSavings = discount
+        ? (parseFloat(amount) - parseFloat(discountedAmount)).toFixed(2)
+        : "0"
+    const isFreeRegistration = discount && discountPercentage >= 100
 
     const goToNextTab = () => {
         const currentIndex = TABS.indexOf(activeTab)
@@ -682,9 +699,37 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                                 <span className="text-muted-foreground">
                                     Volleyball Season Fee
                                 </span>
-                                <span className="font-semibold">${amount}</span>
+                                {discount ? (
+                                    <span className="font-semibold text-muted-foreground line-through">
+                                        ${amount}
+                                    </span>
+                                ) : (
+                                    <span className="font-semibold">
+                                        ${amount}
+                                    </span>
+                                )}
                             </div>
-                            {config.lateDate &&
+                            {discount && (
+                                <>
+                                    <div className="flex justify-between text-green-600 dark:text-green-400">
+                                        <span>
+                                            Discount ({discount.percentage}%
+                                            off)
+                                        </span>
+                                        <span>-${discountSavings}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t pt-2">
+                                        <span className="font-medium">
+                                            Total
+                                        </span>
+                                        <span className="font-bold">
+                                            ${discountedAmount}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                            {!discount &&
+                                config.lateDate &&
                                 config.lateAmount &&
                                 (new Date() >= new Date(config.lateDate) ? (
                                     <p className="text-amber-600 text-xs dark:text-amber-400">
@@ -716,7 +761,47 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                             </div>
                         )}
 
-                        {resolvedTheme == null ? null : (
+                        {isFreeRegistration ? (
+                            <div className="space-y-4">
+                                <div className="rounded-lg border border-green-300 bg-green-50 p-4 text-center dark:border-green-800 dark:bg-green-950">
+                                    <p className="font-semibold text-green-800 dark:text-green-200">
+                                        Your registration is fully covered!
+                                    </p>
+                                    <p className="mt-1 text-green-700 text-sm dark:text-green-300">
+                                        No payment required.
+                                    </p>
+                                </div>
+                                <Button
+                                    onClick={async () => {
+                                        setIsProcessing(true)
+                                        setPaymentResult(null)
+                                        try {
+                                            const result =
+                                                await submitFreeSignup(
+                                                    formData,
+                                                    discount!.id
+                                                )
+                                            setPaymentResult(result)
+                                        } catch (_error) {
+                                            setPaymentResult({
+                                                success: false,
+                                                message:
+                                                    "An unexpected error occurred. Please try again."
+                                            })
+                                        } finally {
+                                            setIsProcessing(false)
+                                        }
+                                    }}
+                                    disabled={isProcessing}
+                                    className="w-full"
+                                    size="lg"
+                                >
+                                    {isProcessing
+                                        ? "Processing..."
+                                        : "Complete Free Registration"}
+                                </Button>
+                            </div>
+                        ) : resolvedTheme == null ? null : (
                             <PaymentForm
                                 key={resolvedTheme}
                                 applicationId={appId}
@@ -740,10 +825,11 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                                         const result =
                                             await submitSeasonPayment(
                                                 tokenResult.token,
-                                                formData
+                                                formData,
+                                                discount?.id
                                             )
                                         setPaymentResult(result)
-                                    } catch (error) {
+                                    } catch (_error) {
                                         setPaymentResult({
                                             success: false,
                                             message:
@@ -757,7 +843,7 @@ export function WizardForm({ amount, users, config }: WizardFormProps) {
                                     countryCode: "US",
                                     currencyCode: "USD",
                                     total: {
-                                        amount,
+                                        amount: discountedAmount,
                                         label: "Volleyball Season Registration"
                                     }
                                 })}

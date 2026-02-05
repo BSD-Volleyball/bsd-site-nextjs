@@ -13,7 +13,8 @@ import {
     RiFileList3Line,
     RiSettings3Line,
     RiGroupLine,
-    RiTimeLine
+    RiTimeLine,
+    RiCoupon3Line
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -71,6 +72,11 @@ const adminNavItems = [
         title: "View Waitlist",
         url: "/dashboard/view-waitlist",
         icon: RiTimeLine
+    },
+    {
+        title: "Manage Discounts",
+        url: "/dashboard/manage-discounts",
+        icon: RiCoupon3Line
     },
     { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
     {
