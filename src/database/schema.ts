@@ -237,3 +237,14 @@ export const discounts = pgTable("discounts", {
         .$defaultFn(() => new Date())
         .notNull()
 })
+
+export const evaluations = pgTable("evaluations", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    player: text("player")
+        .notNull()
+        .references(() => users.id),
+    division: text("division").notNull()
+})
