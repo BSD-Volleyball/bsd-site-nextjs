@@ -1,6 +1,7 @@
 "use client"
 
-import { RedirectToSignUp, SignedIn } from "@daveyplate/better-auth-ui"
+import { SignedIn } from "@daveyplate/better-auth-ui"
+import { RedirectToHome } from "@/components/layout/redirect-to-home"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { DynamicBreadcrumb } from "@/components/layout/dynamic-breadcrumb"
 import { ModeToggle } from "@/components/layout/mode-toggle"
@@ -24,7 +25,7 @@ export default function ProtectedPage({
     return (
         <>
             {onboardingCheck}
-            <RedirectToSignUp />
+            <RedirectToHome />
             <SignedIn>
                 <SidebarProvider defaultOpen={true}>
                     <AppSidebar />
