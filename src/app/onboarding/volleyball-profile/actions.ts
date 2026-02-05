@@ -57,6 +57,13 @@ export async function completeOnboarding(
         return { status: false, message: "You need to be logged in." }
     }
 
+    if (!data.experience?.trim()) {
+        return { status: false, message: "Experience is required." }
+    }
+    if (data.height == null) {
+        return { status: false, message: "Height is required." }
+    }
+
     try {
         await db
             .update(users)
