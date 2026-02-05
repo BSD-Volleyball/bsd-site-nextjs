@@ -229,6 +229,7 @@ export const discounts = pgTable("discounts", {
         .references(() => users.id),
     percentage: numeric("percentage").notNull(),
     expiration: timestamp("expiration"),
+    reason: text("reason"),
     used: boolean("used")
         .$defaultFn(() => false)
         .notNull(),

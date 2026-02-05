@@ -12,6 +12,7 @@ export interface DiscountEntry {
     userName: string
     percentage: string
     expiration: Date | null
+    reason: string | null
     used: boolean
     createdAt: Date
 }
@@ -49,6 +50,7 @@ export async function getDiscounts(): Promise<{
                 preferredName: users.preffered_name,
                 percentage: discounts.percentage,
                 expiration: discounts.expiration,
+                reason: discounts.reason,
                 used: discounts.used,
                 createdAt: discounts.created_at
             })
@@ -64,6 +66,7 @@ export async function getDiscounts(): Promise<{
                 userName: `${row.firstName}${preferred} ${row.lastName}`,
                 percentage: row.percentage || "0",
                 expiration: row.expiration,
+                reason: row.reason,
                 used: row.used,
                 createdAt: row.createdAt
             }
@@ -104,6 +107,7 @@ export async function createDiscount(data: {
     userId: string
     percentage: string
     expiration: string | null
+    reason: string | null
 }): Promise<{ status: boolean; message: string }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -127,6 +131,7 @@ export async function createDiscount(data: {
             user: data.userId,
             percentage: data.percentage,
             expiration: data.expiration ? new Date(data.expiration) : null,
+            reason: data.reason || null,
             used: false,
             created_at: new Date()
         })
@@ -142,6 +147,7 @@ export async function updateDiscount(data: {
     id: number
     percentage: string
     expiration: string | null
+    reason: string | null
 }): Promise<{ status: boolean; message: string }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -165,7 +171,8 @@ export async function updateDiscount(data: {
             .update(discounts)
             .set({
                 percentage: data.percentage,
-                expiration: data.expiration ? new Date(data.expiration) : null
+                expiration: data.expiration ? new Date(data.expiration) : null,
+                reason: data.reason || null
             })
             .where(eq(discounts.id, data.id))
 

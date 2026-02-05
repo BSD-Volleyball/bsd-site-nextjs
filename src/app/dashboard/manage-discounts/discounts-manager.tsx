@@ -40,10 +40,12 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
     const [newUserId, setNewUserId] = useState<string | null>(null)
     const [newPercentage, setNewPercentage] = useState("")
     const [newExpiration, setNewExpiration] = useState("")
+    const [newReason, setNewReason] = useState("")
 
     // Edit form state
     const [editPercentage, setEditPercentage] = useState("")
     const [editExpiration, setEditExpiration] = useState("")
+    const [editReason, setEditReason] = useState("")
 
     const filteredDiscounts = useMemo(() => {
         if (!search) return discounts
@@ -66,7 +68,8 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         const result = await createDiscount({
             userId: newUserId,
             percentage: newPercentage,
-            expiration: newExpiration || null
+            expiration: newExpiration || null,
+            reason: newReason || null
         })
 
         setIsLoading(false)
@@ -77,6 +80,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
             setNewUserId(null)
             setNewPercentage("")
             setNewExpiration("")
+            setNewReason("")
             router.refresh()
         } else {
             setMessage({ type: "error", text: result.message })
@@ -91,6 +95,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                 ? new Date(discount.expiration).toISOString().split("T")[0]
                 : ""
         )
+        setEditReason(discount.reason || "")
         setMessage(null)
     }
 
@@ -98,6 +103,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         setEditingId(null)
         setEditPercentage("")
         setEditExpiration("")
+        setEditReason("")
     }
 
     const handleSaveEdit = async (id: number) => {
@@ -112,7 +118,8 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         const result = await updateDiscount({
             id,
             percentage: editPercentage,
-            expiration: editExpiration || null
+            expiration: editExpiration || null,
+            reason: editReason || null
         })
 
         setIsLoading(false)
@@ -246,6 +253,18 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                                 }
                             />
                         </div>
+                        <div className="sm:col-span-4">
+                            <Label className="mb-1.5 block text-sm">
+                                Reason (optional)
+                            </Label>
+                            <Input
+                                value={newReason}
+                                onChange={(e) =>
+                                    setNewReason(e.target.value)
+                                }
+                                placeholder="e.g. Referral bonus"
+                            />
+                        </div>
                     </div>
                     <div className="mt-4 flex gap-2">
                         <Button
@@ -262,6 +281,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                                 setNewUserId(null)
                                 setNewPercentage("")
                                 setNewExpiration("")
+                                setNewReason("")
                             }}
                             size="sm"
                         >
@@ -286,6 +306,9 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Status
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Reason
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Created
@@ -366,6 +389,24 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                                     )}
                                 </td>
                                 <td className="px-4 py-2 text-muted-foreground">
+                                    {editingId === discount.id ? (
+                                        <Input
+                                            value={editReason}
+                                            onChange={(e) =>
+                                                setEditReason(
+                                                    e.target.value
+                                                )
+                                            }
+                                            className="h-8 w-40"
+                                            placeholder="Optional"
+                                        />
+                                    ) : (
+                                        <span>
+                                            {discount.reason || "—"}
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-2 text-muted-foreground">
                                     {new Date(
                                         discount.createdAt
                                     ).toLocaleDateString()}
@@ -431,7 +472,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                         {filteredDiscounts.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={6}
+                                    colSpan={7}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No discounts found.
