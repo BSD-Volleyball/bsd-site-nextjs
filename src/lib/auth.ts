@@ -20,12 +20,24 @@ export const auth = betterAuth({
         user: {
             create: {
                 before: async (user) => {
-                    const firstName = (user as { first_name?: string }).first_name || ""
-                    const lastName = (user as { last_name?: string }).last_name || ""
+                    let firstName = (user as { first_name?: string }).first_name || ""
+                    let lastName = (user as { last_name?: string }).last_name || ""
+
+                    // Fallback: parse from name field (e.g., unmapped social login)
+                    if (!firstName && !lastName && user.name) {
+                        const parts = user.name.trim().split(/\s+/)
+                        firstName = parts[0] || ""
+                        lastName = parts.slice(1).join(" ") || ""
+                    }
+
+                    const computedName = `${firstName} ${lastName}`.trim()
+
                     return {
                         data: {
                             ...user,
-                            name: `${firstName} ${lastName}`.trim()
+                            first_name: firstName,
+                            last_name: lastName,
+                            name: computedName || user.name || ""
                         }
                     }
                 }
@@ -102,7 +114,11 @@ export const auth = betterAuth({
     socialProviders: {
         google: {
             clientId: process.env.GOOGLE_CLIENT_ID as string,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            mapProfileToUser: (profile) => ({
+                first_name: profile.given_name || "",
+                last_name: profile.family_name || ""
+            })
         }
     },
     plugins: []
