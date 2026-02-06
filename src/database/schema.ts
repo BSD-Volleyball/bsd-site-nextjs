@@ -102,7 +102,8 @@ export const seasons = pgTable("seasons", {
 export const divisions = pgTable("divisions", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    level: integer("level").notNull()
+    level: integer("level").notNull(),
+    active: boolean("active").$defaultFn(() => true).notNull()
 })
 
 export const signups = pgTable("signups", {
@@ -141,19 +142,6 @@ export const teams = pgTable("teams", {
     rank: integer("rank")
 })
 
-export const players = pgTable(
-    "players",
-    {
-        player: text("player")
-            .notNull()
-            .references(() => users.id),
-        team: integer("team")
-            .notNull()
-            .references(() => teams.id)
-    },
-    (table) => [primaryKey({ columns: [table.player, table.team] })]
-)
-
 export const matchs = pgTable("matchs", {
     id: serial("id").primaryKey(),
     season: integer("season")
@@ -163,8 +151,9 @@ export const matchs = pgTable("matchs", {
         .notNull()
         .references(() => divisions.id),
     week: integer("week").notNull(),
-    date: timestamp("date"),
+    date: text("date"),
     time: text("time"),
+    court: integer("court"),
     home_team: integer("home_team")
         .notNull()
         .references(() => teams.id),
@@ -173,7 +162,14 @@ export const matchs = pgTable("matchs", {
         .references(() => teams.id),
     home_score: integer("home_score"),
     away_score: integer("away_score"),
-    winner: integer("winner").references(() => teams.id)
+    home_set1_score: integer("home_set1_score"),
+    away_set1_score: integer("away_set1_score"),
+    home_set2_score: integer("home_set2_score"),
+    away_set2_score: integer("away_set2_score"),
+    home_set3_score: integer("home_set3_score"),
+    away_set3_score: integer("away_set3_score"),
+    winner: integer("winner").references(() => teams.id),
+    playoff: boolean("playoff").$defaultFn(() => false).notNull()
 })
 
 export const champions = pgTable("champions", {
@@ -246,5 +242,20 @@ export const evaluations = pgTable("evaluations", {
     player: text("player")
         .notNull()
         .references(() => users.id),
-    division: text("division").notNull()
+    division: integer("division")
+        .notNull()
+        .references(() => divisions.id)
+})
+
+export const commissioners = pgTable("commissioners", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    commissioner: text("commissioner")
+        .notNull()
+        .references(() => users.id),
+    division: integer("division")
+        .notNull()
+        .references(() => divisions.id)
 })

@@ -133,6 +133,78 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     }
 }
 
+export interface TeamRosterPlayer {
+    id: string
+    displayName: string
+    lastName: string
+    isCaptain: boolean
+}
+
+export interface TeamRosterData {
+    status: boolean
+    message?: string
+    teamName: string
+    players: TeamRosterPlayer[]
+}
+
+export async function getTeamRoster(
+    teamId: number
+): Promise<TeamRosterData> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return { status: false, message: "Not authenticated.", teamName: "", players: [] }
+    }
+
+    try {
+        const [team] = await db
+            .select({
+                id: teams.id,
+                name: teams.name,
+                captain: teams.captain
+            })
+            .from(teams)
+            .where(eq(teams.id, teamId))
+            .limit(1)
+
+        if (!team) {
+            return { status: false, message: "Team not found.", teamName: "", players: [] }
+        }
+
+        const draftRows = await db
+            .select({
+                userId: drafts.user,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name
+            })
+            .from(drafts)
+            .innerJoin(users, eq(drafts.user, users.id))
+            .where(eq(drafts.team, teamId))
+
+        const players: TeamRosterPlayer[] = draftRows.map((row) => ({
+            id: row.userId,
+            displayName: row.preferredName || row.firstName,
+            lastName: row.lastName,
+            isCaptain: row.userId === team.captain
+        }))
+
+        players.sort((a, b) => {
+            const nameA = `${a.displayName} ${a.lastName}`.toLowerCase()
+            const nameB = `${b.displayName} ${b.lastName}`.toLowerCase()
+            return nameA.localeCompare(nameB)
+        })
+
+        return {
+            status: true,
+            teamName: team.name,
+            players
+        }
+    } catch (error) {
+        console.error("Error fetching team roster:", error)
+        return { status: false, message: "Something went wrong.", teamName: "", players: [] }
+    }
+}
+
 export async function expressWaitlistInterest(
     seasonId: number
 ): Promise<{ status: boolean; message: string }> {

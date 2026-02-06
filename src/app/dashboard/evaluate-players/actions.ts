@@ -3,11 +3,21 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, seasons, drafts, evaluations } from "@/database/schema"
+import {
+    users,
+    signups,
+    seasons,
+    drafts,
+    evaluations,
+    divisions
+} from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
-const VALID_DIVISIONS = ["AA", "A", "ABA", "ABB", "BBB", "BB"] as const
+export interface DivisionOption {
+    id: number
+    name: string
+}
 
 export interface NewPlayerEntry {
     userId: string
@@ -17,7 +27,7 @@ export interface NewPlayerEntry {
     male: boolean | null
     experience: string | null
     assessment: string | null
-    division: string | null
+    division: number | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -37,6 +47,7 @@ export async function getNewPlayers(): Promise<{
     status: boolean
     message?: string
     players: NewPlayerEntry[]
+    divisions: DivisionOption[]
     seasonLabel: string
 }> {
     const hasAccess = await checkAdminAccess()
@@ -45,6 +56,7 @@ export async function getNewPlayers(): Promise<{
             status: false,
             message: "Unauthorized",
             players: [],
+            divisions: [],
             seasonLabel: ""
         }
     }
@@ -68,11 +80,18 @@ export async function getNewPlayers(): Promise<{
                 status: false,
                 message: "No current season found.",
                 players: [],
+                divisions: [],
                 seasonLabel: ""
             }
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+
+        const allDivisions = await db
+            .select({ id: divisions.id, name: divisions.name })
+            .from(divisions)
+            .where(eq(divisions.active, true))
+            .orderBy(divisions.level)
 
         // Get all signed up players for this season
         const signupRows = await db
@@ -110,7 +129,7 @@ export async function getNewPlayers(): Promise<{
 
         // Get existing evaluations for this season
         const newPlayerIds = newPlayers.map((p) => p.userId)
-        let evaluationMap = new Map<string, string>()
+        let evaluationMap = new Map<string, number>()
 
         if (newPlayerIds.length > 0) {
             const existingEvals = await db
@@ -133,12 +152,13 @@ export async function getNewPlayers(): Promise<{
 
         const entries: NewPlayerEntry[] = newPlayers.map((row) => ({
             ...row,
-            division: evaluationMap.get(row.userId) || null
+            division: evaluationMap.get(row.userId) ?? null
         }))
 
         return {
             status: true,
             players: entries,
+            divisions: allDivisions,
             seasonLabel
         }
     } catch (error) {
@@ -147,13 +167,14 @@ export async function getNewPlayers(): Promise<{
             status: false,
             message: "Something went wrong.",
             players: [],
+            divisions: [],
             seasonLabel: ""
         }
     }
 }
 
 export async function saveEvaluations(
-    data: { playerId: string; division: string }[]
+    data: { playerId: string; division: number }[]
 ): Promise<{ status: boolean; message: string }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -161,12 +182,19 @@ export async function saveEvaluations(
     }
 
     try {
-        // Validate divisions
+        // Validate division IDs exist
+        const divisionIds = [...new Set(data.map((d) => d.division))]
+        const validDivisions = await db
+            .select({ id: divisions.id })
+            .from(divisions)
+            .where(inArray(divisions.id, divisionIds))
+
+        const validIds = new Set(validDivisions.map((d) => d.id))
         for (const entry of data) {
-            if (!VALID_DIVISIONS.includes(entry.division as typeof VALID_DIVISIONS[number])) {
+            if (!validIds.has(entry.division)) {
                 return {
                     status: false,
-                    message: `Invalid division: ${entry.division}`
+                    message: `Invalid division ID: ${entry.division}`
                 }
             }
         }

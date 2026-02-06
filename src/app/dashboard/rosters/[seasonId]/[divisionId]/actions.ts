@@ -1,7 +1,14 @@
 "use server"
 
 import { db } from "@/database/db"
-import { users, seasons, divisions, teams, drafts } from "@/database/schema"
+import {
+    users,
+    seasons,
+    divisions,
+    teams,
+    drafts,
+    commissioners
+} from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 
 interface RosterPlayer {
@@ -23,6 +30,7 @@ interface RosterData {
     message?: string
     seasonLabel: string
     divisionName: string
+    commissioners: string[]
     teams: RosterTeam[]
 }
 
@@ -52,6 +60,7 @@ export async function getRosterData(
                 message: "Season or division not found.",
                 seasonLabel: "",
                 divisionName: "",
+                commissioners: [],
                 teams: []
             }
         }
@@ -74,11 +83,35 @@ export async function getRosterData(
             )
             .orderBy(teams.number)
 
+        const commissionerRows = await db
+            .select({
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name
+            })
+            .from(commissioners)
+            .innerJoin(
+                users,
+                eq(commissioners.commissioner, users.id)
+            )
+            .where(
+                and(
+                    eq(commissioners.season, seasonId),
+                    eq(commissioners.division, divisionId)
+                )
+            )
+
+        const commissionerNames = commissionerRows.map((c) => {
+            const displayName = c.preferredName || c.firstName
+            return `${displayName} ${c.lastName}`
+        })
+
         if (teamRows.length === 0) {
             return {
                 status: true,
                 seasonLabel,
                 divisionName: divisionRow.name,
+                commissioners: commissionerNames,
                 teams: []
             }
         }
@@ -138,6 +171,7 @@ export async function getRosterData(
             status: true,
             seasonLabel,
             divisionName: divisionRow.name,
+            commissioners: commissionerNames,
             teams: rosterTeams
         }
     } catch (error) {
@@ -147,6 +181,7 @@ export async function getRosterData(
             message: "Something went wrong.",
             seasonLabel: "",
             divisionName: "",
+            commissioners: [],
             teams: []
         }
     }

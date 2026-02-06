@@ -49,6 +49,12 @@ export default async function RosterPage({
                 title={`${result.seasonLabel} — ${result.divisionName} Rosters`}
                 description={`Team rosters for ${result.divisionName}.`}
             />
+            {result.commissioners.length > 0 && (
+                <p className="font-semibold text-lg text-muted-foreground">
+                    Commissioner{result.commissioners.length > 1 ? "s" : ""}:{" "}
+                    {result.commissioners.join(", ")}
+                </p>
+            )}
             {result.teams.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No teams found for this division.

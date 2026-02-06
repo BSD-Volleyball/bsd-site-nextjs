@@ -77,8 +77,13 @@ function generateDynamicBreadcrumbs(pathname: string): BreadcrumbSegment[] {
 export function DynamicBreadcrumb() {
     const pathname = usePathname()
     
-    // Don't show breadcrumbs for root path only
-    if (pathname === '/') {
+    // Don't show breadcrumbs for root path or season pages
+    if (
+        pathname === "/" ||
+        pathname.startsWith("/dashboard/rosters/") ||
+        pathname.startsWith("/dashboard/schedule/") ||
+        pathname.startsWith("/dashboard/playoffs/")
+    ) {
         return null
     }
     

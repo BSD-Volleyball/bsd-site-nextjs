@@ -17,7 +17,9 @@ import {
     RiCoupon3Line,
     RiStarLine,
     RiCalendarLine,
-    RiArrowDownSLine
+    RiArrowDownSLine,
+    RiMergeCellsHorizontal,
+    RiUserUnfollowLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -101,6 +103,16 @@ const adminNavItems = [
         title: "Draft Division",
         url: "/dashboard/draft-division",
         icon: RiFileList3Line
+    },
+    {
+        title: "Merge Users",
+        url: "/dashboard/merge-users",
+        icon: RiMergeCellsHorizontal
+    },
+    {
+        title: "Attrition",
+        url: "/dashboard/attrition",
+        icon: RiUserUnfollowLine
     },
     {
         title: "Site Config",

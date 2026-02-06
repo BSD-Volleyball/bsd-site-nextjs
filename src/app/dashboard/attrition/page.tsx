@@ -5,12 +5,12 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { PageHeader } from "@/components/layout/page-header"
-import { EvaluatePlayersList } from "./evaluate-players-list"
-import { getNewPlayers } from "./actions"
+import { AttritionCharts } from "./attrition-charts"
+import { getAttritionData } from "./actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Evaluate New Players"
+    title: "Attrition"
 }
 
 export const dynamic = "force-dynamic"
@@ -25,7 +25,7 @@ async function checkAdminAccess(userId: string): Promise<boolean> {
     return user?.role === "admin" || user?.role === "director"
 }
 
-export default async function EvaluatePlayersPage() {
+export default async function AttritionPage() {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
@@ -38,17 +38,17 @@ export default async function EvaluatePlayersPage() {
         redirect("/dashboard")
     }
 
-    const result = await getNewPlayers()
+    const result = await getAttritionData()
 
     if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader
-                    title="Evaluate New Players"
-                    description="Assign division evaluations to new players."
+                    title="Attrition"
+                    description="Players who only played for one season."
                 />
                 <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
-                    {result.message || "Failed to load players."}
+                    {result.message || "Failed to load attrition data."}
                 </div>
             </div>
         )
@@ -57,12 +57,17 @@ export default async function EvaluatePlayersPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Evaluate New Players — ${result.seasonLabel}`}
-                description="Assign division evaluations to new players who have not been previously drafted."
+                title="Attrition"
+                description="Players who only played for one season."
             />
-            <EvaluatePlayersList
-                players={result.players}
-                divisions={result.divisions}
+            <AttritionCharts
+                genderData={result.genderData}
+                attritionGenderRatio={result.attritionGenderRatio}
+                overallGenderRatio={result.overallGenderRatio}
+                captainData={result.captainData}
+                captainAvgData={result.captainAvgData}
+                lastSeasonCaptainData={result.lastSeasonCaptainData}
+                lastSeasonCaptainAvgData={result.lastSeasonCaptainAvgData}
             />
         </div>
     )
