@@ -11,12 +11,15 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { saveEvaluations, type NewPlayerEntry } from "./actions"
-
-const DIVISIONS = ["AA", "A", "ABA", "ABB", "BBB", "BB"] as const
+import {
+    saveEvaluations,
+    type NewPlayerEntry,
+    type DivisionOption
+} from "./actions"
 
 interface EvaluatePlayersListProps {
     players: NewPlayerEntry[]
+    divisions: DivisionOption[]
 }
 
 function getDisplayName(entry: NewPlayerEntry): string {
@@ -24,7 +27,10 @@ function getDisplayName(entry: NewPlayerEntry): string {
     return `${entry.firstName}${preferred} ${entry.lastName}`
 }
 
-export function EvaluatePlayersList({ players }: EvaluatePlayersListProps) {
+export function EvaluatePlayersList({
+    players,
+    divisions
+}: EvaluatePlayersListProps) {
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -33,12 +39,12 @@ export function EvaluatePlayersList({ players }: EvaluatePlayersListProps) {
         text: string
     } | null>(null)
 
-    // Track division selections per player
+    // Track division selections per player (string IDs for Select compatibility)
     const [selections, setSelections] = useState<Record<string, string>>(() => {
         const initial: Record<string, string> = {}
         for (const player of players) {
-            if (player.division) {
-                initial[player.userId] = player.division
+            if (player.division !== null) {
+                initial[player.userId] = String(player.division)
             }
         }
         return initial
@@ -71,9 +77,9 @@ export function EvaluatePlayersList({ players }: EvaluatePlayersListProps) {
 
     const handleSubmit = async () => {
         const data = Object.entries(selections).map(
-            ([playerId, division]) => ({
+            ([playerId, divisionId]) => ({
                 playerId,
-                division
+                division: parseInt(divisionId, 10)
             })
         )
 
@@ -200,12 +206,12 @@ export function EvaluatePlayersList({ players }: EvaluatePlayersListProps) {
                                             <SelectValue placeholder="Select" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {DIVISIONS.map((div) => (
+                                            {divisions.map((div) => (
                                                 <SelectItem
-                                                    key={div}
-                                                    value={div}
+                                                    key={div.id}
+                                                    value={String(div.id)}
                                                 >
-                                                    {div}
+                                                    {div.name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

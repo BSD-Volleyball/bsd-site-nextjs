@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
     RiCalendarLine,
-    RiHistoryLine,
     RiCoupon3Line
 } from "@remixicon/react"
 import Link from "next/link"
@@ -28,6 +27,7 @@ import {
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
+import { PreviousSeasonsCard } from "./previous-seasons-card"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -117,12 +117,13 @@ async function getSeasonSignup(userId: string) {
     return { season, signup, pairPickName, config, seasonFull, onWaitlist }
 }
 
-interface PreviousSeason {
+export interface PreviousSeason {
     year: number
     season: string
     divisionName: string
     teamName: string
     captainName: string
+    teamId: number
 }
 
 async function getPreviousSeasonsPlayed(
@@ -134,6 +135,7 @@ async function getPreviousSeasonsPlayed(
             season: seasons.season,
             divisionName: divisions.name,
             teamName: teams.name,
+            teamId: teams.id,
             captainFirstName: users.first_name,
             captainLastName: users.last_name,
             captainPreferredName: users.preffered_name
@@ -151,6 +153,7 @@ async function getPreviousSeasonsPlayed(
         season: r.season,
         divisionName: r.divisionName,
         teamName: r.teamName,
+        teamId: r.teamId,
         captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`
     }))
 }
@@ -415,63 +418,7 @@ export default async function DashboardPage() {
             )}
 
             {previousSeasons.length > 0 && (
-                <Card className="max-w-2xl">
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <RiHistoryLine className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle className="text-lg">
-                                Previous Seasons Played
-                            </CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b">
-                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
-                                            Season
-                                        </th>
-                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
-                                            Division
-                                        </th>
-                                        <th className="py-2 pr-4 text-left font-medium text-muted-foreground">
-                                            Team
-                                        </th>
-                                        <th className="py-2 text-left font-medium text-muted-foreground">
-                                            Captain
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {previousSeasons.map((ps, idx) => (
-                                        <tr
-                                            key={idx}
-                                            className="border-b last:border-0"
-                                        >
-                                            <td className="py-2 pr-4">
-                                                {ps.season
-                                                    .charAt(0)
-                                                    .toUpperCase() +
-                                                    ps.season.slice(1)}{" "}
-                                                {ps.year}
-                                            </td>
-                                            <td className="py-2 pr-4">
-                                                {ps.divisionName}
-                                            </td>
-                                            <td className="py-2 pr-4">
-                                                {ps.teamName}
-                                            </td>
-                                            <td className="py-2">
-                                                {ps.captainName}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
+                <PreviousSeasonsCard previousSeasons={previousSeasons} />
             )}
         </div>
     )

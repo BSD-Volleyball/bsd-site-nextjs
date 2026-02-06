@@ -5,12 +5,12 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { PageHeader } from "@/components/layout/page-header"
-import { EvaluatePlayersList } from "./evaluate-players-list"
-import { getNewPlayers } from "./actions"
+import { MergeUsersForm } from "./merge-users-form"
+import { getOldUsers, getNewUsers } from "./actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Evaluate New Players"
+    title: "Merge Users"
 }
 
 export const dynamic = "force-dynamic"
@@ -25,7 +25,7 @@ async function checkAdminAccess(userId: string): Promise<boolean> {
     return user?.role === "admin" || user?.role === "director"
 }
 
-export default async function EvaluatePlayersPage() {
+export default async function MergeUsersPage() {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
@@ -38,32 +38,18 @@ export default async function EvaluatePlayersPage() {
         redirect("/dashboard")
     }
 
-    const result = await getNewPlayers()
-
-    if (!result.status) {
-        return (
-            <div className="space-y-6">
-                <PageHeader
-                    title="Evaluate New Players"
-                    description="Assign division evaluations to new players."
-                />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
-                    {result.message || "Failed to load players."}
-                </div>
-            </div>
-        )
-    }
+    const [oldUsers, newUsers] = await Promise.all([
+        getOldUsers(),
+        getNewUsers()
+    ])
 
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Evaluate New Players — ${result.seasonLabel}`}
-                description="Assign division evaluations to new players who have not been previously drafted."
+                title="Merge Users"
+                description="Combine duplicate user accounts by transferring records from an old user to a new user."
             />
-            <EvaluatePlayersList
-                players={result.players}
-                divisions={result.divisions}
-            />
+            <MergeUsersForm oldUsers={oldUsers} newUsers={newUsers} />
         </div>
     )
 }

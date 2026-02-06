@@ -38,6 +38,7 @@ export const auth = betterAuth({
                     return {
                         data: {
                             ...user,
+                            email: user.email.toLowerCase(),
                             first_name: firstName,
                             last_name: lastName,
                             name: computedName || user.name || ""
@@ -125,6 +126,7 @@ export const auth = betterAuth({
             clientId: process.env.GOOGLE_CLIENT_ID as string,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
             mapProfileToUser: (profile) => ({
+                email: profile.email.toLowerCase(),
                 first_name: profile.given_name || "",
                 last_name: profile.family_name || ""
             })
