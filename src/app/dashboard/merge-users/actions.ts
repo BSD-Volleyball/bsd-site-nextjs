@@ -15,8 +15,8 @@ import {
 } from "@/database/schema"
 import { eq, lt, gt } from "drizzle-orm"
 
-const OLD_USER_CUTOFF = new Date("2026-01-31T00:00:01")
-const NEW_USER_CUTOFF = new Date("2026-01-31T00:00:02")
+const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
+const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
 
 export interface UserOption {
     id: string
