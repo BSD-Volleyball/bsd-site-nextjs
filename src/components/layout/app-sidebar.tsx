@@ -19,7 +19,8 @@ import {
     RiCalendarLine,
     RiArrowDownSLine,
     RiMergeCellsHorizontal,
-    RiUserUnfollowLine
+    RiUserUnfollowLine,
+    RiHistoryLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -102,6 +103,11 @@ const adminNavItems = [
         title: "Attrition",
         url: "/dashboard/attrition",
         icon: RiUserUnfollowLine
+    },
+    {
+        title: "Audit Log",
+        url: "/dashboard/audit-log",
+        icon: RiHistoryLine
     }
 ]
 

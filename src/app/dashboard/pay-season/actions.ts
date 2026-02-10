@@ -23,6 +23,7 @@ import {
     calculateDiscountedAmount
 } from "@/lib/discount"
 import { site } from "@/config/site"
+import { logAuditEntry } from "@/lib/audit-log"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
@@ -267,6 +268,13 @@ export async function submitSeasonPayment(
                     await markDiscountAsUsed(discountId)
                 }
 
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "signups",
+                    summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
+                })
+
                 // Get user's first name for the email
                 const [user] = await db
                     .select({
@@ -388,6 +396,13 @@ export async function submitFreeSignup(
 
         // Mark discount as used
         await markDiscountAsUsed(discountId)
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create",
+            entityType: "signups",
+            summary: `Free signup for ${config.seasonName} ${config.seasonYear} (100% discount #${discountId})`
+        })
 
         // Get user's first name for the email
         const [user] = await db

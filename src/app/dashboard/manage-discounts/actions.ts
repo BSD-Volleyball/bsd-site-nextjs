@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, discounts } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface DiscountEntry {
     id: number
@@ -136,6 +137,16 @@ export async function createDiscount(data: {
             created_at: new Date()
         })
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "create",
+                entityType: "discounts",
+                summary: `Created ${data.percentage}% discount for user ${data.userId}${data.reason ? ` (reason: ${data.reason})` : ""}`
+            })
+        }
+
         return { status: true, message: "Discount created successfully." }
     } catch (error) {
         console.error("Error creating discount:", error)
@@ -177,6 +188,17 @@ export async function updateDiscount(data: {
             })
             .where(eq(discounts.id, data.id))
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "discounts",
+                entityId: data.id,
+                summary: `Updated discount #${data.id} to ${data.percentage}%`
+            })
+        }
+
         return { status: true, message: "Discount updated successfully." }
     } catch (error) {
         console.error("Error updating discount:", error)
@@ -194,6 +216,18 @@ export async function deleteDiscount(
 
     try {
         await db.delete(discounts).where(eq(discounts.id, id))
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "delete",
+                entityType: "discounts",
+                entityId: id,
+                summary: `Deleted discount #${id}`
+            })
+        }
+
         return { status: true, message: "Discount deleted successfully." }
     } catch (error) {
         console.error("Error deleting discount:", error)

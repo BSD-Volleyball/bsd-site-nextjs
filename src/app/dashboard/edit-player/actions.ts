@@ -18,6 +18,7 @@ import {
 } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 
 async function checkAdminAccess(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -236,6 +237,26 @@ export async function updateUser(
                 .where(eq(users.id, originalId))
         }
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            const effectiveId = isIdChanging ? data.id! : originalId
+            const [updatedUser] = await db
+                .select({ first_name: users.first_name, last_name: users.last_name })
+                .from(users)
+                .where(eq(users.id, effectiveId))
+                .limit(1)
+            const userName = updatedUser
+                ? `${updatedUser.first_name} ${updatedUser.last_name}`
+                : originalId
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "users",
+                entityId: effectiveId,
+                summary: `Admin updated user ${userName} (${originalId})${isIdChanging ? ` (ID changed to ${data.id})` : ""}`
+            })
+        }
+
         return { status: true, message: "User updated successfully." }
     } catch (error) {
         console.error("Error updating user:", error)
@@ -343,6 +364,33 @@ export async function updateSignup(
 
     try {
         await db.update(signups).set(data).where(eq(signups.id, signupId))
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            const [signup] = await db
+                .select({ player: signups.player })
+                .from(signups)
+                .where(eq(signups.id, signupId))
+                .limit(1)
+            let playerName = `signup #${signupId}`
+            if (signup) {
+                const [player] = await db
+                    .select({ first_name: users.first_name, last_name: users.last_name })
+                    .from(users)
+                    .where(eq(users.id, signup.player))
+                    .limit(1)
+                if (player) {
+                    playerName = `${player.first_name} ${player.last_name}`
+                }
+            }
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "signups",
+                entityId: signupId,
+                summary: `Admin updated signup #${signupId} for ${playerName}`
+            })
+        }
 
         return { status: true, message: "Signup updated successfully." }
     } catch (error) {

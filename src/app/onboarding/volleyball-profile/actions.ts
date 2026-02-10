@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface VolleyballProfileData {
     experience: string | null
@@ -79,6 +80,14 @@ export async function completeOnboarding(
                 updatedAt: new Date()
             })
             .where(eq(users.id, session.user.id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "users",
+            entityId: session.user.id,
+            summary: "Completed onboarding (volleyball profile)"
+        })
 
         return { status: true, message: "Onboarding completed!" }
     } catch (error) {

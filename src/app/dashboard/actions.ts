@@ -14,6 +14,7 @@ import {
 } from "@/database/schema"
 import { eq, and, lte, desc, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export async function getSignupEligibility(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -238,6 +239,13 @@ export async function expressWaitlistInterest(
             season: seasonId,
             user: session.user.id,
             created_at: new Date()
+        })
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create",
+            entityType: "waitlist",
+            summary: `Expressed waitlist interest for season ${seasonId}`
         })
 
         return {

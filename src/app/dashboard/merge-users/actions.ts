@@ -14,6 +14,7 @@ import {
     commissioners
 } from "@/database/schema"
 import { eq, lt, gt } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
 const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
@@ -203,6 +204,14 @@ export async function mergeUsers(
 
         // Delete old user record
         await db.delete(users).where(eq(users.id, oldUserId))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "merge",
+            entityType: "users",
+            entityId: newUserId,
+            summary: `Merged user ${oldUserId} into ${newUserId} (old user deleted)`
+        })
 
         return {
             status: true,

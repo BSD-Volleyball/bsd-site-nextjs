@@ -13,6 +13,7 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface DivisionOption {
     id: number
@@ -239,6 +240,16 @@ export async function saveEvaluations(
                     division: entry.division
                 }))
             )
+        }
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "upsert",
+                entityType: "evaluations",
+                summary: `Saved ${data.length} player evaluations for current season`
+            })
         }
 
         return {

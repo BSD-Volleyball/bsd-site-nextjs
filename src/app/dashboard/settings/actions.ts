@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface AccountProfileData {
     first_name: string | null
@@ -116,6 +117,14 @@ export async function updateAccountField(
                 .where(eq(users.id, session.user.id))
         }
 
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "users",
+            entityId: session.user.id,
+            summary: `Updated account field: ${field}`
+        })
+
         return { status: true, message: "Updated successfully!" }
     } catch (error) {
         console.error("Error updating account field:", error)
@@ -156,6 +165,14 @@ export async function updateAccountProfile(
                 updatedAt: new Date()
             })
             .where(eq(users.id, session.user.id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "users",
+            entityId: session.user.id,
+            summary: "Updated account profile"
+        })
 
         return { status: true, message: "Profile updated successfully!" }
     } catch (error) {

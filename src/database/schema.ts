@@ -259,3 +259,17 @@ export const commissioners = pgTable("commissioners", {
         .notNull()
         .references(() => divisions.id)
 })
+
+export const auditLog = pgTable("audit_log", {
+    id: serial("id").primaryKey(),
+    user: text("user")
+        .notNull()
+        .references(() => users.id),
+    action: text("action").notNull(),
+    entity_type: text("entity_type"),
+    entity_id: text("entity_id"),
+    summary: text("summary").notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})

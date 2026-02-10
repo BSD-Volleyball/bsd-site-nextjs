@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface OnboardingAccountData {
     preffered_name: string | null
@@ -58,6 +59,14 @@ export async function updateOnboardingAccount(
                 updatedAt: new Date()
             })
             .where(eq(users.id, session.user.id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "users",
+            entityId: session.user.id,
+            summary: "Updated onboarding account details"
+        })
 
         return { status: true, message: "Account updated successfully!" }
     } catch (error) {

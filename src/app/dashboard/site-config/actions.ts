@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, siteConfig } from "@/database/schema"
 import { eq } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 async function checkAdminAccess(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -55,6 +56,17 @@ export async function updateSiteConfig(
                 })
         }
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            const keys = updates.map(u => u.key.trim()).filter(Boolean)
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "upsert",
+                entityType: "siteConfig",
+                summary: `Updated site config keys: ${keys.join(", ")}`
+            })
+        }
+
         return { status: true, message: "Configuration updated successfully." }
     } catch (error) {
         console.error("Failed to update site config:", error)
@@ -75,6 +87,17 @@ export async function deleteSiteConfigKey(
 
     try {
         await db.delete(siteConfig).where(eq(siteConfig.key, key))
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "delete",
+                entityType: "siteConfig",
+                entityId: key,
+                summary: `Deleted site config key: "${key}"`
+            })
+        }
 
         return {
             status: true,

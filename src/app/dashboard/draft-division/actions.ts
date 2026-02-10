@@ -5,6 +5,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, seasons, divisions, teams, drafts } from "@/database/schema"
 import { eq, desc, and } from "drizzle-orm"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface SeasonOption {
     id: number
@@ -215,6 +216,16 @@ export async function submitDraft(
                 }
             })
         )
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "create",
+                entityType: "drafts",
+                summary: `Submitted ${picks.length} draft picks for division level ${divisionLevel}`
+            })
+        }
 
         return {
             status: true,
