@@ -98,7 +98,19 @@ const adminNavItems = [
         url: "/dashboard/evaluate-players",
         icon: RiStarLine
     },
-    { title: "Create Teams", url: "/dashboard/create-teams", icon: RiTeamLine },
+    {
+        title: "Attrition",
+        url: "/dashboard/attrition",
+        icon: RiUserUnfollowLine
+    }
+]
+
+const adminDangerNavItems = [
+    {
+        title: "Create Teams",
+        url: "/dashboard/create-teams",
+        icon: RiTeamLine
+    },
     {
         title: "Draft Division",
         url: "/dashboard/draft-division",
@@ -110,9 +122,9 @@ const adminNavItems = [
         icon: RiMergeCellsHorizontal
     },
     {
-        title: "Attrition",
-        url: "/dashboard/attrition",
-        icon: RiUserUnfollowLine
+        title: "Edit Player",
+        url: "/dashboard/edit-player",
+        icon: RiEditLine
     },
     {
         title: "Site Config",
@@ -224,52 +236,21 @@ function SeasonNavMenuItem({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <SidebarMenuSub>
-                        {seasonCategories.map((cat) => (
-                            <Collapsible
-                                key={cat.key}
-                                asChild
-                                className="group/category"
-                            >
-                                <SidebarMenuSubItem>
-                                    <CollapsibleTrigger asChild>
-                                        <SidebarMenuSubButton className="cursor-pointer">
+                        {seasonCategories.map((cat) => {
+                            const href = `${cat.basePath}/${season.id}`
+                            return (
+                                <SidebarMenuSubItem key={cat.key}>
+                                    <SidebarMenuSubButton
+                                        asChild
+                                        isActive={pathname.startsWith(href)}
+                                    >
+                                        <Link href={href}>
                                             <span>{cat.label}</span>
-                                            <RiArrowDownSLine
-                                                className="ml-auto transition-transform duration-200 group-data-[state=open]/category:rotate-180"
-                                                size={14}
-                                            />
-                                        </SidebarMenuSubButton>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <SidebarMenuSub>
-                                            {season.divisions.map((div) => {
-                                                const href = `${cat.basePath}/${season.id}/${div.id}`
-                                                return (
-                                                    <SidebarMenuSubItem
-                                                        key={div.id}
-                                                    >
-                                                        <SidebarMenuSubButton
-                                                            asChild
-                                                            size="sm"
-                                                            isActive={
-                                                                pathname ===
-                                                                href
-                                                            }
-                                                        >
-                                                            <Link href={href}>
-                                                                <span>
-                                                                    {div.name}
-                                                                </span>
-                                                            </Link>
-                                                        </SidebarMenuSubButton>
-                                                    </SidebarMenuSubItem>
-                                                )
-                                            })}
-                                        </SidebarMenuSub>
-                                    </CollapsibleContent>
+                                        </Link>
+                                    </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
-                            </Collapsible>
-                        ))}
+                            )
+                        })}
                     </SidebarMenuSub>
                 </CollapsibleContent>
             </SidebarMenuItem>
@@ -345,6 +326,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={adminNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isAdmin && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Admin (Danger Zone)
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={adminDangerNavItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

@@ -27,7 +27,7 @@ import * as path from "path"
 
 const DRAFTS_DIR = path.join(process.env.HOME || "~", "bsd-drafts")
 const MAPPING_FILE = path.join(process.env.HOME || "~", "draft-mapping-fix.csv")
-const PLAYERS_PER_TEAM = 8
+const MAX_PLAYERS_PER_TEAM = 9
 
 // Name mapping from draft files to correct database names
 // Key: "lastname, firstname" (lowercase), Value: { firstName, lastName }
@@ -221,7 +221,7 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
     const content = fs.readFileSync(filePath, "utf-8")
     const lines = content.split("\n")
 
-    // Find the data start row: "1,2,3,4,5,6,," (6 teams) or "1,2,3,4,," (4 teams)
+    // Find the data start row: "1,2,3,...,N" where N is the number of teams (up to 8)
     let startRow = -1
     let numTeams = 0
 
@@ -229,25 +229,20 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
         const fields = parseCSVLine(lines[i])
         const trimmed = fields.map(f => f.trim())
 
-        // Check for 6-team marker
-        if (trimmed.length >= 6 &&
-            trimmed[0] === "1" && trimmed[1] === "2" && trimmed[2] === "3" &&
-            trimmed[3] === "4" && trimmed[4] === "5" && trimmed[5] === "6") {
-            startRow = i
-            numTeams = 6
-            break
-        }
-
-        // Check for 4-team marker
-        if (trimmed.length >= 4 &&
-            trimmed[0] === "1" && trimmed[1] === "2" && trimmed[2] === "3" &&
-            trimmed[3] === "4" && (trimmed.length < 5 || trimmed[4] === "" || trimmed[4] === "5")) {
-            // Make sure it's not actually a 6-team marker we partially matched
-            if (trimmed.length < 5 || trimmed[4] === "") {
-                startRow = i
-                numTeams = 4
+        // Count consecutive numbers starting from 1
+        let count = 0
+        for (let j = 0; j < trimmed.length; j++) {
+            if (trimmed[j] === String(j + 1)) {
+                count++
+            } else {
                 break
             }
+        }
+
+        if (count >= 4) {
+            startRow = i
+            numTeams = count
+            break
         }
     }
 
@@ -262,27 +257,36 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
     }
 
     const captainFields = parseCSVLine(lines[captainRow])
-    const captainLastNames = captainFields.slice(0, numTeams).map(s => s.trim())
+    const captainNames = captainFields.slice(0, numTeams).map(s => s.trim())
 
     // Validate we got captain names
-    if (captainLastNames.some(n => !n)) {
-        throw new Error(`Missing captain name in file "${filename}": [${captainLastNames.join(", ")}]`)
+    if (captainNames.some(n => !n)) {
+        throw new Error(`Missing captain name in file "${filename}": [${captainNames.join(", ")}]`)
     }
 
-    // Initialize team data
-    const teamDataArr: TeamData[] = captainLastNames.map(lastName => ({
-        captainLastName: lastName,
-        captain: null,
-        players: [],
-        teamName: ""
-    }))
+    // Initialize team data - captain name may be "last" or "first last"
+    const teamDataArr: TeamData[] = captainNames.map(name => {
+        const parts = name.split(/\s+/)
+        // If multiple words, last word is the last name; otherwise treat the whole thing as last name
+        const captainLastName = parts.length > 1 ? parts[parts.length - 1] : parts[0]
+        return {
+            captainLastName,
+            captain: null,
+            players: [],
+            teamName: ""
+        }
+    })
 
-    // Parse player rows (exactly 8 rows after captain row)
-    for (let i = 0; i < PLAYERS_PER_TEAM; i++) {
+    // Parse player rows (up to MAX_PLAYERS_PER_TEAM rows, stop when all columns are empty)
+    for (let i = 0; i < MAX_PLAYERS_PER_TEAM; i++) {
         const rowIdx = captainRow + 1 + i
         if (rowIdx >= lines.length) break
 
         const fields = parseCSVLine(lines[rowIdx])
+
+        // Check if all team columns in this row are empty
+        const hasAnyPlayer = fields.slice(0, numTeams).some(f => f.trim() !== "")
+        if (!hasAnyPlayer) break
 
         for (let t = 0; t < numTeams; t++) {
             const nameStr = (fields[t] || "").trim()
@@ -314,8 +318,11 @@ function findUserByName(firstName: string, lastName: string, allUsers: User[]): 
         return uFirst === normFirst ||
                uFirst.startsWith(normFirst) ||
                normFirst.startsWith(uFirst) ||
-               uPref === normFirst ||
-               uPref.startsWith(normFirst)
+               (uPref !== "" && (
+                   uPref === normFirst ||
+                   uPref.startsWith(normFirst) ||
+                   normFirst.startsWith(uPref)
+               ))
     })
 }
 
@@ -335,6 +342,15 @@ function findUserWithMapping(firstName: string, lastName: string, allUsers: User
     }
 
     return { matches: [], mapped: false }
+}
+
+function addRuntimeMapping(firstName: string, lastName: string, user: User): void {
+    const key = `${lastName}, ${firstName}`.toLowerCase()
+    nameMapping.set(key, {
+        firstName: user.first_name,
+        lastName: user.last_name
+    })
+    console.log(`  (remembered mapping: ${firstName} ${lastName} → ${user.first_name} ${user.last_name})`)
 }
 
 function findUserByLastName(lastName: string, allUsers: User[]): User[] {
@@ -418,6 +434,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                 )
                 team.captain = allUsers.find(u => u.id === userId)!
                 team.teamName = `Team ${team.captain.last_name}`
+                addRuntimeMapping(captainName.firstName, captainName.lastName, team.captain)
             }
         } else if (captainCandidatesFromTeam.length > 1) {
             console.log(`Multiple players with last name "${team.captainLastName}":`)
@@ -444,6 +461,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                     )
                     team.captain = allUsers.find(u => u.id === userId)!
                     team.teamName = `Team ${team.captain.last_name}`
+                    addRuntimeMapping(captainName.firstName, captainName.lastName, team.captain)
                 }
             } else {
                 throw new Error("Invalid selection")
@@ -458,6 +476,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
             )
             team.captain = allUsers.find(u => u.id === userId)!
             team.teamName = `Team ${team.captain.last_name}`
+            addRuntimeMapping("", team.captainLastName, team.captain)
         }
     }
 
@@ -485,6 +504,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                         allUsers
                     )
                     player.user = allUsers.find(u => u.id === userId)!
+                    addRuntimeMapping(player.name.firstName, player.name.lastName, player.user)
                 }
             } else {
                 const userId = await promptForUserId(
@@ -493,6 +513,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                     allUsers
                 )
                 player.user = allUsers.find(u => u.id === userId)!
+                addRuntimeMapping(player.name.firstName, player.name.lastName, player.user)
             }
         }
     }
@@ -530,6 +551,17 @@ async function lookupSeasonAndDivision(
         divisionId: divisionRow.id,
         divisionLevel: divisionRow.level
     }
+}
+
+async function checkExistingDrafts(seasonId: number, divisionId: number): Promise<boolean> {
+    const existing = await db
+        .select({ id: drafts.id })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
+        .limit(1)
+
+    return existing.length > 0
 }
 
 // --- Display and insert ---
@@ -708,6 +740,13 @@ async function main() {
                     data.divisionName
                 )
                 console.log(`Season ID: ${seasonId}, Division ID: ${divisionId}, Level: ${divisionLevel}`)
+
+                // Check for existing drafts
+                if (await checkExistingDrafts(seasonId, divisionId)) {
+                    console.log(`  ⚠ Drafts already exist for ${data.season} ${data.year} ${data.divisionName}, skipping.`)
+                    skipped++
+                    continue
+                }
 
                 // Resolve users
                 await resolveUsers(data, allUsers)

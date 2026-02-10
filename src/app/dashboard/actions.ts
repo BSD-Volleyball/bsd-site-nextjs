@@ -189,9 +189,9 @@ export async function getTeamRoster(
         }))
 
         players.sort((a, b) => {
-            const nameA = `${a.displayName} ${a.lastName}`.toLowerCase()
-            const nameB = `${b.displayName} ${b.lastName}`.toLowerCase()
-            return nameA.localeCompare(nameB)
+            const lastCmp = a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase())
+            if (lastCmp !== 0) return lastCmp
+            return a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase())
         })
 
         return {
