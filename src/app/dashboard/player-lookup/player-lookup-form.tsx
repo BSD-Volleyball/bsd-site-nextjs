@@ -52,8 +52,9 @@ export function PlayerLookupForm({ players, playerPicUrl }: PlayerLookupFormProp
         const lowerSearch = search.toLowerCase()
         return players.filter(p => {
             const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
+            const preferredName = (p.preffered_name || "").toLowerCase()
             const oldIdStr = p.old_id?.toString() || ""
-            return fullName.includes(lowerSearch) || oldIdStr.includes(lowerSearch)
+            return fullName.includes(lowerSearch) || preferredName.includes(lowerSearch) || oldIdStr.includes(lowerSearch)
         })
     }, [players, search])
 
