@@ -11,7 +11,6 @@ import {
     RiSearchLine,
     RiTeamLine,
     RiFileList3Line,
-    RiSettings3Line,
     RiGroupLine,
     RiTimeLine,
     RiCoupon3Line,
@@ -137,11 +136,6 @@ const adminDangerNavItems = [
         title: "Edit Player",
         url: "/dashboard/edit-player",
         icon: RiEditLine
-    },
-    {
-        title: "Site Config",
-        url: "/dashboard/site-config",
-        icon: RiSettings3Line
     }
 ]
 

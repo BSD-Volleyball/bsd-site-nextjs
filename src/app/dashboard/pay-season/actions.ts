@@ -10,8 +10,8 @@ import React from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { seasons, signups, users } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { signups, users } from "@/database/schema"
+import { eq } from "drizzle-orm"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
@@ -234,22 +234,10 @@ export async function submitSeasonPayment(
         })
 
         if (response.payment) {
-            // Look up the season from database config
-            const [season] = await db
-                .select({ id: seasons.id })
-                .from(seasons)
-                .where(
-                    and(
-                        eq(seasons.year, config.seasonYear),
-                        eq(seasons.season, config.seasonName)
-                    )
-                )
-                .limit(1)
-
-            if (season) {
+            if (config.seasonId) {
                 // Create signup record
                 await db.insert(signups).values({
-                    season: season.id,
+                    season: config.seasonId,
                     player: session.user.id,
                     order_id: response.payment.id,
                     amount_paid: finalAmount,
@@ -359,19 +347,7 @@ export async function submitFreeSignup(
         const config = await getSeasonConfig()
         const originalAmount = getCurrentSeasonAmount(config)
 
-        // Look up the season from database config
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return {
                 success: false,
                 message: "Season not found."
@@ -380,7 +356,7 @@ export async function submitFreeSignup(
 
         // Create signup record with $0 amount
         await db.insert(signups).values({
-            season: season.id,
+            season: config.seasonId,
             player: session.user.id,
             order_id: `FREE-${discountId}`,
             amount_paid: "0",

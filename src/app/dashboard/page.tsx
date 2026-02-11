@@ -36,19 +36,7 @@ export const metadata: Metadata = {
 async function getSeasonSignup(userId: string) {
     const config = await getSeasonConfig()
 
-    // Look up the season
-    const [season] = await db
-        .select({ id: seasons.id, code: seasons.code })
-        .from(seasons)
-        .where(
-            and(
-                eq(seasons.year, config.seasonYear),
-                eq(seasons.season, config.seasonName)
-            )
-        )
-        .limit(1)
-
-    if (!season) {
+    if (!config.seasonId) {
         return {
             season: null,
             signup: null,
@@ -58,6 +46,8 @@ async function getSeasonSignup(userId: string) {
             onWaitlist: false
         }
     }
+
+    const season = { id: config.seasonId }
 
     // Check if user has a signup for this season
     const [signup] = await db

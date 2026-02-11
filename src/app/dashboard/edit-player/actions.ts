@@ -6,7 +6,6 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
-    seasons,
     teams,
     drafts,
     waitlist,
@@ -291,18 +290,7 @@ export async function getSignupForCurrentSeason(
     try {
         const config = await getSeasonConfig()
 
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return { status: true }
         }
 
@@ -312,7 +300,7 @@ export async function getSignupForCurrentSeason(
             .select()
             .from(signups)
             .where(
-                and(eq(signups.season, season.id), eq(signups.player, userId))
+                and(eq(signups.season, config.seasonId), eq(signups.player, userId))
             )
             .limit(1)
 

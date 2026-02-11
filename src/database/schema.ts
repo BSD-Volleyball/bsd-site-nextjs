@@ -5,8 +5,7 @@ import {
     boolean,
     integer,
     serial,
-    numeric,
-    primaryKey
+    numeric
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -96,7 +95,24 @@ export const seasons = pgTable("seasons", {
     id: serial("id").primaryKey(),
     code: text("code").notNull(),
     year: integer("year").notNull(),
-    season: text("season").notNull()
+    season: text("season").notNull(),
+    registration_open: boolean("registration_open").$defaultFn(() => false).notNull(),
+    late_date: text("late_date"),
+    tryout_1_date: text("tryout_1_date"),
+    tryout_2_date: text("tryout_2_date"),
+    tryout_3_date: text("tryout_3_date"),
+    season_1_date: text("season_1_date"),
+    season_2_date: text("season_2_date"),
+    season_3_date: text("season_3_date"),
+    season_4_date: text("season_4_date"),
+    season_5_date: text("season_5_date"),
+    season_6_date: text("season_6_date"),
+    playoff_1_date: text("playoff_1_date"),
+    playoff_2_date: text("playoff_2_date"),
+    playoff_3_date: text("playoff_3_date"),
+    season_amount: text("season_amount"),
+    late_amount: text("late_amount"),
+    max_players: text("max_players"),
 })
 
 export const divisions = pgTable("divisions", {
@@ -185,14 +201,6 @@ export const champions = pgTable("champions", {
         .references(() => divisions.id),
     picture: text("picture"),
     caption: text("caption")
-})
-
-export const siteConfig = pgTable("site_config", {
-    key: text("key").primaryKey(),
-    value: text("value").notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
 })
 
 export const drafts = pgTable("drafts", {

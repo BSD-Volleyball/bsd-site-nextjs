@@ -6,7 +6,6 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
-    seasons,
     drafts,
     evaluations,
     divisions
@@ -65,18 +64,7 @@ export async function getNewPlayers(): Promise<{
     try {
         const config = await getSeasonConfig()
 
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return {
                 status: false,
                 message: "No current season found.",
@@ -107,7 +95,7 @@ export async function getNewPlayers(): Promise<{
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
-            .where(eq(signups.season, season.id))
+            .where(eq(signups.season, config.seasonId))
             .orderBy(users.last_name, users.first_name)
 
         // Find which players have been drafted (not new)
@@ -141,7 +129,7 @@ export async function getNewPlayers(): Promise<{
                 .from(evaluations)
                 .where(
                     and(
-                        eq(evaluations.season, season.id),
+                        eq(evaluations.season, config.seasonId),
                         inArray(evaluations.player, newPlayerIds)
                     )
                 )
@@ -202,18 +190,7 @@ export async function saveEvaluations(
 
         const config = await getSeasonConfig()
 
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return { status: false, message: "No current season found." }
         }
 
@@ -225,7 +202,7 @@ export async function saveEvaluations(
                 .delete(evaluations)
                 .where(
                     and(
-                        eq(evaluations.season, season.id),
+                        eq(evaluations.season, config.seasonId),
                         inArray(evaluations.player, playerIds)
                     )
                 )
@@ -235,7 +212,7 @@ export async function saveEvaluations(
         if (data.length > 0) {
             await db.insert(evaluations).values(
                 data.map((entry) => ({
-                    season: season.id,
+                    season: config.seasonId,
                     player: entry.playerId,
                     division: entry.division
                 }))

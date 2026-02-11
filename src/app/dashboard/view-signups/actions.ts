@@ -3,8 +3,8 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, seasons, drafts } from "@/database/schema"
-import { eq, and, inArray } from "drizzle-orm"
+import { users, signups, drafts } from "@/database/schema"
+import { eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface SignupEntry {
@@ -55,18 +55,7 @@ export async function getSeasonSignups(): Promise<{
     try {
         const config = await getSeasonConfig()
 
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return {
                 status: false,
                 message: "No current season found.",
@@ -94,7 +83,7 @@ export async function getSeasonSignups(): Promise<{
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
-            .where(eq(signups.season, season.id))
+            .where(eq(signups.season, config.seasonId))
             .orderBy(signups.created_at)
 
         // Determine which users are new (no entry in drafts table)

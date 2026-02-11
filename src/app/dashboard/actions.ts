@@ -64,18 +64,7 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     try {
         const config = await getSeasonConfig()
 
-        const [currentSeason] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!currentSeason) {
+        if (!config.seasonId) {
             return []
         }
 
@@ -86,7 +75,7 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
                 season: seasons.season
             })
             .from(seasons)
-            .where(lte(seasons.id, currentSeason.id))
+            .where(lte(seasons.id, config.seasonId))
             .orderBy(desc(seasons.id))
             .limit(4)
 
