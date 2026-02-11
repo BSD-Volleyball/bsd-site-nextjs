@@ -47,10 +47,23 @@ export async function updateOnboardingAccount(
     }
 
     try {
+        // If preferred name matches first name, clear it
+        const [currentUser] = await db
+            .select({ first_name: users.first_name })
+            .from(users)
+            .where(eq(users.id, session.user.id))
+            .limit(1)
+
+        const prefferedName =
+            data.preffered_name &&
+            data.preffered_name.trim().toLowerCase() === currentUser?.first_name?.toLowerCase()
+                ? null
+                : data.preffered_name || null
+
         await db
             .update(users)
             .set({
-                preffered_name: data.preffered_name || null,
+                preffered_name: prefferedName,
                 phone: data.phone || null,
                 pronouns: data.pronouns || null,
                 emergency_contact: data.emergency_contact || null,
