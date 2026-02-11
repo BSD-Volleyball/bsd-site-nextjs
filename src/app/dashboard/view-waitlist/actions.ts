@@ -11,7 +11,7 @@ import {
     teams,
     divisions
 } from "@/database/schema"
-import { eq, and, desc, inArray } from "drizzle-orm"
+import { eq, desc, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface WaitlistEntry {
@@ -58,18 +58,7 @@ export async function getSeasonWaitlist(): Promise<{
     try {
         const config = await getSeasonConfig()
 
-        const [season] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(
-                and(
-                    eq(seasons.year, config.seasonYear),
-                    eq(seasons.season, config.seasonName)
-                )
-            )
-            .limit(1)
-
-        if (!season) {
+        if (!config.seasonId) {
             return {
                 status: false,
                 message: "No current season found.",
@@ -93,7 +82,7 @@ export async function getSeasonWaitlist(): Promise<{
             })
             .from(waitlist)
             .innerJoin(users, eq(waitlist.user, users.id))
-            .where(eq(waitlist.season, season.id))
+            .where(eq(waitlist.season, config.seasonId))
             .orderBy(waitlist.created_at)
 
         // Look up most recent division for each user from drafts
