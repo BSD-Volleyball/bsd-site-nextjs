@@ -20,7 +20,8 @@ import {
     RiArrowDownSLine,
     RiMergeCellsHorizontal,
     RiUserUnfollowLine,
-    RiHistoryLine
+    RiHistoryLine,
+    RiLinksLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -83,6 +84,11 @@ const adminNavItems = [
         title: "View Signups",
         url: "/dashboard/view-signups",
         icon: RiGroupLine
+    },
+    {
+        title: "Review Pairs",
+        url: "/dashboard/review-pairs",
+        icon: RiLinksLine
     },
     {
         title: "View Waitlist",

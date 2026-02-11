@@ -31,6 +31,7 @@ function getDisplayName(entry: SignupEntry): string {
 export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
     const [search, setSearch] = useState("")
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+    const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
         null
     )
@@ -43,11 +44,11 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
         return signups.filter((s) => {
             const name = `${s.firstName} ${s.lastName}`.toLowerCase()
             const preferred = s.preferredName?.toLowerCase() || ""
-            const email = s.email.toLowerCase()
+            const pairPick = s.pairPickName?.toLowerCase() || ""
             return (
                 name.includes(lower) ||
                 preferred.includes(lower) ||
-                email.includes(lower)
+                pairPick.includes(lower)
             )
         })
     }, [signups, search])
@@ -67,12 +68,13 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
         [signups]
     )
 
-    const handlePlayerClick = async (userId: string) => {
-        setSelectedUserId(userId)
+    const handlePlayerClick = async (entry: SignupEntry) => {
+        setSelectedUserId(entry.userId)
+        setSelectedEntry(entry)
         setIsLoading(true)
         setPlayerDetails(null)
 
-        const result = await getPlayerDetails(userId)
+        const result = await getPlayerDetails(entry.userId)
 
         if (result.status && result.player) {
             setPlayerDetails(result.player)
@@ -83,6 +85,7 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
 
     const handleCloseModal = useCallback(() => {
         setSelectedUserId(null)
+        setSelectedEntry(null)
         setPlayerDetails(null)
     }, [])
 
@@ -120,7 +123,7 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                     )}
                 </div>
                 <Input
-                    placeholder="Filter by name or email..."
+                    placeholder="Filter by name or pair pick..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="max-w-xs"
@@ -138,7 +141,7 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                                 Name
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Email
+                                Pair Pick
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Gender
@@ -166,7 +169,7 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                                     entry.isNew &&
                                         "bg-blue-50 dark:bg-blue-950/40"
                                 )}
-                                onClick={() => handlePlayerClick(entry.userId)}
+                                onClick={() => handlePlayerClick(entry)}
                             >
                                 <td className="px-4 py-2 text-muted-foreground">
                                     {idx + 1}
@@ -181,7 +184,9 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-4 py-2">{entry.email}</td>
+                                <td className="px-4 py-2">
+                                    {entry.pairPickName || "—"}
+                                </td>
                                 <td className="px-4 py-2">
                                     {entry.male === true
                                         ? "M"
@@ -360,6 +365,42 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                                                 "—"}
                                         </p>
                                     </div>
+
+                                    {/* Pair Pick */}
+                                    {(selectedEntry?.pairPickName ||
+                                        selectedEntry?.pairReason) && (
+                                        <div>
+                                            <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                                                Pair Request
+                                            </h3>
+                                            <div className="grid grid-cols-1 gap-3 text-sm">
+                                                {selectedEntry.pairPickName && (
+                                                    <div>
+                                                        <span className="text-muted-foreground">
+                                                            Pair Pick:
+                                                        </span>
+                                                        <span className="ml-2 font-medium">
+                                                            {
+                                                                selectedEntry.pairPickName
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {selectedEntry.pairReason && (
+                                                    <div>
+                                                        <span className="text-muted-foreground">
+                                                            Reason:
+                                                        </span>
+                                                        <span className="ml-2 font-medium">
+                                                            {
+                                                                selectedEntry.pairReason
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Volleyball Profile */}
                                     <div>

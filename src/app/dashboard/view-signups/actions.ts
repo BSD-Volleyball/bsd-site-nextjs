@@ -13,13 +13,14 @@ export interface SignupEntry {
     firstName: string
     lastName: string
     preferredName: string | null
-    email: string
     male: boolean | null
     age: string | null
     captain: string | null
     amountPaid: string | null
     signupDate: Date
     isNew: boolean
+    pairPickName: string | null
+    pairReason: string | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -83,12 +84,13 @@ export async function getSeasonSignups(): Promise<{
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
-                email: users.email,
                 male: users.male,
                 age: signups.age,
                 captain: signups.captain,
                 amountPaid: signups.amount_paid,
-                signupDate: signups.created_at
+                signupDate: signups.created_at,
+                pairPickId: signups.pair_pick,
+                pairReason: signups.pair_reason
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -108,9 +110,49 @@ export async function getSeasonSignups(): Promise<{
             draftedUserIds = new Set(draftedUsers.map((d) => d.user))
         }
 
+        // Fetch pair pick user names
+        const pairPickIds = signupRows
+            .map((r) => r.pairPickId)
+            .filter((id): id is string => id !== null)
+        let pairPickNames = new Map<string, string>()
+
+        if (pairPickIds.length > 0) {
+            const pairPickUsers = await db
+                .select({
+                    id: users.id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preffered_name
+                })
+                .from(users)
+                .where(inArray(users.id, pairPickIds))
+
+            pairPickNames = new Map(
+                pairPickUsers.map((u) => {
+                    const preferred = u.preferredName
+                        ? ` (${u.preferredName})`
+                        : ""
+                    return [u.id, `${u.firstName}${preferred} ${u.lastName}`]
+                })
+            )
+        }
+
         const entries: SignupEntry[] = signupRows.map((row) => ({
-            ...row,
-            isNew: !draftedUserIds.has(row.userId)
+            signupId: row.signupId,
+            userId: row.userId,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            preferredName: row.preferredName,
+            male: row.male,
+            age: row.age,
+            captain: row.captain,
+            amountPaid: row.amountPaid,
+            signupDate: row.signupDate,
+            isNew: !draftedUserIds.has(row.userId),
+            pairPickName: row.pairPickId
+                ? (pairPickNames.get(row.pairPickId) ?? null)
+                : null,
+            pairReason: row.pairReason
         }))
 
         return {
