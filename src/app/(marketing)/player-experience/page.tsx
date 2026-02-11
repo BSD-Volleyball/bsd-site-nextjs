@@ -13,7 +13,7 @@ const divisions = [
         description: "Bumping, setting and hitting on nearly every rally. The better hitter can hit hard and put the ball down, usually against single blocking. Play features longer rallies with fewer kills than AA. Players demonstrate solid defensive abilities. Similar to lower USAV B level."
     },
     {
-        name: "AB Division",
+        name: "AB Division (now split into ABA And ABB)",
         description: "The defining characteristic is consistency. Players attempt the fundamental techniques, but execution varies between excellent plays and occasional lapses. Many competitors here could advance with improved consistency. Resembles Gaithersburg City's B league."
     },
     {
