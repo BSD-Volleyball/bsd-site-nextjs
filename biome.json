@@ -6,18 +6,29 @@
         "useIgnoreFile": true
     },
     "files": {
-        "includes": ["**", "!components/ui/**", "!migrations/**", "!**/*.css"]
+        "includes": [
+            "**",
+            "!src/components/ui/**",
+            "!migrations/**",
+            "!**/*.css",
+            "!public/**"
+        ]
     },
     "formatter": {
         "indentStyle": "space",
         "indentWidth": 4
     },
-    
+
     "linter": {
         "rules": {
             "a11y": {
                 "noSvgWithoutTitle": "off",
-                "useGenericFontNames": "off"
+                "useGenericFontNames": "off",
+                "useSemanticElements": "off",
+                "noLabelWithoutControl": "off"
+            },
+            "performance": {
+                "noImgElement": "off"
             },
             "correctness": {
                 "noUnusedImports": {

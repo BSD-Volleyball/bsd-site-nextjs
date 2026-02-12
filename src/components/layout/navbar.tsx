@@ -114,9 +114,7 @@ export const Navbar = () => {
                         <h3 className="hidden font-bold text-xl sm:block lg:text-2xl">
                             {site.name}
                         </h3>
-                        <h3 className="font-bold text-xl sm:hidden">
-                            BSD
-                        </h3>
+                        <h3 className="font-bold text-xl sm:hidden">BSD</h3>
                     </Link>
 
                     {/* Desktop Navigation */}
@@ -147,7 +145,9 @@ export const Navbar = () => {
                                                                     {title}
                                                                 </p>
                                                                 <p className="line-clamp-2 text-muted-foreground text-xs">
-                                                                    {description}
+                                                                    {
+                                                                        description
+                                                                    }
                                                                 </p>
                                                             </Link>
                                                         </NavigationMenuLink>
@@ -172,12 +172,21 @@ export const Navbar = () => {
                                                         >
                                                             <Link
                                                                 href={href}
-                                                                target={external ? "_blank" : undefined}
-                                                                rel={external ? "noopener noreferrer" : undefined}
-                                                                className="group block rounded-lg p-3 text-sm font-medium transition-colors hover:bg-accent/50 hover:text-primary"
+                                                                target={
+                                                                    external
+                                                                        ? "_blank"
+                                                                        : undefined
+                                                                }
+                                                                rel={
+                                                                    external
+                                                                        ? "noopener noreferrer"
+                                                                        : undefined
+                                                                }
+                                                                className="group block rounded-lg p-3 font-medium text-sm transition-colors hover:bg-accent/50 hover:text-primary"
                                                             >
                                                                 {label}
-                                                                {external && " ↗"}
+                                                                {external &&
+                                                                    " ↗"}
                                                             </Link>
                                                         </NavigationMenuLink>
                                                     </li>
@@ -352,8 +361,16 @@ export const Navbar = () => {
                                                     >
                                                         <Link
                                                             href={href}
-                                                            target={external ? "_blank" : undefined}
-                                                            rel={external ? "noopener noreferrer" : undefined}
+                                                            target={
+                                                                external
+                                                                    ? "_blank"
+                                                                    : undefined
+                                                            }
+                                                            rel={
+                                                                external
+                                                                    ? "noopener noreferrer"
+                                                                    : undefined
+                                                            }
                                                         >
                                                             {label}
                                                             {external && " ↗"}

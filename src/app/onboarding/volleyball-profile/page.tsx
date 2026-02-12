@@ -41,7 +41,7 @@ export default async function OnboardingVolleyballProfilePage() {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h1 className="text-2xl font-bold">Almost there!</h1>
+                <h1 className="font-bold text-2xl">Almost there!</h1>
                 <p className="text-muted-foreground">
                     Tell us about your volleyball experience and skills.
                 </p>

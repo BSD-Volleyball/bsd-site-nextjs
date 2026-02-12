@@ -12,7 +12,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { updateAccountProfile, type AccountProfileData } from "../settings/actions"
+import {
+    updateAccountProfile,
+    type AccountProfileData
+} from "../settings/actions"
 
 interface AccountFormProps {
     profile: AccountProfileData | null
@@ -30,10 +33,13 @@ export function AccountForm({ profile, email }: AccountFormProps) {
         emergency_contact: profile?.emergency_contact ?? null
     })
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+    const [message, setMessage] = useState<{
+        type: "success" | "error"
+        text: string
+    } | null>(null)
 
     const handleChange = (field: keyof AccountProfileData, value: string) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             [field]: value || null
         }))
@@ -74,7 +80,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             <Input
                                 id="first_name"
                                 value={formData.first_name ?? ""}
-                                onChange={(e) => handleChange("first_name", e.target.value)}
+                                onChange={(e) =>
+                                    handleChange("first_name", e.target.value)
+                                }
                                 placeholder="Enter your first name"
                             />
                         </div>
@@ -83,28 +91,36 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             <Input
                                 id="last_name"
                                 value={formData.last_name ?? ""}
-                                onChange={(e) => handleChange("last_name", e.target.value)}
+                                onChange={(e) =>
+                                    handleChange("last_name", e.target.value)
+                                }
                                 placeholder="Enter your last name"
                             />
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="preffered_name">Preferred First Name (if different than above)</Label>
+                        <Label htmlFor="preffered_name">
+                            Preferred First Name (if different than above)
+                        </Label>
                         <Input
                             id="preffered_name"
                             value={formData.preffered_name ?? ""}
-                            onChange={(e) => handleChange("preffered_name", e.target.value)}
+                            onChange={(e) =>
+                                handleChange("preffered_name", e.target.value)
+                            }
                             placeholder="The name you'd like to be called"
                         />
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                             This is how your name will appear to others.
                         </p>
                     </div>
 
                     {/* Contact Section */}
                     <div className="border-t pt-6">
-                        <h3 className="font-medium mb-4">Contact Information</h3>
+                        <h3 className="mb-4 font-medium">
+                            Contact Information
+                        </h3>
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
@@ -112,7 +128,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                                     id="email"
                                     type="email"
                                     value={formData.email ?? ""}
-                                    onChange={(e) => handleChange("email", e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange("email", e.target.value)
+                                    }
                                     placeholder="Enter your email address"
                                 />
                             </div>
@@ -122,7 +140,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                                 <Input
                                     id="phone"
                                     value={formData.phone ?? ""}
-                                    onChange={(e) => handleChange("phone", e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange("phone", e.target.value)
+                                    }
                                     placeholder="Enter your phone number"
                                 />
                             </div>
@@ -131,28 +151,40 @@ export function AccountForm({ profile, email }: AccountFormProps) {
 
                     {/* Additional Info Section */}
                     <div className="border-t pt-6">
-                        <h3 className="font-medium mb-4">Additional Information</h3>
+                        <h3 className="mb-4 font-medium">
+                            Additional Information
+                        </h3>
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="pronouns">Pronouns</Label>
                                 <Input
                                     id="pronouns"
                                     value={formData.pronouns ?? ""}
-                                    onChange={(e) => handleChange("pronouns", e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange("pronouns", e.target.value)
+                                    }
                                     placeholder="e.g., they/them, she/her, he/him"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="emergency_contact">Emergency Contact</Label>
+                                <Label htmlFor="emergency_contact">
+                                    Emergency Contact
+                                </Label>
                                 <Input
                                     id="emergency_contact"
                                     value={formData.emergency_contact ?? ""}
-                                    onChange={(e) => handleChange("emergency_contact", e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            "emergency_contact",
+                                            e.target.value
+                                        )
+                                    }
                                     placeholder="e.g., Jane Doe (wife) - 555-123-4567"
                                 />
-                                <p className="text-sm text-muted-foreground">
-                                    Name and phone number of someone we can contact in case of emergency.
+                                <p className="text-muted-foreground text-sm">
+                                    Name and phone number of someone we can
+                                    contact in case of emergency.
                                 </p>
                             </div>
                         </div>

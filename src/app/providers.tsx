@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ThemeProvider } from "next-themes"
 import type { ReactNode } from "react"
-import NextTopLoader from 'nextjs-toploader';
+import NextTopLoader from "nextjs-toploader"
 import { Toaster } from "sonner"
 import { authClient } from "@/lib/auth-client"
 

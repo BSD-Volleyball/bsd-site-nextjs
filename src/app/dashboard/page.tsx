@@ -14,11 +14,7 @@ import {
 } from "@/database/schema"
 import { eq, and, desc, count } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    RiCheckLine,
-    RiCalendarLine,
-    RiCoupon3Line
-} from "@remixicon/react"
+import { RiCheckLine, RiCalendarLine, RiCoupon3Line } from "@remixicon/react"
 import Link from "next/link"
 import {
     getSeasonConfig,

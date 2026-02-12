@@ -1,8 +1,21 @@
 "use client"
 
-import type { GenderAttritionData, CaptainAttritionData, CaptainAttritionAvgData, GenderRatio } from "./actions"
+import type {
+    GenderAttritionData,
+    CaptainAttritionData,
+    CaptainAttritionAvgData,
+    GenderRatio
+} from "./actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    ResponsiveContainer,
+    Cell
+} from "recharts"
 
 const GENDER_COLORS: Record<string, string> = {
     Male: "#3b82f6",
@@ -10,7 +23,10 @@ const GENDER_COLORS: Record<string, string> = {
     Unknown: "#a1a1aa"
 }
 
-function CaptainTooltip({ active, payload, label }: {
+function CaptainTooltip({
+    active,
+    payload
+}: {
     active?: boolean
     payload?: { payload: CaptainAttritionData }[]
     label?: string
@@ -31,7 +47,10 @@ function CaptainTooltip({ active, payload, label }: {
     )
 }
 
-function CaptainAvgTooltip({ active, payload, label }: {
+function CaptainAvgTooltip({
+    active,
+    payload
+}: {
     active?: boolean
     payload?: { payload: CaptainAttritionAvgData }[]
     label?: string
@@ -42,8 +61,9 @@ function CaptainAvgTooltip({ active, payload, label }: {
         <div className="rounded-md border bg-popover px-3 py-2 text-popover-foreground shadow-md">
             <p className="font-medium text-sm">{data.captain}</p>
             <p className="text-sm">Avg per season: {data.avg}</p>
-            <p className="text-xs text-muted-foreground">
-                {data.total} total over {data.seasons} season{data.seasons !== 1 ? "s" : ""}
+            <p className="text-muted-foreground text-xs">
+                {data.total} total over {data.seasons} season
+                {data.seasons !== 1 ? "s" : ""}
             </p>
             <p className="text-xs" style={{ color: "#3b82f6" }}>
                 Male: {data.male}
@@ -56,10 +76,26 @@ function CaptainAvgTooltip({ active, payload, label }: {
 }
 
 const CAPTAIN_COLORS = [
-    "#3b82f6", "#ef4444", "#f59e0b", "#10b981", "#8b5cf6",
-    "#ec4899", "#06b6d4", "#f97316", "#6366f1", "#14b8a6",
-    "#e11d48", "#84cc16", "#0ea5e9", "#d946ef", "#facc15",
-    "#22d3ee", "#fb7185", "#a3e635", "#818cf8", "#2dd4bf"
+    "#3b82f6",
+    "#ef4444",
+    "#f59e0b",
+    "#10b981",
+    "#8b5cf6",
+    "#ec4899",
+    "#06b6d4",
+    "#f97316",
+    "#6366f1",
+    "#14b8a6",
+    "#e11d48",
+    "#84cc16",
+    "#0ea5e9",
+    "#d946ef",
+    "#facc15",
+    "#22d3ee",
+    "#fb7185",
+    "#a3e635",
+    "#818cf8",
+    "#2dd4bf"
 ]
 
 export function AttritionCharts({
@@ -104,7 +140,10 @@ export function AttritionCharts({
                                     {genderData.map((entry) => (
                                         <Cell
                                             key={entry.label}
-                                            fill={GENDER_COLORS[entry.label] || "#a1a1aa"}
+                                            fill={
+                                                GENDER_COLORS[entry.label] ||
+                                                "#a1a1aa"
+                                            }
                                         />
                                     ))}
                                 </Bar>
@@ -133,11 +172,17 @@ export function AttritionCharts({
                                     </span>
                                 </div>
                                 <p className="mt-1 text-muted-foreground text-xs">
-                                    <span className="font-medium" style={{ color: "#3b82f6" }}>
+                                    <span
+                                        className="font-medium"
+                                        style={{ color: "#3b82f6" }}
+                                    >
                                         {attritionGenderRatio.male} male
                                     </span>
                                     {" / "}
-                                    <span className="font-medium" style={{ color: "#ec4899" }}>
+                                    <span
+                                        className="font-medium"
+                                        style={{ color: "#ec4899" }}
+                                    >
                                         {attritionGenderRatio.nonMale} non-male
                                     </span>
                                 </p>
@@ -161,11 +206,17 @@ export function AttritionCharts({
                                     </span>
                                 </div>
                                 <p className="mt-1 text-muted-foreground text-xs">
-                                    <span className="font-medium" style={{ color: "#3b82f6" }}>
+                                    <span
+                                        className="font-medium"
+                                        style={{ color: "#3b82f6" }}
+                                    >
                                         {overallGenderRatio.male} male
                                     </span>
                                     {" / "}
-                                    <span className="font-medium" style={{ color: "#ec4899" }}>
+                                    <span
+                                        className="font-medium"
+                                        style={{ color: "#ec4899" }}
+                                    >
                                         {overallGenderRatio.nonMale} non-male
                                     </span>
                                 </p>
@@ -209,7 +260,11 @@ export function AttritionCharts({
                                     {captainData.map((_, idx) => (
                                         <Cell
                                             key={idx}
-                                            fill={CAPTAIN_COLORS[idx % CAPTAIN_COLORS.length]}
+                                            fill={
+                                                CAPTAIN_COLORS[
+                                                    idx % CAPTAIN_COLORS.length
+                                                ]
+                                            }
                                         />
                                     ))}
                                 </Bar>
@@ -253,7 +308,11 @@ export function AttritionCharts({
                                     {lastSeasonCaptainData.map((_, idx) => (
                                         <Cell
                                             key={idx}
-                                            fill={CAPTAIN_COLORS[idx % CAPTAIN_COLORS.length]}
+                                            fill={
+                                                CAPTAIN_COLORS[
+                                                    idx % CAPTAIN_COLORS.length
+                                                ]
+                                            }
                                         />
                                     ))}
                                 </Bar>
@@ -297,7 +356,11 @@ export function AttritionCharts({
                                     {captainAvgData.map((_, idx) => (
                                         <Cell
                                             key={idx}
-                                            fill={CAPTAIN_COLORS[idx % CAPTAIN_COLORS.length]}
+                                            fill={
+                                                CAPTAIN_COLORS[
+                                                    idx % CAPTAIN_COLORS.length
+                                                ]
+                                            }
                                         />
                                     ))}
                                 </Bar>
@@ -341,7 +404,11 @@ export function AttritionCharts({
                                     {lastSeasonCaptainAvgData.map((_, idx) => (
                                         <Cell
                                             key={idx}
-                                            fill={CAPTAIN_COLORS[idx % CAPTAIN_COLORS.length]}
+                                            fill={
+                                                CAPTAIN_COLORS[
+                                                    idx % CAPTAIN_COLORS.length
+                                                ]
+                                            }
                                         />
                                     ))}
                                 </Bar>

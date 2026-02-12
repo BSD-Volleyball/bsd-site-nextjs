@@ -37,7 +37,10 @@ const benefitList: BenefitsProps[] = [
 
 export const BenefitsSection = () => {
     return (
-        <section id="benefits" className="container mx-auto px-4 py-16 sm:py-20">
+        <section
+            id="benefits"
+            className="container mx-auto px-4 py-16 sm:py-20"
+        >
             <div className="grid place-items-center lg:grid-cols-2 lg:gap-24">
                 <div>
                     <h2 className="mb-2 text-lg text-primary tracking-wider">
@@ -48,7 +51,9 @@ export const BenefitsSection = () => {
                         Why Choose This Starter
                     </h2>
                     <p className="mb-8 text-muted-foreground text-xl">
-                        Stop wasting time on infrastructure. Get a battle-tested foundation that lets you focus on what matters - building your unique features and growing your business.
+                        Stop wasting time on infrastructure. Get a battle-tested
+                        foundation that lets you focus on what matters -
+                        building your unique features and growing your business.
                     </p>
                 </div>
 

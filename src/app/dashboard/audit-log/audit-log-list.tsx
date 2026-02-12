@@ -98,16 +98,14 @@ export function AuditLogList({
                                 className="border-b transition-colors last:border-0 hover:bg-accent/50"
                             >
                                 <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
-                                    {new Date(
-                                        entry.createdAt
-                                    ).toLocaleString()}
+                                    {new Date(entry.createdAt).toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 font-medium">
                                     {entry.userName ?? entry.userId}
                                 </td>
                                 <td className="px-4 py-2">
                                     <span
-                                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${actionColors[entry.action] || "bg-muted"}`}
+                                        className={`inline-block rounded-full px-2 py-0.5 font-medium text-xs ${actionColors[entry.action] || "bg-muted"}`}
                                     >
                                         {entry.action}
                                     </span>

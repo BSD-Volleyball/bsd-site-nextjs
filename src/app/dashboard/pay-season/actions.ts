@@ -2,8 +2,8 @@
 
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { Resend } from "resend"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
@@ -139,12 +139,14 @@ async function sendSignupConfirmationEmail(
                 baseUrl: site.url,
                 imageUrl: "cid:logo"
             }),
-            attachments: [{
-                filename: "logo.png",
-                content: logoContent,
-                contentType: "image/png",
-                inlineContentId: "logo"
-            }]
+            attachments: [
+                {
+                    filename: "logo.png",
+                    content: logoContent,
+                    contentType: "image/png",
+                    inlineContentId: "logo"
+                }
+            ]
         })
     } catch (error) {
         console.error("Failed to send signup confirmation email:", error)

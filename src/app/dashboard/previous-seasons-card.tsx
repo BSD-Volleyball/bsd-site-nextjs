@@ -80,9 +80,7 @@ export function PreviousSeasonsCard({
                                         onClick={() => handleRowClick(ps)}
                                     >
                                         <td className="py-2 pr-4">
-                                            {ps.season
-                                                .charAt(0)
-                                                .toUpperCase() +
+                                            {ps.season.charAt(0).toUpperCase() +
                                                 ps.season.slice(1)}{" "}
                                             {ps.year}
                                         </td>

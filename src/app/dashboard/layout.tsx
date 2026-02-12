@@ -11,9 +11,6 @@ import {
     SidebarProvider,
     SidebarTrigger
 } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import GithubIcon from "@/components/icons/github-icon"
 
 export default function ProtectedPage({
     children,

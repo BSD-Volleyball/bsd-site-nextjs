@@ -19,11 +19,17 @@
 
 import "dotenv/config"
 import { db } from "../src/database/db"
-import { users, seasons, divisions, teams, drafts } from "../src/database/schema"
+import {
+    users,
+    seasons,
+    divisions,
+    teams,
+    drafts
+} from "../src/database/schema"
 import { eq, and } from "drizzle-orm"
-import * as readline from "readline"
-import * as fs from "fs"
-import * as path from "path"
+import * as readline from "node:readline"
+import * as fs from "node:fs"
+import * as path from "node:path"
 
 const DRAFTS_DIR = path.join(process.env.HOME || "~", "bsd-drafts")
 const MAPPING_FILE = path.join(process.env.HOME || "~", "draft-mapping-fix.csv")
@@ -31,7 +37,8 @@ const MAX_PLAYERS_PER_TEAM = 9
 
 // Name mapping from draft files to correct database names
 // Key: "lastname, firstname" (lowercase), Value: { firstName, lastName }
-let nameMapping: Map<string, { firstName: string; lastName: string }> = new Map()
+const nameMapping: Map<string, { firstName: string; lastName: string }> =
+    new Map()
 
 function loadNameMapping(): void {
     if (!fs.existsSync(MAPPING_FILE)) {
@@ -57,7 +64,7 @@ function loadNameMapping(): void {
 
         // Both are in "Last, First" format
         const key = wrongName.toLowerCase()
-        const [goodLast, goodFirst] = goodName.split(",").map(s => s.trim())
+        const [goodLast, goodFirst] = goodName.split(",").map((s) => s.trim())
 
         nameMapping.set(key, {
             firstName: goodFirst || "",
@@ -68,7 +75,10 @@ function loadNameMapping(): void {
     console.log(`Loaded ${nameMapping.size} name mappings`)
 }
 
-function lookupMappedName(firstName: string, lastName: string): { firstName: string; lastName: string } | null {
+function lookupMappedName(
+    firstName: string,
+    lastName: string
+): { firstName: string; lastName: string } | null {
     // Try "Last, First" format
     const key = `${lastName}, ${firstName}`.toLowerCase()
     return nameMapping.get(key) || null
@@ -147,8 +157,12 @@ function parseName(nameStr: string): ParsedName {
 
     // Check for "Last, First" format
     if (trimmed.includes(",")) {
-        const [last, first] = trimmed.split(",").map(s => s.trim())
-        return { firstName: first || "", lastName: last || "", original: trimmed }
+        const [last, first] = trimmed.split(",").map((s) => s.trim())
+        return {
+            firstName: first || "",
+            lastName: last || "",
+            original: trimmed
+        }
     }
 
     // "First Last" format - split on spaces, last word is last name
@@ -164,17 +178,27 @@ function parseName(nameStr: string): ParsedName {
 
 // --- Filename parsing ---
 
-function parseFilename(filename: string): { season: string; year: number; divisionName: string } {
+function parseFilename(filename: string): {
+    season: string
+    year: number
+    divisionName: string
+} {
     const seasonLetter = filename[0].toUpperCase()
-    const seasonMap: Record<string, string> = { F: "fall", S: "spring", U: "summer" }
+    const seasonMap: Record<string, string> = {
+        F: "fall",
+        S: "spring",
+        U: "summer"
+    }
     const season = seasonMap[seasonLetter]
     if (!season) {
-        throw new Error(`Unknown season letter "${seasonLetter}" in filename "${filename}"`)
+        throw new Error(
+            `Unknown season letter "${seasonLetter}" in filename "${filename}"`
+        )
     }
 
     const yearStr = filename.substring(1, 3)
     const yearNum = parseInt(yearStr, 10)
-    if (isNaN(yearNum)) {
+    if (Number.isNaN(yearNum)) {
         throw new Error(`Invalid year "${yearStr}" in filename "${filename}"`)
     }
     // Convert 2-digit year: 00-49 → 2000s, 50-99 → 1900s
@@ -227,7 +251,7 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
 
     for (let i = 0; i < lines.length; i++) {
         const fields = parseCSVLine(lines[i])
-        const trimmed = fields.map(f => f.trim())
+        const trimmed = fields.map((f) => f.trim())
 
         // Count consecutive numbers starting from 1
         let count = 0
@@ -247,7 +271,9 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
     }
 
     if (startRow === -1) {
-        throw new Error(`Could not find team number marker row (1,2,3,4... ) in file "${filename}"`)
+        throw new Error(
+            `Could not find team number marker row (1,2,3,4... ) in file "${filename}"`
+        )
     }
 
     // Next row has captain last names
@@ -257,18 +283,21 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
     }
 
     const captainFields = parseCSVLine(lines[captainRow])
-    const captainNames = captainFields.slice(0, numTeams).map(s => s.trim())
+    const captainNames = captainFields.slice(0, numTeams).map((s) => s.trim())
 
     // Validate we got captain names
-    if (captainNames.some(n => !n)) {
-        throw new Error(`Missing captain name in file "${filename}": [${captainNames.join(", ")}]`)
+    if (captainNames.some((n) => !n)) {
+        throw new Error(
+            `Missing captain name in file "${filename}": [${captainNames.join(", ")}]`
+        )
     }
 
     // Initialize team data - captain name may be "last" or "first last"
-    const teamDataArr: TeamData[] = captainNames.map(name => {
+    const teamDataArr: TeamData[] = captainNames.map((name) => {
         const parts = name.split(/\s+/)
         // If multiple words, last word is the last name; otherwise treat the whole thing as last name
-        const captainLastName = parts.length > 1 ? parts[parts.length - 1] : parts[0]
+        const captainLastName =
+            parts.length > 1 ? parts[parts.length - 1] : parts[0]
         return {
             captainLastName,
             captain: null,
@@ -285,7 +314,9 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
         const fields = parseCSVLine(lines[rowIdx])
 
         // Check if all team columns in this row are empty
-        const hasAnyPlayer = fields.slice(0, numTeams).some(f => f.trim() !== "")
+        const hasAnyPlayer = fields
+            .slice(0, numTeams)
+            .some((f) => f.trim() !== "")
         if (!hasAnyPlayer) break
 
         for (let t = 0; t < numTeams; t++) {
@@ -302,31 +333,40 @@ function parseCsvFile(filePath: string, filename: string): ParsedData {
 
 // --- User matching ---
 
-function findUserByName(firstName: string, lastName: string, allUsers: User[]): User[] {
+function findUserByName(
+    firstName: string,
+    lastName: string,
+    allUsers: User[]
+): User[] {
     const normFirst = firstName.toLowerCase().trim()
     const normLast = lastName.toLowerCase().trim()
 
     if (!normLast) return []
 
-    return allUsers.filter(u => {
+    return allUsers.filter((u) => {
         const uFirst = u.first_name.toLowerCase()
         const uLast = u.last_name.toLowerCase()
         const uPref = (u.preffered_name || "").toLowerCase()
 
         if (uLast !== normLast) return false
 
-        return uFirst === normFirst ||
-               uFirst.startsWith(normFirst) ||
-               normFirst.startsWith(uFirst) ||
-               (uPref !== "" && (
-                   uPref === normFirst ||
-                   uPref.startsWith(normFirst) ||
-                   normFirst.startsWith(uPref)
-               ))
+        return (
+            uFirst === normFirst ||
+            uFirst.startsWith(normFirst) ||
+            normFirst.startsWith(uFirst) ||
+            (uPref !== "" &&
+                (uPref === normFirst ||
+                    uPref.startsWith(normFirst) ||
+                    normFirst.startsWith(uPref)))
+        )
     })
 }
 
-function findUserWithMapping(firstName: string, lastName: string, allUsers: User[]): { matches: User[]; mapped: boolean; mappedName?: string } {
+function findUserWithMapping(
+    firstName: string,
+    lastName: string,
+    allUsers: User[]
+): { matches: User[]; mapped: boolean; mappedName?: string } {
     // Try direct lookup first
     const directMatches = findUserByName(firstName, lastName, allUsers)
     if (directMatches.length > 0) {
@@ -336,7 +376,11 @@ function findUserWithMapping(firstName: string, lastName: string, allUsers: User
     // Try mapping lookup
     const mapped = lookupMappedName(firstName, lastName)
     if (mapped) {
-        const mappedMatches = findUserByName(mapped.firstName, mapped.lastName, allUsers)
+        const mappedMatches = findUserByName(
+            mapped.firstName,
+            mapped.lastName,
+            allUsers
+        )
         const mappedName = `${mapped.firstName} ${mapped.lastName}`
         return { matches: mappedMatches, mapped: true, mappedName }
     }
@@ -344,18 +388,24 @@ function findUserWithMapping(firstName: string, lastName: string, allUsers: User
     return { matches: [], mapped: false }
 }
 
-function addRuntimeMapping(firstName: string, lastName: string, user: User): void {
+function addRuntimeMapping(
+    firstName: string,
+    lastName: string,
+    user: User
+): void {
     const key = `${lastName}, ${firstName}`.toLowerCase()
     nameMapping.set(key, {
         firstName: user.first_name,
         lastName: user.last_name
     })
-    console.log(`  (remembered mapping: ${firstName} ${lastName} → ${user.first_name} ${user.last_name})`)
+    console.log(
+        `  (remembered mapping: ${firstName} ${lastName} → ${user.first_name} ${user.last_name})`
+    )
 }
 
 function findUserByLastName(lastName: string, allUsers: User[]): User[] {
     const normLast = lastName.toLowerCase().trim()
-    return allUsers.filter(u => u.last_name.toLowerCase() === normLast)
+    return allUsers.filter((u) => u.last_name.toLowerCase() === normLast)
 }
 
 async function promptForUserId(
@@ -369,7 +419,9 @@ async function promptForUserId(
         console.log("Possible matches:")
         candidates.forEach((u, i) => {
             const pref = u.preffered_name ? ` (${u.preffered_name})` : ""
-            console.log(`  ${i + 1}. ${u.first_name}${pref} ${u.last_name} [${u.id}]`)
+            console.log(
+                `  ${i + 1}. ${u.first_name}${pref} ${u.last_name} [${u.id}]`
+            )
         })
         console.log("  0. None of these (enter ID manually)")
 
@@ -380,10 +432,13 @@ async function promptForUserId(
             return candidates[num - 1].id
         }
         if (num === 0 || choice.length > 10) {
-            const userId = num === 0 ? await question("Enter user ID: ") : choice
-            const found = allUsers.find(u => u.id === userId)
+            const userId =
+                num === 0 ? await question("Enter user ID: ") : choice
+            const found = allUsers.find((u) => u.id === userId)
             if (found) {
-                console.log(`  → Selected: ${found.first_name} ${found.last_name}`)
+                console.log(
+                    `  → Selected: ${found.first_name} ${found.last_name}`
+                )
                 return userId
             }
             console.log(`  ⚠ User ID "${userId}" not found in database`)
@@ -392,7 +447,7 @@ async function promptForUserId(
     }
 
     const userId = await question("Enter user ID: ")
-    const found = allUsers.find(u => u.id === userId)
+    const found = allUsers.find((u) => u.id === userId)
     if (found) {
         console.log(`  → Selected: ${found.first_name} ${found.last_name}`)
         return userId
@@ -404,64 +459,98 @@ async function promptForUserId(
 // --- User resolution ---
 
 async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
-    console.log(`\nResolving users for ${data.season} ${data.year} ${data.divisionName}...`)
+    console.log(
+        `\nResolving users for ${data.season} ${data.year} ${data.divisionName}...`
+    )
     console.log(`Found ${data.teams.length} teams\n`)
 
     // First, resolve captains
     for (let t = 0; t < data.teams.length; t++) {
         const team = data.teams[t]
-        console.log(`\n--- Team ${t + 1} (Captain: ${team.captainLastName}) ---`)
+        console.log(
+            `\n--- Team ${t + 1} (Captain: ${team.captainLastName}) ---`
+        )
 
         // Find players with matching last name to identify captain
         const captainCandidatesFromTeam = team.players.filter(
-            p => p.name.lastName.toLowerCase() === team.captainLastName.toLowerCase()
+            (p) =>
+                p.name.lastName.toLowerCase() ===
+                team.captainLastName.toLowerCase()
         )
 
         if (captainCandidatesFromTeam.length === 1) {
             const captainName = captainCandidatesFromTeam[0].name
-            const { matches, mapped, mappedName } = findUserWithMapping(captainName.firstName, captainName.lastName, allUsers)
+            const { matches, mapped, mappedName } = findUserWithMapping(
+                captainName.firstName,
+                captainName.lastName,
+                allUsers
+            )
 
             if (matches.length === 1) {
                 team.captain = matches[0]
                 team.teamName = `Team ${team.captain.last_name}`
-                const suffix = mapped ? ` (mapped from ${captainName.original})` : ""
-                console.log(`Captain: ${team.captain.first_name} ${team.captain.last_name}${suffix} ✓`)
+                const suffix = mapped
+                    ? ` (mapped from ${captainName.original})`
+                    : ""
+                console.log(
+                    `Captain: ${team.captain.first_name} ${team.captain.last_name}${suffix} ✓`
+                )
             } else {
                 const userId = await promptForUserId(
                     `Captain "${captainName.original}"${mapped ? ` (mapped to "${mappedName}")` : ""} - ${matches.length > 1 ? "multiple" : "no"} matches:`,
                     matches,
                     allUsers
                 )
-                team.captain = allUsers.find(u => u.id === userId)!
+                team.captain = allUsers.find((u) => u.id === userId)!
                 team.teamName = `Team ${team.captain.last_name}`
-                addRuntimeMapping(captainName.firstName, captainName.lastName, team.captain)
+                addRuntimeMapping(
+                    captainName.firstName,
+                    captainName.lastName,
+                    team.captain
+                )
             }
         } else if (captainCandidatesFromTeam.length > 1) {
-            console.log(`Multiple players with last name "${team.captainLastName}":`)
+            console.log(
+                `Multiple players with last name "${team.captainLastName}":`
+            )
             captainCandidatesFromTeam.forEach((p, i) => {
                 console.log(`  ${i + 1}. ${p.name.original}`)
             })
-            const choice = await question("Which one is the captain? (enter number): ")
+            const choice = await question(
+                "Which one is the captain? (enter number): "
+            )
             const idx = parseInt(choice, 10) - 1
 
             if (idx >= 0 && idx < captainCandidatesFromTeam.length) {
                 const captainName = captainCandidatesFromTeam[idx].name
-                const { matches, mapped, mappedName } = findUserWithMapping(captainName.firstName, captainName.lastName, allUsers)
+                const { matches, mapped, mappedName } = findUserWithMapping(
+                    captainName.firstName,
+                    captainName.lastName,
+                    allUsers
+                )
 
                 if (matches.length === 1) {
                     team.captain = matches[0]
                     team.teamName = `Team ${team.captain.last_name}`
-                    const suffix = mapped ? ` (mapped from ${captainName.original})` : ""
-                    console.log(`Captain: ${team.captain.first_name} ${team.captain.last_name}${suffix} ✓`)
+                    const suffix = mapped
+                        ? ` (mapped from ${captainName.original})`
+                        : ""
+                    console.log(
+                        `Captain: ${team.captain.first_name} ${team.captain.last_name}${suffix} ✓`
+                    )
                 } else {
                     const userId = await promptForUserId(
                         `Captain "${captainName.original}"${mapped ? ` (mapped to "${mappedName}")` : ""}:`,
                         matches,
                         allUsers
                     )
-                    team.captain = allUsers.find(u => u.id === userId)!
+                    team.captain = allUsers.find((u) => u.id === userId)!
                     team.teamName = `Team ${team.captain.last_name}`
-                    addRuntimeMapping(captainName.firstName, captainName.lastName, team.captain)
+                    addRuntimeMapping(
+                        captainName.firstName,
+                        captainName.lastName,
+                        team.captain
+                    )
                 }
             } else {
                 throw new Error("Invalid selection")
@@ -474,7 +563,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                 matches,
                 allUsers
             )
-            team.captain = allUsers.find(u => u.id === userId)!
+            team.captain = allUsers.find((u) => u.id === userId)!
             team.teamName = `Team ${team.captain.last_name}`
             addRuntimeMapping("", team.captainLastName, team.captain)
         }
@@ -486,25 +575,45 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
         console.log(`\n--- Resolving players for ${team.teamName} ---`)
 
         for (const player of team.players) {
-            const { matches, mapped, mappedName } = findUserWithMapping(player.name.firstName, player.name.lastName, allUsers)
+            const { matches, mapped, mappedName } = findUserWithMapping(
+                player.name.firstName,
+                player.name.lastName,
+                allUsers
+            )
 
             if (matches.length === 1) {
                 player.user = matches[0]
-                const suffix = mapped ? ` (mapped from ${player.name.original})` : ""
-                console.log(`  ${player.name.original} → ${player.user.first_name} ${player.user.last_name}${suffix} ✓`)
+                const suffix = mapped
+                    ? ` (mapped from ${player.name.original})`
+                    : ""
+                console.log(
+                    `  ${player.name.original} → ${player.user.first_name} ${player.user.last_name}${suffix} ✓`
+                )
             } else if (matches.length > 1) {
-                const captainMatch = matches.find(m => m.id === team.captain?.id)
-                if (captainMatch && player.name.lastName.toLowerCase() === team.captainLastName.toLowerCase()) {
+                const captainMatch = matches.find(
+                    (m) => m.id === team.captain?.id
+                )
+                if (
+                    captainMatch &&
+                    player.name.lastName.toLowerCase() ===
+                        team.captainLastName.toLowerCase()
+                ) {
                     player.user = captainMatch
-                    console.log(`  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} (captain) ✓`)
+                    console.log(
+                        `  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} (captain) ✓`
+                    )
                 } else {
                     const userId = await promptForUserId(
                         `Player "${player.name.original}"${mapped ? ` (mapped to "${mappedName}")` : ""} - multiple matches:`,
                         matches,
                         allUsers
                     )
-                    player.user = allUsers.find(u => u.id === userId)!
-                    addRuntimeMapping(player.name.firstName, player.name.lastName, player.user)
+                    player.user = allUsers.find((u) => u.id === userId)!
+                    addRuntimeMapping(
+                        player.name.firstName,
+                        player.name.lastName,
+                        player.user
+                    )
                 }
             } else {
                 const userId = await promptForUserId(
@@ -512,8 +621,12 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                     [],
                     allUsers
                 )
-                player.user = allUsers.find(u => u.id === userId)!
-                addRuntimeMapping(player.name.firstName, player.name.lastName, player.user)
+                player.user = allUsers.find((u) => u.id === userId)!
+                addRuntimeMapping(
+                    player.name.firstName,
+                    player.name.lastName,
+                    player.user
+                )
             }
         }
     }
@@ -553,7 +666,10 @@ async function lookupSeasonAndDivision(
     }
 }
 
-async function checkExistingDrafts(seasonId: number, divisionId: number): Promise<boolean> {
+async function checkExistingDrafts(
+    seasonId: number,
+    divisionId: number
+): Promise<boolean> {
     const existing = await db
         .select({ id: drafts.id })
         .from(drafts)
@@ -575,7 +691,7 @@ function displaySummary(
     const numTeams = data.teams.length
     let totalPicks = 0
 
-    console.log("\n" + "=".repeat(60))
+    console.log(`\n${"=".repeat(60)}`)
     console.log(`IMPORT SUMMARY: ${data.filename}`)
     console.log("=".repeat(60))
     console.log(`Season: ${data.season} ${data.year}`)
@@ -589,7 +705,9 @@ function displaySummary(
         const team = data.teams[t]
         const teamNumber = t + 1
         console.log(`\n  Team ${teamNumber}: ${team.teamName}`)
-        console.log(`  Captain: ${team.captain!.first_name} ${team.captain!.last_name}`)
+        console.log(
+            `  Captain: ${team.captain!.first_name} ${team.captain!.last_name}`
+        )
         console.log(`  Players (${team.players.length}):`)
 
         for (let p = 0; p < team.players.length; p++) {
@@ -597,11 +715,15 @@ function displaySummary(
             const round = p + 1
 
             const isOddRound = round % 2 === 1
-            const baseValue = ((divisionLevel - 1) * 50) + ((round - 1) * numTeams)
-            const positionValue = isOddRound ? teamNumber : (numTeams + 1 - teamNumber)
+            const baseValue = (divisionLevel - 1) * 50 + (round - 1) * numTeams
+            const positionValue = isOddRound
+                ? teamNumber
+                : numTeams + 1 - teamNumber
             const overall = baseValue + positionValue
 
-            console.log(`    R${round} (#${overall}): ${player.user!.first_name} ${player.user!.last_name}`)
+            console.log(
+                `    R${round} (#${overall}): ${player.user!.first_name} ${player.user!.last_name}`
+            )
             totalPicks++
         }
     }
@@ -644,7 +766,12 @@ async function insertData(
 
     console.log("\nInserting draft picks...")
 
-    const draftPicks: { team: number; user: string; round: number; overall: number }[] = []
+    const draftPicks: {
+        team: number
+        user: string
+        round: number
+        overall: number
+    }[] = []
 
     for (let t = 0; t < data.teams.length; t++) {
         const team = data.teams[t]
@@ -656,8 +783,10 @@ async function insertData(
             const round = p + 1
 
             const isOddRound = round % 2 === 1
-            const baseValue = ((divisionLevel - 1) * 50) + ((round - 1) * numTeams)
-            const positionValue = isOddRound ? teamNumber : (numTeams + 1 - teamNumber)
+            const baseValue = (divisionLevel - 1) * 50 + (round - 1) * numTeams
+            const positionValue = isOddRound
+                ? teamNumber
+                : numTeams + 1 - teamNumber
             const overall = baseValue + positionValue
 
             draftPicks.push({
@@ -679,7 +808,7 @@ async function main() {
     try {
         const args = process.argv.slice(2)
         const dryRun = args.includes("--dry-run")
-        const fileArgs = args.filter(a => !a.startsWith("--"))
+        const fileArgs = args.filter((a) => !a.startsWith("--"))
 
         // Load name mapping
         loadNameMapping()
@@ -701,8 +830,9 @@ async function main() {
         if (fileArgs.length > 0) {
             filenames = fileArgs
         } else {
-            filenames = fs.readdirSync(DRAFTS_DIR)
-                .filter(f => /^[FSU]\d{2}/.test(f) && f !== "SystemData")
+            filenames = fs
+                .readdirSync(DRAFTS_DIR)
+                .filter((f) => /^[FSU]\d{2}/.test(f) && f !== "SystemData")
                 .sort()
         }
 
@@ -730,20 +860,27 @@ async function main() {
             try {
                 // Parse the file
                 const data = parseCsvFile(filePath, filename)
-                console.log(`Parsed: ${data.season} ${data.year} ${data.divisionName}`)
+                console.log(
+                    `Parsed: ${data.season} ${data.year} ${data.divisionName}`
+                )
                 console.log(`Teams: ${data.teams.length}`)
 
                 // Look up season and division
-                const { seasonId, divisionId, divisionLevel } = await lookupSeasonAndDivision(
-                    data.season,
-                    data.year,
-                    data.divisionName
+                const { seasonId, divisionId, divisionLevel } =
+                    await lookupSeasonAndDivision(
+                        data.season,
+                        data.year,
+                        data.divisionName
+                    )
+                console.log(
+                    `Season ID: ${seasonId}, Division ID: ${divisionId}, Level: ${divisionLevel}`
                 )
-                console.log(`Season ID: ${seasonId}, Division ID: ${divisionId}, Level: ${divisionLevel}`)
 
                 // Check for existing drafts
                 if (await checkExistingDrafts(seasonId, divisionId)) {
-                    console.log(`  ⚠ Drafts already exist for ${data.season} ${data.year} ${data.divisionName}, skipping.`)
+                    console.log(
+                        `  ⚠ Drafts already exist for ${data.season} ${data.year} ${data.divisionName}, skipping.`
+                    )
                     skipped++
                     continue
                 }
@@ -761,9 +898,14 @@ async function main() {
                 }
 
                 // Ask for confirmation
-                const confirm = await question(`\nInsert ${filename} into the database? [Y/n]: `)
+                const confirm = await question(
+                    `\nInsert ${filename} into the database? [Y/n]: `
+                )
 
-                if (confirm.toLowerCase() === "n" || confirm.toLowerCase() === "no") {
+                if (
+                    confirm.toLowerCase() === "n" ||
+                    confirm.toLowerCase() === "no"
+                ) {
                     console.log(`\nSkipped ${filename}.`)
                     skipped++
                     continue
@@ -774,8 +916,13 @@ async function main() {
                 console.log(`\n✓ Successfully imported ${filename}!`)
                 processed++
             } catch (error) {
-                console.error(`\n✗ Error processing ${filename}:`, error instanceof Error ? error.message : error)
-                const cont = await question("\nContinue with next file? [Y/n]: ")
+                console.error(
+                    `\n✗ Error processing ${filename}:`,
+                    error instanceof Error ? error.message : error
+                )
+                const cont = await question(
+                    "\nContinue with next file? [Y/n]: "
+                )
                 if (cont.toLowerCase() === "n" || cont.toLowerCase() === "no") {
                     break
                 }
@@ -794,7 +941,10 @@ async function main() {
         closeReadline()
         process.exit(0)
     } catch (error) {
-        console.error("\nFatal error:", error instanceof Error ? error.message : error)
+        console.error(
+            "\nFatal error:",
+            error instanceof Error ? error.message : error
+        )
         closeReadline()
         process.exit(1)
     }

@@ -56,7 +56,8 @@ export async function updateOnboardingAccount(
 
         const prefferedName =
             data.preffered_name &&
-            data.preffered_name.trim().toLowerCase() === currentUser?.first_name?.toLowerCase()
+            data.preffered_name.trim().toLowerCase() ===
+                currentUser?.first_name?.toLowerCase()
                 ? null
                 : data.preffered_name || null
 

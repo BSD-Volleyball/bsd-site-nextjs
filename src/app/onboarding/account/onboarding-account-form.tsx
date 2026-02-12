@@ -31,22 +31,29 @@ interface OnboardingAccountFormProps {
     initialData: OnboardingAccountData | null
 }
 
-export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProps) {
+export function OnboardingAccountForm({
+    initialData
+}: OnboardingAccountFormProps) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     // Determine if initial pronouns match a preset option
     const initialPronouns = initialData?.pronouns ?? ""
-    const isPresetPronoun = PRESET_PRONOUNS.includes(initialPronouns as typeof PRESET_PRONOUNS[number])
+    const isPresetPronoun = PRESET_PRONOUNS.includes(
+        initialPronouns as (typeof PRESET_PRONOUNS)[number]
+    )
     const initialPronounSelection = !initialPronouns
         ? BLANK_VALUE
         : isPresetPronoun
           ? initialPronouns
           : "Other"
-    const initialCustomPronouns = isPresetPronoun || !initialPronouns ? "" : initialPronouns
+    const initialCustomPronouns =
+        isPresetPronoun || !initialPronouns ? "" : initialPronouns
 
-    const [pronounSelection, setPronounSelection] = useState(initialPronounSelection)
+    const [pronounSelection, setPronounSelection] = useState(
+        initialPronounSelection
+    )
     const [customPronouns, setCustomPronouns] = useState(initialCustomPronouns)
 
     const [formData, setFormData] = useState({
@@ -54,7 +61,7 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
         phone: initialData?.phone ?? "",
         pronouns: initialData?.pronouns ?? "",
         emergency_contact: initialData?.emergency_contact ?? "",
-        male: initialData?.male ?? null as boolean | null,
+        male: initialData?.male ?? (null as boolean | null),
         referred_by: initialData?.referred_by ?? ""
     })
 
@@ -101,20 +108,27 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                 <CardHeader>
                     <CardTitle>Basic Information</CardTitle>
                     <CardDescription>
-                        Gathering this information now so you don't have to enter it every season.  You can update it at any time on the Account page.
+                        Gathering this information now so you don't have to
+                        enter it every season. You can update it at any time on
+                        the Account page.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="preffered_name">
                             Preferred First Name (if different){" "}
-                            <span className="text-muted-foreground">(optional)</span>
+                            <span className="text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Input
                             id="preffered_name"
                             value={formData.preffered_name}
                             onChange={(e) =>
-                                setFormData({ ...formData, preffered_name: e.target.value })
+                                setFormData({
+                                    ...formData,
+                                    preffered_name: e.target.value
+                                })
                             }
                             placeholder="The name you'd like to be called"
                         />
@@ -122,14 +136,18 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
 
                     <div className="space-y-2">
                         <Label htmlFor="phone">
-                            Phone Number <span className="text-destructive">*</span>
+                            Phone Number{" "}
+                            <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             id="phone"
                             type="tel"
                             value={formData.phone}
                             onChange={(e) =>
-                                setFormData({ ...formData, phone: e.target.value })
+                                setFormData({
+                                    ...formData,
+                                    phone: e.target.value
+                                })
                             }
                             placeholder="Your contact phone number"
                             required
@@ -138,24 +156,47 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
 
                     <div className="space-y-2">
                         <Label>
-                            Male? (<Link href="/gender-policy" className="underline hover:text-primary" target="_blank">why</Link>) <span className="text-destructive">*</span>
+                            Male? (
+                            <Link
+                                href="/gender-policy"
+                                className="underline hover:text-primary"
+                                target="_blank"
+                            >
+                                why
+                            </Link>
+                            ) <span className="text-destructive">*</span>
                         </Label>
                         <RadioGroup
-                            value={formData.male === null ? "" : formData.male ? "yes" : "no"}
+                            value={
+                                formData.male === null
+                                    ? ""
+                                    : formData.male
+                                      ? "yes"
+                                      : "no"
+                            }
                             onValueChange={(value) =>
-                                setFormData({ ...formData, male: value === "yes" })
+                                setFormData({
+                                    ...formData,
+                                    male: value === "yes"
+                                })
                             }
                             className="flex gap-4"
                         >
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="yes" id="male-yes" />
-                                <Label htmlFor="male-yes" className="font-normal cursor-pointer">
+                                <Label
+                                    htmlFor="male-yes"
+                                    className="cursor-pointer font-normal"
+                                >
                                     Yes
                                 </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="no" id="male-no" />
-                                <Label htmlFor="male-no" className="font-normal cursor-pointer">
+                                <Label
+                                    htmlFor="male-no"
+                                    className="cursor-pointer font-normal"
+                                >
                                     No
                                 </Label>
                             </div>
@@ -165,7 +206,9 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                     <div className="space-y-2">
                         <Label htmlFor="pronouns">
                             Pronouns{" "}
-                            <span className="text-muted-foreground">(optional)</span>
+                            <span className="text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Select
                             value={pronounSelection}
@@ -175,9 +218,15 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                                     setFormData({ ...formData, pronouns: "" })
                                     setCustomPronouns("")
                                 } else if (value === "Other") {
-                                    setFormData({ ...formData, pronouns: customPronouns })
+                                    setFormData({
+                                        ...formData,
+                                        pronouns: customPronouns
+                                    })
                                 } else {
-                                    setFormData({ ...formData, pronouns: value })
+                                    setFormData({
+                                        ...formData,
+                                        pronouns: value
+                                    })
                                     setCustomPronouns("")
                                 }
                             }}
@@ -187,7 +236,9 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value={BLANK_VALUE}>
-                                    <span className="text-muted-foreground">—</span>
+                                    <span className="text-muted-foreground">
+                                        —
+                                    </span>
                                 </SelectItem>
                                 {PRESET_PRONOUNS.map((option) => (
                                     <SelectItem key={option} value={option}>
@@ -203,7 +254,10 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                                 value={customPronouns}
                                 onChange={(e) => {
                                     setCustomPronouns(e.target.value)
-                                    setFormData({ ...formData, pronouns: e.target.value })
+                                    setFormData({
+                                        ...formData,
+                                        pronouns: e.target.value
+                                    })
                                 }}
                                 placeholder="Enter your pronouns"
                                 className="mt-2"
@@ -213,7 +267,8 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
 
                     <div className="space-y-2">
                         <Label htmlFor="emergency_contact">
-                            Emergency Contact <span className="text-destructive">*</span>
+                            Emergency Contact{" "}
+                            <span className="text-destructive">*</span>
                         </Label>
                         <Input
                             id="emergency_contact"
@@ -232,7 +287,9 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                     <div className="space-y-2">
                         <Label htmlFor="referred_by">
                             Referred By{" "}
-                            <span className="text-muted-foreground">(optional)</span>
+                            <span className="text-muted-foreground">
+                                (optional)
+                            </span>
                         </Label>
                         <Input
                             id="referred_by"
@@ -254,7 +311,11 @@ export function OnboardingAccountForm({ initialData }: OnboardingAccountFormProp
                     )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading} className="ml-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="ml-auto"
+                    >
                         {isLoading ? "Saving..." : "Continue"}
                     </Button>
                 </CardFooter>

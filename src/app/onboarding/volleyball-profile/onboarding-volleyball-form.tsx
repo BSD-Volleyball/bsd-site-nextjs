@@ -70,7 +70,10 @@ export function OnboardingVolleyballForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label htmlFor="experience">Experience <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="experience">
+                            Experience{" "}
+                            <span className="text-destructive">*</span>
+                        </Label>
                         <Textarea
                             id="experience"
                             placeholder="Describe your volleyball experience..."
@@ -103,7 +106,9 @@ export function OnboardingVolleyballForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="height">Height <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="height">
+                            Height <span className="text-destructive">*</span>
+                        </Label>
                         <Select
                             required
                             value={formData.height?.toString() ?? ""}
@@ -123,7 +128,10 @@ export function OnboardingVolleyballForm({
                                     const feet = Math.floor(inches / 12)
                                     const remainingInches = inches % 12
                                     return (
-                                        <SelectItem key={inches} value={inches.toString()}>
+                                        <SelectItem
+                                            key={inches}
+                                            value={inches.toString()}
+                                        >
                                             {feet}'{remainingInches}"
                                         </SelectItem>
                                     )
@@ -134,8 +142,9 @@ export function OnboardingVolleyballForm({
 
                     <div className="space-y-3">
                         <Label>Skills</Label>
-                        <p className="text-sm text-muted-foreground">
-                            Select the positions/skills you are comfortable playing.
+                        <p className="text-muted-foreground text-sm">
+                            Select the positions/skills you are comfortable
+                            playing.
                         </p>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="flex items-center space-x-2">
@@ -214,13 +223,17 @@ export function OnboardingVolleyballForm({
                     </div>
 
                     {error && (
-                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
                             {error}
                         </div>
                     )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading} className="ml-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="ml-auto"
+                    >
                         {isLoading ? "Completing..." : "Complete Setup"}
                     </Button>
                 </CardFooter>

@@ -274,7 +274,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         getSignupEligibility().then(setShowSignupLink)
         getIsAdminOrDirector().then(setIsAdmin)
         getRecentSeasonsNav().then(setSeasonNav)
-    }, [pathname])
+    }, [])
 
     // Build nav items dynamically
     let navItems = [...baseNavItems]
@@ -296,10 +296,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            <NavItems
-                                items={navItems}
-                                pathname={pathname}
-                            />
+                            <NavItems items={navItems} pathname={pathname} />
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

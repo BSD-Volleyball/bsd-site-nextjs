@@ -4,8 +4,7 @@ import type { MetadataRoute } from "next"
 export default function manifest(): MetadataRoute.Manifest {
     return {
         name: site.name,
-        description:
-            site.description,
+        description: site.description,
         start_url: "/",
         display: "standalone",
         background_color: "#fff",

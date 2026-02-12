@@ -18,8 +18,10 @@ export const CommunitySection = () => {
                         <CardHeader className="flex flex-col items-center">
                             <Github className="mb-4 h-16 w-16" />
                             <CardTitle className="flex flex-col items-center text-center font-bold text-4xl md:text-5xl">
-                                <div className="whitespace-nowrap">Contribute to this</div>
-                                <span className="bg-gradient-to-r from-[#da5319] to-primary bg-clip-text text-transparent py-1">
+                                <div className="whitespace-nowrap">
+                                    Contribute to this
+                                </div>
+                                <span className="bg-gradient-to-r from-[#da5319] to-primary bg-clip-text py-1 text-transparent">
                                     Project
                                 </span>
                             </CardTitle>

@@ -28,7 +28,12 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import { createTeams, type SeasonOption, type DivisionOption, type UserOption } from "./actions"
+import {
+    createTeams,
+    type SeasonOption,
+    type DivisionOption,
+    type UserOption
+} from "./actions"
 
 interface CreateTeamsFormProps {
     seasons: SeasonOption[]
@@ -58,30 +63,38 @@ function UserCombobox({
     const [search, setSearch] = useState("")
 
     const selectedUser = useMemo(
-        () => users.find(u => u.id === value),
+        () => users.find((u) => u.id === value),
         [users, value]
     )
 
     const filteredUsers = useMemo(() => {
-        let filtered = users.filter(u => !excludeIds.includes(u.id) || u.id === value)
+        const filtered = users.filter(
+            (u) => !excludeIds.includes(u.id) || u.id === value
+        )
         if (!search) return filtered
         const lowerSearch = search.toLowerCase()
-        return filtered.filter(u => {
+        return filtered.filter((u) => {
             const fullName = `${u.first_name} ${u.last_name}`.toLowerCase()
             const preferredName = u.preffered_name?.toLowerCase() || ""
             const oldIdStr = u.old_id?.toString() || ""
-            return fullName.includes(lowerSearch) || preferredName.includes(lowerSearch) || oldIdStr.includes(lowerSearch)
+            return (
+                fullName.includes(lowerSearch) ||
+                preferredName.includes(lowerSearch) ||
+                oldIdStr.includes(lowerSearch)
+            )
         })
     }, [users, search, excludeIds, value])
 
     const getDisplayName = (user: UserOption) => {
         const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        const preferredPart = user.preffered_name ? ` (${user.preffered_name})` : ""
+        const preferredPart = user.preffered_name
+            ? ` (${user.preffered_name})`
+            : ""
         return `${oldIdPart}${user.first_name}${preferredPart} ${user.last_name}`
     }
 
     const handleSelect = (userId: string) => {
-        const user = users.find(u => u.id === userId) || null
+        const user = users.find((u) => u.id === userId) || null
         onChange(userId, user)
         setOpen(false)
         setSearch("")
@@ -101,15 +114,19 @@ function UserCombobox({
                     aria-expanded={open}
                     className="w-full justify-between font-normal"
                 >
-                    <span className={cn(!selectedUser && "text-muted-foreground")}>
-                        {selectedUser ? getDisplayName(selectedUser) : placeholder}
+                    <span
+                        className={cn(!selectedUser && "text-muted-foreground")}
+                    >
+                        {selectedUser
+                            ? getDisplayName(selectedUser)
+                            : placeholder}
                     </span>
                     <div className="flex items-center gap-1">
                         {selectedUser && (
                             <span
                                 role="button"
                                 tabIndex={0}
-                                className="rounded-sm hover:bg-accent p-0.5"
+                                className="rounded-sm p-0.5 hover:bg-accent"
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     handleClear()
@@ -128,7 +145,10 @@ function UserCombobox({
                     </div>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-(--radix-popover-trigger-width) p-2" align="start">
+            <PopoverContent
+                className="w-(--radix-popover-trigger-width) p-2"
+                align="start"
+            >
                 <Input
                     placeholder="Search players..."
                     value={search}
@@ -138,16 +158,16 @@ function UserCombobox({
                 />
                 <div className="max-h-60 overflow-y-auto">
                     {filteredUsers.length === 0 ? (
-                        <p className="text-muted-foreground text-sm py-2 text-center">
+                        <p className="py-2 text-center text-muted-foreground text-sm">
                             No players found
                         </p>
                     ) : (
-                        filteredUsers.map(user => (
+                        filteredUsers.map((user) => (
                             <button
                                 key={user.id}
                                 type="button"
                                 className={cn(
-                                    "w-full text-left px-2 py-1.5 rounded-sm text-sm hover:bg-accent",
+                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
                                     value === user.id && "bg-accent"
                                 )}
                                 onClick={() => handleSelect(user.id)}
@@ -162,8 +182,12 @@ function UserCombobox({
     )
 }
 
-export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormProps) {
-    const router = useRouter()
+export function CreateTeamsForm({
+    seasons,
+    divisions,
+    users
+}: CreateTeamsFormProps) {
+    const _router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -172,16 +196,25 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
     const [divisionId, setDivisionId] = useState<string>("")
     const [teamCount, setTeamCount] = useState<"4" | "6">("6")
     const [captains, setCaptains] = useState<CaptainSelection[]>(
-        Array(6).fill(null).map(() => ({ captainId: null, teamName: "" }))
+        Array(6)
+            .fill(null)
+            .map(() => ({ captainId: null, teamName: "" }))
     )
 
     const selectedCaptainIds = useMemo(
-        () => captains.map(c => c.captainId).filter((id): id is string => id !== null),
+        () =>
+            captains
+                .map((c) => c.captainId)
+                .filter((id): id is string => id !== null),
         [captains]
     )
 
-    const handleCaptainChange = (index: number, userId: string | null, user: UserOption | null) => {
-        setCaptains(prev => {
+    const handleCaptainChange = (
+        index: number,
+        userId: string | null,
+        user: UserOption | null
+    ) => {
+        setCaptains((prev) => {
             const newCaptains = [...prev]
             newCaptains[index] = {
                 captainId: userId,
@@ -192,7 +225,7 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
     }
 
     const handleTeamNameChange = (index: number, name: string) => {
-        setCaptains(prev => {
+        setCaptains((prev) => {
             const newCaptains = [...prev]
             newCaptains[index] = {
                 ...newCaptains[index],
@@ -206,7 +239,7 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
         setTeamCount(value)
         // If switching from 6 to 4, clear the last two slots
         if (value === "4") {
-            setCaptains(prev => {
+            setCaptains((prev) => {
                 const newCaptains = [...prev]
                 newCaptains[4] = { captainId: null, teamName: "" }
                 newCaptains[5] = { captainId: null, teamName: "" }
@@ -216,7 +249,8 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
     }
 
     const formatSeasonLabel = (season: SeasonOption) => {
-        const seasonName = season.season.charAt(0).toUpperCase() + season.season.slice(1)
+        const seasonName =
+            season.season.charAt(0).toUpperCase() + season.season.slice(1)
         return `${seasonName} ${season.year}`
     }
 
@@ -236,7 +270,7 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
         }
 
         const numTeams = parseInt(teamCount)
-        const teamsToCreate = captains.slice(0, numTeams).map(c => ({
+        const teamsToCreate = captains.slice(0, numTeams).map((c) => ({
             captainId: c.captainId || "",
             teamName: c.teamName
         }))
@@ -264,7 +298,11 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
         if (result.status) {
             setSuccess(result.message)
             // Reset form
-            setCaptains(Array(6).fill(null).map(() => ({ captainId: null, teamName: "" })))
+            setCaptains(
+                Array(6)
+                    .fill(null)
+                    .map(() => ({ captainId: null, teamName: "" }))
+            )
         } else {
             setError(result.message)
         }
@@ -280,22 +318,30 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
                 <CardHeader>
                     <CardTitle>Team Configuration</CardTitle>
                     <CardDescription>
-                        Select the season, division, and number of teams to create.
+                        Select the season, division, and number of teams to
+                        create.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="season">
-                                Season <span className="text-destructive">*</span>
+                                Season{" "}
+                                <span className="text-destructive">*</span>
                             </Label>
-                            <Select value={seasonId} onValueChange={setSeasonId}>
+                            <Select
+                                value={seasonId}
+                                onValueChange={setSeasonId}
+                            >
                                 <SelectTrigger id="season">
                                     <SelectValue placeholder="Select a season" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {seasons.map((season) => (
-                                        <SelectItem key={season.id} value={season.id.toString()}>
+                                        <SelectItem
+                                            key={season.id}
+                                            value={season.id.toString()}
+                                        >
                                             {formatSeasonLabel(season)}
                                         </SelectItem>
                                     ))}
@@ -305,15 +351,22 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
 
                         <div className="space-y-2">
                             <Label htmlFor="division">
-                                Division <span className="text-destructive">*</span>
+                                Division{" "}
+                                <span className="text-destructive">*</span>
                             </Label>
-                            <Select value={divisionId} onValueChange={setDivisionId}>
+                            <Select
+                                value={divisionId}
+                                onValueChange={setDivisionId}
+                            >
                                 <SelectTrigger id="division">
                                     <SelectValue placeholder="Select a division" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {divisions.map((division) => (
-                                        <SelectItem key={division.id} value={division.id.toString()}>
+                                        <SelectItem
+                                            key={division.id}
+                                            value={division.id.toString()}
+                                        >
                                             {division.name}
                                         </SelectItem>
                                     ))}
@@ -324,22 +377,31 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
 
                     <div className="space-y-2">
                         <Label>
-                            Number of Teams <span className="text-destructive">*</span>
+                            Number of Teams{" "}
+                            <span className="text-destructive">*</span>
                         </Label>
                         <RadioGroup
                             value={teamCount}
-                            onValueChange={(value) => handleTeamCountChange(value as "4" | "6")}
+                            onValueChange={(value) =>
+                                handleTeamCountChange(value as "4" | "6")
+                            }
                             className="flex gap-4"
                         >
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="6" id="teams-6" />
-                                <Label htmlFor="teams-6" className="font-normal cursor-pointer">
+                                <Label
+                                    htmlFor="teams-6"
+                                    className="cursor-pointer font-normal"
+                                >
                                     6 Teams
                                 </Label>
                             </div>
                             <div className="flex items-center space-x-2">
                                 <RadioGroupItem value="4" id="teams-4" />
-                                <Label htmlFor="teams-4" className="font-normal cursor-pointer">
+                                <Label
+                                    htmlFor="teams-4"
+                                    className="cursor-pointer font-normal"
+                                >
                                     4 Teams
                                 </Label>
                             </div>
@@ -347,35 +409,61 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
                     </div>
 
                     <div className="border-t pt-6">
-                        <h3 className="font-semibold mb-4">Captains</h3>
+                        <h3 className="mb-4 font-semibold">Captains</h3>
                         <div className="space-y-4">
-                            {Array.from({ length: numTeams }).map((_, index) => (
-                                <div key={index} className="grid grid-cols-2 gap-4 items-end">
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`captain-${index}`}>
-                                            Captain {index + 1} <span className="text-destructive">*</span>
-                                        </Label>
-                                        <UserCombobox
-                                            users={users}
-                                            value={captains[index].captainId}
-                                            onChange={(userId, user) => handleCaptainChange(index, userId, user)}
-                                            placeholder="Select a captain..."
-                                            excludeIds={selectedCaptainIds}
-                                        />
+                            {Array.from({ length: numTeams }).map(
+                                (_, index) => (
+                                    <div
+                                        key={index}
+                                        className="grid grid-cols-2 items-end gap-4"
+                                    >
+                                        <div className="space-y-2">
+                                            <Label htmlFor={`captain-${index}`}>
+                                                Captain {index + 1}{" "}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <UserCombobox
+                                                users={users}
+                                                value={
+                                                    captains[index].captainId
+                                                }
+                                                onChange={(userId, user) =>
+                                                    handleCaptainChange(
+                                                        index,
+                                                        userId,
+                                                        user
+                                                    )
+                                                }
+                                                placeholder="Select a captain..."
+                                                excludeIds={selectedCaptainIds}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label
+                                                htmlFor={`team-name-${index}`}
+                                            >
+                                                Team Name{" "}
+                                                <span className="text-destructive">
+                                                    *
+                                                </span>
+                                            </Label>
+                                            <Input
+                                                id={`team-name-${index}`}
+                                                value={captains[index].teamName}
+                                                onChange={(e) =>
+                                                    handleTeamNameChange(
+                                                        index,
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="Team name"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`team-name-${index}`}>
-                                            Team Name <span className="text-destructive">*</span>
-                                        </Label>
-                                        <Input
-                                            id={`team-name-${index}`}
-                                            value={captains[index].teamName}
-                                            onChange={(e) => handleTeamNameChange(index, e.target.value)}
-                                            placeholder="Team name"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                                )
+                            )}
                         </div>
                     </div>
 
@@ -392,7 +480,11 @@ export function CreateTeamsForm({ seasons, divisions, users }: CreateTeamsFormPr
                     )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading} className="ml-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="ml-auto"
+                    >
                         {isLoading ? "Creating..." : "Create"}
                     </Button>
                 </CardFooter>

@@ -240,7 +240,10 @@ export async function updateUser(
         if (session) {
             const effectiveId = isIdChanging ? data.id! : originalId
             const [updatedUser] = await db
-                .select({ first_name: users.first_name, last_name: users.last_name })
+                .select({
+                    first_name: users.first_name,
+                    last_name: users.last_name
+                })
                 .from(users)
                 .where(eq(users.id, effectiveId))
                 .limit(1)
@@ -300,7 +303,10 @@ export async function getSignupForCurrentSeason(
             .select()
             .from(signups)
             .where(
-                and(eq(signups.season, config.seasonId), eq(signups.player, userId))
+                and(
+                    eq(signups.season, config.seasonId),
+                    eq(signups.player, userId)
+                )
             )
             .limit(1)
 
@@ -363,7 +369,10 @@ export async function updateSignup(
             let playerName = `signup #${signupId}`
             if (signup) {
                 const [player] = await db
-                    .select({ first_name: users.first_name, last_name: users.last_name })
+                    .select({
+                        first_name: users.first_name,
+                        last_name: users.last_name
+                    })
                     .from(users)
                     .where(eq(users.id, signup.player))
                     .limit(1)

@@ -1,7 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateAccountField, type AccountProfileData } from "./actions"
@@ -23,7 +30,10 @@ export function AccountFieldCard({
 }: AccountFieldCardProps) {
     const [value, setValue] = useState(initialValue ?? "")
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+    const [message, setMessage] = useState<{
+        type: "success" | "error"
+        text: string
+    } | null>(null)
 
     const hasChanged = value !== (initialValue ?? "")
 

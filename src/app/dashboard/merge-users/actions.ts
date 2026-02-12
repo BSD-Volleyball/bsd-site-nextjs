@@ -115,7 +115,10 @@ export async function mergeUsers(
     }
 
     if (oldUserId === newUserId) {
-        return { status: false, message: "Cannot merge a user with themselves." }
+        return {
+            status: false,
+            message: "Cannot merge a user with themselves."
+        }
     }
 
     try {

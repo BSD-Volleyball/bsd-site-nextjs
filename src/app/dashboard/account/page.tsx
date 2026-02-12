@@ -26,10 +26,7 @@ export default async function AccountPage() {
             />
 
             <div className="max-w-2xl">
-                <AccountForm
-                    profile={profile}
-                    email={session.user.email}
-                />
+                <AccountForm profile={profile} email={session.user.email} />
             </div>
         </div>
     )

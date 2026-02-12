@@ -2,7 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+    CardDescription
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -12,7 +19,7 @@ import {
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
+    SelectValue
 } from "@/components/ui/select"
 import { updateVolleyballProfile, type VolleyballProfileData } from "./actions"
 
@@ -20,10 +27,15 @@ interface VolleyballProfileFormProps {
     initialData: VolleyballProfileData | null
 }
 
-export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProps) {
+export function VolleyballProfileForm({
+    initialData
+}: VolleyballProfileFormProps) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+    const [message, setMessage] = useState<{
+        type: "success" | "error"
+        text: string
+    } | null>(null)
 
     const [formData, setFormData] = useState<VolleyballProfileData>({
         experience: initialData?.experience ?? null,
@@ -70,7 +82,10 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                             placeholder="Describe your volleyball experience..."
                             value={formData.experience ?? ""}
                             onChange={(e) =>
-                                setFormData({ ...formData, experience: e.target.value || null })
+                                setFormData({
+                                    ...formData,
+                                    experience: e.target.value || null
+                                })
                             }
                             rows={3}
                         />
@@ -83,7 +98,10 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                             placeholder="How would you rate your overall skill level?"
                             value={formData.assessment ?? ""}
                             onChange={(e) =>
-                                setFormData({ ...formData, assessment: e.target.value || null })
+                                setFormData({
+                                    ...formData,
+                                    assessment: e.target.value || null
+                                })
                             }
                             rows={3}
                         />
@@ -109,7 +127,10 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                     const feet = Math.floor(inches / 12)
                                     const remainingInches = inches % 12
                                     return (
-                                        <SelectItem key={inches} value={inches.toString()}>
+                                        <SelectItem
+                                            key={inches}
+                                            value={inches.toString()}
+                                        >
                                             {feet}'{remainingInches}"
                                         </SelectItem>
                                     )
@@ -121,7 +142,8 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                     <div className="space-y-3">
                         <Label>Skills</Label>
                         <p className="text-muted-foreground text-sm">
-                            Select the positions/skills you are comfortable playing.
+                            Select the positions/skills you are comfortable
+                            playing.
                         </p>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="flex items-center space-x-2">
@@ -129,10 +151,16 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                     id="skill_passer"
                                     checked={formData.skill_passer ?? false}
                                     onCheckedChange={(checked) =>
-                                        setFormData({ ...formData, skill_passer: checked === true })
+                                        setFormData({
+                                            ...formData,
+                                            skill_passer: checked === true
+                                        })
                                     }
                                 />
-                                <Label htmlFor="skill_passer" className="cursor-pointer font-normal">
+                                <Label
+                                    htmlFor="skill_passer"
+                                    className="cursor-pointer font-normal"
+                                >
                                     Passer
                                 </Label>
                             </div>
@@ -141,10 +169,16 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                     id="skill_setter"
                                     checked={formData.skill_setter ?? false}
                                     onCheckedChange={(checked) =>
-                                        setFormData({ ...formData, skill_setter: checked === true })
+                                        setFormData({
+                                            ...formData,
+                                            skill_setter: checked === true
+                                        })
                                     }
                                 />
-                                <Label htmlFor="skill_setter" className="cursor-pointer font-normal">
+                                <Label
+                                    htmlFor="skill_setter"
+                                    className="cursor-pointer font-normal"
+                                >
                                     Setter
                                 </Label>
                             </div>
@@ -153,10 +187,16 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                     id="skill_hitter"
                                     checked={formData.skill_hitter ?? false}
                                     onCheckedChange={(checked) =>
-                                        setFormData({ ...formData, skill_hitter: checked === true })
+                                        setFormData({
+                                            ...formData,
+                                            skill_hitter: checked === true
+                                        })
                                     }
                                 />
-                                <Label htmlFor="skill_hitter" className="cursor-pointer font-normal">
+                                <Label
+                                    htmlFor="skill_hitter"
+                                    className="cursor-pointer font-normal"
+                                >
                                     Hitter
                                 </Label>
                             </div>
@@ -165,10 +205,16 @@ export function VolleyballProfileForm({ initialData }: VolleyballProfileFormProp
                                     id="skill_other"
                                     checked={formData.skill_other ?? false}
                                     onCheckedChange={(checked) =>
-                                        setFormData({ ...formData, skill_other: checked === true })
+                                        setFormData({
+                                            ...formData,
+                                            skill_other: checked === true
+                                        })
                                     }
                                 />
-                                <Label htmlFor="skill_other" className="cursor-pointer font-normal">
+                                <Label
+                                    htmlFor="skill_other"
+                                    className="cursor-pointer font-normal"
+                                >
                                     Other
                                 </Label>
                             </div>

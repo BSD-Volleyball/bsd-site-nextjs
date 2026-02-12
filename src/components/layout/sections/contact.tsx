@@ -67,8 +67,9 @@ export const ContactSection = () => {
                         </h2>
                     </div>
                     <p className="mb-8 text-muted-foreground lg:w-5/6">
-                        We'd love to hear from you! Get in touch with us for any questions, 
-                        inquiries, or collaboration opportunities. We're here to help.
+                        We'd love to hear from you! Get in touch with us for any
+                        questions, inquiries, or collaboration opportunities.
+                        We're here to help.
                     </p>
 
                     <div className="flex flex-col gap-4">
@@ -243,7 +244,9 @@ export const ContactSection = () => {
                                     />
                                 </div>
 
-                                <Button className="mt-4 w-fit">Send message</Button>
+                                <Button className="mt-4 w-fit">
+                                    Send message
+                                </Button>
                             </form>
                         </Form>
                     </CardContent>

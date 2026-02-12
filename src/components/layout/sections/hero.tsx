@@ -19,19 +19,23 @@ export const HeroSection = () => {
                         </h1>
                     </div>
 
-                    <p className="mx-auto max-w-2xl text-muted-foreground text-lg leading-relaxed lg:text-xl">
-                        A recreational co-ed volleyball league that plays on Thursday nights in the Washington DC metro area.
-                        Join us for competitive play across six skill divisions, meet new people,
-                        and have fun!
+                    <p className="mx-auto max-w-2xl text-lg text-muted-foreground leading-relaxed lg:text-xl">
+                        A recreational co-ed volleyball league that plays on
+                        Thursday nights in the Washington DC metro area. Join us
+                        for competitive play across six skill divisions, meet
+                        new people, and have fun!
                     </p>
 
                     <SignedOut>
                         <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
                             <p className="mb-3 font-bold text-lg">
-                                Played with us before? You already have an account!
+                                Played with us before? You already have an
+                                account!
                             </p>
                             <Button asChild size="lg">
-                                <Link href="/auth/forgot-password">Set Password</Link>
+                                <Link href="/auth/forgot-password">
+                                    Set Password
+                                </Link>
                             </Button>
                         </div>
                     </SignedOut>
@@ -79,7 +83,9 @@ export const HeroSection = () => {
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
                             <Users className="size-6 text-primary" />
                         </div>
-                        <h3 className="font-semibold text-lg">6 Skill Divisions</h3>
+                        <h3 className="font-semibold text-lg">
+                            6 Skill Divisions
+                        </h3>
                         <p className="text-muted-foreground text-sm">
                             From beginners to advanced, find your perfect level
                         </p>
@@ -91,7 +97,8 @@ export const HeroSection = () => {
                         </div>
                         <h3 className="font-semibold text-lg">Draft System</h3>
                         <p className="text-muted-foreground text-sm">
-                            Meet new teammates every season through our unique draft
+                            Meet new teammates every season through our unique
+                            draft
                         </p>
                     </div>
 
@@ -99,7 +106,9 @@ export const HeroSection = () => {
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
                             <MapPin className="size-6 text-primary" />
                         </div>
-                        <h3 className="font-semibold text-lg">Maryland SoccerPlex</h3>
+                        <h3 className="font-semibold text-lg">
+                            Maryland SoccerPlex
+                        </h3>
                         <p className="text-muted-foreground text-sm">
                             Premium indoor courts in Boyds, MD
                         </p>
