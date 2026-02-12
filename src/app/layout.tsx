@@ -10,11 +10,7 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
-                <script
-                    async
-                    src="/seline.js"
-                    data-token="24cc7b65ecf3469"
-                />
+                <script async src="/seline.js" data-token="24cc7b65ecf3469" />
             </head>
             <body className="flex min-h-svh flex-col antialiased">
                 <Providers>{children}</Providers>

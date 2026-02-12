@@ -18,7 +18,8 @@ async function main() {
     const toUpdate = rows.filter(
         (r) =>
             r.preffered_name &&
-            r.preffered_name.trim().toLowerCase() === r.first_name.trim().toLowerCase()
+            r.preffered_name.trim().toLowerCase() ===
+                r.first_name.trim().toLowerCase()
     )
 
     console.log(
@@ -26,7 +27,9 @@ async function main() {
     )
 
     for (const row of toUpdate) {
-        console.log(`  Clearing "${row.preffered_name}" for user ${row.id} (first name: "${row.first_name}")`)
+        console.log(
+            `  Clearing "${row.preffered_name}" for user ${row.id} (first name: "${row.first_name}")`
+        )
         await db
             .update(users)
             .set({ preffered_name: null })

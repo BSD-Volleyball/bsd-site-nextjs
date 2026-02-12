@@ -57,17 +57,13 @@ export const ServicesSection = () => {
 
             <div className="mx-auto grid w-full gap-4 sm:grid-cols-2 lg:w-[60%] lg:grid-cols-2">
                 {serviceList.map(({ title, description }) => (
-                    <Card
-                        key={title}
-                        className="relative h-full bg-muted/60"
-                    >
+                    <Card key={title} className="relative h-full bg-muted/60">
                         <CardHeader>
                             <CardTitle className="font-bold text-lg">
                                 {title}
                             </CardTitle>
                             <CardDescription>{description}</CardDescription>
                         </CardHeader>
-                       
                     </Card>
                 ))}
             </div>

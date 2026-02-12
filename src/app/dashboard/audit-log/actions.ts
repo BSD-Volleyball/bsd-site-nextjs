@@ -73,9 +73,7 @@ export async function getAuditLogs(params?: {
         const entries: AuditLogEntry[] = rows.map((row) => ({
             id: row.id,
             userId: row.userId,
-            userName: row.firstName
-                ? `${row.firstName} ${row.lastName}`
-                : null,
+            userName: row.firstName ? `${row.firstName} ${row.lastName}` : null,
             action: row.action,
             entityType: row.entityType,
             entityId: row.entityId,

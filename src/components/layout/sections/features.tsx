@@ -55,7 +55,10 @@ const featureList: FeaturesProps[] = [
 
 export const FeaturesSection = () => {
     return (
-        <section id="features" className="container mx-auto px-4 py-16 sm:py-20">
+        <section
+            id="features"
+            className="container mx-auto px-4 py-16 sm:py-20"
+        >
             <h2 className="mb-2 text-center text-lg text-primary tracking-wider">
                 Features
             </h2>
@@ -65,14 +68,16 @@ export const FeaturesSection = () => {
             </h2>
 
             <h3 className="mx-auto mb-8 text-center text-muted-foreground text-xl md:w-1/2">
-                Launch your SaaS faster with our carefully chosen tech stack and pre-built features. Focus on your unique value proposition, not boilerplate.
+                Launch your SaaS faster with our carefully chosen tech stack and
+                pre-built features. Focus on your unique value proposition, not
+                boilerplate.
             </h3>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {featureList.map(({ icon, title, description }) => (
                     <div key={title}>
                         <Card className="h-full border-0 bg-background shadow-none">
-                            <CardHeader className="flex items-center justify-center gap-4 align-middle pb-2">
+                            <CardHeader className="flex items-center justify-center gap-4 pb-2 align-middle">
                                 <div className="rounded-full bg-primary/20 p-2 ring-8 ring-primary/10">
                                     {icon}
                                 </div>

@@ -96,7 +96,9 @@ export const seasons = pgTable("seasons", {
     code: text("code").notNull(),
     year: integer("year").notNull(),
     season: text("season").notNull(),
-    registration_open: boolean("registration_open").$defaultFn(() => false).notNull(),
+    registration_open: boolean("registration_open")
+        .$defaultFn(() => false)
+        .notNull(),
     late_date: text("late_date"),
     tryout_1_date: text("tryout_1_date"),
     tryout_2_date: text("tryout_2_date"),
@@ -112,14 +114,31 @@ export const seasons = pgTable("seasons", {
     playoff_3_date: text("playoff_3_date"),
     season_amount: text("season_amount"),
     late_amount: text("late_amount"),
-    max_players: text("max_players"),
+    max_players: text("max_players")
 })
 
 export const divisions = pgTable("divisions", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     level: integer("level").notNull(),
-    active: boolean("active").$defaultFn(() => true).notNull()
+    active: boolean("active")
+        .$defaultFn(() => true)
+        .notNull()
+})
+
+export const individual_divisions = pgTable("individual_divisions", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    division: integer("divisions")
+        .notNull()
+        .references(() => divisions.id),
+    coaches: boolean("coaches")
+        .$defaultFn(() => false)
+        .notNull(),
+    gender_split: text("gender_split").notNull(),
+    teams: integer("teams").notNull()
 })
 
 export const signups = pgTable("signups", {
@@ -185,7 +204,9 @@ export const matchs = pgTable("matchs", {
     home_set3_score: integer("home_set3_score"),
     away_set3_score: integer("away_set3_score"),
     winner: integer("winner").references(() => teams.id),
-    playoff: boolean("playoff").$defaultFn(() => false).notNull()
+    playoff: boolean("playoff")
+        .$defaultFn(() => false)
+        .notNull()
 })
 
 export const champions = pgTable("champions", {

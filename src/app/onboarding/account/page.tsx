@@ -40,7 +40,9 @@ export default async function OnboardingAccountPage() {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h1 className="text-2xl font-bold">Welcome! Let's set up your profile</h1>
+                <h1 className="font-bold text-2xl">
+                    Welcome! Let's set up your profile
+                </h1>
                 <p className="text-muted-foreground">
                     Tell us a bit more about yourself.
                 </p>

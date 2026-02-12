@@ -191,7 +191,8 @@ export async function getSeasonPairs(): Promise<{
                         pairReason: data.pairReason
                     },
                     requested: {
-                        name: pairPickNameMap.get(data.pairPickId) ??
+                        name:
+                            pairPickNameMap.get(data.pairPickId) ??
                             "Unknown user"
                     }
                 })

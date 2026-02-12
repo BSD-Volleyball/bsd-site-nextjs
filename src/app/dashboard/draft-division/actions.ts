@@ -143,7 +143,9 @@ export async function getTeamsForSeasonAndDivision(
                 number: teams.number
             })
             .from(teams)
-            .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
+            .where(
+                and(eq(teams.season, seasonId), eq(teams.division, divisionId))
+            )
             .orderBy(teams.number)
 
         return {
@@ -196,7 +198,7 @@ export async function submitDraft(
         }
     }
 
-    const numTeams = new Set(picks.map(p => p.teamId)).size
+    const numTeams = new Set(picks.map((p) => p.teamId)).size
 
     try {
         // Calculate overall for each pick and insert
@@ -204,10 +206,11 @@ export async function submitDraft(
         await db.insert(drafts).values(
             picks.map((pick) => {
                 const isOddRound = pick.round % 2 === 1
-                const baseValue = ((divisionLevel - 1) * 50) + ((pick.round - 1) * numTeams)
+                const baseValue =
+                    (divisionLevel - 1) * 50 + (pick.round - 1) * numTeams
                 const positionValue = isOddRound
                     ? pick.teamNumber
-                    : (numTeams + 1 - pick.teamNumber)
+                    : numTeams + 1 - pick.teamNumber
                 return {
                     team: pick.teamId,
                     user: pick.userId,

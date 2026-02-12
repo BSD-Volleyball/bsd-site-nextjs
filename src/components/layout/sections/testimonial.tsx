@@ -78,7 +78,10 @@ const reviewList: ReviewProps[] = [
 
 export const TestimonialSection = () => {
     return (
-        <section id="testimonials" className="container mx-auto px-4 py-16 sm:py-20">
+        <section
+            id="testimonials"
+            className="container mx-auto px-4 py-16 sm:py-20"
+        >
             <div className="mb-8 text-center">
                 <h2 className="mb-2 text-center text-lg text-primary tracking-wider">
                     Testimonials
@@ -115,7 +118,7 @@ export const TestimonialSection = () => {
                                     </div>
                                 </CardContent>
 
-                                <CardHeader >
+                                <CardHeader>
                                     <div className="flex flex-row items-center gap-4">
                                         <Avatar>
                                             <AvatarImage

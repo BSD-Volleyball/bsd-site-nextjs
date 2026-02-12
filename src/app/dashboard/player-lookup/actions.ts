@@ -3,7 +3,14 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, seasons, drafts, teams, divisions } from "@/database/schema"
+import {
+    users,
+    signups,
+    seasons,
+    drafts,
+    teams,
+    divisions
+} from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 
 export interface PlayerListItem {

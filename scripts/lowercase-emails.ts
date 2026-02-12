@@ -13,7 +13,9 @@ async function main() {
 
     const toUpdate = rows.filter((r) => r.email !== r.email.toLowerCase())
 
-    console.log(`Found ${toUpdate.length} user(s) with mixed-case emails out of ${rows.length} total.`)
+    console.log(
+        `Found ${toUpdate.length} user(s) with mixed-case emails out of ${rows.length} total.`
+    )
 
     for (const row of toUpdate) {
         const lower = row.email.toLowerCase()

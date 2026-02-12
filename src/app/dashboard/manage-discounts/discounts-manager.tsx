@@ -259,9 +259,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                             </Label>
                             <Input
                                 value={newReason}
-                                onChange={(e) =>
-                                    setNewReason(e.target.value)
-                                }
+                                onChange={(e) => setNewReason(e.target.value)}
                                 placeholder="e.g. Referral bonus"
                             />
                         </div>
@@ -393,17 +391,13 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                                         <Input
                                             value={editReason}
                                             onChange={(e) =>
-                                                setEditReason(
-                                                    e.target.value
-                                                )
+                                                setEditReason(e.target.value)
                                             }
                                             className="h-8 w-40"
                                             placeholder="Optional"
                                         />
                                     ) : (
-                                        <span>
-                                            {discount.reason || "—"}
-                                        </span>
+                                        <span>{discount.reason || "—"}</span>
                                     )}
                                 </td>
                                 <td className="px-4 py-2 text-muted-foreground">

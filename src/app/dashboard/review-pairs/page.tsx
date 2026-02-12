@@ -60,10 +60,7 @@ export default async function ReviewPairsPage() {
                 title={`Review Pairs — ${result.seasonLabel}`}
                 description="Review pair requests for the current season."
             />
-            <PairsList
-                matched={result.matched}
-                unmatched={result.unmatched}
-            />
+            <PairsList matched={result.matched} unmatched={result.unmatched} />
         </div>
     )
 }

@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { Resend } from "resend"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
@@ -23,8 +23,10 @@ export const auth = betterAuth({
         user: {
             create: {
                 before: async (user) => {
-                    let firstName = (user as { first_name?: string }).first_name || ""
-                    let lastName = (user as { last_name?: string }).last_name || ""
+                    let firstName =
+                        (user as { first_name?: string }).first_name || ""
+                    let lastName =
+                        (user as { last_name?: string }).last_name || ""
 
                     // Fallback: parse from name field (e.g., unmapped social login)
                     if (!firstName && !lastName && user.name) {
@@ -74,11 +76,11 @@ export const auth = betterAuth({
     },
     emailAndPassword: {
         enabled: true,
-		disableSignUp: false,
-		requireEmailVerification: false,
-		minPasswordLength: 8,
-		maxPasswordLength: 128,
-		autoSignIn: true,
+        disableSignUp: false,
+        requireEmailVerification: false,
+        minPasswordLength: 8,
+        maxPasswordLength: 128,
+        autoSignIn: true,
         sendResetPassword: async ({ user, url }) => {
             const name =
                 (user as { first_name?: string }).first_name ||
@@ -112,12 +114,14 @@ export const auth = betterAuth({
                     baseUrl: site.url,
                     imageUrl: "cid:logo"
                 }),
-                attachments: [{
-                    filename: "logo.png",
-                    content: logoContent,
-                    contentType: "image/png",
-                    inlineContentId: "logo"
-                }]
+                attachments: [
+                    {
+                        filename: "logo.png",
+                        content: logoContent,
+                        contentType: "image/png",
+                        inlineContentId: "logo"
+                    }
+                ]
             })
         }
     },

@@ -41,7 +41,11 @@ const footerSections: FooterSectionProps[] = [
     {
         title: "Resources",
         links: [
-            { href: "https://www.mdsoccerplex.org", label: "MD Soccerplex", external: true },
+            {
+                href: "https://www.mdsoccerplex.org",
+                label: "MD Soccerplex",
+                external: true
+            },
             { href: "/auth/sign-up", label: "Register" },
             { href: "/auth/sign-in", label: "Sign In" }
         ]
@@ -88,16 +92,19 @@ export const FooterSection = () => {
                                         </h3>
                                     </Link>
                                     <p className="mb-6 text-muted-foreground leading-relaxed">
-                                        A recreational co-ed volleyball league in the
-                                        Washington DC metro area. Join us for competitive
-                                        play, meet new people, and have fun!
+                                        A recreational co-ed volleyball league
+                                        in the Washington DC metro area. Join us
+                                        for competitive play, meet new people,
+                                        and have fun!
                                     </p>
 
                                     <div className="mb-4 flex items-start gap-2 text-muted-foreground text-sm">
                                         <MapPin className="mt-0.5 size-4 shrink-0" />
                                         <span>
-                                            Maryland SoccerPlex<br />
-                                            18031 Central Park Circle<br />
+                                            Maryland SoccerPlex
+                                            <br />
+                                            18031 Central Park Circle
+                                            <br />
                                             Boyds, MD 20841
                                         </span>
                                     </div>
@@ -126,7 +133,8 @@ export const FooterSection = () => {
                                                     }
                                                     aria-label={social.label}
                                                 >
-                                                    {social.icon || social.label}
+                                                    {social.icon ||
+                                                        social.label}
                                                 </Link>
                                             </Button>
                                         ))}
@@ -147,8 +155,16 @@ export const FooterSection = () => {
                                                 <li key={link.label}>
                                                     <Link
                                                         href={link.href}
-                                                        target={link.external ? "_blank" : undefined}
-                                                        rel={link.external ? "noopener noreferrer" : undefined}
+                                                        target={
+                                                            link.external
+                                                                ? "_blank"
+                                                                : undefined
+                                                        }
+                                                        rel={
+                                                            link.external
+                                                                ? "noopener noreferrer"
+                                                                : undefined
+                                                        }
                                                         className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
                                                     >
                                                         {link.label}
@@ -182,8 +198,8 @@ export const FooterSection = () => {
                                         </h3>
                                     </Link>
                                     <p className="mb-6 max-w-sm text-muted-foreground text-sm leading-relaxed">
-                                        A recreational co-ed volleyball league in the
-                                        Washington DC metro area.
+                                        A recreational co-ed volleyball league
+                                        in the Washington DC metro area.
                                     </p>
 
                                     {/* Contact Mobile */}
@@ -210,7 +226,8 @@ export const FooterSection = () => {
                                                     }
                                                     aria-label={social.label}
                                                 >
-                                                    {social.icon || social.label}
+                                                    {social.icon ||
+                                                        social.label}
                                                 </Link>
                                             </Button>
                                         ))}
@@ -232,12 +249,21 @@ export const FooterSection = () => {
                                                     <li key={link.label}>
                                                         <Link
                                                             href={link.href}
-                                                            target={link.external ? "_blank" : undefined}
-                                                            rel={link.external ? "noopener noreferrer" : undefined}
+                                                            target={
+                                                                link.external
+                                                                    ? "_blank"
+                                                                    : undefined
+                                                            }
+                                                            rel={
+                                                                link.external
+                                                                    ? "noopener noreferrer"
+                                                                    : undefined
+                                                            }
                                                             className="text-muted-foreground text-sm underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
                                                         >
                                                             {link.label}
-                                                            {link.external && " ↗"}
+                                                            {link.external &&
+                                                                " ↗"}
                                                         </Link>
                                                     </li>
                                                 ))}
@@ -254,7 +280,8 @@ export const FooterSection = () => {
                         <div className="flex flex-col justify-between gap-4 lg:flex-row">
                             <div className="flex flex-col items-center gap-4 text-muted-foreground text-sm sm:flex-row">
                                 <p>
-                                    &copy; {new Date().getFullYear()} Bump, Set, Drink, Inc. All rights reserved.
+                                    &copy; {new Date().getFullYear()} Bump, Set,
+                                    Drink, Inc. All rights reserved.
                                 </p>
                             </div>
                         </div>

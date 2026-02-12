@@ -95,8 +95,14 @@ export async function updateAccountField(
                 .where(eq(users.id, session.user.id))
                 .limit(1)
 
-            const firstName = field === "first_name" ? (value || "") : (currentUser?.first_name || "")
-            const lastName = field === "last_name" ? (value || "") : (currentUser?.last_name || "")
+            const firstName =
+                field === "first_name"
+                    ? value || ""
+                    : currentUser?.first_name || ""
+            const lastName =
+                field === "last_name"
+                    ? value || ""
+                    : currentUser?.last_name || ""
             const fullName = `${firstName} ${lastName}`.trim()
 
             await db
@@ -145,11 +151,15 @@ export async function updateAccountProfile(
         if (data.email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
             if (!emailRegex.test(data.email)) {
-                return { status: false, message: "Please enter a valid email address." }
+                return {
+                    status: false,
+                    message: "Please enter a valid email address."
+                }
             }
         }
 
-        const fullName = `${data.first_name || ""} ${data.last_name || ""}`.trim()
+        const fullName =
+            `${data.first_name || ""} ${data.last_name || ""}`.trim()
 
         await db
             .update(users)

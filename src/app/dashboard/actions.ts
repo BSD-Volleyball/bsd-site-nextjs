@@ -137,12 +137,15 @@ export interface TeamRosterData {
     players: TeamRosterPlayer[]
 }
 
-export async function getTeamRoster(
-    teamId: number
-): Promise<TeamRosterData> {
+export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
-        return { status: false, message: "Not authenticated.", teamName: "", players: [] }
+        return {
+            status: false,
+            message: "Not authenticated.",
+            teamName: "",
+            players: []
+        }
     }
 
     try {
@@ -157,7 +160,12 @@ export async function getTeamRoster(
             .limit(1)
 
         if (!team) {
-            return { status: false, message: "Team not found.", teamName: "", players: [] }
+            return {
+                status: false,
+                message: "Team not found.",
+                teamName: "",
+                players: []
+            }
         }
 
         const draftRows = await db
@@ -179,9 +187,13 @@ export async function getTeamRoster(
         }))
 
         players.sort((a, b) => {
-            const lastCmp = a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase())
+            const lastCmp = a.lastName
+                .toLowerCase()
+                .localeCompare(b.lastName.toLowerCase())
             if (lastCmp !== 0) return lastCmp
-            return a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase())
+            return a.displayName
+                .toLowerCase()
+                .localeCompare(b.displayName.toLowerCase())
         })
 
         return {
@@ -191,7 +203,12 @@ export async function getTeamRoster(
         }
     } catch (error) {
         console.error("Error fetching team roster:", error)
-        return { status: false, message: "Something went wrong.", teamName: "", players: [] }
+        return {
+            status: false,
+            message: "Something went wrong.",
+            teamName: "",
+            players: []
+        }
     }
 }
 

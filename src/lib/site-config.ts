@@ -110,7 +110,9 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const [existingSignup] = await db
         .select({ id: signups.id })
         .from(signups)
-        .where(and(eq(signups.season, config.seasonId), eq(signups.player, userId)))
+        .where(
+            and(eq(signups.season, config.seasonId), eq(signups.player, userId))
+        )
         .limit(1)
 
     if (existingSignup) {

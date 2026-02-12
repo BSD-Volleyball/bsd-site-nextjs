@@ -54,8 +54,7 @@ export function EvaluatePlayersList({
         if (!search) return players
         const lower = search.toLowerCase()
         return players.filter((p) => {
-            const name =
-                `${p.firstName} ${p.lastName}`.toLowerCase()
+            const name = `${p.firstName} ${p.lastName}`.toLowerCase()
             const preferred = p.preferredName?.toLowerCase() || ""
             return name.includes(lower) || preferred.includes(lower)
         })
@@ -67,7 +66,7 @@ export function EvaluatePlayersList({
         setSelections((prev) => ({ ...prev, [userId]: division }))
     }
 
-    const handleClearSelection = (userId: string) => {
+    const _handleClearSelection = (userId: string) => {
         setSelections((prev) => {
             const next = { ...prev }
             delete next[userId]
@@ -192,9 +191,7 @@ export function EvaluatePlayersList({
                                 </td>
                                 <td className="px-4 py-2">
                                     <Select
-                                        value={
-                                            selections[player.userId] || ""
-                                        }
+                                        value={selections[player.userId] || ""}
                                         onValueChange={(value) =>
                                             handleSelectionChange(
                                                 player.userId,

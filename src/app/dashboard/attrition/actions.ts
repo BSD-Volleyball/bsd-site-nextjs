@@ -3,8 +3,8 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, drafts, teams, seasons } from "@/database/schema"
-import { eq, sql, count, max, desc } from "drizzle-orm"
+import { users, drafts, teams } from "@/database/schema"
+import { eq, sql, count, max } from "drizzle-orm"
 
 async function checkAdminAccess(userId: string): Promise<boolean> {
     const [user] = await db
@@ -54,7 +54,15 @@ export async function getAttritionData(): Promise<{
     lastSeasonCaptainData: CaptainAttritionData[]
     lastSeasonCaptainAvgData: CaptainAttritionAvgData[]
 }> {
-    const empty = { genderData: [], attritionGenderRatio: null, overallGenderRatio: null, captainData: [], captainAvgData: [], lastSeasonCaptainData: [], lastSeasonCaptainAvgData: [] }
+    const empty = {
+        genderData: [],
+        attritionGenderRatio: null,
+        overallGenderRatio: null,
+        captainData: [],
+        captainAvgData: [],
+        lastSeasonCaptainData: [],
+        lastSeasonCaptainAvgData: []
+    }
 
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
@@ -104,18 +112,29 @@ export async function getAttritionData(): Promise<{
             .groupBy(users.male)
 
         const genderData: GenderAttritionData[] = genderRows.map((r) => ({
-            label: r.male === true ? "Male" : r.male === false ? "Not Male" : "Unknown",
+            label:
+                r.male === true
+                    ? "Male"
+                    : r.male === false
+                      ? "Not Male"
+                      : "Unknown",
             count: r.count
         }))
 
         // Attrition gender ratio from the chart data
         const attrMale = genderData.find((g) => g.label === "Male")?.count || 0
-        const attrNonMale = genderData.find((g) => g.label === "Not Male")?.count || 0
-        const attritionGenderRatio: GenderRatio | null = attrNonMale > 0
-            ? { male: attrMale, nonMale: attrNonMale, ratio: (attrMale / attrNonMale).toFixed(2) }
-            : attrMale > 0
-              ? { male: attrMale, nonMale: 0, ratio: "N/A" }
-              : null
+        const attrNonMale =
+            genderData.find((g) => g.label === "Not Male")?.count || 0
+        const attritionGenderRatio: GenderRatio | null =
+            attrNonMale > 0
+                ? {
+                      male: attrMale,
+                      nonMale: attrNonMale,
+                      ratio: (attrMale / attrNonMale).toFixed(2)
+                  }
+                : attrMale > 0
+                  ? { male: attrMale, nonMale: 0, ratio: "N/A" }
+                  : null
 
         // Overall gender ratio across all drafted players
         const overallGenderRows = await db
@@ -127,28 +146,44 @@ export async function getAttritionData(): Promise<{
             .innerJoin(users, eq(drafts.user, users.id))
             .groupBy(users.male)
 
-        const overallMale = overallGenderRows.find((r) => r.male === true)?.count || 0
-        const overallNonMale = overallGenderRows.find((r) => r.male === false)?.count || 0
-        const overallGenderRatio: GenderRatio | null = overallNonMale > 0
-            ? { male: overallMale, nonMale: overallNonMale, ratio: (overallMale / overallNonMale).toFixed(2) }
-            : overallMale > 0
-              ? { male: overallMale, nonMale: 0, ratio: "N/A" }
-              : null
+        const overallMale =
+            overallGenderRows.find((r) => r.male === true)?.count || 0
+        const overallNonMale =
+            overallGenderRows.find((r) => r.male === false)?.count || 0
+        const overallGenderRatio: GenderRatio | null =
+            overallNonMale > 0
+                ? {
+                      male: overallMale,
+                      nonMale: overallNonMale,
+                      ratio: (overallMale / overallNonMale).toFixed(2)
+                  }
+                : overallMale > 0
+                  ? { male: overallMale, nonMale: 0, ratio: "N/A" }
+                  : null
 
         // Captain attrition: for each one-season player, find captain and player gender
         const captainPlayerRows = await db
             .select({
                 captainId: teams.captain,
-                playerMale: sql<boolean | null>`(select male from users pu where pu.id = ${drafts.user})`
+                playerMale: sql<
+                    boolean | null
+                >`(select male from users pu where pu.id = ${drafts.user})`
             })
             .from(drafts)
             .innerJoin(teams, eq(drafts.team, teams.id))
             .where(sql`${drafts.user} IN ${oneSeasonUserIds}`)
 
         // Aggregate by captain
-        const captainAgg = new Map<string, { count: number; male: number; nonMale: number }>()
+        const captainAgg = new Map<
+            string,
+            { count: number; male: number; nonMale: number }
+        >()
         for (const row of captainPlayerRows) {
-            const entry = captainAgg.get(row.captainId) || { count: 0, male: 0, nonMale: 0 }
+            const entry = captainAgg.get(row.captainId) || {
+                count: 0,
+                male: 0,
+                nonMale: 0
+            }
             entry.count++
             if (row.playerMale === true) entry.male++
             else if (row.playerMale === false) entry.nonMale++
@@ -162,20 +197,24 @@ export async function getAttritionData(): Promise<{
             .map(([id]) => id)
 
         // Fetch captain names
-        const captainNameRows = topCaptainIds.length > 0
-            ? await db
-                .select({
-                    id: users.id,
-                    firstName: users.first_name,
-                    lastName: users.last_name,
-                    preferredName: users.preffered_name
-                })
-                .from(users)
-                .where(sql`${users.id} IN ${topCaptainIds}`)
-            : []
+        const captainNameRows =
+            topCaptainIds.length > 0
+                ? await db
+                      .select({
+                          id: users.id,
+                          firstName: users.first_name,
+                          lastName: users.last_name,
+                          preferredName: users.preffered_name
+                      })
+                      .from(users)
+                      .where(sql`${users.id} IN ${topCaptainIds}`)
+                : []
 
         const captainNameMap = new Map(
-            captainNameRows.map((r) => [r.id, `${r.preferredName || r.firstName} ${r.lastName}`])
+            captainNameRows.map((r) => [
+                r.id,
+                `${r.preferredName || r.firstName} ${r.lastName}`
+            ])
         )
 
         const captainData: CaptainAttritionData[] = topCaptainIds.map((id) => {
@@ -190,19 +229,23 @@ export async function getAttritionData(): Promise<{
 
         // Count how many seasons each captain has captained
         const allCaptainIds = [...new Set([...captainAgg.keys()])]
-        const captainSeasonRows = allCaptainIds.length > 0
-            ? await db
-                .selectDistinct({
-                    captainId: teams.captain,
-                    seasonId: teams.season
-                })
-                .from(teams)
-                .where(sql`${teams.captain} IN ${allCaptainIds}`)
-            : []
+        const captainSeasonRows =
+            allCaptainIds.length > 0
+                ? await db
+                      .selectDistinct({
+                          captainId: teams.captain,
+                          seasonId: teams.season
+                      })
+                      .from(teams)
+                      .where(sql`${teams.captain} IN ${allCaptainIds}`)
+                : []
 
         const captainSeasonCount = new Map<string, number>()
         for (const row of captainSeasonRows) {
-            captainSeasonCount.set(row.captainId, (captainSeasonCount.get(row.captainId) || 0) + 1)
+            captainSeasonCount.set(
+                row.captainId,
+                (captainSeasonCount.get(row.captainId) || 0) + 1
+            )
         }
 
         // Compute per-season average for one-season captain data
@@ -258,7 +301,9 @@ export async function getAttritionData(): Promise<{
             const lapsedPlayerRows = await db
                 .select({
                     captainId: teams.captain,
-                    playerMale: sql<boolean | null>`(select male from users pu where pu.id = ${lastSeasonPerUser.userId})`
+                    playerMale: sql<
+                        boolean | null
+                    >`(select male from users pu where pu.id = ${lastSeasonPerUser.userId})`
                 })
                 .from(lastSeasonPerUser)
                 .innerJoin(
@@ -270,9 +315,16 @@ export async function getAttritionData(): Promise<{
                     sql`${teams.id} = ${drafts.team} AND ${teams.season} = ${lastSeasonPerUser.maxSeason}`
                 )
 
-            const lapsedAgg = new Map<string, { count: number; male: number; nonMale: number }>()
+            const lapsedAgg = new Map<
+                string,
+                { count: number; male: number; nonMale: number }
+            >()
             for (const row of lapsedPlayerRows) {
-                const entry = lapsedAgg.get(row.captainId) || { count: 0, male: 0, nonMale: 0 }
+                const entry = lapsedAgg.get(row.captainId) || {
+                    count: 0,
+                    male: 0,
+                    nonMale: 0
+                }
                 entry.count++
                 if (row.playerMale === true) entry.male++
                 else if (row.playerMale === false) entry.nonMale++
@@ -284,20 +336,24 @@ export async function getAttritionData(): Promise<{
                 .slice(0, 20)
                 .map(([id]) => id)
 
-            const lapsedCaptainNameRows = topLapsedCaptainIds.length > 0
-                ? await db
-                    .select({
-                        id: users.id,
-                        firstName: users.first_name,
-                        lastName: users.last_name,
-                        preferredName: users.preffered_name
-                    })
-                    .from(users)
-                    .where(sql`${users.id} IN ${topLapsedCaptainIds}`)
-                : []
+            const lapsedCaptainNameRows =
+                topLapsedCaptainIds.length > 0
+                    ? await db
+                          .select({
+                              id: users.id,
+                              firstName: users.first_name,
+                              lastName: users.last_name,
+                              preferredName: users.preffered_name
+                          })
+                          .from(users)
+                          .where(sql`${users.id} IN ${topLapsedCaptainIds}`)
+                    : []
 
             const lapsedNameMap = new Map(
-                lapsedCaptainNameRows.map((r) => [r.id, `${r.preferredName || r.firstName} ${r.lastName}`])
+                lapsedCaptainNameRows.map((r) => [
+                    r.id,
+                    `${r.preferredName || r.firstName} ${r.lastName}`
+                ])
             )
 
             lastSeasonCaptainData = topLapsedCaptainIds.map((id) => {
@@ -312,7 +368,9 @@ export async function getAttritionData(): Promise<{
 
             // Compute per-season average for lapsed captain data
             const lapsedAllIds = [...new Set([...lapsedAgg.keys()])]
-            const missingIds = lapsedAllIds.filter((id) => !captainSeasonCount.has(id))
+            const missingIds = lapsedAllIds.filter(
+                (id) => !captainSeasonCount.has(id)
+            )
             if (missingIds.length > 0) {
                 const extraRows = await db
                     .selectDistinct({
@@ -323,7 +381,10 @@ export async function getAttritionData(): Promise<{
                     .where(sql`${teams.captain} IN ${missingIds}`)
 
                 for (const row of extraRows) {
-                    captainSeasonCount.set(row.captainId, (captainSeasonCount.get(row.captainId) || 0) + 1)
+                    captainSeasonCount.set(
+                        row.captainId,
+                        (captainSeasonCount.get(row.captainId) || 0) + 1
+                    )
                 }
             }
 
@@ -344,7 +405,16 @@ export async function getAttritionData(): Promise<{
                 .slice(0, 20)
         }
 
-        return { status: true, genderData, attritionGenderRatio, overallGenderRatio, captainData, captainAvgData, lastSeasonCaptainData, lastSeasonCaptainAvgData }
+        return {
+            status: true,
+            genderData,
+            attritionGenderRatio,
+            overallGenderRatio,
+            captainData,
+            captainAvgData,
+            lastSeasonCaptainData,
+            lastSeasonCaptainAvgData
+        }
     } catch (error) {
         console.error("Error fetching attrition data:", error)
         return { status: false, message: "Something went wrong.", ...empty }

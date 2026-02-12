@@ -21,8 +21,6 @@ export default async function AuthPage({
 }) {
     const { pathname } = await params
 
-   
-
     return (
         <main className="container mx-auto flex grow flex-col items-center justify-center gap-4 self-center bg-background py-18 sm:py-22">
             <Link href="/" className="absolute top-6 left-8">
@@ -40,9 +38,7 @@ export default async function AuthPage({
                 <WelcomeToast />
             </AuthLoading>
 
-            <AuthCard
-                pathname={pathname}
-            />
+            <AuthCard pathname={pathname} />
 
             {["sign-up"].includes(pathname) && (
                 <div className="text-center text-muted-foreground text-sm">

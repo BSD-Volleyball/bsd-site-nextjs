@@ -97,8 +97,7 @@ export function NavUser() {
         firstName && user.last_name
             ? `${firstName} ${user.last_name}`.trim()
             : null
-    const displayName =
-        fullName || firstName || "User"
+    const displayName = fullName || firstName || "User"
 
     // Generate initials
     const initials =

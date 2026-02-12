@@ -17,9 +17,15 @@
 
 import "dotenv/config"
 import { db } from "../src/database/db"
-import { users, seasons, divisions, teams, drafts } from "../src/database/schema"
+import {
+    users,
+    seasons,
+    divisions,
+    teams,
+    drafts
+} from "../src/database/schema"
 import { eq, and } from "drizzle-orm"
-import * as readline from "readline"
+import * as readline from "node:readline"
 
 interface User {
     id: string
@@ -53,7 +59,7 @@ let rl: readline.Interface | null = null
 function getReadline(): readline.Interface {
     if (!rl) {
         // Use /dev/tty for interactive input when stdin might be used for file input
-        const fs = require("fs")
+        const fs = require("node:fs")
         let input = process.stdin
         try {
             input = fs.createReadStream("/dev/tty")
@@ -91,8 +97,12 @@ function parseName(nameStr: string): ParsedName {
 
     // Check for "Last, First" format
     if (trimmed.includes(",")) {
-        const [last, first] = trimmed.split(",").map(s => s.trim())
-        return { firstName: first || "", lastName: last || "", original: trimmed }
+        const [last, first] = trimmed.split(",").map((s) => s.trim())
+        return {
+            firstName: first || "",
+            lastName: last || "",
+            original: trimmed
+        }
     }
 
     // "First Last" format - split on spaces, last word is last name
@@ -107,28 +117,38 @@ function parseName(nameStr: string): ParsedName {
 }
 
 function parseInputData(input: string): ParsedData {
-    const lines = input.trim().split("\n").filter(line => line.trim())
+    const lines = input
+        .trim()
+        .split("\n")
+        .filter((line) => line.trim())
 
     if (lines.length < 3) {
-        throw new Error("Input must have at least 3 lines: header, captains, and players")
+        throw new Error(
+            "Input must have at least 3 lines: header, captains, and players"
+        )
     }
 
     // Parse header: "Spring 2024 A"
     const headerParts = lines[0].trim().split(/\s+/)
     if (headerParts.length < 3) {
-        throw new Error(`Invalid header format: "${lines[0]}". Expected "Season Year Division"`)
+        throw new Error(
+            `Invalid header format: "${lines[0]}". Expected "Season Year Division"`
+        )
     }
 
     const season = headerParts[0].toLowerCase()
     const year = parseInt(headerParts[1], 10)
     const divisionName = headerParts.slice(2).join(" ")
 
-    if (isNaN(year)) {
+    if (Number.isNaN(year)) {
         throw new Error(`Invalid year in header: "${headerParts[1]}"`)
     }
 
     // Parse captain last names (tab-separated)
-    const captainLastNames = lines[1].split("\t").map(s => s.trim()).filter(Boolean)
+    const captainLastNames = lines[1]
+        .split("\t")
+        .map((s) => s.trim())
+        .filter(Boolean)
     const numTeams = captainLastNames.length
 
     if (numTeams === 0) {
@@ -136,7 +156,7 @@ function parseInputData(input: string): ParsedData {
     }
 
     // Initialize team data
-    const teams: TeamData[] = captainLastNames.map(lastName => ({
+    const teams: TeamData[] = captainLastNames.map((lastName) => ({
         captainLastName: lastName,
         captain: null,
         players: [],
@@ -145,7 +165,7 @@ function parseInputData(input: string): ParsedData {
 
     // Parse player rows
     for (let i = 2; i < lines.length; i++) {
-        const playerNames = lines[i].split("\t").map(s => s.trim())
+        const playerNames = lines[i].split("\t").map((s) => s.trim())
 
         for (let t = 0; t < numTeams; t++) {
             const nameStr = playerNames[t] || ""
@@ -159,12 +179,16 @@ function parseInputData(input: string): ParsedData {
     return { season, year, divisionName, teams }
 }
 
-async function findUserByName(firstName: string, lastName: string, allUsers: User[]): Promise<User[]> {
+async function findUserByName(
+    firstName: string,
+    lastName: string,
+    allUsers: User[]
+): Promise<User[]> {
     // Normalize for comparison
     const normFirst = firstName.toLowerCase().trim()
     const normLast = lastName.toLowerCase().trim()
 
-    return allUsers.filter(u => {
+    return allUsers.filter((u) => {
         const uFirst = u.first_name.toLowerCase()
         const uLast = u.last_name.toLowerCase()
         const uPref = (u.preffered_name || "").toLowerCase()
@@ -173,17 +197,22 @@ async function findUserByName(firstName: string, lastName: string, allUsers: Use
         if (uLast !== normLast) return false
 
         // Match first name or preferred name
-        return uFirst === normFirst ||
-               uFirst.startsWith(normFirst) ||
-               normFirst.startsWith(uFirst) ||
-               uPref === normFirst ||
-               uPref.startsWith(normFirst)
+        return (
+            uFirst === normFirst ||
+            uFirst.startsWith(normFirst) ||
+            normFirst.startsWith(uFirst) ||
+            uPref === normFirst ||
+            uPref.startsWith(normFirst)
+        )
     })
 }
 
-async function findUserByLastName(lastName: string, allUsers: User[]): Promise<User[]> {
+async function findUserByLastName(
+    lastName: string,
+    allUsers: User[]
+): Promise<User[]> {
     const normLast = lastName.toLowerCase().trim()
-    return allUsers.filter(u => u.last_name.toLowerCase() === normLast)
+    return allUsers.filter((u) => u.last_name.toLowerCase() === normLast)
 }
 
 async function promptForUserId(
@@ -197,7 +226,9 @@ async function promptForUserId(
         console.log("Possible matches:")
         candidates.forEach((u, i) => {
             const pref = u.preffered_name ? ` (${u.preffered_name})` : ""
-            console.log(`  ${i + 1}. ${u.first_name}${pref} ${u.last_name} [${u.id}]`)
+            console.log(
+                `  ${i + 1}. ${u.first_name}${pref} ${u.last_name} [${u.id}]`
+            )
         })
         console.log("  0. None of these (enter ID manually)")
 
@@ -209,10 +240,13 @@ async function promptForUserId(
         }
         if (num === 0 || choice.length > 10) {
             // Validate the ID exists
-            const userId = num === 0 ? await question("Enter user ID: ") : choice
-            const found = allUsers.find(u => u.id === userId)
+            const userId =
+                num === 0 ? await question("Enter user ID: ") : choice
+            const found = allUsers.find((u) => u.id === userId)
             if (found) {
-                console.log(`  → Selected: ${found.first_name} ${found.last_name}`)
+                console.log(
+                    `  → Selected: ${found.first_name} ${found.last_name}`
+                )
                 return userId
             }
             console.log(`  ⚠ User ID "${userId}" not found in database`)
@@ -221,7 +255,7 @@ async function promptForUserId(
     }
 
     const userId = await question("Enter user ID: ")
-    const found = allUsers.find(u => u.id === userId)
+    const found = allUsers.find((u) => u.id === userId)
     if (found) {
         console.log(`  → Selected: ${found.first_name} ${found.last_name}`)
         return userId
@@ -231,61 +265,83 @@ async function promptForUserId(
 }
 
 async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
-    console.log(`\nResolving users for ${data.season} ${data.year} ${data.divisionName}...`)
+    console.log(
+        `\nResolving users for ${data.season} ${data.year} ${data.divisionName}...`
+    )
     console.log(`Found ${data.teams.length} teams\n`)
 
     // First, resolve captains
     for (let t = 0; t < data.teams.length; t++) {
         const team = data.teams[t]
-        console.log(`\n--- Team ${t + 1} (Captain: ${team.captainLastName}) ---`)
+        console.log(
+            `\n--- Team ${t + 1} (Captain: ${team.captainLastName}) ---`
+        )
 
         // Find players with matching last name to identify captain
         const captainCandidatesFromTeam = team.players.filter(
-            p => p.name.lastName.toLowerCase() === team.captainLastName.toLowerCase()
+            (p) =>
+                p.name.lastName.toLowerCase() ===
+                team.captainLastName.toLowerCase()
         )
 
         if (captainCandidatesFromTeam.length === 1) {
             // Clear match - use this player's full name to find captain
             const captainName = captainCandidatesFromTeam[0].name
-            const matches = await findUserByName(captainName.firstName, captainName.lastName, allUsers)
+            const matches = await findUserByName(
+                captainName.firstName,
+                captainName.lastName,
+                allUsers
+            )
 
             if (matches.length === 1) {
                 team.captain = matches[0]
                 team.teamName = `Team ${team.captain.last_name}`
-                console.log(`Captain: ${team.captain.first_name} ${team.captain.last_name} ✓`)
+                console.log(
+                    `Captain: ${team.captain.first_name} ${team.captain.last_name} ✓`
+                )
             } else {
                 const userId = await promptForUserId(
                     `Captain "${captainName.original}" - multiple or no matches:`,
                     matches,
                     allUsers
                 )
-                team.captain = allUsers.find(u => u.id === userId)!
+                team.captain = allUsers.find((u) => u.id === userId)!
                 team.teamName = `Team ${team.captain.last_name}`
             }
         } else if (captainCandidatesFromTeam.length > 1) {
             // Multiple players with same last name as captain
-            console.log(`Multiple players with last name "${team.captainLastName}":`)
+            console.log(
+                `Multiple players with last name "${team.captainLastName}":`
+            )
             captainCandidatesFromTeam.forEach((p, i) => {
                 console.log(`  ${i + 1}. ${p.name.original}`)
             })
-            const choice = await question("Which one is the captain? (enter number): ")
+            const choice = await question(
+                "Which one is the captain? (enter number): "
+            )
             const idx = parseInt(choice, 10) - 1
 
             if (idx >= 0 && idx < captainCandidatesFromTeam.length) {
                 const captainName = captainCandidatesFromTeam[idx].name
-                const matches = await findUserByName(captainName.firstName, captainName.lastName, allUsers)
+                const matches = await findUserByName(
+                    captainName.firstName,
+                    captainName.lastName,
+                    allUsers
+                )
 
                 if (matches.length === 1) {
                     team.captain = matches[0]
                     team.teamName = `Team ${team.captain.last_name}`
-                    console.log(`Captain: ${team.captain.first_name} ${team.captain.last_name} ✓`)
+                    console.log(
+                        `Captain: ${team.captain.first_name} ${team.captain.last_name} ✓`
+                    )
                 } else {
                     const userId = await promptForUserId(
                         `Captain "${captainName.original}":`,
                         matches,
                         allUsers
                     )
-                    team.captain = allUsers.find(u => u.id === userId)!
+                    team.captain = allUsers.find((u) => u.id === userId)!
                     team.teamName = `Team ${team.captain.last_name}`
                 }
             } else {
@@ -293,13 +349,16 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
             }
         } else {
             // No player with captain's last name - search database directly
-            const matches = await findUserByLastName(team.captainLastName, allUsers)
+            const matches = await findUserByLastName(
+                team.captainLastName,
+                allUsers
+            )
             const userId = await promptForUserId(
                 `Could not find captain with last name "${team.captainLastName}" in player list:`,
                 matches,
                 allUsers
             )
-            team.captain = allUsers.find(u => u.id === userId)!
+            team.captain = allUsers.find((u) => u.id === userId)!
             team.teamName = `Team ${team.captain.last_name}`
         }
     }
@@ -310,24 +369,38 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
         console.log(`\n--- Resolving players for ${team.teamName} ---`)
 
         for (const player of team.players) {
-            const matches = await findUserByName(player.name.firstName, player.name.lastName, allUsers)
+            const matches = await findUserByName(
+                player.name.firstName,
+                player.name.lastName,
+                allUsers
+            )
 
             if (matches.length === 1) {
                 player.user = matches[0]
-                console.log(`  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} ✓`)
+                console.log(
+                    `  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} ✓`
+                )
             } else if (matches.length > 1) {
                 // Check if captain is one of the matches
-                const captainMatch = matches.find(m => m.id === team.captain?.id)
-                if (captainMatch && player.name.lastName.toLowerCase() === team.captainLastName.toLowerCase()) {
+                const captainMatch = matches.find(
+                    (m) => m.id === team.captain?.id
+                )
+                if (
+                    captainMatch &&
+                    player.name.lastName.toLowerCase() ===
+                        team.captainLastName.toLowerCase()
+                ) {
                     player.user = captainMatch
-                    console.log(`  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} (captain) ✓`)
+                    console.log(
+                        `  ${player.name.original} → ${player.user.first_name} ${player.user.last_name} (captain) ✓`
+                    )
                 } else {
                     const userId = await promptForUserId(
                         `Player "${player.name.original}" - multiple matches:`,
                         matches,
                         allUsers
                     )
-                    player.user = allUsers.find(u => u.id === userId)!
+                    player.user = allUsers.find((u) => u.id === userId)!
                 }
             } else {
                 const userId = await promptForUserId(
@@ -335,7 +408,7 @@ async function resolveUsers(data: ParsedData, allUsers: User[]): Promise<void> {
                     [],
                     allUsers
                 )
-                player.user = allUsers.find(u => u.id === userId)!
+                player.user = allUsers.find((u) => u.id === userId)!
             }
         }
     }
@@ -384,7 +457,7 @@ function displaySummary(
     const numTeams = data.teams.length
     let totalPicks = 0
 
-    console.log("\n" + "=".repeat(60))
+    console.log(`\n${"=".repeat(60)}`)
     console.log("IMPORT SUMMARY")
     console.log("=".repeat(60))
     console.log(`Season: ${data.season} ${data.year}`)
@@ -398,7 +471,9 @@ function displaySummary(
         const team = data.teams[t]
         const teamNumber = t + 1
         console.log(`\n  Team ${teamNumber}: ${team.teamName}`)
-        console.log(`  Captain: ${team.captain!.first_name} ${team.captain!.last_name}`)
+        console.log(
+            `  Captain: ${team.captain!.first_name} ${team.captain!.last_name}`
+        )
         console.log(`  Players (${team.players.length}):`)
 
         for (let p = 0; p < team.players.length; p++) {
@@ -407,11 +482,15 @@ function displaySummary(
 
             // Snake draft: odd rounds go 1-N, even rounds go N-1
             const isOddRound = round % 2 === 1
-            const baseValue = ((divisionLevel - 1) * 50) + ((round - 1) * numTeams)
-            const positionValue = isOddRound ? teamNumber : (numTeams + 1 - teamNumber)
+            const baseValue = (divisionLevel - 1) * 50 + (round - 1) * numTeams
+            const positionValue = isOddRound
+                ? teamNumber
+                : numTeams + 1 - teamNumber
             const overall = baseValue + positionValue
 
-            console.log(`    R${round} (#${overall}): ${player.user!.first_name} ${player.user!.last_name}`)
+            console.log(
+                `    R${round} (#${overall}): ${player.user!.first_name} ${player.user!.last_name}`
+            )
             totalPicks++
         }
     }
@@ -456,7 +535,12 @@ async function insertData(
     console.log("\nInserting draft picks...")
 
     // Insert draft picks
-    const draftPicks: { team: number; user: string; round: number; overall: number }[] = []
+    const draftPicks: {
+        team: number
+        user: string
+        round: number
+        overall: number
+    }[] = []
 
     for (let t = 0; t < data.teams.length; t++) {
         const team = data.teams[t]
@@ -469,8 +553,10 @@ async function insertData(
 
             // Snake draft: odd rounds go 1-N, even rounds go N-1
             const isOddRound = round % 2 === 1
-            const baseValue = ((divisionLevel - 1) * 50) + ((round - 1) * numTeams)
-            const positionValue = isOddRound ? teamNumber : (numTeams + 1 - teamNumber)
+            const baseValue = (divisionLevel - 1) * 50 + (round - 1) * numTeams
+            const positionValue = isOddRound
+                ? teamNumber
+                : numTeams + 1 - teamNumber
             const overall = baseValue + positionValue
 
             draftPicks.push({
@@ -507,14 +593,16 @@ async function main() {
         let input: string
 
         if (args.includes("--interactive")) {
-            console.log("\nPaste your draft data below (press Ctrl+D when done):\n")
+            console.log(
+                "\nPaste your draft data below (press Ctrl+D when done):\n"
+            )
             input = ""
             const interactiveRl = readline.createInterface({
                 input: process.stdin,
                 output: process.stdout
             })
             for await (const line of interactiveRl) {
-                input += line + "\n"
+                input += `${line}\n`
             }
             interactiveRl.close()
         } else if (args.includes("--file")) {
@@ -523,26 +611,31 @@ async function main() {
             if (!filePath) {
                 throw new Error("--file requires a path argument")
             }
-            const fs = await import("fs")
+            const fs = await import("node:fs")
             input = fs.readFileSync(filePath, "utf-8")
         } else {
             // Read from stdin (piped input)
-            const fs = await import("fs")
+            const fs = await import("node:fs")
             input = fs.readFileSync(0, "utf-8")
         }
 
         // Parse input data
         const data = parseInputData(input)
-        console.log(`\nParsed: ${data.season} ${data.year} ${data.divisionName}`)
+        console.log(
+            `\nParsed: ${data.season} ${data.year} ${data.divisionName}`
+        )
         console.log(`Teams: ${data.teams.length}`)
 
         // Look up season and division IDs
-        const { seasonId, divisionId, divisionLevel } = await lookupSeasonAndDivision(
-            data.season,
-            data.year,
-            data.divisionName
+        const { seasonId, divisionId, divisionLevel } =
+            await lookupSeasonAndDivision(
+                data.season,
+                data.year,
+                data.divisionName
+            )
+        console.log(
+            `Season ID: ${seasonId}, Division ID: ${divisionId}, Level: ${divisionLevel}`
         )
-        console.log(`Season ID: ${seasonId}, Division ID: ${divisionId}, Level: ${divisionLevel}`)
 
         // Resolve all users
         await resolveUsers(data, allUsers)
@@ -551,7 +644,9 @@ async function main() {
         displaySummary(data, seasonId, divisionId, divisionLevel)
 
         // Ask for confirmation (default is yes)
-        const confirm = await question("\nDo you want to insert this data into the database? [Y/n]: ")
+        const confirm = await question(
+            "\nDo you want to insert this data into the database? [Y/n]: "
+        )
 
         if (confirm.toLowerCase() === "n" || confirm.toLowerCase() === "no") {
             console.log("\nAborted. No changes were made.")
@@ -562,12 +657,17 @@ async function main() {
         // Insert data
         await insertData(data, seasonId, divisionId, divisionLevel)
 
-        console.log(`\n✓ Successfully imported ${data.season} ${data.year} ${data.divisionName}!`)
+        console.log(
+            `\n✓ Successfully imported ${data.season} ${data.year} ${data.divisionName}!`
+        )
 
         closeReadline()
         process.exit(0)
     } catch (error) {
-        console.error("\nError:", error instanceof Error ? error.message : error)
+        console.error(
+            "\nError:",
+            error instanceof Error ? error.message : error
+        )
         closeReadline()
         process.exit(1)
     }

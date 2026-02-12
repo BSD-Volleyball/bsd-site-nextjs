@@ -71,7 +71,10 @@ function UserCombobox({
                     )}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+            >
                 <div className="border-b p-2">
                     <Input
                         ref={inputRef}
@@ -92,9 +95,7 @@ function UserCombobox({
                                 key={user.id}
                                 type="button"
                                 className={`flex w-full cursor-pointer flex-col gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${
-                                    value === user.id
-                                        ? "bg-accent"
-                                        : ""
+                                    value === user.id ? "bg-accent" : ""
                                 }`}
                                 onClick={() => {
                                     onChange(user.id)
@@ -102,9 +103,7 @@ function UserCombobox({
                                     setSearch("")
                                 }}
                             >
-                                <span className="font-medium">
-                                    {user.name}
-                                </span>
+                                <span className="font-medium">{user.name}</span>
                                 <span className="text-muted-foreground text-xs">
                                     {user.email}
                                 </span>
