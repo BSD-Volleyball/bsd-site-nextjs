@@ -7,7 +7,8 @@ import {
     divisions,
     signups,
     teams,
-    drafts
+    drafts,
+    emailTemplates
 } from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
@@ -16,6 +17,7 @@ interface PotentialCaptain {
     id: string
     displayName: string
     lastName: string
+    email: string
     consecutiveSeasons: number
     captainInterest: "yes" | "only_if_needed" | "no"
 }
@@ -38,6 +40,8 @@ interface PotentialCaptainsData {
     message?: string
     seasonLabel: string
     divisions: DivisionCaptains[]
+    emailTemplate?: string
+    emailSubject?: string
 }
 
 export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData> {
@@ -96,7 +100,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 captain: signups.captain,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preffered_name,
+                email: users.email
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -111,13 +116,16 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
         }
 
         // 3. Get all seasons ordered by ID (newest first)
+        // Exclude the current signup season since it hasn't been played yet
         const allSeasons = await db
             .select({ id: seasons.id })
             .from(seasons)
             .orderBy(desc(seasons.id))
             .limit(11)
 
-        const seasonIds = allSeasons.map((s) => s.id)
+        const seasonIds = allSeasons
+            .map((s) => s.id)
+            .filter((id) => id !== targetSeason.id)
 
         // 4. Get draft history for all signed-up players
         const playerIds = signupRows.map((s) => s.playerId)
@@ -136,8 +144,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
 
         // 5. Build player history map
         type PlayerHistory = {
-            divisionSeasons: Map<number, Set<number>>
             mostRecentDivisionId: number | null
+            mostRecent4Drafts: Array<{ divisionId: number; seasonId: number }>
         }
 
         const playerHistoryMap = new Map<string, PlayerHistory>()
@@ -146,14 +154,6 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             const playerDrafts = draftHistory.filter(
                 (d) => d.playerId === playerId
             )
-            const divisionSeasons = new Map<number, Set<number>>()
-
-            for (const draft of playerDrafts) {
-                if (!divisionSeasons.has(draft.divisionId)) {
-                    divisionSeasons.set(draft.divisionId, new Set())
-                }
-                divisionSeasons.get(draft.divisionId)!.add(draft.seasonId)
-            }
 
             // Find most recent division
             let mostRecentDivisionId: number | null = null
@@ -165,22 +165,40 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 }
             }
 
+            // Get most recent 4 drafts (sorted by season ID, newest first)
+            const sortedDrafts = playerDrafts
+                .filter((d) => seasonIds.includes(d.seasonId))
+                .sort((a, b) => {
+                    const aIndex = seasonIds.indexOf(a.seasonId)
+                    const bIndex = seasonIds.indexOf(b.seasonId)
+                    return aIndex - bIndex
+                })
+                .slice(0, 4)
+                .map((d) => ({
+                    divisionId: d.divisionId,
+                    seasonId: d.seasonId
+                }))
+
             playerHistoryMap.set(playerId, {
-                divisionSeasons,
-                mostRecentDivisionId
+                mostRecentDivisionId,
+                mostRecent4Drafts: sortedDrafts
             })
         }
 
-        // 6. Helper function to count consecutive seasons
-        // Counts from the first season the player actually played (most recent backward)
-        function countConsecutiveSeasons(
-            allSeasonIds: number[],
-            playedSeasonIds: Set<number>
+        // 6. Helper function to count consecutive seasons in a specific division
+        // Counts from the first season the player played in that division (most recent backward)
+        function countConsecutiveSeasonsInDivision(
+            playerDrafts: Array<{ divisionId: number; seasonId: number }>,
+            divisionId: number,
+            allSeasonIds: number[]
         ): number {
             let count = 0
             let started = false
             for (const seasonId of allSeasonIds) {
-                if (playedSeasonIds.has(seasonId)) {
+                const playedInDivision = playerDrafts.some(
+                    (d) => d.seasonId === seasonId && d.divisionId === divisionId
+                )
+                if (playedInDivision) {
                     started = true
                     count++
                 } else if (started) {
@@ -189,6 +207,15 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 }
             }
             return count
+        }
+
+        // Helper function to check if most recent 4 drafts were all in the same division
+        function wereMostRecent4InDivision(
+            mostRecent4: Array<{ divisionId: number; seasonId: number }>,
+            divisionId: number
+        ): boolean {
+            if (mostRecent4.length < 4) return false
+            return mostRecent4.every((draft) => draft.divisionId === divisionId)
         }
 
         // 7. Get all divisions
@@ -219,16 +246,32 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 const history = playerHistoryMap.get(signup.playerId)
                 if (!history) continue
 
-                const divisionSeasons = history.divisionSeasons.get(division.id)
-                if (!divisionSeasons) continue
+                // Get all drafts for this player
+                const playerDrafts = draftHistory
+                    .filter((d) => d.playerId === signup.playerId)
+                    .filter((d) => seasonIds.includes(d.seasonId))
+                    .map((d) => ({
+                        divisionId: d.divisionId,
+                        seasonId: d.seasonId
+                    }))
 
-                const consecutiveSeasons = countConsecutiveSeasons(
-                    seasonIds,
-                    divisionSeasons
+                // Skip if player has no history in this division
+                const hasHistoryInDivision = playerDrafts.some(
+                    (d) => d.divisionId === division.id
+                )
+                if (!hasHistoryInDivision) continue
+
+                const consecutiveSeasons = countConsecutiveSeasonsInDivision(
+                    playerDrafts,
+                    division.id,
+                    seasonIds
                 )
                 const playedLastSeason =
                     history.mostRecentDivisionId === division.id
-                const playedInPast4Seasons = consecutiveSeasons >= 4
+                const mostRecent4InThisDivision = wereMostRecent4InDivision(
+                    history.mostRecent4Drafts,
+                    division.id
+                )
 
                 const displayName = signup.preferredName || signup.firstName
 
@@ -237,6 +280,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                         id: signup.playerId,
                         displayName,
                         lastName: signup.lastName,
+                        email: signup.email,
                         consecutiveSeasons,
                         captainInterest: "yes"
                     })
@@ -248,14 +292,19 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                         id: signup.playerId,
                         displayName,
                         lastName: signup.lastName,
+                        email: signup.email,
                         consecutiveSeasons,
                         captainInterest: "only_if_needed"
                     })
-                } else if (signup.captain === "no" && playedInPast4Seasons) {
+                } else if (
+                    signup.captain === "no" &&
+                    mostRecent4InThisDivision
+                ) {
                     list3Players.push({
                         id: signup.playerId,
                         displayName,
                         lastName: signup.lastName,
+                        email: signup.email,
                         consecutiveSeasons,
                         captainInterest: "no"
                     })
@@ -304,10 +353,34 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             }
         }
 
+        // Fetch email template
+        let emailTemplate = ""
+        let emailSubject = ""
+        try {
+            const [template] = await db
+                .select({
+                    content: emailTemplates.content,
+                    subject: emailTemplates.subject
+                })
+                .from(emailTemplates)
+                .where(eq(emailTemplates.name, "call for captains"))
+                .limit(1)
+
+            if (template) {
+                emailTemplate = template.content
+                emailSubject = template.subject || ""
+            }
+        } catch (templateError) {
+            console.error("Error fetching email template:", templateError)
+            // Continue without template - not a critical error
+        }
+
         return {
             status: true,
             seasonLabel,
-            divisions: divisionData
+            divisions: divisionData,
+            emailTemplate,
+            emailSubject
         }
     } catch (error) {
         console.error("Error fetching potential captains data:", error)

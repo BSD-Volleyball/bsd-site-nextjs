@@ -21,7 +21,8 @@ import {
     RiUserUnfollowLine,
     RiHistoryLine,
     RiLinksLine,
-    RiUserSettingsLine
+    RiUserSettingsLine,
+    RiMailLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -143,6 +144,11 @@ const adminDangerNavItems = [
         title: "Edit Player",
         url: "/dashboard/edit-player",
         icon: RiEditLine
+    },
+    {
+        title: "Edit Emails",
+        url: "/dashboard/edit-emails",
+        icon: RiMailLine
     }
 ]
 
