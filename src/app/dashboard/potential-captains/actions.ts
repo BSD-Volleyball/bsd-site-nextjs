@@ -10,7 +10,7 @@ import {
     drafts
 } from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"
-import { checkCommissionerAccess } from "@/lib/auth-checks"
+import { getIsCommissioner } from "@/app/dashboard/actions"
 
 interface PotentialCaptain {
     id: string
@@ -41,7 +41,7 @@ interface PotentialCaptainsData {
 }
 
 export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData> {
-    const hasAccess = await checkCommissionerAccess()
+    const hasAccess = await getIsCommissioner()
 
     if (!hasAccess) {
         return {

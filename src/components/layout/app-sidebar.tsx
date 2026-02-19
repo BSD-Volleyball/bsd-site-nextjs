@@ -20,7 +20,8 @@ import {
     RiMergeCellsHorizontal,
     RiUserUnfollowLine,
     RiHistoryLine,
-    RiLinksLine
+    RiLinksLine,
+    RiUserSettingsLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -51,6 +52,7 @@ import { site } from "@/config/site"
 import {
     getSignupEligibility,
     getIsAdminOrDirector,
+    getIsCommissioner,
     getRecentSeasonsNav,
     type SeasonNavItem
 } from "@/app/dashboard/actions"
@@ -128,6 +130,11 @@ const adminDangerNavItems = [
         icon: RiFileList3Line
     },
     {
+        title: "Select Commissioners",
+        url: "/dashboard/select-commissioners",
+        icon: RiUserSettingsLine
+    },
+    {
         title: "Merge Users",
         url: "/dashboard/merge-users",
         icon: RiMergeCellsHorizontal
@@ -136,6 +143,14 @@ const adminDangerNavItems = [
         title: "Edit Player",
         url: "/dashboard/edit-player",
         icon: RiEditLine
+    }
+]
+
+const commissionerNavItems = [
+    {
+        title: "Potential Captains",
+        url: "/dashboard/potential-captains",
+        icon: RiUserSettingsLine
     }
 ]
 
@@ -268,11 +283,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [isCommissioner, setIsCommissioner] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
         getIsAdminOrDirector().then(setIsAdmin)
+        getIsCommissioner().then(setIsCommissioner)
         getRecentSeasonsNav().then(setSeasonNav)
     }, [])
 
@@ -315,6 +332,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         pathname={pathname}
                                     />
                                 ))}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isCommissioner && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Commissioner
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={commissionerNavItems}
+                                    pathname={pathname}
+                                />
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
