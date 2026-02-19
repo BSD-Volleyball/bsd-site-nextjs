@@ -282,7 +282,7 @@ export async function saveCommissioners(data: {
         }
 
         // Log the action
-        const session = await auth.api.getSession({ headers: await headers() })()
+        const session = await auth.api.getSession({ headers: await headers() })
         if (session) {
             await logAuditEntry({
                 userId: session.user.id,
