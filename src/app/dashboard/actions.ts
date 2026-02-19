@@ -10,7 +10,8 @@ import {
     seasons,
     teams,
     drafts,
-    divisions
+    divisions,
+    commissioners
 } from "@/database/schema"
 import { eq, and, lte, desc, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -40,6 +41,40 @@ export async function getIsAdminOrDirector(): Promise<boolean> {
         .limit(1)
 
     return user?.role === "admin" || user?.role === "director"
+}
+
+export async function getIsCommissioner(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+
+    if (!session?.user) {
+        return false
+    }
+
+    // Check if user is admin/director (they have full access)
+    const isAdmin = await getIsAdminOrDirector()
+    if (isAdmin) {
+        return true
+    }
+
+    // Get current season
+    const config = await getSeasonConfig()
+    if (!config.seasonId) {
+        return false
+    }
+
+    // Check if user is a commissioner for the current season
+    const [commissionerRecord] = await db
+        .select({ id: commissioners.id })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, config.seasonId),
+                eq(commissioners.commissioner, session.user.id)
+            )
+        )
+        .limit(1)
+
+    return !!commissionerRecord
 }
 
 export interface SeasonNavDivision {

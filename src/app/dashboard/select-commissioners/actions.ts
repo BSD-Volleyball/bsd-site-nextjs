@@ -3,9 +3,10 @@
 import { db } from "@/database/db"
 import { seasons, divisions, commissioners, users } from "@/database/schema"
 import { eq, desc, inArray } from "drizzle-orm"
-import { checkAdminAccess } from "@/lib/auth-checks"
+import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getCurrentSession } from "@/lib/auth-checks"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 
 export interface Season {
     id: number
@@ -36,7 +37,7 @@ export async function getSeasons(): Promise<{
     message?: string
     seasons: Season[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", seasons: [] }
     }
@@ -67,7 +68,7 @@ export async function getCurrentSeason(): Promise<{
     status: boolean
     seasonId: number | null
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, seasonId: null }
     }
@@ -102,7 +103,7 @@ export async function getUsers(): Promise<{
     message?: string
     users: User[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", users: [] }
     }
@@ -144,7 +145,7 @@ export async function getDivisions(): Promise<{
     message?: string
     divisions: Division[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", divisions: [] }
     }
@@ -182,7 +183,7 @@ export async function getCommissionersForSeason(seasonId: number): Promise<{
     message?: string
     assignments: CommissionerAssignment[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", assignments: [] }
     }
@@ -241,7 +242,7 @@ export async function saveCommissioners(data: {
         commissioner2: string | null
     }>
 }): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -281,7 +282,7 @@ export async function saveCommissioners(data: {
         }
 
         // Log the action
-        const session = await getCurrentSession()
+        const session = await auth.api.getSession({ headers: await headers() })()
         if (session) {
             await logAuditEntry({
                 userId: session.user.id,

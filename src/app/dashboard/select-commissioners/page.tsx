@@ -2,7 +2,9 @@ import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
 import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
-import { getCurrentSession, checkAdminAccess } from "@/lib/auth-checks"
+import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -12,13 +14,13 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function SelectCommissionersPage() {
-    const session = await getCurrentSession()
+    const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await getIsAdminOrDirector()
 
     if (!hasAccess) {
         redirect("/dashboard")
