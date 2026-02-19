@@ -12,6 +12,11 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger
+} from "@/components/ui/tooltip"
+import {
     saveEvaluations,
     type NewPlayerEntry,
     type DivisionOption
@@ -25,6 +30,32 @@ interface EvaluatePlayersListProps {
 function getDisplayName(entry: NewPlayerEntry): string {
     const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
     return `${entry.firstName}${preferred} ${entry.lastName}`
+}
+
+function getAverageRatingDisplay(
+    player: NewPlayerEntry,
+    divisions: DivisionOption[]
+): string {
+    if (player.evaluationCount === 0 || player.averageEvaluation === null) {
+        return "—"
+    }
+
+    // Find the closest division to the average
+    const avgDivisionId = Math.round(player.averageEvaluation)
+    const division = divisions.find((d) => d.id === avgDivisionId)
+    const divisionName = division?.name || "Unknown"
+
+    return `${divisionName} (${player.averageEvaluation.toFixed(1)} from ${player.evaluationCount})`
+}
+
+function getEvaluatorTooltip(player: NewPlayerEntry): string {
+    if (player.evaluatorDetails.length === 0) {
+        return "No evaluations yet"
+    }
+
+    return player.evaluatorDetails
+        .map((detail) => `${detail.evaluatorName} - ${detail.divisionName}`)
+        .join(", ")
 }
 
 export function EvaluatePlayersList({
@@ -43,8 +74,8 @@ export function EvaluatePlayersList({
     const [selections, setSelections] = useState<Record<string, string>>(() => {
         const initial: Record<string, string> = {}
         for (const player of players) {
-            if (player.division !== null) {
-                initial[player.userId] = String(player.division)
+            if (player.currentUserEvaluation !== null) {
+                initial[player.userId] = String(player.currentUserEvaluation)
             }
         }
         return initial
@@ -163,7 +194,10 @@ export function EvaluatePlayersList({
                                 Assessment
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Division
+                                Your Rating
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Average Rating
                             </th>
                         </tr>
                     </thead>
@@ -214,12 +248,31 @@ export function EvaluatePlayersList({
                                         </SelectContent>
                                     </Select>
                                 </td>
+                                <td className="px-4 py-2">
+                                    {player.evaluationCount > 0 ? (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="cursor-help underline decoration-dotted">
+                                                    {getAverageRatingDisplay(
+                                                        player,
+                                                        divisions
+                                                    )}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {getEvaluatorTooltip(player)}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </td>
                             </tr>
                         ))}
                         {filteredPlayers.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={5}
+                                    colSpan={6}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No new players found.
