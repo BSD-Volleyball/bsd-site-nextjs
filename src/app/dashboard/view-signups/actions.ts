@@ -10,6 +10,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 export interface SignupEntry {
     signupId: number
     userId: string
+    oldId: number | null
     firstName: string
     lastName: string
     preferredName: string | null
@@ -21,6 +22,16 @@ export interface SignupEntry {
     isNew: boolean
     pairPickName: string | null
     pairReason: string | null
+    experience: string | null
+    assessment: string | null
+    height: number | null
+    picture: string | null
+    skillPasser: boolean | null
+    skillSetter: boolean | null
+    skillHitter: boolean | null
+    skillOther: boolean | null
+    datesMissing: string | null
+    playFirstWeek: boolean | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -70,6 +81,7 @@ export async function getSeasonSignups(): Promise<{
             .select({
                 signupId: signups.id,
                 userId: signups.player,
+                oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
@@ -79,7 +91,17 @@ export async function getSeasonSignups(): Promise<{
                 amountPaid: signups.amount_paid,
                 signupDate: signups.created_at,
                 pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason
+                pairReason: signups.pair_reason,
+                experience: users.experience,
+                assessment: users.assessment,
+                height: users.height,
+                picture: users.picture,
+                skillPasser: users.skill_passer,
+                skillSetter: users.skill_setter,
+                skillHitter: users.skill_hitter,
+                skillOther: users.skill_other,
+                datesMissing: signups.dates_missing,
+                playFirstWeek: signups.play_1st_week
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -129,6 +151,7 @@ export async function getSeasonSignups(): Promise<{
         const entries: SignupEntry[] = signupRows.map((row) => ({
             signupId: row.signupId,
             userId: row.userId,
+            oldId: row.oldId,
             firstName: row.firstName,
             lastName: row.lastName,
             preferredName: row.preferredName,
@@ -141,7 +164,17 @@ export async function getSeasonSignups(): Promise<{
             pairPickName: row.pairPickId
                 ? (pairPickNames.get(row.pairPickId) ?? null)
                 : null,
-            pairReason: row.pairReason
+            pairReason: row.pairReason,
+            experience: row.experience,
+            assessment: row.assessment,
+            height: row.height,
+            picture: row.picture,
+            skillPasser: row.skillPasser,
+            skillSetter: row.skillSetter,
+            skillHitter: row.skillHitter,
+            skillOther: row.skillOther,
+            datesMissing: row.datesMissing,
+            playFirstWeek: row.playFirstWeek
         }))
 
         return {

@@ -63,6 +63,7 @@ export default async function ViewSignupsPage() {
             <SignupsList
                 signups={result.signups}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                seasonLabel={result.seasonLabel}
             />
         </div>
     )

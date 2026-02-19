@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RiCloseLine } from "@remixicon/react"
+import { RiCloseLine, RiDownloadLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
     getPlayerDetails,
@@ -14,6 +15,7 @@ import type { SignupEntry } from "./actions"
 interface SignupsListProps {
     signups: SignupEntry[]
     playerPicUrl: string
+    seasonLabel: string
 }
 
 function formatHeight(inches: number | null): string {
@@ -28,7 +30,70 @@ function getDisplayName(entry: SignupEntry): string {
     return `${entry.firstName}${preferred} ${entry.lastName}`
 }
 
-export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
+function escapeCsvField(field: string): string {
+    if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+        return `"${field.replace(/"/g, '""')}"`
+    }
+    return field
+}
+
+function generateCsvContent(signups: SignupEntry[]): string {
+    const headers = [
+        "id",
+        "First Name",
+        "Last Name",
+        "Preferred Name",
+        "Pair Pick",
+        "Pair Reason",
+        "Gender",
+        "Age",
+        "Captain",
+        "Paid",
+        "Signup Date",
+        "Experience",
+        "Assessment",
+        "Height",
+        "Picture",
+        "Skill: Passer",
+        "Skill: Setter",
+        "Skill: Hitter",
+        "Skill: Other",
+        "Dates Missing",
+        "Play 1st Week"
+    ]
+
+    const rows = signups.map((entry) => [
+        entry.oldId !== null ? String(entry.oldId) : "",
+        escapeCsvField(entry.firstName),
+        escapeCsvField(entry.lastName),
+        escapeCsvField(entry.preferredName || ""),
+        escapeCsvField(entry.pairPickName || ""),
+        escapeCsvField(entry.pairReason || ""),
+        entry.male === true ? "M" : entry.male === false ? "F" : "",
+        entry.age || "",
+        entry.captain === "yes" ? "Yes" :
+            entry.captain === "only_if_needed" ? "If needed" :
+            entry.captain === "no" ? "No" : "",
+        entry.amountPaid || "",
+        new Date(entry.signupDate).toLocaleDateString(),
+        entry.experience || "",
+        entry.assessment || "",
+        formatHeight(entry.height),
+        entry.picture || "",
+        entry.skillPasser ? "Yes" : "No",
+        entry.skillSetter ? "Yes" : "No",
+        entry.skillHitter ? "Yes" : "No",
+        entry.skillOther ? "Yes" : "No",
+        escapeCsvField(entry.datesMissing || ""),
+        entry.playFirstWeek ? "Yes" : "No"
+    ])
+
+    return [headers, ...rows]
+        .map(row => row.join(","))
+        .join("\n")
+}
+
+export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListProps) {
     const [search, setSearch] = useState("")
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
@@ -89,6 +154,28 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
         setPlayerDetails(null)
     }, [])
 
+    const handleDownloadCsv = () => {
+        const csvContent = generateCsvContent(filteredSignups)
+
+        const blob = new Blob(["\ufeff" + csvContent], {
+            type: "text/csv;charset=utf-8;"
+        })
+
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+
+        const seasonSlug = seasonLabel.toLowerCase().replace(/\s+/g, "-")
+        const timestamp = new Date().toISOString().split("T")[0]
+        link.download = `signups-${seasonSlug}-${timestamp}.csv`
+
+        document.body.appendChild(link)
+        link.click()
+
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+    }
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -122,12 +209,24 @@ export function SignupsList({ signups, playerPicUrl }: SignupsListProps) {
                         </span>
                     )}
                 </div>
-                <Input
-                    placeholder="Filter by name or pair pick..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="max-w-xs"
-                />
+
+                <div className="flex items-center gap-2">
+                    <Button
+                        onClick={handleDownloadCsv}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                    >
+                        <RiDownloadLine className="h-4 w-4" />
+                        Export CSV
+                    </Button>
+                    <Input
+                        placeholder="Filter by name or pair pick..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="max-w-xs"
+                    />
+                </div>
             </div>
 
             <div className="overflow-x-auto rounded-lg border">
