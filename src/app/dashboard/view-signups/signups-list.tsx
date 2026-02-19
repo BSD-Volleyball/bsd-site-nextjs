@@ -43,6 +43,8 @@ function generateCsvContent(signups: SignupEntry[]): string {
         "First Name",
         "Last Name",
         "Preferred Name",
+        "Email",
+        "Phone",
         "Pair Pick",
         "Pair Reason",
         "Gender",
@@ -59,7 +61,11 @@ function generateCsvContent(signups: SignupEntry[]): string {
         "Skill: Hitter",
         "Skill: Other",
         "Dates Missing",
-        "Play 1st Week"
+        "Play 1st Week",
+        "Last Draft Season",
+        "Last Draft Division",
+        "Last Draft Captain",
+        "Last Draft Overall"
     ]
 
     const rows = signups.map((entry) => [
@@ -67,6 +73,8 @@ function generateCsvContent(signups: SignupEntry[]): string {
         escapeCsvField(entry.firstName),
         escapeCsvField(entry.lastName),
         escapeCsvField(entry.preferredName || ""),
+        escapeCsvField(entry.email),
+        escapeCsvField(entry.phone || ""),
         escapeCsvField(entry.pairPickName || ""),
         escapeCsvField(entry.pairReason || ""),
         entry.male === true ? "M" : entry.male === false ? "F" : "",
@@ -85,7 +93,11 @@ function generateCsvContent(signups: SignupEntry[]): string {
         entry.skillHitter ? "Yes" : "No",
         entry.skillOther ? "Yes" : "No",
         escapeCsvField(entry.datesMissing || ""),
-        entry.playFirstWeek ? "Yes" : "No"
+        entry.playFirstWeek ? "Yes" : "No",
+        escapeCsvField(entry.lastDraftSeason || ""),
+        escapeCsvField(entry.lastDraftDivision || ""),
+        escapeCsvField(entry.lastDraftCaptain || ""),
+        entry.lastDraftOverall !== null ? String(entry.lastDraftOverall) : ""
     ])
 
     return [headers, ...rows]

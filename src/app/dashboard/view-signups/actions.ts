@@ -3,8 +3,8 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, drafts } from "@/database/schema"
-import { eq, inArray } from "drizzle-orm"
+import { users, signups, drafts, teams, divisions, seasons } from "@/database/schema"
+import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface SignupEntry {
@@ -14,6 +14,8 @@ export interface SignupEntry {
     firstName: string
     lastName: string
     preferredName: string | null
+    email: string
+    phone: string | null
     male: boolean | null
     age: string | null
     captain: string | null
@@ -32,6 +34,10 @@ export interface SignupEntry {
     skillOther: boolean | null
     datesMissing: string | null
     playFirstWeek: boolean | null
+    lastDraftSeason: string | null
+    lastDraftDivision: string | null
+    lastDraftCaptain: string | null
+    lastDraftOverall: number | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -85,6 +91,8 @@ export async function getSeasonSignups(): Promise<{
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
+                email: users.email,
+                phone: users.phone,
                 male: users.male,
                 age: signups.age,
                 captain: signups.captain,
@@ -148,34 +156,94 @@ export async function getSeasonSignups(): Promise<{
             )
         }
 
-        const entries: SignupEntry[] = signupRows.map((row) => ({
-            signupId: row.signupId,
-            userId: row.userId,
-            oldId: row.oldId,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            preferredName: row.preferredName,
-            male: row.male,
-            age: row.age,
-            captain: row.captain,
-            amountPaid: row.amountPaid,
-            signupDate: row.signupDate,
-            isNew: !draftedUserIds.has(row.userId),
-            pairPickName: row.pairPickId
-                ? (pairPickNames.get(row.pairPickId) ?? null)
-                : null,
-            pairReason: row.pairReason,
-            experience: row.experience,
-            assessment: row.assessment,
-            height: row.height,
-            picture: row.picture,
-            skillPasser: row.skillPasser,
-            skillSetter: row.skillSetter,
-            skillHitter: row.skillHitter,
-            skillOther: row.skillOther,
-            datesMissing: row.datesMissing,
-            playFirstWeek: row.playFirstWeek
-        }))
+        // Fetch last draft information for each user
+        const lastDraftInfo = new Map<string, {
+            season: string
+            division: string
+            captain: string
+            overall: number
+        }>()
+
+        if (userIds.length > 0) {
+            const draftData = await db
+                .select({
+                    userId: drafts.user,
+                    teamId: drafts.team,
+                    overall: drafts.overall,
+                    seasonYear: seasons.year,
+                    seasonName: seasons.season,
+                    divisionName: divisions.name,
+                    captainId: teams.captain,
+                    captainFirstName: users.first_name,
+                    captainLastName: users.last_name,
+                    captainPreferredName: users.preffered_name
+                })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .innerJoin(seasons, eq(teams.season, seasons.id))
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .innerJoin(users, eq(teams.captain, users.id))
+                .where(inArray(drafts.user, userIds))
+                .orderBy(desc(seasons.year), desc(seasons.id))
+
+            // Keep only the most recent draft for each user
+            const processedUsers = new Set<string>()
+            for (const draft of draftData) {
+                if (!processedUsers.has(draft.userId)) {
+                    const captainPreferred = draft.captainPreferredName
+                        ? ` (${draft.captainPreferredName})`
+                        : ""
+                    const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
+                    const seasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
+
+                    lastDraftInfo.set(draft.userId, {
+                        season: seasonLabel,
+                        division: draft.divisionName,
+                        captain: captainName,
+                        overall: draft.overall
+                    })
+                    processedUsers.add(draft.userId)
+                }
+            }
+        }
+
+        const entries: SignupEntry[] = signupRows.map((row) => {
+            const lastDraft = lastDraftInfo.get(row.userId)
+            return {
+                signupId: row.signupId,
+                userId: row.userId,
+                oldId: row.oldId,
+                firstName: row.firstName,
+                lastName: row.lastName,
+                preferredName: row.preferredName,
+                email: row.email,
+                phone: row.phone,
+                male: row.male,
+                age: row.age,
+                captain: row.captain,
+                amountPaid: row.amountPaid,
+                signupDate: row.signupDate,
+                isNew: !draftedUserIds.has(row.userId),
+                pairPickName: row.pairPickId
+                    ? (pairPickNames.get(row.pairPickId) ?? null)
+                    : null,
+                pairReason: row.pairReason,
+                experience: row.experience,
+                assessment: row.assessment,
+                height: row.height,
+                picture: row.picture,
+                skillPasser: row.skillPasser,
+                skillSetter: row.skillSetter,
+                skillHitter: row.skillHitter,
+                skillOther: row.skillOther,
+                datesMissing: row.datesMissing,
+                playFirstWeek: row.playFirstWeek,
+                lastDraftSeason: lastDraft?.season ?? null,
+                lastDraftDivision: lastDraft?.division ?? null,
+                lastDraftCaptain: lastDraft?.captain ?? null,
+                lastDraftOverall: lastDraft?.overall ?? null
+            }
+        })
 
         return {
             status: true,
