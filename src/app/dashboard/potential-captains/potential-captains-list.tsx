@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
 import {
     getPlayerDetails,
     type PlayerDetails,
@@ -28,6 +30,7 @@ interface PotentialCaptain {
     id: string
     displayName: string
     lastName: string
+    email: string
     consecutiveSeasons: number
     captainInterest: "yes" | "only_if_needed" | "no"
 }
@@ -54,10 +57,14 @@ function formatHeight(inches: number | null): string {
 
 export function PotentialCaptainsList({
     divisions,
-    playerPicUrl
+    playerPicUrl,
+    emailTemplate,
+    emailSubject
 }: {
     divisions: DivisionCaptains[]
     playerPicUrl: string
+    emailTemplate: string
+    emailSubject: string
 }) {
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
@@ -68,6 +75,16 @@ export function PotentialCaptainsList({
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
+    const [selectedPlayers, setSelectedPlayers] = useState<
+        Map<number, Set<string>>
+    >(new Map())
+    const [showEmailModal, setShowEmailModal] = useState(false)
+    const [currentDivisionId, setCurrentDivisionId] = useState<number | null>(
+        null
+    )
+    const [copySuccess, setCopySuccess] = useState(false)
+    const [copyEmailSuccess, setCopyEmailSuccess] = useState(false)
+    const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
 
     const handlePlayerClick = async (playerId: string) => {
         setSelectedUserId(playerId)
@@ -101,6 +118,87 @@ export function PotentialCaptainsList({
         setPairPickName(null)
         setPairReason(null)
     }, [])
+
+    const togglePlayerSelection = (divisionId: number, playerId: string) => {
+        setSelectedPlayers((prev) => {
+            const newMap = new Map(prev)
+            const currentSet = newMap.get(divisionId) || new Set()
+            const newSet = new Set(currentSet)
+
+            if (newSet.has(playerId)) {
+                newSet.delete(playerId)
+            } else {
+                newSet.add(playerId)
+            }
+            newMap.set(divisionId, newSet)
+            return newMap
+        })
+    }
+
+    const handleGenerateMessage = (divisionId: number) => {
+        setCurrentDivisionId(divisionId)
+        setShowEmailModal(true)
+        setCopySuccess(false)
+        setCopyEmailSuccess(false)
+        setCopySubjectSuccess(false)
+    }
+
+    const getSelectedPlayersForDivision = (
+        divisionId: number
+    ): PotentialCaptain[] => {
+        const division = divisions.find((d) => d.id === divisionId)
+        if (!division) return []
+
+        const selectedIds = selectedPlayers.get(divisionId) || new Set()
+        const allPlayers: PotentialCaptain[] = []
+
+        division.lists.forEach((list) => {
+            allPlayers.push(...list.players)
+        })
+
+        return allPlayers.filter((p) => selectedIds.has(p.id))
+    }
+
+    const formatEmailList = (players: PotentialCaptain[]): string => {
+        return players
+            .map((p) => `${p.displayName} ${p.lastName} <${p.email}>`)
+            .join(", ")
+    }
+
+    const handleCopyToClipboard = async () => {
+        if (!currentDivisionId) return
+
+        const players = getSelectedPlayersForDivision(currentDivisionId)
+        const emailList = formatEmailList(players)
+
+        try {
+            await navigator.clipboard.writeText(emailList)
+            setCopySuccess(true)
+            setTimeout(() => setCopySuccess(false), 2000)
+        } catch (err) {
+            console.error("Failed to copy to clipboard:", err)
+        }
+    }
+
+    const handleCopyEmailTemplate = async () => {
+        try {
+            await navigator.clipboard.writeText(emailTemplate)
+            setCopyEmailSuccess(true)
+            setTimeout(() => setCopyEmailSuccess(false), 2000)
+        } catch (err) {
+            console.error("Failed to copy email template to clipboard:", err)
+        }
+    }
+
+    const handleCopySubject = async () => {
+        try {
+            await navigator.clipboard.writeText(emailSubject)
+            setCopySubjectSuccess(true)
+            setTimeout(() => setCopySubjectSuccess(false), 2000)
+        } catch (err) {
+            console.error("Failed to copy subject to clipboard:", err)
+        }
+    }
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -146,36 +244,80 @@ export function PotentialCaptainsList({
                                         ) : (
                                             <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                                                 {list.players.map((player) => (
-                                                    <button
+                                                    <div
                                                         key={player.id}
-                                                        type="button"
-                                                        onClick={() =>
-                                                            handlePlayerClick(
-                                                                player.id
-                                                            )
-                                                        }
-                                                        className="flex items-center justify-between rounded-md border bg-background p-3 transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                                                        className="flex items-center gap-2 rounded-md border bg-background p-3"
                                                     >
-                                                        <span className="text-sm">
-                                                            {player.displayName}{" "}
-                                                            {player.lastName}
-                                                        </span>
-                                                        <Badge variant="secondary">
-                                                            {player.consecutiveSeasons >=
-                                                            10
-                                                                ? "9+"
-                                                                : player.consecutiveSeasons}{" "}
-                                                            {player.consecutiveSeasons ===
-                                                            1
-                                                                ? "season"
-                                                                : "seasons"}
-                                                        </Badge>
-                                                    </button>
+                                                        <Checkbox
+                                                            checked={
+                                                                selectedPlayers
+                                                                    .get(
+                                                                        division.id
+                                                                    )
+                                                                    ?.has(
+                                                                        player.id
+                                                                    ) || false
+                                                            }
+                                                            onCheckedChange={() =>
+                                                                togglePlayerSelection(
+                                                                    division.id,
+                                                                    player.id
+                                                                )
+                                                            }
+                                                            onClick={(e) =>
+                                                                e.stopPropagation()
+                                                            }
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handlePlayerClick(
+                                                                    player.id
+                                                                )
+                                                            }
+                                                            className="flex flex-1 items-center justify-between transition-colors hover:text-primary focus:outline-none"
+                                                        >
+                                                            <span className="text-sm">
+                                                                {
+                                                                    player.displayName
+                                                                }{" "}
+                                                                {player.lastName}
+                                                            </span>
+                                                            <Badge variant="secondary">
+                                                                {player.consecutiveSeasons >=
+                                                                10
+                                                                    ? "9+"
+                                                                    : player.consecutiveSeasons}{" "}
+                                                                {player.consecutiveSeasons ===
+                                                                1
+                                                                    ? "season"
+                                                                    : "seasons"}
+                                                            </Badge>
+                                                        </button>
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
                                 ))}
+                            </div>
+                            <div className="mt-6 flex justify-end border-t px-4 py-4">
+                                <Button
+                                    onClick={() =>
+                                        handleGenerateMessage(division.id)
+                                    }
+                                    disabled={
+                                        !selectedPlayers.get(division.id) ||
+                                        selectedPlayers.get(division.id)!
+                                            .size === 0
+                                    }
+                                    variant="default"
+                                >
+                                    Generate Message (
+                                    {selectedPlayers.get(division.id)?.size ||
+                                        0}{" "}
+                                    selected)
+                                </Button>
                             </div>
                         </CollapsibleContent>
                     </div>
@@ -382,6 +524,7 @@ export function PotentialCaptainsList({
                                                     data={draftHistory.map(
                                                         (d) => {
                                                             // Map division names to Y-axis values
+                                                            // Treat old AB division as ABA
                                                             const divisionValues: Record<
                                                                 string,
                                                                 number
@@ -389,6 +532,7 @@ export function PotentialCaptainsList({
                                                                 AA: 6,
                                                                 A: 5,
                                                                 ABA: 4,
+                                                                AB: 4,
                                                                 ABB: 3,
                                                                 BBB: 2,
                                                                 BB: 1
@@ -485,6 +629,7 @@ export function PotentialCaptainsList({
                                                         {draftHistory.map(
                                                             (d, index) => {
                                                                 // Color code by division name
+                                                                // Treat old AB division as ABA
                                                                 const colors: Record<
                                                                     string,
                                                                     string
@@ -492,6 +637,7 @@ export function PotentialCaptainsList({
                                                                     AA: "#ef4444",
                                                                     A: "#f97316",
                                                                     ABA: "#eab308",
+                                                                    AB: "#eab308",
                                                                     ABB: "#22c55e",
                                                                     BBB: "#3b82f6",
                                                                     BB: "#8b5cf6"
@@ -555,6 +701,118 @@ export function PotentialCaptainsList({
                         >
                             <RiCloseLine className="h-6 w-6" />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Email Generation Modal */}
+            {showEmailModal && currentDivisionId && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={() => setShowEmailModal(false)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") setShowEmailModal(false)
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative w-full max-w-2xl rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setShowEmailModal(false)}
+                            className="absolute top-3 right-3 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                            <RiCloseLine className="h-5 w-5" />
+                        </button>
+
+                        <h2 className="mb-6 font-semibold text-xl">
+                            Suggested Draft Message
+                        </h2>
+
+                        <h3 className="mb-2 font-semibold text-sm">
+                            Email Recipients{" "}
+                            <span className="font-normal text-muted-foreground">
+                                (please remember to BCC this list)
+                            </span>
+                        </h3>
+
+                        <div className="mb-4 max-h-64 overflow-y-auto rounded-md border bg-muted/30 p-4">
+                            <p className="break-all font-mono text-sm">
+                                {formatEmailList(
+                                    getSelectedPlayersForDivision(
+                                        currentDivisionId
+                                    )
+                                )}
+                            </p>
+                        </div>
+
+                        <div className="mb-4">
+                            <Button
+                                onClick={handleCopyToClipboard}
+                                variant="default"
+                            >
+                                {copySuccess
+                                    ? "Copied!"
+                                    : "Copy Email Addresses"}
+                            </Button>
+                        </div>
+
+                        {emailSubject && (
+                            <div className="mb-4">
+                                <h3 className="mb-2 font-semibold text-sm">
+                                    Draft Email Subject
+                                </h3>
+                                <div className="mb-2 rounded-md border bg-muted/30 p-4">
+                                    <p className="text-sm">{emailSubject}</p>
+                                </div>
+                                <Button
+                                    onClick={handleCopySubject}
+                                    variant="default"
+                                >
+                                    {copySubjectSuccess
+                                        ? "Copied!"
+                                        : "Copy Subject"}
+                                </Button>
+                            </div>
+                        )}
+
+                        {emailTemplate && (
+                            <div className="mb-4">
+                                <h3 className="mb-2 font-semibold text-sm">
+                                    Draft Email Content
+                                </h3>
+                                <div className="max-h-96 overflow-y-auto rounded-md border bg-muted/30 p-4">
+                                    <p className="whitespace-pre-wrap text-sm">
+                                        {emailTemplate}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2">
+                            {emailTemplate && (
+                                <Button
+                                    onClick={handleCopyEmailTemplate}
+                                    variant="default"
+                                >
+                                    {copyEmailSuccess
+                                        ? "Copied!"
+                                        : "Copy Email Content"}
+                                </Button>
+                            )}
+                            <Button
+                                onClick={() => setShowEmailModal(false)}
+                                variant="outline"
+                            >
+                                Close
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -305,3 +305,16 @@ export const auditLog = pgTable("audit_log", {
         .$defaultFn(() => new Date())
         .notNull()
 })
+
+export const emailTemplates = pgTable("email_templates", {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull().unique(),
+    subject: text("subject"),
+    content: text("content").notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull(),
+    updated_at: timestamp("updated_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})

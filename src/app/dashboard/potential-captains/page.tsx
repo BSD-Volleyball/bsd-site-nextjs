@@ -57,6 +57,8 @@ export default async function PotentialCaptainsPage() {
                 <PotentialCaptainsList
                     divisions={result.divisions}
                     playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    emailTemplate={result.emailTemplate || ""}
+                    emailSubject={result.emailSubject || ""}
                 />
             )}
         </div>
