@@ -273,7 +273,10 @@ export const evaluations = pgTable("evaluations", {
         .references(() => users.id),
     division: integer("division")
         .notNull()
-        .references(() => divisions.id)
+        .references(() => divisions.id),
+    evaluator: text("evaluator")
+        .notNull()
+        .references(() => users.id)
 })
 
 export const commissioners = pgTable("commissioners", {

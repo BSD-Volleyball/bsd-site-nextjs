@@ -19,6 +19,12 @@ export interface DivisionOption {
     name: string
 }
 
+export interface EvaluatorDetail {
+    evaluatorName: string
+    divisionId: number
+    divisionName: string
+}
+
 export interface NewPlayerEntry {
     userId: string
     firstName: string
@@ -27,7 +33,10 @@ export interface NewPlayerEntry {
     male: boolean | null
     experience: string | null
     assessment: string | null
-    division: number | null
+    currentUserEvaluation: number | null
+    averageEvaluation: number | null
+    evaluationCount: number
+    evaluatorDetails: EvaluatorDetail[]
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -116,17 +125,37 @@ export async function getNewPlayers(): Promise<{
             (r) => !draftedUserIds.has(r.userId)
         )
 
+        // Get current user session
+        const session = await auth.api.getSession({ headers: await headers() })
+        const currentUserId = session?.user.id
+
         // Get existing evaluations for this season
         const newPlayerIds = newPlayers.map((p) => p.userId)
-        let evaluationMap = new Map<string, number>()
+        const playerEvaluationsMap = new Map<
+            string,
+            {
+                currentUserEval: number | null
+                allEvals: Array<{
+                    divisionId: number
+                    divisionName: string
+                    evaluatorName: string
+                }>
+            }
+        >()
 
-        if (newPlayerIds.length > 0) {
+        if (newPlayerIds.length > 0 && currentUserId) {
             const existingEvals = await db
                 .select({
                     player: evaluations.player,
-                    division: evaluations.division
+                    division: evaluations.division,
+                    evaluator: evaluations.evaluator,
+                    divisionName: divisions.name,
+                    evaluatorFirstName: users.first_name,
+                    evaluatorPreferredName: users.preffered_name
                 })
                 .from(evaluations)
+                .innerJoin(divisions, eq(evaluations.division, divisions.id))
+                .innerJoin(users, eq(evaluations.evaluator, users.id))
                 .where(
                     and(
                         eq(evaluations.season, config.seasonId),
@@ -134,15 +163,53 @@ export async function getNewPlayers(): Promise<{
                     )
                 )
 
-            evaluationMap = new Map(
-                existingEvals.map((e) => [e.player, e.division])
-            )
+            // Group evaluations by player
+            for (const evalRow of existingEvals) {
+                if (!playerEvaluationsMap.has(evalRow.player)) {
+                    playerEvaluationsMap.set(evalRow.player, {
+                        currentUserEval: null,
+                        allEvals: []
+                    })
+                }
+
+                const playerData = playerEvaluationsMap.get(evalRow.player)!
+
+                if (evalRow.evaluator === currentUserId) {
+                    playerData.currentUserEval = evalRow.division
+                }
+
+                playerData.allEvals.push({
+                    divisionId: evalRow.division,
+                    divisionName: evalRow.divisionName,
+                    evaluatorName:
+                        evalRow.evaluatorPreferredName ||
+                        evalRow.evaluatorFirstName
+                })
+            }
         }
 
-        const entries: NewPlayerEntry[] = newPlayers.map((row) => ({
-            ...row,
-            division: evaluationMap.get(row.userId) ?? null
-        }))
+        const entries: NewPlayerEntry[] = newPlayers.map((row) => {
+            const evalData = playerEvaluationsMap.get(row.userId) || {
+                currentUserEval: null,
+                allEvals: []
+            }
+
+            const averageEvaluation =
+                evalData.allEvals.length > 0
+                    ? evalData.allEvals.reduce(
+                          (sum, e) => sum + e.divisionId,
+                          0
+                      ) / evalData.allEvals.length
+                    : null
+
+            return {
+                ...row,
+                currentUserEvaluation: evalData.currentUserEval,
+                averageEvaluation,
+                evaluationCount: evalData.allEvals.length,
+                evaluatorDetails: evalData.allEvals
+            }
+        })
 
         return {
             status: true,
@@ -194,40 +261,45 @@ export async function saveEvaluations(
             return { status: false, message: "No current season found." }
         }
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session) {
+            return { status: false, message: "Unauthorized - no session" }
+        }
+
+        const currentUserId = session.user.id
         const playerIds = data.map((d) => d.playerId)
 
-        // Delete existing evaluations for these players this season
+        // Delete existing evaluations by this user for these players this season
         if (playerIds.length > 0) {
             await db
                 .delete(evaluations)
                 .where(
                     and(
                         eq(evaluations.season, config.seasonId),
-                        inArray(evaluations.player, playerIds)
+                        inArray(evaluations.player, playerIds),
+                        eq(evaluations.evaluator, currentUserId)
                     )
                 )
         }
 
-        // Insert new evaluations
+        // Insert new evaluations with evaluator
         if (data.length > 0) {
             await db.insert(evaluations).values(
                 data.map((entry) => ({
                     season: config.seasonId,
                     player: entry.playerId,
-                    division: entry.division
+                    division: entry.division,
+                    evaluator: currentUserId
                 }))
             )
         }
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "upsert",
-                entityType: "evaluations",
-                summary: `Saved ${data.length} player evaluations for current season`
-            })
-        }
+        await logAuditEntry({
+            userId: currentUserId,
+            action: "upsert",
+            entityType: "evaluations",
+            summary: `Saved ${data.length} player evaluations for current season`
+        })
 
         return {
             status: true,
