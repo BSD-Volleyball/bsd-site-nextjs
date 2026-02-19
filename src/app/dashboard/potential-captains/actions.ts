@@ -115,7 +115,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             .select({ id: seasons.id })
             .from(seasons)
             .orderBy(desc(seasons.id))
-            .limit(10)
+            .limit(11)
 
         const seasonIds = allSeasons.map((s) => s.id)
 
@@ -172,15 +172,19 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
         }
 
         // 6. Helper function to count consecutive seasons
+        // Counts from the first season the player actually played (most recent backward)
         function countConsecutiveSeasons(
             allSeasonIds: number[],
             playedSeasonIds: Set<number>
         ): number {
             let count = 0
+            let started = false
             for (const seasonId of allSeasonIds) {
                 if (playedSeasonIds.has(seasonId)) {
+                    started = true
                     count++
-                } else {
+                } else if (started) {
+                    // Found a gap after we started counting
                     break
                 }
             }
@@ -224,8 +228,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 )
                 const playedLastSeason =
                     history.mostRecentDivisionId === division.id
-                const playedInPast4Seasons =
-                    consecutiveSeasons > 0 && consecutiveSeasons <= 4
+                const playedInPast4Seasons = consecutiveSeasons >= 4
 
                 const displayName = signup.preferredName || signup.firstName
 
@@ -293,7 +296,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                         {
                             title: "Not Interested - Experienced Players",
                             description:
-                                "Players not interested in captaining but with recent history in this division (past 4 seasons)",
+                                "Players not interested in captaining but with 4+ consecutive seasons in this division",
                             players: list3Players
                         }
                     ]

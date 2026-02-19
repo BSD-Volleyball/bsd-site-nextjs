@@ -54,7 +54,10 @@ export default async function PotentialCaptainsPage() {
                     No potential captains found for this season.
                 </div>
             ) : (
-                <PotentialCaptainsList divisions={result.divisions} />
+                <PotentialCaptainsList
+                    divisions={result.divisions}
+                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                />
             )}
         </div>
     )
