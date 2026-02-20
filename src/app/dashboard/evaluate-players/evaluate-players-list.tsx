@@ -101,8 +101,26 @@ export function EvaluatePlayersList({
 
     const evaluatedCount = Object.keys(selections).length
 
-    const handleSelectionChange = (userId: string, division: string) => {
+    const handleSelectionChange = async (userId: string, division: string) => {
         setSelections((prev) => ({ ...prev, [userId]: division }))
+        setIsLoading(true)
+        setMessage(null)
+
+        const result = await saveEvaluations([
+            {
+                playerId: userId,
+                division: parseInt(division, 10)
+            }
+        ])
+
+        setIsLoading(false)
+
+        if (result.status) {
+            setMessage({ type: "success", text: result.message })
+            router.refresh()
+        } else {
+            setMessage({ type: "error", text: result.message })
+        }
     }
 
     const _handleClearSelection = (userId: string) => {
