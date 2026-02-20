@@ -54,6 +54,7 @@ import {
     getSignupEligibility,
     getIsAdminOrDirector,
     getIsCommissioner,
+    getHasAdministrativeAccess,
     getRecentSeasonsNav,
     type SeasonNavItem
 } from "@/app/dashboard/actions"
@@ -83,8 +84,8 @@ const adminNavItems = [
         icon: RiSearchLine
     },
     {
-        title: "View Signups",
-        url: "/dashboard/view-signups",
+        title: "Admin View Signups",
+        url: "/dashboard/admin-view-signups",
         icon: RiGroupLine
     },
     {
@@ -153,6 +154,16 @@ const adminDangerNavItems = [
 ]
 
 const commissionerNavItems = [
+    {
+        title: "View Signups",
+        url: "/dashboard/view-signups",
+        icon: RiGroupLine
+    },
+    {
+        title: "Player Lookup",
+        url: "/dashboard/player-lookup-signups",
+        icon: RiSearchLine
+    },
     {
         title: "Potential Captains",
         url: "/dashboard/potential-captains",
@@ -290,12 +301,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [showSignupLink, setShowSignupLink] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isCommissioner, setIsCommissioner] = useState(false)
+    const [hasAdministrativeAccess, setHasAdministrativeAccess] =
+        useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
         getIsAdminOrDirector().then(setIsAdmin)
         getIsCommissioner().then(setIsCommissioner)
+        getHasAdministrativeAccess().then(setHasAdministrativeAccess)
         getRecentSeasonsNav().then(setSeasonNav)
     }, [])
 
@@ -343,10 +357,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                {isCommissioner && (
+                {hasAdministrativeAccess && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Commissioner
+                            Administrative
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>

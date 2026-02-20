@@ -55,13 +55,21 @@ function formatHeight(inches: number | null): string {
     return `${feet}'${remainingInches}"`
 }
 
+interface SeasonInfo {
+    id: number
+    year: number
+    name: string
+}
+
 export function PotentialCaptainsList({
     divisions,
+    allSeasons,
     playerPicUrl,
     emailTemplate,
     emailSubject
 }: {
     divisions: DivisionCaptains[]
+    allSeasons: SeasonInfo[]
     playerPicUrl: string
     emailTemplate: string
     emailSubject: string
@@ -281,7 +289,9 @@ export function PotentialCaptainsList({
                                                                 {
                                                                     player.displayName
                                                                 }{" "}
-                                                                {player.lastName}
+                                                                {
+                                                                    player.lastName
+                                                                }
                                                             </span>
                                                             <Badge variant="secondary">
                                                                 {player.consecutiveSeasons >=
@@ -521,33 +531,91 @@ export function PotentialCaptainsList({
                                                 height={250}
                                             >
                                                 <BarChart
-                                                    data={draftHistory.map(
-                                                        (d) => {
-                                                            // Map division names to Y-axis values
-                                                            // Treat old AB division as ABA
-                                                            const divisionValues: Record<
-                                                                string,
-                                                                number
-                                                            > = {
-                                                                AA: 6,
-                                                                A: 5,
-                                                                ABA: 4,
-                                                                AB: 4,
-                                                                ABB: 3,
-                                                                BBB: 2,
-                                                                BB: 1
-                                                            }
-                                                            return {
-                                                                ...d,
-                                                                label: `${d.seasonName.charAt(0).toUpperCase() + d.seasonName.slice(1)} ${d.seasonYear}`,
-                                                                divisionValue:
-                                                                    divisionValues[
-                                                                        d
-                                                                            .divisionName
-                                                                    ] || 0
-                                                            }
+                                                    data={(() => {
+                                                        const divisionValues: Record<
+                                                            string,
+                                                            number
+                                                        > = {
+                                                            AA: 6,
+                                                            A: 5,
+                                                            ABA: 4,
+                                                            AB: 4,
+                                                            ABB: 3,
+                                                            BBB: 2,
+                                                            BB: 1
                                                         }
-                                                    )}
+                                                        // Build a map of seasonId -> draft entry
+                                                        const draftBySeasonId =
+                                                            new Map<
+                                                                number,
+                                                                PlayerDraftHistory
+                                                            >()
+                                                        for (const d of draftHistory) {
+                                                            draftBySeasonId.set(
+                                                                d.seasonId,
+                                                                d
+                                                            )
+                                                        }
+                                                        // Find the range of season IDs this player spans
+                                                        const firstSeasonId =
+                                                            draftHistory[0]
+                                                                .seasonId
+                                                        const lastSeasonId =
+                                                            draftHistory[
+                                                                draftHistory.length -
+                                                                    1
+                                                            ].seasonId
+                                                        // Get all seasons in range (allSeasons is newest-first, so reverse for chronological)
+                                                        const seasonsInRange = [
+                                                            ...allSeasons
+                                                        ]
+                                                            .reverse()
+                                                            .filter(
+                                                                (s) =>
+                                                                    s.id >=
+                                                                        firstSeasonId &&
+                                                                    s.id <=
+                                                                        lastSeasonId
+                                                            )
+                                                        // Build timeline with gaps
+                                                        return seasonsInRange.map(
+                                                            (s) => {
+                                                                const draft =
+                                                                    draftBySeasonId.get(
+                                                                        s.id
+                                                                    )
+                                                                const label = `${s.name.charAt(0).toUpperCase() + s.name.slice(1)} ${s.year}`
+                                                                if (draft) {
+                                                                    return {
+                                                                        ...draft,
+                                                                        label,
+                                                                        divisionValue:
+                                                                            divisionValues[
+                                                                                draft
+                                                                                    .divisionName
+                                                                            ] ||
+                                                                            0
+                                                                    }
+                                                                }
+                                                                return {
+                                                                    seasonId:
+                                                                        s.id,
+                                                                    seasonYear:
+                                                                        s.year,
+                                                                    seasonName:
+                                                                        s.name,
+                                                                    divisionName:
+                                                                        "",
+                                                                    teamName:
+                                                                        "",
+                                                                    round: 0,
+                                                                    overall: 0,
+                                                                    label,
+                                                                    divisionValue: 0
+                                                                }
+                                                            }
+                                                        )
+                                                    })()}
                                                     margin={{
                                                         top: 5,
                                                         right: 20,
@@ -599,6 +667,24 @@ export function PotentialCaptainsList({
                                                             const d =
                                                                 payload[0]
                                                                     .payload
+                                                            if (
+                                                                !d.divisionName
+                                                            ) {
+                                                                return (
+                                                                    <div className="rounded-md border bg-background p-3 text-sm shadow-md">
+                                                                        <p className="font-medium">
+                                                                            {
+                                                                                d.label
+                                                                            }
+                                                                        </p>
+                                                                        <p className="text-muted-foreground italic">
+                                                                            Did
+                                                                            not
+                                                                            play
+                                                                        </p>
+                                                                    </div>
+                                                                )
+                                                            }
                                                             return (
                                                                 <div className="rounded-md border bg-background p-3 text-sm shadow-md">
                                                                     <p className="font-medium">
@@ -626,38 +712,73 @@ export function PotentialCaptainsList({
                                                         dataKey="divisionValue"
                                                         radius={[4, 4, 0, 0]}
                                                     >
-                                                        {draftHistory.map(
-                                                            (d, index) => {
-                                                                // Color code by division name
-                                                                // Treat old AB division as ABA
-                                                                const colors: Record<
-                                                                    string,
-                                                                    string
-                                                                > = {
-                                                                    AA: "#ef4444",
-                                                                    A: "#f97316",
-                                                                    ABA: "#eab308",
-                                                                    AB: "#eab308",
-                                                                    ABB: "#22c55e",
-                                                                    BBB: "#3b82f6",
-                                                                    BB: "#8b5cf6"
-                                                                }
-                                                                return (
-                                                                    <Cell
-                                                                        key={
-                                                                            index
-                                                                        }
-                                                                        fill={
-                                                                            colors[
-                                                                                d
-                                                                                    .divisionName
-                                                                            ] ||
-                                                                            "hsl(var(--primary))"
-                                                                        }
-                                                                    />
+                                                        {(() => {
+                                                            const firstSeasonId =
+                                                                draftHistory[0]
+                                                                    .seasonId
+                                                            const lastSeasonId =
+                                                                draftHistory[
+                                                                    draftHistory.length -
+                                                                        1
+                                                                ].seasonId
+                                                            const seasonsInRange =
+                                                                [...allSeasons]
+                                                                    .reverse()
+                                                                    .filter(
+                                                                        (s) =>
+                                                                            s.id >=
+                                                                                firstSeasonId &&
+                                                                            s.id <=
+                                                                                lastSeasonId
+                                                                    )
+                                                            const draftBySeasonId =
+                                                                new Map<
+                                                                    number,
+                                                                    PlayerDraftHistory
+                                                                >()
+                                                            for (const d of draftHistory) {
+                                                                draftBySeasonId.set(
+                                                                    d.seasonId,
+                                                                    d
                                                                 )
                                                             }
-                                                        )}
+                                                            const colors: Record<
+                                                                string,
+                                                                string
+                                                            > = {
+                                                                AA: "#ef4444",
+                                                                A: "#f97316",
+                                                                ABA: "#eab308",
+                                                                AB: "#eab308",
+                                                                ABB: "#22c55e",
+                                                                BBB: "#3b82f6",
+                                                                BB: "#8b5cf6"
+                                                            }
+                                                            return seasonsInRange.map(
+                                                                (s, index) => {
+                                                                    const draft =
+                                                                        draftBySeasonId.get(
+                                                                            s.id
+                                                                        )
+                                                                    return (
+                                                                        <Cell
+                                                                            key={
+                                                                                index
+                                                                            }
+                                                                            fill={
+                                                                                draft
+                                                                                    ? colors[
+                                                                                          draft
+                                                                                              .divisionName
+                                                                                      ] ||
+                                                                                      "hsl(var(--primary))"
+                                                                                    : "transparent"
+                                                                            }
+                                                                        />
+                                                                    )
+                                                                }
+                                                            )
+                                                        })()}
                                                     </Bar>
                                                 </BarChart>
                                             </ResponsiveContainer>

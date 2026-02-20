@@ -68,6 +68,7 @@ export interface PlayerSignup {
 }
 
 export interface PlayerDraftHistory {
+    seasonId: number
     seasonYear: number
     seasonName: string
     divisionName: string
@@ -242,6 +243,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
         // Fetch draft history
         const draftData = await db
             .select({
+                seasonId: seasons.id,
                 seasonYear: seasons.year,
                 seasonName: seasons.season,
                 divisionName: divisions.name,

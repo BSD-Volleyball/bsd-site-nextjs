@@ -77,6 +77,56 @@ export async function getIsCommissioner(): Promise<boolean> {
     return !!commissionerRecord
 }
 
+export async function getHasAdministrativeAccess(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+
+    if (!session?.user) {
+        return false
+    }
+
+    // Check if user is admin/director
+    const isAdmin = await getIsAdminOrDirector()
+    if (isAdmin) {
+        return true
+    }
+
+    // Get current season
+    const config = await getSeasonConfig()
+    if (!config.seasonId) {
+        return false
+    }
+
+    // Check if user is a commissioner for the current season
+    const [commissionerRecord] = await db
+        .select({ id: commissioners.id })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, config.seasonId),
+                eq(commissioners.commissioner, session.user.id)
+            )
+        )
+        .limit(1)
+
+    if (commissionerRecord) {
+        return true
+    }
+
+    // Check if user is a captain for the current season
+    const [captainRecord] = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, config.seasonId),
+                eq(teams.captain, session.user.id)
+            )
+        )
+        .limit(1)
+
+    return !!captainRecord
+}
+
 export interface SeasonNavDivision {
     id: number
     name: string

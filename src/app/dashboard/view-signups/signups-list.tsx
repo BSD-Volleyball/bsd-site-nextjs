@@ -1,21 +1,40 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RiCloseLine, RiDownloadLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
+import { useState, useCallback, useEffect } from "react"
+import type { SignupGroup } from "./actions"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card"
+import { RiCloseLine } from "@remixicon/react"
 import {
     getPlayerDetails,
-    type PlayerDetails
+    type PlayerDetails,
+    type PlayerDraftHistory
 } from "@/app/dashboard/player-lookup/actions"
-import type { SignupEntry } from "./actions"
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    Tooltip,
+    ResponsiveContainer,
+    Cell
+} from "recharts"
+
+interface SeasonInfo {
+    id: number
+    year: number
+    name: string
+}
 
 interface SignupsListProps {
-    signups: SignupEntry[]
+    groups: SignupGroup[]
+    allSeasons: SeasonInfo[]
     playerPicUrl: string
-    seasonLabel: string
 }
 
 function formatHeight(inches: number | null): string {
@@ -25,136 +44,41 @@ function formatHeight(inches: number | null): string {
     return `${feet}'${remainingInches}"`
 }
 
-function getDisplayName(entry: SignupEntry): string {
-    const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
-    return `${entry.firstName}${preferred} ${entry.lastName}`
-}
-
-function escapeCsvField(field: string): string {
-    if (field.includes(",") || field.includes('"') || field.includes("\n")) {
-        return `"${field.replace(/"/g, '""')}"`
-    }
-    return field
-}
-
-function generateCsvContent(signups: SignupEntry[]): string {
-    const headers = [
-        "id",
-        "First Name",
-        "Last Name",
-        "Preferred Name",
-        "Email",
-        "Phone",
-        "Pair Pick",
-        "Pair Reason",
-        "Gender",
-        "Age",
-        "Captain",
-        "Paid",
-        "Signup Date",
-        "Experience",
-        "Assessment",
-        "Height",
-        "Picture",
-        "Skill: Passer",
-        "Skill: Setter",
-        "Skill: Hitter",
-        "Skill: Other",
-        "Dates Missing",
-        "Play 1st Week",
-        "Last Draft Season",
-        "Last Draft Division",
-        "Last Draft Captain",
-        "Last Draft Overall"
-    ]
-
-    const rows = signups.map((entry) => [
-        entry.oldId !== null ? String(entry.oldId) : "",
-        escapeCsvField(entry.firstName),
-        escapeCsvField(entry.lastName),
-        escapeCsvField(entry.preferredName || ""),
-        escapeCsvField(entry.email),
-        escapeCsvField(entry.phone || ""),
-        escapeCsvField(entry.pairPickName || ""),
-        escapeCsvField(entry.pairReason || ""),
-        entry.male === true ? "M" : entry.male === false ? "F" : "",
-        entry.age || "",
-        entry.captain === "yes" ? "Yes" :
-            entry.captain === "only_if_needed" ? "If needed" :
-            entry.captain === "no" ? "No" : "",
-        entry.amountPaid || "",
-        new Date(entry.signupDate).toLocaleDateString(),
-        entry.experience || "",
-        entry.assessment || "",
-        formatHeight(entry.height),
-        entry.picture || "",
-        entry.skillPasser ? "Yes" : "No",
-        entry.skillSetter ? "Yes" : "No",
-        entry.skillHitter ? "Yes" : "No",
-        entry.skillOther ? "Yes" : "No",
-        escapeCsvField(entry.datesMissing || ""),
-        entry.playFirstWeek ? "Yes" : "No",
-        escapeCsvField(entry.lastDraftSeason || ""),
-        escapeCsvField(entry.lastDraftDivision || ""),
-        escapeCsvField(entry.lastDraftCaptain || ""),
-        entry.lastDraftOverall !== null ? String(entry.lastDraftOverall) : ""
-    ])
-
-    return [headers, ...rows]
-        .map(row => row.join(","))
-        .join("\n")
-}
-
-export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListProps) {
-    const [search, setSearch] = useState("")
+export function SignupsList({
+    groups,
+    allSeasons,
+    playerPicUrl
+}: SignupsListProps) {
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-    const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
         null
     )
+    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
+    const [pairPickName, setPairPickName] = useState<string | null>(null)
+    const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
 
-    const filteredSignups = useMemo(() => {
-        if (!search) return signups
-        const lower = search.toLowerCase()
-        return signups.filter((s) => {
-            const name = `${s.firstName} ${s.lastName}`.toLowerCase()
-            const preferred = s.preferredName?.toLowerCase() || ""
-            const pairPick = s.pairPickName?.toLowerCase() || ""
-            return (
-                name.includes(lower) ||
-                preferred.includes(lower) ||
-                pairPick.includes(lower)
-            )
-        })
-    }, [signups, search])
-
-    const newCount = useMemo(
-        () => signups.filter((s) => s.isNew).length,
-        [signups]
-    )
-
-    const maleCount = useMemo(
-        () => signups.filter((s) => s.male === true).length,
-        [signups]
-    )
-
-    const nonMaleCount = useMemo(
-        () => signups.filter((s) => s.male !== true).length,
-        [signups]
-    )
-
-    const handlePlayerClick = async (entry: SignupEntry) => {
-        setSelectedUserId(entry.userId)
-        setSelectedEntry(entry)
+    const handlePlayerClick = async (playerId: string) => {
+        setSelectedUserId(playerId)
         setIsLoading(true)
         setPlayerDetails(null)
+        setDraftHistory([])
+        setPairPickName(null)
+        setPairReason(null)
 
-        const result = await getPlayerDetails(entry.userId)
+        const result = await getPlayerDetails(playerId)
 
         if (result.status && result.player) {
             setPlayerDetails(result.player)
+            setDraftHistory(result.draftHistory)
+
+            // Get pair info from most recent signup
+            if (result.signupHistory.length > 0) {
+                const mostRecentSignup = result.signupHistory[0]
+                setPairPickName(mostRecentSignup.pairPickName)
+                setPairReason(mostRecentSignup.pairReason)
+            }
         }
 
         setIsLoading(false)
@@ -162,31 +86,11 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
 
     const handleCloseModal = useCallback(() => {
         setSelectedUserId(null)
-        setSelectedEntry(null)
         setPlayerDetails(null)
+        setDraftHistory([])
+        setPairPickName(null)
+        setPairReason(null)
     }, [])
-
-    const handleDownloadCsv = () => {
-        const csvContent = generateCsvContent(filteredSignups)
-
-        const blob = new Blob(["\ufeff" + csvContent], {
-            type: "text/csv;charset=utf-8;"
-        })
-
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-
-        const seasonSlug = seasonLabel.toLowerCase().replace(/\s+/g, "-")
-        const timestamp = new Date().toISOString().split("T")[0]
-        link.download = `signups-${seasonSlug}-${timestamp}.csv`
-
-        document.body.appendChild(link)
-        link.click()
-
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-    }
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -201,147 +105,96 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
         document.addEventListener("keydown", handleKeyDown)
         return () => document.removeEventListener("keydown", handleKeyDown)
     }, [selectedUserId, showImageModal, handleCloseModal])
-
     return (
-        <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
-                        {signups.length} total
-                    </span>
-                    <span className="rounded-md bg-blue-100 px-3 py-1.5 font-medium text-blue-700 text-sm dark:bg-blue-900 dark:text-blue-300">
-                        {maleCount} male
-                    </span>
-                    <span className="rounded-md bg-purple-100 px-3 py-1.5 font-medium text-purple-700 text-sm dark:bg-purple-900 dark:text-purple-300">
-                        {nonMaleCount} non-male
-                    </span>
-                    {newCount > 0 && (
-                        <span className="rounded-md bg-green-100 px-3 py-1.5 font-medium text-green-700 text-sm dark:bg-green-900 dark:text-green-300">
-                            {newCount} new
-                        </span>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <Button
-                        onClick={handleDownloadCsv}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                    >
-                        <RiDownloadLine className="h-4 w-4" />
-                        Export CSV
-                    </Button>
-                    <Input
-                        placeholder="Filter by name or pair pick..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="max-w-xs"
-                    />
-                </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b bg-muted/50">
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                #
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Name
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Pair Pick
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Gender
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Age
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Captain
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Paid
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Date
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredSignups.map((entry, idx) => (
-                            <tr
-                                key={entry.signupId}
-                                className={cn(
-                                    "cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/50",
-                                    entry.isNew &&
-                                        "bg-blue-50 dark:bg-blue-950/40"
-                                )}
-                                onClick={() => handlePlayerClick(entry)}
-                            >
-                                <td className="px-4 py-2 text-muted-foreground">
-                                    {idx + 1}
-                                </td>
-                                <td className="px-4 py-2 font-medium">
-                                    <div className="flex items-center gap-2">
-                                        {getDisplayName(entry)}
-                                        {entry.isNew && (
-                                            <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-blue-700 text-xs dark:bg-blue-900 dark:text-blue-300">
-                                                new
-                                            </span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-2">
-                                    {entry.pairPickName || "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {entry.male === true
-                                        ? "M"
-                                        : entry.male === false
-                                          ? "F"
-                                          : "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {entry.age || "—"}
-                                </td>
-                                <td className="px-4 py-2 capitalize">
-                                    {entry.captain === "yes"
-                                        ? "Yes"
-                                        : entry.captain === "only_if_needed"
-                                          ? "If needed"
-                                          : entry.captain === "no"
-                                            ? "No"
-                                            : "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {entry.amountPaid
-                                        ? `$${entry.amountPaid}`
-                                        : "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {new Date(
-                                        entry.signupDate
-                                    ).toLocaleDateString()}
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredSignups.length === 0 && (
-                            <tr>
-                                <td
-                                    colSpan={8}
-                                    className="px-4 py-6 text-center text-muted-foreground"
-                                >
-                                    No signups found.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+        <div className="space-y-6">
+            {groups.map((group) => (
+                <Card key={group.groupLabel}>
+                    <CardHeader>
+                        <CardTitle>{group.groupLabel}</CardTitle>
+                        <CardDescription>
+                            {group.players.length} player
+                            {group.players.length !== 1 ? "s" : ""}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="overflow-x-auto rounded-lg border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/50">
+                                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                            Name
+                                        </th>
+                                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                            Paired With
+                                        </th>
+                                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                            Gender
+                                        </th>
+                                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                            Age
+                                        </th>
+                                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                            Height
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {group.players.map((player) => (
+                                        <tr
+                                            key={player.userId}
+                                            className="border-b transition-colors last:border-0 hover:bg-accent/50"
+                                        >
+                                            <td className="px-4 py-2 font-medium">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handlePlayerClick(
+                                                            player.userId
+                                                        )
+                                                    }
+                                                    className="text-left underline decoration-dotted transition-colors hover:text-primary focus:outline-none"
+                                                >
+                                                    {player.displayName}
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {player.pairedWith ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            player.pairedWithId &&
+                                                            handlePlayerClick(
+                                                                player.pairedWithId
+                                                            )
+                                                        }
+                                                        className="text-left underline decoration-dotted transition-colors hover:text-primary focus:outline-none"
+                                                        disabled={
+                                                            !player.pairedWithId
+                                                        }
+                                                    >
+                                                        {player.pairedWith}
+                                                    </button>
+                                                ) : (
+                                                    "—"
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {player.gender}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {player.age || "—"}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {formatHeight(player.height)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
 
             {/* Player Detail Modal */}
             {selectedUserId && (
@@ -419,22 +272,6 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
                                         <div className="grid grid-cols-2 gap-3 text-sm">
                                             <div>
                                                 <span className="text-muted-foreground">
-                                                    Email:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.email}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Phone:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.phone || "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
                                                     Pronouns:
                                                 </span>
                                                 <span className="ml-2 font-medium">
@@ -451,61 +288,37 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
                                                         ? "Male"
                                                         : playerDetails.male ===
                                                             false
-                                                          ? "Female"
+                                                          ? "Non-Male"
                                                           : "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Role:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.role || "—"}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Emergency Contact */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Emergency Contact
-                                        </h3>
-                                        <p className="text-sm">
-                                            {playerDetails.emergency_contact ||
-                                                "—"}
-                                        </p>
-                                    </div>
-
-                                    {/* Pair Pick */}
-                                    {(selectedEntry?.pairPickName ||
-                                        selectedEntry?.pairReason) && (
+                                    {/* Pair Request */}
+                                    {(pairPickName || pairReason) && (
                                         <div>
                                             <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                                                 Pair Request
                                             </h3>
                                             <div className="grid grid-cols-1 gap-3 text-sm">
-                                                {selectedEntry.pairPickName && (
+                                                {pairPickName && (
                                                     <div>
                                                         <span className="text-muted-foreground">
                                                             Pair Pick:
                                                         </span>
                                                         <span className="ml-2 font-medium">
-                                                            {
-                                                                selectedEntry.pairPickName
-                                                            }
+                                                            {pairPickName}
                                                         </span>
                                                     </div>
                                                 )}
-                                                {selectedEntry.pairReason && (
+                                                {pairReason && (
                                                     <div>
                                                         <span className="text-muted-foreground">
                                                             Reason:
                                                         </span>
                                                         <span className="ml-2 font-medium">
-                                                            {
-                                                                selectedEntry.pairReason
-                                                            }
+                                                            {pairReason}
                                                         </span>
                                                     </div>
                                                 )}
@@ -569,34 +382,266 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
                                         </div>
                                     </div>
 
-                                    {/* Account Info */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Account Information
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Onboarding:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.onboarding_completed
-                                                        ? "Completed"
-                                                        : "Not completed"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Created:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {new Date(
-                                                        playerDetails.createdAt
-                                                    ).toLocaleDateString()}
-                                                </span>
-                                            </div>
+                                    {/* Division History Graph */}
+                                    {draftHistory.length > 0 && (
+                                        <div>
+                                            <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                                                Division History
+                                            </h3>
+                                            <ResponsiveContainer
+                                                width="100%"
+                                                height={250}
+                                            >
+                                                <BarChart
+                                                    data={(() => {
+                                                        const divisionValues: Record<
+                                                            string,
+                                                            number
+                                                        > = {
+                                                            AA: 6,
+                                                            A: 5,
+                                                            ABA: 4,
+                                                            AB: 4,
+                                                            ABB: 3,
+                                                            BBB: 2,
+                                                            BB: 1
+                                                        }
+                                                        const draftBySeasonId =
+                                                            new Map<
+                                                                number,
+                                                                PlayerDraftHistory
+                                                            >()
+                                                        for (const d of draftHistory) {
+                                                            draftBySeasonId.set(
+                                                                d.seasonId,
+                                                                d
+                                                            )
+                                                        }
+                                                        const firstSeasonId =
+                                                            draftHistory[0]
+                                                                .seasonId
+                                                        const lastSeasonId =
+                                                            draftHistory[
+                                                                draftHistory.length -
+                                                                    1
+                                                            ].seasonId
+                                                        const seasonsInRange = [
+                                                            ...allSeasons
+                                                        ]
+                                                            .reverse()
+                                                            .filter(
+                                                                (s) =>
+                                                                    s.id >=
+                                                                        firstSeasonId &&
+                                                                    s.id <=
+                                                                        lastSeasonId
+                                                            )
+                                                        return seasonsInRange.map(
+                                                            (s) => {
+                                                                const draft =
+                                                                    draftBySeasonId.get(
+                                                                        s.id
+                                                                    )
+                                                                const label = `${s.name.charAt(0).toUpperCase() + s.name.slice(1)} ${s.year}`
+                                                                if (draft) {
+                                                                    return {
+                                                                        ...draft,
+                                                                        label,
+                                                                        divisionValue:
+                                                                            divisionValues[
+                                                                                draft
+                                                                                    .divisionName
+                                                                            ] ||
+                                                                            0
+                                                                    }
+                                                                }
+                                                                return {
+                                                                    seasonId:
+                                                                        s.id,
+                                                                    seasonYear:
+                                                                        s.year,
+                                                                    seasonName:
+                                                                        s.name,
+                                                                    divisionName:
+                                                                        "",
+                                                                    teamName:
+                                                                        "",
+                                                                    round: 0,
+                                                                    overall: 0,
+                                                                    label,
+                                                                    divisionValue: 0
+                                                                }
+                                                            }
+                                                        )
+                                                    })()}
+                                                    margin={{
+                                                        top: 5,
+                                                        right: 20,
+                                                        bottom: 5,
+                                                        left: 50
+                                                    }}
+                                                >
+                                                    <XAxis
+                                                        dataKey="label"
+                                                        tick={{ fontSize: 12 }}
+                                                    />
+                                                    <YAxis
+                                                        domain={[0, 7]}
+                                                        ticks={[
+                                                            1, 2, 3, 4, 5, 6
+                                                        ]}
+                                                        tickFormatter={(
+                                                            value: number
+                                                        ) => {
+                                                            const labels: Record<
+                                                                number,
+                                                                string
+                                                            > = {
+                                                                6: "AA",
+                                                                5: "A",
+                                                                4: "ABA",
+                                                                3: "ABB",
+                                                                2: "BBB",
+                                                                1: "BB"
+                                                            }
+                                                            return (
+                                                                labels[value] ||
+                                                                ""
+                                                            )
+                                                        }}
+                                                        tick={{ fontSize: 11 }}
+                                                        width={45}
+                                                    />
+                                                    <Tooltip
+                                                        content={({
+                                                            active,
+                                                            payload
+                                                        }) => {
+                                                            if (
+                                                                !active ||
+                                                                !payload?.length
+                                                            )
+                                                                return null
+                                                            const d =
+                                                                payload[0]
+                                                                    .payload
+                                                            if (
+                                                                !d.divisionName
+                                                            ) {
+                                                                return (
+                                                                    <div className="rounded-md border bg-background p-3 text-sm shadow-md">
+                                                                        <p className="font-medium">
+                                                                            {
+                                                                                d.label
+                                                                            }
+                                                                        </p>
+                                                                        <p className="text-muted-foreground italic">
+                                                                            Did
+                                                                            not
+                                                                            play
+                                                                        </p>
+                                                                    </div>
+                                                                )
+                                                            }
+                                                            return (
+                                                                <div className="rounded-md border bg-background p-3 text-sm shadow-md">
+                                                                    <p className="font-medium">
+                                                                        {
+                                                                            d.label
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-muted-foreground">
+                                                                        Division:{" "}
+                                                                        {
+                                                                            d.divisionName
+                                                                        }
+                                                                    </p>
+                                                                    <p className="text-muted-foreground">
+                                                                        Team:{" "}
+                                                                        {
+                                                                            d.teamName
+                                                                        }
+                                                                    </p>
+                                                                </div>
+                                                            )
+                                                        }}
+                                                    />
+                                                    <Bar
+                                                        dataKey="divisionValue"
+                                                        radius={[4, 4, 0, 0]}
+                                                    >
+                                                        {(() => {
+                                                            const firstSeasonId =
+                                                                draftHistory[0]
+                                                                    .seasonId
+                                                            const lastSeasonId =
+                                                                draftHistory[
+                                                                    draftHistory.length -
+                                                                        1
+                                                                ].seasonId
+                                                            const seasonsInRange =
+                                                                [...allSeasons]
+                                                                    .reverse()
+                                                                    .filter(
+                                                                        (s) =>
+                                                                            s.id >=
+                                                                                firstSeasonId &&
+                                                                            s.id <=
+                                                                                lastSeasonId
+                                                                    )
+                                                            const draftBySeasonId =
+                                                                new Map<
+                                                                    number,
+                                                                    PlayerDraftHistory
+                                                                >()
+                                                            for (const d of draftHistory) {
+                                                                draftBySeasonId.set(
+                                                                    d.seasonId,
+                                                                    d
+                                                                )
+                                                            }
+                                                            const colors: Record<
+                                                                string,
+                                                                string
+                                                            > = {
+                                                                AA: "#ef4444",
+                                                                A: "#f97316",
+                                                                ABA: "#eab308",
+                                                                AB: "#eab308",
+                                                                ABB: "#22c55e",
+                                                                BBB: "#3b82f6",
+                                                                BB: "#8b5cf6"
+                                                            }
+                                                            return seasonsInRange.map(
+                                                                (s, index) => {
+                                                                    const draft =
+                                                                        draftBySeasonId.get(
+                                                                            s.id
+                                                                        )
+                                                                    return (
+                                                                        <Cell
+                                                                            key={
+                                                                                index
+                                                                            }
+                                                                            fill={
+                                                                                draft
+                                                                                    ? colors[
+                                                                                          draft
+                                                                                              .divisionName
+                                                                                      ] ||
+                                                                                      "#94a3b8"
+                                                                                    : "transparent"
+                                                                            }
+                                                                        />
+                                                                    )
+                                                                }
+                                                            )
+                                                        })()}
+                                                    </Bar>
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         </div>
-                                    </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}

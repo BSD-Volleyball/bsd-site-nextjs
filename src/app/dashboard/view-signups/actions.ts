@@ -3,68 +3,127 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, drafts, teams, divisions, seasons } from "@/database/schema"
-import { eq, inArray, desc } from "drizzle-orm"
+import {
+    users,
+    signups,
+    drafts,
+    teams,
+    seasons,
+    divisions,
+    commissioners
+} from "@/database/schema"
+import { eq, inArray, and, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
-export interface SignupEntry {
-    signupId: number
+export interface SignupPlayer {
     userId: string
-    oldId: number | null
-    firstName: string
-    lastName: string
-    preferredName: string | null
-    email: string
-    phone: string | null
-    male: boolean | null
+    displayName: string
+    pairedWith: string | null
+    pairedWithId: string | null
+    gender: string
     age: string | null
-    captain: string | null
-    amountPaid: string | null
-    signupDate: Date
-    isNew: boolean
-    pairPickName: string | null
-    pairReason: string | null
-    experience: string | null
-    assessment: string | null
     height: number | null
-    picture: string | null
-    skillPasser: boolean | null
-    skillSetter: boolean | null
-    skillHitter: boolean | null
-    skillOther: boolean | null
-    datesMissing: string | null
-    playFirstWeek: boolean | null
-    lastDraftSeason: string | null
-    lastDraftDivision: string | null
-    lastDraftCaptain: string | null
-    lastDraftOverall: number | null
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
+export interface SignupGroup {
+    groupLabel: string
+    seasonOrder: number
+    players: SignupPlayer[]
+}
 
+async function checkIsAdminOrDirector(userId: string): Promise<boolean> {
     const [user] = await db
         .select({ role: users.role })
         .from(users)
-        .where(eq(users.id, session.user.id))
+        .where(eq(users.id, userId))
         .limit(1)
 
     return user?.role === "admin" || user?.role === "director"
 }
 
-export async function getSeasonSignups(): Promise<{
+async function checkIsCommissioner(
+    userId: string,
+    seasonId: number
+): Promise<boolean> {
+    const [commissionerRecord] = await db
+        .select({ id: commissioners.id })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, seasonId),
+                eq(commissioners.commissioner, userId)
+            )
+        )
+        .limit(1)
+
+    return !!commissionerRecord
+}
+
+async function checkIsCaptain(
+    userId: string,
+    seasonId: number
+): Promise<boolean> {
+    const [captainRecord] = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
+        .limit(1)
+
+    return !!captainRecord
+}
+
+export async function checkViewSignupsAccess(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+
+    if (!session?.user) {
+        return false
+    }
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) {
+        return false
+    }
+
+    // Check if user is admin/director
+    const isAdmin = await checkIsAdminOrDirector(session.user.id)
+    if (isAdmin) {
+        return true
+    }
+
+    // Check if user is commissioner for current season
+    const isCommissioner = await checkIsCommissioner(
+        session.user.id,
+        config.seasonId
+    )
+    if (isCommissioner) {
+        return true
+    }
+
+    // Check if user is a captain for current season
+    const isCaptain = await checkIsCaptain(session.user.id, config.seasonId)
+    return isCaptain
+}
+
+export interface SeasonInfo {
+    id: number
+    year: number
+    name: string
+}
+
+export async function getSignupsData(): Promise<{
     status: boolean
     message?: string
-    signups: SignupEntry[]
+    groups: SignupGroup[]
+    allSeasons: SeasonInfo[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkViewSignupsAccess()
     if (!hasAccess) {
         return {
             status: false,
             message: "Unauthorized",
-            signups: [],
+            groups: [],
+            allSeasons: [],
             seasonLabel: ""
         }
     }
@@ -76,64 +135,83 @@ export async function getSeasonSignups(): Promise<{
             return {
                 status: false,
                 message: "No current season found.",
-                signups: [],
+                groups: [],
+                allSeasons: [],
                 seasonLabel: ""
             }
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
+        // Fetch all signups for the current season
         const signupRows = await db
             .select({
-                signupId: signups.id,
                 userId: signups.player,
-                oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
-                email: users.email,
-                phone: users.phone,
                 male: users.male,
                 age: signups.age,
-                captain: signups.captain,
-                amountPaid: signups.amount_paid,
-                signupDate: signups.created_at,
-                pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason,
-                experience: users.experience,
-                assessment: users.assessment,
                 height: users.height,
-                picture: users.picture,
-                skillPasser: users.skill_passer,
-                skillSetter: users.skill_setter,
-                skillHitter: users.skill_hitter,
-                skillOther: users.skill_other,
-                datesMissing: signups.dates_missing,
-                playFirstWeek: signups.play_1st_week
+                pairPickId: signups.pair_pick
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
             .where(eq(signups.season, config.seasonId))
-            .orderBy(signups.created_at)
+            .orderBy(users.last_name, users.first_name)
 
-        // Determine which users are new (no entry in drafts table)
-        const userIds = signupRows.map((r) => r.userId)
-        let draftedUserIds = new Set<string>()
-
-        if (userIds.length > 0) {
-            const draftedUsers = await db
-                .select({ user: drafts.user })
-                .from(drafts)
-                .where(inArray(drafts.user, userIds))
-
-            draftedUserIds = new Set(draftedUsers.map((d) => d.user))
+        if (signupRows.length === 0) {
+            return {
+                status: true,
+                groups: [],
+                allSeasons: [],
+                seasonLabel
+            }
         }
 
-        // Fetch pair pick user names
+        const userIds = signupRows.map((r) => r.userId)
+
+        // Fetch last draft information for each user
+        const lastDraftMap = new Map<
+            string,
+            {
+                divisionName: string
+                divisionLevel: number
+            }
+        >()
+
+        const draftData = await db
+            .select({
+                userId: drafts.user,
+                seasonId: seasons.id,
+                seasonYear: seasons.year,
+                divisionName: divisions.name,
+                divisionLevel: divisions.level
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .innerJoin(seasons, eq(teams.season, seasons.id))
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(inArray(drafts.user, userIds))
+            .orderBy(desc(seasons.year), desc(seasons.id))
+
+        // Keep only the most recent draft for each user
+        const processedUsers = new Set<string>()
+        for (const draft of draftData) {
+            if (!processedUsers.has(draft.userId)) {
+                lastDraftMap.set(draft.userId, {
+                    divisionName: draft.divisionName,
+                    divisionLevel: draft.divisionLevel
+                })
+                processedUsers.add(draft.userId)
+            }
+        }
+
+        // Fetch pair pick names
         const pairPickIds = signupRows
             .map((r) => r.pairPickId)
             .filter((id): id is string => id !== null)
-        let pairPickNames = new Map<string, string>()
+        const pairPickNames = new Map<string, string>()
 
         if (pairPickIds.length > 0) {
             const pairPickUsers = await db
@@ -146,116 +224,118 @@ export async function getSeasonSignups(): Promise<{
                 .from(users)
                 .where(inArray(users.id, pairPickIds))
 
-            pairPickNames = new Map(
-                pairPickUsers.map((u) => {
-                    const preferred = u.preferredName
-                        ? ` (${u.preferredName})`
-                        : ""
-                    return [u.id, `${u.firstName}${preferred} ${u.lastName}`]
-                })
-            )
-        }
-
-        // Fetch last draft information for each user
-        const lastDraftInfo = new Map<string, {
-            season: string
-            division: string
-            captain: string
-            overall: number
-        }>()
-
-        if (userIds.length > 0) {
-            const draftData = await db
-                .select({
-                    userId: drafts.user,
-                    teamId: drafts.team,
-                    overall: drafts.overall,
-                    seasonYear: seasons.year,
-                    seasonName: seasons.season,
-                    divisionName: divisions.name,
-                    captainId: teams.captain,
-                    captainFirstName: users.first_name,
-                    captainLastName: users.last_name,
-                    captainPreferredName: users.preffered_name
-                })
-                .from(drafts)
-                .innerJoin(teams, eq(drafts.team, teams.id))
-                .innerJoin(seasons, eq(teams.season, seasons.id))
-                .innerJoin(divisions, eq(teams.division, divisions.id))
-                .innerJoin(users, eq(teams.captain, users.id))
-                .where(inArray(drafts.user, userIds))
-                .orderBy(desc(seasons.year), desc(seasons.id))
-
-            // Keep only the most recent draft for each user
-            const processedUsers = new Set<string>()
-            for (const draft of draftData) {
-                if (!processedUsers.has(draft.userId)) {
-                    const captainPreferred = draft.captainPreferredName
-                        ? ` (${draft.captainPreferredName})`
-                        : ""
-                    const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
-                    const seasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
-
-                    lastDraftInfo.set(draft.userId, {
-                        season: seasonLabel,
-                        division: draft.divisionName,
-                        captain: captainName,
-                        overall: draft.overall
-                    })
-                    processedUsers.add(draft.userId)
-                }
+            for (const u of pairPickUsers) {
+                const displayName = u.preferredName
+                    ? `${u.preferredName} ${u.lastName}`
+                    : `${u.firstName} ${u.lastName}`
+                pairPickNames.set(u.id, displayName)
             }
         }
 
-        const entries: SignupEntry[] = signupRows.map((row) => {
-            const lastDraft = lastDraftInfo.get(row.userId)
-            return {
-                signupId: row.signupId,
+        // Group players by their last drafted division
+        const groupMap = new Map<string, SignupPlayer[]>()
+        const groupOrderMap = new Map<string, number>()
+
+        for (const row of signupRows) {
+            const lastDraft = lastDraftMap.get(row.userId)
+            let groupLabel: string
+            let divisionOrder: number
+
+            if (lastDraft) {
+                groupLabel = lastDraft.divisionName
+                divisionOrder = lastDraft.divisionLevel
+            } else {
+                groupLabel = "New Players"
+                divisionOrder = 999
+            }
+
+            const displayName = row.preferredName
+                ? `${row.preferredName} ${row.lastName}`
+                : `${row.firstName} ${row.lastName}`
+
+            const gender =
+                row.male === null ? "Unknown" : row.male ? "Male" : "Non-Male"
+
+            const player: SignupPlayer = {
                 userId: row.userId,
-                oldId: row.oldId,
-                firstName: row.firstName,
-                lastName: row.lastName,
-                preferredName: row.preferredName,
-                email: row.email,
-                phone: row.phone,
-                male: row.male,
-                age: row.age,
-                captain: row.captain,
-                amountPaid: row.amountPaid,
-                signupDate: row.signupDate,
-                isNew: !draftedUserIds.has(row.userId),
-                pairPickName: row.pairPickId
+                displayName,
+                pairedWith: row.pairPickId
                     ? (pairPickNames.get(row.pairPickId) ?? null)
                     : null,
-                pairReason: row.pairReason,
-                experience: row.experience,
-                assessment: row.assessment,
-                height: row.height,
-                picture: row.picture,
-                skillPasser: row.skillPasser,
-                skillSetter: row.skillSetter,
-                skillHitter: row.skillHitter,
-                skillOther: row.skillOther,
-                datesMissing: row.datesMissing,
-                playFirstWeek: row.playFirstWeek,
-                lastDraftSeason: lastDraft?.season ?? null,
-                lastDraftDivision: lastDraft?.division ?? null,
-                lastDraftCaptain: lastDraft?.captain ?? null,
-                lastDraftOverall: lastDraft?.overall ?? null
+                pairedWithId: row.pairPickId,
+                gender,
+                age: row.age,
+                height: row.height
             }
+
+            if (!groupMap.has(groupLabel)) {
+                groupMap.set(groupLabel, [])
+                groupOrderMap.set(groupLabel, divisionOrder)
+            }
+
+            groupMap.get(groupLabel)!.push(player)
+        }
+
+        // Sort players within each group by gender, then last name
+        for (const group of groupMap.values()) {
+            group.sort((a, b) => {
+                // Sort by gender first (Male, Non-Male, Unknown)
+                const genderOrder = { Male: 0, "Non-Male": 1, Unknown: 2 }
+                const genderCompare =
+                    genderOrder[a.gender as keyof typeof genderOrder] -
+                    genderOrder[b.gender as keyof typeof genderOrder]
+                if (genderCompare !== 0) return genderCompare
+
+                // Then sort by last name (extracted from displayName)
+                const aLastName = a.displayName.split(" ").pop() || ""
+                const bLastName = b.displayName.split(" ").pop() || ""
+                return aLastName.localeCompare(bLastName)
+            })
+        }
+
+        // Convert map to array and sort groups (by division level, "New Players" always first)
+        const groups: SignupGroup[] = Array.from(groupMap.entries()).map(
+            ([label, players]) => ({
+                groupLabel: label,
+                seasonOrder: groupOrderMap.get(label)!,
+                players
+            })
+        )
+
+        groups.sort((a, b) => {
+            if (a.groupLabel === "New Players") return -1
+            if (b.groupLabel === "New Players") return 1
+            return a.seasonOrder - b.seasonOrder
         })
+
+        // Fetch all seasons for chart gap detection
+        const allSeasonRows = await db
+            .select({
+                id: seasons.id,
+                year: seasons.year,
+                name: seasons.season
+            })
+            .from(seasons)
+            .orderBy(desc(seasons.id))
+            .limit(11)
 
         return {
             status: true,
-            signups: entries,
+            groups,
+            allSeasons: allSeasonRows.map((s) => ({
+                id: s.id,
+                year: s.year,
+                name: s.name
+            })),
             seasonLabel
         }
     } catch (error) {
-        console.error("Error fetching season signups:", error)
+        console.error("Error fetching signups data:", error)
         return {
             status: false,
             message: "Something went wrong.",
-            signups: [],
+            groups: [],
+            allSeasons: [],
             seasonLabel: ""
         }
     }

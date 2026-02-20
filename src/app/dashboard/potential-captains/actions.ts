@@ -35,11 +35,18 @@ interface DivisionCaptains {
     lists: CaptainList[]
 }
 
+interface SeasonInfo {
+    id: number
+    year: number
+    name: string
+}
+
 interface PotentialCaptainsData {
     status: boolean
     message?: string
     seasonLabel: string
     divisions: DivisionCaptains[]
+    allSeasons: SeasonInfo[]
     emailTemplate?: string
     emailSubject?: string
 }
@@ -52,7 +59,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             status: false,
             message: "Unauthorized",
             seasonLabel: "",
-            divisions: []
+            divisions: [],
+            allSeasons: []
         }
     }
 
@@ -87,7 +95,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 status: false,
                 message: "No season found.",
                 seasonLabel: "",
-                divisions: []
+                divisions: [],
+                allSeasons: []
             }
         }
 
@@ -111,14 +120,19 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             return {
                 status: true,
                 seasonLabel,
-                divisions: []
+                divisions: [],
+                allSeasons: []
             }
         }
 
         // 3. Get all seasons ordered by ID (newest first)
         // Exclude the current signup season since it hasn't been played yet
         const allSeasons = await db
-            .select({ id: seasons.id })
+            .select({
+                id: seasons.id,
+                year: seasons.year,
+                name: seasons.season
+            })
             .from(seasons)
             .orderBy(desc(seasons.id))
             .limit(11)
@@ -196,7 +210,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             let started = false
             for (const seasonId of allSeasonIds) {
                 const playedInDivision = playerDrafts.some(
-                    (d) => d.seasonId === seasonId && d.divisionId === divisionId
+                    (d) =>
+                        d.seasonId === seasonId && d.divisionId === divisionId
                 )
                 if (playedInDivision) {
                     started = true
@@ -241,6 +256,9 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
 
             // List 3: "no" captain + played in this division in past 4 seasons
             const list3Players: PotentialCaptain[] = []
+
+            // List 4: "no" captain + 1-3 consecutive seasons in this division
+            const list4Players: PotentialCaptain[] = []
 
             for (const signup of signupRows) {
                 const history = playerHistoryMap.get(signup.playerId)
@@ -308,6 +326,20 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                         consecutiveSeasons,
                         captainInterest: "no"
                     })
+                } else if (
+                    signup.captain === "no" &&
+                    playedLastSeason &&
+                    consecutiveSeasons >= 1 &&
+                    consecutiveSeasons <= 3
+                ) {
+                    list4Players.push({
+                        id: signup.playerId,
+                        displayName,
+                        lastName: signup.lastName,
+                        email: signup.email,
+                        consecutiveSeasons,
+                        captainInterest: "no"
+                    })
                 }
             }
 
@@ -318,12 +350,14 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             list1Players.sort(sortPlayers)
             list2Players.sort(sortPlayers)
             list3Players.sort(sortPlayers)
+            list4Players.sort(sortPlayers)
 
             // Only include division if it has players in any list
             if (
                 list1Players.length > 0 ||
                 list2Players.length > 0 ||
-                list3Players.length > 0
+                list3Players.length > 0 ||
+                list4Players.length > 0
             ) {
                 divisionData.push({
                     id: division.id,
@@ -347,6 +381,12 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                             description:
                                 "Players not interested in captaining but with 4+ consecutive seasons in this division",
                             players: list3Players
+                        },
+                        {
+                            title: "Not Interested - Newer Players",
+                            description:
+                                "Players not interested in captaining but with 1-3 consecutive seasons in this division",
+                            players: list4Players
                         }
                     ]
                 })
@@ -379,6 +419,11 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             status: true,
             seasonLabel,
             divisions: divisionData,
+            allSeasons: allSeasons.map((s) => ({
+                id: s.id,
+                year: s.year,
+                name: s.name
+            })),
             emailTemplate,
             emailSubject
         }
@@ -388,7 +433,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             status: false,
             message: "Something went wrong.",
             seasonLabel: "",
-            divisions: []
+            divisions: [],
+            allSeasons: []
         }
     }
 }
