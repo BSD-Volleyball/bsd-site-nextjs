@@ -17,6 +17,7 @@ import { logAuditEntry } from "@/lib/audit-log"
 export interface DivisionOption {
     id: number
     name: string
+    level: number
 }
 
 export interface EvaluatorDetail {
@@ -86,7 +87,11 @@ export async function getNewPlayers(): Promise<{
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
         const allDivisions = await db
-            .select({ id: divisions.id, name: divisions.name })
+            .select({
+                id: divisions.id,
+                name: divisions.name,
+                level: divisions.level
+            })
             .from(divisions)
             .where(eq(divisions.active, true))
             .orderBy(divisions.level)
@@ -137,6 +142,7 @@ export async function getNewPlayers(): Promise<{
                 currentUserEval: number | null
                 allEvals: Array<{
                     divisionId: number
+                    divisionLevel: number
                     divisionName: string
                     evaluatorName: string
                 }>
@@ -150,6 +156,7 @@ export async function getNewPlayers(): Promise<{
                     division: evaluations.division,
                     evaluator: evaluations.evaluator,
                     divisionName: divisions.name,
+                    divisionLevel: divisions.level,
                     evaluatorFirstName: users.first_name,
                     evaluatorPreferredName: users.preffered_name
                 })
@@ -180,6 +187,7 @@ export async function getNewPlayers(): Promise<{
 
                 playerData.allEvals.push({
                     divisionId: evalRow.division,
+                    divisionLevel: evalRow.divisionLevel,
                     divisionName: evalRow.divisionName,
                     evaluatorName:
                         evalRow.evaluatorPreferredName ||
@@ -197,7 +205,7 @@ export async function getNewPlayers(): Promise<{
             const averageEvaluation =
                 evalData.allEvals.length > 0
                     ? evalData.allEvals.reduce(
-                          (sum, e) => sum + e.divisionId,
+                          (sum, e) => sum + e.divisionLevel,
                           0
                       ) / evalData.allEvals.length
                     : null

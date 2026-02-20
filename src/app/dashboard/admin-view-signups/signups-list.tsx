@@ -130,6 +130,12 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
         })
     }, [signups, search])
 
+    const signupNumberById = useMemo(() => {
+        return new Map(
+            signups.map((entry, index) => [entry.signupId, signups.length - index])
+        )
+    }, [signups])
+
     const newCount = useMemo(
         () => signups.filter((s) => s.isNew).length,
         [signups]
@@ -283,7 +289,7 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
                                 onClick={() => handlePlayerClick(entry)}
                             >
                                 <td className="px-4 py-2 text-muted-foreground">
-                                    {idx + 1}
+                                    {signupNumberById.get(entry.signupId) ?? idx + 1}
                                 </td>
                                 <td className="px-4 py-2 font-medium">
                                     <div className="flex items-center gap-2">

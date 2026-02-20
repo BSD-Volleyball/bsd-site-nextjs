@@ -40,12 +40,19 @@ function getAverageRatingDisplay(
         return "—"
     }
 
-    // Find the closest division to the average
-    const avgDivisionId = Math.round(player.averageEvaluation)
-    const division = divisions.find((d) => d.id === avgDivisionId)
+    const averageLevel = player.averageEvaluation
+
+    // Find the closest division by level to the average level
+    const division = divisions.reduce<DivisionOption | null>((closest, current) => {
+        if (!closest) return current
+        return Math.abs(current.level - averageLevel) <
+            Math.abs(closest.level - averageLevel)
+            ? current
+            : closest
+    }, null)
     const divisionName = division?.name || "Unknown"
 
-    return `${divisionName} (${player.averageEvaluation.toFixed(1)} from ${player.evaluationCount})`
+    return `${divisionName} (${averageLevel.toFixed(1)} from ${player.evaluationCount})`
 }
 
 function getEvaluatorTooltip(player: NewPlayerEntry): string {
@@ -64,6 +71,7 @@ export function EvaluatePlayersList({
 }: EvaluatePlayersListProps) {
     const router = useRouter()
     const [search, setSearch] = useState("")
+    const [showAverages, setShowAverages] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [message, setMessage] = useState<{
         type: "success" | "error"
@@ -168,6 +176,14 @@ export function EvaluatePlayersList({
                         className="max-w-xs"
                     />
                     <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAverages((prev) => !prev)}
+                    >
+                        {showAverages ? "Hide Averages" : "Show Averages"}
+                    </Button>
+                    <Button
                         onClick={handleSubmit}
                         disabled={isLoading || evaluatedCount === 0}
                         size="sm"
@@ -196,9 +212,11 @@ export function EvaluatePlayersList({
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Your Rating
                             </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Average Rating
-                            </th>
+                            {showAverages && (
+                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                    Average Rating
+                                </th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -248,31 +266,33 @@ export function EvaluatePlayersList({
                                         </SelectContent>
                                     </Select>
                                 </td>
-                                <td className="px-4 py-2">
-                                    {player.evaluationCount > 0 ? (
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="cursor-help underline decoration-dotted">
-                                                    {getAverageRatingDisplay(
-                                                        player,
-                                                        divisions
-                                                    )}
-                                                </span>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                {getEvaluatorTooltip(player)}
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    ) : (
-                                        "—"
-                                    )}
-                                </td>
+                                {showAverages && (
+                                    <td className="px-4 py-2">
+                                        {player.evaluationCount > 0 ? (
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="cursor-help underline decoration-dotted">
+                                                        {getAverageRatingDisplay(
+                                                            player,
+                                                            divisions
+                                                        )}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    {getEvaluatorTooltip(player)}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        ) : (
+                                            "—"
+                                        )}
+                                    </td>
+                                )}
                             </tr>
                         ))}
                         {filteredPlayers.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={6}
+                                    colSpan={showAverages ? 6 : 5}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No new players found.
