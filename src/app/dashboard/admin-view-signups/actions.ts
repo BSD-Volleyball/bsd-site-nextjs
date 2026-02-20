@@ -114,7 +114,7 @@ export async function getSeasonSignups(): Promise<{
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
             .where(eq(signups.season, config.seasonId))
-            .orderBy(signups.created_at)
+            .orderBy(desc(signups.created_at), desc(signups.id))
 
         // Determine which users are new (no entry in drafts table)
         const userIds = signupRows.map((r) => r.userId)
