@@ -209,6 +209,29 @@ export const matchs = pgTable("matchs", {
         .notNull()
 })
 
+export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    division: integer("division")
+        .notNull()
+        .references(() => divisions.id),
+    week: integer("week").notNull(),
+    match_num: integer("match_num").notNull(),
+    match_id: integer("match_id").references(() => matchs.id),
+    date: text("date"),
+    time: text("time"),
+    court: integer("court"),
+    bracket: text("bracket"),
+    home_source: text("home_source").notNull(),
+    away_source: text("away_source").notNull(),
+    work_assignment: text("work_assignment"),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 export const champions = pgTable("champions", {
     id: serial("id").primaryKey(),
     team: integer("team")
