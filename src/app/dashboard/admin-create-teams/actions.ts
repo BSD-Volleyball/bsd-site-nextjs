@@ -3,11 +3,16 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, divisions, teams, signups } from "@/database/schema"
-import { eq, and, inArray } from "drizzle-orm"
+import { users, seasons, divisions, teams } from "@/database/schema"
+import { eq, desc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getIsCommissioner } from "@/app/dashboard/actions"
-import { getSeasonConfig } from "@/lib/site-config"
+
+export interface SeasonOption {
+    id: number
+    code: string
+    year: number
+    season: string
+}
 
 export interface DivisionOption {
     id: number
@@ -23,43 +28,48 @@ export interface UserOption {
     preffered_name: string | null
 }
 
+async function checkAdminAccess(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session) return false
+
+    const [user] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1)
+
+    return user?.role === "admin" || user?.role === "director"
+}
+
 export async function getCreateTeamsData(): Promise<{
     status: boolean
     message?: string
-    seasonId: number
-    seasonLabel: string
+    seasons: SeasonOption[]
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
-    const hasAccess = await getIsCommissioner()
+    const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
         return {
             status: false,
             message: "You don't have permission to access this page.",
-            seasonId: 0,
-            seasonLabel: "",
+            seasons: [],
             divisions: [],
             users: []
         }
     }
 
     try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                seasonId: 0,
-                seasonLabel: "",
-                divisions: [],
-                users: []
-            }
-        }
-
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-
-        const [allDivisions, signedUpUsers] = await Promise.all([
+        const [allSeasons, allDivisions, allUsers] = await Promise.all([
+            db
+                .select({
+                    id: seasons.id,
+                    code: seasons.code,
+                    year: seasons.year,
+                    season: seasons.season
+                })
+                .from(seasons)
+                .orderBy(desc(seasons.year), desc(seasons.id)),
             db
                 .select({
                     id: divisions.id,
@@ -67,36 +77,31 @@ export async function getCreateTeamsData(): Promise<{
                     level: divisions.level
                 })
                 .from(divisions)
-                .where(eq(divisions.active, true))
                 .orderBy(divisions.level),
             db
-                .selectDistinct({
+                .select({
                     id: users.id,
                     old_id: users.old_id,
                     first_name: users.first_name,
                     last_name: users.last_name,
                     preffered_name: users.preffered_name
                 })
-                .from(signups)
-                .innerJoin(users, eq(signups.player, users.id))
-                .where(eq(signups.season, config.seasonId))
+                .from(users)
                 .orderBy(users.last_name, users.first_name)
         ])
 
         return {
             status: true,
-            seasonId: config.seasonId,
-            seasonLabel,
+            seasons: allSeasons,
             divisions: allDivisions,
-            users: signedUpUsers
+            users: allUsers
         }
     } catch (error) {
         console.error("Error fetching create teams data:", error)
         return {
             status: false,
             message: "Something went wrong.",
-            seasonId: 0,
-            seasonLabel: "",
+            seasons: [],
             divisions: [],
             users: []
         }
@@ -109,10 +114,11 @@ interface TeamToCreate {
 }
 
 export async function createTeams(
+    seasonId: number,
     divisionId: number,
     teamsToCreate: TeamToCreate[]
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsCommissioner()
+    const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -120,10 +126,10 @@ export async function createTeams(
         }
     }
 
-    if (!divisionId) {
+    if (!seasonId || !divisionId) {
         return {
             status: false,
-            message: "Please select a division."
+            message: "Please select a season and division."
         }
     }
 
@@ -131,38 +137,6 @@ export async function createTeams(
         return {
             status: false,
             message: "Please select at least one captain."
-        }
-    }
-
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return {
-            status: false,
-            message: "No current season found."
-        }
-    }
-
-    const [selectedDivision] = await db
-        .select({ id: divisions.id, name: divisions.name })
-        .from(divisions)
-        .where(eq(divisions.id, divisionId))
-        .limit(1)
-
-    if (!selectedDivision) {
-        return {
-            status: false,
-            message: "Invalid division selected."
-        }
-    }
-
-    const expectedTeamCount =
-        selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
-
-    if (teamsToCreate.length !== expectedTeamCount) {
-        return {
-            status: false,
-            message: `Division ${selectedDivision.name} requires ${expectedTeamCount} teams.`
         }
     }
 
@@ -183,38 +157,11 @@ export async function createTeams(
         }
     }
 
-    const captainIds = teamsToCreate.map((team) => team.captainId)
-    const uniqueCaptainIds = new Set(captainIds)
-
-    if (uniqueCaptainIds.size !== captainIds.length) {
-        return {
-            status: false,
-            message: "Each team must have a unique captain."
-        }
-    }
-
-    const signedUpCaptains = await db
-        .select({ playerId: signups.player })
-        .from(signups)
-        .where(
-            and(
-                eq(signups.season, config.seasonId),
-                inArray(signups.player, [...uniqueCaptainIds])
-            )
-        )
-
-    if (signedUpCaptains.length !== uniqueCaptainIds.size) {
-        return {
-            status: false,
-            message: "All selected captains must be signed up for the current season."
-        }
-    }
-
     try {
-        // Create all teams for the current season
+        // Create all teams
         await db.insert(teams).values(
             teamsToCreate.map((team, index) => ({
-                season: config.seasonId,
+                season: seasonId,
                 captain: team.captainId,
                 division: divisionId,
                 name: team.teamName.trim(),
@@ -228,7 +175,7 @@ export async function createTeams(
                 userId: session.user.id,
                 action: "create",
                 entityType: "teams",
-                summary: `Created ${teamsToCreate.length} teams for current season ${config.seasonId}, division ${divisionId}`
+                summary: `Created ${teamsToCreate.length} teams for season ${seasonId}, division ${divisionId}`
             })
         }
 

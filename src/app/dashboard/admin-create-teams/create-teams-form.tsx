@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import {
     Card,
     CardContent,
@@ -19,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
     Popover,
     PopoverContent,
@@ -28,12 +30,13 @@ import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
     createTeams,
+    type SeasonOption,
     type DivisionOption,
     type UserOption
 } from "./actions"
 
 interface CreateTeamsFormProps {
-    seasonLabel: string
+    seasons: SeasonOption[]
     divisions: DivisionOption[]
     users: UserOption[]
 }
@@ -180,52 +183,30 @@ function UserCombobox({
 }
 
 export function CreateTeamsForm({
-    seasonLabel,
+    seasons,
     divisions,
     users
 }: CreateTeamsFormProps) {
+    const _router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
 
+    const [seasonId, setSeasonId] = useState<string>("")
     const [divisionId, setDivisionId] = useState<string>("")
+    const [teamCount, setTeamCount] = useState<"4" | "6">("6")
     const [captains, setCaptains] = useState<CaptainSelection[]>(
         Array(6)
             .fill(null)
             .map(() => ({ captainId: null, teamName: "" }))
     )
 
-    const selectedDivision = useMemo(
-        () => divisions.find((d) => d.id.toString() === divisionId) || null,
-        [divisions, divisionId]
-    )
-
-    const numTeams = useMemo(() => {
-        if (!selectedDivision) {
-            return 6
-        }
-
-        return selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
-    }, [selectedDivision])
-
-    useEffect(() => {
-        if (numTeams === 4) {
-            setCaptains((prev) => {
-                const next = [...prev]
-                next[4] = { captainId: null, teamName: "" }
-                next[5] = { captainId: null, teamName: "" }
-                return next
-            })
-        }
-    }, [numTeams])
-
     const selectedCaptainIds = useMemo(
         () =>
             captains
-                .slice(0, numTeams)
                 .map((c) => c.captainId)
                 .filter((id): id is string => id !== null),
-        [captains, numTeams]
+        [captains]
     )
 
     const handleCaptainChange = (
@@ -254,16 +235,41 @@ export function CreateTeamsForm({
         })
     }
 
+    const handleTeamCountChange = (value: "4" | "6") => {
+        setTeamCount(value)
+        // If switching from 6 to 4, clear the last two slots
+        if (value === "4") {
+            setCaptains((prev) => {
+                const newCaptains = [...prev]
+                newCaptains[4] = { captainId: null, teamName: "" }
+                newCaptains[5] = { captainId: null, teamName: "" }
+                return newCaptains
+            })
+        }
+    }
+
+    const formatSeasonLabel = (season: SeasonOption) => {
+        const seasonName =
+            season.season.charAt(0).toUpperCase() + season.season.slice(1)
+        return `${seasonName} ${season.year}`
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         setError(null)
         setSuccess(null)
+
+        if (!seasonId) {
+            setError("Please select a season.")
+            return
+        }
 
         if (!divisionId) {
             setError("Please select a division.")
             return
         }
 
+        const numTeams = parseInt(teamCount)
         const teamsToCreate = captains.slice(0, numTeams).map((c) => ({
             captainId: c.captainId || "",
             teamName: c.teamName
@@ -283,7 +289,11 @@ export function CreateTeamsForm({
 
         setIsLoading(true)
 
-        const result = await createTeams(parseInt(divisionId), teamsToCreate)
+        const result = await createTeams(
+            parseInt(seasonId),
+            parseInt(divisionId),
+            teamsToCreate
+        )
 
         if (result.status) {
             setSuccess(result.message)
@@ -300,46 +310,102 @@ export function CreateTeamsForm({
         setIsLoading(false)
     }
 
+    const numTeams = parseInt(teamCount)
+
     return (
         <form onSubmit={handleSubmit}>
             <Card className="max-w-2xl">
                 <CardHeader>
                     <CardTitle>Team Configuration</CardTitle>
                     <CardDescription>
-                        Create teams for the current season by selecting a
-                        division and captains.
+                        Select the season, division, and number of teams to
+                        create.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="current-season">Current Season</Label>
-                        <Input
-                            id="current-season"
-                            value={seasonLabel}
-                            readOnly
-                            className="bg-muted"
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="season">
+                                Season{" "}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <Select
+                                value={seasonId}
+                                onValueChange={setSeasonId}
+                            >
+                                <SelectTrigger id="season">
+                                    <SelectValue placeholder="Select a season" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {seasons.map((season) => (
+                                        <SelectItem
+                                            key={season.id}
+                                            value={season.id.toString()}
+                                        >
+                                            {formatSeasonLabel(season)}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="division">
+                                Division{" "}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <Select
+                                value={divisionId}
+                                onValueChange={setDivisionId}
+                            >
+                                <SelectTrigger id="division">
+                                    <SelectValue placeholder="Select a division" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {divisions.map((division) => (
+                                        <SelectItem
+                                            key={division.id}
+                                            value={division.id.toString()}
+                                        >
+                                            {division.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="division">
-                            Division <span className="text-destructive">*</span>
+                        <Label>
+                            Number of Teams{" "}
+                            <span className="text-destructive">*</span>
                         </Label>
-                        <Select value={divisionId} onValueChange={setDivisionId}>
-                            <SelectTrigger id="division">
-                                <SelectValue placeholder="Select a division" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {divisions.map((division) => (
-                                    <SelectItem
-                                        key={division.id}
-                                        value={division.id.toString()}
-                                    >
-                                        {division.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <RadioGroup
+                            value={teamCount}
+                            onValueChange={(value) =>
+                                handleTeamCountChange(value as "4" | "6")
+                            }
+                            className="flex gap-4"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="6" id="teams-6" />
+                                <Label
+                                    htmlFor="teams-6"
+                                    className="cursor-pointer font-normal"
+                                >
+                                    6 Teams
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="4" id="teams-4" />
+                                <Label
+                                    htmlFor="teams-4"
+                                    className="cursor-pointer font-normal"
+                                >
+                                    4 Teams
+                                </Label>
+                            </div>
+                        </RadioGroup>
                     </div>
 
                     <div className="border-t pt-6">
@@ -360,7 +426,9 @@ export function CreateTeamsForm({
                                             </Label>
                                             <UserCombobox
                                                 users={users}
-                                                value={captains[index].captainId}
+                                                value={
+                                                    captains[index].captainId
+                                                }
                                                 onChange={(userId, user) =>
                                                     handleCaptainChange(
                                                         index,
@@ -373,7 +441,9 @@ export function CreateTeamsForm({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor={`team-name-${index}`}>
+                                            <Label
+                                                htmlFor={`team-name-${index}`}
+                                            >
                                                 Team Name{" "}
                                                 <span className="text-destructive">
                                                     *
@@ -410,7 +480,11 @@ export function CreateTeamsForm({
                     )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading} className="ml-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="ml-auto"
+                    >
                         {isLoading ? "Creating..." : "Create"}
                     </Button>
                 </CardFooter>

@@ -122,8 +122,8 @@ const adminNavItems = [
 
 const adminDangerNavItems = [
     {
-        title: "Create Teams",
-        url: "/dashboard/create-teams",
+        title: "Admin Create Teams",
+        url: "/dashboard/admin-create-teams",
         icon: RiTeamLine
     },
     {
@@ -168,6 +168,11 @@ const commissionerNavItems = [
         title: "Potential Captains",
         url: "/dashboard/potential-captains",
         icon: RiUserSettingsLine
+    },
+    {
+        title: "Create Teams",
+        url: "/dashboard/create-teams",
+        icon: RiTeamLine
     }
 ]
 
