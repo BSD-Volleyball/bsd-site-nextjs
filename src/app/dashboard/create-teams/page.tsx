@@ -49,7 +49,7 @@ export default async function CreateTeamsPage() {
                 description="Create teams for the current season by selecting captains."
             />
             <CreateTeamsForm
-                seasonLabel={result.seasonLabel}
+                seasonLabel={result.seasonLabel || ""}
                 divisions={result.divisions}
                 users={result.users}
             />

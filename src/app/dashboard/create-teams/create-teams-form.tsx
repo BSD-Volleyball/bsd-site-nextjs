@@ -180,7 +180,7 @@ function UserCombobox({
 }
 
 export function CreateTeamsForm({
-    seasonLabel,
+    seasonLabel = "",
     divisions,
     users
 }: CreateTeamsFormProps) {
@@ -315,7 +315,7 @@ export function CreateTeamsForm({
                         <Label htmlFor="current-season">Current Season</Label>
                         <Input
                             id="current-season"
-                            value={seasonLabel}
+                            value={seasonLabel ?? ""}
                             readOnly
                             className="bg-muted"
                         />
