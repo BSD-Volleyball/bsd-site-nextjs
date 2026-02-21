@@ -28,6 +28,10 @@
         "GOOGLE_CLIENT_ID",
         "GOOGLE_CLIENT_SECRET",
         "TWITTER_CLIENT_ID",
-        "TWITTER_CLIENT_SECRET"
+        "TWITTER_CLIENT_SECRET",
+        "PLAYER_PIC_URL",
+        "SQUARE_ACCESS_TOKEN",
+        "BETTER_AUTH_BASE_URL",
+        "SQUARE_ENVIRONMENT"
     ]
 }
