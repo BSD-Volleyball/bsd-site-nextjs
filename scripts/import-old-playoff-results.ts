@@ -1228,19 +1228,53 @@ async function main() {
             }
         })
 
-        const metaRowsWithoutMatchId = resolvedMatches.map((m) => ({
-            season: seasonId,
-            division: divisionId,
-            week: m.week + weekOffset,
-            match_num: m.matchNum,
-            date: m.date,
-            time: m.time,
-            court: m.court,
-            bracket: inferBracket(m.homeRef, m.awayRef),
-            home_source: m.homeRef,
-            away_source: m.awayRef,
-            work_assignment: m.workRef
-        }))
+        // Build forward reference maps: for each match, find where
+        // its winner and loser advance to.
+        const nextMatchNumMap = new Map<number, number>()
+        const nextLoserMatchNumMap = new Map<number, number>()
+        for (const target of resolvedMatches) {
+            const winnerPattern = /^W(?:inner)?(\d+)$/i
+            const loserPattern = /^L(?:oser)?(\d+)$/i
+
+            for (const ref of [target.homeRef, target.awayRef]) {
+                const wm = ref.match(winnerPattern)
+                if (wm) {
+                    const sourceMatchNum = Number.parseInt(wm[1], 10)
+                    nextMatchNumMap.set(sourceMatchNum, target.matchNum)
+                }
+                const lm = ref.match(loserPattern)
+                if (lm) {
+                    const sourceMatchNum = Number.parseInt(lm[1], 10)
+                    nextLoserMatchNumMap.set(sourceMatchNum, target.matchNum)
+                }
+            }
+        }
+
+        const metaRowsWithoutMatchId = resolvedMatches.map((m) => {
+            // Resolve work_team: workRef can be a team number or a
+            // bracket reference like "W3" / "L2" — try team number first.
+            let workTeamId: number | null = null
+            if (m.workRef) {
+                const workNum = Number.parseInt(m.workRef, 10)
+                if (!Number.isNaN(workNum)) {
+                    workTeamId = teamMap.get(workNum) ?? null
+                }
+            }
+
+            return {
+                season: seasonId,
+                division: divisionId,
+                week: m.week + weekOffset,
+                match_num: m.matchNum,
+                bracket: inferBracket(m.homeRef, m.awayRef),
+                home_source: m.homeRef,
+                away_source: m.awayRef,
+                next_match_num: nextMatchNumMap.get(m.matchNum) ?? null,
+                next_loser_match_num:
+                    nextLoserMatchNumMap.get(m.matchNum) ?? null,
+                work_team: workTeamId
+            }
+        })
 
         console.log(
             `Parsed ${rows.length} playoff rows for season=${seasonId}, division=${divisionId}`

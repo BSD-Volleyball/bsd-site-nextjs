@@ -325,6 +325,16 @@ export function PlayerLookupForm({
                                         {playerDetails.role || "—"}
                                     </span>
                                 </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Captain Eligible:
+                                    </span>
+                                    <span className="ml-2 font-medium">
+                                        {playerDetails.captain_eligible
+                                            ? "Yes"
+                                            : "No"}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 

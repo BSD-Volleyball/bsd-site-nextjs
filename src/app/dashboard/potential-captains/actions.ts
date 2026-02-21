@@ -107,6 +107,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             .select({
                 playerId: signups.player,
                 captain: signups.captain,
+                captainEligible: users.captain_eligible,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
@@ -261,6 +262,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             const list4Players: PotentialCaptain[] = []
 
             for (const signup of signupRows) {
+                if (!signup.captainEligible) continue
+
                 const history = playerHistoryMap.get(signup.playerId)
                 if (!history) continue
 
