@@ -44,6 +44,7 @@
         "react-day-picker": "^9.7.0",
         "react-dom": "19.2.4",
         "react-hook-form": "^7.60.0",
+        "react-is": "^19.2.4",
         "react-square-web-payments-sdk": "^3.3.0",
         "react-svg-pan-zoom": "^3.13.1",
         "react-use-measure": "^2.1.7",
