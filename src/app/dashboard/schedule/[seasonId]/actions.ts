@@ -89,8 +89,8 @@ function getSetScores(row: {
 
 function getHeadToHeadStats(
     divisionMatches: Array<{
-        homeTeamId: number
-        awayTeamId: number
+        homeTeamId: number | null
+        awayTeamId: number | null
         homeScore: number | null
         awayScore: number | null
         home_set1_score: number | null
@@ -271,6 +271,8 @@ export async function getSeasonScheduleData(
                 )
 
                 for (const match of divisionMatches) {
+                    if (match.homeTeamId === null || match.awayTeamId === null)
+                        continue
                     const homeStanding = standingsByTeamId.get(match.homeTeamId)
                     const awayStanding = standingsByTeamId.get(match.awayTeamId)
                     if (!homeStanding || !awayStanding) continue
@@ -343,6 +345,8 @@ export async function getSeasonScheduleData(
 
                 const weeksMap = new Map<number, WeekRow>()
                 for (const match of divisionMatches) {
+                    if (match.homeTeamId === null || match.awayTeamId === null)
+                        continue
                     const homeTeam = teamById.get(match.homeTeamId)
                     const awayTeam = teamById.get(match.awayTeamId)
                     if (!homeTeam || !awayTeam) continue

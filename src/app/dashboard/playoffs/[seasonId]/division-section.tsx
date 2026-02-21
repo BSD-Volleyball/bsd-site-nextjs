@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { RiArrowDownSLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +15,20 @@ import type {
     PlayoffMatchLine,
     PlayoffSection
 } from "./actions"
+
+const BracketView = dynamic(
+    () => import("./bracket-view").then((mod) => mod.BracketView),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="flex min-h-[500px] items-center justify-center rounded-lg border bg-muted/20 p-3">
+                <span className="text-muted-foreground">
+                    Loading bracket visualization...
+                </span>
+            </div>
+        )
+    }
+)
 
 function MatchCard({ match }: { match: PlayoffMatchLine }) {
     return (
@@ -328,7 +343,11 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                     </div>
                                 )}
 
-                                {division.sections.length === 0 ? (
+                                {division.bracketMatches ? (
+                                    <BracketView
+                                        matches={division.bracketMatches}
+                                    />
+                                ) : division.sections.length === 0 ? (
                                     <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                                         No playoff bracket data found for this
                                         division.

@@ -2,13 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import type { SignupGroup } from "./actions"
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RiCloseLine } from "@remixicon/react"
 import {
     getPlayerDetails,
@@ -111,10 +105,27 @@ export function SignupsList({
                 <Card key={group.groupLabel}>
                     <CardHeader>
                         <CardTitle>{group.groupLabel}</CardTitle>
-                        <CardDescription>
-                            {group.players.length} player
-                            {group.players.length !== 1 ? "s" : ""}
-                        </CardDescription>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
+                                {group.players.length} total
+                            </span>
+                            <span className="rounded-md bg-blue-100 px-3 py-1.5 font-medium text-blue-700 text-sm dark:bg-blue-900 dark:text-blue-300">
+                                {
+                                    group.players.filter(
+                                        (player) => player.gender === "Male"
+                                    ).length
+                                }{" "}
+                                male
+                            </span>
+                            <span className="rounded-md bg-purple-100 px-3 py-1.5 font-medium text-purple-700 text-sm dark:bg-purple-900 dark:text-purple-300">
+                                {
+                                    group.players.filter(
+                                        (player) => player.gender !== "Male"
+                                    ).length
+                                }{" "}
+                                non-male
+                            </span>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="overflow-x-auto rounded-lg border">

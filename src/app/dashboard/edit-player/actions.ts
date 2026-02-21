@@ -81,6 +81,7 @@ export interface UserDetails {
     role: string | null
     male: boolean | null
     onboarding_completed: boolean | null
+    captain_eligible: boolean
 }
 
 export async function getUserDetails(
@@ -138,6 +139,7 @@ export async function updateUser(
         role?: string | null
         male?: boolean | null
         onboarding_completed?: boolean | null
+        captain_eligible?: boolean
     }
 ): Promise<{ status: boolean; message: string }> {
     const hasAccess = await checkAdminAccess()

@@ -43,6 +43,7 @@ export interface PlayerDetails {
     role: string | null
     male: boolean | null
     onboarding_completed: boolean | null
+    captain_eligible: boolean
     picture: string | null
     createdAt: Date
     updatedAt: Date
@@ -172,6 +173,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 role: users.role,
                 male: users.male,
                 onboarding_completed: users.onboarding_completed,
+                captain_eligible: users.captain_eligible,
                 picture: users.picture,
                 createdAt: users.createdAt,
                 updatedAt: users.updatedAt

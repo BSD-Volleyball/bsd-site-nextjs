@@ -52,6 +52,7 @@ interface FormData {
     role: string
     male: boolean
     onboarding_completed: boolean
+    captain_eligible: boolean
     createdAt: string
     updatedAt: string
 }
@@ -136,6 +137,7 @@ function userToFormData(user: UserDetails): FormData {
         role: user.role ?? "",
         male: user.male ?? false,
         onboarding_completed: user.onboarding_completed ?? false,
+        captain_eligible: user.captain_eligible ?? true,
         createdAt: user.createdAt
             ? new Date(user.createdAt).toLocaleString()
             : "",
@@ -244,7 +246,8 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
                 referred_by: formData.referred_by || null,
                 pronouns: formData.pronouns || null,
                 male: formData.male,
-                onboarding_completed: formData.onboarding_completed
+                onboarding_completed: formData.onboarding_completed,
+                captain_eligible: formData.captain_eligible
             })
 
             if (result.status) {
@@ -326,7 +329,8 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
         { key: "skill_passer", label: "Skill: Passer" },
         { key: "skill_other", label: "Skill: Other" },
         { key: "male", label: "Male" },
-        { key: "onboarding_completed", label: "Onboarding Completed" }
+        { key: "onboarding_completed", label: "Onboarding Completed" },
+        { key: "captain_eligible", label: "Captain Eligible" }
     ]
 
     return (

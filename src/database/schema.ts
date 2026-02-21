@@ -44,7 +44,10 @@ export const users = pgTable("users", {
     male: boolean("male"),
     onboarding_completed: boolean("onboarding_completed").$defaultFn(
         () => false
-    )
+    ),
+    captain_eligible: boolean("captain_eligible")
+        .$defaultFn(() => true)
+        .notNull()
 })
 
 export const sessions = pgTable("sessions", {
@@ -189,12 +192,8 @@ export const matchs = pgTable("matchs", {
     date: text("date"),
     time: text("time"),
     court: integer("court"),
-    home_team: integer("home_team")
-        .notNull()
-        .references(() => teams.id),
-    away_team: integer("away_team")
-        .notNull()
-        .references(() => teams.id),
+    home_team: integer("home_team").references(() => teams.id),
+    away_team: integer("away_team").references(() => teams.id),
     home_score: integer("home_score"),
     away_score: integer("away_score"),
     home_set1_score: integer("home_set1_score"),
@@ -220,13 +219,12 @@ export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
     week: integer("week").notNull(),
     match_num: integer("match_num").notNull(),
     match_id: integer("match_id").references(() => matchs.id),
-    date: text("date"),
-    time: text("time"),
-    court: integer("court"),
     bracket: text("bracket"),
     home_source: text("home_source").notNull(),
     away_source: text("away_source").notNull(),
-    work_assignment: text("work_assignment"),
+    next_match_num: integer("next_match_num"),
+    next_loser_match_num: integer("next_loser_match_num"),
+    work_team: integer("work_team").references(() => teams.id),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull()
