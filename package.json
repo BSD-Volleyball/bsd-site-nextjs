@@ -85,6 +85,9 @@
         "overrides": {
             "@g-loot/react-tournament-brackets>react": "$react",
             "@g-loot/react-tournament-brackets>react-dom": "$react-dom"
+        },
+        "patchedDependencies": {
+            "@g-loot/react-tournament-brackets": "patches/@g-loot__react-tournament-brackets.patch"
         }
     },
     "packageManager": "pnpm@10.12.1",
