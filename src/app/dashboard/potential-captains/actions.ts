@@ -13,6 +13,33 @@ import {
 import { eq, inArray, desc } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 
+export interface PotentialCaptainPlayerDetails {
+    id: string
+    first_name: string
+    last_name: string
+    preffered_name: string | null
+    pronouns: string | null
+    male: boolean | null
+    experience: string | null
+    assessment: string | null
+    height: number | null
+    skill_setter: boolean | null
+    skill_hitter: boolean | null
+    skill_passer: boolean | null
+    skill_other: boolean | null
+    picture: string | null
+}
+
+export interface PotentialCaptainDraftHistory {
+    seasonId: number
+    seasonYear: number
+    seasonName: string
+    divisionName: string
+    teamName: string
+    round: number
+    overall: number
+}
+
 interface PotentialCaptain {
     id: string
     displayName: string
@@ -49,6 +76,130 @@ interface PotentialCaptainsData {
     allSeasons: SeasonInfo[]
     emailTemplate?: string
     emailSubject?: string
+}
+
+export async function getPotentialCaptainPlayerDetails(
+    playerId: string
+): Promise<{
+    status: boolean
+    message?: string
+    player: PotentialCaptainPlayerDetails | null
+    draftHistory: PotentialCaptainDraftHistory[]
+    pairPickName: string | null
+    pairReason: string | null
+}> {
+    const hasAccess = await getIsCommissioner()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "You don't have permission to access this page.",
+            player: null,
+            draftHistory: [],
+            pairPickName: null,
+            pairReason: null
+        }
+    }
+
+    try {
+        const [player] = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                preffered_name: users.preffered_name,
+                pronouns: users.pronouns,
+                male: users.male,
+                experience: users.experience,
+                assessment: users.assessment,
+                height: users.height,
+                skill_setter: users.skill_setter,
+                skill_hitter: users.skill_hitter,
+                skill_passer: users.skill_passer,
+                skill_other: users.skill_other,
+                picture: users.picture
+            })
+            .from(users)
+            .where(eq(users.id, playerId))
+            .limit(1)
+
+        if (!player) {
+            return {
+                status: false,
+                message: "Player not found.",
+                player: null,
+                draftHistory: [],
+                pairPickName: null,
+                pairReason: null
+            }
+        }
+
+        const draftHistory = await db
+            .select({
+                seasonId: seasons.id,
+                seasonYear: seasons.year,
+                seasonName: seasons.season,
+                divisionName: divisions.name,
+                teamName: teams.name,
+                round: drafts.round,
+                overall: drafts.overall
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .innerJoin(seasons, eq(teams.season, seasons.id))
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(eq(drafts.user, playerId))
+            .orderBy(seasons.year, seasons.id)
+
+        let pairPickName: string | null = null
+        let pairReason: string | null = null
+
+        const [mostRecentSignup] = await db
+            .select({
+                pairPickId: signups.pair_pick,
+                pairReason: signups.pair_reason
+            })
+            .from(signups)
+            .where(eq(signups.player, playerId))
+            .orderBy(desc(signups.season), desc(signups.id))
+            .limit(1)
+
+        if (mostRecentSignup) {
+            pairReason = mostRecentSignup.pairReason
+
+            if (mostRecentSignup.pairPickId) {
+                const [pairUser] = await db
+                    .select({
+                        first_name: users.first_name,
+                        last_name: users.last_name
+                    })
+                    .from(users)
+                    .where(eq(users.id, mostRecentSignup.pairPickId))
+                    .limit(1)
+
+                if (pairUser) {
+                    pairPickName = `${pairUser.first_name} ${pairUser.last_name}`
+                }
+            }
+        }
+
+        return {
+            status: true,
+            player,
+            draftHistory,
+            pairPickName,
+            pairReason
+        }
+    } catch (error) {
+        console.error("Error fetching potential captain player details:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            player: null,
+            draftHistory: [],
+            pairPickName: null,
+            pairReason: null
+        }
+    }
 }
 
 export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData> {

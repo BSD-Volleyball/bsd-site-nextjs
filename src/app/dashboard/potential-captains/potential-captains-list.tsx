@@ -12,10 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import {
-    getPlayerDetails,
-    type PlayerDetails,
-    type PlayerDraftHistory
-} from "@/app/dashboard/player-lookup/actions"
+    getPotentialCaptainPlayerDetails,
+    type PotentialCaptainPlayerDetails,
+    type PotentialCaptainDraftHistory
+} from "./actions"
 import {
     BarChart,
     Bar,
@@ -75,10 +75,14 @@ export function PotentialCaptainsList({
     emailSubject: string
 }) {
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-    const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
+    const [playerDetails, setPlayerDetails] =
+        useState<PotentialCaptainPlayerDetails | null>(null)
+    const [draftHistory, setDraftHistory] = useState<
+        PotentialCaptainDraftHistory[]
+    >([])
+    const [playerDetailsError, setPlayerDetailsError] = useState<string | null>(
         null
     )
-    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -101,19 +105,19 @@ export function PotentialCaptainsList({
         setDraftHistory([])
         setPairPickName(null)
         setPairReason(null)
+        setPlayerDetailsError(null)
 
-        const result = await getPlayerDetails(playerId)
+        const result = await getPotentialCaptainPlayerDetails(playerId)
 
         if (result.status && result.player) {
             setPlayerDetails(result.player)
             setDraftHistory(result.draftHistory)
-
-            // Get pair info from most recent signup
-            if (result.signupHistory.length > 0) {
-                const mostRecentSignup = result.signupHistory[0]
-                setPairPickName(mostRecentSignup.pairPickName)
-                setPairReason(mostRecentSignup.pairReason)
-            }
+            setPairPickName(result.pairPickName)
+            setPairReason(result.pairReason)
+        } else {
+            setPlayerDetailsError(
+                result.message || "Failed to load player details."
+            )
         }
 
         setIsLoading(false)
@@ -125,6 +129,7 @@ export function PotentialCaptainsList({
         setDraftHistory([])
         setPairPickName(null)
         setPairReason(null)
+        setPlayerDetailsError(null)
     }, [])
 
     const togglePlayerSelection = (divisionId: number, playerId: string) => {
@@ -548,7 +553,7 @@ export function PotentialCaptainsList({
                                                         const draftBySeasonId =
                                                             new Map<
                                                                 number,
-                                                                PlayerDraftHistory
+                                                                PotentialCaptainDraftHistory
                                                             >()
                                                         for (const d of draftHistory) {
                                                             draftBySeasonId.set(
@@ -734,7 +739,7 @@ export function PotentialCaptainsList({
                                                             const draftBySeasonId =
                                                                 new Map<
                                                                     number,
-                                                                    PlayerDraftHistory
+                                                                    PotentialCaptainDraftHistory
                                                                 >()
                                                             for (const d of draftHistory) {
                                                                 draftBySeasonId.set(
@@ -790,7 +795,8 @@ export function PotentialCaptainsList({
 
                         {!isLoading && !playerDetails && (
                             <div className="p-8 text-center text-muted-foreground">
-                                Failed to load player details.
+                                {playerDetailsError ||
+                                    "Failed to load player details."}
                             </div>
                         )}
                     </div>
