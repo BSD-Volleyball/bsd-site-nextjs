@@ -804,15 +804,11 @@ function buildBracketData(
 
         // Only matches with one direct source (bye team) and one winner
         // reference need a BYE predecessor to balance the tree.
-        if (
-            !(homeIsDirect && awayIsWinRef) &&
-            !(awayIsDirect && homeIsWinRef)
-        )
+        if (!(homeIsDirect && awayIsWinRef) && !(awayIsDirect && homeIsWinRef))
             continue
 
         const byeSide = homeIsDirect ? "home" : "away"
-        const byeTeamId =
-            byeSide === "home" ? cm.homeTeamId : cm.awayTeamId
+        const byeTeamId = byeSide === "home" ? cm.homeTeamId : cm.awayTeamId
         const byeTeamLabel = resolveSideLabel(
             byeTeamId,
             byeSide === "home" ? cm.homeSource : cm.awaySource,

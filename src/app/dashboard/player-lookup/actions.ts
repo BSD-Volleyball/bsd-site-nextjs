@@ -9,9 +9,11 @@ import {
     seasons,
     drafts,
     teams,
-    divisions
+    divisions,
+    commissioners
 } from "@/database/schema"
-import { eq, desc } from "drizzle-orm"
+import { eq, desc, and } from "drizzle-orm"
+import { getSeasonConfig } from "@/lib/site-config"
 
 export interface PlayerListItem {
     id: string
@@ -131,6 +133,36 @@ export async function getPlayersForLookup(): Promise<{
     }
 }
 
+async function checkAdminOrCommissionerAccess(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session) return false
+
+    const [user] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1)
+
+    if (user?.role === "admin" || user?.role === "director") return true
+
+    // Check if user is a commissioner for the current season
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+
+    const [commissionerRecord] = await db
+        .select({ id: commissioners.id })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, config.seasonId),
+                eq(commissioners.commissioner, session.user.id)
+            )
+        )
+        .limit(1)
+
+    return !!commissionerRecord
+}
+
 export async function getPlayerDetails(playerId: string): Promise<{
     status: boolean
     message?: string
@@ -138,7 +170,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
     signupHistory: PlayerSignup[]
     draftHistory: PlayerDraftHistory[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkAdminOrCommissionerAccess()
     if (!hasAccess) {
         return {
             status: false,
