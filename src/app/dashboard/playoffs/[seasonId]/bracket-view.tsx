@@ -5,12 +5,12 @@ import dynamic from "next/dynamic"
 import type {
     MatchComponentProps,
     SvgWrapperProps
-} from "@g-loot/react-tournament-brackets"
+} from "@/lib/playoff-brackets"
 import type { BracketMatch } from "./actions"
 
 const DoubleEliminationBracket = dynamic(
     () =>
-        import("@g-loot/react-tournament-brackets").then(
+        import("@/lib/playoff-brackets").then(
             (mod) => mod.DoubleEliminationBracket
         ),
     { ssr: false }
