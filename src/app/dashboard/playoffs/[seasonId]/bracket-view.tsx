@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useRef, type MouseEvent as ReactMouseEvent } from "react"
 import dynamic from "next/dynamic"
 import type {
     MatchComponentProps,
@@ -18,29 +18,29 @@ const DoubleEliminationBracket = dynamic(
 
 // Must provide ALL properties — the library does NOT merge with defaults.
 const BRACKET_STYLE = {
-    width: 280,
-    boxHeight: 120,
-    canvasPadding: 25,
-    spaceBetweenColumns: 50,
-    spaceBetweenRows: 40,
+    width: 185,
+    boxHeight: 90,
+    canvasPadding: 12,
+    spaceBetweenColumns: 24,
+    spaceBetweenRows: 16,
     connectorColor: "#d1d5db",
     connectorColorHighlight: "#10b981",
     roundHeader: {
         isShown: true,
-        height: 25,
-        marginBottom: 25,
-        fontSize: 14,
+        height: 20,
+        marginBottom: 12,
+        fontSize: 11,
         fontColor: "#6b7280",
         backgroundColor: "transparent",
         fontFamily: "system-ui, sans-serif",
         roundTextGenerator: undefined
     },
-    roundSeparatorWidth: 24,
+    roundSeparatorWidth: 16,
     lineInfo: {
-        separation: -13,
+        separation: -10,
         homeVisitorSpread: 0.5
     },
-    horizontalOffset: 13,
+    horizontalOffset: 10,
     wonBywalkOverText: "WO",
     lostByNoShowText: "NS"
 }
@@ -52,8 +52,12 @@ function CustomMatch(props: MatchComponentProps) {
         bottomParty,
         topWon,
         bottomWon,
+        topHovered,
+        bottomHovered,
         teamNameFallback,
-        resultFallback
+        resultFallback,
+        onMouseEnter,
+        onMouseLeave
     } = props
     const bm = match as unknown as BracketMatch
 
@@ -74,9 +78,9 @@ function CustomMatch(props: MatchComponentProps) {
                     width: "100%",
                     height: "100%",
                     background: "var(--muted)",
-                    borderRadius: "6px",
+                    borderRadius: "4px",
                     border: "1px dashed var(--border)",
-                    fontSize: "11px",
+                    fontSize: "10px",
                     fontFamily: "system-ui, sans-serif",
                     color: "var(--muted-foreground)",
                     opacity: 0.7
@@ -96,10 +100,10 @@ function CustomMatch(props: MatchComponentProps) {
                 width: "100%",
                 height: "100%",
                 background: "var(--card)",
-                borderRadius: "6px",
+                borderRadius: "4px",
                 border: "1px solid var(--border)",
                 overflow: "hidden",
-                fontSize: "12px",
+                fontSize: "11px",
                 fontFamily: "system-ui, sans-serif",
                 color: "var(--foreground)"
             }}
@@ -108,8 +112,8 @@ function CustomMatch(props: MatchComponentProps) {
                 style={{
                     display: "flex",
                     justifyContent: "space-between",
-                    padding: "3px 8px",
-                    fontSize: "10px",
+                    padding: "2px 6px",
+                    fontSize: "9px",
                     color: "var(--muted-foreground)",
                     borderBottom: "1px solid var(--border)"
                 }}
@@ -128,19 +132,27 @@ function CustomMatch(props: MatchComponentProps) {
                 name={topParty?.name || teamNameFallback}
                 resultText={topParty?.resultText ?? resultFallback}
                 won={topWon}
+                hovered={topHovered}
+                partyId={topParty?.id}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
             />
             <PartyRow
                 name={bottomParty?.name || teamNameFallback}
                 resultText={bottomParty?.resultText ?? resultFallback}
                 won={bottomWon}
+                hovered={bottomHovered}
+                partyId={bottomParty?.id}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
             />
 
             {bm.scoresDisplay !== "\u2014" && (
                 <div
                     style={{
-                        fontSize: "9px",
+                        fontSize: "10px",
                         color: "var(--muted-foreground)",
-                        padding: "2px 8px 3px",
+                        padding: "2px 6px",
                         borderTop: "1px solid var(--border)"
                     }}
                 >
@@ -154,32 +166,51 @@ function CustomMatch(props: MatchComponentProps) {
 function PartyRow({
     name,
     resultText,
-    won
+    won,
+    hovered,
+    partyId,
+    onMouseEnter,
+    onMouseLeave
 }: {
     name: string
     resultText: string | null | undefined
     won: boolean
+    hovered: boolean
+    partyId?: string | number
+    onMouseEnter?: (partyId: string | number) => void
+    onMouseLeave?: () => void
 }) {
     return (
+        // biome-ignore lint/a11y: decorative hover highlight inside SVG bracket
         <div
             style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                padding: "4px 8px",
-                backgroundColor: won
-                    ? "rgba(16, 185, 129, 0.1)"
-                    : "transparent",
-                fontWeight: won ? 600 : 400,
-                color: won ? "#059669" : "var(--foreground)"
+                padding: "3px 6px",
+                backgroundColor: hovered
+                    ? "rgba(16, 185, 129, 0.15)"
+                    : won
+                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+                      : "transparent",
+                fontWeight: won || hovered ? 600 : 400,
+                color: hovered
+                    ? "#059669"
+                    : won
+                      ? "var(--primary)"
+                      : "var(--foreground)",
+                cursor: "pointer",
+                transition: "background-color 0.15s"
             }}
+            onMouseEnter={() => partyId && onMouseEnter?.(partyId)}
+            onMouseLeave={() => onMouseLeave?.()}
         >
             <span
                 style={{
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
-                    maxWidth: "170px"
+                    maxWidth: "105px"
                 }}
             >
                 {name}
@@ -197,9 +228,51 @@ function PartyRow({
 }
 
 function ScrollWrapper({ children }: SvgWrapperProps) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const dragging = useRef(false)
+    const startX = useRef(0)
+    const startY = useRef(0)
+    const scrollLeftRef = useRef(0)
+    const scrollTopRef = useRef(0)
+
+    const onMouseDown = (e: ReactMouseEvent) => {
+        const el = containerRef.current
+        if (!el) return
+        dragging.current = true
+        startX.current = e.clientX
+        startY.current = e.clientY
+        scrollLeftRef.current = el.scrollLeft
+        scrollTopRef.current = el.scrollTop
+        el.style.cursor = "grabbing"
+        el.style.userSelect = "none"
+    }
+
+    const onMouseMove = (e: ReactMouseEvent) => {
+        if (!dragging.current) return
+        const el = containerRef.current
+        if (!el) return
+        el.scrollLeft = scrollLeftRef.current - (e.clientX - startX.current)
+        el.scrollTop = scrollTopRef.current - (e.clientY - startY.current)
+    }
+
+    const onMouseUp = () => {
+        dragging.current = false
+        const el = containerRef.current
+        if (el) {
+            el.style.cursor = "grab"
+            el.style.userSelect = ""
+        }
+    }
+
     return (
+        // biome-ignore lint/a11y: drag-to-pan scroll container for bracket
         <div
-            style={{ overflowX: "auto", overflowY: "auto", maxHeight: "800px" }}
+            ref={containerRef}
+            style={{ overflow: "auto", cursor: "grab" }}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
         >
             {children}
         </div>
