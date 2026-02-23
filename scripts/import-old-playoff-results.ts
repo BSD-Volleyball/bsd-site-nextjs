@@ -41,13 +41,13 @@ interface ResolvedPlayoffMatch {
     homeRef: string
     awayRef: string
     workRef: string | null
-    homeTeamNum: number
-    awayTeamNum: number
+    homeTeamNum: number | null
+    awayTeamNum: number | null
     sets: ParsedSetScore[]
     homeWins: number
     awayWins: number
-    winnerTeamNum: number
-    loserTeamNum: number
+    winnerTeamNum: number | null
+    loserTeamNum: number | null
 }
 
 interface ParsedFile {
@@ -762,6 +762,10 @@ function resolveTeamRef(
 ): number | null {
     const normalized = ref.trim().replace(/^"|"$/g, "")
 
+    if (isByeLikeRef(normalized)) {
+        return null
+    }
+
     const directNum = Number.parseInt(normalized, 10)
     if (!Number.isNaN(directNum)) {
         return directNum
@@ -786,6 +790,10 @@ function resolveTeamRef(
     }
 
     return null
+}
+
+function isByeLikeRef(ref: string): boolean {
+    return /^(?:BYE|OPEN|TBD|-|NONE)$/i.test(ref.trim().replace(/^"|"$/g, ""))
 }
 
 function computeSetWins(sets: ParsedSetScore[]): {
@@ -919,15 +927,19 @@ async function resolveBracketMatches(
             loserByMatch
         )
 
-        if (!homeTeamNum) {
+        if (homeTeamNum === null && !isByeLikeRef(match.homeRef)) {
             homeTeamNum = await askTeamNumForRef(match.homeRef, parsed)
         }
 
-        if (!awayTeamNum) {
+        if (awayTeamNum === null && !isByeLikeRef(match.awayRef)) {
             awayTeamNum = await askTeamNumForRef(match.awayRef, parsed)
         }
 
-        if (homeTeamNum === awayTeamNum) {
+        if (
+            homeTeamNum !== null &&
+            awayTeamNum !== null &&
+            homeTeamNum === awayTeamNum
+        ) {
             const shouldProceed = await askYesNo(
                 `Match #${match.matchNum} resolved to same team (${homeTeamNum}) on both sides. Continue anyway?`,
                 "n"
@@ -941,22 +953,53 @@ async function resolveBracketMatches(
 
         let { homeWins, awayWins } = computeSetWins(match.sets)
 
-        if (homeWins === awayWins) {
+        // Handle BYE/placeholder side.
+        if (homeTeamNum !== null && awayTeamNum === null) {
+            homeWins = Math.max(homeWins, 1)
+            awayWins = 0
+        } else if (homeTeamNum === null && awayTeamNum !== null) {
+            homeWins = 0
+            awayWins = Math.max(awayWins, 1)
+        } else if (homeTeamNum === null && awayTeamNum === null) {
+            const shouldSkip = await askYesNo(
+                `Match #${match.matchNum} in ${parsed.fileName} resolved to no teams (both refs null/bye). Skip this match?`,
+                "y"
+            )
+            if (shouldSkip) {
+                continue
+            }
+        } else if (homeWins === awayWins) {
+            const resolvedHomeTeamNum = homeTeamNum as number
+            const resolvedAwayTeamNum = awayTeamNum as number
             const homeName =
-                parsed.teamNamesByNum.get(homeTeamNum) || `#${homeTeamNum}`
+                parsed.teamNamesByNum.get(resolvedHomeTeamNum) ||
+                `#${resolvedHomeTeamNum}`
             const awayName =
-                parsed.teamNamesByNum.get(awayTeamNum) || `#${awayTeamNum}`
+                parsed.teamNamesByNum.get(resolvedAwayTeamNum) ||
+                `#${resolvedAwayTeamNum}`
             const manual = await askNonTieGameWins(match, homeName, awayName)
             homeWins = manual.homeWins
             awayWins = manual.awayWins
         }
 
-        const homeWinsMatch = homeWins > awayWins
-        const winnerTeamNum = homeWinsMatch ? homeTeamNum : awayTeamNum
-        const loserTeamNum = homeWinsMatch ? awayTeamNum : homeTeamNum
+        let winnerTeamNum: number | null = null
+        let loserTeamNum: number | null = null
+        if (homeTeamNum !== null && awayTeamNum !== null) {
+            const homeWinsMatch = homeWins > awayWins
+            winnerTeamNum = homeWinsMatch ? homeTeamNum : awayTeamNum
+            loserTeamNum = homeWinsMatch ? awayTeamNum : homeTeamNum
+        } else if (homeTeamNum !== null && awayTeamNum === null) {
+            winnerTeamNum = homeTeamNum
+        } else if (homeTeamNum === null && awayTeamNum !== null) {
+            winnerTeamNum = awayTeamNum
+        }
 
-        winnerByMatch.set(match.matchNum, winnerTeamNum)
-        loserByMatch.set(match.matchNum, loserTeamNum)
+        if (winnerTeamNum !== null) {
+            winnerByMatch.set(match.matchNum, winnerTeamNum)
+        }
+        if (loserTeamNum !== null) {
+            loserByMatch.set(match.matchNum, loserTeamNum)
+        }
 
         resolved.push({
             week: match.week,
@@ -978,6 +1021,25 @@ async function resolveBracketMatches(
     }
 
     return resolved
+}
+
+function buildWinnerLoserMaps(matches: ResolvedPlayoffMatch[]): {
+    winnerByMatch: Map<number, number>
+    loserByMatch: Map<number, number>
+} {
+    const winnerByMatch = new Map<number, number>()
+    const loserByMatch = new Map<number, number>()
+
+    for (const match of matches) {
+        if (match.winnerTeamNum !== null) {
+            winnerByMatch.set(match.matchNum, match.winnerTeamNum)
+        }
+        if (match.loserTeamNum !== null) {
+            loserByMatch.set(match.matchNum, match.loserTeamNum)
+        }
+    }
+
+    return { winnerByMatch, loserByMatch }
 }
 
 async function maybeReplaceExistingMatches(
@@ -1196,11 +1258,24 @@ async function main() {
         }
 
         const rows = resolvedMatches.map((m) => {
-            const homeTeamId = teamMap.get(m.homeTeamNum)
-            const awayTeamId = teamMap.get(m.awayTeamNum)
-            const winnerTeamId = teamMap.get(m.winnerTeamNum)
+            const homeTeamId =
+                m.homeTeamNum !== null
+                    ? (teamMap.get(m.homeTeamNum) ?? null)
+                    : null
+            const awayTeamId =
+                m.awayTeamNum !== null
+                    ? (teamMap.get(m.awayTeamNum) ?? null)
+                    : null
+            const winnerTeamId =
+                m.winnerTeamNum !== null
+                    ? (teamMap.get(m.winnerTeamNum) ?? null)
+                    : null
 
-            if (!homeTeamId || !awayTeamId || !winnerTeamId) {
+            if (
+                (m.homeTeamNum !== null && homeTeamId === null) ||
+                (m.awayTeamNum !== null && awayTeamId === null) ||
+                (m.winnerTeamNum !== null && winnerTeamId === null)
+            ) {
                 throw new Error(
                     `Missing team mapping in ${fileName} for playoff match #${m.matchNum}`
                 )
@@ -1250,13 +1325,21 @@ async function main() {
             }
         }
 
+        const { winnerByMatch, loserByMatch } =
+            buildWinnerLoserMaps(resolvedMatches)
+
         const metaRowsWithoutMatchId = resolvedMatches.map((m) => {
             // Resolve work_team: workRef can be a team number or a
-            // bracket reference like "W3" / "L2" — try team number first.
+            // bracket reference like "W3" / "L2" / "Seed2".
             let workTeamId: number | null = null
             if (m.workRef) {
-                const workNum = Number.parseInt(m.workRef, 10)
-                if (!Number.isNaN(workNum)) {
+                const workNum = resolveTeamRef(
+                    m.workRef,
+                    parsed.seeds,
+                    winnerByMatch,
+                    loserByMatch
+                )
+                if (workNum !== null) {
                     workTeamId = teamMap.get(workNum) ?? null
                 }
             }
