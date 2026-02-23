@@ -126,20 +126,24 @@ function Match({
                     height: boxHeight,
                     rx: 4,
                     ry: 4,
-                    fill: "#f4f4f5",
-                    stroke: "#d1d5db",
-                    strokeWidth: 1,
-                    strokeDasharray: "4 2",
-                    opacity: 0.7
+                    style: {
+                        fill: "var(--muted)",
+                        stroke: "var(--border)",
+                        strokeWidth: 1,
+                        strokeDasharray: "4 2",
+                        opacity: 0.7
+                    }
                 }),
                 _jsx("text", {
                     x: width / 2,
                     y: boxHeight / 2,
                     textAnchor: "middle",
                     dominantBaseline: "central",
-                    fontSize: 10,
-                    fill: "#71717a",
-                    fontFamily: "system-ui, sans-serif",
+                    style: {
+                        fontSize: 10,
+                        fill: "var(--muted-foreground)",
+                        fontFamily: "system-ui, sans-serif"
+                    },
                     children: `${byeTeamName} (BYE)`
                 })
             ]
