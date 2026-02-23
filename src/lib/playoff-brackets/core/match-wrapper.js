@@ -17,6 +17,8 @@ function Match({
     matchComponent: MatchComponent,
     onMatchClick,
     onPartyClick,
+    x = 0,
+    y = 0,
     ...rest
 }) {
     const {
@@ -104,35 +106,38 @@ function Match({
     topParty.name = topParty.name || teamNameFallback
     topParty.resultText = topParty.resultText || resultFallback(topParty)
 
-    return _jsx("svg", {
-        width,
-        height: boxHeight,
-        viewBox: `0 0 ${width} ${boxHeight}`,
+    return _jsx("g", {
+        transform: `translate(${x}, ${y})`,
         ...rest,
-        children: _jsx("foreignObject", {
-            x: 0,
-            y: 0,
+        children: _jsx("svg", {
             width,
             height: boxHeight,
-            children:
-                MatchComponent &&
-                _jsx(MatchComponent, {
-                    match,
-                    onMatchClick,
-                    onPartyClick,
-                    onMouseEnter,
-                    onMouseLeave,
-                    topParty,
-                    bottomParty,
-                    topWon,
-                    bottomWon,
-                    topHovered,
-                    bottomHovered,
-                    topText,
-                    bottomText,
-                    connectorColor,
-                    computedStyles
-                })
+            viewBox: `0 0 ${width} ${boxHeight}`,
+            children: _jsx("foreignObject", {
+                x: 0,
+                y: 0,
+                width,
+                height: boxHeight,
+                children:
+                    MatchComponent &&
+                    _jsx(MatchComponent, {
+                        match,
+                        onMatchClick,
+                        onPartyClick,
+                        onMouseEnter,
+                        onMouseLeave,
+                        topParty,
+                        bottomParty,
+                        topWon,
+                        bottomWon,
+                        topHovered,
+                        bottomHovered,
+                        topText,
+                        bottomText,
+                        connectorColor,
+                        computedStyles
+                    })
+            })
         })
     })
 }
