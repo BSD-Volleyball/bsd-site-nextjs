@@ -3,7 +3,14 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, signups, drafts, teams, divisions, seasons } from "@/database/schema"
+import {
+    users,
+    signups,
+    drafts,
+    teams,
+    divisions,
+    seasons
+} from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
@@ -157,12 +164,15 @@ export async function getSeasonSignups(): Promise<{
         }
 
         // Fetch last draft information for each user
-        const lastDraftInfo = new Map<string, {
-            season: string
-            division: string
-            captain: string
-            overall: number
-        }>()
+        const lastDraftInfo = new Map<
+            string,
+            {
+                season: string
+                division: string
+                captain: string
+                overall: number
+            }
+        >()
 
         if (userIds.length > 0) {
             const draftData = await db

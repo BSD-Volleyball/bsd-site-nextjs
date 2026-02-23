@@ -81,11 +81,17 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
     }
 }
 
+function isPastLateDateET(lateDate: string): boolean {
+    const nowET = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
+    )
+    const target = new Date(lateDate)
+    return nowET >= target
+}
+
 export function getCurrentSeasonAmount(config: SeasonConfig): string {
     if (config.lateDate && config.lateAmount) {
-        const now = new Date()
-        const lateDate = new Date(config.lateDate)
-        if (now >= lateDate) {
+        if (isPastLateDateET(config.lateDate)) {
             return config.lateAmount
         }
     }
@@ -94,7 +100,7 @@ export function getCurrentSeasonAmount(config: SeasonConfig): string {
 
 export function isLatePricing(config: SeasonConfig): boolean {
     if (config.lateDate && config.lateAmount) {
-        return new Date() >= new Date(config.lateDate)
+        return isPastLateDateET(config.lateDate)
     }
     return false
 }

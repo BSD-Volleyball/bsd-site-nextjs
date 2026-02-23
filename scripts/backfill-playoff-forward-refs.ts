@@ -23,7 +23,9 @@ interface MetaRow {
     awaySource: string
 }
 
-function parseWinnerLoserRef(source: string): { kind: "winner" | "loser"; value: number } | null {
+function parseWinnerLoserRef(
+    source: string
+): { kind: "winner" | "loser"; value: number } | null {
     const normalized = source.trim().replace(/^"|"$/g, "").toUpperCase()
     const winnerMatch = normalized.match(/^W(?:INNER)?(\d+)$/)
     if (winnerMatch) {

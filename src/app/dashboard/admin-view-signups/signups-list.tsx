@@ -79,9 +79,13 @@ function generateCsvContent(signups: SignupEntry[]): string {
         escapeCsvField(entry.pairReason || ""),
         entry.male === true ? "M" : entry.male === false ? "F" : "",
         entry.age || "",
-        entry.captain === "yes" ? "Yes" :
-            entry.captain === "only_if_needed" ? "If needed" :
-            entry.captain === "no" ? "No" : "",
+        entry.captain === "yes"
+            ? "Yes"
+            : entry.captain === "only_if_needed"
+              ? "If needed"
+              : entry.captain === "no"
+                ? "No"
+                : "",
         entry.amountPaid || "",
         new Date(entry.signupDate).toLocaleDateString(),
         entry.experience || "",
@@ -100,12 +104,14 @@ function generateCsvContent(signups: SignupEntry[]): string {
         entry.lastDraftOverall !== null ? String(entry.lastDraftOverall) : ""
     ])
 
-    return [headers, ...rows]
-        .map(row => row.join(","))
-        .join("\n")
+    return [headers, ...rows].map((row) => row.join(",")).join("\n")
 }
 
-export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListProps) {
+export function SignupsList({
+    signups,
+    playerPicUrl,
+    seasonLabel
+}: SignupsListProps) {
     const [search, setSearch] = useState("")
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
@@ -132,7 +138,10 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
 
     const signupNumberById = useMemo(() => {
         return new Map(
-            signups.map((entry, index) => [entry.signupId, signups.length - index])
+            signups.map((entry, index) => [
+                entry.signupId,
+                signups.length - index
+            ])
         )
     }, [signups])
 
@@ -175,7 +184,7 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
     const handleDownloadCsv = () => {
         const csvContent = generateCsvContent(filteredSignups)
 
-        const blob = new Blob(["\ufeff" + csvContent], {
+        const blob = new Blob([`\ufeff${csvContent}`], {
             type: "text/csv;charset=utf-8;"
         })
 
@@ -289,7 +298,8 @@ export function SignupsList({ signups, playerPicUrl, seasonLabel }: SignupsListP
                                 onClick={() => handlePlayerClick(entry)}
                             >
                                 <td className="px-4 py-2 text-muted-foreground">
-                                    {signupNumberById.get(entry.signupId) ?? idx + 1}
+                                    {signupNumberById.get(entry.signupId) ??
+                                        idx + 1}
                                 </td>
                                 <td className="px-4 py-2 font-medium">
                                     <div className="flex items-center gap-2">

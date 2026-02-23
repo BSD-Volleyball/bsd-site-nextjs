@@ -731,7 +731,11 @@ export function WizardForm({
                             {!discount &&
                                 config.lateDate &&
                                 config.lateAmount &&
-                                (new Date() >= new Date(config.lateDate) ? (
+                                (new Date(
+                                    new Date().toLocaleString("en-US", {
+                                        timeZone: "America/New_York"
+                                    })
+                                ) >= new Date(config.lateDate) ? (
                                     <p className="text-amber-600 text-xs dark:text-amber-400">
                                         Late registration pricing is in effect
                                         (after{" "}
