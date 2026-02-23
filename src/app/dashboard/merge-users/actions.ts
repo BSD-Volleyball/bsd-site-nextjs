@@ -23,6 +23,7 @@ export interface UserOption {
     id: string
     name: string
     email: string
+    phone: string | null
     createdAt: Date
 }
 
@@ -54,6 +55,7 @@ export async function getOldUsers(): Promise<UserOption[]> {
             lastName: users.last_name,
             preferredName: users.preffered_name,
             email: users.email,
+            phone: users.phone,
             createdAt: users.createdAt
         })
         .from(users)
@@ -64,6 +66,7 @@ export async function getOldUsers(): Promise<UserOption[]> {
         id: u.id,
         name: `${u.preferredName || u.firstName} ${u.lastName}`,
         email: u.email,
+        phone: u.phone,
         createdAt: u.createdAt
     }))
 }
@@ -86,6 +89,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
             lastName: users.last_name,
             preferredName: users.preffered_name,
             email: users.email,
+            phone: users.phone,
             createdAt: users.createdAt
         })
         .from(users)
@@ -96,6 +100,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
         id: u.id,
         name: `${u.preferredName || u.firstName} ${u.lastName}`,
         email: u.email,
+        phone: u.phone,
         createdAt: u.createdAt
     }))
 }
