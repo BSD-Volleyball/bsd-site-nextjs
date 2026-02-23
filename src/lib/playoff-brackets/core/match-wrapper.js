@@ -1,4 +1,4 @@
-import { jsx as _jsx } from "react/jsx-runtime"
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime"
 import { useContext } from "react"
 import { defaultStyle, getCalculatedStyles } from "../settings"
 import { sortTeamsSeedOrder } from "./match-functions"
@@ -105,6 +105,46 @@ function Match({
         bottomParty.resultText || resultFallback(bottomParty)
     topParty.name = topParty.name || teamNameFallback
     topParty.resultText = topParty.resultText || resultFallback(topParty)
+
+    // BYE matches: render as pure SVG to avoid Safari foreignObject positioning bug
+    const isBye = match.name === "BYE"
+    if (isBye) {
+        const byeTeamName =
+            topParty.name && topParty.name !== "BYE"
+                ? topParty.name
+                : bottomParty.name && bottomParty.name !== "BYE"
+                  ? bottomParty.name
+                  : "TBD"
+        return _jsxs("g", {
+            transform: `translate(${x}, ${y})`,
+            ...rest,
+            children: [
+                _jsx("rect", {
+                    x: 0,
+                    y: 0,
+                    width,
+                    height: boxHeight,
+                    rx: 4,
+                    ry: 4,
+                    fill: "#f4f4f5",
+                    stroke: "#d1d5db",
+                    strokeWidth: 1,
+                    strokeDasharray: "4 2",
+                    opacity: 0.7
+                }),
+                _jsx("text", {
+                    x: width / 2,
+                    y: boxHeight / 2,
+                    textAnchor: "middle",
+                    dominantBaseline: "central",
+                    fontSize: 10,
+                    fill: "#71717a",
+                    fontFamily: "system-ui, sans-serif",
+                    children: `${byeTeamName} (BYE)`
+                })
+            ]
+        })
+    }
 
     return _jsx("g", {
         transform: `translate(${x}, ${y})`,
