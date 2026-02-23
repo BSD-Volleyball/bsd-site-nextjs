@@ -15,6 +15,7 @@ const LowerBracket = ({
 }) => {
     const { canvasPadding, columnWidth, rowHeight, roundHeader } =
         calculatedStyles
+    const firstRoundMatchCount = columns[0]?.length || 0
     return columns.map((matchesColumn, columnIndex) =>
         matchesColumn.map((match, rowIndex) => {
             const { x, y } = calculatePositionOfMatchLowerBracket(
@@ -24,7 +25,8 @@ const LowerBracket = ({
                     canvasPadding,
                     columnWidth,
                     rowHeight,
-                    offsetY: upperBracketHeight
+                    offsetY: upperBracketHeight,
+                    firstRoundMatchCount
                 }
             )
             const previousBottomPosition = (rowIndex + 1) * 2 - 1
@@ -50,7 +52,8 @@ const LowerBracket = ({
                                         gameHeight,
                                         gameWidth,
                                         style: calculatedStyles,
-                                        offsetY: upperBracketHeight
+                                        offsetY: upperBracketHeight,
+                                        firstRoundMatchCount
                                     }
                                 )
                             ),
