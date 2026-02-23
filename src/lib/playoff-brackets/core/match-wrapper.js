@@ -109,18 +109,17 @@ function Match({
     return _jsx("g", {
         transform: `translate(${x}, ${y})`,
         ...rest,
-        children: _jsx("svg", {
+        children: _jsx("foreignObject", {
+            x: 0,
+            y: 0,
             width,
             height: boxHeight,
-            viewBox: `0 0 ${width} ${boxHeight}`,
-            children: _jsx("foreignObject", {
-                x: 0,
-                y: 0,
-                width,
-                height: boxHeight,
-                children:
-                    MatchComponent &&
-                    _jsx(MatchComponent, {
+            children:
+                MatchComponent &&
+                _jsx("div", {
+                    xmlns: "http://www.w3.org/1999/xhtml",
+                    style: { width: `${width}px`, height: `${boxHeight}px` },
+                    children: _jsx(MatchComponent, {
                         match,
                         onMatchClick,
                         onPartyClick,
@@ -137,7 +136,7 @@ function Match({
                         connectorColor,
                         computedStyles
                     })
-            })
+                })
         })
     })
 }
