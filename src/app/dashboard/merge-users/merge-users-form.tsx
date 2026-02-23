@@ -41,7 +41,7 @@ function UserCombobox({
         const q = search.toLowerCase()
         return (
             u.name.toLowerCase().includes(q) ||
-            u.email.toLowerCase().includes(q)
+            (u.phone?.toLowerCase().includes(q) ?? false)
         )
     })
 
@@ -63,6 +63,7 @@ function UserCombobox({
                     {selectedUser ? (
                         <span className="truncate">
                             {selectedUser.name} ({selectedUser.email})
+                            {selectedUser.phone && ` - ${selectedUser.phone}`}
                         </span>
                     ) : (
                         <span className="text-muted-foreground">
@@ -78,7 +79,7 @@ function UserCombobox({
                 <div className="border-b p-2">
                     <Input
                         ref={inputRef}
-                        placeholder="Search by name or email..."
+                        placeholder="Search by name or phone..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="h-8"
@@ -105,7 +106,7 @@ function UserCombobox({
                             >
                                 <span className="font-medium">{user.name}</span>
                                 <span className="text-muted-foreground text-xs">
-                                    {user.email}
+                                    {user.phone || "No phone"}
                                 </span>
                             </button>
                         ))
