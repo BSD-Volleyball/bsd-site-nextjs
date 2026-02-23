@@ -60,36 +60,7 @@ function CustomMatch(props: MatchComponentProps) {
         onMouseLeave
     } = props
     const bm = match as unknown as BracketMatch
-
-    // BYE placeholder — render a minimal muted card
-    if (bm.matchNum < 0) {
-        const byeTeam =
-            topParty?.name && topParty.name !== "BYE"
-                ? topParty.name
-                : bottomParty?.name && bottomParty.name !== "BYE"
-                  ? bottomParty.name
-                  : teamNameFallback
-        return (
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "100%",
-                    background: "var(--muted)",
-                    borderRadius: "4px",
-                    border: "1px dashed var(--border)",
-                    fontSize: "10px",
-                    fontFamily: "system-ui, sans-serif",
-                    color: "var(--muted-foreground)",
-                    opacity: 0.7
-                }}
-            >
-                <span>{byeTeam} (BYE)</span>
-            </div>
-        )
-    }
+    const isBye = bm.matchNum < 0
 
     return (
         <div
@@ -99,65 +70,92 @@ function CustomMatch(props: MatchComponentProps) {
                 justifyContent: "center",
                 width: "100%",
                 height: "100%",
-                background: "var(--card)",
+                background: isBye ? "var(--muted)" : "var(--card)",
                 borderRadius: "4px",
-                border: "1px solid var(--border)",
+                border: isBye
+                    ? "1px dashed var(--border)"
+                    : "1px solid var(--border)",
                 overflow: "hidden",
                 fontSize: "11px",
                 fontFamily: "system-ui, sans-serif",
-                color: "var(--foreground)"
+                color: "var(--foreground)",
+                opacity: isBye ? 0.7 : 1
             }}
         >
-            <div
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    padding: "2px 6px",
-                    fontSize: "9px",
-                    color: "var(--muted-foreground)",
-                    borderBottom: "1px solid var(--border)"
-                }}
-            >
-                <span>
-                    #{bm.matchNum} W{bm.week}
-                </span>
-                <span>
-                    {bm.date || "TBD"}
-                    {bm.time ? ` ${bm.time}` : ""}
-                    {bm.court !== null ? ` Ct${bm.court}` : ""}
-                </span>
-            </div>
-
-            <PartyRow
-                name={topParty?.name || teamNameFallback}
-                resultText={topParty?.resultText ?? resultFallback}
-                won={topWon}
-                hovered={topHovered}
-                partyId={topParty?.id}
-                onMouseEnter={onMouseEnter}
-                onMouseLeave={onMouseLeave}
-            />
-            <PartyRow
-                name={bottomParty?.name || teamNameFallback}
-                resultText={bottomParty?.resultText ?? resultFallback}
-                won={bottomWon}
-                hovered={bottomHovered}
-                partyId={bottomParty?.id}
-                onMouseEnter={onMouseEnter}
-                onMouseLeave={onMouseLeave}
-            />
-
-            {bm.scoresDisplay !== "\u2014" && (
+            {isBye ? (
                 <div
                     style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flex: 1,
                         fontSize: "10px",
-                        color: "var(--muted-foreground)",
-                        padding: "2px 6px",
-                        borderTop: "1px solid var(--border)"
+                        color: "var(--muted-foreground)"
                     }}
                 >
-                    Sets: {bm.scoresDisplay}
+                    <span>
+                        {topParty?.name && topParty.name !== "BYE"
+                            ? topParty.name
+                            : bottomParty?.name && bottomParty.name !== "BYE"
+                              ? bottomParty.name
+                              : teamNameFallback}{" "}
+                        (BYE)
+                    </span>
                 </div>
+            ) : (
+                <>
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            padding: "2px 6px",
+                            fontSize: "9px",
+                            color: "var(--muted-foreground)",
+                            borderBottom: "1px solid var(--border)"
+                        }}
+                    >
+                        <span>
+                            #{bm.matchNum} W{bm.week}
+                        </span>
+                        <span>
+                            {bm.date || "TBD"}
+                            {bm.time ? ` ${bm.time}` : ""}
+                            {bm.court !== null ? ` Ct${bm.court}` : ""}
+                        </span>
+                    </div>
+
+                    <PartyRow
+                        name={topParty?.name || teamNameFallback}
+                        resultText={topParty?.resultText ?? resultFallback}
+                        won={topWon}
+                        hovered={topHovered}
+                        partyId={topParty?.id}
+                        onMouseEnter={onMouseEnter}
+                        onMouseLeave={onMouseLeave}
+                    />
+                    <PartyRow
+                        name={bottomParty?.name || teamNameFallback}
+                        resultText={bottomParty?.resultText ?? resultFallback}
+                        won={bottomWon}
+                        hovered={bottomHovered}
+                        partyId={bottomParty?.id}
+                        onMouseEnter={onMouseEnter}
+                        onMouseLeave={onMouseLeave}
+                    />
+
+                    {bm.scoresDisplay !== "\u2014" && (
+                        <div
+                            style={{
+                                fontSize: "10px",
+                                color: "var(--muted-foreground)",
+                                padding: "2px 6px",
+                                borderTop: "1px solid var(--border)"
+                            }}
+                        >
+                            Sets: {bm.scoresDisplay}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )
