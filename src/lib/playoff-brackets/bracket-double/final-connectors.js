@@ -16,7 +16,8 @@ const FinalConnectors = ({
     numOfLowerRounds,
     lowerBracketHeight,
     upperBracketHeight,
-    gameHeight
+    gameHeight,
+    firstRoundLowerMatchCount = 0
 }) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const currentMatchPosition = calculatePositionOfFinalGame(
@@ -49,7 +50,8 @@ const FinalConnectors = ({
             canvasPadding,
             rowHeight,
             columnWidth,
-            offsetY: upperBracketHeight + offsetY
+            offsetY: upperBracketHeight + offsetY,
+            firstRoundMatchCount: firstRoundLowerMatchCount
         }
     )
     return _jsx(Connector, {

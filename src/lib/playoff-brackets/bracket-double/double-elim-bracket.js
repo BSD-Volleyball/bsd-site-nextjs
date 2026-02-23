@@ -205,7 +205,9 @@ const DoubleEliminationBracket = ({
                             gameWidth,
                             matchComponent,
                             onMatchClick,
-                            onPartyClick
+                            onPartyClick,
+                            firstRoundLowerMatchCount:
+                                lowerColumns[0]?.length || 0
                         }),
                         finalsArray?.length > 1 &&
                             _jsx(ExtraFinal, {

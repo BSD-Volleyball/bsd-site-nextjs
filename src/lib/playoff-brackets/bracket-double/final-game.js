@@ -20,7 +20,8 @@ const FinalGame = ({
     numOfUpperRounds,
     numOfLowerRounds,
     upperBracketHeight,
-    lowerBracketHeight
+    lowerBracketHeight,
+    firstRoundLowerMatchCount = 0
 }) => {
     const { canvasPadding, columnWidth, rowHeight, roundHeader } =
         calculatedStyles
@@ -49,7 +50,8 @@ const FinalGame = ({
                             lowerBracketHeight,
                             upperBracketHeight,
                             style: calculatedStyles,
-                            bracketSnippet
+                            bracketSnippet,
+                            firstRoundLowerMatchCount
                         }
                     )
                 ),

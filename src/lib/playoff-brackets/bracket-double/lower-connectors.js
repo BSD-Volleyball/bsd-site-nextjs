@@ -7,7 +7,8 @@ const ConnectorsLower = ({
     rowIndex,
     columnIndex,
     style,
-    offsetY = 0
+    offsetY = 0,
+    firstRoundMatchCount = 0
 }) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const currentMatchPosition = calculatePositionOfMatchLowerBracket(
@@ -17,7 +18,8 @@ const ConnectorsLower = ({
             canvasPadding,
             rowHeight,
             columnWidth,
-            offsetY
+            offsetY,
+            firstRoundMatchCount
         }
     )
     const previousBottomPosition = (rowIndex + 1) * 2 - 1
@@ -30,7 +32,8 @@ const ConnectorsLower = ({
                 canvasPadding,
                 rowHeight,
                 columnWidth,
-                offsetY
+                offsetY,
+                firstRoundMatchCount
             }
         )
     const previousBottomMatchPosition =
@@ -42,7 +45,8 @@ const ConnectorsLower = ({
                 canvasPadding,
                 rowHeight,
                 columnWidth,
-                offsetY
+                offsetY,
+                firstRoundMatchCount
             }
         )
     return _jsx(Connectors, {
