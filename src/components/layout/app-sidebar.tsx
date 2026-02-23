@@ -122,6 +122,16 @@ const adminNavItems = [
 
 const adminDangerNavItems = [
     {
+        title: "Create Week 1",
+        url: "/dashboard/create-week-1",
+        icon: RiCalendarLine
+    },
+    {
+        title: "Edit Week 1",
+        url: "/dashboard/edit-week-1",
+        icon: RiEditLine
+    },
+    {
         title: "Admin Create Teams",
         url: "/dashboard/admin-create-teams",
         icon: RiTeamLine
@@ -173,6 +183,11 @@ const commissionerNavItems = [
         title: "Create Teams",
         url: "/dashboard/create-teams",
         icon: RiTeamLine
+    },
+    {
+        title: "Draft Preseason Week 1",
+        url: "/dashboard/draft-preseason-week-1",
+        icon: RiCalendarLine
     }
 ]
 
@@ -305,7 +320,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [isCommissioner, setIsCommissioner] = useState(false)
+    const [_isCommissioner, setIsCommissioner] = useState(false)
     const [hasAdministrativeAccess, setHasAdministrativeAccess] =
         useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])

@@ -852,6 +852,22 @@ function buildBracketData(
         })
     }
 
+    // Null out nextMatchId/nextLooserMatchId that reference matches not in the
+    // bracket (e.g. an "if necessary" championship game that was never played).
+    const allIds = new Set([...upper, ...lower].map((m) => m.id))
+    for (const m of upper) {
+        if (m.nextMatchId !== null && !allIds.has(m.nextMatchId))
+            m.nextMatchId = null
+        if (m.nextLooserMatchId !== null && !allIds.has(m.nextLooserMatchId))
+            m.nextLooserMatchId = null
+    }
+    for (const m of lower) {
+        if (m.nextMatchId !== null && !allIds.has(m.nextMatchId))
+            m.nextMatchId = null
+        if (m.nextLooserMatchId !== null && !allIds.has(m.nextLooserMatchId))
+            m.nextLooserMatchId = null
+    }
+
     return { upper, lower }
 }
 
