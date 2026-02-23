@@ -33,12 +33,22 @@ export interface MatchComponentProps {
     match: Match
     onMatchClick?: (...args: unknown[]) => void
     onPartyClick?: (...args: unknown[]) => void
-    onMouseEnter?: (match: Match) => void
-    onMouseLeave?: (match: Match) => void
-    topParty?: { name?: string; resultText?: string | null }
-    bottomParty?: { name?: string; resultText?: string | null }
+    onMouseEnter?: (partyId: string | number) => void
+    onMouseLeave?: () => void
+    topParty?: {
+        id?: string | number
+        name?: string
+        resultText?: string | null
+    }
+    bottomParty?: {
+        id?: string | number
+        name?: string
+        resultText?: string | null
+    }
     topWon: boolean
     bottomWon: boolean
+    topHovered: boolean
+    bottomHovered: boolean
     topText: string
     bottomText: string
     connectorColor?: string
