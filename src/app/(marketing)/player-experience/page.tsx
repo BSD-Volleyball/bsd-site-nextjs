@@ -8,22 +8,22 @@ const divisions = [
     {
         name: "AA Division",
         description:
-            "Bumping, setting and hitting on nearly every rally. Hitters put the ball down hard and usually face double blocking. Skilled setters can place balls strategically. Comparable to USAV B or Gaithersburg City's BB league."
+            "Passing, setting and hitting on nearly every rally. Hitters put the ball down hard and usually face double blocking. Skilled setters can place balls strategically. Comparable to USAV B."
     },
     {
         name: "A Division",
         description:
-            "Bumping, setting and hitting on nearly every rally. The better hitter can hit hard and put the ball down, usually against single blocking. Play features longer rallies with fewer kills than AA. Players demonstrate solid defensive abilities. Similar to lower USAV B level."
+            "Passing, setting and hitting on nearly every rally. The better hitter can hit hard and put the ball down, usually against single blocking. Play features longer rallies with fewer kills than AA. Players demonstrate solid defensive abilities. Similar to lower USAV B level."
     },
     {
         name: "AB Division (now split into ABA And ABB)",
         description:
-            "The defining characteristic is consistency. Players attempt the fundamental techniques, but execution varies between excellent plays and occasional lapses. Many competitors here could advance with improved consistency. Resembles Gaithersburg City's B league."
+            "The defining characteristic is consistency. Players attempt the fundamental techniques, but execution varies between excellent plays and occasional lapses. Many competitors here could advance with improved consistency."
     },
     {
         name: "BBB Division",
         description:
-            "Clearly a step above beginning players. Teams attempt to score by bumping, setting and spiking. Players understand court positioning and can sustain extended rallies. Slightly below Gaithersburg City's B league."
+            "Clearly a step above beginning players. Teams attempt to score by bumping, setting and spiking. Players understand court positioning and can sustain extended rallies."
     },
     {
         name: "BB Division",
