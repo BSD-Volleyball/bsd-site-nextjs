@@ -78,8 +78,7 @@ async function main() {
             }
         }
 
-        const genderSplit =
-            fiveThreeCount >= sixTwoCount ? "5-3" : "6-2"
+        const genderSplit = fiveThreeCount >= sixTwoCount ? "5-3" : "6-2"
 
         console.log(
             `  Season ${pairing.season}, Division ${pairing.division}: ${pairing.teamCount} teams, gender_split="${genderSplit}" (5-3: ${fiveThreeCount} teams, 6-2: ${sixTwoCount} teams)`

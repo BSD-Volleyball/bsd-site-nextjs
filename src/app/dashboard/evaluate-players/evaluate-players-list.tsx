@@ -43,13 +43,16 @@ function getAverageRatingDisplay(
     const averageLevel = player.averageEvaluation
 
     // Find the closest division by level to the average level
-    const division = divisions.reduce<DivisionOption | null>((closest, current) => {
-        if (!closest) return current
-        return Math.abs(current.level - averageLevel) <
-            Math.abs(closest.level - averageLevel)
-            ? current
-            : closest
-    }, null)
+    const division = divisions.reduce<DivisionOption | null>(
+        (closest, current) => {
+            if (!closest) return current
+            return Math.abs(current.level - averageLevel) <
+                Math.abs(closest.level - averageLevel)
+                ? current
+                : closest
+        },
+        null
+    )
     const divisionName = division?.name || "Unknown"
 
     return `${divisionName} (${averageLevel.toFixed(1)} from ${player.evaluationCount})`
@@ -297,7 +300,9 @@ export function EvaluatePlayersList({
                                                     </span>
                                                 </TooltipTrigger>
                                                 <TooltipContent>
-                                                    {getEvaluatorTooltip(player)}
+                                                    {getEvaluatorTooltip(
+                                                        player
+                                                    )}
                                                 </TooltipContent>
                                             </Tooltip>
                                         ) : (

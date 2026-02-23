@@ -26,11 +26,7 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import {
-    createTeams,
-    type DivisionOption,
-    type UserOption
-} from "./actions"
+import { createTeams, type DivisionOption, type UserOption } from "./actions"
 
 interface CreateTeamsFormProps {
     seasonLabel: string
@@ -325,7 +321,10 @@ export function CreateTeamsForm({
                         <Label htmlFor="division">
                             Division <span className="text-destructive">*</span>
                         </Label>
-                        <Select value={divisionId} onValueChange={setDivisionId}>
+                        <Select
+                            value={divisionId}
+                            onValueChange={setDivisionId}
+                        >
                             <SelectTrigger id="division">
                                 <SelectValue placeholder="Select a division" />
                             </SelectTrigger>
@@ -360,7 +359,9 @@ export function CreateTeamsForm({
                                             </Label>
                                             <UserCombobox
                                                 users={users}
-                                                value={captains[index].captainId}
+                                                value={
+                                                    captains[index].captainId
+                                                }
                                                 onChange={(userId, user) =>
                                                     handleCaptainChange(
                                                         index,
@@ -373,7 +374,9 @@ export function CreateTeamsForm({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor={`team-name-${index}`}>
+                                            <Label
+                                                htmlFor={`team-name-${index}`}
+                                            >
                                                 Team Name{" "}
                                                 <span className="text-destructive">
                                                     *
@@ -410,7 +413,11 @@ export function CreateTeamsForm({
                     )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading} className="ml-auto">
+                    <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="ml-auto"
+                    >
                         {isLoading ? "Creating..." : "Create"}
                     </Button>
                 </CardFooter>

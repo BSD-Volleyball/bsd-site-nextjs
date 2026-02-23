@@ -51,7 +51,8 @@ export const calculatePositionOfMatchUpperBracket = (
         y: yResult + canvasPadding + offsetY
     }
 }
-export const returnLowerBracketColumnIndex = (columnIndex) => columnIndex
+export const returnLowerBracketColumnIndex = (columnIndex) =>
+    Math.ceil(columnIndex / 2)
 export const calculatePositionOfMatchLowerBracket = (
     rowIndex,
     columnIndex,

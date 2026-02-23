@@ -117,9 +117,11 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                                     </Label>
                                     <Input
                                         id={`name-${template.id}`}
-                                        value={formData[template.id]?.name || ""}
+                                        value={
+                                            formData[template.id]?.name || ""
+                                        }
                                         readOnly
-                                        className="bg-muted cursor-not-allowed"
+                                        className="cursor-not-allowed bg-muted"
                                     />
                                 </div>
 
@@ -180,7 +182,9 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
 
                                 <div className="flex justify-end">
                                     <Button
-                                        onClick={() => handleUpdate(template.id)}
+                                        onClick={() =>
+                                            handleUpdate(template.id)
+                                        }
                                         disabled={loading[template.id]}
                                     >
                                         {loading[template.id]

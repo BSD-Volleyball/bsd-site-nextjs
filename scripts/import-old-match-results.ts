@@ -5,7 +5,13 @@ import * as fs from "node:fs"
 import * as path from "node:path"
 import * as readline from "node:readline"
 import { db } from "../src/database/db"
-import { divisions, matchs, seasons, teams, users } from "../src/database/schema"
+import {
+    divisions,
+    matchs,
+    seasons,
+    teams,
+    users
+} from "../src/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 
 interface ParsedSetScore {
@@ -191,7 +197,10 @@ Options:
 }
 
 function normalizeDivisionName(value: string): string {
-    return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "")
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
 }
 
 function parseTitleSeasonAndDivision(title: string): {
@@ -215,7 +224,9 @@ function parseTitleSeasonAndDivision(title: string): {
 }
 
 function parsePlayDates(scriptText: string): string[] {
-    const playDatesMatch = scriptText.match(/var\s+playdates\s*=\s*\[([^\]]+)\]/i)
+    const playDatesMatch = scriptText.match(
+        /var\s+playdates\s*=\s*\[([^\]]+)\]/i
+    )
     if (!playDatesMatch) {
         throw new Error("Could not parse playdates array")
     }
@@ -246,7 +257,9 @@ function parseTeamList(scriptText: string): Map<number, string> {
 }
 
 function parseDefaultCourt(scriptText: string): number {
-    const courtMatch = scriptText.match(/dates\[d\]\.matches\[m\]\.court\s*=\s*(\d+)/)
+    const courtMatch = scriptText.match(
+        /dates\[d\]\.matches\[m\]\.court\s*=\s*(\d+)/
+    )
     if (!courtMatch) {
         return 0
     }
@@ -295,7 +308,9 @@ function parseMatches(scriptText: string): ParsedMatch[] {
         const date = playDates[dateIndex]
 
         if (!date) {
-            throw new Error(`Week ${week}: missing playdate for index ${dateIndex}`)
+            throw new Error(
+                `Week ${week}: missing playdate for index ${dateIndex}`
+            )
         }
 
         const matchRegex =
@@ -321,7 +336,9 @@ function parseMatches(scriptText: string): ParsedMatch[] {
                 const setMatch = matchBody.match(setRegex)
 
                 if (!setMatch) {
-                    throw new Error(`Week ${week}, ${timeMatch[1]}: missing set ${g + 1} score`)
+                    throw new Error(
+                        `Week ${week}, ${timeMatch[1]}: missing set ${g + 1} score`
+                    )
                 }
 
                 parsedSets.push({
@@ -371,10 +388,14 @@ function parseFile(filePath: string): ParsedFile {
 
     const parsedTitle = parseTitleSeasonAndDivision(titleMatch[1].trim())
     if (!parsedTitle) {
-        throw new Error(`Could not parse season/division from title: ${titleMatch[1]}`)
+        throw new Error(
+            `Could not parse season/division from title: ${titleMatch[1]}`
+        )
     }
 
-    const scriptBlocks = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)]
+    const scriptBlocks = [
+        ...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)
+    ]
     const dataScript =
         scriptBlocks.find((block) => block[1].includes("var teamlist"))?.[1] ||
         ""
@@ -433,7 +454,11 @@ async function resolveSeasonId(parsed: ParsedFile): Promise<number> {
 
 async function resolveDivisionId(parsed: ParsedFile): Promise<number> {
     const divisionRows = await db
-        .select({ id: divisions.id, name: divisions.name, level: divisions.level })
+        .select({
+            id: divisions.id,
+            name: divisions.name,
+            level: divisions.level
+        })
         .from(divisions)
         .orderBy(divisions.level)
 
@@ -444,7 +469,8 @@ async function resolveDivisionId(parsed: ParsedFile): Promise<number> {
 
     if (
         parsed.titleDivisionCode &&
-        normalizeDivisionName(parsed.titleDivisionCode) !== normalizedFileDivision
+        normalizeDivisionName(parsed.titleDivisionCode) !==
+            normalizedFileDivision
     ) {
         const proceed = await askYesNo(
             `Division mismatch in ${parsed.fileName}: filename=${parsed.divisionCode}, title=${parsed.titleDivisionCode}. Continue?`,
@@ -530,10 +556,16 @@ async function resolveTeamMap(
             !usedTeamIds.has(byNumber.id)
         ) {
             chosenTeam = byNumber
-        } else if (byNumber && byCaptainLastUnique && byNumber.id !== byCaptainLastUnique.id) {
+        } else if (
+            byNumber &&
+            byCaptainLastUnique &&
+            byNumber.id !== byCaptainLastUnique.id
+        ) {
             // Signals conflict: ask user which mapping to trust.
             const candidates = [byNumber, byCaptainLastUnique, ...teamRows]
-                .filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i)
+                .filter(
+                    (t, i, arr) => arr.findIndex((x) => x.id === t.id) === i
+                )
                 .filter((t) => !usedTeamIds.has(t.id))
 
             if (candidates.length === 0) {
@@ -549,7 +581,11 @@ async function resolveTeamMap(
                 candidates,
                 (team) => formatTeamOption(team)
             )
-        } else if (byNumber && !byCaptainLastUnique && byCaptainLast.length <= 1) {
+        } else if (
+            byNumber &&
+            !byCaptainLastUnique &&
+            byCaptainLast.length <= 1
+        ) {
             // Only number mapping is available.
             if (!usedTeamIds.has(byNumber.id)) {
                 chosenTeam = byNumber
@@ -561,7 +597,9 @@ async function resolveTeamMap(
             }
         } else if (byCaptainLast.length > 1) {
             // Ambiguous captain-last-name mapping: ask user.
-            const candidates = byCaptainLast.filter((t) => !usedTeamIds.has(t.id))
+            const candidates = byCaptainLast.filter(
+                (t) => !usedTeamIds.has(t.id)
+            )
             if (candidates.length > 0) {
                 chosenTeam = await askChoice(
                     `Captain last-name "${oldCaptainLastRaw}" matched multiple teams for old team #${teamNum} in ${parsed.fileName}. Choose target team:`,
@@ -711,7 +749,10 @@ async function main() {
             parsed = parseFile(filePath)
         } catch (error) {
             console.error(`Parse failed for ${fileName}:`, error)
-            const continueNext = await askYesNo("Skip this file and continue?", "y")
+            const continueNext = await askYesNo(
+                "Skip this file and continue?",
+                "y"
+            )
             if (continueNext) {
                 continue
             }
@@ -719,7 +760,9 @@ async function main() {
         }
 
         if (parsed.matches.length === 0) {
-            console.log("No regular-season matches found (weeks 1-6). Skipping.")
+            console.log(
+                "No regular-season matches found (weeks 1-6). Skipping."
+            )
             continue
         }
 

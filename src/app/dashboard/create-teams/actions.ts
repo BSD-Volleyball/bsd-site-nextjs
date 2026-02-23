@@ -206,7 +206,8 @@ export async function createTeams(
     if (signedUpCaptains.length !== uniqueCaptainIds.size) {
         return {
             status: false,
-            message: "All selected captains must be signed up for the current season."
+            message:
+                "All selected captains must be signed up for the current season."
         }
     }
 
