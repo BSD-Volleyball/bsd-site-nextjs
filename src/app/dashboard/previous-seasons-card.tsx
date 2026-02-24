@@ -12,7 +12,7 @@ import {
     DialogTitle,
     DialogDescription
 } from "@/components/ui/dialog"
-import { RiHistoryLine, RiStarFill } from "@remixicon/react"
+import { RiHistoryLine, RiStarFill, RiTrophyLine } from "@remixicon/react"
 
 export function PreviousSeasonsCard({
     previousSeasons
@@ -24,12 +24,16 @@ export function PreviousSeasonsCard({
     const [teamName, setTeamName] = useState("")
     const [players, setPlayers] = useState<TeamRosterPlayer[]>([])
     const [seasonLabel, setSeasonLabel] = useState("")
+    const [isChampionSeason, setIsChampionSeason] = useState(false)
+    const [championPicture, setChampionPicture] = useState<string | null>(null)
 
     async function handleRowClick(ps: PreviousSeason) {
         setSeasonLabel(
             `${ps.season.charAt(0).toUpperCase() + ps.season.slice(1)} ${ps.year}`
         )
         setTeamName(ps.teamName)
+        setIsChampionSeason(ps.champion)
+        setChampionPicture(ps.championPicture)
         setPlayers([])
         setOpen(true)
         setLoading(true)
@@ -88,7 +92,12 @@ export function PreviousSeasonsCard({
                                             {ps.divisionName}
                                         </td>
                                         <td className="py-2 pr-4">
-                                            {ps.teamName}
+                                            <span className="inline-flex items-center gap-2">
+                                                {ps.teamName}
+                                                {ps.champion && (
+                                                    <RiTrophyLine className="h-4 w-4 text-amber-500" />
+                                                )}
+                                            </span>
                                         </td>
                                         <td className="py-2">
                                             {ps.captainName}
@@ -102,13 +111,26 @@ export function PreviousSeasonsCard({
             </Card>
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
                     <DialogHeader>
-                        <DialogTitle>{teamName}</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            {teamName}
+                            {isChampionSeason && (
+                                <RiTrophyLine className="h-5 w-5 text-amber-500" />
+                            )}
+                        </DialogTitle>
                         <DialogDescription>
                             {seasonLabel} Roster
                         </DialogDescription>
                     </DialogHeader>
+                    {isChampionSeason && championPicture && (
+                        <img
+                            src={championPicture}
+                            alt={`${seasonLabel} championship team`}
+                            className="w-full rounded-md border object-cover"
+                            loading="lazy"
+                        />
+                    )}
                     {loading ? (
                         <p className="text-muted-foreground text-sm">
                             Loading roster...
