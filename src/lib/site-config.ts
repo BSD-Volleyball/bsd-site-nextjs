@@ -1,5 +1,5 @@
 import { db } from "@/database/db"
-import { seasons, signups } from "@/database/schema"
+import { seasons, signups, waitlist } from "@/database/schema"
 import { eq, desc, count, and } from "drizzle-orm"
 
 export interface SeasonConfig {
@@ -134,7 +134,18 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
             .where(eq(signups.season, config.seasonId))
 
         if (result && result.total >= maxPlayers) {
-            return false
+            const [waitlistEntry] = await db
+                .select({ approved: waitlist.approved })
+                .from(waitlist)
+                .where(
+                    and(
+                        eq(waitlist.season, config.seasonId),
+                        eq(waitlist.user, userId)
+                    )
+                )
+                .limit(1)
+
+            return waitlistEntry?.approved ?? false
         }
     }
 

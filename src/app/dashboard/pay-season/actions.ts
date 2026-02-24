@@ -10,8 +10,8 @@ import React from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { signups, users } from "@/database/schema"
-import { eq } from "drizzle-orm"
+import { signups, users, waitlist } from "@/database/schema"
+import { eq, and } from "drizzle-orm"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
@@ -253,6 +253,15 @@ export async function submitSeasonPayment(
                     created_at: new Date()
                 })
 
+                await db
+                    .delete(waitlist)
+                    .where(
+                        and(
+                            eq(waitlist.season, config.seasonId),
+                            eq(waitlist.user, session.user.id)
+                        )
+                    )
+
                 // Mark discount as used after successful payment
                 if (discountId && discountInfo) {
                     await markDiscountAsUsed(discountId)
@@ -371,6 +380,15 @@ export async function submitFreeSignup(
             play_1st_week: formData.play1stWeek,
             created_at: new Date()
         })
+
+        await db
+            .delete(waitlist)
+            .where(
+                and(
+                    eq(waitlist.season, config.seasonId),
+                    eq(waitlist.user, session.user.id)
+                )
+            )
 
         // Mark discount as used
         await markDiscountAsUsed(discountId)

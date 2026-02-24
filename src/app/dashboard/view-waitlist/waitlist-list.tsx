@@ -2,13 +2,15 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RiCloseLine } from "@remixicon/react"
 import {
     getPlayerDetails,
     type PlayerDetails
 } from "@/app/dashboard/player-lookup/actions"
-import type { WaitlistEntry } from "./actions"
+import { setWaitlistApproval, type WaitlistEntry } from "./actions"
+import { useRouter } from "next/navigation"
 
 interface WaitlistListProps {
     entries: WaitlistEntry[]
@@ -28,6 +30,7 @@ function getDisplayName(entry: WaitlistEntry): string {
 }
 
 export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
+    const router = useRouter()
     const [search, setSearch] = useState("")
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
@@ -35,6 +38,9 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
     )
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
+    const [approvalLoadingId, setApprovalLoadingId] = useState<number | null>(
+        null
+    )
 
     const filteredEntries = useMemo(() => {
         if (!search) return entries
@@ -69,6 +75,13 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
         setSelectedUserId(null)
         setPlayerDetails(null)
     }, [])
+
+    const handleToggleApproval = async (entry: WaitlistEntry) => {
+        setApprovalLoadingId(entry.waitlistId)
+        await setWaitlistApproval(entry.waitlistId, !entry.approved)
+        setApprovalLoadingId(null)
+        router.refresh()
+    }
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -120,6 +133,9 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Date Added
                             </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Approval
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -157,12 +173,37 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
                                         entry.createdAt
                                     ).toLocaleDateString()}
                                 </td>
+                                <td className="px-4 py-2">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            void handleToggleApproval(entry)
+                                        }}
+                                        disabled={
+                                            approvalLoadingId ===
+                                            entry.waitlistId
+                                        }
+                                        className={
+                                            entry.approved
+                                                ? "bg-red-600 text-white hover:bg-red-700"
+                                                : "bg-green-600 text-white hover:bg-green-700"
+                                        }
+                                    >
+                                        {approvalLoadingId === entry.waitlistId
+                                            ? "Saving..."
+                                            : entry.approved
+                                              ? "Unapprove"
+                                              : "Approve"}
+                                    </Button>
+                                </td>
                             </tr>
                         ))}
                         {filteredEntries.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={6}
+                                    colSpan={7}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No waitlist entries found.

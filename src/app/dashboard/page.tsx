@@ -39,7 +39,8 @@ async function getSeasonSignup(userId: string) {
             pairPickName: null,
             config,
             seasonFull: false,
-            onWaitlist: false
+            onWaitlist: false,
+            waitlistApproved: false
         }
     }
 
@@ -88,9 +89,10 @@ async function getSeasonSignup(userId: string) {
 
     // Check if user is on the waitlist
     let onWaitlist = false
-    if (seasonFull) {
+    let waitlistApproved = false
+    if (!signup) {
         const [waitlistEntry] = await db
-            .select({ id: waitlist.id })
+            .select({ id: waitlist.id, approved: waitlist.approved })
             .from(waitlist)
             .where(
                 and(eq(waitlist.season, season.id), eq(waitlist.user, userId))
@@ -98,9 +100,18 @@ async function getSeasonSignup(userId: string) {
             .limit(1)
 
         onWaitlist = !!waitlistEntry
+        waitlistApproved = waitlistEntry?.approved ?? false
     }
 
-    return { season, signup, pairPickName, config, seasonFull, onWaitlist }
+    return {
+        season,
+        signup,
+        pairPickName,
+        config,
+        seasonFull,
+        onWaitlist,
+        waitlistApproved
+    }
 }
 
 export interface PreviousSeason {
@@ -320,16 +331,37 @@ export default async function DashboardPage() {
                                     The {seasonLabel} season is currently full.
                                 </p>
                                 {signupStatus.onWaitlist ? (
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                                            <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                    signupStatus.waitlistApproved ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                                                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                                </div>
+                                                <p className="font-medium text-green-700 text-sm dark:text-green-400">
+                                                    You have been approved from
+                                                    the waitlist and can now
+                                                    complete your registration.
+                                                </p>
+                                            </div>
+                                            <Link
+                                                href="/dashboard/pay-season"
+                                                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
+                                            >
+                                                Sign-up Now
+                                            </Link>
                                         </div>
-                                        <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                                            You've expressed interest in
-                                            playing. We'll reach out if a spot
-                                            opens up!
-                                        </p>
-                                    </div>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                                                <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                                                You've expressed interest in
+                                                playing. We'll reach out if a
+                                                spot opens up!
+                                            </p>
+                                        </div>
+                                    )
                                 ) : (
                                     <div className="space-y-2">
                                         <p className="text-muted-foreground text-sm">
