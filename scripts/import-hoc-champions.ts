@@ -662,6 +662,7 @@ async function ensureUserForName(
         id: randomUUID(),
         first_name: parsed.firstName,
         last_name: parsed.lastName,
+        preffered_name: null,
         email
     }
 
