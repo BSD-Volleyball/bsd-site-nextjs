@@ -22,7 +22,8 @@ import {
     RiHistoryLine,
     RiLinksLine,
     RiUserSettingsLine,
-    RiMailLine
+    RiMailLine,
+    RiTrophyLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -68,7 +69,12 @@ const baseNavItems = [
     },
     { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
     { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
-    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine }
+    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine },
+    {
+        title: "Hall of Champions",
+        url: "/dashboard/hall-of-champions",
+        icon: RiTrophyLine
+    }
 ]
 
 const signupNavItem = {

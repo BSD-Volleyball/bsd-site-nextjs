@@ -254,6 +254,7 @@ export const champions = pgTable("champions", {
         .notNull()
         .references(() => divisions.id),
     picture: text("picture"),
+    picture2: text("picture2"),
     caption: text("caption")
 })
 
