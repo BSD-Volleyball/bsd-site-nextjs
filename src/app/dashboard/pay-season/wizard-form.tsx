@@ -127,6 +127,16 @@ export function WizardForm({
         }
     }, [paymentResult?.success, router])
 
+    useEffect(() => {
+        if (
+            paymentResult &&
+            !paymentResult.success &&
+            paymentResult.shouldRefresh
+        ) {
+            router.refresh()
+        }
+    }, [paymentResult, router])
+
     const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID!
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
 
