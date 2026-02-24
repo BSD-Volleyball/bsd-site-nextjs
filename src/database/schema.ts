@@ -278,6 +278,9 @@ export const waitlist = pgTable("waitlist", {
     user: text("user")
         .notNull()
         .references(() => users.id),
+    approved: boolean("approved")
+        .$defaultFn(() => false)
+        .notNull(),
     created_at: timestamp("created_at").notNull()
 })
 

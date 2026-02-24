@@ -11,8 +11,9 @@ import {
     teams,
     divisions
 } from "@/database/schema"
-import { eq, desc, inArray } from "drizzle-orm"
+import { eq, desc, inArray, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface WaitlistEntry {
     waitlistId: number
@@ -22,6 +23,7 @@ export interface WaitlistEntry {
     preferredName: string | null
     email: string
     male: boolean | null
+    approved: boolean
     createdAt: Date
     lastDivision: string | null
 }
@@ -78,6 +80,7 @@ export async function getSeasonWaitlist(): Promise<{
                 preferredName: users.preffered_name,
                 email: users.email,
                 male: users.male,
+                approved: waitlist.approved,
                 createdAt: waitlist.created_at
             })
             .from(waitlist)
@@ -128,6 +131,72 @@ export async function getSeasonWaitlist(): Promise<{
             message: "Something went wrong.",
             entries: [],
             seasonLabel: ""
+        }
+    }
+}
+
+export async function setWaitlistApproval(
+    waitlistId: number,
+    approved: boolean
+): Promise<{ status: boolean; message: string }> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return { status: false, message: "Unauthorized" }
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    try {
+        const config = await getSeasonConfig()
+        if (!config.seasonId) {
+            return { status: false, message: "No current season found." }
+        }
+
+        const [entry] = await db
+            .select({
+                id: waitlist.id,
+                userId: waitlist.user
+            })
+            .from(waitlist)
+            .where(
+                and(
+                    eq(waitlist.id, waitlistId),
+                    eq(waitlist.season, config.seasonId)
+                )
+            )
+            .limit(1)
+
+        if (!entry) {
+            return { status: false, message: "Waitlist entry not found." }
+        }
+
+        await db
+            .update(waitlist)
+            .set({ approved })
+            .where(eq(waitlist.id, waitlistId))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "waitlist",
+            entityId: waitlistId.toString(),
+            summary: `${approved ? "Approved" : "Unapproved"} waitlist entry for user ${entry.userId}`
+        })
+
+        return {
+            status: true,
+            message: approved
+                ? "Player approved from waitlist."
+                : "Player unapproved on waitlist."
+        }
+    } catch (error) {
+        console.error("Error updating waitlist approval:", error)
+        return {
+            status: false,
+            message: "Something went wrong."
         }
     }
 }
