@@ -11,7 +11,7 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { signups, users, waitlist } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, count } from "drizzle-orm"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
@@ -158,6 +158,62 @@ export interface PaymentResult {
     message: string
     paymentId?: string
     receiptUrl?: string
+    shouldRefresh?: boolean
+}
+
+async function validateFinalSignupAvailability(
+    userId: string,
+    seasonId: number,
+    maxPlayersValue: string
+): Promise<{
+    ok: boolean
+    message?: string
+    shouldRefresh?: boolean
+}> {
+    const [existingSignup] = await db
+        .select({ id: signups.id })
+        .from(signups)
+        .where(and(eq(signups.season, seasonId), eq(signups.player, userId)))
+        .limit(1)
+
+    if (existingSignup) {
+        return {
+            ok: false,
+            message: "You are already registered for this season.",
+            shouldRefresh: true
+        }
+    }
+
+    const maxPlayers = parseInt(maxPlayersValue, 10)
+    if (!Number.isFinite(maxPlayers) || maxPlayers <= 0) {
+        return { ok: true }
+    }
+
+    const [waitlistEntry] = await db
+        .select({ approved: waitlist.approved })
+        .from(waitlist)
+        .where(and(eq(waitlist.season, seasonId), eq(waitlist.user, userId)))
+        .limit(1)
+
+    if (waitlistEntry?.approved) {
+        return { ok: true }
+    }
+
+    const [signupCount] = await db
+        .select({ total: count() })
+        .from(signups)
+        .where(eq(signups.season, seasonId))
+
+    if ((signupCount?.total ?? 0) >= maxPlayers) {
+        return {
+            ok: false,
+            message:
+                "We are at the max number of players for this season. Please join the waitlist from your dashboard.",
+            shouldRefresh: true
+        }
+    }
+
+    return { ok: true }
 }
 
 export async function fetchSeasonConfig(): Promise<SeasonConfig> {
@@ -222,6 +278,29 @@ export async function submitSeasonPayment(
         }
 
         const amountCents = BigInt(Math.round(parseFloat(finalAmount) * 100))
+
+        if (!config.seasonId) {
+            return {
+                success: false,
+                message: "Season not found."
+            }
+        }
+
+        const availabilityCheck = await validateFinalSignupAvailability(
+            session.user.id,
+            config.seasonId,
+            config.maxPlayers
+        )
+
+        if (!availabilityCheck.ok) {
+            return {
+                success: false,
+                message:
+                    availabilityCheck.message ||
+                    "Signups are currently unavailable.",
+                shouldRefresh: availabilityCheck.shouldRefresh
+            }
+        }
 
         const client = getSquareClient()
         const response = await client.payments.create({
@@ -362,6 +441,22 @@ export async function submitFreeSignup(
             return {
                 success: false,
                 message: "Season not found."
+            }
+        }
+
+        const availabilityCheck = await validateFinalSignupAvailability(
+            session.user.id,
+            config.seasonId,
+            config.maxPlayers
+        )
+
+        if (!availabilityCheck.ok) {
+            return {
+                success: false,
+                message:
+                    availabilityCheck.message ||
+                    "Signups are currently unavailable.",
+                shouldRefresh: availabilityCheck.shouldRefresh
             }
         }
 
