@@ -10,7 +10,8 @@ import {
     drafts,
     teams,
     divisions,
-    waitlist
+    waitlist,
+    champions
 } from "@/database/schema"
 import { eq, and, desc, count } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -121,6 +122,8 @@ export interface PreviousSeason {
     teamName: string
     captainName: string
     teamId: number
+    champion: boolean
+    championPicture: string | null
 }
 
 async function getPreviousSeasonsPlayed(
@@ -135,13 +138,16 @@ async function getPreviousSeasonsPlayed(
             teamId: teams.id,
             captainFirstName: users.first_name,
             captainLastName: users.last_name,
-            captainPreferredName: users.preffered_name
+            captainPreferredName: users.preffered_name,
+            championId: champions.id,
+            championPicture: champions.picture
         })
         .from(drafts)
         .innerJoin(teams, eq(drafts.team, teams.id))
         .innerJoin(seasons, eq(teams.season, seasons.id))
         .innerJoin(divisions, eq(teams.division, divisions.id))
         .innerJoin(users, eq(teams.captain, users.id))
+        .leftJoin(champions, eq(teams.id, champions.team))
         .where(eq(drafts.user, userId))
         .orderBy(desc(seasons.year), desc(seasons.id))
 
@@ -151,7 +157,9 @@ async function getPreviousSeasonsPlayed(
         divisionName: r.divisionName,
         teamName: r.teamName,
         teamId: r.teamId,
-        captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`
+        captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`,
+        champion: !!r.championId,
+        championPicture: r.championPicture
     }))
 }
 
