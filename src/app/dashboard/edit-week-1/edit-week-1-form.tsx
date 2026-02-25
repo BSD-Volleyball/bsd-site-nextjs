@@ -288,7 +288,12 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                 </Card>
             ))}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" asChild>
+                    <a href="/dashboard/edit-week-1/tryout-sheets">
+                        Download Week 1 Tryout PDF
+                    </a>
+                </Button>
                 <Button
                     type="button"
                     onClick={handleSubmit}

@@ -25,6 +25,7 @@ import {
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
+import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -165,6 +166,9 @@ async function getPreviousSeasonsPlayed(
 
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
+    const hasTryoutSheetAccess = session?.user
+        ? await hasCaptainPagesAccessBySession()
+        : false
 
     let signupStatus = null
     let userName: string | null = null
@@ -205,6 +209,28 @@ export default async function DashboardPage() {
                 title={greeting}
                 description="Here's what's happening with your account today."
             />
+
+            {hasTryoutSheetAccess && (
+                <Card className="max-w-md border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                            Week 1 Tryout Sheets
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-blue-700 text-sm dark:text-blue-300">
+                            Download the latest week 1 tryout sheets PDF for
+                            on-court evaluations.
+                        </p>
+                        <Link
+                            href="/dashboard/edit-week-1/tryout-sheets"
+                            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
+                        >
+                            Download Week 1 PDF
+                        </Link>
+                    </CardContent>
+                </Card>
+            )}
 
             {discount && signupStatus && !signupStatus.signup && (
                 <Card className="max-w-md border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">

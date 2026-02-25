@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
     Accordion,
     AccordionContent,
@@ -27,7 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
     savePlayerRatingNote,
-    savePlayerSkillRating,
+    savePlayerSkillRatings,
     type LookupType,
     type PlayerRatingValues,
     type RatePlayerEntry,
@@ -100,6 +100,7 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground" />
                         <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                             Old ID
                         </th>
@@ -115,7 +116,6 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
                         <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                             Last Division Played
                         </th>
-                        <th className="px-4 py-2.5 text-right font-medium text-muted-foreground" />
                     </tr>
                 </thead>
                 <tbody>
@@ -134,6 +134,15 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
                                 key={player.id}
                                 className="border-b transition-colors last:border-0 hover:bg-accent/50"
                             >
+                                <td className="px-4 py-2 text-left">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => onRate(player)}
+                                    >
+                                        Rate
+                                    </Button>
+                                </td>
                                 <td className="px-4 py-2 font-medium">
                                     {player.oldId ?? "—"}
                                 </td>
@@ -148,15 +157,6 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
                                 </td>
                                 <td className="px-4 py-2">
                                     {player.lastDivisionName || "—"}
-                                </td>
-                                <td className="px-4 py-2 text-right">
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={() => onRate(player)}
-                                    >
-                                        Rate
-                                    </Button>
                                 </td>
                             </tr>
                         ))
@@ -194,9 +194,12 @@ function SkillSlider({
                 disabled={disabled}
                 className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
             />
-            <div className="flex justify-between text-muted-foreground text-xs">
-                <span>0</span>
-                <span>4</span>
+            <div className="grid grid-cols-5 text-muted-foreground text-xs">
+                <span className="text-left">0</span>
+                <span className="text-center">1</span>
+                <span className="text-center">2</span>
+                <span className="text-center">3</span>
+                <span className="text-right">4</span>
             </div>
         </div>
     )
@@ -226,13 +229,16 @@ export function RatePlayerClient({
     const [serving, setServing] = useState(0)
     const [sharedNotes, setSharedNotes] = useState("")
     const [privateNotes, setPrivateNotes] = useState("")
-    const [savingSkill, setSavingSkill] = useState<RatingSkill | null>(null)
+    const [hasPendingSkillSave, setHasPendingSkillSave] = useState(false)
+    const [savingSkills, setSavingSkills] = useState(false)
     const [savingSharedNotes, setSavingSharedNotes] = useState(false)
     const [savingPrivateNotes, setSavingPrivateNotes] = useState(false)
     const [modalMessage, setModalMessage] = useState<{
         type: "success" | "error"
         text: string
     } | null>(null)
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const latestSaveRequestIdRef = useRef(0)
 
     useEffect(() => {
         if (!selectedPlayer) {
@@ -240,6 +246,11 @@ export function RatePlayerClient({
         }
 
         const rating = ratingsByPlayer[selectedPlayer.id] || getEmptyRating()
+        setHasPendingSkillSave(false)
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+            saveTimeoutRef.current = null
+        }
         setPassing(rating.passing ?? 0)
         setSetting(rating.setting ?? 0)
         setHitting(rating.hitting ?? 0)
@@ -247,6 +258,58 @@ export function RatePlayerClient({
         setSharedNotes(rating.sharedNotes || "")
         setPrivateNotes(rating.privateNotes || "")
     }, [selectedPlayer, ratingsByPlayer])
+
+    useEffect(() => {
+        if (!selectedPlayer || !hasPendingSkillSave) {
+            return
+        }
+
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+        }
+
+        const selectedPlayerId = selectedPlayer.id
+
+        saveTimeoutRef.current = setTimeout(async () => {
+            const requestId = latestSaveRequestIdRef.current + 1
+            latestSaveRequestIdRef.current = requestId
+            setSavingSkills(true)
+
+            const result = await savePlayerSkillRatings(selectedPlayerId, {
+                passing,
+                setting,
+                hitting,
+                serving
+            })
+
+            if (latestSaveRequestIdRef.current !== requestId) {
+                return
+            }
+
+            setSavingSkills(false)
+            setHasPendingSkillSave(false)
+            setModalMessage({
+                type: result.status ? "success" : "error",
+                text: result.message
+            })
+        }, 2000)
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current)
+                saveTimeoutRef.current = null
+            }
+        }
+    }, [selectedPlayer, hasPendingSkillSave, passing, setting, hitting, serving])
+
+    useEffect(
+        () => () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current)
+            }
+        },
+        []
+    )
 
     useEffect(() => {
         if (
@@ -301,6 +364,12 @@ export function RatePlayerClient({
     }
 
     const closeDialog = () => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+            saveTimeoutRef.current = null
+        }
+        setHasPendingSkillSave(false)
+        setSavingSkills(false)
         setIsDialogOpen(false)
         setSelectedPlayer(null)
         setModalMessage(null)
@@ -322,7 +391,7 @@ export function RatePlayerClient({
         })
     }
 
-    const handleSkillChange = async (skill: RatingSkill, value: number) => {
+    const handleSkillChange = (skill: RatingSkill, value: number) => {
         if (!selectedPlayer) {
             return
         }
@@ -340,19 +409,7 @@ export function RatePlayerClient({
         }
 
         updateRatingStateForPlayer(selectedPlayer.id, { [skill]: value })
-        setSavingSkill(skill)
-
-        const result = await savePlayerSkillRating(
-            selectedPlayer.id,
-            skill,
-            value
-        )
-
-        setSavingSkill(null)
-        setModalMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
+        setHasPendingSkillSave(true)
     }
 
     const handleSaveNotes = async (noteType: RatingNoteType) => {
@@ -585,7 +642,7 @@ export function RatePlayerClient({
                                 <SkillSlider
                                     label="Passing"
                                     value={passing}
-                                    disabled={savingSkill !== null}
+                                    disabled={false}
                                     onChange={(value) =>
                                         handleSkillChange("passing", value)
                                     }
@@ -593,7 +650,7 @@ export function RatePlayerClient({
                                 <SkillSlider
                                     label="Setting"
                                     value={setting}
-                                    disabled={savingSkill !== null}
+                                    disabled={false}
                                     onChange={(value) =>
                                         handleSkillChange("setting", value)
                                     }
@@ -601,7 +658,7 @@ export function RatePlayerClient({
                                 <SkillSlider
                                     label="Hitting"
                                     value={hitting}
-                                    disabled={savingSkill !== null}
+                                    disabled={false}
                                     onChange={(value) =>
                                         handleSkillChange("hitting", value)
                                     }
@@ -609,11 +666,17 @@ export function RatePlayerClient({
                                 <SkillSlider
                                     label="Serving"
                                     value={serving}
-                                    disabled={savingSkill !== null}
+                                    disabled={false}
                                     onChange={(value) =>
                                         handleSkillChange("serving", value)
                                     }
                                 />
+
+                                {savingSkills && (
+                                    <p className="text-muted-foreground text-sm">
+                                        Saving ratings...
+                                    </p>
+                                )}
 
                                 <div className="space-y-2">
                                     <Label htmlFor="shared_notes">
