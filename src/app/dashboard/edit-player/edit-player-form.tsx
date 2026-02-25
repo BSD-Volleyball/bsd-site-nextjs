@@ -355,7 +355,9 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 current
                     ? {
                           ...current,
-                          picture: uploadStart.pictureFilename ?? ""
+                          picture:
+                              finalizeResult.picturePath ||
+                              `/playerpics/${uploadStart.pictureFilename}`
                       }
                     : current
             )

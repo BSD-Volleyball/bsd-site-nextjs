@@ -24,6 +24,7 @@ import {
 } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
+    getPlayerPictureDbPath,
     getExpectedPlayerPictureFilename,
     getPlayerPictureObjectKey
 } from "@/lib/player-picture"
@@ -180,7 +181,7 @@ export async function createPlayerPictureUpload(userId: string): Promise<{
 export async function finalizePlayerPictureUpload(
     userId: string,
     pictureFilename: string
-): Promise<{ status: boolean; message: string }> {
+): Promise<{ status: boolean; message: string; picturePath?: string }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
@@ -218,10 +219,12 @@ export async function finalizePlayerPictureUpload(
             }
         }
 
+        const picturePath = getPlayerPictureDbPath(pictureFilename)
+
         await db
             .update(users)
             .set({
-                picture: pictureFilename,
+                picture: picturePath,
                 updatedAt: new Date()
             })
             .where(eq(users.id, userId))
@@ -239,7 +242,11 @@ export async function finalizePlayerPictureUpload(
             })
         }
 
-        return { status: true, message: "Player picture uploaded." }
+        return {
+            status: true,
+            message: "Player picture uploaded.",
+            picturePath
+        }
     } catch (error) {
         console.error("Error finalizing player picture upload:", error)
         return { status: false, message: "Failed to finalize picture upload." }
