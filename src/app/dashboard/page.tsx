@@ -25,7 +25,10 @@ import {
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
-import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import {
+    hasCaptainPagesAccessBySession,
+    isAdminOrDirectorBySession
+} from "@/lib/rbac"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -169,6 +172,9 @@ export default async function DashboardPage() {
     const hasTryoutSheetAccess = session?.user
         ? await hasCaptainPagesAccessBySession()
         : false
+    const hasNametagAccess = session?.user
+        ? await isAdminOrDirectorBySession()
+        : false
 
     let signupStatus = null
     let userName: string | null = null
@@ -222,12 +228,34 @@ export default async function DashboardPage() {
                             Download the latest week 1 tryout sheets PDF for
                             on-court evaluations.
                         </p>
-                        <Link
+                        <a
                             href="/dashboard/edit-week-1/tryout-sheets"
                             className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
                         >
                             Download Week 1 PDF
-                        </Link>
+                        </a>
+                    </CardContent>
+                </Card>
+            )}
+
+            {hasNametagAccess && (
+                <Card className="max-w-md">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">
+                            Week 1 Nametag Labels
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-muted-foreground text-sm">
+                            Download Avery 5164 nametag labels for Week 1
+                            sessions 1 and 2.
+                        </p>
+                        <a
+                            href="/dashboard/edit-week-1/nametags"
+                            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
+                        >
+                            Download Nametag PDF
+                        </a>
                     </CardContent>
                 </Card>
             )}
