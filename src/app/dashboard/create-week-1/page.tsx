@@ -52,6 +52,7 @@ export default async function CreateWeek1Page() {
                 seasonLabel={result.seasonLabel}
                 candidates={result.candidates}
                 groups={result.groups}
+                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>
     )
