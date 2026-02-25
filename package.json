@@ -11,6 +11,8 @@
         "check-authz": "node scripts/security/authz-regression-check.js"
     },
     "dependencies": {
+        "@aws-sdk/client-s3": "^3.997.0",
+        "@aws-sdk/s3-request-presigner": "^3.997.0",
         "@daveyplate/better-auth-ui": "^2.0.8",
         "@hookform/resolvers": "^5.1.1",
         "@marsidev/react-turnstile": "^1.4.2",

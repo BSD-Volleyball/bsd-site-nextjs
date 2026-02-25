@@ -22,6 +22,11 @@ import {
     invalidateAllSessionsForUser,
     isAdminOrDirectorBySession
 } from "@/lib/rbac"
+import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
+import {
+    getExpectedPlayerPictureFilename,
+    getPlayerPictureObjectKey
+} from "@/lib/player-picture"
 
 async function checkAdminAccess(): Promise<boolean> {
     return isAdminOrDirectorBySession()
@@ -107,6 +112,137 @@ export async function getUserDetails(
     } catch (error) {
         console.error("Error fetching user details:", error)
         return { status: false, message: "Failed to load user details." }
+    }
+}
+
+export async function createPlayerPictureUpload(userId: string): Promise<{
+    status: boolean
+    message?: string
+    uploadUrl?: string
+    pictureFilename?: string
+}> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return { status: false, message: "Unauthorized" }
+    }
+
+    try {
+        const [user] = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                old_id: users.old_id
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+
+        if (!user) {
+            return { status: false, message: "User not found." }
+        }
+
+        const pictureFilename = getExpectedPlayerPictureFilename(user)
+        if (!pictureFilename) {
+            if (!user.old_id || user.old_id <= 0) {
+                return {
+                    status: false,
+                    message:
+                        "User must have a valid old_id before uploading a picture."
+                }
+            }
+            return {
+                status: false,
+                message:
+                    "User must have first and last name initials before uploading a picture."
+            }
+        }
+
+        const uploadUrl = await createPlayerPictureUploadPresignedUrl({
+            key: getPlayerPictureObjectKey(pictureFilename),
+            contentType: "image/jpeg"
+        })
+
+        return {
+            status: true,
+            uploadUrl,
+            pictureFilename
+        }
+    } catch (error) {
+        console.error("Error creating player picture upload URL:", error)
+        return {
+            status: false,
+            message: "Failed to start picture upload."
+        }
+    }
+}
+
+export async function finalizePlayerPictureUpload(
+    userId: string,
+    pictureFilename: string
+): Promise<{ status: boolean; message: string }> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return { status: false, message: "Unauthorized" }
+    }
+
+    try {
+        const [user] = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                old_id: users.old_id
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+
+        if (!user) {
+            return { status: false, message: "User not found." }
+        }
+
+        const expectedFilename = getExpectedPlayerPictureFilename(user)
+        if (!expectedFilename) {
+            return {
+                status: false,
+                message:
+                    "User must have old_id and valid name initials before finalizing picture upload."
+            }
+        }
+
+        if (pictureFilename !== expectedFilename) {
+            return {
+                status: false,
+                message: "Uploaded filename does not match the expected format."
+            }
+        }
+
+        await db
+            .update(users)
+            .set({
+                picture: pictureFilename,
+                updatedAt: new Date()
+            })
+            .where(eq(users.id, userId))
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "users",
+                entityId: userId,
+                summary: `Admin uploaded player picture for ${user.first_name} ${user.last_name} (${userId}) as ${getPlayerPictureObjectKey(
+                    pictureFilename
+                )}`
+            })
+        }
+
+        return { status: true, message: "Player picture uploaded." }
+    } catch (error) {
+        console.error("Error finalizing player picture upload:", error)
+        return { status: false, message: "Failed to finalize picture upload." }
     }
 }
 

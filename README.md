@@ -40,6 +40,18 @@ pnpm install
 
 2. Configure environment variables (copy `.env.example` to `.env.local`)
 
+Required for player picture uploads to Cloudflare R2:
+- `PLAYER_PIC_URL` (public base URL used to display pictures, typically ending in `/playerpics/`)
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET`
+
+Player pictures are uploaded under the `playerpics/` prefix in the R2 bucket.
+
+R2 bucket CORS must allow browser `PUT` from your app origin with
+`Content-Type` header.
+
 3. Run database migrations:
 ```bash
 npx drizzle-kit migrate
