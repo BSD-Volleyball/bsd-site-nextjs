@@ -8,8 +8,19 @@ import { RiCloseLine, RiDownloadLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
     getPlayerDetails,
-    type PlayerDetails
+    type PlayerDetails,
+    type PlayerDraftHistory
 } from "@/app/dashboard/player-lookup/actions"
+import {
+    Bar,
+    BarChart,
+    Cell,
+    ReferenceArea,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from "recharts"
 import type { SignupEntry } from "./actions"
 
 interface SignupsListProps {
@@ -118,6 +129,7 @@ export function SignupsList({
     const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
         null
     )
+    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
 
@@ -165,11 +177,13 @@ export function SignupsList({
         setSelectedEntry(entry)
         setIsLoading(true)
         setPlayerDetails(null)
+        setDraftHistory([])
 
         const result = await getPlayerDetails(entry.userId)
 
         if (result.status && result.player) {
             setPlayerDetails(result.player)
+            setDraftHistory(result.draftHistory)
         }
 
         setIsLoading(false)
@@ -179,6 +193,7 @@ export function SignupsList({
         setSelectedUserId(null)
         setSelectedEntry(null)
         setPlayerDetails(null)
+        setDraftHistory([])
     }, [])
 
     const handleDownloadCsv = () => {
@@ -613,6 +628,235 @@ export function SignupsList({
                                             </div>
                                         </div>
                                     </div>
+
+                                    {draftHistory.length > 0 &&
+                                        (() => {
+                                            const divisionBands = [
+                                                {
+                                                    y1: 0,
+                                                    y2: 49,
+                                                    label: "AA",
+                                                    color: "#ef4444"
+                                                },
+                                                {
+                                                    y1: 50,
+                                                    y2: 99,
+                                                    label: "A",
+                                                    color: "#f97316"
+                                                },
+                                                {
+                                                    y1: 100,
+                                                    y2: 149,
+                                                    label: "ABA",
+                                                    color: "#eab308"
+                                                },
+                                                {
+                                                    y1: 150,
+                                                    y2: 199,
+                                                    label: "ABB",
+                                                    color: "#22c55e"
+                                                },
+                                                {
+                                                    y1: 200,
+                                                    y2: 249,
+                                                    label: "BBB",
+                                                    color: "#3b82f6"
+                                                },
+                                                {
+                                                    y1: 250,
+                                                    y2: 299,
+                                                    label: "BB",
+                                                    color: "#8b5cf6"
+                                                }
+                                            ]
+
+                                            const maxOverall = Math.max(
+                                                ...draftHistory.map(
+                                                    (draft) => draft.overall
+                                                )
+                                            )
+                                            const yMax = Math.min(
+                                                Math.ceil(
+                                                    (maxOverall + 10) / 50
+                                                ) * 50,
+                                                300
+                                            )
+                                            const visibleBands =
+                                                divisionBands.filter(
+                                                    (band) => band.y1 < yMax
+                                                )
+
+                                            return (
+                                                <div>
+                                                    <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                                                        Draft Pick History
+                                                    </h3>
+                                                    <div className="h-[300px] w-full">
+                                                        <ResponsiveContainer
+                                                            width="100%"
+                                                            height="100%"
+                                                        >
+                                                            <BarChart
+                                                                data={draftHistory.map(
+                                                                    (
+                                                                        draft
+                                                                    ) => ({
+                                                                        ...draft,
+                                                                        label: `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
+                                                                    })
+                                                                )}
+                                                                margin={{
+                                                                    top: 5,
+                                                                    right: 20,
+                                                                    bottom: 5,
+                                                                    left: 10
+                                                                }}
+                                                            >
+                                                                {visibleBands.map(
+                                                                    (band) => (
+                                                                        <ReferenceArea
+                                                                            key={
+                                                                                band.label
+                                                                            }
+                                                                            y1={
+                                                                                band.y1
+                                                                            }
+                                                                            y2={Math.min(
+                                                                                band.y2,
+                                                                                yMax
+                                                                            )}
+                                                                            fill={
+                                                                                band.color
+                                                                            }
+                                                                            fillOpacity={
+                                                                                0.15
+                                                                            }
+                                                                            ifOverflow="hidden"
+                                                                        />
+                                                                    )
+                                                                )}
+                                                                <XAxis
+                                                                    dataKey="label"
+                                                                    tick={{
+                                                                        fontSize: 12
+                                                                    }}
+                                                                />
+                                                                <YAxis
+                                                                    reversed
+                                                                    domain={[
+                                                                        0,
+                                                                        yMax
+                                                                    ]}
+                                                                    ticks={visibleBands.map(
+                                                                        (
+                                                                            band
+                                                                        ) =>
+                                                                            band.y1 +
+                                                                            25
+                                                                    )}
+                                                                    tickFormatter={(
+                                                                        value: number
+                                                                    ) => {
+                                                                        const band =
+                                                                            visibleBands.find(
+                                                                                (
+                                                                                    item
+                                                                                ) =>
+                                                                                    value >=
+                                                                                        item.y1 &&
+                                                                                    value <=
+                                                                                        item.y2
+                                                                            )
+
+                                                                        return (
+                                                                            band?.label ||
+                                                                            ""
+                                                                        )
+                                                                    }}
+                                                                    tick={{
+                                                                        fontSize: 11
+                                                                    }}
+                                                                    width={40}
+                                                                />
+                                                                <Tooltip
+                                                                    content={({
+                                                                        active,
+                                                                        payload
+                                                                    }) => {
+                                                                        if (
+                                                                            !active ||
+                                                                            !payload?.length
+                                                                        ) {
+                                                                            return null
+                                                                        }
+
+                                                                        const draft =
+                                                                            payload[0]
+                                                                                .payload
+
+                                                                        return (
+                                                                            <div className="rounded-md border bg-background p-3 text-sm shadow-md">
+                                                                                <p className="font-medium">
+                                                                                    {
+                                                                                        draft.label
+                                                                                    }
+                                                                                </p>
+                                                                                <p className="text-muted-foreground">
+                                                                                    Division:{" "}
+                                                                                    {
+                                                                                        draft.divisionName
+                                                                                    }
+                                                                                </p>
+                                                                                <p className="text-muted-foreground">
+                                                                                    Team:{" "}
+                                                                                    {
+                                                                                        draft.teamName
+                                                                                    }
+                                                                                </p>
+                                                                                <p className="text-muted-foreground">
+                                                                                    Round:{" "}
+                                                                                    {
+                                                                                        draft.round
+                                                                                    }
+                                                                                </p>
+                                                                                <p className="text-muted-foreground">
+                                                                                    Overall
+                                                                                    Pick:{" "}
+                                                                                    {
+                                                                                        draft.overall
+                                                                                    }
+                                                                                </p>
+                                                                            </div>
+                                                                        )
+                                                                    }}
+                                                                />
+                                                                <Bar
+                                                                    dataKey="overall"
+                                                                    radius={[
+                                                                        4, 4, 0,
+                                                                        0
+                                                                    ]}
+                                                                >
+                                                                    {draftHistory.map(
+                                                                        (
+                                                                            _,
+                                                                            index
+                                                                        ) => (
+                                                                            <Cell
+                                                                                key={
+                                                                                    index
+                                                                                }
+                                                                                className="fill-primary"
+                                                                            />
+                                                                        )
+                                                                    )}
+                                                                </Bar>
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })()}
                                 </CardContent>
                             </Card>
                         )}
