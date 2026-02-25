@@ -34,3 +34,7 @@ export function getExpectedPlayerPictureFilename(
 export function getPlayerPictureObjectKey(filename: string): string {
     return `${PLAYER_PICTURE_OBJECT_PREFIX}/${filename}`
 }
+
+export function getPlayerPictureDbPath(filename: string): string {
+    return `/${getPlayerPictureObjectKey(filename)}`
+}

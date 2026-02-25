@@ -9,6 +9,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { isCommissionerBySession } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
+    getPlayerPictureDbPath,
     getExpectedPlayerPictureFilename,
     getPlayerPictureObjectKey
 } from "@/lib/player-picture"
@@ -197,7 +198,7 @@ export async function createMissingPictureUpload(userId: string): Promise<{
 export async function finalizeMissingPictureUpload(
     userId: string,
     pictureFilename: string
-): Promise<{ status: boolean; message: string }> {
+): Promise<{ status: boolean; message: string; picturePath?: string }> {
     const hasAccess = await checkAddPicturesAccess()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
@@ -256,8 +257,10 @@ export async function finalizeMissingPictureUpload(
             }
         }
 
+        const picturePath = getPlayerPictureDbPath(pictureFilename)
+
         if (row.picture?.trim()) {
-            if (row.picture === pictureFilename) {
+            if (row.picture === picturePath) {
                 return { status: true, message: "Picture already uploaded." }
             }
             return {
@@ -269,7 +272,7 @@ export async function finalizeMissingPictureUpload(
         await db
             .update(users)
             .set({
-                picture: pictureFilename,
+                picture: picturePath,
                 updatedAt: new Date()
             })
             .where(eq(users.id, userId))
@@ -287,7 +290,11 @@ export async function finalizeMissingPictureUpload(
             })
         }
 
-        return { status: true, message: "Player picture uploaded." }
+        return {
+            status: true,
+            message: "Player picture uploaded.",
+            picturePath
+        }
     } catch (error) {
         console.error("Error finalizing missing picture upload:", error)
         return { status: false, message: "Failed to finalize picture upload." }
