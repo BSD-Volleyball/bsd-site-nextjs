@@ -8,19 +8,14 @@ import {
     finalizeMissingPictureUpload,
     type MissingPicturePlayer
 } from "./actions"
+import { compressImageForUpload } from "@/lib/image-compression"
 
 interface AddPicturesListProps {
     initialPlayers: MissingPicturePlayer[]
 }
 
-function isJpegFile(file: File): boolean {
-    const normalizedType = file.type.toLowerCase()
-    if (normalizedType === "image/jpeg" || normalizedType === "image/pjpeg") {
-        return true
-    }
-
-    const normalizedName = file.name.toLowerCase()
-    return normalizedName.endsWith(".jpg") || normalizedName.endsWith(".jpeg")
+function isSupportedImageFile(file: File): boolean {
+    return file.type.startsWith("image/")
 }
 
 export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
@@ -33,7 +28,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
     } | null>(null)
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-    const maxPictureUploadBytes = 5 * 1024 * 1024
+    const maxSourcePictureUploadBytes = 25 * 1024 * 1024
 
     const filteredPlayers = useMemo(() => {
         if (!search.trim()) {
@@ -84,19 +79,19 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
             return
         }
 
-        if (!isJpegFile(file)) {
+        if (!isSupportedImageFile(file)) {
             setMessage({
                 type: "error",
-                text: "Only JPG files are supported."
+                text: "Only image files are supported."
             })
             clearFileInput(player.userId)
             return
         }
 
-        if (file.size > maxPictureUploadBytes) {
+        if (file.size > maxSourcePictureUploadBytes) {
             setMessage({
                 type: "error",
-                text: "Picture must be 5MB or smaller."
+                text: "Image must be 25MB or smaller before compression."
             })
             clearFileInput(player.userId)
             return
@@ -106,6 +101,18 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
         setMessage(null)
 
         try {
+            let processedImage: { blob: Blob }
+            try {
+                processedImage = await compressImageForUpload(file)
+            } catch (error) {
+                console.error("Image compression failed:", error)
+                setMessage({
+                    type: "error",
+                    text: "Could not process that image. Please try another photo."
+                })
+                return
+            }
+
             const uploadStart = await createMissingPictureUpload(player.userId)
             if (
                 !uploadStart.status ||
@@ -131,7 +138,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                 headers: {
                     "Content-Type": "image/jpeg"
                 },
-                body: file
+                body: processedImage.blob
             })
 
             if (!uploadResponse.ok) {
@@ -235,7 +242,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                                             ] = node
                                         }}
                                         type="file"
-                                        accept="image/jpeg"
+                                        accept="image/*"
                                         capture="environment"
                                         className="hidden"
                                         disabled={
