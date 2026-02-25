@@ -11,7 +11,7 @@ import {
 } from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { hasViewSignupsAccessBySession } from "@/lib/rbac"
+import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
 export interface SignupPlayer {
     userId: string
@@ -29,8 +29,8 @@ export interface SignupGroup {
     players: SignupPlayer[]
 }
 
-export async function checkViewSignupsAccess(): Promise<boolean> {
-    return hasViewSignupsAccessBySession()
+export async function checkCaptainPagesAccess(): Promise<boolean> {
+    return hasCaptainPagesAccessBySession()
 }
 
 export interface SeasonInfo {
@@ -46,7 +46,7 @@ export async function getSignupsData(): Promise<{
     allSeasons: SeasonInfo[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkViewSignupsAccess()
+    const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
         return {
             status: false,

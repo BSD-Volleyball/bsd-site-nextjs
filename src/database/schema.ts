@@ -5,7 +5,8 @@ import {
     boolean,
     integer,
     serial,
-    numeric
+    numeric,
+    uniqueIndex
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -315,6 +316,36 @@ export const evaluations = pgTable("evaluations", {
         .notNull()
         .references(() => users.id)
 })
+
+export const playerRatings = pgTable(
+    "player_ratings",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        player: text("player")
+            .notNull()
+            .references(() => users.id),
+        evaluator: text("evaluator")
+            .notNull()
+            .references(() => users.id),
+        passing: integer("passing"),
+        setting: integer("setting"),
+        hitting: integer("hitting"),
+        serving: integer("serving"),
+        shared_notes: text("shared_notes"),
+        private_notes: text("private_notes"),
+        updated_at: timestamp("updated_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        seasonPlayerEvaluatorUnique: uniqueIndex(
+            "player_ratings_season_player_evaluator_unique"
+        ).on(table.season, table.player, table.evaluator)
+    })
+)
 
 export const commissioners = pgTable("commissioners", {
     id: serial("id").primaryKey(),

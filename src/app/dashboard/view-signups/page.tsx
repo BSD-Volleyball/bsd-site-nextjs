@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SignupsList } from "./signups-list"
-import { getSignupsData, checkViewSignupsAccess } from "./actions"
+import { getSignupsData, checkCaptainPagesAccess } from "./actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import type { Metadata } from "next"
@@ -19,7 +19,7 @@ export default async function ViewSignupsPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await checkViewSignupsAccess()
+    const hasAccess = await checkCaptainPagesAccess()
 
     if (!hasAccess) {
         redirect("/dashboard")

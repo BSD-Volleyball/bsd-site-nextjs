@@ -55,7 +55,7 @@ import {
     getSignupEligibility,
     getIsAdminOrDirector,
     getIsCommissioner,
-    getHasAdministrativeAccess,
+    getHasCaptainPagesAccess,
     getRecentSeasonsNav,
     type SeasonNavItem
 } from "@/app/dashboard/actions"
@@ -143,11 +143,6 @@ const adminDangerNavItems = [
         icon: RiTeamLine
     },
     {
-        title: "Draft Division",
-        url: "/dashboard/draft-division",
-        icon: RiFileList3Line
-    },
-    {
         title: "Select Commissioners",
         url: "/dashboard/select-commissioners",
         icon: RiUserSettingsLine
@@ -171,14 +166,9 @@ const adminDangerNavItems = [
 
 const commissionerNavItems = [
     {
-        title: "View Signups",
-        url: "/dashboard/view-signups",
-        icon: RiGroupLine
-    },
-    {
-        title: "Player Lookup",
-        url: "/dashboard/player-lookup-signups",
-        icon: RiSearchLine
+        title: "Draft Division",
+        url: "/dashboard/draft-division",
+        icon: RiFileList3Line
     },
     {
         title: "Add Pictures",
@@ -191,14 +181,32 @@ const commissionerNavItems = [
         icon: RiUserSettingsLine
     },
     {
-        title: "Create Teams",
-        url: "/dashboard/create-teams",
+        title: "Select Captains",
+        url: "/dashboard/select-captains",
         icon: RiTeamLine
     },
     {
         title: "Draft Preseason Week 1",
         url: "/dashboard/draft-preseason-week-1",
         icon: RiCalendarLine
+    }
+]
+
+const captainPagesNavItems = [
+    {
+        title: "View Signups",
+        url: "/dashboard/view-signups",
+        icon: RiGroupLine
+    },
+    {
+        title: "Player Lookup",
+        url: "/dashboard/player-lookup-signups",
+        icon: RiSearchLine
+    },
+    {
+        title: "Rate Player",
+        url: "/dashboard/rate-player",
+        icon: RiStarLine
     }
 ]
 
@@ -331,16 +339,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
-    const [_isCommissioner, setIsCommissioner] = useState(false)
-    const [hasAdministrativeAccess, setHasAdministrativeAccess] =
-        useState(false)
+    const [isCommissioner, setIsCommissioner] = useState(false)
+    const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
         getIsAdminOrDirector().then(setIsAdmin)
         getIsCommissioner().then(setIsCommissioner)
-        getHasAdministrativeAccess().then(setHasAdministrativeAccess)
+        getHasCaptainPagesAccess().then(setHasCaptainPagesAccess)
         getRecentSeasonsNav().then(setSeasonNav)
     }, [])
 
@@ -388,10 +395,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                {hasAdministrativeAccess && (
+                {hasCaptainPagesAccess && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Administrative
+                            Captain Pages
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={captainPagesNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isCommissioner && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Commissioners
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>

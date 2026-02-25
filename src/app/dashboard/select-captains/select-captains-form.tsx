@@ -28,7 +28,7 @@ import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import { createTeams, type DivisionOption, type UserOption } from "./actions"
 
-interface CreateTeamsFormProps {
+interface SelectCaptainsFormProps {
     seasonLabel: string
     divisions: DivisionOption[]
     users: UserOption[]
@@ -175,11 +175,11 @@ function UserCombobox({
     )
 }
 
-export function CreateTeamsForm({
+export function SelectCaptainsForm({
     seasonLabel = "",
     divisions,
     users
-}: CreateTeamsFormProps) {
+}: SelectCaptainsFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -302,8 +302,8 @@ export function CreateTeamsForm({
                 <CardHeader>
                     <CardTitle>Team Configuration</CardTitle>
                     <CardDescription>
-                        Create teams for the current season by selecting a
-                        division and captains.
+                        Select captains for the current season by choosing a
+                        division and players.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">

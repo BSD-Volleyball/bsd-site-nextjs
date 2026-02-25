@@ -10,7 +10,7 @@ import {
     divisions
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import { checkViewSignupsAccess } from "@/app/dashboard/view-signups/actions"
+import { checkCaptainPagesAccess } from "@/app/dashboard/view-signups/actions"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface PlayerListItem {
@@ -33,7 +33,7 @@ export async function getSignedUpPlayers(): Promise<{
     players: PlayerListItem[]
     allSeasons: SeasonInfo[]
 }> {
-    const hasAccess = await checkViewSignupsAccess()
+    const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -132,7 +132,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
     pairReason: string | null
     draftHistory: PlayerDraftHistory[]
 }> {
-    const hasAccess = await checkViewSignupsAccess()
+    const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
         return {
             status: false,

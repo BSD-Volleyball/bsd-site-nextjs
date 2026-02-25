@@ -6,7 +6,7 @@ import { db } from "@/database/db"
 import { users, seasons, divisions, teams, drafts } from "@/database/schema"
 import { eq, desc, and } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isCommissionerBySession } from "@/lib/rbac"
 
 export interface SeasonOption {
     id: number
@@ -37,8 +37,8 @@ export interface UserOption {
     picture: string | null
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
+async function checkCommissionersAccess(): Promise<boolean> {
+    return isCommissionerBySession()
 }
 
 export async function getDraftDivisionData(): Promise<{
@@ -48,7 +48,7 @@ export async function getDraftDivisionData(): Promise<{
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkCommissionersAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -118,7 +118,7 @@ export async function getTeamsForSeasonAndDivision(
     message?: string
     teams: TeamOption[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkCommissionersAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -165,7 +165,7 @@ export async function submitDraft(
     divisionLevel: number,
     picks: DraftPick[]
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkCommissionersAccess()
     if (!hasAccess) {
         return {
             status: false,
