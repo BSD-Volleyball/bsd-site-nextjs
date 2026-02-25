@@ -18,7 +18,8 @@ import { logAuditEntry } from "@/lib/audit-log"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
-    hasAdministrativeAccessBySession
+    hasAdministrativeAccessBySession,
+    hasCaptainPagesAccessBySession
 } from "@/lib/rbac"
 
 export async function getSignupEligibility(): Promise<boolean> {
@@ -41,6 +42,10 @@ export async function getIsCommissioner(): Promise<boolean> {
 
 export async function getHasAdministrativeAccess(): Promise<boolean> {
     return hasAdministrativeAccessBySession()
+}
+
+export async function getHasCaptainPagesAccess(): Promise<boolean> {
+    return hasCaptainPagesAccessBySession()
 }
 
 export interface SeasonNavDivision {

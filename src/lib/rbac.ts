@@ -86,6 +86,10 @@ export async function isCommissionerBySession(): Promise<boolean> {
 }
 
 export async function hasAdministrativeAccessBySession(): Promise<boolean> {
+    return hasCaptainPagesAccessBySession()
+}
+
+export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
     const userId = await getSessionUserId()
     if (!userId) {
         return false
@@ -110,7 +114,7 @@ export async function hasAdministrativeAccessBySession(): Promise<boolean> {
 }
 
 export async function hasViewSignupsAccessBySession(): Promise<boolean> {
-    return hasAdministrativeAccessBySession()
+    return hasCaptainPagesAccessBySession()
 }
 
 export async function invalidateAllSessionsForUser(
