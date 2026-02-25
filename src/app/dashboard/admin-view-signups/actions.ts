@@ -9,9 +9,12 @@ import {
     divisions,
     seasons
 } from "@/database/schema"
-import { eq, inArray, desc } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { logAuditEntry } from "@/lib/audit-log"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 
 export interface SignupEntry {
     signupId: number
@@ -257,6 +260,105 @@ export async function getSeasonSignups(): Promise<{
             message: "Something went wrong.",
             signups: [],
             seasonLabel: ""
+        }
+    }
+}
+
+export async function deleteSignupEntry(signupId: number): Promise<{
+    status: boolean
+    message: string
+}> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "Unauthorized"
+        }
+    }
+
+    if (!Number.isInteger(signupId) || signupId <= 0) {
+        return {
+            status: false,
+            message: "Invalid signup id."
+        }
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return {
+            status: false,
+            message: "Not authenticated."
+        }
+    }
+
+    try {
+        const config = await getSeasonConfig()
+
+        if (!config.seasonId) {
+            return {
+                status: false,
+                message: "No current season found."
+            }
+        }
+
+        const [signupRecord] = await db
+            .select({
+                id: signups.id,
+                season: signups.season,
+                player: signups.player,
+                age: signups.age,
+                captain: signups.captain,
+                pair: signups.pair,
+                pairPick: signups.pair_pick,
+                pairReason: signups.pair_reason,
+                datesMissing: signups.dates_missing,
+                playFirstWeek: signups.play_1st_week,
+                orderId: signups.order_id,
+                amountPaid: signups.amount_paid,
+                createdAt: signups.created_at
+            })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.id, signupId),
+                    eq(signups.season, config.seasonId)
+                )
+            )
+            .limit(1)
+
+        if (!signupRecord) {
+            return {
+                status: false,
+                message: "Signup entry not found for the current season."
+            }
+        }
+
+        await db
+            .delete(signups)
+            .where(
+                and(
+                    eq(signups.id, signupId),
+                    eq(signups.season, config.seasonId)
+                )
+            )
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "delete",
+            entityType: "signups",
+            entityId: signupId,
+            summary: `Deleted signup entry. Full deleted signup record: ${JSON.stringify(signupRecord)}`
+        })
+
+        return {
+            status: true,
+            message: "Signup entry deleted."
+        }
+    } catch (error) {
+        console.error("Error deleting signup entry:", error)
+        return {
+            status: false,
+            message: "Something went wrong."
         }
     }
 }

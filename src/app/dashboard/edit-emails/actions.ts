@@ -5,6 +5,7 @@ import { emailTemplates } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { auth } from "@/lib/auth"
+import { logAuditEntry } from "@/lib/audit-log"
 import { headers } from "next/headers"
 
 interface EmailTemplate {
@@ -121,6 +122,14 @@ export async function updateEmailTemplate(
                 updated_at: new Date()
             })
             .where(eq(emailTemplates.id, id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "email_template",
+            entityId: id,
+            summary: `Updated email template \"${name.trim()}\" (id ${id})`
+        })
 
         return {
             status: true,
