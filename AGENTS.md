@@ -15,6 +15,7 @@ pnpm dev
 pnpm build
 pnpm lint
 pnpm check-types
+pnpm check-authz
 ```
 
 Database and auth schema workflows:
@@ -46,10 +47,20 @@ npx @better-auth/cli generate
 - Co-locate mutations in `actions.ts` with `"use server"`.
 - Client forms/components generally use controlled state (`useState`) and call server actions.
 - After successful mutations, call `router.refresh()` in client components to resync server-rendered data.
-- Keep auth checks explicit in actions/components with:
-  - `auth.api.getSession({ headers: await headers() })`
-- Admin authorization is role-based via `users.role` (`admin` or `director`) and checked per action.
+- Keep auth and RBAC checks explicit in actions/components.
+- Prefer centralized authorization helpers in `src/lib/rbac.ts` instead of duplicating role checks in each file.
+- Use `auth.api.getSession({ headers: await headers() })` directly only when session data is needed for action payloads/logging.
+- Admin authorization is role-based via `users.role` (`admin` or `director`).
+- Commissioner/captain/admin access policy checks should go through shared helpers (for example `isCommissionerBySession`, `hasAdministrativeAccessBySession`, `hasViewSignupsAccessBySession`).
 - Administrative mutations should log audit entries through `logAuditEntry` when appropriate.
+
+## Security Patterns
+
+- Every exported server action must enforce authorization at the action boundary, even if the route/page is already protected.
+- For season-bound actions, validate incoming `seasonId` (positive integer) before querying.
+- Current commissioner policy is league-wide commissioner access for the active season (not division-scoped yet).
+- Role updates that change privilege should invalidate active sessions for the affected user.
+- Baseline HTTP security headers are configured in `next.config.ts` (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
 
 ## Database Conventions
 

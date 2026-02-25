@@ -9,6 +9,7 @@ pnpm dev              # Start development server with Turbopack
 pnpm build            # Production build
 pnpm lint             # Run Biome linter
 pnpm check-types      # TypeScript type checking
+pnpm check-authz      # Authorization regression guard/matrix checks
 
 # Database
 npx drizzle-kit generate   # Generate migration from schema changes
@@ -54,8 +55,27 @@ src/app/dashboard/volleyball-profile/
 
 Actions return `{ status: boolean; message: string; data?: T }`. After successful mutations, client components call `router.refresh()` to update server component data.
 
+Authorization and validation expectations for server actions:
+- Enforce authorization inside each exported action (do not rely only on page-level guards).
+- Prefer shared RBAC helpers from `src/lib/rbac.ts` over inline `checkAdminAccess` implementations.
+- Validate critical action inputs early (for example, season-bound actions should reject non-positive/non-integer `seasonId` values).
+
 ### Admin Authorization
-No middleware — authorization is checked per-action. Admin routes use a `checkAdminAccess()` helper that verifies `users.role` is `"admin"` or `"director"`. Admin actions log to audit_log via `logAuditEntry()` from `src/lib/audit-log.ts`. Admin sections are conditionally rendered in the sidebar.
+No middleware — authorization is checked per-action.
+
+Primary RBAC helpers now live in `src/lib/rbac.ts`:
+- `getSessionUserId()`
+- `isAdminOrDirector(userId)` / `isAdminOrDirectorBySession()`
+- `isCommissionerForSeason(userId, seasonId)` / `isCommissionerForCurrentSeason(userId)` / `isCommissionerBySession()`
+- `isCaptainForSeason(userId, seasonId)`
+- `hasAdministrativeAccessBySession()`
+- `hasViewSignupsAccessBySession()`
+
+Current policy:
+- Admin/director access is role-based via `users.role`.
+- Commissioner access is currently league-wide for the active season (future work may scope by division).
+- Admin actions should log to audit_log via `logAuditEntry()` from `src/lib/audit-log.ts`.
+- Role changes in admin tooling should invalidate active sessions for the affected user.
 
 ### Site Config System
 Dynamic configuration stored in the `site_config` database table (key-value pairs). Managed at `/dashboard/site-config`. Controls: season pricing, late pricing dates, max players, registration open/closed, tryout/season/playoff dates. Access via helpers in `src/lib/site-config.ts` (`getSeasonConfig()`, `getCurrentSeasonAmount()`, `checkSignupEligibility()`).
@@ -66,10 +86,19 @@ Dynamic configuration stored in the `site_config` database table (key-value pair
 
 ### Key Patterns
 - Use `auth.api.getSession({ headers: await headers() })` to get session in server components/actions
+- Use `src/lib/rbac.ts` helpers for role/scope checks to keep policy centralized
 - Import `@/*` paths map to `./src/*`
 - UI components from shadcn/ui in `src/components/ui/`
 - Layout components in `src/components/layout/`
 - Forms primarily use controlled components with `useState`, not react-hook-form
+
+### Security Headers
+Baseline HTTP security headers are configured in `next.config.ts`:
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
 
 ### Formatting
 - Biome linter with 4-space indentation

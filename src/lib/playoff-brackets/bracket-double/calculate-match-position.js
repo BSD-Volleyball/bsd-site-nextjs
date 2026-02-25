@@ -56,7 +56,14 @@ export const returnLowerBracketColumnIndex = (columnIndex) =>
 export const calculatePositionOfMatchLowerBracket = (
     rowIndex,
     columnIndex,
-    { canvasPadding, rowHeight, columnWidth, offsetX = 0, offsetY = 0, firstRoundMatchCount = 0 }
+    {
+        canvasPadding,
+        rowHeight,
+        columnWidth,
+        offsetX = 0,
+        offsetY = 0,
+        firstRoundMatchCount = 0
+    }
 ) => {
     let effectiveDepth = returnLowerBracketColumnIndex(columnIndex)
     // Cap depth so matches don't spread wider than first-round count allows

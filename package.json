@@ -7,7 +7,8 @@
         "build": "next build",
         "start": "next start",
         "lint": "biome check",
-        "check-types": "tsc --noEmit"
+        "check-types": "tsc --noEmit",
+        "check-authz": "node scripts/security/authz-regression-check.js"
     },
     "dependencies": {
         "@daveyplate/better-auth-ui": "^2.0.8",

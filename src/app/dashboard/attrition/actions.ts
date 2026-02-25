@@ -5,15 +5,10 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, drafts, teams } from "@/database/schema"
 import { eq, sql, count, max } from "drizzle-orm"
+import { isAdminOrDirector } from "@/lib/rbac"
 
 async function checkAdminAccess(userId: string): Promise<boolean> {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirector(userId)
 }
 
 export interface GenderAttritionData {

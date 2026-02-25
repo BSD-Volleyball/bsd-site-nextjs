@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { auth } from "@/lib/auth"
 import {
     users,
     seasons,
@@ -10,6 +11,7 @@ import {
     commissioners
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
+import { headers } from "next/headers"
 
 interface RosterPlayer {
     id: string
@@ -41,6 +43,25 @@ interface RosterData {
 }
 
 export async function getRosterData(seasonId: number): Promise<RosterData> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return {
+            status: false,
+            message: "Not authenticated.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
+    if (!Number.isInteger(seasonId) || seasonId <= 0) {
+        return {
+            status: false,
+            message: "Invalid season.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
     try {
         const [seasonRow] = await db
             .select({

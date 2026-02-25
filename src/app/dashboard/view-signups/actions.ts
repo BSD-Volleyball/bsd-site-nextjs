@@ -1,7 +1,5 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -9,11 +7,11 @@ import {
     drafts,
     teams,
     seasons,
-    divisions,
-    commissioners
+    divisions
 } from "@/database/schema"
-import { eq, inArray, and, desc } from "drizzle-orm"
+import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { hasViewSignupsAccessBySession } from "@/lib/rbac"
 
 export interface SignupPlayer {
     userId: string
@@ -31,77 +29,8 @@ export interface SignupGroup {
     players: SignupPlayer[]
 }
 
-async function checkIsAdminOrDirector(userId: string): Promise<boolean> {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
-}
-
-async function checkIsCommissioner(
-    userId: string,
-    seasonId: number
-): Promise<boolean> {
-    const [commissionerRecord] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
-            )
-        )
-        .limit(1)
-
-    return !!commissionerRecord
-}
-
-async function checkIsCaptain(
-    userId: string,
-    seasonId: number
-): Promise<boolean> {
-    const [captainRecord] = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
-        .limit(1)
-
-    return !!captainRecord
-}
-
 export async function checkViewSignupsAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        return false
-    }
-
-    const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return false
-    }
-
-    // Check if user is admin/director
-    const isAdmin = await checkIsAdminOrDirector(session.user.id)
-    if (isAdmin) {
-        return true
-    }
-
-    // Check if user is commissioner for current season
-    const isCommissioner = await checkIsCommissioner(
-        session.user.id,
-        config.seasonId
-    )
-    if (isCommissioner) {
-        return true
-    }
-
-    // Check if user is a captain for current season
-    const isCaptain = await checkIsCaptain(session.user.id, config.seasonId)
-    return isCaptain
+    return hasViewSignupsAccessBySession()
 }
 
 export interface SeasonInfo {

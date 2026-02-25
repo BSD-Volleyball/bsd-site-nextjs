@@ -1,13 +1,11 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { db } from "@/database/db"
-import { users } from "@/database/schema"
-import { eq } from "drizzle-orm"
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerLookupForm } from "./player-lookup-form"
 import { getPlayersForLookup } from "./actions"
 import type { Metadata } from "next"
+import { isAdminOrDirector, isCommissionerForCurrentSeason } from "@/lib/rbac"
 
 export const metadata: Metadata = {
     title: "Admin Player Lookup"
@@ -15,14 +13,15 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-async function checkAdminAccess(userId: string): Promise<boolean> {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
+async function checkAdminOrCommissionerAccess(
+    userId: string
+): Promise<boolean> {
+    const isAdmin = await isAdminOrDirector(userId)
+    if (isAdmin) {
+        return true
+    }
 
-    return user?.role === "admin" || user?.role === "director"
+    return isCommissionerForCurrentSeason(userId)
 }
 
 export default async function PlayerLookupPage() {
@@ -32,7 +31,7 @@ export default async function PlayerLookupPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await checkAdminOrCommissionerAccess(session.user.id)
 
     if (!hasAccess) {
         redirect("/dashboard")

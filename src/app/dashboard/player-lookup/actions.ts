@@ -1,7 +1,5 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -9,11 +7,10 @@ import {
     seasons,
     drafts,
     teams,
-    divisions,
-    commissioners
+    divisions
 } from "@/database/schema"
-import { eq, desc, and } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { eq, desc } from "drizzle-orm"
+import { isCommissionerBySession } from "@/lib/rbac"
 
 export interface PlayerListItem {
     id: string
@@ -80,17 +77,8 @@ export interface PlayerDraftHistory {
     overall: number
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+async function checkAdminOrCommissionerAccess(): Promise<boolean> {
+    return isCommissionerBySession()
 }
 
 export async function getPlayersForLookup(): Promise<{
@@ -98,7 +86,7 @@ export async function getPlayersForLookup(): Promise<{
     message?: string
     players: PlayerListItem[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await checkAdminOrCommissionerAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -131,36 +119,6 @@ export async function getPlayersForLookup(): Promise<{
             players: []
         }
     }
-}
-
-async function checkAdminOrCommissionerAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    if (user?.role === "admin" || user?.role === "director") return true
-
-    // Check if user is a commissioner for the current season
-    const config = await getSeasonConfig()
-    if (!config.seasonId) return false
-
-    const [commissionerRecord] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, config.seasonId),
-                eq(commissioners.commissioner, session.user.id)
-            )
-        )
-        .limit(1)
-
-    return !!commissionerRecord
 }
 
 export async function getPlayerDetails(playerId: string): Promise<{
