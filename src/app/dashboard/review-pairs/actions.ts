@@ -4,7 +4,8 @@ import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
 import { eq, and, isNotNull, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { logAuditEntry } from "@/lib/audit-log"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { revalidatePath } from "next/cache"
 
 export interface PairUser {
@@ -255,6 +256,11 @@ export async function bustMatchedPair(
     }
 
     try {
+        const actorId = await getSessionUserId()
+        if (!actorId) {
+            return { status: false, message: "Not authenticated." }
+        }
+
         const config = await getSeasonConfig()
         if (!config.seasonId) {
             return { status: false, message: "No current season found." }
@@ -272,6 +278,13 @@ export async function bustMatchedPair(
                     inArray(signups.player, [userAId, userBId])
                 )
             )
+
+        await logAuditEntry({
+            userId: actorId,
+            action: "update",
+            entityType: "signups",
+            summary: `Split matched pair (${userAId}, ${userBId}) for season ${config.seasonId}`
+        })
 
         revalidatePath("/dashboard/review-pairs")
         return { status: true, message: "Pair has been split." }
@@ -294,6 +307,11 @@ export async function bustUnmatchedPair(
     }
 
     try {
+        const actorId = await getSessionUserId()
+        if (!actorId) {
+            return { status: false, message: "Not authenticated." }
+        }
+
         const config = await getSeasonConfig()
         if (!config.seasonId) {
             return { status: false, message: "No current season found." }
@@ -311,6 +329,13 @@ export async function bustUnmatchedPair(
                     eq(signups.player, requesterId)
                 )
             )
+
+        await logAuditEntry({
+            userId: actorId,
+            action: "update",
+            entityType: "signups",
+            summary: `Removed unmatched pair request by ${requesterId} for season ${config.seasonId}`
+        })
 
         revalidatePath("/dashboard/review-pairs")
         return { status: true, message: "Pair request has been removed." }
@@ -338,6 +363,11 @@ export async function completeUnmatchedPair(
     }
 
     try {
+        const actorId = await getSessionUserId()
+        if (!actorId) {
+            return { status: false, message: "Not authenticated." }
+        }
+
         const config = await getSeasonConfig()
         if (!config.seasonId) {
             return { status: false, message: "No current season found." }
@@ -408,6 +438,13 @@ export async function completeUnmatchedPair(
                     eq(signups.player, requestedId)
                 )
             )
+
+        await logAuditEntry({
+            userId: actorId,
+            action: "update",
+            entityType: "signups",
+            summary: `Completed unmatched pair request (${requesterId} -> ${requestedId}) for season ${config.seasonId}`
+        })
 
         revalidatePath("/dashboard/review-pairs")
         return { status: true, message: "Pair has been completed." }

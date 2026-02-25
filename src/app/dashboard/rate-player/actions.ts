@@ -12,6 +12,7 @@ import {
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUserId, hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
 export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3"
@@ -454,6 +455,14 @@ export async function savePlayerSkillRating(
                 }
             })
 
+        await logAuditEntry({
+            userId: context.evaluatorId,
+            action: "update",
+            entityType: "player_rating",
+            entityId: playerId,
+            summary: `Saved ${skill} rating (${value}) for player ${playerId} in season ${context.seasonId}`
+        })
+
         return { status: true, message: "Rating saved." }
     } catch (error) {
         console.error("Error saving player skill rating:", error)
@@ -537,6 +546,14 @@ export async function savePlayerSkillRatings(
                 }
             })
 
+        await logAuditEntry({
+            userId: context.evaluatorId,
+            action: "update",
+            entityType: "player_rating",
+            entityId: playerId,
+            summary: `Saved full skill ratings for player ${playerId} in season ${context.seasonId}`
+        })
+
         return { status: true, message: "Ratings saved." }
     } catch (error) {
         console.error("Error saving player skill ratings:", error)
@@ -602,6 +619,14 @@ export async function savePlayerRatingNote(
                     updated_at: now
                 }
             })
+
+        await logAuditEntry({
+            userId: context.evaluatorId,
+            action: "update",
+            entityType: "player_rating",
+            entityId: playerId,
+            summary: `Saved ${noteType} note for player ${playerId} in season ${context.seasonId}`
+        })
 
         return { status: true, message: "Note saved." }
     } catch (error) {

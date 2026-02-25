@@ -1,9 +1,18 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
 import { RiCloseLine, RiDownloadLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
@@ -21,7 +30,7 @@ import {
     XAxis,
     YAxis
 } from "recharts"
-import type { SignupEntry } from "./actions"
+import { deleteSignupEntry, type SignupEntry } from "./actions"
 
 interface SignupsListProps {
     signups: SignupEntry[]
@@ -123,6 +132,7 @@ export function SignupsList({
     playerPicUrl,
     seasonLabel
 }: SignupsListProps) {
+    const router = useRouter()
     const [search, setSearch] = useState("")
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
@@ -132,6 +142,14 @@ export function SignupsList({
     const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
+    const [signupToDelete, setSignupToDelete] = useState<SignupEntry | null>(
+        null
+    )
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteResult, setDeleteResult] = useState<{
+        status: boolean
+        message: string
+    } | null>(null)
 
     const filteredSignups = useMemo(() => {
         if (!search) return signups
@@ -218,6 +236,26 @@ export function SignupsList({
         URL.revokeObjectURL(url)
     }
 
+    const handleDeleteSignup = async () => {
+        if (!signupToDelete) {
+            return
+        }
+
+        setIsDeleting(true)
+
+        const result = await deleteSignupEntry(signupToDelete.signupId)
+        setDeleteResult(result)
+        setIsDeleting(false)
+
+        if (result.status) {
+            if (selectedEntry?.signupId === signupToDelete.signupId) {
+                handleCloseModal()
+            }
+            setSignupToDelete(null)
+            router.refresh()
+        }
+    }
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape") {
@@ -271,6 +309,19 @@ export function SignupsList({
                 </div>
             </div>
 
+            {deleteResult && (
+                <div
+                    className={cn(
+                        "rounded-md p-4 text-sm",
+                        deleteResult.status
+                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
+                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
+                    )}
+                >
+                    {deleteResult.message}
+                </div>
+            )}
+
             <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-sm">
                     <thead>
@@ -298,6 +349,9 @@ export function SignupsList({
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Date
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Actions
                             </th>
                         </tr>
                     </thead>
@@ -358,12 +412,26 @@ export function SignupsList({
                                         entry.signupDate
                                     ).toLocaleDateString()}
                                 </td>
+                                <td className="px-4 py-2">
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={(event) => {
+                                            event.stopPropagation()
+                                            setDeleteResult(null)
+                                            setSignupToDelete(entry)
+                                        }}
+                                    >
+                                        Delete
+                                    </Button>
+                                </td>
                             </tr>
                         ))}
                         {filteredSignups.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={8}
+                                    colSpan={9}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No signups found.
@@ -898,6 +966,79 @@ export function SignupsList({
                     </div>
                 </div>
             )}
+
+            <Dialog
+                open={signupToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isDeleting) {
+                        setSignupToDelete(null)
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Signup Deletion</DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="rounded-md bg-red-50 p-4 dark:bg-red-950">
+                            <p className="font-medium text-red-800 text-sm dark:text-red-200">
+                                Warning
+                            </p>
+                            <div className="mt-2 space-y-1 text-red-700 text-sm dark:text-red-300">
+                                <p>
+                                    This will make it as if this player never
+                                    signed up.
+                                </p>
+                                <p>
+                                    This will not refund their payment. Refunds
+                                    must be done manually and separately.
+                                </p>
+                                <p>This action cannot be reversed.</p>
+                            </div>
+                        </div>
+
+                        {signupToDelete && (
+                            <div className="rounded-md border p-3 text-sm">
+                                <p>
+                                    <span className="font-medium">Player:</span>{" "}
+                                    {getDisplayName(signupToDelete)}
+                                </p>
+                                <p>
+                                    <span className="font-medium">Email:</span>{" "}
+                                    {signupToDelete.email}
+                                </p>
+                                <p>
+                                    <span className="font-medium">
+                                        Signup ID:
+                                    </span>{" "}
+                                    {signupToDelete.signupId}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setSignupToDelete(null)}
+                            disabled={isDeleting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeleteSignup}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? "Deleting..." : "Confirm Delete"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
