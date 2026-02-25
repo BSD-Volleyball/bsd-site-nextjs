@@ -22,6 +22,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { compressImageForUpload } from "@/lib/image-compression"
 
 interface EditPlayerFormProps {
     users: { id: string; name: string }[]
@@ -175,7 +176,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         type: "success" | "error"
     } | null>(null)
 
-    const maxPictureUploadBytes = 5 * 1024 * 1024
+    const maxSourcePictureUploadBytes = 25 * 1024 * 1024
 
     const handleUserSelect = async (userId: string | null) => {
         setSelectedUserId(userId)
@@ -283,23 +284,23 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
 
         if (!pictureFile) {
             setPictureMessage({
-                text: "Select a JPG file before uploading.",
+                text: "Select an image file before uploading.",
                 type: "error"
             })
             return
         }
 
-        if (pictureFile.type !== "image/jpeg") {
+        if (!pictureFile.type.startsWith("image/")) {
             setPictureMessage({
-                text: "Only JPG files are supported.",
+                text: "Only image files are supported.",
                 type: "error"
             })
             return
         }
 
-        if (pictureFile.size > maxPictureUploadBytes) {
+        if (pictureFile.size > maxSourcePictureUploadBytes) {
             setPictureMessage({
-                text: "Picture must be 5MB or smaller.",
+                text: "Image must be 25MB or smaller before compression.",
                 type: "error"
             })
             return
@@ -309,6 +310,18 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         setPictureMessage(null)
 
         startPictureUploadTransition(async () => {
+            let processedImage: { blob: Blob }
+            try {
+                processedImage = await compressImageForUpload(fileToUpload)
+            } catch (error) {
+                console.error("Image compression failed:", error)
+                setPictureMessage({
+                    text: "Could not process that image. Please try another photo.",
+                    type: "error"
+                })
+                return
+            }
+
             const uploadStart = await createPlayerPictureUpload(originalId)
             if (
                 !uploadStart.status ||
@@ -327,7 +340,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 headers: {
                     "Content-Type": "image/jpeg"
                 },
-                body: fileToUpload
+                body: processedImage.blob
             })
 
             if (!uploadResponse.ok) {
@@ -499,13 +512,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
 
                             <div className="w-full max-w-md space-y-2">
                                 <Label htmlFor="player_picture_upload">
-                                    Upload JPG (max 5MB)
+                                    Upload image (auto-compressed)
                                 </Label>
                                 <Input
                                     id="player_picture_upload"
                                     ref={fileInputRef}
                                     type="file"
-                                    accept="image/jpeg"
+                                    accept="image/*"
                                     onChange={(event) => {
                                         const file =
                                             event.target.files?.[0] ?? null
