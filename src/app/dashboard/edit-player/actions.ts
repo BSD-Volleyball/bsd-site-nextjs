@@ -18,21 +18,21 @@ import {
 import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    invalidateAllSessionsForUser,
+    isAdminOrDirectorBySession
+} from "@/lib/rbac"
 
 async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirectorBySession()
 }
 
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return []
+    }
+
     const allUsers = await db
         .select({
             id: users.id,
@@ -150,6 +150,19 @@ export async function updateUser(
     const isIdChanging = data.id !== undefined && data.id !== originalId
 
     try {
+        const [existingUser] = await db
+            .select({ id: users.id, role: users.role })
+            .from(users)
+            .where(eq(users.id, originalId))
+            .limit(1)
+
+        if (!existingUser) {
+            return { status: false, message: "User not found." }
+        }
+
+        const roleWillChange =
+            data.role !== undefined && data.role !== existingUser.role
+
         if (isIdChanging) {
             const newId = data.id as string
 
@@ -238,9 +251,10 @@ export async function updateUser(
                 .where(eq(users.id, originalId))
         }
 
+        const effectiveId = isIdChanging ? data.id! : originalId
+
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {
-            const effectiveId = isIdChanging ? data.id! : originalId
             const [updatedUser] = await db
                 .select({
                     first_name: users.first_name,
@@ -261,7 +275,16 @@ export async function updateUser(
             })
         }
 
-        return { status: true, message: "User updated successfully." }
+        if (roleWillChange) {
+            await invalidateAllSessionsForUser(effectiveId)
+        }
+
+        return {
+            status: true,
+            message: roleWillChange
+                ? "User updated successfully. Active sessions were invalidated due to role change."
+                : "User updated successfully."
+        }
     } catch (error) {
         console.error("Error updating user:", error)
         return { status: false, message: "Failed to update user." }

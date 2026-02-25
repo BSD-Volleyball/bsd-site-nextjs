@@ -1,10 +1,9 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, auditLog } from "@/database/schema"
 import { eq, desc, sql } from "drizzle-orm"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 
 export interface AuditLogEntry {
     id: number
@@ -18,16 +17,7 @@ export interface AuditLogEntry {
 }
 
 async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirectorBySession()
 }
 
 export async function getAuditLogs(params?: {

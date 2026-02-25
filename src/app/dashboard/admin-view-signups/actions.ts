@@ -1,7 +1,5 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -13,6 +11,7 @@ import {
 } from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 
 export interface SignupEntry {
     signupId: number
@@ -48,16 +47,7 @@ export interface SignupEntry {
 }
 
 async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirectorBySession()
 }
 
 export async function getSeasonSignups(): Promise<{

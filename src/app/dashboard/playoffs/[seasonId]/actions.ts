@@ -2,6 +2,7 @@
 
 import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
+import { auth } from "@/lib/auth"
 import {
     divisions,
     matchs,
@@ -9,6 +10,7 @@ import {
     seasons,
     teams
 } from "@/database/schema"
+import { headers } from "next/headers"
 
 type SectionKey = "winners" | "losers" | "championship"
 type SourceKind = "none" | "seed" | "winner" | "loser" | "team" | "unknown"
@@ -872,6 +874,25 @@ function buildBracketData(
 }
 
 export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return {
+            status: false,
+            message: "Not authenticated.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
+    if (!Number.isInteger(seasonId) || seasonId <= 0) {
+        return {
+            status: false,
+            message: "Invalid season.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
     try {
         const [seasonRow] = await db
             .select({

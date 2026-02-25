@@ -10,12 +10,16 @@ import {
     seasons,
     teams,
     drafts,
-    divisions,
-    commissioners
+    divisions
 } from "@/database/schema"
 import { eq, and, lte, desc, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    isAdminOrDirectorBySession,
+    isCommissionerBySession,
+    hasAdministrativeAccessBySession
+} from "@/lib/rbac"
 
 export async function getSignupEligibility(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -28,103 +32,15 @@ export async function getSignupEligibility(): Promise<boolean> {
 }
 
 export async function getIsAdminOrDirector(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        return false
-    }
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirectorBySession()
 }
 
 export async function getIsCommissioner(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        return false
-    }
-
-    // Check if user is admin/director (they have full access)
-    const isAdmin = await getIsAdminOrDirector()
-    if (isAdmin) {
-        return true
-    }
-
-    // Get current season
-    const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return false
-    }
-
-    // Check if user is a commissioner for the current season
-    const [commissionerRecord] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, config.seasonId),
-                eq(commissioners.commissioner, session.user.id)
-            )
-        )
-        .limit(1)
-
-    return !!commissionerRecord
+    return isCommissionerBySession()
 }
 
 export async function getHasAdministrativeAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        return false
-    }
-
-    // Check if user is admin/director
-    const isAdmin = await getIsAdminOrDirector()
-    if (isAdmin) {
-        return true
-    }
-
-    // Get current season
-    const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return false
-    }
-
-    // Check if user is a commissioner for the current season
-    const [commissionerRecord] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, config.seasonId),
-                eq(commissioners.commissioner, session.user.id)
-            )
-        )
-        .limit(1)
-
-    if (commissionerRecord) {
-        return true
-    }
-
-    // Check if user is a captain for the current season
-    const [captainRecord] = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
-            )
-        )
-        .limit(1)
-
-    return !!captainRecord
+    return hasAdministrativeAccessBySession()
 }
 
 export interface SeasonNavDivision {

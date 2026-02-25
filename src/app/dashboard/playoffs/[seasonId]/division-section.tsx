@@ -335,7 +335,13 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                                 >
                                                     <span className="font-semibold">
                                                         {seed.seed}
-                                                        {seed.seed === 1 ? "st" : seed.seed === 2 ? "nd" : seed.seed === 3 ? "rd" : "th"}{" "}
+                                                        {seed.seed === 1
+                                                            ? "st"
+                                                            : seed.seed === 2
+                                                              ? "nd"
+                                                              : seed.seed === 3
+                                                                ? "rd"
+                                                                : "th"}{" "}
                                                         Seed:
                                                     </span>{" "}
                                                     {seed.teamLabel}

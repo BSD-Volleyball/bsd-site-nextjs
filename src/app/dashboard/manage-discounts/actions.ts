@@ -6,6 +6,7 @@ import { db } from "@/database/db"
 import { users, discounts } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 
 export interface DiscountEntry {
     id: number
@@ -19,16 +20,7 @@ export interface DiscountEntry {
 }
 
 async function checkAdminAccess(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) return false
-
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, session.user.id))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirectorBySession()
 }
 
 export async function getDiscounts(): Promise<{
@@ -85,6 +77,11 @@ export async function getDiscounts(): Promise<{
 }
 
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return []
+    }
+
     const allUsers = await db
         .select({
             id: users.id,

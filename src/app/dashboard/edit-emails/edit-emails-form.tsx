@@ -32,17 +32,14 @@ interface TemplateFormData {
 export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const router = useRouter()
     const [formData, setFormData] = useState<Record<number, TemplateFormData>>(
-        templates.reduce(
-            (acc, template) => ({
-                ...acc,
-                [template.id]: {
-                    name: template.name,
-                    subject: template.subject || "",
-                    content: template.content
-                }
-            }),
-            {}
-        )
+        templates.reduce<Record<number, TemplateFormData>>((acc, template) => {
+            acc[template.id] = {
+                name: template.name,
+                subject: template.subject || "",
+                content: template.content
+            }
+            return acc
+        }, {})
     )
     const [loading, setLoading] = useState<Record<number, boolean>>({})
     const [messages, setMessages] = useState<

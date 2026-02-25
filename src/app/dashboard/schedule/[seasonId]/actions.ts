@@ -3,6 +3,8 @@
 import { db } from "@/database/db"
 import { divisions, matchs, seasons, teams } from "@/database/schema"
 import { and, eq, inArray } from "drizzle-orm"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 
 interface StandingTeam {
     id: number
@@ -151,6 +153,25 @@ function getHeadToHeadStats(
 export async function getSeasonScheduleData(
     seasonId: number
 ): Promise<ScheduleData> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return {
+            status: false,
+            message: "Not authenticated.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
+    if (!Number.isInteger(seasonId) || seasonId <= 0) {
+        return {
+            status: false,
+            message: "Invalid season.",
+            seasonLabel: "",
+            divisions: []
+        }
+    }
+
     try {
         const [seasonRow] = await db
             .select({

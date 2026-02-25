@@ -15,6 +15,7 @@ import {
 } from "@/database/schema"
 import { eq, lt, gt } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { isAdminOrDirector } from "@/lib/rbac"
 
 const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
 const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
@@ -28,13 +29,7 @@ export interface UserOption {
 }
 
 async function checkAdminAccess(userId: string): Promise<boolean> {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
+    return isAdminOrDirector(userId)
 }
 
 export async function getOldUsers(): Promise<UserOption[]> {
