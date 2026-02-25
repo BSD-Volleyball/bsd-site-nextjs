@@ -50,6 +50,13 @@ export interface TryoutSessionGroup {
 export type RatingSkill = "passing" | "setting" | "hitting" | "serving"
 export type RatingNoteType = "shared" | "private"
 
+export interface SkillRatingsInput {
+    passing: number
+    setting: number
+    hitting: number
+    serving: number
+}
+
 const validSkills = new Set<RatingSkill>([
     "passing",
     "setting",
@@ -453,6 +460,89 @@ export async function savePlayerSkillRating(
         return {
             status: false,
             message: "Failed to save rating."
+        }
+    }
+}
+
+export async function savePlayerSkillRatings(
+    playerId: string,
+    values: SkillRatingsInput
+): Promise<{ status: boolean; message: string }> {
+    if (!playerId.trim()) {
+        return { status: false, message: "Player ID is required." }
+    }
+
+    const context = await getSaveContext()
+    if (!context.status) {
+        return { status: false, message: context.message }
+    }
+
+    const skillValues = [
+        values.passing,
+        values.setting,
+        values.hitting,
+        values.serving
+    ]
+
+    const areValuesValid = skillValues.every(
+        (value) => Number.isInteger(value) && value >= 0 && value <= 4
+    )
+
+    if (!areValuesValid) {
+        return {
+            status: false,
+            message: "Skill values must be between 0 and 4."
+        }
+    }
+
+    try {
+        const playerIsSignedUp = await ensurePlayerIsActiveSeasonSignup(
+            playerId,
+            context.seasonId
+        )
+
+        if (!playerIsSignedUp) {
+            return {
+                status: false,
+                message: "Player is not signed up for the active season."
+            }
+        }
+
+        const now = new Date()
+
+        await db
+            .insert(playerRatings)
+            .values({
+                season: context.seasonId,
+                player: playerId,
+                evaluator: context.evaluatorId,
+                passing: values.passing,
+                setting: values.setting,
+                hitting: values.hitting,
+                serving: values.serving,
+                updated_at: now
+            })
+            .onConflictDoUpdate({
+                target: [
+                    playerRatings.season,
+                    playerRatings.player,
+                    playerRatings.evaluator
+                ],
+                set: {
+                    passing: values.passing,
+                    setting: values.setting,
+                    hitting: values.hitting,
+                    serving: values.serving,
+                    updated_at: now
+                }
+            })
+
+        return { status: true, message: "Ratings saved." }
+    } catch (error) {
+        console.error("Error saving player skill ratings:", error)
+        return {
+            status: false,
+            message: "Failed to save ratings."
         }
     }
 }
