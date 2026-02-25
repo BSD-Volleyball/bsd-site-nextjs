@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useRef, useState, useTransition } from "react"
 import { UserCombobox } from "@/app/dashboard/manage-discounts/user-combobox"
 import {
+    createPlayerPictureUpload,
+    finalizePlayerPictureUpload,
     getUserDetails,
     updateUser,
     getSignupForCurrentSeason,
@@ -23,6 +25,7 @@ import {
 
 interface EditPlayerFormProps {
     users: { id: string; name: string }[]
+    playerPicUrl: string
 }
 
 interface FormData {
@@ -147,7 +150,8 @@ function userToFormData(user: UserDetails): FormData {
     }
 }
 
-export function EditPlayerForm({ users }: EditPlayerFormProps) {
+export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
+    const fileInputRef = useRef<HTMLInputElement | null>(null)
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [originalId, setOriginalId] = useState<string | null>(null)
     const [formData, setFormData] = useState<FormData | null>(null)
@@ -163,6 +167,15 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
     } | null>(null)
     const [isPending, startTransition] = useTransition()
     const [isSignupPending, startSignupTransition] = useTransition()
+    const [isPictureUploadPending, startPictureUploadTransition] =
+        useTransition()
+    const [pictureFile, setPictureFile] = useState<File | null>(null)
+    const [pictureMessage, setPictureMessage] = useState<{
+        text: string
+        type: "success" | "error"
+    } | null>(null)
+
+    const maxPictureUploadBytes = 5 * 1024 * 1024
 
     const handleUserSelect = async (userId: string | null) => {
         setSelectedUserId(userId)
@@ -171,6 +184,11 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
         setFormData(null)
         setSignupData(null)
         setOriginalId(null)
+        setPictureFile(null)
+        setPictureMessage(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ""
+        }
 
         if (!userId) return
 
@@ -255,6 +273,100 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
             } else {
                 setMessage({ text: result.message, type: "error" })
             }
+        })
+    }
+
+    const handlePictureUpload = () => {
+        if (!originalId) {
+            return
+        }
+
+        if (!pictureFile) {
+            setPictureMessage({
+                text: "Select a JPG file before uploading.",
+                type: "error"
+            })
+            return
+        }
+
+        if (pictureFile.type !== "image/jpeg") {
+            setPictureMessage({
+                text: "Only JPG files are supported.",
+                type: "error"
+            })
+            return
+        }
+
+        if (pictureFile.size > maxPictureUploadBytes) {
+            setPictureMessage({
+                text: "Picture must be 5MB or smaller.",
+                type: "error"
+            })
+            return
+        }
+
+        const fileToUpload = pictureFile
+        setPictureMessage(null)
+
+        startPictureUploadTransition(async () => {
+            const uploadStart = await createPlayerPictureUpload(originalId)
+            if (
+                !uploadStart.status ||
+                !uploadStart.uploadUrl ||
+                !uploadStart.pictureFilename
+            ) {
+                setPictureMessage({
+                    text: uploadStart.message || "Failed to start upload.",
+                    type: "error"
+                })
+                return
+            }
+
+            const uploadResponse = await fetch(uploadStart.uploadUrl, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "image/jpeg"
+                },
+                body: fileToUpload
+            })
+
+            if (!uploadResponse.ok) {
+                setPictureMessage({
+                    text: "Upload to storage failed. Please try again.",
+                    type: "error"
+                })
+                return
+            }
+
+            const finalizeResult = await finalizePlayerPictureUpload(
+                originalId,
+                uploadStart.pictureFilename
+            )
+
+            if (!finalizeResult.status) {
+                setPictureMessage({
+                    text: finalizeResult.message,
+                    type: "error"
+                })
+                return
+            }
+
+            setFormData((current) =>
+                current
+                    ? {
+                          ...current,
+                          picture: uploadStart.pictureFilename ?? ""
+                      }
+                    : current
+            )
+            setPictureFile(null)
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ""
+            }
+            setPictureMessage({
+                text: finalizeResult.message,
+                type: "success"
+            })
         })
     }
 
@@ -365,6 +477,68 @@ export function EditPlayerForm({ users }: EditPlayerFormProps) {
 
             {formData && (
                 <div className="space-y-8">
+                    <div className="space-y-3 rounded-md border p-4">
+                        <h3 className="font-medium text-sm">Player Picture</h3>
+
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                            <div>
+                                {playerPicUrl && formData.picture ? (
+                                    <img
+                                        src={`${playerPicUrl}${formData.picture}`}
+                                        alt={formData.name || "Player"}
+                                        className="h-44 w-32 rounded-md border object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-44 w-32 items-center justify-center rounded-md border text-muted-foreground text-xs">
+                                        No picture
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="w-full max-w-md space-y-2">
+                                <Label htmlFor="player_picture_upload">
+                                    Upload JPG (max 5MB)
+                                </Label>
+                                <Input
+                                    id="player_picture_upload"
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg"
+                                    onChange={(event) => {
+                                        const file =
+                                            event.target.files?.[0] ?? null
+                                        setPictureFile(file)
+                                        setPictureMessage(null)
+                                    }}
+                                    disabled={isPictureUploadPending}
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={handlePictureUpload}
+                                    disabled={
+                                        isPictureUploadPending || !pictureFile
+                                    }
+                                >
+                                    {isPictureUploadPending
+                                        ? "Uploading..."
+                                        : "Upload Picture"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {pictureMessage && (
+                            <div
+                                className={`rounded-md p-3 text-sm ${
+                                    pictureMessage.type === "success"
+                                        ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
+                                        : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
+                                }`}
+                            >
+                                {pictureMessage.text}
+                            </div>
+                        )}
+                    </div>
+
                     <div className="grid gap-4 sm:grid-cols-2">
                         {textFields.map((field) => {
                             const isReadOnly = readOnlyFields.has(field.key)

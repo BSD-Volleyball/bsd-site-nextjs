@@ -46,7 +46,10 @@ export default async function EditPlayerPage() {
                 title="Edit Player"
                 description="View and edit player details."
             />
-            <EditPlayerForm users={usersData} />
+            <EditPlayerForm
+                users={usersData}
+                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+            />
         </div>
     )
 }

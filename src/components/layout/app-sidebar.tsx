@@ -181,6 +181,11 @@ const commissionerNavItems = [
         icon: RiSearchLine
     },
     {
+        title: "Add Pictures",
+        url: "/dashboard/add-pictures",
+        icon: RiEditLine
+    },
+    {
         title: "Potential Captains",
         url: "/dashboard/potential-captains",
         icon: RiUserSettingsLine
