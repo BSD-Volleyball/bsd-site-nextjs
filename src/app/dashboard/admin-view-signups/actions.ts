@@ -7,7 +7,8 @@ import {
     drafts,
     teams,
     divisions,
-    seasons
+    seasons,
+    discounts
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -47,6 +48,7 @@ export interface SignupEntry {
     lastDraftDivision: string | null
     lastDraftCaptain: string | null
     lastDraftOverall: number | null
+    discountCodeName: string | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -58,6 +60,7 @@ export async function getSeasonSignups(): Promise<{
     message?: string
     signups: SignupEntry[]
     seasonLabel: string
+    lateAmount: string
 }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -65,7 +68,8 @@ export async function getSeasonSignups(): Promise<{
             status: false,
             message: "Unauthorized",
             signups: [],
-            seasonLabel: ""
+            seasonLabel: "",
+            lateAmount: ""
         }
     }
 
@@ -77,7 +81,8 @@ export async function getSeasonSignups(): Promise<{
                 status: false,
                 message: "No current season found.",
                 signups: [],
-                seasonLabel: ""
+                seasonLabel: "",
+                lateAmount: ""
             }
         }
 
@@ -127,6 +132,35 @@ export async function getSeasonSignups(): Promise<{
                 .where(inArray(drafts.user, userIds))
 
             draftedUserIds = new Set(draftedUsers.map((d) => d.user))
+        }
+
+        // Fetch used discount codes for signup users and keep the most recent per user
+        const usedDiscountByUserId = new Map<string, string>()
+
+        if (userIds.length > 0) {
+            const usedDiscountRows = await db
+                .select({
+                    userId: discounts.user,
+                    discountId: discounts.id,
+                    reason: discounts.reason
+                })
+                .from(discounts)
+                .where(
+                    and(
+                        inArray(discounts.user, userIds),
+                        eq(discounts.used, true)
+                    )
+                )
+                .orderBy(desc(discounts.created_at), desc(discounts.id))
+
+            for (const discount of usedDiscountRows) {
+                if (!usedDiscountByUserId.has(discount.userId)) {
+                    usedDiscountByUserId.set(
+                        discount.userId,
+                        discount.reason || `Discount #${discount.discountId}`
+                    )
+                }
+            }
         }
 
         // Fetch pair pick user names
@@ -244,14 +278,16 @@ export async function getSeasonSignups(): Promise<{
                 lastDraftSeason: lastDraft?.season ?? null,
                 lastDraftDivision: lastDraft?.division ?? null,
                 lastDraftCaptain: lastDraft?.captain ?? null,
-                lastDraftOverall: lastDraft?.overall ?? null
+                lastDraftOverall: lastDraft?.overall ?? null,
+                discountCodeName: usedDiscountByUserId.get(row.userId) ?? null
             }
         })
 
         return {
             status: true,
             signups: entries,
-            seasonLabel
+            seasonLabel,
+            lateAmount: config.lateAmount || ""
         }
     } catch (error) {
         console.error("Error fetching season signups:", error)
@@ -259,7 +295,8 @@ export async function getSeasonSignups(): Promise<{
             status: false,
             message: "Something went wrong.",
             signups: [],
-            seasonLabel: ""
+            seasonLabel: "",
+            lateAmount: ""
         }
     }
 }
