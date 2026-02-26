@@ -68,6 +68,13 @@ function getEvaluatorTooltip(player: NewPlayerEntry): string {
         .join(", ")
 }
 
+function formatHeight(inches: number | null): string {
+    if (!inches) return "—"
+    const feet = Math.floor(inches / 12)
+    const remainingInches = inches % 12
+    return `${feet}'${remainingInches}\"`
+}
+
 export function EvaluatePlayersList({
     players,
     divisions
@@ -225,6 +232,9 @@ export function EvaluatePlayersList({
                                 Gender
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Height
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Experience
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
@@ -255,6 +265,9 @@ export function EvaluatePlayersList({
                                         : player.male === false
                                           ? "F"
                                           : "—"}
+                                </td>
+                                <td className="px-4 py-2">
+                                    {formatHeight(player.height)}
                                 </td>
                                 <td className="px-4 py-2">
                                     {player.experience || "—"}
@@ -315,7 +328,7 @@ export function EvaluatePlayersList({
                         {filteredPlayers.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={showAverages ? 6 : 5}
+                                    colSpan={showAverages ? 7 : 6}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No new players found.

@@ -39,6 +39,24 @@ function capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+function getSeasonAbbreviation(seasonName: string): string {
+    const normalized = seasonName.trim().toLowerCase()
+
+    if (normalized.startsWith("fall")) {
+        return "F"
+    }
+
+    if (normalized.startsWith("spring")) {
+        return "S"
+    }
+
+    if (normalized.startsWith("summer")) {
+        return "U"
+    }
+
+    return seasonName.charAt(0).toUpperCase()
+}
+
 function getDisplayName({
     firstName,
     lastName,
@@ -255,7 +273,7 @@ export async function GET() {
 
             latestDraftByUser.set(draft.userId, {
                 seasonId: draft.seasonId,
-                seasonLabel: `${capitalize(draft.seasonName)} ${String(draft.seasonYear).slice(-2)}`,
+                seasonLabel: `${getSeasonAbbreviation(draft.seasonName)}${String(draft.seasonYear).slice(-2)}`,
                 divisionLabel: draft.divisionName
             })
         }
@@ -297,11 +315,16 @@ export async function GET() {
         const margin = 32
         const headerTextSize = 18
         const subheaderTextSize = 10
-        const cellFontSize = 10
+        const cellFontSize = 12
         const headerRowHeight = 24
         const tableWidth = pageWidth - margin * 2
         const tableTopY = pageHeight - margin - 72
         const availableRowsHeight = tableTopY - headerRowHeight - margin
+        const getCellTextY = (
+            topY: number,
+            cellHeight: number,
+            fontSize: number
+        ) => topY - (cellHeight + fontSize) / 2 + 2
 
         const getColumnWidth = ({
             header,
@@ -343,6 +366,14 @@ export async function GET() {
             minWidth: 40
         })
 
+        const idWidth = getColumnWidth({
+            header: "ID",
+            values: rosterRows.map((row) =>
+                row.oldId === null ? "—" : String(row.oldId)
+            ),
+            minWidth: 40
+        })
+
         const positionsWidth = getColumnWidth({
             header: "Pos",
             values: rosterRows.map((row) =>
@@ -356,13 +387,13 @@ export async function GET() {
         })
 
         const heightWidth = getColumnWidth({
-            header: "Height",
+            header: "H",
             values: rosterRows.map((row) => formatHeight(row.height)),
             minWidth: 36
         })
 
         const genderWidth = getColumnWidth({
-            header: "Male?",
+            header: "M?",
             values: rosterRows.map((row) => getGenderLabel(row.male)),
             minWidth: 34
         })
@@ -370,13 +401,13 @@ export async function GET() {
         const staticColumns = [
             { key: "up", label: "", width: 18 },
             { key: "down", label: "", width: 18 },
-            { key: "id", label: "ID", width: 34 },
+            { key: "id", label: "ID", width: idWidth },
             { key: "lastDivision", label: "LD", width: ldWidth },
             { key: "lastSeason", label: "LS", width: lsWidth },
             { key: "positions", label: "Pos", width: positionsWidth },
-            { key: "height", label: "Height", width: heightWidth },
-            { key: "gender", label: "Male?", width: genderWidth },
-            { key: "notes", label: "Notes (score 1-4)", width: 0 }
+            { key: "height", label: "H", width: heightWidth },
+            { key: "gender", label: "M?", width: genderWidth },
+            { key: "notes", label: "Notes - Score 1(BB) - 6(AA)", width: 0 }
         ]
 
         const nameMaxWidth = Math.max(
@@ -455,7 +486,6 @@ export async function GET() {
             Math.min(44, Math.floor(availableRowsHeight / maxRowsPerPage))
         )
         const notesFontSize = Math.max(7, cellFontSize - 2)
-        const notesLineGap = 2
         const highlightYellow = rgb(1, 0.98, 0.8)
         const highlightGreen = rgb(0.88, 0.97, 0.88)
 
@@ -473,7 +503,7 @@ export async function GET() {
                 })
 
                 page.drawText(`Generated ${generatedTimestamp} ET`, {
-                    x: pageWidth - margin - 140,
+                    x: pageWidth - margin - 180,
                     y: pageHeight - margin - headerTextSize - 18,
                     size: subheaderTextSize,
                     font: regularFont,
@@ -578,7 +608,11 @@ export async function GET() {
                     } else {
                         page.drawText(column.label, {
                             x: currentX + 4,
-                            y: currentY - 16,
+                            y: getCellTextY(
+                                currentY,
+                                headerRowHeight,
+                                cellFontSize
+                            ),
                             size: cellFontSize,
                             font: boldFont,
                             color: rgb(0, 0, 0)
@@ -692,43 +726,20 @@ export async function GET() {
                         }
 
                         if (column.key === "notes") {
-                            const notesBlockHeight =
-                                notesFontSize * 2 + notesLineGap
-                            const notesTopInset = Math.max(
-                                2,
-                                Math.floor((rowHeight - notesBlockHeight) / 2)
-                            )
-                            const firstLineY =
-                                currentY - notesTopInset - notesFontSize
-                            const secondLineY =
-                                firstLineY - notesFontSize - notesLineGap
+                            const notesBottomInset = 3
+                            const notesY =
+                                currentY - rowHeight + notesBottomInset
 
                             page.drawText(
                                 truncateToFit({
-                                    text: "Pass __  Set __",
+                                    text: "Pass __  Set __  Hit __  Serve __",
                                     maxWidth: column.width - 8,
                                     fontSize: notesFontSize,
                                     font: regularFont
                                 }),
                                 {
                                     x: currentX + 4,
-                                    y: firstLineY,
-                                    size: notesFontSize,
-                                    font: regularFont,
-                                    color: rgb(0, 0, 0)
-                                }
-                            )
-
-                            page.drawText(
-                                truncateToFit({
-                                    text: "Hit __  Serve __",
-                                    maxWidth: column.width - 8,
-                                    fontSize: notesFontSize,
-                                    font: regularFont
-                                }),
-                                {
-                                    x: currentX + 4,
-                                    y: secondLineY,
+                                    y: notesY,
                                     size: notesFontSize,
                                     font: regularFont,
                                     color: rgb(0, 0, 0)
@@ -751,7 +762,11 @@ export async function GET() {
                                 }),
                                 {
                                     x: currentX + 4,
-                                    y: currentY - 16,
+                                    y: getCellTextY(
+                                        currentY,
+                                        rowHeight,
+                                        cellFontSize
+                                    ),
                                     size: cellFontSize,
                                     font: regularFont,
                                     color: rgb(0, 0, 0)

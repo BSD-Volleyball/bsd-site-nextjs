@@ -187,19 +187,21 @@ function SkillSlider({
             <input
                 type="range"
                 min={0}
-                max={4}
+                max={6}
                 step={1}
                 value={value}
                 onChange={(event) => onChange(Number(event.target.value))}
                 disabled={disabled}
                 className="h-2 w-full cursor-pointer accent-primary disabled:cursor-not-allowed"
             />
-            <div className="grid grid-cols-5 text-muted-foreground text-xs">
+            <div className="grid grid-cols-7 text-muted-foreground text-xs">
                 <span className="text-left">0</span>
-                <span className="text-center">1</span>
-                <span className="text-center">2</span>
-                <span className="text-center">3</span>
-                <span className="text-right">4</span>
+                <span className="text-center">1 (BB)</span>
+                <span className="text-center">2 (BBB)</span>
+                <span className="text-center">3 (ABB)</span>
+                <span className="text-center">4 (ABA)</span>
+                <span className="text-center">5 (A)</span>
+                <span className="text-right">6 (AA)</span>
             </div>
         </div>
     )
@@ -300,7 +302,14 @@ export function RatePlayerClient({
                 saveTimeoutRef.current = null
             }
         }
-    }, [selectedPlayer, hasPendingSkillSave, passing, setting, hitting, serving])
+    }, [
+        selectedPlayer,
+        hasPendingSkillSave,
+        passing,
+        setting,
+        hitting,
+        serving
+    ])
 
     useEffect(
         () => () => {
