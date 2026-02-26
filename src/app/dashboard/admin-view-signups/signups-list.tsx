@@ -569,9 +569,15 @@ export function SignupsList({
                     </div>
 
                     <div className="space-y-2">
-                        <h3 className="font-medium text-sm">
-                            Discount Code Usage
-                        </h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-sm">
+                                Discount Code Usage
+                            </h3>
+                            <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-xs">
+                                {discountUsage.length} user
+                                {discountUsage.length !== 1 && "s"}
+                            </span>
+                        </div>
                         <p className="text-muted-foreground text-sm">
                             Total paid by discount users:{" "}
                             {discountUsageTotalPaidDisplay}
@@ -626,9 +632,15 @@ export function SignupsList({
                     </div>
 
                     <div className="space-y-2">
-                        <h3 className="font-medium text-sm">
-                            Late Fee Payments
-                        </h3>
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-sm">
+                                Late Fee Payments
+                            </h3>
+                            <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-xs">
+                                {lateFeeUsers.length} user
+                                {lateFeeUsers.length !== 1 && "s"}
+                            </span>
+                        </div>
                         <p className="text-muted-foreground text-sm">
                             Late fee amount: {lateAmountDisplay}
                         </p>
