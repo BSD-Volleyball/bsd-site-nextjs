@@ -537,10 +537,11 @@ export default async function DashboardPage() {
                                 />
                             )
                         ) : signupStatus.config.phase ===
-                              "registration_closed" ||
-                          signupStatus.config.phase === "tryout_week_1" ||
-                          signupStatus.config.phase === "tryout_week_2" ||
-                          signupStatus.config.phase === "tryout_week_3" ? (
+                              "select_commissioners" ||
+                          signupStatus.config.phase === "select_captains" ||
+                          signupStatus.config.phase === "prep_tryout_week_1" ||
+                          signupStatus.config.phase === "prep_tryout_week_2" ||
+                          signupStatus.config.phase === "prep_tryout_week_3" ? (
                             signupStatus.signup ? (
                                 <div className="space-y-4">
                                     <RegistrationConfirmation
@@ -555,6 +556,51 @@ export default async function DashboardPage() {
                                             }
                                         </p>
                                     </div>
+                                </div>
+                            ) : signupStatus.season ? (
+                                <div className="space-y-3">
+                                    <p className="text-muted-foreground">
+                                        Registration is closed. Tryouts are
+                                        underway for the {seasonLabel} season.
+                                    </p>
+                                    {signupStatus.onWaitlist ? (
+                                        signupStatus.waitlistApproved ? (
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                                                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                                </div>
+                                                <p className="font-medium text-green-700 text-sm dark:text-green-400">
+                                                    You've been approved from
+                                                    the waitlist! We'll be in
+                                                    touch with next steps.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                                                    <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                                                    You've expressed interest in
+                                                    playing. We'll reach out if
+                                                    a spot opens up!
+                                                </p>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p className="text-muted-foreground text-sm">
+                                                Interested in joining? There are
+                                                occasionally drop-outs,
+                                                injuries, or scheduling
+                                                conflicts. Express your interest
+                                                to get on the waitlist.
+                                            </p>
+                                            <WaitlistButton
+                                                seasonId={waitlistSeasonId!}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground">
