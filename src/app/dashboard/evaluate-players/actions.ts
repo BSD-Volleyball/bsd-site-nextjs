@@ -33,6 +33,7 @@ export interface NewPlayerEntry {
     lastName: string
     preferredName: string | null
     male: boolean | null
+    height: number | null
     experience: string | null
     assessment: string | null
     currentUserEvaluation: number | null
@@ -96,6 +97,7 @@ export async function getNewPlayers(): Promise<{
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
                 male: users.male,
+                height: users.height,
                 experience: users.experience,
                 assessment: users.assessment
             })
