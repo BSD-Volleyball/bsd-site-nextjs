@@ -2,7 +2,7 @@
 
 import { db } from "@/database/db"
 import { seasons, divisions, commissioners, users } from "@/database/schema"
-import { eq, desc, inArray } from "drizzle-orm"
+import { eq, desc, inArray, notInArray } from "drizzle-orm"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
@@ -77,7 +77,7 @@ export async function getCurrentSeason(): Promise<{
         const [currentSeason] = await db
             .select({ id: seasons.id })
             .from(seasons)
-            .where(eq(seasons.registration_open, true))
+            .where(notInArray(seasons.phase, ["off_season", "complete"]))
             .limit(1)
 
         if (currentSeason) {

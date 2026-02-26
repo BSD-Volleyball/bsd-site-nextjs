@@ -21,6 +21,7 @@ import {
     hasAdministrativeAccessBySession,
     hasCaptainPagesAccessBySession
 } from "@/lib/rbac"
+import type { SeasonPhase } from "@/lib/season-phases"
 
 export async function getSignupEligibility(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -46,6 +47,12 @@ export async function getHasAdministrativeAccess(): Promise<boolean> {
 
 export async function getHasCaptainPagesAccess(): Promise<boolean> {
     return hasCaptainPagesAccessBySession()
+}
+
+export async function getSeasonPhase(): Promise<SeasonPhase | null> {
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return null
+    return config.phase
 }
 
 export interface SeasonNavDivision {

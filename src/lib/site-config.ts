@@ -1,6 +1,7 @@
 import { db } from "@/database/db"
 import { seasons, signups, waitlist } from "@/database/schema"
 import { eq, desc, count, and } from "drizzle-orm"
+import type { SeasonPhase } from "@/lib/season-phases"
 
 export interface SeasonConfig {
     seasonId: number
@@ -10,7 +11,7 @@ export interface SeasonConfig {
     maxPlayers: string
     seasonYear: number
     seasonName: string
-    registrationOpen: boolean
+    phase: SeasonPhase
     tryout1Date: string
     tryout1Session1Time: string
     tryout1Session2Time: string
@@ -52,7 +53,7 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
             maxPlayers: "",
             seasonYear: 0,
             seasonName: "",
-            registrationOpen: false,
+            phase: "off_season",
             tryout1Date: "",
             tryout1Session1Time: "",
             tryout1Session2Time: "",
@@ -87,7 +88,7 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         maxPlayers: season.max_players || "",
         seasonYear: season.year,
         seasonName: season.season,
-        registrationOpen: season.registration_open,
+        phase: season.phase as SeasonPhase,
         tryout1Date: season.tryout_1_date || "",
         tryout1Session1Time: season.tryout_1_s1_time || "",
         tryout1Session2Time: season.tryout_1_s2_time || "",
@@ -141,7 +142,7 @@ export function isLatePricing(config: SeasonConfig): boolean {
 export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const config = await getSeasonConfig()
 
-    if (!config.registrationOpen || !config.seasonId) {
+    if (config.phase !== "registration_open" || !config.seasonId) {
         return false
     }
 

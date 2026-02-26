@@ -10,7 +10,7 @@ import {
     drafts,
     emailTemplates
 } from "@/database/schema"
-import { eq, inArray, desc } from "drizzle-orm"
+import { eq, inArray, notInArray, desc } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 
 export interface PotentialCaptainPlayerDetails {
@@ -224,7 +224,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 season: seasons.season
             })
             .from(seasons)
-            .where(eq(seasons.registration_open, true))
+            .where(notInArray(seasons.phase, ["off_season", "complete"]))
             .limit(1)
 
         let targetSeason = currentSeason
