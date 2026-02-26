@@ -53,6 +53,10 @@ export default async function DraftPreseasonWeek1Page() {
     }
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const sessionTimes: Record<1 | 2, string> = {
+        1: config.tryout1Session1Time,
+        2: config.tryout1Session2Time
+    }
 
     const rosterRows = await db
         .select({
@@ -189,9 +193,7 @@ export default async function DraftPreseasonWeek1Page() {
                         Session {sessionNumber}{" "}
                         <span className="font-normal text-base text-muted-foreground">
                             (
-                            {sessionNumber === 1
-                                ? "7:00pm - 8:30pm"
-                                : "8:30pm - 10:00pm"}
+                            {sessionTimes[sessionNumber as 1 | 2] || "Time TBD"}
                             )
                         </span>
                     </h2>

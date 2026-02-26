@@ -154,35 +154,39 @@ function drawPageFooter({
     page,
     pageWidth,
     sessionNumber,
-    globalPageNumber,
+    sessionTime,
+    pageNumber,
     totalPages,
     font
 }: {
     page: PDFPage
     pageWidth: number
     sessionNumber: number
-    globalPageNumber: number
+    sessionTime: string
+    pageNumber: number
     totalPages: number
     font: PDFFont
 }) {
     const footerSize = 10
     const footerColor = rgb(0.2, 0.2, 0.2)
-    const sessionLabel = `SESSION #${sessionNumber} NAMETAGS`
+    const sessionLabel = sessionTime
+        ? `SESSION #${sessionNumber} NAMETAGS • ${sessionTime}`
+        : `SESSION #${sessionNumber} NAMETAGS`
     drawCenteredText({
         page,
         text: sessionLabel,
         centerX: pageWidth / 2,
-        y: 10,
+        y: 34,
         size: footerSize,
         font,
         color: footerColor
     })
 
-    const pageLabel = `Page ${globalPageNumber} out of ${totalPages}`
+    const pageLabel = `Page ${pageNumber} out of ${totalPages}`
     const pageLabelWidth = font.widthOfTextAtSize(pageLabel, footerSize)
     page.drawText(pageLabel, {
         x: pageWidth - 18 - pageLabelWidth,
-        y: 10,
+        y: 34,
         size: footerSize,
         font,
         color: footerColor
@@ -196,6 +200,7 @@ function drawNametag({
     width,
     height,
     row,
+    sessionTime,
     initialsFont,
     idFont,
     detailsFont
@@ -206,6 +211,7 @@ function drawNametag({
     width: number
     height: number
     row: NametagRow
+    sessionTime: string
     initialsFont: PDFFont
     idFont: PDFFont
     detailsFont: PDFFont
@@ -217,8 +223,14 @@ function drawNametag({
 
     const headline = initials
     const oldIdLabel = row.oldId === null ? "—" : String(row.oldId)
-    const legalNameLabel = `${normalizedLast.toUpperCase()}, ${normalizeName(row.firstName).toUpperCase()}`
+    const normalizedFirst = normalizeName(row.firstName)
+    const fullName = `${normalizedFirst} ${normalizedLast}`
+    const legalNameLabel =
+        fullName.length > 25
+            ? `${normalizedLast.toUpperCase()}, ${normalizedFirst.charAt(0).toUpperCase()}.`
+            : `${normalizedLast.toUpperCase()}, ${normalizedFirst.toUpperCase()}`
     const courtLabel = `Court ${row.courtNumber}`
+    const sessionTimeLabel = sessionTime.trim()
 
     const contentWidth = width - 20
     const centerX = x + width / 2
@@ -231,13 +243,23 @@ function drawNametag({
         font: initialsFont
     })
 
-    const oldIdSize = fitFontSize({
-        text: oldIdLabel,
+    const fourDigitOldIdSize = fitFontSize({
+        text: "0000",
         maxWidth: contentWidth,
         preferredSize: 165,
         minSize: 118,
         font: idFont
     })
+
+    const oldIdSize = /^\d{3}$/.test(oldIdLabel)
+        ? fourDigitOldIdSize
+        : fitFontSize({
+              text: oldIdLabel,
+              maxWidth: contentWidth,
+              preferredSize: 165,
+              minSize: 118,
+              font: idFont
+          })
 
     const legalNameSize = fitFontSize({
         text: legalNameLabel,
@@ -266,7 +288,8 @@ function drawNametag({
             headline,
             headlineSize
         )
-        const iconX = centerX + headlineWidth / 2 + 16
+        const iconShiftX = 18
+        const iconX = centerX + headlineWidth / 2 + 16 + iconShiftX
         const iconY = initialsY + headlineSize * 0.42 - 6.5
         const iconStroke = rgb(0, 0, 0)
 
@@ -305,12 +328,24 @@ function drawNametag({
             font: detailsFont,
             color: rgb(0.15, 0.15, 0.15)
         })
+
+        if (sessionTimeLabel) {
+            drawCenteredText({
+                page,
+                text: sessionTimeLabel,
+                centerX: iconX + 9,
+                y: iconY - 24,
+                size: 8,
+                font: detailsFont,
+                color: rgb(0.15, 0.15, 0.15)
+            })
+        }
     } else {
         const headlineWidth = initialsFont.widthOfTextAtSize(
             headline,
             headlineSize
         )
-        const labelCenterX = centerX + headlineWidth / 2 + 25
+        const labelCenterX = centerX + headlineWidth / 2 + 25 + 18
         const labelY = initialsY + headlineSize * 0.42 - 20.5
 
         drawCenteredText({
@@ -322,6 +357,18 @@ function drawNametag({
             font: detailsFont,
             color: rgb(0.15, 0.15, 0.15)
         })
+
+        if (sessionTimeLabel) {
+            drawCenteredText({
+                page,
+                text: sessionTimeLabel,
+                centerX: labelCenterX,
+                y: labelY - 10,
+                size: 8,
+                font: detailsFont,
+                color: rgb(0.15, 0.15, 0.15)
+            })
+        }
     }
 
     drawStyledCenteredText({
@@ -386,6 +433,11 @@ export async function GET() {
                 users.first_name
             )
 
+        const sessionTimes: Record<number, string> = {
+            1: config.tryout1Session1Time.trim(),
+            2: config.tryout1Session2Time.trim()
+        }
+
         if (rosterRows.length === 0) {
             return NextResponse.json(
                 {
@@ -411,18 +463,14 @@ export async function GET() {
         const labelHeight =
             (pageHeight - marginY * 2 - gutterY * (rowsPerPage - 1)) /
             rowsPerPage
-        const totalPages = [1, 2].reduce((sum, sessionNumber) => {
-            const sessionCount = rosterRows.filter(
-                (row) => row.sessionNumber === sessionNumber
-            ).length
-            return sum + Math.ceil(sessionCount / 6)
-        }, 0)
-        let globalPageNumber = 1
 
         for (const sessionNumber of [1, 2]) {
             const sessionRows = rosterRows.filter(
                 (row) => row.sessionNumber === sessionNumber
             )
+            const sessionTime = sessionTimes[sessionNumber]
+            const totalPages = Math.ceil(sessionRows.length / 6)
+            let pageNumber = 1
 
             for (let start = 0; start < sessionRows.length; start += 6) {
                 const page = pdfDoc.addPage([pageWidth, pageHeight])
@@ -446,6 +494,7 @@ export async function GET() {
                         width: labelWidth,
                         height: labelHeight,
                         row,
+                        sessionTime,
                         initialsFont: regularFont,
                         idFont: regularFont,
                         detailsFont: regularFont
@@ -456,12 +505,13 @@ export async function GET() {
                     page,
                     pageWidth,
                     sessionNumber,
-                    globalPageNumber,
+                    sessionTime,
+                    pageNumber,
                     totalPages,
                     font: regularFont
                 })
 
-                globalPageNumber += 1
+                pageNumber += 1
             }
         }
 
