@@ -12,8 +12,19 @@ export interface SeasonConfig {
     seasonName: string
     registrationOpen: boolean
     tryout1Date: string
+    tryout1Session1Time: string
+    tryout1Session2Time: string
     tryout2Date: string
+    tryout2Session1Time: string
+    tryout2Session2Time: string
+    tryout2Session3Time: string
     tryout3Date: string
+    tryout3Session1Time: string
+    tryout3Session2Time: string
+    tryout3Session3Time: string
+    seasonSession1Time: string
+    seasonSession2Time: string
+    seasonSession3Time: string
     season1Date: string
     season2Date: string
     season3Date: string
@@ -43,8 +54,19 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
             seasonName: "",
             registrationOpen: false,
             tryout1Date: "",
+            tryout1Session1Time: "",
+            tryout1Session2Time: "",
             tryout2Date: "",
+            tryout2Session1Time: "",
+            tryout2Session2Time: "",
+            tryout2Session3Time: "",
             tryout3Date: "",
+            tryout3Session1Time: "",
+            tryout3Session2Time: "",
+            tryout3Session3Time: "",
+            seasonSession1Time: "",
+            seasonSession2Time: "",
+            seasonSession3Time: "",
             season1Date: "",
             season2Date: "",
             season3Date: "",
@@ -67,8 +89,19 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         seasonName: season.season,
         registrationOpen: season.registration_open,
         tryout1Date: season.tryout_1_date || "",
+        tryout1Session1Time: season.tryout_1_s1_time || "",
+        tryout1Session2Time: season.tryout_1_s2_time || "",
         tryout2Date: season.tryout_2_date || "",
+        tryout2Session1Time: season.tryout_2_s1_time || "",
+        tryout2Session2Time: season.tryout_2_s2_time || "",
+        tryout2Session3Time: season.tryout_2_s3_time || "",
         tryout3Date: season.tryout_3_date || "",
+        tryout3Session1Time: season.tryout_3_s1_time || "",
+        tryout3Session2Time: season.tryout_3_s2_time || "",
+        tryout3Session3Time: season.tryout_3_s3_time || "",
+        seasonSession1Time: season.season_s1_time || "",
+        seasonSession2Time: season.season_s2_time || "",
+        seasonSession3Time: season.season_s3_time || "",
         season1Date: season.season_1_date || "",
         season2Date: season.season_2_date || "",
         season3Date: season.season_3_date || "",

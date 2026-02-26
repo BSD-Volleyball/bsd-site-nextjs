@@ -363,7 +363,7 @@ export async function GET() {
             values: Array.from(latestDraftByUser.values()).map(
                 (draft) => draft.seasonLabel
             ),
-            minWidth: 40
+            minWidth: 26
         })
 
         const idWidth = getColumnWidth({
