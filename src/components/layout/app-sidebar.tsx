@@ -133,8 +133,18 @@ const adminDangerNavItems = [
         icon: RiCalendarLine
     },
     {
+        title: "Create Week 2",
+        url: "/dashboard/create-week-2",
+        icon: RiCalendarLine
+    },
+    {
         title: "Edit Week 1",
         url: "/dashboard/edit-week-1",
+        icon: RiEditLine
+    },
+    {
+        title: "Edit Week 2",
+        url: "/dashboard/edit-week-2",
         icon: RiEditLine
     },
     {
