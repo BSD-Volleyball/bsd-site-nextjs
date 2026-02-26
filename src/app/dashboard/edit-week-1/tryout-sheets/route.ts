@@ -464,6 +464,10 @@ export async function GET() {
         const sessions = [
             ...new Set(rosterRows.map((row) => row.sessionNumber))
         ].sort((a, b) => a - b)
+        const sessionTimes: Record<number, string> = {
+            1: config.tryout1Session1Time.trim(),
+            2: config.tryout1Session2Time.trim()
+        }
 
         const generatedTimestamp = new Intl.DateTimeFormat("en-US", {
             timeZone: "America/New_York",
@@ -492,7 +496,11 @@ export async function GET() {
         for (const sessionNumber of sessions) {
             for (const courtNumber of [1, 2, 3, 4]) {
                 const page = pdfDoc.addPage([pageWidth, pageHeight])
-                const title = `${capitalize(config.seasonName)} ${config.seasonYear} Week 1 Tryouts - Session ${sessionNumber} - Court ${courtNumber}`
+                const sessionTime = sessionTimes[sessionNumber]
+                const sessionLabel = sessionTime
+                    ? `Session ${sessionNumber} (${sessionTime})`
+                    : `Session ${sessionNumber}`
+                const title = `${capitalize(config.seasonName)} ${config.seasonYear} Week 1 Tryouts - ${sessionLabel} - Court ${courtNumber}`
 
                 page.drawText(title, {
                     x: margin,
