@@ -1,10 +1,11 @@
 export const SEASON_PHASES = [
     "off_season",
     "registration_open",
-    "registration_closed",
-    "tryout_week_1",
-    "tryout_week_2",
-    "tryout_week_3",
+    "select_commissioners",
+    "select_captains",
+    "prep_tryout_week_1",
+    "prep_tryout_week_2",
+    "prep_tryout_week_3",
     "draft",
     "regular_season",
     "playoffs",
@@ -45,65 +46,82 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
         label: "Registration Open",
         description: "Players can sign up and pay for the season.",
         adminHint:
-            "Monitor signups. Close registration when ready for tryouts.",
+            "Monitor signups. Close registration when ready to select commissioners.",
         showRegistration: true,
         showTryoutTools: false,
         showDraftTools: false,
         showSeasonTools: false,
         showPlayoffTools: false,
-        nextPhases: ["registration_closed"],
+        nextPhases: ["select_commissioners"],
         previousPhase: "off_season"
     },
-    registration_closed: {
-        label: "Registration Closed",
-        description: "Registration is closed. Prepare for tryout week 1.",
+    select_commissioners: {
+        label: "Select Commissioners",
+        description:
+            "Registration is closed. Assign commissioners for each division.",
         adminHint:
-            "Create Week 1 rosters and finalize the waitlist. Advance when ready for tryouts.",
+            "Assign commissioners for the season. Advance when all divisions have commissioners.",
         showRegistration: false,
         showTryoutTools: true,
         showDraftTools: false,
         showSeasonTools: false,
         showPlayoffTools: false,
-        nextPhases: ["tryout_week_1", "registration_open"],
+        nextPhases: ["select_captains", "registration_open"],
         previousPhase: "registration_open"
     },
-    tryout_week_1: {
-        label: "Tryout Week 1",
-        description: "Week 1 tryouts for new and legacy player evaluation.",
+    select_captains: {
+        label: "Select Captains",
+        description: "Commissioners select team captains for their divisions.",
         adminHint:
-            "Evaluate new players after tryouts. Advance to Week 2 when done.",
+            "Commissioners should identify and select captains. Advance when captains are confirmed.",
         showRegistration: false,
         showTryoutTools: true,
         showDraftTools: false,
         showSeasonTools: false,
         showPlayoffTools: false,
-        nextPhases: ["tryout_week_2"],
-        previousPhase: "registration_closed"
+        nextPhases: ["prep_tryout_week_1"],
+        previousPhase: "select_commissioners"
     },
-    tryout_week_2: {
-        label: "Tryout Week 2",
-        description: "Week 2 tryouts for all players.",
-        adminHint: "Rate players, review pairs. Advance to Week 3 when done.",
+    prep_tryout_week_1: {
+        label: "Prepare for Tryout Week 1",
+        description: "Prepare Week 1 tryout rosters and logistics.",
+        adminHint:
+            "Create Week 1 rosters and finalize preparations. Advance after tryout week 1 is complete.",
         showRegistration: false,
         showTryoutTools: true,
         showDraftTools: false,
         showSeasonTools: false,
         showPlayoffTools: false,
-        nextPhases: ["tryout_week_3"],
-        previousPhase: "tryout_week_1"
+        nextPhases: ["prep_tryout_week_2"],
+        previousPhase: "select_captains"
     },
-    tryout_week_3: {
-        label: "Tryout Week 3",
-        description: "Week 3 tryouts and final evaluation.",
+    prep_tryout_week_2: {
+        label: "Prepare for Tryout Week 2",
+        description:
+            "Evaluate Week 1 results and prepare Week 2 tryout rosters.",
         adminHint:
-            "Finalize evaluations and ratings. Select captains and create teams before advancing to draft.",
+            "Evaluate new players, create Week 2 rosters. Advance after tryout week 2 is complete.",
+        showRegistration: false,
+        showTryoutTools: true,
+        showDraftTools: false,
+        showSeasonTools: false,
+        showPlayoffTools: false,
+        nextPhases: ["prep_tryout_week_3"],
+        previousPhase: "prep_tryout_week_1"
+    },
+    prep_tryout_week_3: {
+        label: "Prepare for Tryout Week 3",
+        description:
+            "Evaluate Week 2 results and prepare Week 3 tryout rosters.",
+        adminHint:
+            "Rate players, review pairs, finalize evaluations. Advance after tryout week 3 is complete.",
         showRegistration: false,
         showTryoutTools: true,
         showDraftTools: true,
         showSeasonTools: false,
         showPlayoffTools: false,
         nextPhases: ["draft"],
-        previousPhase: "tryout_week_2"
+        previousPhase: "prep_tryout_week_2"
     },
     draft: {
         label: "Draft",
@@ -116,7 +134,7 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
         showSeasonTools: false,
         showPlayoffTools: false,
         nextPhases: ["regular_season"],
-        previousPhase: "tryout_week_3"
+        previousPhase: "prep_tryout_week_3"
     },
     regular_season: {
         label: "Regular Season",
