@@ -40,9 +40,33 @@ interface SignupsListProps {
 
 function formatHeight(inches: number | null): string {
     if (!inches) return "—"
-    const feet = Math.floor(inches / 12)
-    const remainingInches = inches % 12
-    return `${feet}'${remainingInches}"`
+    const numericInches = Number(inches)
+    if (!Number.isFinite(numericInches)) return "—"
+
+    const feet = Math.floor(numericInches / 12)
+    const remainingInches = numericInches % 12
+    const formattedFeet = String(feet).replace(/\.0+$/, "")
+    const formattedInches = String(remainingInches).replace(/\.0+$/, "")
+
+    return `${formattedFeet}'${formattedInches}"`
+}
+
+function buildPlayerPictureUrl(
+    baseUrl: string,
+    picturePath: string | null
+): string {
+    if (!picturePath) return ""
+    if (/^https?:\/\//i.test(picturePath)) return picturePath
+    if (!baseUrl) return picturePath
+
+    const normalizedBaseUrl = baseUrl.endsWith("/")
+        ? baseUrl.slice(0, -1)
+        : baseUrl
+    const normalizedPicturePath = picturePath.startsWith("/")
+        ? picturePath
+        : `/${picturePath}`
+
+    return `${normalizedBaseUrl}${normalizedPicturePath}`
 }
 
 function getDisplayName(entry: SignupEntry): string {
@@ -50,14 +74,16 @@ function getDisplayName(entry: SignupEntry): string {
     return `${entry.firstName}${preferred} ${entry.lastName}`
 }
 
-function escapeCsvField(field: string): string {
-    if (field.includes(",") || field.includes('"') || field.includes("\n")) {
-        return `"${field.replace(/"/g, '""')}"`
-    }
-    return field
+function serializeCsvField(value: unknown): string {
+    const stringValue =
+        value === null || value === undefined ? "" : String(value)
+    return `"${stringValue.replace(/"/g, '""')}"`
 }
 
-function generateCsvContent(signups: SignupEntry[]): string {
+function generateCsvContent(
+    signups: SignupEntry[],
+    playerPicUrl: string
+): string {
     const headers = [
         "id",
         "First Name",
@@ -90,13 +116,13 @@ function generateCsvContent(signups: SignupEntry[]): string {
 
     const rows = signups.map((entry) => [
         entry.oldId !== null ? String(entry.oldId) : "",
-        escapeCsvField(entry.firstName),
-        escapeCsvField(entry.lastName),
-        escapeCsvField(entry.preferredName || ""),
-        escapeCsvField(entry.email),
-        escapeCsvField(entry.phone || ""),
-        escapeCsvField(entry.pairPickName || ""),
-        escapeCsvField(entry.pairReason || ""),
+        entry.firstName,
+        entry.lastName,
+        entry.preferredName || "",
+        entry.email,
+        entry.phone || "",
+        entry.pairPickName || "",
+        entry.pairReason || "",
         entry.male === true ? "M" : entry.male === false ? "F" : "",
         entry.age || "",
         entry.captain === "yes"
@@ -111,20 +137,22 @@ function generateCsvContent(signups: SignupEntry[]): string {
         entry.experience || "",
         entry.assessment || "",
         formatHeight(entry.height),
-        entry.picture || "",
+        buildPlayerPictureUrl(playerPicUrl, entry.picture),
         entry.skillPasser ? "Yes" : "No",
         entry.skillSetter ? "Yes" : "No",
         entry.skillHitter ? "Yes" : "No",
         entry.skillOther ? "Yes" : "No",
-        escapeCsvField(entry.datesMissing || ""),
+        entry.datesMissing || "",
         entry.playFirstWeek ? "Yes" : "No",
-        escapeCsvField(entry.lastDraftSeason || ""),
-        escapeCsvField(entry.lastDraftDivision || ""),
-        escapeCsvField(entry.lastDraftCaptain || ""),
+        entry.lastDraftSeason || "",
+        entry.lastDraftDivision || "",
+        entry.lastDraftCaptain || "",
         entry.lastDraftOverall !== null ? String(entry.lastDraftOverall) : ""
     ])
 
-    return [headers, ...rows].map((row) => row.join(",")).join("\n")
+    return [headers, ...rows]
+        .map((row) => row.map((value) => serializeCsvField(value)).join(","))
+        .join("\r\n")
 }
 
 export function SignupsList({
@@ -215,7 +243,7 @@ export function SignupsList({
     }, [])
 
     const handleDownloadCsv = () => {
-        const csvContent = generateCsvContent(filteredSignups)
+        const csvContent = generateCsvContent(filteredSignups, playerPicUrl)
 
         const blob = new Blob([`\ufeff${csvContent}`], {
             type: "text/csv;charset=utf-8;"
