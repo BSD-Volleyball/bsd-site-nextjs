@@ -22,6 +22,7 @@ import {
     getCurrentSeasonAmount,
     isLatePricing
 } from "@/lib/site-config"
+import { PHASE_CONFIG } from "@/lib/season-phases"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
@@ -167,6 +168,193 @@ async function getPreviousSeasonsPlayed(
     }))
 }
 
+function RegistrationConfirmation({
+    signupStatus
+}: {
+    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
+}) {
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-3">
+                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                    <p className="font-medium text-green-700 dark:text-green-400">
+                        You're registered!
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                        Paid ${signupStatus.signup!.amount_paid} on{" "}
+                        {new Date(
+                            signupStatus.signup!.created_at
+                        ).toLocaleDateString()}
+                    </p>
+                </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-4 text-sm">
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                        Captain Interest:
+                    </span>
+                    <span className="font-medium capitalize">
+                        {signupStatus.signup!.captain === "yes"
+                            ? "Yes"
+                            : signupStatus.signup!.captain === "only_if_needed"
+                              ? "Only if needed"
+                              : "No"}
+                    </span>
+                </div>
+
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                        Week 1 Tryouts:
+                    </span>
+                    <span className="font-medium">
+                        {signupStatus.signup!.play_1st_week
+                            ? "Requested"
+                            : "Not requested"}
+                    </span>
+                </div>
+
+                {signupStatus.pairPickName && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">
+                            Pair Request:
+                        </span>
+                        <span className="font-medium">
+                            {signupStatus.pairPickName}
+                        </span>
+                    </div>
+                )}
+
+                {signupStatus.signup!.dates_missing && (
+                    <div className="flex flex-col gap-1">
+                        <span className="text-muted-foreground">
+                            Dates Missing:
+                        </span>
+                        <span className="font-medium text-xs">
+                            {signupStatus.signup!.dates_missing}
+                        </span>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+function WaitlistContent({
+    signupStatus,
+    seasonLabel,
+    waitlistSeasonId
+}: {
+    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
+    seasonLabel: string | null
+    waitlistSeasonId: number | null
+}) {
+    return (
+        <div className="space-y-3">
+            <p className="text-muted-foreground">
+                The {seasonLabel} season is currently full.
+            </p>
+            {signupStatus.onWaitlist ? (
+                signupStatus.waitlistApproved ? (
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                                <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                            </div>
+                            <p className="font-medium text-green-700 text-sm dark:text-green-400">
+                                You have been approved from the waitlist and can
+                                now complete your registration.
+                            </p>
+                        </div>
+                        <Link
+                            href="/dashboard/pay-season"
+                            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
+                        >
+                            Sign-up Now
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                            <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                            You've expressed interest in playing. We'll reach
+                            out if a spot opens up!
+                        </p>
+                    </div>
+                )
+            ) : (
+                <div className="space-y-2">
+                    <p className="text-muted-foreground text-sm">
+                        There are occasionally drop-outs, injuries, or
+                        scheduling conflicts. Click here to express your
+                        interest in a spot in the league if one opens up or
+                        possibly a substitute if needed.
+                    </p>
+                    <WaitlistButton seasonId={waitlistSeasonId!} />
+                </div>
+            )}
+        </div>
+    )
+}
+
+function SignupCTA({
+    signupStatus,
+    seasonLabel
+}: {
+    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
+    seasonLabel: string | null
+}) {
+    return (
+        <div className="space-y-3">
+            <p className="text-muted-foreground">
+                You haven't signed up for the {seasonLabel} season yet.
+            </p>
+            <div className="space-y-1 rounded-lg bg-muted p-3">
+                <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Season Fee:</span>
+                    <span className="font-semibold">
+                        ${getCurrentSeasonAmount(signupStatus.config)}
+                    </span>
+                </div>
+                {signupStatus.config.lateDate &&
+                    signupStatus.config.lateAmount &&
+                    (isLatePricing(signupStatus.config) ? (
+                        <p className="text-amber-600 text-xs dark:text-amber-400">
+                            Late registration pricing in effect
+                        </p>
+                    ) : (
+                        <p className="text-muted-foreground text-xs">
+                            Price increases to ${signupStatus.config.lateAmount}{" "}
+                            after{" "}
+                            {new Date(
+                                signupStatus.config.lateDate
+                            ).toLocaleDateString()}
+                        </p>
+                    ))}
+            </div>
+            <div className="flex gap-2">
+                <Link
+                    href="/dashboard/pay-season"
+                    className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
+                >
+                    Sign-up Now
+                </Link>
+                <Link
+                    href="/spring-2026-season-info"
+                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 font-medium text-sm hover:bg-accent hover:text-accent-foreground"
+                >
+                    More Info
+                </Link>
+            </div>
+        </div>
+    )
+}
+
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
     const hasTryoutSheetAccess = session?.user
@@ -247,8 +435,17 @@ export default async function DashboardPage() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <p className="text-muted-foreground text-sm">
-                            Download Avery 5164 nametag labels for Week 1
-                            sessions 1 and 2.
+                            Download Week 1 sessions 1 and 2 Nametags. Should be
+                            printed on{" "}
+                            <a
+                                href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary underline hover:text-primary/80"
+                            >
+                                Avery 5164 labels
+                            </a>
+                            .
                         </p>
                         <a
                             href="/dashboard/edit-week-1/nametags"
@@ -287,7 +484,8 @@ export default async function DashboardPage() {
                                     ).toLocaleDateString()}
                                 </p>
                             )}
-                            {signupStatus.config.registrationOpen && (
+                            {signupStatus.config.phase ===
+                                "registration_open" && (
                                 <Link
                                     href="/dashboard/pay-season"
                                     className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
@@ -309,188 +507,100 @@ export default async function DashboardPage() {
                                 {seasonLabel} Season
                             </CardTitle>
                         </div>
+                        <p className="text-muted-foreground text-xs">
+                            {PHASE_CONFIG[signupStatus.config.phase].label}
+                        </p>
                     </CardHeader>
                     <CardContent>
-                        {signupStatus.signup ? (
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                                        <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium text-green-700 dark:text-green-400">
-                                            You're registered!
-                                        </p>
-                                        <p className="text-muted-foreground text-sm">
-                                            Paid $
-                                            {signupStatus.signup.amount_paid} on{" "}
-                                            {new Date(
-                                                signupStatus.signup.created_at
-                                            ).toLocaleDateString()}
+                        {signupStatus.config.phase === "off_season" ? (
+                            <p className="text-muted-foreground">
+                                Check back soon for the next season!
+                            </p>
+                        ) : signupStatus.config.phase ===
+                          "registration_open" ? (
+                            /* Registration phase: signup confirmation, waitlist, or signup CTA */
+                            signupStatus.signup ? (
+                                <RegistrationConfirmation
+                                    signupStatus={signupStatus}
+                                />
+                            ) : signupStatus.seasonFull &&
+                              signupStatus.season ? (
+                                <WaitlistContent
+                                    signupStatus={signupStatus}
+                                    seasonLabel={seasonLabel}
+                                    waitlistSeasonId={waitlistSeasonId}
+                                />
+                            ) : (
+                                <SignupCTA
+                                    signupStatus={signupStatus}
+                                    seasonLabel={seasonLabel}
+                                />
+                            )
+                        ) : signupStatus.config.phase ===
+                              "registration_closed" ||
+                          signupStatus.config.phase === "tryout_week_1" ||
+                          signupStatus.config.phase === "tryout_week_2" ||
+                          signupStatus.config.phase === "tryout_week_3" ? (
+                            signupStatus.signup ? (
+                                <div className="space-y-4">
+                                    <RegistrationConfirmation
+                                        signupStatus={signupStatus}
+                                    />
+                                    <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+                                        <p className="font-medium text-blue-700 text-sm dark:text-blue-300">
+                                            {
+                                                PHASE_CONFIG[
+                                                    signupStatus.config.phase
+                                                ].description
+                                            }
                                         </p>
                                     </div>
                                 </div>
-
-                                <div className="space-y-2 border-t pt-4 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Captain Interest:
-                                        </span>
-                                        <span className="font-medium capitalize">
-                                            {signupStatus.signup.captain ===
-                                            "yes"
-                                                ? "Yes"
-                                                : signupStatus.signup
-                                                        .captain ===
-                                                    "only_if_needed"
-                                                  ? "Only if needed"
-                                                  : "No"}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">
-                                            Week 1 Tryouts:
-                                        </span>
-                                        <span className="font-medium">
-                                            {signupStatus.signup.play_1st_week
-                                                ? "Requested"
-                                                : "Not requested"}
-                                        </span>
-                                    </div>
-
-                                    {signupStatus.pairPickName && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">
-                                                Pair Request:
-                                            </span>
-                                            <span className="font-medium">
-                                                {signupStatus.pairPickName}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {signupStatus.signup.dates_missing && (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-muted-foreground">
-                                                Dates Missing:
-                                            </span>
-                                            <span className="font-medium text-xs">
-                                                {
-                                                    signupStatus.signup
-                                                        .dates_missing
-                                                }
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : signupStatus.config.registrationOpen &&
-                          signupStatus.seasonFull &&
-                          signupStatus.season ? (
-                            <div className="space-y-3">
+                            ) : (
                                 <p className="text-muted-foreground">
-                                    The {seasonLabel} season is currently full.
+                                    Registration is closed. Tryouts are underway
+                                    for the {seasonLabel} season.
                                 </p>
-                                {signupStatus.onWaitlist ? (
-                                    signupStatus.waitlistApproved ? (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                                                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                                </div>
-                                                <p className="font-medium text-green-700 text-sm dark:text-green-400">
-                                                    You have been approved from
-                                                    the waitlist and can now
-                                                    complete your registration.
-                                                </p>
-                                            </div>
-                                            <Link
-                                                href="/dashboard/pay-season"
-                                                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                                            >
-                                                Sign-up Now
-                                            </Link>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-3">
-                                            <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                                                <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                                                You've expressed interest in
-                                                playing. We'll reach out if a
-                                                spot opens up!
-                                            </p>
-                                        </div>
-                                    )
-                                ) : (
-                                    <div className="space-y-2">
-                                        <p className="text-muted-foreground text-sm">
-                                            Express your interest in case a spot
-                                            opens up due to a drop or injury.
-                                        </p>
-                                        <WaitlistButton
-                                            seasonId={waitlistSeasonId!}
-                                        />
-                                    </div>
-                                )}
+                            )
+                        ) : signupStatus.config.phase === "draft" ? (
+                            <div className="space-y-2">
+                                <p className="font-medium text-sm">
+                                    Teams are being formed!
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                    Commissioners are drafting players onto
+                                    teams. Check back soon for your team
+                                    assignment.
+                                </p>
                             </div>
-                        ) : signupStatus.config.registrationOpen ? (
+                        ) : signupStatus.config.phase === "regular_season" ? (
                             <div className="space-y-3">
-                                <p className="text-muted-foreground">
-                                    You haven't signed up for the {seasonLabel}{" "}
-                                    season yet.
+                                <p className="font-medium text-sm">
+                                    Regular season is underway!
                                 </p>
-                                <div className="space-y-1 rounded-lg bg-muted p-3">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            Season Fee:
-                                        </span>
-                                        <span className="font-semibold">
-                                            $
-                                            {getCurrentSeasonAmount(
-                                                signupStatus.config
-                                            )}
-                                        </span>
-                                    </div>
-                                    {signupStatus.config.lateDate &&
-                                        signupStatus.config.lateAmount &&
-                                        (isLatePricing(signupStatus.config) ? (
-                                            <p className="text-amber-600 text-xs dark:text-amber-400">
-                                                Late registration pricing in
-                                                effect
-                                            </p>
-                                        ) : (
-                                            <p className="text-muted-foreground text-xs">
-                                                Price increases to $
-                                                {signupStatus.config.lateAmount}{" "}
-                                                after{" "}
-                                                {new Date(
-                                                    signupStatus.config.lateDate
-                                                ).toLocaleDateString()}
-                                            </p>
-                                        ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <Link
-                                        href="/dashboard/pay-season"
-                                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                                    >
-                                        Sign-up Now
-                                    </Link>
-                                    <Link
-                                        href="/spring-2026-season-info"
-                                        className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 font-medium text-sm hover:bg-accent hover:text-accent-foreground"
-                                    >
-                                        More Info
-                                    </Link>
-                                </div>
+                                <p className="text-muted-foreground text-sm">
+                                    Check the schedule and standings for the
+                                    latest results.
+                                </p>
                             </div>
+                        ) : signupStatus.config.phase === "playoffs" ? (
+                            <div className="space-y-3">
+                                <p className="font-medium text-sm">
+                                    Playoffs are underway!
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                    Check the playoff bracket for matchups and
+                                    results.
+                                </p>
+                            </div>
+                        ) : signupStatus.config.phase === "complete" ? (
+                            <p className="text-muted-foreground">
+                                The {seasonLabel} season is complete. Thanks for
+                                playing!
+                            </p>
                         ) : (
                             <p className="text-muted-foreground">
-                                Registration for the {seasonLabel} season is
-                                currently closed.
+                                Season information will be available soon.
                             </p>
                         )}
                     </CardContent>

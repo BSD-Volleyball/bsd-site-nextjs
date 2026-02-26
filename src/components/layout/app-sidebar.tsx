@@ -23,7 +23,8 @@ import {
     RiLinksLine,
     RiUserSettingsLine,
     RiMailLine,
-    RiTrophyLine
+    RiTrophyLine,
+    RiSettings3Line
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -57,8 +58,10 @@ import {
     getIsCommissioner,
     getHasCaptainPagesAccess,
     getRecentSeasonsNav,
+    getSeasonPhase,
     type SeasonNavItem
 } from "@/app/dashboard/actions"
+import { PHASE_CONFIG, type SeasonPhase } from "@/lib/season-phases"
 
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
@@ -84,6 +87,11 @@ const signupNavItem = {
 }
 
 const adminNavItems = [
+    {
+        title: "Season Control",
+        url: "/dashboard/season-control",
+        icon: RiSettings3Line
+    },
     {
         title: "Admin Player Lookup",
         url: "/dashboard/player-lookup",
@@ -352,6 +360,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
+    const [phase, setPhase] = useState<SeasonPhase | null>(null)
 
     useEffect(() => {
         getSignupEligibility().then(setShowSignupLink)
@@ -359,7 +368,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         getIsCommissioner().then(setIsCommissioner)
         getHasCaptainPagesAccess().then(setHasCaptainPagesAccess)
         getRecentSeasonsNav().then(setSeasonNav)
+        getSeasonPhase().then(setPhase)
     }, [])
+
+    const phaseConfig = phase ? PHASE_CONFIG[phase] : null
 
     // Build nav items dynamically
     let navItems = [...baseNavItems]
@@ -405,37 +417,44 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                {hasCaptainPagesAccess && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Captain Pages
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <NavItems
-                                    items={captainPagesNavItems}
-                                    pathname={pathname}
-                                />
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
+                {hasCaptainPagesAccess &&
+                    phaseConfig &&
+                    (phaseConfig.showTryoutTools ||
+                        phaseConfig.showDraftTools ||
+                        phaseConfig.showSeasonTools) && (
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                                Captain Pages
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <NavItems
+                                        items={captainPagesNavItems}
+                                        pathname={pathname}
+                                    />
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    )}
 
-                {isCommissioner && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Commissioners
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <NavItems
-                                    items={commissionerNavItems}
-                                    pathname={pathname}
-                                />
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
+                {isCommissioner &&
+                    phaseConfig &&
+                    (phaseConfig.showTryoutTools ||
+                        phaseConfig.showDraftTools) && (
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                                Commissioners
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <NavItems
+                                        items={commissionerNavItems}
+                                        pathname={pathname}
+                                    />
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    )}
 
                 {isAdmin && (
                     <SidebarGroup>

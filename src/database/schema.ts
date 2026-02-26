@@ -100,8 +100,8 @@ export const seasons = pgTable("seasons", {
     code: text("code").notNull(),
     year: integer("year").notNull(),
     season: text("season").notNull(),
-    registration_open: boolean("registration_open")
-        .$defaultFn(() => false)
+    phase: text("phase")
+        .$defaultFn(() => "off_season")
         .notNull(),
     late_date: text("late_date"),
     tryout_1_date: text("tryout_1_date"),
