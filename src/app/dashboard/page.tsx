@@ -11,11 +11,17 @@ import {
     teams,
     divisions,
     waitlist,
-    champions
+    champions,
+    evaluations
 } from "@/database/schema"
-import { eq, and, desc, count } from "drizzle-orm"
+import { eq, and, desc, count, inArray } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RiCheckLine, RiCalendarLine, RiCoupon3Line } from "@remixicon/react"
+import {
+    RiCheckLine,
+    RiCalendarLine,
+    RiCoupon3Line,
+    RiStarLine
+} from "@remixicon/react"
 import Link from "next/link"
 import {
     getSeasonConfig,
@@ -28,7 +34,8 @@ import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
 import {
     hasCaptainPagesAccessBySession,
-    isAdminOrDirectorBySession
+    isAdminOrDirectorBySession,
+    isCommissionerBySession
 } from "@/lib/rbac"
 
 export const metadata: Metadata = {
@@ -166,6 +173,46 @@ async function getPreviousSeasonsPlayed(
         champion: !!r.championId,
         championPicture: r.championPicture
     }))
+}
+
+async function getNewPlayerEvalStats(
+    userId: string,
+    seasonId: number
+): Promise<{ totalNew: number; ratedByUser: number }> {
+    // Get all signed-up players for this season
+    const signedUpUsers = await db
+        .select({ userId: signups.player })
+        .from(signups)
+        .where(eq(signups.season, seasonId))
+
+    const userIds = signedUpUsers.map((r) => r.userId)
+    if (userIds.length === 0) return { totalNew: 0, ratedByUser: 0 }
+
+    // Find which have been drafted before (not new)
+    const draftedUsers = await db
+        .select({ user: drafts.user })
+        .from(drafts)
+        .where(inArray(drafts.user, userIds))
+
+    const draftedUserIds = new Set(draftedUsers.map((d) => d.user))
+    const newPlayerIds = userIds.filter((id) => !draftedUserIds.has(id))
+    const totalNew = newPlayerIds.length
+
+    if (totalNew === 0) return { totalNew: 0, ratedByUser: 0 }
+
+    // Count how many the current user has evaluated this season
+    const [result] = await db
+        .select({ total: count() })
+        .from(evaluations)
+        .where(
+            and(
+                eq(evaluations.season, seasonId),
+                eq(evaluations.evaluator, userId),
+                inArray(evaluations.player, newPlayerIds)
+            )
+        )
+
+    return { totalNew, ratedByUser: result?.total ?? 0 }
 }
 
 function RegistrationConfirmation({
@@ -360,13 +407,15 @@ export default async function DashboardPage() {
     const hasTryoutSheetAccess = session?.user
         ? await hasCaptainPagesAccessBySession()
         : false
-    const hasNametagAccess = session?.user
-        ? await isAdminOrDirectorBySession()
+    const isAdmin = session?.user ? await isAdminOrDirectorBySession() : false
+    const isCommissioner = session?.user
+        ? await isCommissionerBySession()
         : false
 
     let signupStatus = null
     let userName: string | null = null
     let previousSeasons: PreviousSeason[] = []
+    let evalStats: { totalNew: number; ratedByUser: number } | null = null
     let discount: Awaited<ReturnType<typeof getActiveDiscountForUser>> = null
 
     if (session?.user) {
@@ -385,6 +434,13 @@ export default async function DashboardPage() {
             .limit(1)
 
         userName = user?.preffered_name || user?.first_name || null
+
+        if (isAdmin && signupStatus?.config.seasonId) {
+            evalStats = await getNewPlayerEvalStats(
+                session.user.id,
+                signupStatus.config.seasonId
+            )
+        }
     }
 
     const seasonLabel = signupStatus
@@ -404,254 +460,324 @@ export default async function DashboardPage() {
                 description="Here's what's happening with your account today."
             />
 
-            {hasTryoutSheetAccess && (
-                <Card className="max-w-md border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
-                            Week 1 Tryout Sheets
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-blue-700 text-sm dark:text-blue-300">
-                            Download the latest week 1 tryout sheets PDF for
-                            on-court evaluations.
-                        </p>
-                        <a
-                            href="/dashboard/edit-week-1/tryout-sheets"
-                            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                        >
-                            Download Week 1 PDF
-                        </a>
-                    </CardContent>
-                </Card>
-            )}
-
-            {hasNametagAccess && (
-                <Card className="max-w-md">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg">
-                            Week 1 Nametag Labels
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-muted-foreground text-sm">
-                            Download Week 1 sessions 1 and 2 Nametags. Should be
-                            printed on{" "}
-                            <a
-                                href="https://www.amazon.com/dp/B0BCFNZJK6"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary underline hover:text-primary/80"
-                            >
-                                Avery 5164 labels
-                            </a>
-                            .
-                        </p>
-                        <a
-                            href="/dashboard/edit-week-1/nametags"
-                            className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                        >
-                            Download Nametag PDF
-                        </a>
-                    </CardContent>
-                </Card>
-            )}
-
-            {discount && signupStatus && !signupStatus.signup && (
-                <Card className="max-w-md border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center gap-2">
-                            <RiCoupon3Line className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            <CardTitle className="text-green-700 text-lg dark:text-green-300">
-                                Discount Available!
-                            </CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-3">
-                            <p className="text-green-700 dark:text-green-300">
-                                You have a{" "}
-                                <span className="font-bold">
-                                    {discount.percentage}% discount
-                                </span>{" "}
-                                available for season registration.
-                            </p>
-                            {discount.expiration && (
-                                <p className="text-green-600 text-sm dark:text-green-400">
-                                    Expires on{" "}
-                                    {new Date(
-                                        discount.expiration
-                                    ).toLocaleDateString()}
+            <div className="flex flex-wrap gap-6">
+                {isCommissioner &&
+                    signupStatus?.config.phase === "select_captains" && (
+                        <Card className="min-w-[280px] flex-1 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-amber-700 text-lg dark:text-amber-300">
+                                    Time to Select Captains
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p className="text-amber-700 text-sm dark:text-amber-300">
+                                    It's time to select team captains for your
+                                    division. Review candidates and make your
+                                    selections.
                                 </p>
-                            )}
-                            {signupStatus.config.phase ===
-                                "registration_open" && (
                                 <Link
-                                    href="/dashboard/pay-season"
-                                    className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
+                                    href="/dashboard/select-captains"
+                                    className="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 font-medium text-sm text-white hover:bg-amber-700"
                                 >
-                                    Use Discount Now
+                                    Select Captains
                                 </Link>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                            </CardContent>
+                        </Card>
+                    )}
 
-            {signupStatus && (
-                <Card className="max-w-md">
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <RiCalendarLine className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle className="text-lg">
-                                {seasonLabel} Season
+                {isAdmin &&
+                    evalStats &&
+                    signupStatus &&
+                    [
+                        "registration_open",
+                        "select_commissioners",
+                        "select_captains",
+                        "prep_tryout_week_1"
+                    ].includes(signupStatus.config.phase) && (
+                        <Card className="min-w-[280px] flex-1 border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center gap-2">
+                                    <RiStarLine className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                    <CardTitle className="text-lg text-purple-700 dark:text-purple-300">
+                                        Evaluate New Players
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p className="text-purple-700 text-sm dark:text-purple-300">
+                                    There are {evalStats.totalNew} new players
+                                    this season. You've evaluated{" "}
+                                    {evalStats.ratedByUser} of{" "}
+                                    {evalStats.totalNew}.
+                                </p>
+                                <Link
+                                    href="/dashboard/evaluate-players"
+                                    className="inline-flex items-center justify-center rounded-md bg-purple-600 px-4 py-2 font-medium text-sm text-white hover:bg-purple-700"
+                                >
+                                    Evaluate New Players
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                {hasTryoutSheetAccess && (
+                    <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                                Week 1 Tryout Sheets
                             </CardTitle>
-                        </div>
-                        <p className="text-muted-foreground text-xs">
-                            {PHASE_CONFIG[signupStatus.config.phase].label}
-                        </p>
-                    </CardHeader>
-                    <CardContent>
-                        {signupStatus.config.phase === "off_season" ? (
-                            <p className="text-muted-foreground">
-                                Check back soon for the next season!
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-blue-700 text-sm dark:text-blue-300">
+                                Download the latest week 1 tryout sheets PDF for
+                                on-court evaluations.
                             </p>
-                        ) : signupStatus.config.phase ===
-                          "registration_open" ? (
-                            /* Registration phase: signup confirmation, waitlist, or signup CTA */
-                            signupStatus.signup ? (
-                                <RegistrationConfirmation
-                                    signupStatus={signupStatus}
-                                />
-                            ) : signupStatus.seasonFull &&
-                              signupStatus.season ? (
-                                <WaitlistContent
-                                    signupStatus={signupStatus}
-                                    seasonLabel={seasonLabel}
-                                    waitlistSeasonId={waitlistSeasonId}
-                                />
-                            ) : (
-                                <SignupCTA
-                                    signupStatus={signupStatus}
-                                    seasonLabel={seasonLabel}
-                                />
-                            )
-                        ) : signupStatus.config.phase ===
-                              "select_commissioners" ||
-                          signupStatus.config.phase === "select_captains" ||
-                          signupStatus.config.phase === "prep_tryout_week_1" ||
-                          signupStatus.config.phase === "prep_tryout_week_2" ||
-                          signupStatus.config.phase === "prep_tryout_week_3" ? (
-                            signupStatus.signup ? (
-                                <div className="space-y-4">
+                            <a
+                                href="/dashboard/edit-week-1/tryout-sheets"
+                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
+                            >
+                                Download Week 1 PDF
+                            </a>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {isAdmin && (
+                    <Card className="min-w-[280px] flex-1">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg">
+                                Week 1 Nametag Labels
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-muted-foreground text-sm">
+                                Download Week 1 sessions 1 and 2 Nametags.
+                                Should be printed on{" "}
+                                <a
+                                    href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline hover:text-primary/80"
+                                >
+                                    Avery 5164 labels
+                                </a>
+                                .
+                            </p>
+                            <a
+                                href="/dashboard/edit-week-1/nametags"
+                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
+                            >
+                                Download Nametag PDF
+                            </a>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {discount && signupStatus && !signupStatus.signup && (
+                    <Card className="min-w-[280px] flex-1 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCoupon3Line className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                <CardTitle className="text-green-700 text-lg dark:text-green-300">
+                                    Discount Available!
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3">
+                                <p className="text-green-700 dark:text-green-300">
+                                    You have a{" "}
+                                    <span className="font-bold">
+                                        {discount.percentage}% discount
+                                    </span>{" "}
+                                    available for season registration.
+                                </p>
+                                {discount.expiration && (
+                                    <p className="text-green-600 text-sm dark:text-green-400">
+                                        Expires on{" "}
+                                        {new Date(
+                                            discount.expiration
+                                        ).toLocaleDateString()}
+                                    </p>
+                                )}
+                                {signupStatus.config.phase ===
+                                    "registration_open" && (
+                                    <Link
+                                        href="/dashboard/pay-season"
+                                        className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
+                                    >
+                                        Use Discount Now
+                                    </Link>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {signupStatus && (
+                    <Card className="min-w-[280px] flex-1">
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-muted-foreground" />
+                                <CardTitle className="text-lg">
+                                    {seasonLabel} Season
+                                </CardTitle>
+                            </div>
+                            <p className="text-muted-foreground text-xs">
+                                {PHASE_CONFIG[signupStatus.config.phase].label}
+                            </p>
+                        </CardHeader>
+                        <CardContent>
+                            {signupStatus.config.phase === "off_season" ? (
+                                <p className="text-muted-foreground">
+                                    Check back soon for the next season!
+                                </p>
+                            ) : signupStatus.config.phase ===
+                              "registration_open" ? (
+                                /* Registration phase: signup confirmation, waitlist, or signup CTA */
+                                signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
                                     />
-                                    <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-                                        <p className="font-medium text-blue-700 text-sm dark:text-blue-300">
-                                            {
-                                                PHASE_CONFIG[
-                                                    signupStatus.config.phase
-                                                ].description
-                                            }
-                                        </p>
+                                ) : signupStatus.seasonFull &&
+                                  signupStatus.season ? (
+                                    <WaitlistContent
+                                        signupStatus={signupStatus}
+                                        seasonLabel={seasonLabel}
+                                        waitlistSeasonId={waitlistSeasonId}
+                                    />
+                                ) : (
+                                    <SignupCTA
+                                        signupStatus={signupStatus}
+                                        seasonLabel={seasonLabel}
+                                    />
+                                )
+                            ) : signupStatus.config.phase ===
+                                  "select_commissioners" ||
+                              signupStatus.config.phase === "select_captains" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_1" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_2" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_3" ? (
+                                signupStatus.signup ? (
+                                    <div className="space-y-4">
+                                        <RegistrationConfirmation
+                                            signupStatus={signupStatus}
+                                        />
+                                        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+                                            <p className="font-medium text-blue-700 text-sm dark:text-blue-300">
+                                                {
+                                                    PHASE_CONFIG[
+                                                        signupStatus.config
+                                                            .phase
+                                                    ].description
+                                                }
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                            ) : signupStatus.season ? (
-                                <div className="space-y-3">
+                                ) : signupStatus.season ? (
+                                    <div className="space-y-3">
+                                        <p className="text-muted-foreground">
+                                            Registration is closed. Tryouts are
+                                            underway for the {seasonLabel}{" "}
+                                            season.
+                                        </p>
+                                        {signupStatus.onWaitlist ? (
+                                            signupStatus.waitlistApproved ? (
+                                                <div className="flex items-center gap-3">
+                                                    <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                                                        <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                                    </div>
+                                                    <p className="font-medium text-green-700 text-sm dark:text-green-400">
+                                                        You've been approved
+                                                        from the waitlist! We'll
+                                                        be in touch with next
+                                                        steps.
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3">
+                                                    <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                                                        <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                    </div>
+                                                    <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                                                        You've expressed
+                                                        interest in playing.
+                                                        We'll reach out if a
+                                                        spot opens up!
+                                                    </p>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <p className="text-muted-foreground text-sm">
+                                                    Interested in joining? There
+                                                    are occasionally drop-outs,
+                                                    injuries, or scheduling
+                                                    conflicts. Express your
+                                                    interest to get on the
+                                                    waitlist.
+                                                </p>
+                                                <WaitlistButton
+                                                    seasonId={waitlistSeasonId!}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
                                     <p className="text-muted-foreground">
                                         Registration is closed. Tryouts are
                                         underway for the {seasonLabel} season.
                                     </p>
-                                    {signupStatus.onWaitlist ? (
-                                        signupStatus.waitlistApproved ? (
-                                            <div className="flex items-center gap-3">
-                                                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                                                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                                </div>
-                                                <p className="font-medium text-green-700 text-sm dark:text-green-400">
-                                                    You've been approved from
-                                                    the waitlist! We'll be in
-                                                    touch with next steps.
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-3">
-                                                <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                                                    <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                </div>
-                                                <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                                                    You've expressed interest in
-                                                    playing. We'll reach out if
-                                                    a spot opens up!
-                                                </p>
-                                            </div>
-                                        )
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p className="text-muted-foreground text-sm">
-                                                Interested in joining? There are
-                                                occasionally drop-outs,
-                                                injuries, or scheduling
-                                                conflicts. Express your interest
-                                                to get on the waitlist.
-                                            </p>
-                                            <WaitlistButton
-                                                seasonId={waitlistSeasonId!}
-                                            />
-                                        </div>
-                                    )}
+                                )
+                            ) : signupStatus.config.phase === "draft" ? (
+                                <div className="space-y-2">
+                                    <p className="font-medium text-sm">
+                                        Teams are being formed!
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        Commissioners are drafting players onto
+                                        teams. Check back soon for your team
+                                        assignment.
+                                    </p>
                                 </div>
+                            ) : signupStatus.config.phase ===
+                              "regular_season" ? (
+                                <div className="space-y-3">
+                                    <p className="font-medium text-sm">
+                                        Regular season is underway!
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        Check the schedule and standings for the
+                                        latest results.
+                                    </p>
+                                </div>
+                            ) : signupStatus.config.phase === "playoffs" ? (
+                                <div className="space-y-3">
+                                    <p className="font-medium text-sm">
+                                        Playoffs are underway!
+                                    </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        Check the playoff bracket for matchups
+                                        and results.
+                                    </p>
+                                </div>
+                            ) : signupStatus.config.phase === "complete" ? (
+                                <p className="text-muted-foreground">
+                                    The {seasonLabel} season is complete. Thanks
+                                    for playing!
+                                </p>
                             ) : (
                                 <p className="text-muted-foreground">
-                                    Registration is closed. Tryouts are underway
-                                    for the {seasonLabel} season.
+                                    Season information will be available soon.
                                 </p>
-                            )
-                        ) : signupStatus.config.phase === "draft" ? (
-                            <div className="space-y-2">
-                                <p className="font-medium text-sm">
-                                    Teams are being formed!
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    Commissioners are drafting players onto
-                                    teams. Check back soon for your team
-                                    assignment.
-                                </p>
-                            </div>
-                        ) : signupStatus.config.phase === "regular_season" ? (
-                            <div className="space-y-3">
-                                <p className="font-medium text-sm">
-                                    Regular season is underway!
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    Check the schedule and standings for the
-                                    latest results.
-                                </p>
-                            </div>
-                        ) : signupStatus.config.phase === "playoffs" ? (
-                            <div className="space-y-3">
-                                <p className="font-medium text-sm">
-                                    Playoffs are underway!
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    Check the playoff bracket for matchups and
-                                    results.
-                                </p>
-                            </div>
-                        ) : signupStatus.config.phase === "complete" ? (
-                            <p className="text-muted-foreground">
-                                The {seasonLabel} season is complete. Thanks for
-                                playing!
-                            </p>
-                        ) : (
-                            <p className="text-muted-foreground">
-                                Season information will be available soon.
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
             {previousSeasons.length > 0 && (
                 <PreviousSeasonsCard previousSeasons={previousSeasons} />

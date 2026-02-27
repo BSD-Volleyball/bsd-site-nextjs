@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -13,23 +13,13 @@ import {
     DialogHeader,
     DialogTitle
 } from "@/components/ui/dialog"
-import { RiCloseLine, RiDownloadLine } from "@remixicon/react"
+import { RiDownloadLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
-    getPlayerDetails,
-    type PlayerDetails,
-    type PlayerDraftHistory
-} from "@/app/dashboard/player-lookup/actions"
-import {
-    Bar,
-    BarChart,
-    Cell,
-    ReferenceArea,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis
-} from "recharts"
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup,
+    formatHeight
+} from "@/components/player-detail"
 import { deleteSignupEntry, type SignupEntry } from "./actions"
 
 interface SignupsListProps {
@@ -37,19 +27,6 @@ interface SignupsListProps {
     playerPicUrl: string
     seasonLabel: string
     lateAmount: string
-}
-
-function formatHeight(inches: number | null): string {
-    if (!inches) return "—"
-    const numericInches = Number(inches)
-    if (!Number.isFinite(numericInches)) return "—"
-
-    const feet = Math.floor(numericInches / 12)
-    const remainingInches = numericInches % 12
-    const formattedFeet = String(feet).replace(/\.0+$/, "")
-    const formattedInches = String(remainingInches).replace(/\.0+$/, "")
-
-    return `${formattedFeet}'${formattedInches}"`
 }
 
 function buildPlayerPictureUrl(
@@ -164,14 +141,7 @@ export function SignupsList({
 }: SignupsListProps) {
     const router = useRouter()
     const [search, setSearch] = useState("")
-    const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
     const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
-    const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
-        null
-    )
-    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-    const [showImageModal, setShowImageModal] = useState(false)
     const [signupToDelete, setSignupToDelete] = useState<SignupEntry | null>(
         null
     )
@@ -180,6 +150,8 @@ export function SignupsList({
         status: boolean
         message: string
     } | null>(null)
+
+    const modal = usePlayerDetailModal()
 
     const filteredSignups = useMemo(() => {
         if (!search) return signups
@@ -302,29 +274,15 @@ export function SignupsList({
         }).format(lateAmountValue)
     }, [lateAmount])
 
-    const handlePlayerClick = async (entry: SignupEntry) => {
-        setSelectedUserId(entry.userId)
+    const handlePlayerClick = (entry: SignupEntry) => {
         setSelectedEntry(entry)
-        setIsLoading(true)
-        setPlayerDetails(null)
-        setDraftHistory([])
-
-        const result = await getPlayerDetails(entry.userId)
-
-        if (result.status && result.player) {
-            setPlayerDetails(result.player)
-            setDraftHistory(result.draftHistory)
-        }
-
-        setIsLoading(false)
+        modal.openPlayerDetail(entry.userId)
     }
 
-    const handleCloseModal = useCallback(() => {
-        setSelectedUserId(null)
+    const handleCloseModal = () => {
         setSelectedEntry(null)
-        setPlayerDetails(null)
-        setDraftHistory([])
-    }, [])
+        modal.closePlayerDetail()
+    }
 
     const handleDownloadCsv = () => {
         const csvContent = generateCsvContent(filteredSignups, playerPicUrl)
@@ -367,20 +325,6 @@ export function SignupsList({
             router.refresh()
         }
     }
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                if (showImageModal) {
-                    setShowImageModal(false)
-                } else if (selectedUserId) {
-                    handleCloseModal()
-                }
-            }
-        }
-        document.addEventListener("keydown", handleKeyDown)
-        return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [selectedUserId, showImageModal, handleCloseModal])
 
     return (
         <div className="space-y-4">
@@ -493,17 +437,17 @@ export function SignupsList({
                                     </div>
                                 </td>
                                 <td className="px-4 py-2">
-                                    {entry.pairPickName || "—"}
+                                    {entry.pairPickName || "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
                                     {entry.male === true
                                         ? "M"
                                         : entry.male === false
                                           ? "F"
-                                          : "—"}
+                                          : "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
-                                    {entry.age || "—"}
+                                    {entry.age || "\u2014"}
                                 </td>
                                 <td className="px-4 py-2 capitalize">
                                     {entry.captain === "yes"
@@ -512,12 +456,12 @@ export function SignupsList({
                                           ? "If needed"
                                           : entry.captain === "no"
                                             ? "No"
-                                            : "—"}
+                                            : "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
                                     {entry.amountPaid
                                         ? `$${entry.amountPaid}`
-                                        : "—"}
+                                        : "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
                                     {new Date(
@@ -689,530 +633,17 @@ export function SignupsList({
                 </CardContent>
             </Card>
 
-            {/* Player Detail Modal */}
-            {selectedUserId && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                    onClick={handleCloseModal}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCloseModal()
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
-                >
-                    <div
-                        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-0 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="document"
-                    >
-                        <button
-                            type="button"
-                            onClick={handleCloseModal}
-                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                        >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-
-                        {isLoading && (
-                            <div className="p-8 text-center text-muted-foreground">
-                                Loading player details...
-                            </div>
-                        )}
-
-                        {playerDetails && !isLoading && (
-                            <Card className="border-0 shadow-none">
-                                <CardHeader>
-                                    <div className="flex items-start gap-4">
-                                        {playerPicUrl &&
-                                            playerDetails.picture && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        setShowImageModal(true)
-                                                    }
-                                                    className="shrink-0 cursor-pointer transition-opacity hover:opacity-90"
-                                                >
-                                                    <img
-                                                        src={`${playerPicUrl}${playerDetails.picture}`}
-                                                        alt={`${playerDetails.first_name} ${playerDetails.last_name}`}
-                                                        className="h-48 w-32 rounded-md object-cover"
-                                                    />
-                                                </button>
-                                            )}
-                                        <CardTitle className="pt-1">
-                                            {playerDetails.first_name}{" "}
-                                            {playerDetails.last_name}
-                                            {playerDetails.preffered_name && (
-                                                <span className="ml-2 font-normal text-base text-muted-foreground">
-                                                    (
-                                                    {
-                                                        playerDetails.preffered_name
-                                                    }
-                                                    )
-                                                </span>
-                                            )}
-                                        </CardTitle>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    {/* Basic Info */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Basic Information
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Email:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.email}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Phone:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.phone || "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Pronouns:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.pronouns ||
-                                                        "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Gender:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.male === true
-                                                        ? "Male"
-                                                        : playerDetails.male ===
-                                                            false
-                                                          ? "Female"
-                                                          : "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Role:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.role || "—"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Emergency Contact */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Emergency Contact
-                                        </h3>
-                                        <p className="text-sm">
-                                            {playerDetails.emergency_contact ||
-                                                "—"}
-                                        </p>
-                                    </div>
-
-                                    {/* Pair Pick */}
-                                    {(selectedEntry?.pairPickName ||
-                                        selectedEntry?.pairReason) && (
-                                        <div>
-                                            <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                                Pair Request
-                                            </h3>
-                                            <div className="grid grid-cols-1 gap-3 text-sm">
-                                                {selectedEntry.pairPickName && (
-                                                    <div>
-                                                        <span className="text-muted-foreground">
-                                                            Pair Pick:
-                                                        </span>
-                                                        <span className="ml-2 font-medium">
-                                                            {
-                                                                selectedEntry.pairPickName
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {selectedEntry.pairReason && (
-                                                    <div>
-                                                        <span className="text-muted-foreground">
-                                                            Reason:
-                                                        </span>
-                                                        <span className="ml-2 font-medium">
-                                                            {
-                                                                selectedEntry.pairReason
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Volleyball Profile */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Volleyball Profile
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Experience:
-                                                </span>
-                                                <span className="ml-2 font-medium capitalize">
-                                                    {playerDetails.experience ||
-                                                        "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Assessment:
-                                                </span>
-                                                <span className="ml-2 font-medium capitalize">
-                                                    {playerDetails.assessment ||
-                                                        "—"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Height:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {formatHeight(
-                                                        playerDetails.height
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Skills:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {[
-                                                        playerDetails.skill_passer &&
-                                                            "Passer",
-                                                        playerDetails.skill_setter &&
-                                                            "Setter",
-                                                        playerDetails.skill_hitter &&
-                                                            "Hitter",
-                                                        playerDetails.skill_other &&
-                                                            "Other"
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(", ") || "—"}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Account Info */}
-                                    <div>
-                                        <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                            Account Information
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Onboarding:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {playerDetails.onboarding_completed
-                                                        ? "Completed"
-                                                        : "Not completed"}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Created:
-                                                </span>
-                                                <span className="ml-2 font-medium">
-                                                    {new Date(
-                                                        playerDetails.createdAt
-                                                    ).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {draftHistory.length > 0 &&
-                                        (() => {
-                                            const divisionBands = [
-                                                {
-                                                    y1: 0,
-                                                    y2: 49,
-                                                    label: "AA",
-                                                    color: "#ef4444"
-                                                },
-                                                {
-                                                    y1: 50,
-                                                    y2: 99,
-                                                    label: "A",
-                                                    color: "#f97316"
-                                                },
-                                                {
-                                                    y1: 100,
-                                                    y2: 149,
-                                                    label: "ABA",
-                                                    color: "#eab308"
-                                                },
-                                                {
-                                                    y1: 150,
-                                                    y2: 199,
-                                                    label: "ABB",
-                                                    color: "#22c55e"
-                                                },
-                                                {
-                                                    y1: 200,
-                                                    y2: 249,
-                                                    label: "BBB",
-                                                    color: "#3b82f6"
-                                                },
-                                                {
-                                                    y1: 250,
-                                                    y2: 299,
-                                                    label: "BB",
-                                                    color: "#8b5cf6"
-                                                }
-                                            ]
-
-                                            const maxOverall = Math.max(
-                                                ...draftHistory.map(
-                                                    (draft) => draft.overall
-                                                )
-                                            )
-                                            const yMax = Math.min(
-                                                Math.ceil(
-                                                    (maxOverall + 10) / 50
-                                                ) * 50,
-                                                300
-                                            )
-                                            const visibleBands =
-                                                divisionBands.filter(
-                                                    (band) => band.y1 < yMax
-                                                )
-
-                                            return (
-                                                <div>
-                                                    <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                                        Draft Pick History
-                                                    </h3>
-                                                    <div className="h-[300px] w-full">
-                                                        <ResponsiveContainer
-                                                            width="100%"
-                                                            height="100%"
-                                                        >
-                                                            <BarChart
-                                                                data={draftHistory.map(
-                                                                    (
-                                                                        draft
-                                                                    ) => ({
-                                                                        ...draft,
-                                                                        label: `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
-                                                                    })
-                                                                )}
-                                                                margin={{
-                                                                    top: 5,
-                                                                    right: 20,
-                                                                    bottom: 5,
-                                                                    left: 10
-                                                                }}
-                                                            >
-                                                                {visibleBands.map(
-                                                                    (band) => (
-                                                                        <ReferenceArea
-                                                                            key={
-                                                                                band.label
-                                                                            }
-                                                                            y1={
-                                                                                band.y1
-                                                                            }
-                                                                            y2={Math.min(
-                                                                                band.y2,
-                                                                                yMax
-                                                                            )}
-                                                                            fill={
-                                                                                band.color
-                                                                            }
-                                                                            fillOpacity={
-                                                                                0.15
-                                                                            }
-                                                                            ifOverflow="hidden"
-                                                                        />
-                                                                    )
-                                                                )}
-                                                                <XAxis
-                                                                    dataKey="label"
-                                                                    tick={{
-                                                                        fontSize: 12
-                                                                    }}
-                                                                />
-                                                                <YAxis
-                                                                    reversed
-                                                                    domain={[
-                                                                        0,
-                                                                        yMax
-                                                                    ]}
-                                                                    ticks={visibleBands.map(
-                                                                        (
-                                                                            band
-                                                                        ) =>
-                                                                            band.y1 +
-                                                                            25
-                                                                    )}
-                                                                    tickFormatter={(
-                                                                        value: number
-                                                                    ) => {
-                                                                        const band =
-                                                                            visibleBands.find(
-                                                                                (
-                                                                                    item
-                                                                                ) =>
-                                                                                    value >=
-                                                                                        item.y1 &&
-                                                                                    value <=
-                                                                                        item.y2
-                                                                            )
-
-                                                                        return (
-                                                                            band?.label ||
-                                                                            ""
-                                                                        )
-                                                                    }}
-                                                                    tick={{
-                                                                        fontSize: 11
-                                                                    }}
-                                                                    width={40}
-                                                                />
-                                                                <Tooltip
-                                                                    content={({
-                                                                        active,
-                                                                        payload
-                                                                    }) => {
-                                                                        if (
-                                                                            !active ||
-                                                                            !payload?.length
-                                                                        ) {
-                                                                            return null
-                                                                        }
-
-                                                                        const draft =
-                                                                            payload[0]
-                                                                                .payload
-
-                                                                        return (
-                                                                            <div className="rounded-md border bg-background p-3 text-sm shadow-md">
-                                                                                <p className="font-medium">
-                                                                                    {
-                                                                                        draft.label
-                                                                                    }
-                                                                                </p>
-                                                                                <p className="text-muted-foreground">
-                                                                                    Division:{" "}
-                                                                                    {
-                                                                                        draft.divisionName
-                                                                                    }
-                                                                                </p>
-                                                                                <p className="text-muted-foreground">
-                                                                                    Team:{" "}
-                                                                                    {
-                                                                                        draft.teamName
-                                                                                    }
-                                                                                </p>
-                                                                                <p className="text-muted-foreground">
-                                                                                    Round:{" "}
-                                                                                    {
-                                                                                        draft.round
-                                                                                    }
-                                                                                </p>
-                                                                                <p className="text-muted-foreground">
-                                                                                    Overall
-                                                                                    Pick:{" "}
-                                                                                    {
-                                                                                        draft.overall
-                                                                                    }
-                                                                                </p>
-                                                                            </div>
-                                                                        )
-                                                                    }}
-                                                                />
-                                                                <Bar
-                                                                    dataKey="overall"
-                                                                    radius={[
-                                                                        4, 4, 0,
-                                                                        0
-                                                                    ]}
-                                                                >
-                                                                    {draftHistory.map(
-                                                                        (
-                                                                            _,
-                                                                            index
-                                                                        ) => (
-                                                                            <Cell
-                                                                                key={
-                                                                                    index
-                                                                                }
-                                                                                className="fill-primary"
-                                                                            />
-                                                                        )
-                                                                    )}
-                                                                </Bar>
-                                                            </BarChart>
-                                                        </ResponsiveContainer>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })()}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {!isLoading && !playerDetails && (
-                            <div className="p-8 text-center text-muted-foreground">
-                                Failed to load player details.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Image Modal */}
-            {showImageModal && playerDetails?.picture && playerPicUrl && (
-                <div
-                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
-                    onClick={() => setShowImageModal(false)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") setShowImageModal(false)
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
-                >
-                    <div className="relative max-h-[90vh] max-w-[90vw]">
-                        <img
-                            src={`${playerPicUrl}${playerDetails.picture}`}
-                            alt={`${playerDetails.first_name} ${playerDetails.last_name}`}
-                            className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setShowImageModal(false)}
-                            className="-top-3 -right-3 absolute rounded-full bg-white p-1 text-black hover:bg-gray-200"
-                        >
-                            <RiCloseLine className="h-6 w-6" />
-                        </button>
-                    </div>
-                </div>
-            )}
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={handleCloseModal}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                pairPickName={selectedEntry?.pairPickName}
+                pairReason={selectedEntry?.pairReason}
+            />
 
             <Dialog
                 open={signupToDelete !== null}

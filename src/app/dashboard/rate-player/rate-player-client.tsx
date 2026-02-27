@@ -8,6 +8,7 @@ import {
     AccordionTrigger
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { formatHeight } from "@/components/player-detail"
 import {
     Dialog,
     DialogContent,
@@ -58,17 +59,6 @@ function getOldIdLabel(player: RatePlayerEntry): string {
     }
 
     return `#${player.oldId}`
-}
-
-function formatHeight(inches: number | null): string {
-    if (!inches) {
-        return "—"
-    }
-
-    const feet = Math.floor(inches / 12)
-    const inchesRemainder = inches % 12
-
-    return `${feet}'${inchesRemainder}"`
 }
 
 function getGenderLabel(male: boolean | null): string {

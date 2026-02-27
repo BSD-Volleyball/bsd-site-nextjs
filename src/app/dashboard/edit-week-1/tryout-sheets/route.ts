@@ -16,6 +16,7 @@ import {
 import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatHeight } from "@/components/player-detail/format-height"
 
 export const runtime = "nodejs"
 
@@ -67,16 +68,6 @@ function getDisplayName({
     preferredName: string | null
 }): string {
     return `${preferredName || firstName} ${lastName}`
-}
-
-function formatHeight(inches: number | null): string {
-    if (!inches) {
-        return "—"
-    }
-
-    const feet = Math.floor(inches / 12)
-    const inchesRemainder = inches % 12
-    return `${feet}'${inchesRemainder}\"`
 }
 
 function getGenderLabel(male: boolean | null): string {

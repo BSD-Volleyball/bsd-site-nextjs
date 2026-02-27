@@ -136,9 +136,7 @@ export function DivisionHistoryChart({
                                 }
                                 return (
                                     <div className="rounded-md border bg-background p-3 text-sm shadow-md">
-                                        <p className="font-medium">
-                                            {d.label}
-                                        </p>
+                                        <p className="font-medium">{d.label}</p>
                                         <p className="text-muted-foreground">
                                             Division: {d.divisionName}
                                         </p>
