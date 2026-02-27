@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { and, eq, inArray } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import {
     PDFDocument,
     type PDFPage,
@@ -10,7 +10,7 @@ import {
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, week1Rosters } from "@/database/schema"
+import { divisions, users, week2Rosters } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -25,6 +25,27 @@ interface NametagRow {
     lastName: string
     preferredName: string | null
     picture: string | null
+}
+
+const LEGACY_COURT_BY_DIVISION: Record<string, number> = {
+    AA: 1,
+    A: 2,
+    ABA: 3,
+    ABB: 4,
+    BB: 7,
+    BBB: 8
+}
+
+function getSessionNumberFromTeam(teamNumber: number): 1 | 2 | 3 {
+    if (teamNumber <= 2) {
+        return 1
+    }
+
+    if (teamNumber <= 4) {
+        return 2
+    }
+
+    return 3
 }
 
 function normalizeName(value: string): string {
@@ -412,37 +433,50 @@ export async function GET() {
 
         const rosterRows = await db
             .select({
-                sessionNumber: week1Rosters.session_number,
-                courtNumber: week1Rosters.court_number,
+                teamNumber: week2Rosters.team_number,
+                divisionId: week2Rosters.division,
+                divisionName: divisions.name,
+                divisionLevel: divisions.level,
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preffered_name,
                 picture: users.picture
             })
-            .from(week1Rosters)
-            .innerJoin(users, eq(week1Rosters.user, users.id))
-            .where(
-                and(
-                    eq(week1Rosters.season, config.seasonId),
-                    inArray(week1Rosters.session_number, [1, 2])
-                )
-            )
+            .from(week2Rosters)
+            .innerJoin(users, eq(week2Rosters.user, users.id))
+            .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
+            .where(eq(week2Rosters.season, config.seasonId))
             .orderBy(
-                week1Rosters.session_number,
+                divisions.level,
+                week2Rosters.team_number,
                 users.last_name,
                 users.first_name
             )
 
+        const normalizedRows: NametagRow[] = rosterRows.map((row) => ({
+            sessionNumber: getSessionNumberFromTeam(row.teamNumber),
+            courtNumber:
+                LEGACY_COURT_BY_DIVISION[row.divisionName] ??
+                row.divisionLevel ??
+                row.divisionId,
+            oldId: row.oldId,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            preferredName: row.preferredName,
+            picture: row.picture
+        }))
+
         const sessionTimes: Record<number, string> = {
-            1: config.tryout1Session1Time.trim(),
-            2: config.tryout1Session2Time.trim()
+            1: config.tryout2Session1Time.trim(),
+            2: config.tryout2Session2Time.trim(),
+            3: config.tryout2Session3Time.trim()
         }
 
-        if (rosterRows.length === 0) {
+        if (normalizedRows.length === 0) {
             return NextResponse.json(
                 {
-                    error: "No week 1 roster rows found for sessions 1-2."
+                    error: "No week 2 roster rows found."
                 },
                 { status: 404 }
             )
@@ -465,10 +499,15 @@ export async function GET() {
             (pageHeight - marginY * 2 - gutterY * (rowsPerPage - 1)) /
             rowsPerPage
 
-        for (const sessionNumber of [1, 2]) {
-            const sessionRows = rosterRows.filter(
+        for (const sessionNumber of [1, 2, 3]) {
+            const sessionRows = normalizedRows.filter(
                 (row) => row.sessionNumber === sessionNumber
             )
+
+            if (sessionRows.length === 0) {
+                continue
+            }
+
             const sessionTime = sessionTimes[sessionNumber]
             const totalPages = Math.ceil(sessionRows.length / 6)
             let pageNumber = 1
@@ -522,15 +561,15 @@ export async function GET() {
             .trim()
             .replace(/\s+/g, "-")
             .replace(/[^a-z0-9-]/g, "")
-        const downloadFileName = `bsd-week1-nametags-${seasonSlug}-${config.seasonYear}.pdf`
+        const downloadFileName = `bsd-week2-nametags-${seasonSlug}-${config.seasonYear}.pdf`
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session?.user) {
             await logAuditEntry({
                 userId: session.user.id,
                 action: "read",
-                entityType: "week1_rosters",
-                summary: `Downloaded week 1 nametag labels PDF for season ${config.seasonId}`
+                entityType: "week2_rosters",
+                summary: `Downloaded week 2 nametag labels PDF for season ${config.seasonId}`
             })
         }
 
@@ -542,7 +581,7 @@ export async function GET() {
             }
         })
     } catch (error) {
-        console.error("Error creating week 1 nametag labels PDF:", error)
+        console.error("Error creating week 2 nametag labels PDF:", error)
         return NextResponse.json(
             { error: "Failed to generate nametag labels PDF." },
             { status: 500 }

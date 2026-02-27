@@ -204,8 +204,13 @@ const commissionerNavItems = [
         icon: RiTeamLine
     },
     {
-        title: "Draft Preseason Week 1",
-        url: "/dashboard/draft-preseason-week-1",
+        title: "Pre-Season Week 1",
+        url: "/dashboard/preseason-week-1",
+        icon: RiCalendarLine
+    },
+    {
+        title: "Pre-Season Week 2",
+        url: "/dashboard/preseason-week-2",
         icon: RiCalendarLine
     }
 ]
