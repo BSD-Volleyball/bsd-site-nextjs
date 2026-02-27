@@ -542,6 +542,28 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
+                {hasTryoutSheetAccess && (
+                    <Card className="min-w-[280px] flex-1 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-indigo-700 text-lg dark:text-indigo-300">
+                                Week 2 Tryout Sheets
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-indigo-700 text-sm dark:text-indigo-300">
+                                Download the latest week 2 tryout sheets PDF by
+                                division/session for on-court evaluations.
+                            </p>
+                            <a
+                                href="/dashboard/edit-week-2/tryout-sheets"
+                                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 font-medium text-sm text-white hover:bg-indigo-700"
+                            >
+                                Download Week 2 PDF
+                            </a>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {isAdmin && (
                     <Card className="min-w-[280px] flex-1">
                         <CardHeader className="pb-2">
@@ -568,6 +590,37 @@ export default async function DashboardPage() {
                                 className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
                             >
                                 Download Nametag PDF
+                            </a>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {isAdmin && (
+                    <Card className="min-w-[280px] flex-1">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-lg">
+                                Week 2 Nametag Labels
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-muted-foreground text-sm">
+                                Download Week 2 sessions 1-3 Nametags. Should be
+                                printed on{" "}
+                                <a
+                                    href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary underline hover:text-primary/80"
+                                >
+                                    Avery 5164 labels
+                                </a>
+                                .
+                            </p>
+                            <a
+                                href="/dashboard/edit-week-2/nametags"
+                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
+                            >
+                                Download Week 2 Nametag PDF
                             </a>
                         </CardContent>
                     </Card>
