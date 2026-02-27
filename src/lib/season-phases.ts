@@ -66,7 +66,7 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
         showDraftTools: false,
         showSeasonTools: false,
         showPlayoffTools: false,
-        nextPhases: ["select_captains", "registration_open"],
+        nextPhases: ["select_captains"],
         previousPhase: "registration_open"
     },
     select_captains: {

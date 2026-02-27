@@ -480,7 +480,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <NavItems
-                                    items={adminDangerNavItems}
+                                    items={adminDangerNavItems.filter(
+                                        (item) =>
+                                            item.url !==
+                                                "/dashboard/select-commissioners" ||
+                                            phase === "select_commissioners"
+                                    )}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

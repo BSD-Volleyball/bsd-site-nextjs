@@ -21,6 +21,7 @@ import {
     type NewPlayerEntry,
     type DivisionOption
 } from "./actions"
+import { formatHeight } from "@/components/player-detail"
 
 interface EvaluatePlayersListProps {
     players: NewPlayerEntry[]
@@ -66,13 +67,6 @@ function getEvaluatorTooltip(player: NewPlayerEntry): string {
     return player.evaluatorDetails
         .map((detail) => `${detail.evaluatorName} - ${detail.divisionName}`)
         .join(", ")
-}
-
-function formatHeight(inches: number | null): string {
-    if (!inches) return "—"
-    const feet = Math.floor(inches / 12)
-    const remainingInches = inches % 12
-    return `${feet}'${remainingInches}\"`
 }
 
 export function EvaluatePlayersList({
