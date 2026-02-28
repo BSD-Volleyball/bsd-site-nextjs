@@ -49,7 +49,8 @@ export default async function DraftDivisionPage() {
                 description="Conduct the draft for a division by selecting players for each team."
             />
             <DraftDivisionForm
-                seasons={result.seasons}
+                currentSeasonId={result.currentSeasonId}
+                divisionSplits={result.divisionSplits}
                 divisions={result.divisions}
                 users={result.users}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}

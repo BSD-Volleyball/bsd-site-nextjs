@@ -3,16 +3,21 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, seasons, divisions, teams, drafts } from "@/database/schema"
-import { eq, desc, and } from "drizzle-orm"
+import {
+    users,
+    divisions,
+    individual_divisions,
+    teams,
+    drafts
+} from "@/database/schema"
+import { eq, and } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getSeasonConfig } from "@/lib/site-config"
 import { isCommissionerBySession } from "@/lib/rbac"
 
-export interface SeasonOption {
-    id: number
-    code: string
-    year: number
-    season: string
+export interface DivisionSplitConfig {
+    divisionId: number
+    genderSplit: string
 }
 
 export interface DivisionOption {
@@ -44,7 +49,8 @@ async function checkCommissionersAccess(): Promise<boolean> {
 export async function getDraftDivisionData(): Promise<{
     status: boolean
     message?: string
-    seasons: SeasonOption[]
+    currentSeasonId: number
+    divisionSplits: DivisionSplitConfig[]
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
@@ -53,23 +59,18 @@ export async function getDraftDivisionData(): Promise<{
         return {
             status: false,
             message: "You don't have permission to access this page.",
-            seasons: [],
+            currentSeasonId: 0,
+            divisionSplits: [],
             divisions: [],
             users: []
         }
     }
 
     try {
-        const [allSeasons, allDivisions, allUsers] = await Promise.all([
-            db
-                .select({
-                    id: seasons.id,
-                    code: seasons.code,
-                    year: seasons.year,
-                    season: seasons.season
-                })
-                .from(seasons)
-                .orderBy(desc(seasons.year), desc(seasons.id)),
+        const config = await getSeasonConfig()
+        const seasonId = config.seasonId || 0
+
+        const [allDivisions, allUsers, splitRows] = await Promise.all([
             db
                 .select({
                     id: divisions.id,
@@ -89,13 +90,36 @@ export async function getDraftDivisionData(): Promise<{
                     picture: users.picture
                 })
                 .from(users)
-                .orderBy(users.last_name, users.first_name)
+                .orderBy(users.last_name, users.first_name),
+            seasonId > 0
+                ? db
+                      .select({
+                          divisionId: individual_divisions.division,
+                          genderSplit: individual_divisions.gender_split
+                      })
+                      .from(individual_divisions)
+                      .where(eq(individual_divisions.season, seasonId))
+                : Promise.resolve([])
         ])
+
+        const configuredDivisionIds = new Set(
+            splitRows
+                .filter((r) => r.divisionId !== null)
+                .map((r) => r.divisionId as number)
+        )
 
         return {
             status: true,
-            seasons: allSeasons,
-            divisions: allDivisions,
+            currentSeasonId: seasonId,
+            divisionSplits: splitRows
+                .filter((r) => r.divisionId !== null)
+                .map((r) => ({
+                    divisionId: r.divisionId as number,
+                    genderSplit: r.genderSplit ?? "5-3"
+                })),
+            divisions: allDivisions.filter((d) =>
+                configuredDivisionIds.has(d.id)
+            ),
             users: allUsers
         }
     } catch (error) {
@@ -103,7 +127,8 @@ export async function getDraftDivisionData(): Promise<{
         return {
             status: false,
             message: "Something went wrong.",
-            seasons: [],
+            currentSeasonId: 0,
+            divisionSplits: [],
             divisions: [],
             users: []
         }
