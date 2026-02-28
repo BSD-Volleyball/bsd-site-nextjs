@@ -30,6 +30,7 @@ export interface RatePlayerEntry {
 }
 
 export interface PlayerRatingValues {
+    overall: number | null
     passing: number | null
     setting: number | null
     hitting: number | null
@@ -48,10 +49,16 @@ export interface TryoutSessionGroup {
     courts: TryoutCourt[]
 }
 
-export type RatingSkill = "passing" | "setting" | "hitting" | "serving"
+export type RatingSkill =
+    | "overall"
+    | "passing"
+    | "setting"
+    | "hitting"
+    | "serving"
 export type RatingNoteType = "shared" | "private"
 
 export interface SkillRatingsInput {
+    overall: number
     passing: number
     setting: number
     hitting: number
@@ -59,6 +66,7 @@ export interface SkillRatingsInput {
 }
 
 const validSkills = new Set<RatingSkill>([
+    "overall",
     "passing",
     "setting",
     "hitting",
@@ -94,6 +102,10 @@ function getRatingSkillUpdate(
     skill: RatingSkill,
     value: number
 ): Partial<typeof playerRatings.$inferInsert> {
+    if (skill === "overall") {
+        return { overall: value }
+    }
+
     if (skill === "passing") {
         return { passing: value }
     }
@@ -288,6 +300,7 @@ export async function getRatePlayerData(): Promise<{
         const ratingRows = await db
             .select({
                 playerId: playerRatings.player,
+                overall: playerRatings.overall,
                 passing: playerRatings.passing,
                 setting: playerRatings.setting,
                 hitting: playerRatings.hitting,
@@ -306,6 +319,7 @@ export async function getRatePlayerData(): Promise<{
 
         for (const row of ratingRows) {
             ratingsByPlayer[row.playerId] = {
+                overall: row.overall,
                 passing: row.passing,
                 setting: row.setting,
                 hitting: row.hitting,
@@ -487,6 +501,7 @@ export async function savePlayerSkillRatings(
     }
 
     const skillValues = [
+        values.overall,
         values.passing,
         values.setting,
         values.hitting,
@@ -525,6 +540,7 @@ export async function savePlayerSkillRatings(
                 season: context.seasonId,
                 player: playerId,
                 evaluator: context.evaluatorId,
+                overall: values.overall,
                 passing: values.passing,
                 setting: values.setting,
                 hitting: values.hitting,
@@ -538,6 +554,7 @@ export async function savePlayerSkillRatings(
                     playerRatings.evaluator
                 ],
                 set: {
+                    overall: values.overall,
                     passing: values.passing,
                     setting: values.setting,
                     hitting: values.hitting,

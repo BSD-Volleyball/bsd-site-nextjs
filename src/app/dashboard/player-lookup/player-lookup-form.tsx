@@ -18,6 +18,12 @@ import {
     type PlayerDraftHistory
 } from "./actions"
 import { AdminPlayerDetailPopup } from "@/components/player-detail"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
 
 interface PlayerLookupFormProps {
     players: PlayerListItem[]
@@ -38,6 +44,15 @@ export function PlayerLookupForm({
     )
     const [signupHistory, setSignupHistory] = useState<PlayerSignup[]>([])
     const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
+    const [ratingAverages, setRatingAverages] = useState<PlayerRatingAverages>(
+        getEmptyPlayerRatingAverages()
+    )
+    const [sharedRatingNotes, setSharedRatingNotes] = useState<
+        PlayerRatingSharedNote[]
+    >([])
+    const [privateRatingNotes, setPrivateRatingNotes] = useState<
+        PlayerRatingPrivateNote[]
+    >([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -74,11 +89,17 @@ export function PlayerLookupForm({
             setPlayerDetails(result.player)
             setSignupHistory(result.signupHistory)
             setDraftHistory(result.draftHistory)
+            setRatingAverages(result.ratingAverages)
+            setSharedRatingNotes(result.sharedRatingNotes)
+            setPrivateRatingNotes(result.privateRatingNotes)
         } else {
             setError(result.message || "Failed to load player details")
             setPlayerDetails(null)
             setSignupHistory([])
             setDraftHistory([])
+            setRatingAverages(getEmptyPlayerRatingAverages())
+            setSharedRatingNotes([])
+            setPrivateRatingNotes([])
         }
 
         setIsLoading(false)
@@ -89,6 +110,9 @@ export function PlayerLookupForm({
         setPlayerDetails(null)
         setSignupHistory([])
         setDraftHistory([])
+        setRatingAverages(getEmptyPlayerRatingAverages())
+        setSharedRatingNotes([])
+        setPrivateRatingNotes([])
         setSearch("")
         setError(null)
     }
@@ -207,6 +231,9 @@ export function PlayerLookupForm({
                 isLoading={isLoading}
                 pairPickName={pairPickName}
                 pairReason={pairReason}
+                ratingAverages={ratingAverages}
+                sharedRatingNotes={sharedRatingNotes}
+                privateRatingNotes={privateRatingNotes}
                 inline
             />
 

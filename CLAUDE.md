@@ -92,6 +92,13 @@ Dynamic configuration stored in the `site_config` database table (key-value pair
 - Layout components in `src/components/layout/`
 - Forms primarily use controlled components with `useState`, not react-hook-form
 
+### Consolidated User Details Pop-up Pattern
+- Shared orchestration lives in `src/components/player-detail/use-player-detail-modal.ts` (`usePlayerDetailModal`) and should be reused rather than reimplementing popup state/fetch flows.
+- Open from list/table interactions using `openPlayerDetail(userId)` and close with `closePlayerDetail()`.
+- Non-admin contexts should render `PlayerDetailPopup` (`src/components/player-detail/player-detail-popup.tsx`) for core player profile details, pair context, ratings, and division history.
+- Admin contexts should render `AdminPlayerDetailPopup` (`src/components/player-detail/admin-player-detail-popup.tsx`) to include expanded private/admin fields (account/contact details, signup history, and draft history).
+- Prefer full modal overlay usage for interactive lists (for example `view-signups`, `admin-view-signups`, `potential-captains`); use `inline` mode only for embedded drill-down experiences such as player lookup.
+
 ### Security Headers
 Baseline HTTP security headers are configured in `next.config.ts`:
 - `X-Frame-Options: DENY`

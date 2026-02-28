@@ -166,6 +166,11 @@ const adminDangerNavItems = [
         icon: RiUserSettingsLine
     },
     {
+        title: "Create Divisions",
+        url: "/dashboard/create-divisions",
+        icon: RiTeamLine
+    },
+    {
         title: "Merge Users",
         url: "/dashboard/merge-users",
         icon: RiMergeCellsHorizontal
@@ -487,9 +492,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 <NavItems
                                     items={adminDangerNavItems.filter(
                                         (item) =>
-                                            item.url !==
+                                            (item.url !==
                                                 "/dashboard/select-commissioners" ||
-                                            phase === "select_commissioners"
+                                                phase ===
+                                                    "select_commissioners") &&
+                                            (item.url !==
+                                                "/dashboard/create-divisions" ||
+                                                phase ===
+                                                    "select_commissioners" ||
+                                                phase === "select_captains")
                                     )}
                                     pathname={pathname}
                                 />

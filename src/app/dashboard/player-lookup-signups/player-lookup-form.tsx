@@ -18,6 +18,12 @@ import {
     type SeasonInfo
 } from "./actions"
 import { PlayerDetailPopup } from "@/components/player-detail"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
 
 interface PlayerLookupSignupsFormProps {
     players: PlayerListItem[]
@@ -39,6 +45,15 @@ export function PlayerLookupSignupsForm({
         null
     )
     const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
+    const [ratingAverages, setRatingAverages] = useState<PlayerRatingAverages>(
+        getEmptyPlayerRatingAverages()
+    )
+    const [sharedRatingNotes, setSharedRatingNotes] = useState<
+        PlayerRatingSharedNote[]
+    >([])
+    const [privateRatingNotes, setPrivateRatingNotes] = useState<
+        PlayerRatingPrivateNote[]
+    >([])
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -76,12 +91,18 @@ export function PlayerLookupSignupsForm({
         if (result.status && result.player) {
             setPlayerDetails(result.player)
             setDraftHistory(result.draftHistory)
+            setRatingAverages(result.ratingAverages)
+            setSharedRatingNotes(result.sharedRatingNotes)
+            setPrivateRatingNotes(result.privateRatingNotes)
             setPairPickName(result.pairPickName)
             setPairReason(result.pairReason)
         } else {
             setError(result.message || "Failed to load player details")
             setPlayerDetails(null)
             setDraftHistory([])
+            setRatingAverages(getEmptyPlayerRatingAverages())
+            setSharedRatingNotes([])
+            setPrivateRatingNotes([])
             setPairPickName(null)
             setPairReason(null)
         }
@@ -93,6 +114,9 @@ export function PlayerLookupSignupsForm({
         setSelectedPlayerId(null)
         setPlayerDetails(null)
         setDraftHistory([])
+        setRatingAverages(getEmptyPlayerRatingAverages())
+        setSharedRatingNotes([])
+        setPrivateRatingNotes([])
         setPairPickName(null)
         setPairReason(null)
         setSearch("")
@@ -204,6 +228,9 @@ export function PlayerLookupSignupsForm({
                 isLoading={isLoading}
                 pairPickName={pairPickName}
                 pairReason={pairReason}
+                ratingAverages={ratingAverages}
+                sharedRatingNotes={sharedRatingNotes}
+                privateRatingNotes={privateRatingNotes}
                 inline
             />
         </div>

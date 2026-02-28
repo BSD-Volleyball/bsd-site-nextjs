@@ -10,7 +10,15 @@ import {
     divisions
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import { isCommissionerBySession } from "@/lib/rbac"
+import { getSessionUserId, isCommissionerBySession } from "@/lib/rbac"
+import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
+import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 
 export interface PlayerListItem {
     id: string
@@ -127,6 +135,9 @@ export async function getPlayerDetails(playerId: string): Promise<{
     player: PlayerDetails | null
     signupHistory: PlayerSignup[]
     draftHistory: PlayerDraftHistory[]
+    ratingAverages: PlayerRatingAverages
+    sharedRatingNotes: PlayerRatingSharedNote[]
+    privateRatingNotes: PlayerRatingPrivateNote[]
 }> {
     const hasAccess = await checkAdminOrCommissionerAccess()
     if (!hasAccess) {
@@ -135,7 +146,10 @@ export async function getPlayerDetails(playerId: string): Promise<{
             message: "You don't have permission to access this page.",
             player: null,
             signupHistory: [],
-            draftHistory: []
+            draftHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: []
         }
     }
 
@@ -178,9 +192,20 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 message: "Player not found.",
                 player: null,
                 signupHistory: [],
-                draftHistory: []
+                draftHistory: [],
+                ratingAverages: getEmptyPlayerRatingAverages(),
+                sharedRatingNotes: [],
+                privateRatingNotes: []
             }
         }
+
+        const config = await getSeasonConfig()
+        const viewerUserId = await getSessionUserId()
+        const ratingsSection = await getPlayerRatingsSectionData(
+            playerId,
+            config.seasonId ?? null,
+            viewerUserId
+        )
 
         // Fetch signup history with season info
         const signupData = await db
@@ -254,7 +279,10 @@ export async function getPlayerDetails(playerId: string): Promise<{
             status: true,
             player,
             signupHistory,
-            draftHistory: draftData
+            draftHistory: draftData,
+            ratingAverages: ratingsSection.averages,
+            sharedRatingNotes: ratingsSection.sharedNotes,
+            privateRatingNotes: ratingsSection.privateNotes
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -263,7 +291,10 @@ export async function getPlayerDetails(playerId: string): Promise<{
             message: "Something went wrong.",
             player: null,
             signupHistory: [],
-            draftHistory: []
+            draftHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: []
         }
     }
 }
