@@ -62,7 +62,7 @@ export async function getSignupsCsvData(): Promise<{
     entries: SignupCsvEntry[]
     seasonLabel: string
 }> {
-    const hasAccess = await hasCaptainPagesAccessBySession()
+    const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
         return {
             status: false,
