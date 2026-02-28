@@ -19,7 +19,6 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
     Popover,
     PopoverContent,
@@ -35,14 +34,15 @@ import { cn } from "@/lib/utils"
 import {
     getTeamsForSeasonAndDivision,
     submitDraft,
-    type SeasonOption,
     type DivisionOption,
     type TeamOption,
-    type UserOption
+    type UserOption,
+    type DivisionSplitConfig
 } from "./actions"
 
 interface DraftDivisionFormProps {
-    seasons: SeasonOption[]
+    currentSeasonId: number
+    divisionSplits: DivisionSplitConfig[]
     divisions: DivisionOption[]
     users: UserOption[]
     playerPicUrl: string
@@ -50,7 +50,7 @@ interface DraftDivisionFormProps {
 
 const ROUNDS = 8
 
-type GenderSplit = "5-3" | "6-2"
+type GenderSplit = "5-3" | "6-2" | "4-4"
 
 function UserCombobox({
     users,
@@ -188,7 +188,8 @@ function UserCombobox({
 }
 
 export function DraftDivisionForm({
-    seasons,
+    currentSeasonId,
+    divisionSplits,
     divisions,
     users,
     playerPicUrl
@@ -202,9 +203,7 @@ export function DraftDivisionForm({
         null
     )
 
-    const [seasonId, setSeasonId] = useState<string>("")
     const [divisionId, setDivisionId] = useState<string>("")
-    const [genderSplit, setGenderSplit] = useState<GenderSplit>("5-3")
     const [teamsList, setTeamsList] = useState<TeamOption[]>([])
 
     // Draft picks: keyed by "round-teamId"
@@ -216,6 +215,21 @@ export function DraftDivisionForm({
         () => divisions.find((d) => d.id.toString() === divisionId),
         [divisions, divisionId]
     )
+
+    const divisionSplitsMap = useMemo(
+        () =>
+            new Map(
+                divisionSplits.map((d) => [
+                    d.divisionId,
+                    d.genderSplit as GenderSplit
+                ])
+            ),
+        [divisionSplits]
+    )
+
+    const genderSplit: GenderSplit | null = divisionId
+        ? (divisionSplitsMap.get(parseInt(divisionId)) ?? null)
+        : null
 
     // Get all selected user IDs to exclude from other pickers
     const selectedUserIds = useMemo(
@@ -266,9 +280,21 @@ export function DraftDivisionForm({
         return counts
     }, [draftPicks, teamsList, usersMap])
 
-    // Get the max allowed for each gender based on split
-    const maxMales = genderSplit === "5-3" ? 5 : 6
-    const maxFemales = genderSplit === "5-3" ? 3 : 2
+    // Get the max allowed for each gender based on split (999 = no limit when unconfigured)
+    const maxMales = !genderSplit
+        ? 999
+        : genderSplit === "4-4"
+          ? 4
+          : genderSplit === "5-3"
+            ? 5
+            : 6
+    const maxFemales = !genderSplit
+        ? 999
+        : genderSplit === "4-4"
+          ? 4
+          : genderSplit === "5-3"
+            ? 3
+            : 2
 
     // Group selected players by team for picture display
     const playersByTeam = useMemo(() => {
@@ -331,18 +357,6 @@ export function DraftDivisionForm({
         }
     }
 
-    const handleSeasonChange = async (value: string) => {
-        setSeasonId(value)
-        setTeamsList([])
-        setDraftPicks({})
-        setError(null)
-        setSuccess(null)
-
-        if (value && divisionId) {
-            await loadTeams(parseInt(value), parseInt(divisionId))
-        }
-    }
-
     const handleDivisionChange = async (value: string) => {
         setDivisionId(value)
         setTeamsList([])
@@ -350,8 +364,8 @@ export function DraftDivisionForm({
         setError(null)
         setSuccess(null)
 
-        if (seasonId && value) {
-            await loadTeams(parseInt(seasonId), parseInt(value))
+        if (value) {
+            await loadTeams(currentSeasonId, parseInt(value))
         }
     }
 
@@ -377,21 +391,10 @@ export function DraftDivisionForm({
         }))
     }
 
-    const formatSeasonLabel = (season: SeasonOption) => {
-        const seasonName =
-            season.season.charAt(0).toUpperCase() + season.season.slice(1)
-        return `${seasonName} ${season.year}`
-    }
-
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         setError(null)
         setSuccess(null)
-
-        if (!seasonId) {
-            setError("Please select a season.")
-            return
-        }
 
         if (!divisionId || !selectedDivision) {
             setError("Please select a division.")
@@ -399,7 +402,7 @@ export function DraftDivisionForm({
         }
 
         if (teamsList.length === 0) {
-            setError("No teams found for the selected season and division.")
+            setError("No teams found for the selected division.")
             return
         }
 
@@ -455,8 +458,8 @@ export function DraftDivisionForm({
                         <div>
                             <CardTitle>Draft Configuration</CardTitle>
                             <CardDescription>
-                                Select the season and division to load the teams
-                                for drafting.
+                                Select a division to load the teams for the
+                                current season.
                             </CardDescription>
                         </div>
                         <Button
@@ -478,33 +481,8 @@ export function DraftDivisionForm({
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="grid max-w-2xl grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="season">
-                                    Season{" "}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                <Select
-                                    value={seasonId}
-                                    onValueChange={handleSeasonChange}
-                                >
-                                    <SelectTrigger id="season">
-                                        <SelectValue placeholder="Select a season" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {seasons.map((season) => (
-                                            <SelectItem
-                                                key={season.id}
-                                                value={season.id.toString()}
-                                            >
-                                                {formatSeasonLabel(season)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
+                        <div className="flex max-w-2xl gap-6">
+                            <div className="flex-1 space-y-2">
                                 <Label htmlFor="division">
                                     Division{" "}
                                     <span className="text-destructive">*</span>
@@ -530,42 +508,24 @@ export function DraftDivisionForm({
                             </div>
 
                             <div className="space-y-2">
-                                <Label>
-                                    Split{" "}
-                                    <span className="text-destructive">*</span>
-                                </Label>
-                                <RadioGroup
-                                    value={genderSplit}
-                                    onValueChange={(value) =>
-                                        setGenderSplit(value as GenderSplit)
-                                    }
-                                    className="flex h-9 items-center gap-4"
-                                >
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem
-                                            value="5-3"
-                                            id="split-5-3"
-                                        />
-                                        <Label
-                                            htmlFor="split-5-3"
-                                            className="cursor-pointer font-normal"
-                                        >
-                                            5-3
-                                        </Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem
-                                            value="6-2"
-                                            id="split-6-2"
-                                        />
-                                        <Label
-                                            htmlFor="split-6-2"
-                                            className="cursor-pointer font-normal"
-                                        >
-                                            6-2
-                                        </Label>
-                                    </div>
-                                </RadioGroup>
+                                <Label>Gender Split</Label>
+                                <div className="flex h-9 items-center">
+                                    {divisionId ? (
+                                        genderSplit ? (
+                                            <span className="font-medium">
+                                                {genderSplit}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground text-sm">
+                                                Not configured
+                                            </span>
+                                        )
+                                    ) : (
+                                        <span className="text-muted-foreground text-sm">
+                                            —
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -782,13 +742,11 @@ export function DraftDivisionForm({
                             </div>
                         )}
 
-                        {seasonId &&
-                            divisionId &&
+                        {divisionId &&
                             !isLoadingTeams &&
                             teamsList.length === 0 && (
                                 <p className="text-muted-foreground">
-                                    No teams found for the selected season and
-                                    division.
+                                    No teams found for the selected division.
                                 </p>
                             )}
 
