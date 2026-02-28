@@ -6,7 +6,8 @@ import {
     integer,
     serial,
     numeric,
-    uniqueIndex
+    uniqueIndex,
+    jsonb
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -124,6 +125,13 @@ export const seasons = pgTable("seasons", {
     season_4_date: text("season_4_date"),
     season_5_date: text("season_5_date"),
     season_6_date: text("season_6_date"),
+    captain_select_date: text("captain_select_date"),
+    draft_1_date: text("draft_1_date"),
+    draft_2_date: text("draft_2_date"),
+    draft_3_date: text("draft_3_date"),
+    draft_4_date: text("draft_4_date"),
+    draft_5_date: text("draft_5_date"),
+    draft_6_date: text("draft_6_date"),
     playoff_1_date: text("playoff_1_date"),
     playoff_2_date: text("playoff_2_date"),
     playoff_3_date: text("playoff_3_date"),
@@ -407,7 +415,7 @@ export const emailTemplates = pgTable("email_templates", {
     id: serial("id").primaryKey(),
     name: text("name").notNull().unique(),
     subject: text("subject"),
-    content: text("content").notNull(),
+    content: jsonb("content").$type<Record<string, unknown>>().notNull(),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull(),

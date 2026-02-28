@@ -3,16 +3,36 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, divisions, teams, signups } from "@/database/schema"
+import {
+    users,
+    divisions,
+    individual_divisions,
+    teams,
+    signups,
+    emailTemplates,
+    commissioners
+} from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+import {
+    type LexicalEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent,
+    normalizeEmailTemplateContent
+} from "@/lib/email-template-content"
 
 export interface DivisionOption {
     id: number
     name: string
     level: number
+    gender_split: string | null
+}
+
+export interface DivisionCommissioner {
+    divisionId: number
+    userId: string
+    name: string
 }
 
 export interface UserOption {
@@ -21,6 +41,7 @@ export interface UserOption {
     first_name: string
     last_name: string
     preffered_name: string | null
+    email: string
 }
 
 export async function getCreateTeamsData(): Promise<{
@@ -30,6 +51,11 @@ export async function getCreateTeamsData(): Promise<{
     seasonLabel: string
     divisions: DivisionOption[]
     users: UserOption[]
+    emailTemplate: string
+    emailTemplateContent: LexicalEmailTemplateContent | null
+    emailSubject: string
+    seasonConfig: SeasonConfig | null
+    divisionCommissioners: DivisionCommissioner[]
 }> {
     const hasAccess = await getIsCommissioner()
     if (!hasAccess) {
@@ -39,7 +65,12 @@ export async function getCreateTeamsData(): Promise<{
             seasonId: 0,
             seasonLabel: "",
             divisions: [],
-            users: []
+            users: [],
+            emailTemplate: "",
+            emailTemplateContent: null,
+            emailSubject: "",
+            seasonConfig: null,
+            divisionCommissioners: []
         }
     }
 
@@ -53,42 +84,115 @@ export async function getCreateTeamsData(): Promise<{
                 seasonId: 0,
                 seasonLabel: "",
                 divisions: [],
-                users: []
+                users: [],
+                emailTemplate: "",
+                emailTemplateContent: null,
+                emailSubject: "",
+                seasonConfig: null,
+                divisionCommissioners: []
             }
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        const [allDivisions, signedUpUsers] = await Promise.all([
-            db
+        const [allDivisions, signedUpUsers, commissionerRows] =
+            await Promise.all([
+                db
+                    .select({
+                        id: divisions.id,
+                        name: divisions.name,
+                        level: divisions.level,
+                        gender_split: individual_divisions.gender_split
+                    })
+                    .from(divisions)
+                    .leftJoin(
+                        individual_divisions,
+                        and(
+                            eq(
+                                individual_divisions.division,
+                                divisions.id
+                            ),
+                            eq(
+                                individual_divisions.season,
+                                config.seasonId
+                            )
+                        )
+                    )
+                    .where(eq(divisions.active, true))
+                    .orderBy(divisions.level),
+                db
+                    .selectDistinct({
+                        id: users.id,
+                        old_id: users.old_id,
+                        first_name: users.first_name,
+                        last_name: users.last_name,
+                        preffered_name: users.preffered_name,
+                        email: users.email
+                    })
+                    .from(signups)
+                    .innerJoin(users, eq(signups.player, users.id))
+                    .where(eq(signups.season, config.seasonId))
+                    .orderBy(users.last_name, users.first_name),
+                db
+                    .select({
+                        divisionId: commissioners.division,
+                        userId: commissioners.commissioner,
+                        firstName: users.first_name,
+                        preferredName: users.preffered_name
+                    })
+                    .from(commissioners)
+                    .innerJoin(users, eq(commissioners.commissioner, users.id))
+                    .where(eq(commissioners.season, config.seasonId))
+            ])
+
+        const divisionCommissioners: DivisionCommissioner[] =
+            commissionerRows.map((row) => ({
+                divisionId: row.divisionId,
+                userId: row.userId,
+                name: row.preferredName || row.firstName
+            }))
+
+        let emailTemplate = ""
+        let emailTemplateContent: LexicalEmailTemplateContent | null = null
+        let emailSubject = ""
+
+        try {
+            const [template] = await db
                 .select({
-                    id: divisions.id,
-                    name: divisions.name,
-                    level: divisions.level
+                    content: emailTemplates.content,
+                    subject: emailTemplates.subject
                 })
-                .from(divisions)
-                .where(eq(divisions.active, true))
-                .orderBy(divisions.level),
-            db
-                .selectDistinct({
-                    id: users.id,
-                    old_id: users.old_id,
-                    first_name: users.first_name,
-                    last_name: users.last_name,
-                    preffered_name: users.preffered_name
-                })
-                .from(signups)
-                .innerJoin(users, eq(signups.player, users.id))
-                .where(eq(signups.season, config.seasonId))
-                .orderBy(users.last_name, users.first_name)
-        ])
+                .from(emailTemplates)
+                .where(eq(emailTemplates.name, "captains selected"))
+                .limit(1)
+
+            if (template) {
+                emailTemplateContent = normalizeEmailTemplateContent(
+                    template.content
+                )
+                emailTemplate = extractPlainTextFromEmailTemplateContent(
+                    template.content
+                )
+                emailSubject = template.subject || ""
+            }
+        } catch (templateError) {
+            console.error(
+                "Error fetching captains selected template:",
+                templateError
+            )
+        }
 
         return {
             status: true,
             seasonId: config.seasonId,
             seasonLabel,
             divisions: allDivisions,
-            users: signedUpUsers
+            users: signedUpUsers,
+            emailTemplate,
+            emailTemplateContent,
+            emailSubject,
+            seasonConfig: config,
+            divisionCommissioners
         }
     } catch (error) {
         console.error("Error fetching create teams data:", error)
@@ -98,7 +202,12 @@ export async function getCreateTeamsData(): Promise<{
             seasonId: 0,
             seasonLabel: "",
             divisions: [],
-            users: []
+            users: [],
+            emailTemplate: "",
+            emailTemplateContent: null,
+            emailSubject: "",
+            seasonConfig: null,
+            divisionCommissioners: []
         }
     }
 }

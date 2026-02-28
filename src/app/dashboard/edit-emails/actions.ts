@@ -7,12 +7,17 @@ import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { auth } from "@/lib/auth"
 import { logAuditEntry } from "@/lib/audit-log"
 import { headers } from "next/headers"
+import {
+    type LexicalEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent,
+    normalizeEmailTemplateContent
+} from "@/lib/email-template-content"
 
 interface EmailTemplate {
     id: number
     name: string
     subject: string | null
-    content: string
+    content: LexicalEmailTemplateContent
     created_at: Date
     updated_at: Date
 }
@@ -45,9 +50,14 @@ export async function getEmailTemplates(): Promise<GetEmailTemplatesResult> {
             .from(emailTemplates)
             .orderBy(emailTemplates.name)
 
+        const normalizedTemplates = templates.map((template) => ({
+            ...template,
+            content: normalizeEmailTemplateContent(template.content)
+        }))
+
         return {
             status: true,
-            templates
+            templates: normalizedTemplates
         }
     } catch (error) {
         console.error("Error fetching email templates:", error)
@@ -63,7 +73,7 @@ export async function updateEmailTemplate(
     id: number,
     name: string,
     subject: string | null,
-    content: string
+    content: LexicalEmailTemplateContent
 ): Promise<UpdateEmailTemplateResult> {
     try {
         const hasAccess = await getIsAdminOrDirector()
@@ -91,7 +101,11 @@ export async function updateEmailTemplate(
             }
         }
 
-        if (!content.trim()) {
+        const normalizedContent = normalizeEmailTemplateContent(content)
+
+        if (
+            !extractPlainTextFromEmailTemplateContent(normalizedContent).trim()
+        ) {
             return {
                 status: false,
                 message: "Template content is required."
@@ -118,7 +132,10 @@ export async function updateEmailTemplate(
             .set({
                 name: name.trim(),
                 subject: subject?.trim() || null,
-                content: content.trim(),
+                content: normalizedContent as unknown as Record<
+                    string,
+                    unknown
+                >,
                 updated_at: new Date()
             })
             .where(eq(emailTemplates.id, id))

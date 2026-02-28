@@ -59,7 +59,12 @@ export default async function PotentialCaptainsPage() {
                     allSeasons={result.allSeasons}
                     playerPicUrl={process.env.PLAYER_PIC_URL || ""}
                     emailTemplate={result.emailTemplate || ""}
+                    emailTemplateContent={result.emailTemplateContent}
                     emailSubject={result.emailSubject || ""}
+                    seasonConfig={result.seasonConfig}
+                    commissionerName={session.user.name || ""}
+                    currentUserId={session.user.id}
+                    divisionCommissioners={result.divisionCommissioners}
                 />
             )}
         </div>
