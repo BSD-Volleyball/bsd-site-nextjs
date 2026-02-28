@@ -13,6 +13,29 @@ import { eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
+export interface SignupCsvEntry {
+    oldId: number | null
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    pairPickName: string | null
+    male: boolean | null
+    age: string | null
+    captain: string | null
+    experience: string | null
+    assessment: string | null
+    height: number | null
+    picture: string | null
+    skillPasser: boolean | null
+    skillSetter: boolean | null
+    skillHitter: boolean | null
+    skillOther: boolean | null
+    datesMissing: string | null
+    lastDraftSeason: string | null
+    lastDraftDivision: string | null
+    lastDraftCaptain: string | null
+}
+
 export interface SignupPlayer {
     userId: string
     displayName: string
@@ -31,6 +54,170 @@ export interface SignupGroup {
 
 export async function checkCaptainPagesAccess(): Promise<boolean> {
     return hasCaptainPagesAccessBySession()
+}
+
+export async function getSignupsCsvData(): Promise<{
+    status: boolean
+    message?: string
+    entries: SignupCsvEntry[]
+    seasonLabel: string
+}> {
+    const hasAccess = await hasCaptainPagesAccessBySession()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "Unauthorized",
+            entries: [],
+            seasonLabel: ""
+        }
+    }
+
+    try {
+        const config = await getSeasonConfig()
+
+        if (!config.seasonId) {
+            return {
+                status: false,
+                message: "No current season found.",
+                entries: [],
+                seasonLabel: ""
+            }
+        }
+
+        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+
+        const signupRows = await db
+            .select({
+                userId: signups.player,
+                oldId: users.old_id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name,
+                male: users.male,
+                age: signups.age,
+                captain: signups.captain,
+                pairPickId: signups.pair_pick,
+                experience: users.experience,
+                assessment: users.assessment,
+                height: users.height,
+                picture: users.picture,
+                skillPasser: users.skill_passer,
+                skillSetter: users.skill_setter,
+                skillHitter: users.skill_hitter,
+                skillOther: users.skill_other,
+                datesMissing: signups.dates_missing
+            })
+            .from(signups)
+            .innerJoin(users, eq(signups.player, users.id))
+            .where(eq(signups.season, config.seasonId))
+            .orderBy(users.last_name, users.first_name)
+
+        const userIds = signupRows.map((r) => r.userId)
+
+        // Fetch pair pick user names
+        const pairPickIds = signupRows
+            .map((r) => r.pairPickId)
+            .filter((id): id is string => id !== null)
+        const pairPickNames = new Map<string, string>()
+
+        if (pairPickIds.length > 0) {
+            const pairPickUsers = await db
+                .select({
+                    id: users.id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preffered_name
+                })
+                .from(users)
+                .where(inArray(users.id, pairPickIds))
+
+            for (const u of pairPickUsers) {
+                const preferred = u.preferredName ? ` (${u.preferredName})` : ""
+                pairPickNames.set(u.id, `${u.firstName}${preferred} ${u.lastName}`)
+            }
+        }
+
+        // Fetch last draft info (season label, division, captain name)
+        const lastDraftInfo = new Map<
+            string,
+            { season: string; division: string; captain: string }
+        >()
+
+        if (userIds.length > 0) {
+            const draftData = await db
+                .select({
+                    userId: drafts.user,
+                    seasonYear: seasons.year,
+                    seasonName: seasons.season,
+                    divisionName: divisions.name,
+                    captainFirstName: users.first_name,
+                    captainLastName: users.last_name,
+                    captainPreferredName: users.preffered_name
+                })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .innerJoin(seasons, eq(teams.season, seasons.id))
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .innerJoin(users, eq(teams.captain, users.id))
+                .where(inArray(drafts.user, userIds))
+                .orderBy(desc(seasons.year), desc(seasons.id))
+
+            const processedUsers = new Set<string>()
+            for (const draft of draftData) {
+                if (!processedUsers.has(draft.userId)) {
+                    const captainPreferred = draft.captainPreferredName
+                        ? ` (${draft.captainPreferredName})`
+                        : ""
+                    const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
+                    const draftSeasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
+                    lastDraftInfo.set(draft.userId, {
+                        season: draftSeasonLabel,
+                        division: draft.divisionName,
+                        captain: captainName
+                    })
+                    processedUsers.add(draft.userId)
+                }
+            }
+        }
+
+        const entries: SignupCsvEntry[] = signupRows.map((row) => {
+            const lastDraft = lastDraftInfo.get(row.userId)
+            return {
+                oldId: row.oldId,
+                firstName: row.firstName,
+                lastName: row.lastName,
+                preferredName: row.preferredName,
+                pairPickName: row.pairPickId
+                    ? (pairPickNames.get(row.pairPickId) ?? null)
+                    : null,
+                male: row.male,
+                age: row.age,
+                captain: row.captain,
+                experience: row.experience,
+                assessment: row.assessment,
+                height: row.height,
+                picture: row.picture,
+                skillPasser: row.skillPasser,
+                skillSetter: row.skillSetter,
+                skillHitter: row.skillHitter,
+                skillOther: row.skillOther,
+                datesMissing: row.datesMissing,
+                lastDraftSeason: lastDraft?.season ?? null,
+                lastDraftDivision: lastDraft?.division ?? null,
+                lastDraftCaptain: lastDraft?.captain ?? null
+            }
+        })
+
+        return { status: true, entries, seasonLabel }
+    } catch (error) {
+        console.error("Error fetching CSV data:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            entries: [],
+            seasonLabel: ""
+        }
+    }
 }
 
 export interface SeasonInfo {

@@ -28,7 +28,7 @@ export const users = pgTable("users", {
     updatedAt: timestamp("updated_at")
         .$defaultFn(() => /* @__PURE__ */ new Date())
         .notNull(),
-    old_id: integer("old_id"),
+    old_id: serial("old_id"),
     picture: text("picture"),
     phone: text("phone"),
     experience: text("experience"),
