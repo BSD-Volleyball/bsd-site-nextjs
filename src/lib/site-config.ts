@@ -35,6 +35,13 @@ export interface SeasonConfig {
     playoff1Date: string
     playoff2Date: string
     playoff3Date: string
+    captainSelectDate: string
+    draft1Date: string
+    draft2Date: string
+    draft3Date: string
+    draft4Date: string
+    draft5Date: string
+    draft6Date: string
 }
 
 export async function getSeasonConfig(): Promise<SeasonConfig> {
@@ -76,7 +83,14 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
             season6Date: "",
             playoff1Date: "",
             playoff2Date: "",
-            playoff3Date: ""
+            playoff3Date: "",
+            captainSelectDate: "",
+            draft1Date: "",
+            draft2Date: "",
+            draft3Date: "",
+            draft4Date: "",
+            draft5Date: "",
+            draft6Date: ""
         }
     }
 
@@ -111,7 +125,14 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         season6Date: season.season_6_date || "",
         playoff1Date: season.playoff_1_date || "",
         playoff2Date: season.playoff_2_date || "",
-        playoff3Date: season.playoff_3_date || ""
+        playoff3Date: season.playoff_3_date || "",
+        captainSelectDate: season.captain_select_date || "",
+        draft1Date: season.draft_1_date || "",
+        draft2Date: season.draft_2_date || "",
+        draft3Date: season.draft_3_date || "",
+        draft4Date: season.draft_4_date || "",
+        draft5Date: season.draft_5_date || "",
+        draft6Date: season.draft_6_date || ""
     }
 }
 

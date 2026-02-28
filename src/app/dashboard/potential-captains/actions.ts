@@ -5,13 +5,21 @@ import {
     users,
     seasons,
     divisions,
+    individual_divisions,
     signups,
     teams,
     drafts,
-    emailTemplates
+    emailTemplates,
+    commissioners
 } from "@/database/schema"
-import { eq, inArray, notInArray, desc } from "drizzle-orm"
+import { eq, and, inArray, notInArray, desc } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
+import {
+    type LexicalEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent,
+    normalizeEmailTemplateContent
+} from "@/lib/email-template-content"
+import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -59,12 +67,19 @@ interface DivisionCaptains {
     id: number
     name: string
     level: number
+    gender_split: string | null
     lists: CaptainList[]
 }
 
 interface SeasonInfo {
     id: number
     year: number
+    name: string
+}
+
+export interface DivisionCommissioner {
+    divisionId: number
+    userId: string
     name: string
 }
 
@@ -75,7 +90,10 @@ interface PotentialCaptainsData {
     divisions: DivisionCaptains[]
     allSeasons: SeasonInfo[]
     emailTemplate?: string
+    emailTemplateContent?: LexicalEmailTemplateContent
     emailSubject?: string
+    seasonConfig?: SeasonConfig
+    divisionCommissioners: DivisionCommissioner[]
 }
 
 export async function getPotentialCaptainPlayerDetails(
@@ -211,7 +229,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             message: "Unauthorized",
             seasonLabel: "",
             divisions: [],
-            allSeasons: []
+            allSeasons: [],
+            divisionCommissioners: []
         }
     }
 
@@ -247,7 +266,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 message: "No season found.",
                 seasonLabel: "",
                 divisions: [],
-                allSeasons: []
+                allSeasons: [],
+                divisionCommissioners: []
             }
         }
 
@@ -273,7 +293,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 status: true,
                 seasonLabel,
                 divisions: [],
-                allSeasons: []
+                allSeasons: [],
+                divisionCommissioners: []
             }
         }
 
@@ -390,9 +411,17 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             .select({
                 id: divisions.id,
                 name: divisions.name,
-                level: divisions.level
+                level: divisions.level,
+                gender_split: individual_divisions.gender_split
             })
             .from(divisions)
+            .leftJoin(
+                individual_divisions,
+                and(
+                    eq(individual_divisions.division, divisions.id),
+                    eq(individual_divisions.season, targetSeason.id)
+                )
+            )
             .where(eq(divisions.active, true))
             .orderBy(divisions.level)
 
@@ -517,6 +546,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                     id: division.id,
                     name: division.name,
                     level: division.level,
+                    gender_split: division.gender_split ?? null,
                     lists: [
                         {
                             title: "Yes - Interested in Being Captain",
@@ -547,26 +577,62 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             }
         }
 
-        // Fetch email template
+        // Fetch email template, season config, and commissioners in parallel
         let emailTemplate = ""
+        let emailTemplateContent: LexicalEmailTemplateContent | undefined
         let emailSubject = ""
-        try {
-            const [template] = await db
-                .select({
-                    content: emailTemplates.content,
-                    subject: emailTemplates.subject
-                })
-                .from(emailTemplates)
-                .where(eq(emailTemplates.name, "call for captains"))
-                .limit(1)
+        let seasonConfig: SeasonConfig | undefined
+        let divisionCommissioners: DivisionCommissioner[] = []
 
-            if (template) {
-                emailTemplate = template.content
-                emailSubject = template.subject || ""
-            }
-        } catch (templateError) {
-            console.error("Error fetching email template:", templateError)
-            // Continue without template - not a critical error
+        const [templateResult, configResult, commissionersResult] =
+            await Promise.allSettled([
+                db
+                    .select({
+                        content: emailTemplates.content,
+                        subject: emailTemplates.subject
+                    })
+                    .from(emailTemplates)
+                    .where(eq(emailTemplates.name, "call for captains"))
+                    .limit(1),
+                getSeasonConfig(),
+                db
+                    .select({
+                        divisionId: commissioners.division,
+                        userId: commissioners.commissioner,
+                        firstName: users.first_name,
+                        preferredName: users.preffered_name
+                    })
+                    .from(commissioners)
+                    .innerJoin(users, eq(commissioners.commissioner, users.id))
+                    .where(eq(commissioners.season, targetSeason.id))
+            ])
+
+        if (templateResult.status === "fulfilled" && templateResult.value[0]) {
+            const template = templateResult.value[0]
+            emailTemplateContent = normalizeEmailTemplateContent(
+                template.content
+            )
+            emailTemplate = extractPlainTextFromEmailTemplateContent(
+                template.content
+            )
+            emailSubject = template.subject || ""
+        } else if (templateResult.status === "rejected") {
+            console.error(
+                "Error fetching email template:",
+                templateResult.reason
+            )
+        }
+
+        if (configResult.status === "fulfilled") {
+            seasonConfig = configResult.value
+        }
+
+        if (commissionersResult.status === "fulfilled") {
+            divisionCommissioners = commissionersResult.value.map((row) => ({
+                divisionId: row.divisionId,
+                userId: row.userId,
+                name: row.preferredName || row.firstName
+            }))
         }
 
         return {
@@ -579,7 +645,10 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 name: s.name
             })),
             emailTemplate,
-            emailSubject
+            emailTemplateContent,
+            emailSubject,
+            seasonConfig,
+            divisionCommissioners
         }
     } catch (error) {
         console.error("Error fetching potential captains data:", error)
@@ -588,7 +657,8 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             message: "Something went wrong.",
             seasonLabel: "",
             divisions: [],
-            allSeasons: []
+            allSeasons: [],
+            divisionCommissioners: []
         }
     }
 }

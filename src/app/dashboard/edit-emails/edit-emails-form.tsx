@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { RiArrowDownSLine } from "@remixicon/react"
 import {
@@ -11,14 +11,24 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { updateEmailTemplate } from "./actions"
+import {
+    type LexicalEmailTemplateContent,
+    normalizeEmailTemplateContent
+} from "@/lib/email-template-content"
+import { LexicalEmailEditor } from "@/components/email-template/lexical-email-editor"
+
+const SUBJECT_VARIABLES = [
+    { key: "division_name", label: "Division Name" },
+    { key: "season_name", label: "Season Name" },
+    { key: "season_year", label: "Season Year" }
+]
 
 interface EmailTemplate {
     id: number
     name: string
     subject: string | null
-    content: string
+    content: LexicalEmailTemplateContent
     created_at: Date
     updated_at: Date
 }
@@ -26,17 +36,18 @@ interface EmailTemplate {
 interface TemplateFormData {
     name: string
     subject: string
-    content: string
+    content: LexicalEmailTemplateContent
 }
 
 export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const router = useRouter()
+    const subjectInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
     const [formData, setFormData] = useState<Record<number, TemplateFormData>>(
         templates.reduce<Record<number, TemplateFormData>>((acc, template) => {
             acc[template.id] = {
                 name: template.name,
                 subject: template.subject || "",
-                content: template.content
+                content: normalizeEmailTemplateContent(template.content)
             }
             return acc
         }, {})
@@ -78,10 +89,10 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         }
     }
 
-    const handleInputChange = (
+    const handleInputChange = <K extends keyof TemplateFormData>(
         templateId: number,
-        field: keyof TemplateFormData,
-        value: string
+        field: K,
+        value: TemplateFormData[K]
     ) => {
         setFormData((prev) => ({
             ...prev,
@@ -90,6 +101,24 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                 [field]: value
             }
         }))
+    }
+
+    const insertSubjectVariable = (templateId: number, variableKey: string) => {
+        const input = subjectInputRefs.current.get(templateId)
+        if (!input) return
+        const start = input.selectionStart ?? input.value.length
+        const end = input.selectionEnd ?? input.value.length
+        const insertion = `[${variableKey}]`
+        const newValue =
+            input.value.slice(0, start) + insertion + input.value.slice(end)
+        handleInputChange(templateId, "subject", newValue)
+        requestAnimationFrame(() => {
+            input.focus()
+            input.setSelectionRange(
+                start + insertion.length,
+                start + insertion.length
+            )
+        })
     }
 
     return (
@@ -126,42 +155,87 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                                     <Label htmlFor={`subject-${template.id}`}>
                                         Subject (Optional)
                                     </Label>
-                                    <Input
-                                        id={`subject-${template.id}`}
-                                        value={
-                                            formData[template.id]?.subject || ""
-                                        }
-                                        onChange={(e) =>
-                                            handleInputChange(
-                                                template.id,
-                                                "subject",
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder="Email subject line"
-                                    />
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id={`subject-${template.id}`}
+                                            ref={(el) => {
+                                                if (el) {
+                                                    subjectInputRefs.current.set(
+                                                        template.id,
+                                                        el
+                                                    )
+                                                } else {
+                                                    subjectInputRefs.current.delete(
+                                                        template.id
+                                                    )
+                                                }
+                                            }}
+                                            value={
+                                                formData[template.id]
+                                                    ?.subject || ""
+                                            }
+                                            onChange={(e) =>
+                                                handleInputChange(
+                                                    template.id,
+                                                    "subject",
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder="Email subject line"
+                                        />
+                                        <select
+                                            className="h-10 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
+                                            value="default"
+                                            onChange={(e) => {
+                                                if (
+                                                    e.target.value !== "default"
+                                                ) {
+                                                    insertSubjectVariable(
+                                                        template.id,
+                                                        e.target.value
+                                                    )
+                                                    e.target.value = "default"
+                                                }
+                                            }}
+                                            aria-label="Insert subject variable"
+                                        >
+                                            <option value="default">
+                                                Insert variable...
+                                            </option>
+                                            {SUBJECT_VARIABLES.map((v) => (
+                                                <option
+                                                    key={v.key}
+                                                    value={v.key}
+                                                >
+                                                    {v.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor={`content-${template.id}`}>
                                         Content
                                     </Label>
-                                    <Textarea
-                                        id={`content-${template.id}`}
-                                        value={
-                                            formData[template.id]?.content || ""
-                                        }
-                                        onChange={(e) =>
-                                            handleInputChange(
-                                                template.id,
-                                                "content",
-                                                e.target.value
-                                            )
-                                        }
-                                        placeholder="Email content"
-                                        rows={15}
-                                        className="font-mono text-sm"
-                                    />
+                                    <div id={`content-${template.id}`}>
+                                        <LexicalEmailEditor
+                                            content={
+                                                formData[template.id]
+                                                    ?.content ||
+                                                normalizeEmailTemplateContent(
+                                                    ""
+                                                )
+                                            }
+                                            onChange={(value) =>
+                                                handleInputChange(
+                                                    template.id,
+                                                    "content",
+                                                    value
+                                                )
+                                            }
+                                        />
+                                    </div>
                                 </div>
 
                                 {messages[template.id] && (

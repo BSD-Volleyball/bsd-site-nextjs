@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS email_templates (
     id serial PRIMARY KEY NOT NULL,
     name text NOT NULL,
     subject text,
-    content text NOT NULL,
+    content jsonb NOT NULL,
     created_at timestamp NOT NULL,
     updated_at timestamp NOT NULL,
     CONSTRAINT email_templates_name_unique UNIQUE(name)
@@ -14,7 +14,29 @@ INSERT INTO email_templates (name, subject, content, created_at, updated_at)
 VALUES (
     'call for captains',
     'Call for Team Captains',
-    'Hi Folks,
+    jsonb_build_object(
+        'root',
+        jsonb_build_object(
+            'type', 'root',
+            'direction', NULL,
+            'format', '',
+            'indent', 0,
+            'version', 1,
+            'children', jsonb_build_array(
+                jsonb_build_object(
+                    'type', 'paragraph',
+                    'direction', NULL,
+                    'format', '',
+                    'indent', 0,
+                    'version', 1,
+                    'children', jsonb_build_array(
+                        jsonb_build_object(
+                            'type', 'text',
+                            'detail', 0,
+                            'format', 0,
+                            'mode', 'normal',
+                            'style', '',
+                            'text', 'Hi Folks,
 
 Thank you all for continuing to play BSD Volleyball this season.  Jack Griffith and I are the AA Division Commissioners for the Fall 2025 Season, and we are actively recruiting Team Captains!  You are receiving this email because you volunteered to be a Captain during your registration, or we think you are a good candidate for a Captain.
 
@@ -68,6 +90,78 @@ Captains will be placed on Preseason Teams and are expected to play. They are el
 
 Jack and I intend to make captain selections by Monday, August 11th.
 Thanks for reading this long email.  Please let us know your decision either way!',
+                            'version', 1
+                        )
+                    )
+                )
+            )
+        )
+    ),
+    NOW(),
+    NOW()
+)
+ON CONFLICT (name) DO NOTHING;
+
+-- Insert the "captains selected" template
+INSERT INTO email_templates (name, subject, content, created_at, updated_at)
+VALUES (
+    'captains selected',
+    'BSD Volleyball: Congrats [division] Division Captains',
+    jsonb_build_object(
+        'root',
+        jsonb_build_object(
+            'type', 'root',
+            'direction', NULL,
+            'format', '',
+            'indent', 0,
+            'version', 1,
+            'children', jsonb_build_array(
+                jsonb_build_object(
+                    'type', 'paragraph',
+                    'direction', NULL,
+                    'format', '',
+                    'indent', 0,
+                    'version', 1,
+                    'children', jsonb_build_array(
+                        jsonb_build_object(
+                            'type', 'text',
+                            'detail', 0,
+                            'format', 0,
+                            'mode', 'normal',
+                            'style', '',
+                            'text', 'First of all, a sincere thank you to everyone who volunteered to be a captain in ABA division this season.  I will try to provide as much info as possible to get started, and please feel free to contact me or Josh with questions.  
+
+1) ABA Division Captains 
+Margarita Gomez
+Austin Jimenez
+Anderson Yao
+Ken Yuen
+Gustavo Rojas Matutue
+Kamal Rajogopal
+
+2) It looks like a 6/2 split with gender. At this time, our registration numbers indicate a max of 6 males drafted per team for ABA division. If anything changes we will let you know, but don''t count on it!
+
+3) Preseason Week 1 is this Thursday, August 14th.  The primary focus will be new players, with some limited slots available for returning players to round out the rosters:
+There will be two 90-minute sessions, starting at 7:00 pm and 8:30 pm.  Captains MUST attend both sessions.  Attendance will be limited to 96 registered players (48 players for each session - 8 teams of 6 players each across 4 courts).  Each session will contain players at all skill levels.  Before each session, players will be ranked and grouped according to perceived skill level across 4 courts (Court 1 with the highest skilled players thru Court 4 with the lowest skilled players).  The time will be divided equally between drills and game play with an opportunity for “player movement” halfway through each session based on Captain feedback. You should be focusing your attention primarily on courts 2 and 3.
+
+Preseason rosters are posted on the website. Captains will not play in Preseason Week 1.  We will schedule games for all players, including Captains, in Preseason Weeks 2 and 3! 
+
+4) List of Players: The 6 of you will have access to a spreadsheet containing all players registered for this season. You can find that here: https://docs.google.com/spreadsheets/d/1EMwVfRG2W7cPQjemoeKaEHUzqh9coDJlijBoepYwcog/edit?usp=sharing
+
+Please pay special attention to the "Updates" tab on the spreadsheet, as the board will update it regularly with player injuries, dropouts, etc. This is for your use as a Captain only.  It should not be shared with anyone else. HIGHLY CLASSIFIED!
+
+5) Draft Day is Thursday, September 4th: We are planning to go to a local bar/restaurant, as we always do, to conduct the draft. We plan to host the draft at Dogfish Head or a similar establishment in Gaithersburg at 7:30 PM. If that time frame/location doesn''t work for any of you, then please let us know. If, for whatever reason, you cannot physically attend the draft, we can arrange a Zoom call or phone call during the draft to record your picks. 
+
+Thanks again for volunteering.  Please reply to this email and confirm your attendance.
+
+See you Thursday night!  ',
+                            'version', 1
+                        )
+                    )
+                )
+            )
+        )
+    ),
     NOW(),
     NOW()
 )

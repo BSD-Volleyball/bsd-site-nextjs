@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useMemo } from "react"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import {
     Collapsible,
@@ -15,6 +15,19 @@ import {
     usePlayerDetailModal,
     PlayerDetailPopup
 } from "@/components/player-detail"
+import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
+import {
+    type LexicalEmailTemplateContent,
+    normalizeEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent
+} from "@/lib/email-template-content"
+import {
+    resolveTemplateVariablesInContent,
+    resolveSubjectVariables,
+    type TemplateVariableValues
+} from "@/lib/email-template-variables"
+import type { SeasonConfig } from "@/lib/site-config"
+import type { DivisionCommissioner } from "./actions"
 
 interface PotentialCaptain {
     id: string
@@ -35,6 +48,7 @@ interface DivisionCaptains {
     id: number
     name: string
     level: number
+    gender_split: string | null
     lists: CaptainList[]
 }
 
@@ -43,13 +57,23 @@ export function PotentialCaptainsList({
     allSeasons,
     playerPicUrl,
     emailTemplate,
-    emailSubject
+    emailTemplateContent,
+    emailSubject,
+    seasonConfig,
+    commissionerName,
+    currentUserId,
+    divisionCommissioners
 }: {
     divisions: DivisionCaptains[]
     allSeasons: { id: number; year: number; name: string }[]
     playerPicUrl: string
     emailTemplate: string
+    emailTemplateContent?: LexicalEmailTemplateContent
     emailSubject: string
+    seasonConfig?: SeasonConfig
+    commissionerName?: string
+    currentUserId?: string
+    divisionCommissioners?: DivisionCommissioner[]
 }) {
     const modal = usePlayerDetailModal()
     const [selectedPlayers, setSelectedPlayers] = useState<
@@ -62,6 +86,98 @@ export function PotentialCaptainsList({
     const [copySuccess, setCopySuccess] = useState(false)
     const [copyEmailSuccess, setCopyEmailSuccess] = useState(false)
     const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
+
+    const baseEmailTemplateContent =
+        emailTemplateContent || normalizeEmailTemplateContent(emailTemplate)
+
+    const currentDivision = useMemo(
+        () => divisions.find((d) => d.id === currentDivisionId) ?? null,
+        [divisions, currentDivisionId]
+    )
+
+    const buildVariableValues = useCallback(
+        (
+            divisionId: number,
+            divisionName: string,
+            genderSplit: string | null
+        ): TemplateVariableValues => {
+            const otherCommissioner =
+                divisionCommissioners
+                    ?.filter(
+                        (c) =>
+                            c.divisionId === divisionId &&
+                            c.userId !== currentUserId
+                    )
+                    .map((c) => c.name)
+                    .join(", ") ?? ""
+
+            const values: TemplateVariableValues = {
+                division_name: divisionName,
+                season_name: seasonConfig
+                    ? `${seasonConfig.seasonName.charAt(0).toUpperCase() + seasonConfig.seasonName.slice(1)} ${seasonConfig.seasonYear}`
+                    : "",
+                season_year: seasonConfig
+                    ? String(seasonConfig.seasonYear)
+                    : "",
+                gender_split: genderSplit ?? "",
+                commissioner_name: commissionerName ?? "",
+                captain_names: "",
+                other_commissioner: otherCommissioner
+            }
+
+            if (seasonConfig) {
+                values.tryout_1_date = seasonConfig.tryout1Date
+                values.tryout_2_date = seasonConfig.tryout2Date
+                values.tryout_3_date = seasonConfig.tryout3Date
+                values.season_1_date = seasonConfig.season1Date
+                values.season_2_date = seasonConfig.season2Date
+                values.season_3_date = seasonConfig.season3Date
+                values.season_4_date = seasonConfig.season4Date
+                values.season_5_date = seasonConfig.season5Date
+                values.season_6_date = seasonConfig.season6Date
+                values.playoff_1_date = seasonConfig.playoff1Date
+                values.playoff_2_date = seasonConfig.playoff2Date
+                values.playoff_3_date = seasonConfig.playoff3Date
+                values.tryout_1_s1_time = seasonConfig.tryout1Session1Time
+                values.tryout_1_s2_time = seasonConfig.tryout1Session2Time
+                values.tryout_2_s1_time = seasonConfig.tryout2Session1Time
+                values.tryout_2_s2_time = seasonConfig.tryout2Session2Time
+                values.tryout_2_s3_time = seasonConfig.tryout2Session3Time
+                values.tryout_3_s1_time = seasonConfig.tryout3Session1Time
+                values.tryout_3_s2_time = seasonConfig.tryout3Session2Time
+                values.tryout_3_s3_time = seasonConfig.tryout3Session3Time
+                values.season_s1_time = seasonConfig.seasonSession1Time
+                values.season_s2_time = seasonConfig.seasonSession2Time
+                values.season_s3_time = seasonConfig.seasonSession3Time
+            }
+
+            return values
+        },
+        [seasonConfig, commissionerName, currentUserId, divisionCommissioners]
+    )
+
+    const resolvedEmailTemplateContent = useMemo(() => {
+        if (!currentDivision) return baseEmailTemplateContent
+        const values = buildVariableValues(
+            currentDivision.id,
+            currentDivision.name,
+            currentDivision.gender_split
+        )
+        return resolveTemplateVariablesInContent(
+            baseEmailTemplateContent,
+            values
+        )
+    }, [currentDivision, baseEmailTemplateContent, buildVariableValues])
+
+    const resolvedEmailSubject = useMemo(() => {
+        if (!currentDivision || !emailSubject) return emailSubject
+        const values = buildVariableValues(
+            currentDivision.id,
+            currentDivision.name,
+            currentDivision.gender_split
+        )
+        return resolveSubjectVariables(emailSubject, values)
+    }, [currentDivision, emailSubject, buildVariableValues])
 
     const togglePlayerSelection = (divisionId: number, playerId: string) => {
         setSelectedPlayers((prev) => {
@@ -126,7 +242,10 @@ export function PotentialCaptainsList({
 
     const handleCopyEmailTemplate = async () => {
         try {
-            await navigator.clipboard.writeText(emailTemplate)
+            const plainText = extractPlainTextFromEmailTemplateContent(
+                resolvedEmailTemplateContent
+            )
+            await navigator.clipboard.writeText(plainText)
             setCopyEmailSuccess(true)
             setTimeout(() => setCopyEmailSuccess(false), 2000)
         } catch (err) {
@@ -136,7 +255,7 @@ export function PotentialCaptainsList({
 
     const handleCopySubject = async () => {
         try {
-            await navigator.clipboard.writeText(emailSubject)
+            await navigator.clipboard.writeText(resolvedEmailSubject)
             setCopySubjectSuccess(true)
             setTimeout(() => setCopySubjectSuccess(false), 2000)
         } catch (err) {
@@ -332,12 +451,14 @@ export function PotentialCaptainsList({
                                     : "Copy Email Addresses"}
                             </Button>
                         </Card>
-                        {emailSubject && (
+                        {resolvedEmailSubject && (
                             <Card className="mb-4 p-4">
                                 <h4 className="mb-2 font-medium text-sm">
                                     Subject
                                 </h4>
-                                <p className="mb-2 text-sm">{emailSubject}</p>
+                                <p className="mb-2 text-sm">
+                                    {resolvedEmailSubject}
+                                </p>
                                 <Button
                                     size="sm"
                                     onClick={handleCopySubject}
@@ -354,9 +475,11 @@ export function PotentialCaptainsList({
                                 <h4 className="mb-2 font-medium text-sm">
                                     Email Template
                                 </h4>
-                                <pre className="mb-2 max-h-60 overflow-y-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">
-                                    {emailTemplate}
-                                </pre>
+                                <div className="mb-2">
+                                    <LexicalEmailPreview
+                                        content={resolvedEmailTemplateContent}
+                                    />
+                                </div>
                                 <Button
                                     size="sm"
                                     onClick={handleCopyEmailTemplate}

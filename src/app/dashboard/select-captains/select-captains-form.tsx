@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import {
     Card,
     CardContent,
@@ -26,12 +26,35 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import { createTeams, type DivisionOption, type UserOption } from "./actions"
+import {
+    createTeams,
+    type DivisionOption,
+    type UserOption,
+    type DivisionCommissioner
+} from "./actions"
+import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
+import {
+    type LexicalEmailTemplateContent,
+    normalizeEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent
+} from "@/lib/email-template-content"
+import {
+    resolveTemplateVariablesInContent,
+    resolveSubjectVariables
+} from "@/lib/email-template-variables"
+import type { SeasonConfig } from "@/lib/site-config"
 
 interface SelectCaptainsFormProps {
     seasonLabel: string
     divisions: DivisionOption[]
     users: UserOption[]
+    emailTemplate: string
+    emailTemplateContent: LexicalEmailTemplateContent | null
+    emailSubject: string
+    seasonConfig?: SeasonConfig | null
+    commissionerName?: string
+    currentUserId?: string
+    divisionCommissioners?: DivisionCommissioner[]
 }
 
 interface CaptainSelection {
@@ -178,11 +201,25 @@ function UserCombobox({
 export function SelectCaptainsForm({
     seasonLabel = "",
     divisions,
-    users
+    users,
+    emailTemplate,
+    emailTemplateContent,
+    emailSubject,
+    seasonConfig,
+    commissionerName = "",
+    currentUserId,
+    divisionCommissioners
 }: SelectCaptainsFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [showEmailModal, setShowEmailModal] = useState(false)
+    const [copySuccess, setCopySuccess] = useState(false)
+    const [copyEmailSuccess, setCopyEmailSuccess] = useState(false)
+    const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
+
+    const baseEmailTemplateContent =
+        emailTemplateContent || normalizeEmailTemplateContent(emailTemplate)
 
     const [divisionId, setDivisionId] = useState<string>("")
     const [captains, setCaptains] = useState<CaptainSelection[]>(
@@ -223,6 +260,165 @@ export function SelectCaptainsForm({
                 .filter((id): id is string => id !== null),
         [captains, numTeams]
     )
+
+    const selectedCaptains = useMemo(() => {
+        return selectedCaptainIds
+            .map((captainId) => users.find((user) => user.id === captainId))
+            .filter((user): user is UserOption => user !== undefined)
+    }, [selectedCaptainIds, users])
+
+    const variableValues = useMemo(() => {
+        const captainNames =
+            selectedCaptains.length > 0
+                ? selectedCaptains
+                      .map((u) => `• ${u.first_name} ${u.last_name}`)
+                      .join("\n")
+                : ""
+
+        const otherCommissioner =
+            selectedDivision && divisionCommissioners
+                ? divisionCommissioners
+                      .filter(
+                          (c) =>
+                              c.divisionId === selectedDivision.id &&
+                              c.userId !== currentUserId
+                      )
+                      .map((c) => c.name)
+                      .join(", ")
+                : ""
+
+        const values: Record<string, string> = {
+            division_name: selectedDivision?.name ?? "",
+            season_name: seasonConfig
+                ? `${seasonConfig.seasonName.charAt(0).toUpperCase() + seasonConfig.seasonName.slice(1)} ${seasonConfig.seasonYear}`
+                : "",
+            season_year: seasonConfig ? String(seasonConfig.seasonYear) : "",
+            gender_split: selectedDivision?.gender_split ?? "",
+            commissioner_name: commissionerName,
+            captain_names: captainNames,
+            other_commissioner: otherCommissioner
+        }
+
+        if (seasonConfig) {
+            values.tryout_1_date = seasonConfig.tryout1Date
+            values.tryout_2_date = seasonConfig.tryout2Date
+            values.tryout_3_date = seasonConfig.tryout3Date
+            values.season_1_date = seasonConfig.season1Date
+            values.season_2_date = seasonConfig.season2Date
+            values.season_3_date = seasonConfig.season3Date
+            values.season_4_date = seasonConfig.season4Date
+            values.season_5_date = seasonConfig.season5Date
+            values.season_6_date = seasonConfig.season6Date
+            values.playoff_1_date = seasonConfig.playoff1Date
+            values.playoff_2_date = seasonConfig.playoff2Date
+            values.playoff_3_date = seasonConfig.playoff3Date
+            values.captain_select_date = seasonConfig.captainSelectDate
+            values.draft_1_date = seasonConfig.draft1Date
+            values.draft_2_date = seasonConfig.draft2Date
+            values.draft_3_date = seasonConfig.draft3Date
+            values.draft_4_date = seasonConfig.draft4Date
+            values.draft_5_date = seasonConfig.draft5Date
+            values.draft_6_date = seasonConfig.draft6Date
+            values.tryout_1_s1_time = seasonConfig.tryout1Session1Time
+            values.tryout_1_s2_time = seasonConfig.tryout1Session2Time
+            values.tryout_2_s1_time = seasonConfig.tryout2Session1Time
+            values.tryout_2_s2_time = seasonConfig.tryout2Session2Time
+            values.tryout_2_s3_time = seasonConfig.tryout2Session3Time
+            values.tryout_3_s1_time = seasonConfig.tryout3Session1Time
+            values.tryout_3_s2_time = seasonConfig.tryout3Session2Time
+            values.tryout_3_s3_time = seasonConfig.tryout3Session3Time
+            values.season_s1_time = seasonConfig.seasonSession1Time
+            values.season_s2_time = seasonConfig.seasonSession2Time
+            values.season_s3_time = seasonConfig.seasonSession3Time
+        }
+
+        return values
+    }, [
+        selectedDivision,
+        selectedCaptains,
+        seasonConfig,
+        commissionerName,
+        currentUserId,
+        divisionCommissioners
+    ])
+
+    const resolvedEmailTemplateContent = useMemo(
+        () =>
+            resolveTemplateVariablesInContent(
+                baseEmailTemplateContent,
+                variableValues
+            ),
+        [baseEmailTemplateContent, variableValues]
+    )
+
+    const resolvedEmailSubject = useMemo(() => {
+        if (!emailSubject) return ""
+        return resolveSubjectVariables(emailSubject, variableValues)
+    }, [emailSubject, variableValues])
+
+    const formatEmailList = (captainUsers: UserOption[]): string => {
+        return captainUsers
+            .map(
+                (user) => `${user.first_name} ${user.last_name} <${user.email}>`
+            )
+            .join(", ")
+    }
+
+    const handleGenerateMessage = () => {
+        setShowEmailModal(true)
+        setCopySuccess(false)
+        setCopyEmailSuccess(false)
+        setCopySubjectSuccess(false)
+    }
+
+    const handleCloseEmailModal = useCallback(() => {
+        setShowEmailModal(false)
+    }, [])
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && showEmailModal) {
+                handleCloseEmailModal()
+            }
+        }
+        document.addEventListener("keydown", handleKeyDown)
+        return () => document.removeEventListener("keydown", handleKeyDown)
+    }, [showEmailModal, handleCloseEmailModal])
+
+    const handleCopyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(
+                formatEmailList(selectedCaptains)
+            )
+            setCopySuccess(true)
+            setTimeout(() => setCopySuccess(false), 2000)
+        } catch (copyError) {
+            console.error("Failed to copy selected captain emails:", copyError)
+        }
+    }
+
+    const handleCopyEmailTemplate = async () => {
+        try {
+            const plainText = extractPlainTextFromEmailTemplateContent(
+                resolvedEmailTemplateContent
+            )
+            await navigator.clipboard.writeText(plainText)
+            setCopyEmailSuccess(true)
+            setTimeout(() => setCopyEmailSuccess(false), 2000)
+        } catch (copyError) {
+            console.error("Failed to copy email template:", copyError)
+        }
+    }
+
+    const handleCopySubject = async () => {
+        try {
+            await navigator.clipboard.writeText(resolvedEmailSubject)
+            setCopySubjectSuccess(true)
+            setTimeout(() => setCopySubjectSuccess(false), 2000)
+        } catch (copyError) {
+            console.error("Failed to copy email subject:", copyError)
+        }
+    }
 
     const handleCaptainChange = (
         index: number,
@@ -412,16 +608,107 @@ export function SelectCaptainsForm({
                         </div>
                     )}
                 </CardContent>
-                <CardFooter className="border-t pt-6">
+                <CardFooter className="flex items-center justify-between border-t pt-6">
                     <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="ml-auto"
+                        type="button"
+                        variant="outline"
+                        onClick={handleGenerateMessage}
+                        disabled={
+                            !selectedDivision || selectedCaptains.length === 0
+                        }
                     >
+                        Generate Message ({selectedCaptains.length} selected)
+                    </Button>
+                    <Button type="submit" disabled={isLoading}>
                         {isLoading ? "Creating..." : "Create"}
                     </Button>
                 </CardFooter>
             </Card>
+
+            {showEmailModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={handleCloseEmailModal}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") handleCloseEmailModal()
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <button
+                            type="button"
+                            onClick={handleCloseEmailModal}
+                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                            <RiCloseLine className="h-5 w-5" />
+                        </button>
+                        <h3 className="mb-4 font-semibold text-lg">
+                            Email Recipients
+                        </h3>
+                        <Card className="mb-4 p-4">
+                            <p className="mb-2 text-sm">
+                                {formatEmailList(selectedCaptains)}
+                            </p>
+                            <Button
+                                size="sm"
+                                onClick={handleCopyToClipboard}
+                                variant="outline"
+                            >
+                                {copySuccess
+                                    ? "Copied!"
+                                    : "Copy Email Addresses"}
+                            </Button>
+                        </Card>
+                        {resolvedEmailSubject && (
+                            <Card className="mb-4 p-4">
+                                <h4 className="mb-2 font-medium text-sm">
+                                    Subject
+                                </h4>
+                                <p className="mb-2 text-sm">
+                                    {resolvedEmailSubject}
+                                </p>
+                                <Button
+                                    size="sm"
+                                    onClick={handleCopySubject}
+                                    variant="outline"
+                                >
+                                    {copySubjectSuccess
+                                        ? "Copied!"
+                                        : "Copy Subject"}
+                                </Button>
+                            </Card>
+                        )}
+                        {emailTemplate && (
+                            <Card className="p-4">
+                                <h4 className="mb-2 font-medium text-sm">
+                                    Email Template
+                                </h4>
+                                <div className="mb-2">
+                                    <LexicalEmailPreview
+                                        content={resolvedEmailTemplateContent}
+                                    />
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleCopyEmailTemplate}
+                                    variant="outline"
+                                >
+                                    {copyEmailSuccess
+                                        ? "Copied!"
+                                        : "Copy Email Template"}
+                                </Button>
+                            </Card>
+                        )}
+                    </div>
+                </div>
+            )}
         </form>
     )
 }

@@ -52,6 +52,13 @@ export default async function SelectCaptainsPage() {
                 seasonLabel={result.seasonLabel || ""}
                 divisions={result.divisions}
                 users={result.users}
+                emailTemplate={result.emailTemplate || ""}
+                emailTemplateContent={result.emailTemplateContent}
+                emailSubject={result.emailSubject || ""}
+                seasonConfig={result.seasonConfig}
+                commissionerName={session.user.name || ""}
+                currentUserId={session.user.id}
+                divisionCommissioners={result.divisionCommissioners}
             />
         </div>
     )
