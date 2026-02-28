@@ -7,6 +7,13 @@ import type { PlayerDraftHistory } from "@/app/dashboard/player-lookup/actions"
 import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DivisionHistoryChart } from "./division-history-chart"
+import { PlayerRatingsSection } from "./player-ratings-section"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
 
 interface SeasonInfo {
     id: number
@@ -40,6 +47,9 @@ interface PlayerDetailPopupProps {
     isLoading: boolean
     pairPickName?: string | null
     pairReason?: string | null
+    ratingAverages?: PlayerRatingAverages
+    sharedRatingNotes?: PlayerRatingSharedNote[]
+    privateRatingNotes?: PlayerRatingPrivateNote[]
     inline?: boolean
     children?: React.ReactNode
 }
@@ -54,6 +64,9 @@ export function PlayerDetailPopup({
     isLoading,
     pairPickName,
     pairReason,
+    ratingAverages = getEmptyPlayerRatingAverages(),
+    sharedRatingNotes = [],
+    privateRatingNotes = [],
     inline = false,
     children
 }: PlayerDetailPopupProps) {
@@ -215,6 +228,12 @@ export function PlayerDetailPopup({
                                 </div>
                             </div>
                         </div>
+
+                        <PlayerRatingsSection
+                            ratingAverages={ratingAverages}
+                            sharedRatingNotes={sharedRatingNotes}
+                            privateRatingNotes={privateRatingNotes}
+                        />
 
                         {/* Division History Chart */}
                         <DivisionHistoryChart

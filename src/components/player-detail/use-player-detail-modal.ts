@@ -7,12 +7,21 @@ import type {
     PlayerSignup
 } from "@/app/dashboard/player-lookup/actions"
 import { getPlayerDetails } from "@/app/dashboard/player-lookup/actions"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
 
 interface FetchResult {
     status: boolean
     player: PlayerDetails | null
     draftHistory: PlayerDraftHistory[]
     signupHistory: PlayerSignup[]
+    ratingAverages: PlayerRatingAverages
+    sharedRatingNotes: PlayerRatingSharedNote[]
+    privateRatingNotes: PlayerRatingPrivateNote[]
     pairPickName?: string | null
     pairReason?: string | null
 }
@@ -26,6 +35,9 @@ export interface PlayerDetailModalState {
     playerDetails: PlayerDetails | null
     draftHistory: PlayerDraftHistory[]
     signupHistory: PlayerSignup[]
+    ratingAverages: PlayerRatingAverages
+    sharedRatingNotes: PlayerRatingSharedNote[]
+    privateRatingNotes: PlayerRatingPrivateNote[]
     pairPickName: string | null
     pairReason: string | null
     isLoading: boolean
@@ -51,6 +63,9 @@ const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
         player: result.player,
         draftHistory: result.draftHistory,
         signupHistory: result.signupHistory,
+        ratingAverages: result.ratingAverages,
+        sharedRatingNotes: result.sharedRatingNotes,
+        privateRatingNotes: result.privateRatingNotes,
         pairPickName,
         pairReason
     }
@@ -65,6 +80,15 @@ export function usePlayerDetailModal(
     )
     const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
     const [signupHistory, setSignupHistory] = useState<PlayerSignup[]>([])
+    const [ratingAverages, setRatingAverages] = useState<PlayerRatingAverages>(
+        getEmptyPlayerRatingAverages()
+    )
+    const [sharedRatingNotes, setSharedRatingNotes] = useState<
+        PlayerRatingSharedNote[]
+    >([])
+    const [privateRatingNotes, setPrivateRatingNotes] = useState<
+        PlayerRatingPrivateNote[]
+    >([])
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -79,6 +103,9 @@ export function usePlayerDetailModal(
             setPlayerDetails(null)
             setDraftHistory([])
             setSignupHistory([])
+            setRatingAverages(getEmptyPlayerRatingAverages())
+            setSharedRatingNotes([])
+            setPrivateRatingNotes([])
             setPairPickName(null)
             setPairReason(null)
 
@@ -88,6 +115,9 @@ export function usePlayerDetailModal(
                 setPlayerDetails(result.player)
                 setDraftHistory(result.draftHistory)
                 setSignupHistory(result.signupHistory)
+                setRatingAverages(result.ratingAverages)
+                setSharedRatingNotes(result.sharedRatingNotes)
+                setPrivateRatingNotes(result.privateRatingNotes)
                 setPairPickName(result.pairPickName ?? null)
                 setPairReason(result.pairReason ?? null)
             }
@@ -102,6 +132,9 @@ export function usePlayerDetailModal(
         setPlayerDetails(null)
         setDraftHistory([])
         setSignupHistory([])
+        setRatingAverages(getEmptyPlayerRatingAverages())
+        setSharedRatingNotes([])
+        setPrivateRatingNotes([])
         setPairPickName(null)
         setPairReason(null)
     }, [])
@@ -125,6 +158,9 @@ export function usePlayerDetailModal(
         playerDetails,
         draftHistory,
         signupHistory,
+        ratingAverages,
+        sharedRatingNotes,
+        privateRatingNotes,
         pairPickName,
         pairReason,
         isLoading,

@@ -500,6 +500,9 @@ export function PairsList({
                 isLoading={modal.isLoading}
                 pairPickName={selectedContext?.pairPickName}
                 pairReason={selectedContext?.pairReason}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
             />
         </div>
     )

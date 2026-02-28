@@ -75,6 +75,7 @@ function getGenderLabel(male: boolean | null): string {
 
 function getEmptyRating(): PlayerRatingValues {
     return {
+        overall: null,
         passing: null,
         setting: null,
         hitting: null,
@@ -215,6 +216,7 @@ export function RatePlayerClient({
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [ratingsByPlayer, setRatingsByPlayer] =
         useState<Record<string, PlayerRatingValues>>(initialRatings)
+    const [overall, setOverall] = useState(0)
     const [passing, setPassing] = useState(0)
     const [setting, setSetting] = useState(0)
     const [hitting, setHitting] = useState(0)
@@ -233,25 +235,6 @@ export function RatePlayerClient({
     const latestSaveRequestIdRef = useRef(0)
 
     useEffect(() => {
-        if (!selectedPlayer) {
-            return
-        }
-
-        const rating = ratingsByPlayer[selectedPlayer.id] || getEmptyRating()
-        setHasPendingSkillSave(false)
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current)
-            saveTimeoutRef.current = null
-        }
-        setPassing(rating.passing ?? 0)
-        setSetting(rating.setting ?? 0)
-        setHitting(rating.hitting ?? 0)
-        setServing(rating.serving ?? 0)
-        setSharedNotes(rating.sharedNotes || "")
-        setPrivateNotes(rating.privateNotes || "")
-    }, [selectedPlayer, ratingsByPlayer])
-
-    useEffect(() => {
         if (!selectedPlayer || !hasPendingSkillSave) {
             return
         }
@@ -268,6 +251,7 @@ export function RatePlayerClient({
             setSavingSkills(true)
 
             const result = await savePlayerSkillRatings(selectedPlayerId, {
+                overall,
                 passing,
                 setting,
                 hitting,
@@ -295,6 +279,7 @@ export function RatePlayerClient({
     }, [
         selectedPlayer,
         hasPendingSkillSave,
+        overall,
         passing,
         setting,
         hitting,
@@ -357,6 +342,19 @@ export function RatePlayerClient({
     )
 
     const openRateDialog = (player: RatePlayerEntry) => {
+        const rating = ratingsByPlayer[player.id] || getEmptyRating()
+        setHasPendingSkillSave(false)
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+            saveTimeoutRef.current = null
+        }
+        setOverall(rating.overall ?? 0)
+        setPassing(rating.passing ?? 0)
+        setSetting(rating.setting ?? 0)
+        setHitting(rating.hitting ?? 0)
+        setServing(rating.serving ?? 0)
+        setSharedNotes(rating.sharedNotes || "")
+        setPrivateNotes(rating.privateNotes || "")
         setSelectedPlayer(player)
         setModalMessage(null)
         setIsDialogOpen(true)
@@ -397,7 +395,9 @@ export function RatePlayerClient({
 
         setModalMessage(null)
 
-        if (skill === "passing") {
+        if (skill === "overall") {
+            setOverall(value)
+        } else if (skill === "passing") {
             setPassing(value)
         } else if (skill === "setting") {
             setSetting(value)
@@ -451,6 +451,68 @@ export function RatePlayerClient({
         setModalMessage({
             type: result.status ? "success" : "error",
             text: result.message
+        })
+    }
+
+    const handleSaveSharedRatings = async () => {
+        if (!selectedPlayer) {
+            return
+        }
+
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current)
+            saveTimeoutRef.current = null
+        }
+
+        setHasPendingSkillSave(false)
+        setSavingSkills(true)
+        setSavingSharedNotes(true)
+        setModalMessage(null)
+
+        const skillResult = await savePlayerSkillRatings(selectedPlayer.id, {
+            overall,
+            passing,
+            setting,
+            hitting,
+            serving
+        })
+
+        const sharedNoteResult = await savePlayerRatingNote(
+            selectedPlayer.id,
+            "shared",
+            sharedNotes
+        )
+
+        setSavingSkills(false)
+        setSavingSharedNotes(false)
+
+        if (skillResult.status) {
+            updateRatingStateForPlayer(selectedPlayer.id, {
+                overall,
+                passing,
+                setting,
+                hitting,
+                serving
+            })
+        }
+
+        if (sharedNoteResult.status) {
+            updateRatingStateForPlayer(selectedPlayer.id, {
+                sharedNotes: sharedNotes.trim() || null
+            })
+        }
+
+        if (skillResult.status && sharedNoteResult.status) {
+            setModalMessage({
+                type: "success",
+                text: "Shared ratings and note saved."
+            })
+            return
+        }
+
+        setModalMessage({
+            type: "error",
+            text: `${skillResult.status ? "" : `${skillResult.message} `}${sharedNoteResult.status ? "" : sharedNoteResult.message}`.trim()
         })
     }
 
@@ -618,6 +680,10 @@ export function RatePlayerClient({
                                         {getOldIdLabel(selectedPlayer)} -{" "}
                                         {getDisplayName(selectedPlayer)}
                                     </p>
+                                    <p className="text-muted-foreground text-sm">
+                                        {getGenderLabel(selectedPlayer.male)} •{" "}
+                                        {formatHeight(selectedPlayer.height)}
+                                    </p>
                                 </div>
                             </div>
 
@@ -638,6 +704,15 @@ export function RatePlayerClient({
                                     Shared with other captains
                                 </h3>
 
+                                <SkillSlider
+                                    label="Overall"
+                                    value={overall}
+                                    disabled={false}
+                                    onChange={(value) =>
+                                        handleSkillChange("overall", value)
+                                    }
+                                />
+                                <div className="border-t" />
                                 <SkillSlider
                                     label="Passing"
                                     value={passing}
@@ -693,14 +768,15 @@ export function RatePlayerClient({
                                         <Button
                                             type="button"
                                             size="sm"
-                                            onClick={() =>
-                                                handleSaveNotes("shared")
+                                            onClick={handleSaveSharedRatings}
+                                            disabled={
+                                                savingSharedNotes ||
+                                                savingSkills
                                             }
-                                            disabled={savingSharedNotes}
                                         >
-                                            {savingSharedNotes
+                                            {savingSharedNotes || savingSkills
                                                 ? "Saving..."
-                                                : "Save Shared Note"}
+                                                : "Save Shared Ratings"}
                                         </Button>
                                     </div>
                                 </div>

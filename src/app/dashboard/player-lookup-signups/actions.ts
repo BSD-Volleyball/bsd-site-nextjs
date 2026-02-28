@@ -11,7 +11,15 @@ import {
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 import { checkCaptainPagesAccess } from "@/app/dashboard/view-signups/actions"
+import { getSessionUserId } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
+import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 
 export interface PlayerListItem {
     id: string
@@ -131,6 +139,9 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
     pairPickName: string | null
     pairReason: string | null
     draftHistory: PlayerDraftHistory[]
+    ratingAverages: PlayerRatingAverages
+    sharedRatingNotes: PlayerRatingSharedNote[]
+    privateRatingNotes: PlayerRatingPrivateNote[]
 }> {
     const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
@@ -140,7 +151,10 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
-            draftHistory: []
+            draftHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: []
         }
     }
 
@@ -173,9 +187,20 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
                 player: null,
                 pairPickName: null,
                 pairReason: null,
-                draftHistory: []
+                draftHistory: [],
+                ratingAverages: getEmptyPlayerRatingAverages(),
+                sharedRatingNotes: [],
+                privateRatingNotes: []
             }
         }
+
+        const config = await getSeasonConfig()
+        const viewerUserId = await getSessionUserId()
+        const ratingsSection = await getPlayerRatingsSectionData(
+            playerId,
+            config.seasonId ?? null,
+            viewerUserId
+        )
 
         // Get pair info from most recent signup
         let pairPickName: string | null = null
@@ -234,7 +259,10 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player,
             pairPickName,
             pairReason,
-            draftHistory: draftData
+            draftHistory: draftData,
+            ratingAverages: ratingsSection.averages,
+            sharedRatingNotes: ratingsSection.sharedNotes,
+            privateRatingNotes: ratingsSection.privateNotes
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -244,7 +272,10 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
-            draftHistory: []
+            draftHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: []
         }
     }
 }

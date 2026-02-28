@@ -358,6 +358,7 @@ export const playerRatings = pgTable(
         evaluator: text("evaluator")
             .notNull()
             .references(() => users.id),
+        overall: integer("overall"),
         passing: integer("passing"),
         setting: integer("setting"),
         hitting: integer("hitting"),

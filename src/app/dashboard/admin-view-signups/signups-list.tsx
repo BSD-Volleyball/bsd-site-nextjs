@@ -643,6 +643,9 @@ export function SignupsList({
                 isLoading={modal.isLoading}
                 pairPickName={selectedEntry?.pairPickName}
                 pairReason={selectedEntry?.pairReason}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
             />
 
             <Dialog

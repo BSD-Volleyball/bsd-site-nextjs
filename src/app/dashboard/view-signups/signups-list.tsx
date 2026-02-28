@@ -145,6 +145,9 @@ export function SignupsList({
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
                 pairReason={modal.pairReason}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
             />
         </div>
     )

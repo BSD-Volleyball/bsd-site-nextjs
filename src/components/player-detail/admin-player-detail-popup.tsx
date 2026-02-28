@@ -11,6 +11,13 @@ import type {
 import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
+import { PlayerRatingsSection } from "./player-ratings-section"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
 
 interface AdminPlayerDetailPopupProps {
     open: boolean
@@ -22,6 +29,9 @@ interface AdminPlayerDetailPopupProps {
     isLoading: boolean
     pairPickName?: string | null
     pairReason?: string | null
+    ratingAverages?: PlayerRatingAverages
+    sharedRatingNotes?: PlayerRatingSharedNote[]
+    privateRatingNotes?: PlayerRatingPrivateNote[]
     inline?: boolean
     children?: React.ReactNode
 }
@@ -42,6 +52,9 @@ export function AdminPlayerDetailPopup({
     isLoading,
     pairPickName,
     pairReason,
+    ratingAverages = getEmptyPlayerRatingAverages(),
+    sharedRatingNotes = [],
+    privateRatingNotes = [],
     inline = false,
     children
 }: AdminPlayerDetailPopupProps) {
@@ -246,6 +259,12 @@ export function AdminPlayerDetailPopup({
                                 </div>
                             </div>
                         </div>
+
+                        <PlayerRatingsSection
+                            ratingAverages={ratingAverages}
+                            sharedRatingNotes={sharedRatingNotes}
+                            privateRatingNotes={privateRatingNotes}
+                        />
 
                         {/* Pair Request */}
                         {(pairPickName || pairReason) && (

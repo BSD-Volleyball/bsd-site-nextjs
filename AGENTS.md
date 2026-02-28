@@ -80,6 +80,15 @@ npx @better-auth/cli generate
 - Use Tailwind utility classes; prefer `cn()` when conditionally combining classes.
 - Maintain existing UX patterns in dashboard tables/forms (status messages, loading state, empty states).
 
+## Consolidated User Details Pop-up Pattern
+
+- Shared state/fetch orchestration lives in `src/components/player-detail/use-player-detail-modal.ts` via `usePlayerDetailModal()`.
+- Trigger the pop-up by calling `openPlayerDetail(userId)` from list/table rows and close with `closePlayerDetail()`.
+- Non-admin views should use `PlayerDetailPopup` (`src/components/player-detail/player-detail-popup.tsx`) for player-facing fields, pair request context, ratings, and division history.
+- Admin views should use `AdminPlayerDetailPopup` (`src/components/player-detail/admin-player-detail-popup.tsx`) for expanded account/contact data, signup history, and draft history in addition to ratings.
+- Use the default modal overlay pattern for list/table contexts (for example signups/captains), and `inline` rendering only when details need to be embedded into an existing page flow (for example player lookup).
+- Keep the data contract centralized through the hook output (`playerDetails`, `draftHistory`, `signupHistory`, `pairPickName`, `pairReason`, ratings and notes) instead of duplicating local fetch/state logic.
+
 ## Formatting and Quality Gates
 
 - Biome is the formatter/linter (`biome.json`):
