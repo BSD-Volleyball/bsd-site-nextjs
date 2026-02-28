@@ -49,6 +49,8 @@ export interface SignupEntry {
     lastDraftCaptain: string | null
     lastDraftOverall: number | null
     discountCodeName: string | null
+    captainIn: string | null
+    draftedIn: string | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -244,6 +246,53 @@ export async function getSeasonSignups(): Promise<{
             }
         }
 
+        // Fetch current-season draft assignments
+        const draftedInMap = new Map<string, string>()
+
+        if (userIds.length > 0) {
+            const draftedRows = await db
+                .select({
+                    userId: drafts.user,
+                    divisionName: divisions.name
+                })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        inArray(drafts.user, userIds)
+                    )
+                )
+
+            for (const draft of draftedRows) {
+                draftedInMap.set(draft.userId, draft.divisionName)
+            }
+        }
+
+        // Fetch current-season captain roles
+        const captainDivisionMap = new Map<string, string>()
+
+        if (userIds.length > 0) {
+            const captainTeams = await db
+                .select({
+                    captainId: teams.captain,
+                    divisionName: divisions.name
+                })
+                .from(teams)
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        inArray(teams.captain, userIds)
+                    )
+                )
+
+            for (const team of captainTeams) {
+                captainDivisionMap.set(team.captainId, team.divisionName)
+            }
+        }
+
         const entries: SignupEntry[] = signupRows.map((row) => {
             const lastDraft = lastDraftInfo.get(row.userId)
             return {
@@ -279,7 +328,9 @@ export async function getSeasonSignups(): Promise<{
                 lastDraftDivision: lastDraft?.division ?? null,
                 lastDraftCaptain: lastDraft?.captain ?? null,
                 lastDraftOverall: lastDraft?.overall ?? null,
-                discountCodeName: usedDiscountByUserId.get(row.userId) ?? null
+                discountCodeName: usedDiscountByUserId.get(row.userId) ?? null,
+                captainIn: captainDivisionMap.get(row.userId) ?? null,
+                draftedIn: draftedInMap.get(row.userId) ?? null
             }
         })
 

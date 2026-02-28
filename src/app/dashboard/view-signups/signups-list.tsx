@@ -60,7 +60,6 @@ function generateCsvContent(
         "Pair Pick",
         "Gender",
         "Age",
-        "Captain",
         "Experience",
         "Assessment",
         "Height",
@@ -72,7 +71,9 @@ function generateCsvContent(
         "Dates Missing",
         "Last Season",
         "Last Division",
-        "Last Captain"
+        "Last Captain",
+        "Captain In",
+        "Drafted In"
     ]
 
     const rows = entries.map((entry) => [
@@ -83,13 +84,6 @@ function generateCsvContent(
         entry.pairPickName || "",
         entry.male === true ? "M" : entry.male === false ? "NM" : "",
         entry.age || "",
-        entry.captain === "yes"
-            ? "Yes"
-            : entry.captain === "only_if_needed"
-              ? "If needed"
-              : entry.captain === "no"
-                ? "No"
-                : "",
         entry.experience || "",
         entry.assessment || "",
         formatHeight(entry.height),
@@ -101,7 +95,9 @@ function generateCsvContent(
         entry.datesMissing || "",
         entry.lastDraftSeason || "",
         entry.lastDraftDivision || "",
-        entry.lastDraftCaptain || ""
+        entry.lastDraftCaptain || "",
+        entry.captainIn || "",
+        entry.draftedIn || ""
     ])
 
     return [headers, ...rows]
