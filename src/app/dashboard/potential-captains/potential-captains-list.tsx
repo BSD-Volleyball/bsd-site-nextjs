@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import {
     usePlayerDetailModal,
-    AdminPlayerDetailPopup
+    PlayerDetailPopup
 } from "@/components/player-detail"
 
 interface PotentialCaptain {
@@ -40,7 +40,7 @@ interface DivisionCaptains {
 
 export function PotentialCaptainsList({
     divisions,
-    allSeasons: _allSeasons,
+    allSeasons,
     playerPicUrl,
     emailTemplate,
     emailSubject
@@ -271,12 +271,12 @@ export function PotentialCaptainsList({
                 </Collapsible>
             ))}
 
-            <AdminPlayerDetailPopup
+            <PlayerDetailPopup
                 open={!!modal.selectedUserId}
                 onClose={modal.closePlayerDetail}
                 playerDetails={modal.playerDetails}
                 draftHistory={modal.draftHistory}
-                signupHistory={modal.signupHistory}
+                allSeasons={allSeasons}
                 playerPicUrl={playerPicUrl}
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
