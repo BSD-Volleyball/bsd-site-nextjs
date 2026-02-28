@@ -251,7 +251,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 preffered_name: formData.preffered_name || null,
                 email: formData.email,
                 emailVerified: formData.emailVerified,
-                old_id: formData.old_id ? parseInt(formData.old_id, 10) : null,
+                old_id: formData.old_id ? parseInt(formData.old_id, 10) : 0,
                 picture: formData.picture || null,
                 phone: formData.phone || null,
                 experience: formData.experience || null,

@@ -95,7 +95,7 @@ function generateCsvContent(
     ]
 
     const rows = signups.map((entry) => [
-        entry.oldId !== null ? String(entry.oldId) : "",
+        entry.oldId !== 0 ? String(entry.oldId) : "",
         entry.firstName,
         entry.lastName,
         entry.preferredName || "",

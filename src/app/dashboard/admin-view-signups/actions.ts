@@ -20,7 +20,7 @@ import { headers } from "next/headers"
 export interface SignupEntry {
     signupId: number
     userId: string
-    oldId: number | null
+    oldId: number
     firstName: string
     lastName: string
     preferredName: string | null
