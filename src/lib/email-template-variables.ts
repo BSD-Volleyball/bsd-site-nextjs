@@ -42,6 +42,13 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         category: "General",
         description: "Gender split for the selected division (e.g. 50/50)"
     },
+    {
+        key: "court_focus",
+        label: "Court Focus",
+        category: "General",
+        description:
+            "Court focus text based on selected division level (e.g. court 1 and 2)"
+    },
 
     // People
     {
@@ -160,6 +167,13 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         label: "Draft 6 Date",
         category: "Dates",
         description: "Sixth draft date"
+    },
+    {
+        key: "division_draft_date",
+        label: "Division Draft Date",
+        category: "Dates",
+        description:
+            "Draft date for the selected division based on division level"
     },
     {
         key: "playoff_1_date",
