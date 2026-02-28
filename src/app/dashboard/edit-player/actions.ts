@@ -71,7 +71,7 @@ export interface UserDetails {
     avatarUrl: string | null
     createdAt: Date
     updatedAt: Date
-    old_id: number | null
+    old_id: number
     picture: string | null
     phone: string | null
     experience: string | null
@@ -266,7 +266,7 @@ export async function updateUser(
         image?: string | null
         avatar?: string | null
         avatarUrl?: string | null
-        old_id?: number | null
+        old_id?: number
         picture?: string | null
         phone?: string | null
         experience?: string | null

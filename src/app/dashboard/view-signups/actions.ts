@@ -14,7 +14,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
 export interface SignupCsvEntry {
-    oldId: number | null
+    oldId: number
     firstName: string
     lastName: string
     preferredName: string | null
