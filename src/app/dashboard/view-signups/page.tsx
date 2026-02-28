@@ -56,6 +56,7 @@ export default async function ViewSignupsPage() {
                     groups={result.groups}
                     allSeasons={result.allSeasons}
                     playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    seasonLabel={result.seasonLabel}
                 />
             )}
         </div>

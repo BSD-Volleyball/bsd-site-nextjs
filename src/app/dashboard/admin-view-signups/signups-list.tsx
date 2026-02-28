@@ -86,10 +86,10 @@ function generateCsvContent(
         "Skill: Other",
         "Dates Missing",
         "Play 1st Week",
-        "Last Draft Season",
-        "Last Draft Division",
-        "Last Draft Captain",
-        "Last Draft Overall"
+        "Last Season",
+        "Last Division",
+        "Last Captain",
+        "Last Overall"
     ]
 
     const rows = signups.map((entry) => [
@@ -101,7 +101,7 @@ function generateCsvContent(
         entry.phone || "",
         entry.pairPickName || "",
         entry.pairReason || "",
-        entry.male === true ? "M" : entry.male === false ? "F" : "",
+        entry.male === true ? "M" : entry.male === false ? "NM" : "",
         entry.age || "",
         entry.captain === "yes"
             ? "Yes"
