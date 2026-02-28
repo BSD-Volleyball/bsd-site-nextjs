@@ -287,6 +287,15 @@ export function SelectCaptainsForm({
                       .join(", ")
                 : ""
 
+        const courtFocusByDivisionLevel: Record<number, string> = {
+            1: "court 1",
+            2: "court 1 and 2",
+            3: "court 2 and 3",
+            4: "court 2 and 3",
+            5: "court 3 and 4",
+            6: "court 4"
+        }
+
         const values: Record<string, string> = {
             division_name: selectedDivision?.name ?? "",
             season_name: seasonConfig
@@ -294,12 +303,24 @@ export function SelectCaptainsForm({
                 : "",
             season_year: seasonConfig ? String(seasonConfig.seasonYear) : "",
             gender_split: selectedDivision?.gender_split ?? "",
+            court_focus: selectedDivision
+                ? (courtFocusByDivisionLevel[selectedDivision.level] ?? "")
+                : "",
             commissioner_name: commissionerName,
             captain_names: captainNames,
             other_commissioner: otherCommissioner
         }
 
         if (seasonConfig) {
+            const divisionDraftDateByLevel: Record<number, string> = {
+                1: seasonConfig.draft1Date,
+                2: seasonConfig.draft2Date,
+                3: seasonConfig.draft3Date,
+                4: seasonConfig.draft4Date,
+                5: seasonConfig.draft5Date,
+                6: seasonConfig.draft6Date
+            }
+
             values.tryout_1_date = seasonConfig.tryout1Date
             values.tryout_2_date = seasonConfig.tryout2Date
             values.tryout_3_date = seasonConfig.tryout3Date
@@ -330,6 +351,9 @@ export function SelectCaptainsForm({
             values.season_s1_time = seasonConfig.seasonSession1Time
             values.season_s2_time = seasonConfig.seasonSession2Time
             values.season_s3_time = seasonConfig.seasonSession3Time
+            values.division_draft_date = selectedDivision
+                ? (divisionDraftDateByLevel[selectedDivision.level] ?? "")
+                : ""
         }
 
         return values

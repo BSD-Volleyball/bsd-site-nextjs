@@ -37,6 +37,8 @@ import {
 } from "@/components/email-template/nodes/template-variable-node"
 import { getTemplateVariablesByCategory } from "@/lib/email-template-variables"
 
+const EDITOR_INSTANCE_KEY = `email-template-editor-${Math.random().toString(36).slice(2)}`
+
 interface LexicalEmailEditorProps {
     content: LexicalEmailTemplateContent
     onChange: (value: LexicalEmailTemplateContent) => void
@@ -220,6 +222,7 @@ export function LexicalEmailEditor({
     return (
         <div className="overflow-hidden rounded-md border bg-background">
             <LexicalComposer
+                key={EDITOR_INSTANCE_KEY}
                 initialConfig={{
                     namespace: "email-template-editor",
                     editorState: JSON.stringify(content),
