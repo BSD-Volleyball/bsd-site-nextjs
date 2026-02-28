@@ -9,7 +9,7 @@ import {
     seasons,
     divisions
 } from "@/database/schema"
-import { eq, inArray, desc } from "drizzle-orm"
+import { and, eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 
@@ -21,7 +21,6 @@ export interface SignupCsvEntry {
     pairPickName: string | null
     male: boolean | null
     age: string | null
-    captain: string | null
     experience: string | null
     assessment: string | null
     height: number | null
@@ -34,6 +33,8 @@ export interface SignupCsvEntry {
     lastDraftSeason: string | null
     lastDraftDivision: string | null
     lastDraftCaptain: string | null
+    captainIn: string | null
+    draftedIn: string | null
 }
 
 export interface SignupPlayer {
@@ -95,7 +96,6 @@ export async function getSignupsCsvData(): Promise<{
                 preferredName: users.preffered_name,
                 male: users.male,
                 age: signups.age,
-                captain: signups.captain,
                 pairPickId: signups.pair_pick,
                 experience: users.experience,
                 assessment: users.assessment,
@@ -180,6 +180,53 @@ export async function getSignupsCsvData(): Promise<{
             }
         }
 
+        // Fetch current-season draft assignments
+        const draftedInMap = new Map<string, string>()
+
+        if (userIds.length > 0) {
+            const draftedRows = await db
+                .select({
+                    userId: drafts.user,
+                    divisionName: divisions.name
+                })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        inArray(drafts.user, userIds)
+                    )
+                )
+
+            for (const draft of draftedRows) {
+                draftedInMap.set(draft.userId, draft.divisionName)
+            }
+        }
+
+        // Fetch current-season captain roles
+        const captainDivisionMap = new Map<string, string>()
+
+        if (userIds.length > 0) {
+            const captainTeams = await db
+                .select({
+                    captainId: teams.captain,
+                    divisionName: divisions.name
+                })
+                .from(teams)
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        inArray(teams.captain, userIds)
+                    )
+                )
+
+            for (const team of captainTeams) {
+                captainDivisionMap.set(team.captainId, team.divisionName)
+            }
+        }
+
         const entries: SignupCsvEntry[] = signupRows.map((row) => {
             const lastDraft = lastDraftInfo.get(row.userId)
             return {
@@ -192,7 +239,6 @@ export async function getSignupsCsvData(): Promise<{
                     : null,
                 male: row.male,
                 age: row.age,
-                captain: row.captain,
                 experience: row.experience,
                 assessment: row.assessment,
                 height: row.height,
@@ -204,7 +250,9 @@ export async function getSignupsCsvData(): Promise<{
                 datesMissing: row.datesMissing,
                 lastDraftSeason: lastDraft?.season ?? null,
                 lastDraftDivision: lastDraft?.division ?? null,
-                lastDraftCaptain: lastDraft?.captain ?? null
+                lastDraftCaptain: lastDraft?.captain ?? null,
+                captainIn: captainDivisionMap.get(row.userId) ?? null,
+                draftedIn: draftedInMap.get(row.userId) ?? null
             }
         })
 

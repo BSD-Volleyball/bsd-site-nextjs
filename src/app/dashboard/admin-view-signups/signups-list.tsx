@@ -74,6 +74,8 @@ function generateCsvContent(
         "Gender",
         "Age",
         "Captain",
+        "Captain In",
+        "Drafted In",
         "Paid",
         "Signup Date",
         "Experience",
@@ -110,6 +112,8 @@ function generateCsvContent(
               : entry.captain === "no"
                 ? "No"
                 : "",
+        entry.captainIn || "",
+        entry.draftedIn || "",
         entry.amountPaid || "",
         new Date(entry.signupDate).toLocaleDateString(),
         entry.experience || "",
