@@ -214,14 +214,61 @@ function getTextFromParagraph(paragraph: unknown): string {
     return parts.join("")
 }
 
+function escapeHtml(str: string): string {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+}
+
+function textNodeToHtml(node: LexicalTextNode): string {
+    let html = escapeHtml(node.text).replace(/\n/g, "<br>")
+    if (node.format & 1) html = `<strong>${html}</strong>`
+    if (node.format & 2) html = `<em>${html}</em>`
+    if (node.format & 8) html = `<u>${html}</u>`
+    if (node.format & 4) html = `<s>${html}</s>`
+    return html
+}
+
+function inlineNodeToHtml(node: LexicalInlineNode): string {
+    if (node.type === "template-variable") {
+        return escapeHtml(`[${node.variableKey}]`)
+    }
+    return textNodeToHtml(node)
+}
+
+function listItemToHtml(item: LexicalListItemNode): string {
+    return `<li>${item.children.map(inlineNodeToHtml).join("")}</li>`
+}
+
+export function convertEmailTemplateContentToHtml(
+    content: LexicalEmailTemplateContent
+): string {
+    return content.root.children
+        .map((child) => {
+            if (child.type === "list") {
+                const tag = child.listType === "number" ? "ol" : "ul"
+                return `<${tag}>${child.children.map(listItemToHtml).join("")}</${tag}>`
+            }
+            const inner = child.children.map(inlineNodeToHtml).join("")
+            return `<p>${inner || "<br>"}</p>`
+        })
+        .join("")
+}
+
 export function extractPlainTextFromEmailTemplateContent(
     value: unknown
 ): string {
     const normalized = normalizeEmailTemplateContent(value)
 
-    const lines = normalized.root.children.map((paragraph) =>
-        getTextFromParagraph(paragraph)
-    )
+    const lines = normalized.root.children.map((child) => {
+        if (child.type === "list") {
+            return child.children
+                .map(
+                    (item) =>
+                        `• ${item.children.map(getInlineNodeText).join("")}`
+                )
+                .join("\n")
+        }
+        return getTextFromParagraph(child)
+    })
 
     return lines.join("\n\n").trim()
 }

@@ -36,7 +36,8 @@ import { LexicalEmailPreview } from "@/components/email-template/lexical-email-p
 import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent,
-    extractPlainTextFromEmailTemplateContent
+    extractPlainTextFromEmailTemplateContent,
+    convertEmailTemplateContentToHtml
 } from "@/lib/email-template-content"
 import {
     resolveTemplateVariablesInContent,
@@ -216,6 +217,7 @@ export function SelectCaptainsForm({
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
     const [copyEmailSuccess, setCopyEmailSuccess] = useState(false)
+    const [copyRichTextSuccess, setCopyRichTextSuccess] = useState(false)
     const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
 
     const baseEmailTemplateContent =
@@ -392,6 +394,7 @@ export function SelectCaptainsForm({
         setShowEmailModal(true)
         setCopySuccess(false)
         setCopyEmailSuccess(false)
+        setCopyRichTextSuccess(false)
         setCopySubjectSuccess(false)
     }
 
@@ -431,6 +434,29 @@ export function SelectCaptainsForm({
             setTimeout(() => setCopyEmailSuccess(false), 2000)
         } catch (copyError) {
             console.error("Failed to copy email template:", copyError)
+        }
+    }
+
+    const handleCopyRichText = async () => {
+        try {
+            const html = convertEmailTemplateContentToHtml(
+                resolvedEmailTemplateContent
+            )
+            const plainText = extractPlainTextFromEmailTemplateContent(
+                resolvedEmailTemplateContent
+            )
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    "text/html": new Blob([html], { type: "text/html" }),
+                    "text/plain": new Blob([plainText], {
+                        type: "text/plain"
+                    })
+                })
+            ])
+            setCopyRichTextSuccess(true)
+            setTimeout(() => setCopyRichTextSuccess(false), 2000)
+        } catch (copyError) {
+            console.error("Failed to copy rich text:", copyError)
         }
     }
 
@@ -719,15 +745,26 @@ export function SelectCaptainsForm({
                                         content={resolvedEmailTemplateContent}
                                     />
                                 </div>
-                                <Button
-                                    size="sm"
-                                    onClick={handleCopyEmailTemplate}
-                                    variant="outline"
-                                >
-                                    {copyEmailSuccess
-                                        ? "Copied!"
-                                        : "Copy Email Template"}
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={handleCopyEmailTemplate}
+                                        variant="outline"
+                                    >
+                                        {copyEmailSuccess
+                                            ? "Copied!"
+                                            : "Copy Plain Text"}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleCopyRichText}
+                                        variant="outline"
+                                    >
+                                        {copyRichTextSuccess
+                                            ? "Copied!"
+                                            : "Copy Rich Text"}
+                                    </Button>
+                                </div>
                             </Card>
                         )}
                     </div>
