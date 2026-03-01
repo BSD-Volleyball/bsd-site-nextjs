@@ -12,11 +12,11 @@ import {
 } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 
-const liveblocks = new Liveblocks({
-    secret: process.env.LIVEBLOCKS_SECRET_KEY!
-})
-
 export async function POST() {
+    const liveblocks = new Liveblocks({
+        secret: process.env.LIVEBLOCKS_SECRET_KEY!
+    })
+
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session?.user) {
