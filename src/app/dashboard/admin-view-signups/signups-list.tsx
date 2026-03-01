@@ -20,7 +20,11 @@ import {
     AdminPlayerDetailPopup,
     formatHeight
 } from "@/components/player-detail"
-import { deleteSignupEntry, logAdminCsvDownload, type SignupEntry } from "./actions"
+import {
+    deleteSignupEntry,
+    logAdminCsvDownload,
+    type SignupEntry
+} from "./actions"
 
 interface SignupsListProps {
     signups: SignupEntry[]
@@ -86,6 +90,8 @@ function generateCsvContent(
         "Skill: Setter",
         "Skill: Hitter",
         "Skill: Other",
+        "Seasons List",
+        "Notification List",
         "Dates Missing",
         "Play 1st Week",
         "Last Season",
@@ -124,6 +130,8 @@ function generateCsvContent(
         entry.skillSetter ? "Yes" : "No",
         entry.skillHitter ? "Yes" : "No",
         entry.skillOther ? "Yes" : "No",
+        entry.seasonsList,
+        entry.notificationList,
         entry.datesMissing || "",
         entry.playFirstWeek ? "Yes" : "No",
         entry.lastDraftSeason || "",

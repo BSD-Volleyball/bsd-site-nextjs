@@ -23,6 +23,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { compressImageForUpload } from "@/lib/image-compression"
+import { googleMembershipOptions } from "@/lib/google-membership"
 
 interface EditPlayerFormProps {
     users: { id: string; name: string }[]
@@ -56,9 +57,21 @@ interface FormData {
     role: string
     male: boolean
     onboarding_completed: boolean
+    seasons_list: string
+    notification_list: string
     captain_eligible: boolean
     createdAt: string
     updatedAt: string
+}
+
+function normalizeMembershipValue(value: string | null | undefined): string {
+    if (!value || value === "false") {
+        return ""
+    }
+
+    return googleMembershipOptions.some((option) => option.value === value)
+        ? value
+        : ""
 }
 
 const readOnlyFields = new Set([
@@ -141,6 +154,8 @@ function userToFormData(user: UserDetails): FormData {
         role: user.role ?? "",
         male: user.male ?? false,
         onboarding_completed: user.onboarding_completed ?? false,
+        seasons_list: normalizeMembershipValue(user.seasons_list),
+        notification_list: normalizeMembershipValue(user.notification_list),
         captain_eligible: user.captain_eligible ?? true,
         createdAt: user.createdAt
             ? new Date(user.createdAt).toLocaleString()
@@ -266,6 +281,8 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 pronouns: formData.pronouns || null,
                 male: formData.male,
                 onboarding_completed: formData.onboarding_completed,
+                seasons_list: formData.seasons_list || "false",
+                notification_list: formData.notification_list || "false",
                 captain_eligible: formData.captain_eligible
             })
 
@@ -460,6 +477,11 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         { key: "captain_eligible", label: "Captain Eligible" }
     ]
 
+    const membershipFields: { key: keyof FormData; label: string }[] = [
+        { key: "seasons_list", label: "Seasons List" },
+        { key: "notification_list", label: "Notification List" }
+    ]
+
     return (
         <div className="space-y-6">
             <div className="max-w-md">
@@ -604,6 +626,44 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                         )
                                     }
                                 />
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {membershipFields.map((field) => (
+                            <div key={field.key}>
+                                <Label
+                                    htmlFor={field.key}
+                                    className="mb-1 block"
+                                >
+                                    {field.label}
+                                </Label>
+                                <Select
+                                    value={
+                                        (formData[field.key] as string) || ""
+                                    }
+                                    onValueChange={(value) =>
+                                        handleTextChange(field.key, value)
+                                    }
+                                >
+                                    <SelectTrigger id={field.key}>
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {googleMembershipOptions.map(
+                                            (option) => (
+                                                <SelectItem
+                                                    key={`${field.key}-${option.value}`}
+                                                    value={option.value}
+                                                >
+                                                    {option.value} -{" "}
+                                                    {option.label}
+                                                </SelectItem>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         ))}
                     </div>

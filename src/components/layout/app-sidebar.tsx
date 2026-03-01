@@ -103,6 +103,11 @@ const adminNavItems = [
         icon: RiGroupLine
     },
     {
+        title: "Google Membership",
+        url: "/dashboard/google-membership",
+        icon: RiMailLine
+    },
+    {
         title: "Review Pairs",
         url: "/dashboard/review-pairs",
         icon: RiLinksLine

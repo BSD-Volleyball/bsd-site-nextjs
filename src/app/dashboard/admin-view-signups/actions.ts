@@ -51,6 +51,8 @@ export interface SignupEntry {
     discountCodeName: string | null
     captainIn: string | null
     draftedIn: string | null
+    seasonsList: string
+    notificationList: string
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -115,6 +117,8 @@ export async function getSeasonSignups(): Promise<{
                 skillSetter: users.skill_setter,
                 skillHitter: users.skill_hitter,
                 skillOther: users.skill_other,
+                seasonsList: users.seasons_list,
+                notificationList: users.notification_list,
                 datesMissing: signups.dates_missing,
                 playFirstWeek: signups.play_1st_week
             })
@@ -330,7 +334,9 @@ export async function getSeasonSignups(): Promise<{
                 lastDraftOverall: lastDraft?.overall ?? null,
                 discountCodeName: usedDiscountByUserId.get(row.userId) ?? null,
                 captainIn: captainDivisionMap.get(row.userId) ?? null,
-                draftedIn: draftedInMap.get(row.userId) ?? null
+                draftedIn: draftedInMap.get(row.userId) ?? null,
+                seasonsList: row.seasonsList,
+                notificationList: row.notificationList
             }
         })
 

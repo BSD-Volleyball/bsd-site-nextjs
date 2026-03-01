@@ -12,6 +12,7 @@ import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
 import { PlayerRatingsSection } from "./player-ratings-section"
+import { getGoogleMembershipLabel } from "@/lib/google-membership"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -194,6 +195,26 @@ export function AdminPlayerDetailPopup({
                                         {playerDetails.captain_eligible
                                             ? "Yes"
                                             : "No"}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Seasons List:
+                                    </span>
+                                    <span className="ml-2 font-medium">
+                                        {getGoogleMembershipLabel(
+                                            playerDetails.seasons_list
+                                        )}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Notification List:
+                                    </span>
+                                    <span className="ml-2 font-medium">
+                                        {getGoogleMembershipLabel(
+                                            playerDetails.notification_list
+                                        )}
                                     </span>
                                 </div>
                             </div>
