@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +10,12 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import { useStorage, useMutation, useSelf, useEventListener } from "@/lib/liveblocks.config"
+import {
+    useStorage,
+    useMutation,
+    useSelf,
+    useEventListener
+} from "@/lib/liveblocks.config"
 import { PresenceBar } from "./presence-bar"
 import { toast } from "sonner"
 import type { TeamOption, UserOption, DivisionSplitConfig } from "./actions"
@@ -175,15 +180,21 @@ export function DraftBoard({
     captainTeamIds,
     onPicksChange
 }: DraftBoardProps) {
-    const [enlargedPlayer, setEnlargedPlayer] = useState<UserOption | null>(null)
+    const [enlargedPlayer, setEnlargedPlayer] = useState<UserOption | null>(
+        null
+    )
 
     // Shared Liveblocks state
     const picks = useStorage((root) => root.picks)
 
     const updatePick = useMutation(
         ({ storage }, round: number, teamId: number, userId: string | null) => {
-            const p = storage.get("picks")
-            p.set(`${round}-${teamId}`, userId)
+            const current =
+                (storage.get("picks") as Record<string, string | null>) ?? {}
+            storage.set("picks", {
+                ...current,
+                [`${round}-${teamId}`]: userId
+            })
         },
         []
     )
@@ -198,13 +209,9 @@ export function DraftBoard({
     })
 
     // Notify parent of pick changes for submit
-    useMemo(() => {
+    useEffect(() => {
         if (picks) {
-            const plainPicks: Record<string, string | null> = {}
-            for (const [k, v] of picks) {
-                plainPicks[k] = v
-            }
-            onPicksChange(plainPicks)
+            onPicksChange(picks as Record<string, string | null>)
         }
     }, [picks, onPicksChange])
 
@@ -243,19 +250,11 @@ export function DraftBoard({
         [users]
     )
 
-    // Convert LiveMap to plain object for derived state
-    const picksObj = useMemo((): Record<string, string | null> => {
-        if (!picks) return {}
-        const obj: Record<string, string | null> = {}
-        for (const [k, v] of picks) {
-            obj[k] = v
-        }
-        return obj
-    }, [picks])
+    // Readonly plain object from Liveblocks storage — use directly for derived state
+    const picksObj = (picks ?? {}) as Record<string, string | null>
 
     const selectedUserIds = useMemo(
-        () =>
-            Object.values(picksObj).filter((id): id is string => id !== null),
+        () => Object.values(picksObj).filter((id): id is string => id !== null),
         [picksObj]
     )
 
@@ -309,7 +308,10 @@ export function DraftBoard({
         return grouped
     }, [picksObj, teams, usersMap])
 
-    const getCellViolation = (teamId: number, userId: string | null): boolean => {
+    const getCellViolation = (
+        teamId: number,
+        userId: string | null
+    ): boolean => {
         if (!userId) return false
         const user = usersMap.get(userId)
         if (!user) return false
@@ -325,7 +327,8 @@ export function DraftBoard({
         const user = usersMap.get(userId)
         if (!user) return ""
         if (duplicateUserIds.has(userId)) return "bg-red-200 dark:bg-red-900"
-        if (getCellViolation(teamId, userId)) return "bg-red-200 dark:bg-red-900"
+        if (getCellViolation(teamId, userId))
+            return "bg-red-200 dark:bg-red-900"
         if (user.male === true) return "bg-blue-100 dark:bg-blue-900/50"
         return "bg-pink-100 dark:bg-pink-900/50"
     }
@@ -373,7 +376,7 @@ export function DraftBoard({
             {/* Turn indicator */}
             <div
                 className={cn(
-                    "mb-4 rounded-lg border px-4 py-3 text-sm font-medium",
+                    "mb-4 rounded-lg border px-4 py-3 font-medium text-sm",
                     currentTurn
                         ? "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
                         : "border-green-200 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100"
@@ -385,11 +388,12 @@ export function DraftBoard({
                             {currentTurn.team.name}
                         </span>{" "}
                         is up to pick — Round {currentTurn.round}
-                        {self?.info && captainTeamIds.includes(currentTurn.team.id) && (
-                            <span className="ml-2 rounded-full bg-blue-200 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                                Your pick!
-                            </span>
-                        )}
+                        {self?.info &&
+                            captainTeamIds.includes(currentTurn.team.id) && (
+                                <span className="ml-2 rounded-full bg-blue-200 px-2 py-0.5 text-blue-800 text-xs dark:bg-blue-800 dark:text-blue-100">
+                                    Your pick!
+                                </span>
+                            )}
                     </>
                 ) : (
                     "All picks complete — ready to submit"
@@ -460,7 +464,7 @@ export function DraftBoard({
                                                         }
                                                     />
                                                 ) : (
-                                                    <div className="h-8 px-2 flex items-center text-xs truncate">
+                                                    <div className="flex h-8 items-center truncate px-2 text-xs">
                                                         {userId
                                                             ? (() => {
                                                                   const u =

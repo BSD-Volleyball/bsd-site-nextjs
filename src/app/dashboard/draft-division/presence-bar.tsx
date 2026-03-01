@@ -8,7 +8,8 @@ export function PresenceBar() {
     const self = useSelf()
     const room = useRoom()
     const status = room.getStatus()
-    const isReconnecting = status === "reconnecting" || status === "disconnected"
+    const isReconnecting =
+        status === "reconnecting" || status === "disconnected"
 
     return (
         <div className="mb-4 space-y-2">
