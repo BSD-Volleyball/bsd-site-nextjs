@@ -672,17 +672,31 @@ function buildTeamsForDivision(
     const assignedCaptainIds = new Set<string>()
     for (let i = 0; i < captains.length && i < teamCount; i++) {
         const captain = captains[i]
-        teams[i].players.push(captain)
-        teams[i].scoreSum += captain.placementScore
-        if (captain.male === true) {
-            teams[i].maleCount += 1
-        } else {
-            teams[i].nonMaleCount += 1
+        const captainMutualPair = captain.pairUserId
+            ? (divisionPlayers.find(
+                  (p) =>
+                      p.userId === captain.pairUserId &&
+                      p.pairUserId === captain.userId &&
+                      !assignedCaptainIds.has(p.userId)
+              ) ?? null)
+            : null
+        const toPlace = captainMutualPair
+            ? [captain, captainMutualPair]
+            : [captain]
+
+        for (const player of toPlace) {
+            teams[i].players.push(player)
+            teams[i].scoreSum += player.placementScore
+            if (player.male === true) {
+                teams[i].maleCount += 1
+            } else {
+                teams[i].nonMaleCount += 1
+            }
+            if (player.isNew) {
+                teams[i].newCount += 1
+            }
+            assignedCaptainIds.add(player.userId)
         }
-        if (captain.isNew) {
-            teams[i].newCount += 1
-        }
-        assignedCaptainIds.add(captain.userId)
     }
 
     const remaining = divisionPlayers.filter(
@@ -1247,6 +1261,19 @@ export function CreateWeek2Form({
         setMessage(null)
     }
 
+    const captainPairIds = useMemo(() => {
+        const captainIds = new Set(
+            candidates.filter((c) => c.isCaptain).map((c) => c.userId)
+        )
+        const result = new Set<string>()
+        for (const candidate of candidates) {
+            if (candidate.pairUserId && captainIds.has(candidate.pairUserId)) {
+                result.add(candidate.userId)
+            }
+        }
+        return result
+    }, [candidates])
+
     const findClosestEligibleReplacement = (
         players: Week2Candidate[],
         targetPlayer: Week2Candidate,
@@ -1308,8 +1335,13 @@ export function CreateWeek2Form({
             return
         }
 
-        if (selectedPlayer.isCaptain) {
-            setError("Captains cannot be moved between divisions.")
+        if (
+            selectedPlayer.isCaptain ||
+            captainPairIds.has(selectedPlayer.userId)
+        ) {
+            setError(
+                "Captains and their paired partners cannot be moved between divisions."
+            )
             return
         }
 
@@ -1564,6 +1596,15 @@ export function CreateWeek2Form({
                                                             CAPTAIN (locked)
                                                         </span>
                                                     )}
+                                                    {!player.isCaptain &&
+                                                        captainPairIds.has(
+                                                            player.userId
+                                                        ) && (
+                                                            <span className="ml-2 font-semibold text-primary">
+                                                                (locked with
+                                                                captain)
+                                                            </span>
+                                                        )}
                                                 </div>
                                                 <div className="ml-2 flex items-center gap-1">
                                                     <span className="text-muted-foreground">
@@ -1603,7 +1644,10 @@ export function CreateWeek2Form({
                                                         }
                                                         disabled={
                                                             index === 0 ||
-                                                            player.isCaptain
+                                                            player.isCaptain ||
+                                                            captainPairIds.has(
+                                                                player.userId
+                                                            )
                                                         }
                                                     >
                                                         ↑
@@ -1624,7 +1668,10 @@ export function CreateWeek2Form({
                                                             index ===
                                                                 divisions.length -
                                                                     1 ||
-                                                            player.isCaptain
+                                                            player.isCaptain ||
+                                                            captainPairIds.has(
+                                                                player.userId
+                                                            )
                                                         }
                                                     >
                                                         ↓
