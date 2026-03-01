@@ -30,7 +30,6 @@ import {
 } from "./actions"
 import { DraftRoomProvider } from "./draft-room-provider"
 import { DraftBoard } from "./draft-board"
-import { useBroadcastEvent } from "@/lib/liveblocks.config"
 
 interface DraftDivisionFormProps {
     currentSeasonId: number
@@ -75,13 +74,7 @@ export function DraftDivisionForm({
     )
 
     const divisionSplitsMap = useMemo(
-        () =>
-            new Map(
-                divisionSplits.map((d) => [
-                    d.divisionId,
-                    d.genderSplit
-                ])
-            ),
+        () => new Map(divisionSplits.map((d) => [d.divisionId, d.genderSplit])),
         [divisionSplits]
     )
 

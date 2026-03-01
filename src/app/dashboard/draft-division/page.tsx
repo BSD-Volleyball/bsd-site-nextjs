@@ -3,8 +3,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDivisionForm } from "./draft-division-form"
-import { getDraftDivisionData } from "./actions"
-import { isCommissionerBySession } from "@/lib/rbac"
+import { getDraftDivisionData, hasDraftPageAccess } from "./actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -20,9 +19,9 @@ export default async function DraftDivisionPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await isCommissionerBySession()
+    const access = await hasDraftPageAccess()
 
-    if (!hasAccess) {
+    if (!access.hasAccess) {
         redirect("/dashboard")
     }
 
@@ -46,7 +45,11 @@ export default async function DraftDivisionPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Draft Division"
-                description="Conduct the draft for a division by selecting players for each team."
+                description={
+                    access.role === "commissioner"
+                        ? "Conduct the draft for a division by selecting players for each team."
+                        : "View and make picks for your team in the live draft."
+                }
             />
             <DraftDivisionForm
                 currentSeasonId={result.currentSeasonId}
@@ -54,6 +57,9 @@ export default async function DraftDivisionPage() {
                 divisions={result.divisions}
                 users={result.users}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                role={access.role!}
+                captainTeamIds={access.captainTeamIds}
+                defaultDivisionId={access.captainDivisionId ?? undefined}
             />
         </div>
     )

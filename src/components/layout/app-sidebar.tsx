@@ -240,6 +240,11 @@ const captainPagesNavItems = [
         title: "Rate Player",
         url: "/dashboard/rate-player",
         icon: RiStarLine
+    },
+    {
+        title: "Live Draft",
+        url: "/dashboard/draft-division",
+        icon: RiFileList3Line
     }
 ]
 

@@ -13,7 +13,12 @@ import {
 import { eq, and } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
-import { isCommissionerBySession } from "@/lib/rbac"
+import {
+    isAdminOrDirector,
+    isCommissionerBySession,
+    isCommissionerForCurrentSeason,
+    isCaptainForSeason
+} from "@/lib/rbac"
 
 export interface DivisionSplitConfig {
     divisionId: number
@@ -46,6 +51,98 @@ async function checkCommissionersAccess(): Promise<boolean> {
     return isCommissionerBySession()
 }
 
+async function checkDraftReadAccess(): Promise<boolean> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return false
+
+    const userId = session.user.id
+    const isAdmin = await isAdminOrDirector(userId)
+    if (isAdmin) return true
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+
+    const [isCommissioner, isCaptain] = await Promise.all([
+        isCommissionerForCurrentSeason(userId),
+        isCaptainForSeason(userId, config.seasonId)
+    ])
+
+    return isCommissioner || isCaptain
+}
+
+export async function hasDraftPageAccess(): Promise<{
+    hasAccess: boolean
+    role: "commissioner" | "captain" | null
+    captainTeamIds: number[]
+    captainDivisionId: number | null
+}> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return {
+            hasAccess: false,
+            role: null,
+            captainTeamIds: [],
+            captainDivisionId: null
+        }
+    }
+
+    const userId = session.user.id
+    const config = await getSeasonConfig()
+    if (!config.seasonId) {
+        return {
+            hasAccess: false,
+            role: null,
+            captainTeamIds: [],
+            captainDivisionId: null
+        }
+    }
+
+    const seasonId = config.seasonId
+
+    const isAdmin = await isAdminOrDirector(userId)
+    if (isAdmin) {
+        return {
+            hasAccess: true,
+            role: "commissioner",
+            captainTeamIds: [],
+            captainDivisionId: null
+        }
+    }
+
+    const [isCommissioner, captainTeams] = await Promise.all([
+        isCommissionerForCurrentSeason(userId),
+        db
+            .select({ id: teams.id, division: teams.division })
+            .from(teams)
+            .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
+    ])
+
+    if (isCommissioner) {
+        return {
+            hasAccess: true,
+            role: "commissioner",
+            captainTeamIds: [],
+            captainDivisionId: null
+        }
+    }
+
+    if (captainTeams.length > 0) {
+        return {
+            hasAccess: true,
+            role: "captain",
+            captainTeamIds: captainTeams.map((t) => t.id),
+            captainDivisionId: captainTeams[0].division
+        }
+    }
+
+    return {
+        hasAccess: false,
+        role: null,
+        captainTeamIds: [],
+        captainDivisionId: null
+    }
+}
+
 export async function getDraftDivisionData(): Promise<{
     status: boolean
     message?: string
@@ -54,7 +151,7 @@ export async function getDraftDivisionData(): Promise<{
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
-    const hasAccess = await checkCommissionersAccess()
+    const hasAccess = await checkDraftReadAccess()
     if (!hasAccess) {
         return {
             status: false,
@@ -143,7 +240,7 @@ export async function getTeamsForSeasonAndDivision(
     message?: string
     teams: TeamOption[]
 }> {
-    const hasAccess = await checkCommissionersAccess()
+    const hasAccess = await checkDraftReadAccess()
     if (!hasAccess) {
         return {
             status: false,
