@@ -12,6 +12,9 @@ import {
 import { and, eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import { logAuditEntry } from "@/lib/audit-log"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
 
 export interface SignupCsvEntry {
     oldId: number
@@ -255,6 +258,16 @@ export async function getSignupsCsvData(): Promise<{
                 draftedIn: draftedInMap.get(row.userId) ?? null
             }
         })
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session?.user) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "read",
+                entityType: "signups",
+                summary: `Downloaded signups CSV for season ${config.seasonId}`
+            })
+        }
 
         return { status: true, entries, seasonLabel }
     } catch (error) {

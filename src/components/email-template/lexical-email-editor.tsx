@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin"
 import { ContentEditable } from "@lexical/react/LexicalContentEditable"
@@ -7,12 +8,15 @@ import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin"
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin"
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
 import { ListPlugin } from "@lexical/react/LexicalListPlugin"
+import { TabIndentationPlugin } from "@lexical/react/LexicalTabIndentationPlugin"
 import {
     ListItemNode,
     ListNode,
     INSERT_ORDERED_LIST_COMMAND,
-    INSERT_UNORDERED_LIST_COMMAND
+    INSERT_UNORDERED_LIST_COMMAND,
+    REMOVE_LIST_COMMAND
 } from "@lexical/list"
+import { $getNearestNodeOfType } from "@lexical/utils"
 import { $patchStyleText } from "@lexical/selection"
 import {
     $getSelection,
@@ -44,8 +48,49 @@ interface LexicalEmailEditorProps {
     onChange: (value: LexicalEmailTemplateContent) => void
 }
 
+interface ToolbarState {
+    isBold: boolean
+    isItalic: boolean
+    isUnderline: boolean
+    blockType: "paragraph" | "ul" | "ol"
+}
+
 function Toolbar() {
     const [editor] = useLexicalComposerContext()
+    const [state, setState] = useState<ToolbarState>({
+        isBold: false,
+        isItalic: false,
+        isUnderline: false,
+        blockType: "paragraph"
+    })
+
+    useEffect(() => {
+        return editor.registerUpdateListener(({ editorState }) => {
+            editorState.read(() => {
+                const selection = $getSelection()
+                if (!$isRangeSelection(selection)) return
+
+                let blockType: ToolbarState["blockType"] = "paragraph"
+                const anchorNode = selection.anchor.getNode()
+                const parent =
+                    anchorNode.getKey() === "root"
+                        ? anchorNode
+                        : anchorNode.getTopLevelElementOrThrow()
+                const listNode = $getNearestNodeOfType(parent, ListNode)
+                if (listNode) {
+                    blockType =
+                        listNode.getListType() === "number" ? "ol" : "ul"
+                }
+
+                setState({
+                    isBold: selection.hasFormat("bold"),
+                    isItalic: selection.hasFormat("italic"),
+                    isUnderline: selection.hasFormat("underline"),
+                    blockType
+                })
+            })
+        })
+    }, [editor])
 
     const applyFontSize = (fontSize: string) => {
         editor.update(() => {
@@ -67,6 +112,22 @@ function Toolbar() {
             }
         })
         editor.focus()
+    }
+
+    const toggleBulletList = () => {
+        if (state.blockType === "ul") {
+            editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined)
+        } else {
+            editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)
+        }
+    }
+
+    const toggleNumberedList = () => {
+        if (state.blockType === "ol") {
+            editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined)
+        } else {
+            editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)
+        }
     }
 
     const variablesByCategory = getTemplateVariablesByCategory()
@@ -108,7 +169,7 @@ function Toolbar() {
             <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant={state.isBold ? "default" : "outline"}
                 onClick={() =>
                     editor.dispatchCommand(FORMAT_TEXT_COMMAND, "bold")
                 }
@@ -118,7 +179,7 @@ function Toolbar() {
             <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant={state.isItalic ? "default" : "outline"}
                 onClick={() =>
                     editor.dispatchCommand(FORMAT_TEXT_COMMAND, "italic")
                 }
@@ -128,7 +189,7 @@ function Toolbar() {
             <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant={state.isUnderline ? "default" : "outline"}
                 onClick={() =>
                     editor.dispatchCommand(FORMAT_TEXT_COMMAND, "underline")
                 }
@@ -153,13 +214,8 @@ function Toolbar() {
                     <Button
                         type="button"
                         size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            editor.dispatchCommand(
-                                INSERT_UNORDERED_LIST_COMMAND,
-                                undefined
-                            )
-                        }
+                        variant={state.blockType === "ul" ? "default" : "outline"}
+                        onClick={toggleBulletList}
                         aria-label="Bullet List"
                     >
                         <List className="h-4 w-4" />
@@ -172,13 +228,8 @@ function Toolbar() {
                     <Button
                         type="button"
                         size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            editor.dispatchCommand(
-                                INSERT_ORDERED_LIST_COMMAND,
-                                undefined
-                            )
-                        }
+                        variant={state.blockType === "ol" ? "default" : "outline"}
+                        onClick={toggleNumberedList}
                         aria-label="Numbered List"
                     >
                         <ListOrdered className="h-4 w-4" />
@@ -233,19 +284,22 @@ export function LexicalEmailEditor({
                 }}
             >
                 <Toolbar />
-                <RichTextPlugin
-                    contentEditable={
-                        <ContentEditable className="min-h-80 whitespace-pre-wrap p-3 text-sm outline-none [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6" />
-                    }
-                    placeholder={
-                        <div className="pointer-events-none absolute p-3 text-muted-foreground text-sm">
-                            Email content
-                        </div>
-                    }
-                    ErrorBoundary={LexicalErrorBoundary}
-                />
+                <div className="relative">
+                    <RichTextPlugin
+                        contentEditable={
+                            <ContentEditable className="min-h-80 whitespace-pre-wrap p-3 text-sm outline-none [&_li]:my-1 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6" />
+                        }
+                        placeholder={
+                            <div className="pointer-events-none absolute top-0 p-3 text-muted-foreground text-sm">
+                                Email content
+                            </div>
+                        }
+                        ErrorBoundary={LexicalErrorBoundary}
+                    />
+                </div>
                 <HistoryPlugin />
                 <ListPlugin />
+                <TabIndentationPlugin />
                 <OnChangePlugin
                     onChange={(editorState) => {
                         onChange(

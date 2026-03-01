@@ -450,3 +450,17 @@ export async function deleteSignupEntry(signupId: number): Promise<{
         }
     }
 }
+
+export async function logAdminCsvDownload(): Promise<void> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return
+
+    const config = await getSeasonConfig()
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "read",
+        entityType: "signups",
+        summary: `Downloaded admin signups CSV for season ${config.seasonId ?? "unknown"}`
+    })
+}
