@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import {
     Card,
     CardContent,
@@ -10,7 +10,6 @@ import {
     CardDescription
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     Select,
@@ -19,17 +18,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover"
-import {
-    RiArrowDownSLine,
-    RiCloseLine,
-    RiFullscreenLine,
-    RiFullscreenExitLine
-} from "@remixicon/react"
+import { RiFullscreenLine, RiFullscreenExitLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
     getTeamsForSeasonAndDivision,
@@ -39,6 +28,9 @@ import {
     type UserOption,
     type DivisionSplitConfig
 } from "./actions"
+import { DraftRoomProvider } from "./draft-room-provider"
+import { DraftBoard } from "./draft-board"
+import { useBroadcastEvent } from "@/lib/liveblocks.config"
 
 interface DraftDivisionFormProps {
     currentSeasonId: number
@@ -46,170 +38,36 @@ interface DraftDivisionFormProps {
     divisions: DivisionOption[]
     users: UserOption[]
     playerPicUrl: string
+    role: "commissioner" | "captain"
+    captainTeamIds: number[]
+    defaultDivisionId?: number
 }
 
 const ROUNDS = 8
-
-type GenderSplit = "5-3" | "6-2" | "4-4"
-
-function UserCombobox({
-    users,
-    value,
-    onChange,
-    placeholder = "Select a player...",
-    excludeIds = []
-}: {
-    users: UserOption[]
-    value: string | null
-    onChange: (userId: string | null) => void
-    placeholder?: string
-    excludeIds?: string[]
-}) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState("")
-
-    const selectedUser = useMemo(
-        () => users.find((u) => u.id === value),
-        [users, value]
-    )
-
-    const filteredUsers = useMemo(() => {
-        const filtered = users.filter(
-            (u) => !excludeIds.includes(u.id) || u.id === value
-        )
-        if (!search) return filtered
-        const lowerSearch = search.toLowerCase()
-        return filtered.filter((u) => {
-            const fullName = `${u.first_name} ${u.last_name}`.toLowerCase()
-            const preferredName = u.preffered_name?.toLowerCase() || ""
-            const oldIdStr = u.old_id?.toString() || ""
-            return (
-                fullName.includes(lowerSearch) ||
-                preferredName.includes(lowerSearch) ||
-                oldIdStr.includes(lowerSearch)
-            )
-        })
-    }, [users, search, excludeIds, value])
-
-    const getDisplayName = (user: UserOption) => {
-        const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        const preferredPart = user.preffered_name
-            ? ` (${user.preffered_name})`
-            : ""
-        return `${oldIdPart}${user.first_name}${preferredPart} ${user.last_name}`
-    }
-
-    const handleSelect = (userId: string) => {
-        onChange(userId)
-        setOpen(false)
-        setSearch("")
-    }
-
-    const handleClear = () => {
-        onChange(null)
-        setSearch("")
-    }
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="h-8 w-full justify-between border-0 bg-transparent font-normal text-xs shadow-none hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                    <span
-                        className={cn(
-                            "truncate",
-                            !selectedUser && "text-muted-foreground"
-                        )}
-                    >
-                        {selectedUser
-                            ? getDisplayName(selectedUser)
-                            : placeholder}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                        {selectedUser && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleClear()
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className="h-3 w-3 text-muted-foreground" />
-                            </span>
-                        )}
-                        <RiArrowDownSLine className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-                <Input
-                    placeholder="Search players..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    autoCorrect="off"
-                    className="mb-2 h-8 text-sm"
-                />
-                <div className="max-h-60 overflow-y-auto">
-                    {filteredUsers.length === 0 ? (
-                        <p className="py-2 text-center text-muted-foreground text-sm">
-                            No players found
-                        </p>
-                    ) : (
-                        filteredUsers.map((user) => (
-                            <button
-                                key={user.id}
-                                type="button"
-                                className={cn(
-                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                    value === user.id && "bg-accent"
-                                )}
-                                onClick={() => handleSelect(user.id)}
-                            >
-                                {getDisplayName(user)}
-                            </button>
-                        ))
-                    )}
-                </div>
-            </PopoverContent>
-        </Popover>
-    )
-}
 
 export function DraftDivisionForm({
     currentSeasonId,
     divisionSplits,
     divisions,
     users,
-    playerPicUrl
+    playerPicUrl,
+    role,
+    captainTeamIds,
+    defaultDivisionId
 }: DraftDivisionFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingTeams, setIsLoadingTeams] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
     const [isExpanded, setIsExpanded] = useState(false)
-    const [enlargedPlayer, setEnlargedPlayer] = useState<UserOption | null>(
-        null
-    )
 
-    const [divisionId, setDivisionId] = useState<string>("")
+    const [divisionId, setDivisionId] = useState<string>(
+        defaultDivisionId ? defaultDivisionId.toString() : ""
+    )
     const [teamsList, setTeamsList] = useState<TeamOption[]>([])
 
-    // Draft picks: keyed by "round-teamId"
-    const [draftPicks, setDraftPicks] = useState<Record<string, string | null>>(
-        {}
-    )
+    // Picks snapshot maintained by DraftBoard via onPicksChange callback
+    const picksRef = useRef<Record<string, string | null>>({})
 
     const selectedDivision = useMemo(
         () => divisions.find((d) => d.id.toString() === divisionId),
@@ -221,148 +79,29 @@ export function DraftDivisionForm({
             new Map(
                 divisionSplits.map((d) => [
                     d.divisionId,
-                    d.genderSplit as GenderSplit
+                    d.genderSplit
                 ])
             ),
         [divisionSplits]
     )
 
-    const genderSplit: GenderSplit | null = divisionId
+    const genderSplit = divisionId
         ? (divisionSplitsMap.get(parseInt(divisionId)) ?? null)
         : null
 
-    // Get all selected user IDs to exclude from other pickers
-    const selectedUserIds = useMemo(
-        () =>
-            Object.values(draftPicks).filter((id): id is string => id !== null),
-        [draftPicks]
+    const handlePicksChange = useCallback(
+        (picks: Record<string, string | null>) => {
+            picksRef.current = picks
+        },
+        []
     )
-
-    // Track duplicate user IDs (users selected more than once)
-    const duplicateUserIds = useMemo(() => {
-        const counts: Record<string, number> = {}
-        for (const userId of Object.values(draftPicks)) {
-            if (userId) {
-                counts[userId] = (counts[userId] || 0) + 1
-            }
-        }
-        return new Set(
-            Object.entries(counts)
-                .filter(([_, count]) => count > 1)
-                .map(([id]) => id)
-        )
-    }, [draftPicks])
-
-    // Create a map of userId to user for quick lookup
-    const usersMap = useMemo(
-        () => new Map(users.map((u) => [u.id, u])),
-        [users]
-    )
-
-    // Calculate gender counts per team
-    const teamGenderCounts = useMemo(() => {
-        const counts: Record<number, { males: number; females: number }> = {}
-        for (const team of teamsList) {
-            counts[team.id] = { males: 0, females: 0 }
-        }
-        for (const [key, userId] of Object.entries(draftPicks)) {
-            if (!userId) continue
-            const teamId = parseInt(key.split("-")[1])
-            const user = usersMap.get(userId)
-            if (user) {
-                if (user.male === true) {
-                    counts[teamId].males++
-                } else {
-                    counts[teamId].females++
-                }
-            }
-        }
-        return counts
-    }, [draftPicks, teamsList, usersMap])
-
-    // Get the max allowed for each gender based on split (999 = no limit when unconfigured)
-    const maxMales = !genderSplit
-        ? 999
-        : genderSplit === "4-4"
-          ? 4
-          : genderSplit === "5-3"
-            ? 5
-            : 6
-    const maxFemales = !genderSplit
-        ? 999
-        : genderSplit === "4-4"
-          ? 4
-          : genderSplit === "5-3"
-            ? 3
-            : 2
-
-    // Group selected players by team for picture display
-    const playersByTeam = useMemo(() => {
-        const grouped: Record<number, UserOption[]> = {}
-        for (const team of teamsList) {
-            grouped[team.id] = []
-        }
-        for (const [key, userId] of Object.entries(draftPicks)) {
-            if (!userId) continue
-            const teamId = parseInt(key.split("-")[1])
-            const user = usersMap.get(userId)
-            if (user && grouped[teamId]) {
-                grouped[teamId].push(user)
-            }
-        }
-        return grouped
-    }, [draftPicks, teamsList, usersMap])
-
-    // Check if a cell violates the gender split
-    const getCellViolation = (
-        teamId: number,
-        userId: string | null
-    ): boolean => {
-        if (!userId) return false
-        const user = usersMap.get(userId)
-        if (!user) return false
-
-        const counts = teamGenderCounts[teamId]
-        if (!counts) return false
-
-        if (user.male === true && counts.males > maxMales) {
-            return true
-        }
-        if (user.male !== true && counts.females > maxFemales) {
-            return true
-        }
-        return false
-    }
-
-    // Get cell background color based on gender and violation
-    const getCellStyle = (teamId: number, userId: string | null): string => {
-        if (!userId) return ""
-        const user = usersMap.get(userId)
-        if (!user) return ""
-
-        // Check for duplicate selection first
-        if (duplicateUserIds.has(userId)) {
-            return "bg-red-200 dark:bg-red-900"
-        }
-
-        const isViolation = getCellViolation(teamId, userId)
-        if (isViolation) {
-            return "bg-red-200 dark:bg-red-900"
-        }
-
-        if (user.male === true) {
-            return "bg-blue-100 dark:bg-blue-900/50"
-        } else {
-            return "bg-pink-100 dark:bg-pink-900/50"
-        }
-    }
 
     const handleDivisionChange = async (value: string) => {
         setDivisionId(value)
         setTeamsList([])
-        setDraftPicks({})
         setError(null)
         setSuccess(null)
+        picksRef.current = {}
 
         if (value) {
             await loadTeams(currentSeasonId, parseInt(value))
@@ -380,16 +119,12 @@ export function DraftDivisionForm({
         setIsLoadingTeams(false)
     }
 
-    const handlePickChange = (
-        round: number,
-        teamId: number,
-        userId: string | null
-    ) => {
-        setDraftPicks((prev) => ({
-            ...prev,
-            [`${round}-${teamId}`]: userId
-        }))
-    }
+    // Load default division teams on mount if captain has a pre-selected division
+    useState(() => {
+        if (defaultDivisionId && divisionId) {
+            loadTeams(currentSeasonId, defaultDivisionId)
+        }
+    })
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -406,11 +141,10 @@ export function DraftDivisionForm({
             return
         }
 
-        // Build picks array
         const picks = []
         for (let round = 1; round <= ROUNDS; round++) {
             for (const team of teamsList) {
-                const userId = draftPicks[`${round}-${team.id}`]
+                const userId = picksRef.current[`${round}-${team.id}`]
                 if (userId) {
                     picks.push({
                         teamId: team.id,
@@ -433,8 +167,6 @@ export function DraftDivisionForm({
 
         if (result.status) {
             setSuccess(result.message)
-            // Reset draft picks
-            setDraftPicks({})
         } else {
             setError(result.message)
         }
@@ -458,8 +190,9 @@ export function DraftDivisionForm({
                         <div>
                             <CardTitle>Draft Configuration</CardTitle>
                             <CardDescription>
-                                Select a division to load the teams for the
-                                current season.
+                                {role === "commissioner"
+                                    ? "Select a division to load the teams for the current season."
+                                    : "Your division is pre-selected. Edit your team's picks in the draft board below."}
                             </CardDescription>
                         </div>
                         <Button
@@ -485,11 +218,16 @@ export function DraftDivisionForm({
                             <div className="flex-1 space-y-2">
                                 <Label htmlFor="division">
                                     Division{" "}
-                                    <span className="text-destructive">*</span>
+                                    {role === "commissioner" && (
+                                        <span className="text-destructive">
+                                            *
+                                        </span>
+                                    )}
                                 </Label>
                                 <Select
                                     value={divisionId}
                                     onValueChange={handleDivisionChange}
+                                    disabled={role === "captain"}
                                 >
                                     <SelectTrigger id="division">
                                         <SelectValue placeholder="Select a division" />
@@ -535,210 +273,26 @@ export function DraftDivisionForm({
                             </p>
                         )}
 
-                        {teamsList.length > 0 && (
+                        {teamsList.length > 0 && divisionId && (
                             <div className="border-t pt-6">
                                 <h3 className="mb-4 font-semibold">
                                     Draft Board
                                 </h3>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full border-collapse">
-                                        <thead>
-                                            <tr>
-                                                <th className="w-24 border bg-muted p-2 text-left font-semibold text-sm">
-                                                    Round
-                                                </th>
-                                                {teamsList.map((team) => (
-                                                    <th
-                                                        key={team.id}
-                                                        className="min-w-48 border bg-muted p-2 text-center font-semibold text-sm"
-                                                    >
-                                                        {team.name}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {Array.from({ length: ROUNDS }).map(
-                                                (_, roundIndex) => {
-                                                    const round = roundIndex + 1
-                                                    return (
-                                                        <tr key={round}>
-                                                            <td className="border bg-muted/50 p-2 font-medium text-sm">
-                                                                Round {round}
-                                                            </td>
-                                                            {teamsList.map(
-                                                                (team) => {
-                                                                    const userId =
-                                                                        draftPicks[
-                                                                            `${round}-${team.id}`
-                                                                        ] ||
-                                                                        null
-                                                                    const cellStyle =
-                                                                        getCellStyle(
-                                                                            team.id,
-                                                                            userId
-                                                                        )
-                                                                    return (
-                                                                        <td
-                                                                            key={
-                                                                                team.id
-                                                                            }
-                                                                            className={cn(
-                                                                                "border p-1",
-                                                                                cellStyle
-                                                                            )}
-                                                                        >
-                                                                            <UserCombobox
-                                                                                users={
-                                                                                    users
-                                                                                }
-                                                                                value={
-                                                                                    userId
-                                                                                }
-                                                                                onChange={(
-                                                                                    newUserId
-                                                                                ) =>
-                                                                                    handlePickChange(
-                                                                                        round,
-                                                                                        team.id,
-                                                                                        newUserId
-                                                                                    )
-                                                                                }
-                                                                                placeholder="Select player..."
-                                                                                excludeIds={
-                                                                                    selectedUserIds
-                                                                                }
-                                                                            />
-                                                                        </td>
-                                                                    )
-                                                                }
-                                                            )}
-                                                        </tr>
-                                                    )
-                                                }
-                                            )}
-                                            {/* Gender count row */}
-                                            <tr>
-                                                <td className="border bg-muted p-2 font-medium text-sm">
-                                                    Count
-                                                </td>
-                                                {teamsList.map((team) => {
-                                                    const counts =
-                                                        teamGenderCounts[
-                                                            team.id
-                                                        ] || {
-                                                            males: 0,
-                                                            females: 0
-                                                        }
-                                                    const maleOverLimit =
-                                                        counts.males > maxMales
-                                                    const femaleOverLimit =
-                                                        counts.females >
-                                                        maxFemales
-                                                    return (
-                                                        <td
-                                                            key={team.id}
-                                                            className="border p-2 text-center text-sm"
-                                                        >
-                                                            <span
-                                                                className={cn(
-                                                                    "mr-1 inline-block rounded px-2 py-0.5",
-                                                                    maleOverLimit
-                                                                        ? "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                                                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"
-                                                                )}
-                                                            >
-                                                                M:{" "}
-                                                                {counts.males}
-                                                            </span>
-                                                            <span
-                                                                className={cn(
-                                                                    "inline-block rounded px-2 py-0.5",
-                                                                    femaleOverLimit
-                                                                        ? "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                                                        : "bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-200"
-                                                                )}
-                                                            >
-                                                                F:{" "}
-                                                                {counts.females}
-                                                            </span>
-                                                        </td>
-                                                    )
-                                                })}
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Player Pictures by Team */}
-                                {playerPicUrl && (
-                                    <div className="mt-6 border-t pt-6">
-                                        <h3 className="mb-4 font-semibold">
-                                            Team Rosters
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {teamsList.map((team) => {
-                                                const players =
-                                                    playersByTeam[team.id] || []
-                                                if (players.length === 0)
-                                                    return null
-                                                return (
-                                                    <div
-                                                        key={team.id}
-                                                        className="flex items-start gap-3"
-                                                    >
-                                                        <div className="w-24 shrink-0 pt-2">
-                                                            <span className="font-medium text-muted-foreground text-sm">
-                                                                {team.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {players.map(
-                                                                (player) => (
-                                                                    <button
-                                                                        type="button"
-                                                                        key={
-                                                                            player.id
-                                                                        }
-                                                                        onClick={() =>
-                                                                            setEnlargedPlayer(
-                                                                                player
-                                                                            )
-                                                                        }
-                                                                        className={cn(
-                                                                            "flex cursor-pointer flex-col items-center rounded-lg border p-1.5 transition-opacity hover:opacity-80",
-                                                                            player.male ===
-                                                                                true
-                                                                                ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
-                                                                                : "border-pink-200 bg-pink-50 dark:border-pink-800 dark:bg-pink-900/20"
-                                                                        )}
-                                                                    >
-                                                                        {player.picture ? (
-                                                                            <img
-                                                                                src={`${playerPicUrl}${player.picture}`}
-                                                                                alt={`${player.first_name} ${player.last_name}`}
-                                                                                className="h-18 w-12 rounded object-cover"
-                                                                            />
-                                                                        ) : (
-                                                                            <div className="flex h-18 w-12 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
-                                                                                No
-                                                                                photo
-                                                                            </div>
-                                                                        )}
-                                                                        <span className="mt-1 max-w-14 truncate text-center text-xs">
-                                                                            {player.preffered_name ||
-                                                                                player.first_name}
-                                                                        </span>
-                                                                    </button>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
+                                <DraftRoomProvider
+                                    seasonId={currentSeasonId}
+                                    divisionId={parseInt(divisionId)}
+                                >
+                                    <DraftBoardWithBroadcast
+                                        teams={teamsList}
+                                        users={users}
+                                        playerPicUrl={playerPicUrl}
+                                        divisionSplits={divisionSplits}
+                                        divisionId={divisionId}
+                                        role={role}
+                                        captainTeamIds={captainTeamIds}
+                                        onPicksChange={handlePicksChange}
+                                    />
+                                </DraftRoomProvider>
                             </div>
                         )}
 
@@ -762,71 +316,34 @@ export function DraftDivisionForm({
                             </div>
                         )}
                     </CardContent>
-                    <CardFooter className="border-t pt-6">
-                        <Button
-                            type="submit"
-                            disabled={isLoading || teamsList.length === 0}
-                            className="ml-auto"
-                        >
-                            {isLoading ? "Submitting..." : "Submit Draft"}
-                        </Button>
-                    </CardFooter>
+                    {role === "commissioner" && (
+                        <CardFooter className="border-t pt-6">
+                            <Button
+                                type="submit"
+                                disabled={isLoading || teamsList.length === 0}
+                                className="ml-auto"
+                            >
+                                {isLoading ? "Submitting..." : "Submit Draft"}
+                            </Button>
+                        </CardFooter>
+                    )}
                 </Card>
             </form>
-
-            {/* Enlarged Player Image Modal */}
-            {enlargedPlayer && playerPicUrl && (
-                <div
-                    className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => setEnlargedPlayer(null)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") setEnlargedPlayer(null)
-                    }}
-                    role="button"
-                    tabIndex={0}
-                >
-                    <div
-                        className={cn(
-                            "relative rounded-xl p-4",
-                            enlargedPlayer.male === true
-                                ? "bg-blue-50 dark:bg-blue-900/40"
-                                : "bg-pink-50 dark:bg-pink-900/40"
-                        )}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="dialog"
-                    >
-                        <button
-                            type="button"
-                            className="-top-2 -right-2 absolute rounded-full bg-background p-1 shadow-lg hover:bg-accent"
-                            onClick={() => setEnlargedPlayer(null)}
-                        >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-                        {enlargedPlayer.picture ? (
-                            <img
-                                src={`${playerPicUrl}${enlargedPlayer.picture}`}
-                                alt={`${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
-                                className="max-h-[80vh] w-auto rounded-lg object-contain"
-                            />
-                        ) : (
-                            <div className="flex h-[80vh] w-[53vh] items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                                No photo
-                            </div>
-                        )}
-                        <p className="mt-3 text-center font-medium">
-                            {enlargedPlayer.preffered_name
-                                ? `${enlargedPlayer.first_name} (${enlargedPlayer.preffered_name}) ${enlargedPlayer.last_name}`
-                                : `${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
-                        </p>
-                        {enlargedPlayer.old_id && (
-                            <p className="text-center text-muted-foreground text-sm">
-                                ID: {enlargedPlayer.old_id}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     )
+}
+
+// Inner wrapper that has access to Liveblocks context (inside RoomProvider)
+// Broadcasts DRAFT_SUBMITTED when submit succeeds
+function DraftBoardWithBroadcast(props: {
+    teams: TeamOption[]
+    users: UserOption[]
+    playerPicUrl: string
+    divisionSplits: DivisionSplitConfig[]
+    divisionId: string
+    role: "commissioner" | "captain"
+    captainTeamIds: number[]
+    onPicksChange: (picks: Record<string, string | null>) => void
+}) {
+    return <DraftBoard {...props} />
 }

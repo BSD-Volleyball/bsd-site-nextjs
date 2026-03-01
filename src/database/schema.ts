@@ -47,6 +47,12 @@ export const users = pgTable("users", {
     onboarding_completed: boolean("onboarding_completed").$defaultFn(
         () => false
     ),
+    seasons_list: text("seasons_list")
+        .$defaultFn(() => "false")
+        .notNull(),
+    notification_list: text("notification_list")
+        .$defaultFn(() => "false")
+        .notNull(),
     captain_eligible: boolean("captain_eligible")
         .$defaultFn(() => true)
         .notNull()

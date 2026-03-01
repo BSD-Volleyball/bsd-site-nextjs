@@ -87,6 +87,8 @@ export interface UserDetails {
     role: string | null
     male: boolean | null
     onboarding_completed: boolean | null
+    seasons_list: string
+    notification_list: string
     captain_eligible: boolean
 }
 
@@ -282,6 +284,8 @@ export async function updateUser(
         role?: string | null
         male?: boolean | null
         onboarding_completed?: boolean | null
+        seasons_list?: string
+        notification_list?: string
         captain_eligible?: boolean
     }
 ): Promise<{ status: boolean; message: string }> {

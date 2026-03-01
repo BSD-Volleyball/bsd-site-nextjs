@@ -160,6 +160,13 @@ export function PotentialCaptainsList({
                 values.playoff_1_date = seasonConfig.playoff1Date
                 values.playoff_2_date = seasonConfig.playoff2Date
                 values.playoff_3_date = seasonConfig.playoff3Date
+                values.captain_select_date = seasonConfig.captainSelectDate
+                values.draft_1_date = seasonConfig.draft1Date
+                values.draft_2_date = seasonConfig.draft2Date
+                values.draft_3_date = seasonConfig.draft3Date
+                values.draft_4_date = seasonConfig.draft4Date
+                values.draft_5_date = seasonConfig.draft5Date
+                values.draft_6_date = seasonConfig.draft6Date
                 values.tryout_1_s1_time = seasonConfig.tryout1Session1Time
                 values.tryout_1_s2_time = seasonConfig.tryout1Session2Time
                 values.tryout_2_s1_time = seasonConfig.tryout2Session1Time
