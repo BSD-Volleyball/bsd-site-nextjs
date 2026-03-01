@@ -30,7 +30,8 @@ import {
     createTeams,
     type DivisionOption,
     type UserOption,
-    type DivisionCommissioner
+    type DivisionCommissioner,
+    type ExistingTeam
 } from "./actions"
 import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
 import {
@@ -56,6 +57,7 @@ interface SelectCaptainsFormProps {
     commissionerName?: string
     currentUserId?: string
     divisionCommissioners?: DivisionCommissioner[]
+    existingTeamsByDivision?: Record<number, ExistingTeam[]>
 }
 
 interface CaptainSelection {
@@ -209,11 +211,13 @@ export function SelectCaptainsForm({
     seasonConfig,
     commissionerName = "",
     currentUserId,
-    divisionCommissioners
+    divisionCommissioners,
+    existingTeamsByDivision
 }: SelectCaptainsFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [copyReminder, setCopyReminder] = useState(false)
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
     const [copyEmailSuccess, setCopyEmailSuccess] = useState(false)
@@ -244,15 +248,34 @@ export function SelectCaptainsForm({
     }, [selectedDivision])
 
     useEffect(() => {
-        if (numTeams === 4) {
-            setCaptains((prev) => {
-                const next = [...prev]
-                next[4] = { captainId: null, teamName: "" }
-                next[5] = { captainId: null, teamName: "" }
-                return next
-            })
-        }
-    }, [numTeams])
+        const parsedId = parseInt(divisionId)
+        const existing =
+            divisionId && !Number.isNaN(parsedId)
+                ? (existingTeamsByDivision?.[parsedId] ?? [])
+                : []
+
+        const byNumber = new Map(existing.map((t) => [t.number, t]))
+
+        setSuccess(null)
+        setError(null)
+        setCopyReminder(false)
+
+        setCaptains(() => {
+            const next: CaptainSelection[] = Array(6)
+                .fill(null)
+                .map(() => ({ captainId: null, teamName: "" }))
+            for (let i = 0; i < 6; i++) {
+                const team = byNumber.get(i + 1)
+                if (team) {
+                    next[i] = {
+                        captainId: team.captainId,
+                        teamName: team.teamName
+                    }
+                }
+            }
+            return next
+        })
+    }, [divisionId, existingTeamsByDivision])
 
     const selectedCaptainIds = useMemo(
         () =>
@@ -418,6 +441,7 @@ export function SelectCaptainsForm({
                 formatEmailList(selectedCaptains)
             )
             setCopySuccess(true)
+            setCopyReminder(true)
             setTimeout(() => setCopySuccess(false), 2000)
         } catch (copyError) {
             console.error("Failed to copy selected captain emails:", copyError)
@@ -431,6 +455,7 @@ export function SelectCaptainsForm({
             )
             await navigator.clipboard.writeText(plainText)
             setCopyEmailSuccess(true)
+            setCopyReminder(true)
             setTimeout(() => setCopyEmailSuccess(false), 2000)
         } catch (copyError) {
             console.error("Failed to copy email template:", copyError)
@@ -454,6 +479,7 @@ export function SelectCaptainsForm({
                 })
             ])
             setCopyRichTextSuccess(true)
+            setCopyReminder(true)
             setTimeout(() => setCopyRichTextSuccess(false), 2000)
         } catch (copyError) {
             console.error("Failed to copy rich text:", copyError)
@@ -464,6 +490,7 @@ export function SelectCaptainsForm({
         try {
             await navigator.clipboard.writeText(resolvedEmailSubject)
             setCopySubjectSuccess(true)
+            setCopyReminder(true)
             setTimeout(() => setCopySubjectSuccess(false), 2000)
         } catch (copyError) {
             console.error("Failed to copy email subject:", copyError)
@@ -500,6 +527,7 @@ export function SelectCaptainsForm({
         e.preventDefault()
         setError(null)
         setSuccess(null)
+        setCopyReminder(false)
 
         if (!divisionId) {
             setError("Please select a division.")
@@ -652,6 +680,12 @@ export function SelectCaptainsForm({
                         </div>
                     )}
 
+                    {copyReminder && !success && (
+                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
+                            Remember to click Create to save your teams
+                        </div>
+                    )}
+
                     {success && (
                         <div className="rounded-md bg-green-50 p-3 text-green-800 text-sm dark:bg-green-950 dark:text-green-200">
                             {success}
@@ -707,6 +741,7 @@ export function SelectCaptainsForm({
                                 {formatEmailList(selectedCaptains)}
                             </p>
                             <Button
+                                type="button"
                                 size="sm"
                                 onClick={handleCopyToClipboard}
                                 variant="outline"
@@ -725,6 +760,7 @@ export function SelectCaptainsForm({
                                     {resolvedEmailSubject}
                                 </p>
                                 <Button
+                                    type="button"
                                     size="sm"
                                     onClick={handleCopySubject}
                                     variant="outline"
@@ -747,6 +783,7 @@ export function SelectCaptainsForm({
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={handleCopyEmailTemplate}
                                         variant="outline"
@@ -756,6 +793,7 @@ export function SelectCaptainsForm({
                                             : "Copy Plain Text"}
                                     </Button>
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={handleCopyRichText}
                                         variant="outline"

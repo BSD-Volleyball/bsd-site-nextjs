@@ -59,6 +59,7 @@ export default async function SelectCaptainsPage() {
                 commissionerName={session.user.name || ""}
                 currentUserId={session.user.id}
                 divisionCommissioners={result.divisionCommissioners}
+                existingTeamsByDivision={result.existingTeamsByDivision}
             />
         </div>
     )
