@@ -12,7 +12,7 @@ import {
     emailTemplates,
     commissioners
 } from "@/database/schema"
-import { eq, and, inArray } from "drizzle-orm"
+import { eq, and, inArray, asc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -27,6 +27,13 @@ export interface DivisionOption {
     name: string
     level: number
     gender_split: string | null
+}
+
+export interface ExistingTeam {
+    id: number
+    number: number
+    captainId: string
+    teamName: string
 }
 
 export interface DivisionCommissioner {
@@ -56,6 +63,7 @@ export async function getCreateTeamsData(): Promise<{
     emailSubject: string
     seasonConfig: SeasonConfig | null
     divisionCommissioners: DivisionCommissioner[]
+    existingTeamsByDivision: Record<number, ExistingTeam[]>
 }> {
     const hasAccess = await getIsCommissioner()
     if (!hasAccess) {
@@ -70,7 +78,8 @@ export async function getCreateTeamsData(): Promise<{
             emailTemplateContent: null,
             emailSubject: "",
             seasonConfig: null,
-            divisionCommissioners: []
+            divisionCommissioners: [],
+            existingTeamsByDivision: {}
         }
     }
 
@@ -89,13 +98,14 @@ export async function getCreateTeamsData(): Promise<{
                 emailTemplateContent: null,
                 emailSubject: "",
                 seasonConfig: null,
-                divisionCommissioners: []
+                divisionCommissioners: [],
+                existingTeamsByDivision: {}
             }
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        const [allDivisions, signedUpUsers, commissionerRows] =
+        const [allDivisions, signedUpUsers, commissionerRows, existingTeamRows] =
             await Promise.all([
                 db
                     .select({
@@ -142,7 +152,18 @@ export async function getCreateTeamsData(): Promise<{
                     })
                     .from(commissioners)
                     .innerJoin(users, eq(commissioners.commissioner, users.id))
-                    .where(eq(commissioners.season, config.seasonId))
+                    .where(eq(commissioners.season, config.seasonId)),
+                db
+                    .select({
+                        id: teams.id,
+                        number: teams.number,
+                        captain: teams.captain,
+                        name: teams.name,
+                        division: teams.division
+                    })
+                    .from(teams)
+                    .where(eq(teams.season, config.seasonId))
+                    .orderBy(teams.number)
             ])
 
         const divisionCommissioners: DivisionCommissioner[] =
@@ -151,6 +172,19 @@ export async function getCreateTeamsData(): Promise<{
                 userId: row.userId,
                 name: row.preferredName || row.firstName
             }))
+
+        const existingTeamsByDivision: Record<number, ExistingTeam[]> = {}
+        for (const team of existingTeamRows) {
+            if (!existingTeamsByDivision[team.division]) {
+                existingTeamsByDivision[team.division] = []
+            }
+            existingTeamsByDivision[team.division].push({
+                id: team.id,
+                number: team.number ?? 0,
+                captainId: team.captain,
+                teamName: team.name
+            })
+        }
 
         let emailTemplate = ""
         let emailTemplateContent: LexicalEmailTemplateContent | null = null
@@ -192,7 +226,8 @@ export async function getCreateTeamsData(): Promise<{
             emailTemplateContent,
             emailSubject,
             seasonConfig: config,
-            divisionCommissioners
+            divisionCommissioners,
+            existingTeamsByDivision
         }
     } catch (error) {
         console.error("Error fetching create teams data:", error)
@@ -207,7 +242,8 @@ export async function getCreateTeamsData(): Promise<{
             emailTemplateContent: null,
             emailSubject: "",
             seasonConfig: null,
-            divisionCommissioners: []
+            divisionCommissioners: [],
+            existingTeamsByDivision: {}
         }
     }
 }
@@ -321,36 +357,76 @@ export async function createTeams(
     }
 
     try {
-        // Create all teams for the current season
-        await db.insert(teams).values(
-            teamsToCreate.map((team, index) => ({
-                season: config.seasonId,
-                captain: team.captainId,
-                division: divisionId,
-                name: team.teamName.trim(),
-                number: index + 1
-            }))
-        )
+        // Fetch existing teams for this division+season to support upsert
+        const existingTeams = await db
+            .select({ id: teams.id, number: teams.number })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, config.seasonId),
+                    eq(teams.division, divisionId)
+                )
+            )
+            .orderBy(asc(teams.number))
 
+        const existingByNumber = new Map<number, number>()
+        for (const team of existingTeams) {
+            if (team.number !== null) {
+                existingByNumber.set(team.number, team.id)
+            }
+        }
+
+        for (let i = 0; i < teamsToCreate.length; i++) {
+            const team = teamsToCreate[i]
+            const number = i + 1
+            const existingId = existingByNumber.get(number)
+
+            if (existingId !== undefined) {
+                await db
+                    .update(teams)
+                    .set({
+                        captain: team.captainId,
+                        name: team.teamName.trim()
+                    })
+                    .where(eq(teams.id, existingId))
+                existingByNumber.delete(number)
+            } else {
+                await db.insert(teams).values({
+                    season: config.seasonId,
+                    captain: team.captainId,
+                    division: divisionId,
+                    name: team.teamName.trim(),
+                    number
+                })
+            }
+        }
+
+        // Delete any stale teams (numbers beyond the new count)
+        const staleIds = [...existingByNumber.values()]
+        if (staleIds.length > 0) {
+            await db.delete(teams).where(inArray(teams.id, staleIds))
+        }
+
+        const isUpdate = existingTeams.length > 0
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {
             await logAuditEntry({
                 userId: session.user.id,
-                action: "create",
+                action: isUpdate ? "update" : "create",
                 entityType: "teams",
-                summary: `Created ${teamsToCreate.length} teams for current season ${config.seasonId}, division ${divisionId}`
+                summary: `${isUpdate ? "Updated" : "Created"} ${teamsToCreate.length} teams for current season ${config.seasonId}, division ${divisionId}`
             })
         }
 
         return {
             status: true,
-            message: `Successfully created ${teamsToCreate.length} teams!`
+            message: `Successfully ${isUpdate ? "updated" : "created"} ${teamsToCreate.length} teams!`
         }
     } catch (error) {
-        console.error("Error creating teams:", error)
+        console.error("Error saving teams:", error)
         return {
             status: false,
-            message: "Something went wrong while creating teams."
+            message: "Something went wrong while saving teams."
         }
     }
 }

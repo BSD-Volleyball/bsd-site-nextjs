@@ -492,6 +492,7 @@ export function PotentialCaptainsList({
                                 )}
                             </p>
                             <Button
+                                type="button"
                                 size="sm"
                                 onClick={handleCopyToClipboard}
                                 variant="outline"
@@ -510,6 +511,7 @@ export function PotentialCaptainsList({
                                     {resolvedEmailSubject}
                                 </p>
                                 <Button
+                                    type="button"
                                     size="sm"
                                     onClick={handleCopySubject}
                                     variant="outline"
@@ -532,6 +534,7 @@ export function PotentialCaptainsList({
                                 </div>
                                 <div className="flex gap-2">
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={handleCopyEmailTemplate}
                                         variant="outline"
@@ -541,6 +544,7 @@ export function PotentialCaptainsList({
                                             : "Copy Plain Text"}
                                     </Button>
                                     <Button
+                                        type="button"
                                         size="sm"
                                         onClick={handleCopyRichText}
                                         variant="outline"
