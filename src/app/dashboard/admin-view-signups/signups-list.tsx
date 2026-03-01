@@ -20,7 +20,7 @@ import {
     AdminPlayerDetailPopup,
     formatHeight
 } from "@/components/player-detail"
-import { deleteSignupEntry, type SignupEntry } from "./actions"
+import { deleteSignupEntry, logAdminCsvDownload, type SignupEntry } from "./actions"
 
 interface SignupsListProps {
     signups: SignupEntry[]
@@ -308,6 +308,8 @@ export function SignupsList({
 
         document.body.removeChild(link)
         URL.revokeObjectURL(url)
+
+        logAdminCsvDownload()
     }
 
     const handleDeleteSignup = async () => {
