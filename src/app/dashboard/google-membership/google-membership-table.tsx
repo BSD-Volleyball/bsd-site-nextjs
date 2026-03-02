@@ -18,6 +18,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 interface GoogleMembershipTableProps {
     users: GoogleMembershipUser[]
     initialQuery: string
+    initialFilter: string
     page: number
     totalPages: number
     total: number
@@ -36,6 +37,7 @@ function normalizeMembershipValue(value: string | null | undefined): string {
 export function GoogleMembershipTable({
     users,
     initialQuery,
+    initialFilter,
     page,
     totalPages,
     total
@@ -45,6 +47,7 @@ export function GoogleMembershipTable({
     const searchParams = useSearchParams()
 
     const [search, setSearch] = useState(initialQuery)
+    const [activeFilter, setActiveFilter] = useState(initialFilter)
     const [rowValues, setRowValues] = useState<
         Record<string, { seasonsList: string; notificationList: string }>
     >({})
@@ -56,6 +59,10 @@ export function GoogleMembershipTable({
     useEffect(() => {
         setSearch(initialQuery)
     }, [initialQuery])
+
+    useEffect(() => {
+        setActiveFilter(initialFilter)
+    }, [initialFilter])
 
     useEffect(() => {
         setRowValues((current) => {
@@ -107,6 +114,17 @@ export function GoogleMembershipTable({
         router.replace(`${pathname}?${params.toString()}`)
     }
 
+    const handleFilterChange = (filter: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (filter) {
+            params.set("filter", filter)
+        } else {
+            params.delete("filter")
+        }
+        params.set("page", "1")
+        router.replace(`${pathname}?${params.toString()}`)
+    }
+
     const handleRowValueChange = (
         userId: string,
         key: "seasonsList" | "notificationList",
@@ -146,6 +164,31 @@ export function GoogleMembershipTable({
 
     return (
         <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    variant={
+                        activeFilter === "notification" ? "default" : "outline"
+                    }
+                    onClick={() => handleFilterChange("notification")}
+                >
+                    Not on Notification List
+                </Button>
+                <Button
+                    type="button"
+                    variant={activeFilter === "season" ? "default" : "outline"}
+                    onClick={() => handleFilterChange("season")}
+                >
+                    Not on Season List
+                </Button>
+                <Button
+                    type="button"
+                    variant={activeFilter === "" ? "default" : "outline"}
+                    onClick={() => handleFilterChange("")}
+                >
+                    All Users
+                </Button>
+            </div>
             <div className="max-w-lg">
                 <Input
                     placeholder="Search by old_id, name, or email"

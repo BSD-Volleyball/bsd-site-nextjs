@@ -214,7 +214,9 @@ function Toolbar() {
                     <Button
                         type="button"
                         size="sm"
-                        variant={state.blockType === "ul" ? "default" : "outline"}
+                        variant={
+                            state.blockType === "ul" ? "default" : "outline"
+                        }
                         onClick={toggleBulletList}
                         aria-label="Bullet List"
                     >
@@ -228,7 +230,9 @@ function Toolbar() {
                     <Button
                         type="button"
                         size="sm"
-                        variant={state.blockType === "ol" ? "default" : "outline"}
+                        variant={
+                            state.blockType === "ol" ? "default" : "outline"
+                        }
                         onClick={toggleNumberedList}
                         aria-label="Numbered List"
                     >

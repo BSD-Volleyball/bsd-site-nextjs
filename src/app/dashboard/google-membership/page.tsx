@@ -19,6 +19,7 @@ interface GoogleMembershipPageProps {
     searchParams?: Promise<{
         q?: string
         page?: string
+        filter?: string
     }>
 }
 
@@ -39,6 +40,9 @@ export default async function GoogleMembershipPage({
     const query = resolvedSearchParams?.q ?? ""
     const pageRaw = Number.parseInt(resolvedSearchParams?.page ?? "1", 10)
     const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1
+    const filterRaw = resolvedSearchParams?.filter ?? ""
+    const filter =
+        filterRaw === "notification" || filterRaw === "season" ? filterRaw : ""
 
     const session = await auth.api.getSession({ headers: await headers() })
 
@@ -55,7 +59,8 @@ export default async function GoogleMembershipPage({
     const result = await getGoogleMembershipUsers({
         query,
         page,
-        limit: 50
+        limit: 50,
+        filter
     })
 
     if (!result.status) {
@@ -81,6 +86,7 @@ export default async function GoogleMembershipPage({
             <GoogleMembershipTable
                 users={result.users}
                 initialQuery={result.query}
+                initialFilter={result.filter}
                 page={result.page}
                 totalPages={result.totalPages}
                 total={result.total}

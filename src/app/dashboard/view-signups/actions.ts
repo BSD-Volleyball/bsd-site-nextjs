@@ -136,7 +136,10 @@ export async function getSignupsCsvData(): Promise<{
 
             for (const u of pairPickUsers) {
                 const preferred = u.preferredName ? ` (${u.preferredName})` : ""
-                pairPickNames.set(u.id, `${u.firstName}${preferred} ${u.lastName}`)
+                pairPickNames.set(
+                    u.id,
+                    `${u.firstName}${preferred} ${u.lastName}`
+                )
             }
         }
 
