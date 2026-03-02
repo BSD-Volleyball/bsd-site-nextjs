@@ -285,6 +285,23 @@ export const week2Rosters = pgTable("week2_rosters", {
         .notNull()
 })
 
+export const week3Rosters = pgTable("week3_rosters", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    user: text("user")
+        .notNull()
+        .references(() => users.id),
+    division: integer("division")
+        .notNull()
+        .references(() => divisions.id),
+    team_number: integer("team_number").notNull(),
+    is_captain: boolean("is_captain")
+        .$defaultFn(() => false)
+        .notNull()
+})
+
 export const champions = pgTable("champions", {
     id: serial("id").primaryKey(),
     team: integer("team")

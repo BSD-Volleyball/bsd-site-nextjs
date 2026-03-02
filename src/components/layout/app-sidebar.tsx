@@ -151,6 +151,11 @@ const adminDangerNavItems = [
         icon: RiCalendarLine
     },
     {
+        title: "Create Week 3",
+        url: "/dashboard/create-week-3",
+        icon: RiCalendarLine
+    },
+    {
         title: "Edit Week 1",
         url: "/dashboard/edit-week-1",
         icon: RiEditLine
@@ -192,6 +197,14 @@ const adminDangerNavItems = [
     }
 ]
 
+const seasonNavItems = [
+    {
+        title: "Pre-Season Week 1",
+        url: "/dashboard/preseason-week-1",
+        icon: RiCalendarLine
+    }
+]
+
 const commissionerNavItems = [
     {
         title: "Draft Division",
@@ -212,11 +225,6 @@ const commissionerNavItems = [
         title: "Select Captains",
         url: "/dashboard/select-captains",
         icon: RiTeamLine
-    },
-    {
-        title: "Pre-Season Week 1",
-        url: "/dashboard/preseason-week-1",
-        icon: RiCalendarLine
     },
     {
         title: "Pre-Season Week 2",
@@ -419,6 +427,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <NavItems items={navItems} pathname={pathname} />
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                        Season
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <NavItems items={seasonNavItems} pathname={pathname} />
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

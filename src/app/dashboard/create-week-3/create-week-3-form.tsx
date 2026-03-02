@@ -5,22 +5,22 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { saveWeek2Rosters } from "./actions"
+import { saveWeek3Rosters } from "./actions"
 import type {
-    Week2Candidate,
-    Week2Division,
-    Week2ExcludedPlayer,
-    Week2SavedAssignment
-} from "./week2-types"
+    Week3Candidate,
+    Week3Division,
+    Week3ExcludedPlayer,
+    Week3SavedAssignment
+} from "./week3-types"
 
-interface CreateWeek2FormProps {
+interface CreateWeek3FormProps {
     seasonLabel: string
-    divisions: Week2Division[]
-    candidates: Week2Candidate[]
-    excludedPlayers: Week2ExcludedPlayer[]
+    divisions: Week3Division[]
+    candidates: Week3Candidate[]
+    excludedPlayers: Week3ExcludedPlayer[]
 }
 
-interface Week2PlacedPlayer extends Week2Candidate {
+interface Week3PlacedPlayer extends Week3Candidate {
     entryId: string
     sourceUserId: string
     isDuplicateEntry: boolean
@@ -28,16 +28,19 @@ interface Week2PlacedPlayer extends Week2Candidate {
 
 interface PlacementUnit {
     id: string
-    players: Week2Candidate[]
+    players: Week3Candidate[]
     maleCount: number
     nonMaleCount: number
     size: number
     averageScore: number
-    lockedDivisionId: number | null
+    hasCaptain: boolean
+    isMutualPair: boolean
+    captainDivisionId: number | null
+    preferredWeek2DivisionId: number | null
 }
 
 interface DivisionPlacement {
-    division: Week2Division
+    division: Week3Division
     units: PlacementUnit[]
     maleCount: number
     nonMaleCount: number
@@ -69,14 +72,55 @@ interface TeamBucket {
     newCount: number
 }
 
-function getDisplayName(player: Week2Candidate) {
+type PlacementReason =
+    | "captain_locked"
+    | "mutual_pair_locked"
+    | "tryout2_same_division"
+    | "forced_move_up"
+    | "forced_move_down"
+    | "score_based"
+
+const placementReasonLabel: Record<PlacementReason, string> = {
+    captain_locked: "Captain (locked)",
+    mutual_pair_locked: "Paired with captain (locked)",
+    tryout2_same_division: "Played in Week 2 division",
+    forced_move_up: "Forced move up",
+    forced_move_down: "Forced move down",
+    score_based: "Did not play week 2"
+}
+
+const placementReasonClasses: Record<PlacementReason, string> = {
+    captain_locked:
+        "border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100",
+    mutual_pair_locked:
+        "border-orange-300 bg-orange-100 text-orange-950 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-100",
+    tryout2_same_division:
+        "border-blue-300 bg-blue-100 text-blue-950 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-100",
+    forced_move_up:
+        "border-emerald-300 bg-emerald-100 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100",
+    forced_move_down:
+        "border-rose-300 bg-rose-100 text-rose-950 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-100",
+    score_based:
+        "border-slate-300 bg-slate-100 text-slate-950 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100"
+}
+
+const placementReasonOrder: PlacementReason[] = [
+    "captain_locked",
+    "mutual_pair_locked",
+    "tryout2_same_division",
+    "forced_move_up",
+    "forced_move_down",
+    "score_based"
+]
+
+function getDisplayName(player: Week3Candidate) {
     if (player.preferredName) {
         return `${player.preferredName} ${player.lastName}`
     }
     return `${player.firstName} ${player.lastName}`
 }
 
-function compareCandidates(a: Week2Candidate, b: Week2Candidate) {
+function compareCandidates(a: Week3Candidate, b: Week3Candidate) {
     if (a.placementScore !== b.placementScore) {
         return a.placementScore - b.placementScore
     }
@@ -86,7 +130,7 @@ function compareCandidates(a: Week2Candidate, b: Week2Candidate) {
         .localeCompare(getDisplayName(b).toLowerCase())
 }
 
-function sortDivisionPlayers(players: Week2PlacedPlayer[]) {
+function sortDivisionPlayers(players: Week3PlacedPlayer[]) {
     return [...players].sort((a, b) => {
         if (a.male === true && b.male !== true) {
             return -1
@@ -98,7 +142,7 @@ function sortDivisionPlayers(players: Week2PlacedPlayer[]) {
     })
 }
 
-function toOriginalPlacedPlayer(candidate: Week2Candidate): Week2PlacedPlayer {
+function toOriginalPlacedPlayer(candidate: Week3Candidate): Week3PlacedPlayer {
     return {
         ...candidate,
         entryId: `orig:${candidate.userId}`,
@@ -107,7 +151,7 @@ function toOriginalPlacedPlayer(candidate: Week2Candidate): Week2PlacedPlayer {
     }
 }
 
-function buildPlacementUnits(candidates: Week2Candidate[]): PlacementUnit[] {
+function buildPlacementUnits(candidates: Week3Candidate[]): PlacementUnit[] {
     const sorted = [...candidates].sort(compareCandidates)
     const byId = new Map(
         sorted.map((candidate) => [candidate.userId, candidate])
@@ -128,6 +172,7 @@ function buildPlacementUnits(candidates: Week2Candidate[]): PlacementUnit[] {
             !!partner &&
             !used.has(partner.userId) &&
             partner.pairUserId === candidate.userId &&
+            candidate.week2DivisionId === partner.week2DivisionId &&
             !(
                 candidate.captainDivisionId &&
                 partner.captainDivisionId &&
@@ -143,9 +188,16 @@ function buildPlacementUnits(candidates: Week2Candidate[]): PlacementUnit[] {
             players.reduce((sum, player) => sum + player.placementScore, 0) /
             players.length
 
-        const lockedDivisionId =
+        const captainDivisionId =
             players.find((player) => !!player.captainDivisionId)
                 ?.captainDivisionId || null
+        const week2DivisionCandidates = players
+            .map((player) => player.week2DivisionId)
+            .filter((value): value is number => value !== null)
+        const preferredWeek2DivisionId =
+            week2DivisionCandidates.length > 0
+                ? week2DivisionCandidates[0]
+                : null
 
         const unitId = players
             .map((player) => player.userId)
@@ -159,7 +211,10 @@ function buildPlacementUnits(candidates: Week2Candidate[]): PlacementUnit[] {
             nonMaleCount,
             size: players.length,
             averageScore,
-            lockedDivisionId
+            hasCaptain: players.some((player) => player.isCaptain),
+            isMutualPair: players.length > 1,
+            captainDivisionId,
+            preferredWeek2DivisionId
         })
 
         for (const player of players) {
@@ -256,8 +311,8 @@ function allocateByWeightWithCapacity(
 }
 
 function getDivisionTargets(
-    divisions: Week2Division[],
-    candidates: Week2Candidate[]
+    divisions: Week3Division[],
+    candidates: Week3Candidate[]
 ) {
     const totalPlayers = candidates.length
     const totalTeams = divisions.reduce(
@@ -348,9 +403,13 @@ function getDivisionTargets(
 }
 
 function buildDivisionPlacement(
-    divisions: Week2Division[],
-    candidates: Week2Candidate[]
-): Map<number, DivisionPlacement> {
+    divisions: Week3Division[],
+    candidates: Week3Candidate[]
+): {
+    placement: Map<number, DivisionPlacement>
+    reasonByUser: Map<string, PlacementReason>
+    lockedUserIds: Set<string>
+} {
     const units = buildPlacementUnits(candidates)
     const targets = getDivisionTargets(divisions, candidates)
     const placement = new Map<number, DivisionPlacement>(
@@ -368,187 +427,275 @@ function buildDivisionPlacement(
             }
         ])
     )
-
-    const lastDivision = divisions[divisions.length - 1]
-    const nonLastDivisions = divisions.slice(0, -1)
-
-    for (const unit of units.filter((entry) => !!entry.lockedDivisionId)) {
-        const target = placement.get(unit.lockedDivisionId as number)
-        if (target) {
-            addUnitToPlacement(target, unit)
-        }
-    }
-
-    const nonLastBuckets = nonLastDivisions.map(
-        (division) => placement.get(division.id) as DivisionPlacement
+    const reasonByUser = new Map<string, PlacementReason>()
+    const lockedUserIds = new Set<string>()
+    const unitDivisionMap = new Map<string, number>()
+    const divisionIndexById = new Map(
+        divisions.map((division, index) => [division.id, index])
     )
+    const unitByPlayerId = new Map<string, PlacementUnit>()
 
-    const canFitStrict = (bucket: DivisionPlacement, unit: PlacementUnit) => {
-        return (
-            bucket.size + unit.size <= bucket.targetSize &&
-            bucket.maleCount + unit.maleCount <= bucket.targetMale &&
-            bucket.nonMaleCount + unit.nonMaleCount <= bucket.targetNonMale
-        )
+    for (const unit of units) {
+        for (const player of unit.players) {
+            unitByPlayerId.set(player.userId, unit)
+        }
     }
 
-    const canFitSizeOnly = (bucket: DivisionPlacement, unit: PlacementUnit) => {
-        return bucket.size + unit.size <= bucket.targetSize
+    const placeUnit = (
+        unit: PlacementUnit,
+        divisionId: number,
+        reason: PlacementReason,
+        locked: boolean
+    ) => {
+        const target = placement.get(divisionId)
+        if (!target) {
+            return
+        }
+
+        addUnitToPlacement(target, unit)
+        unitDivisionMap.set(unit.id, divisionId)
+
+        for (const player of unit.players) {
+            reasonByUser.set(player.userId, reason)
+            if (locked) {
+                lockedUserIds.add(player.userId)
+            }
+        }
     }
 
-    let preferredBucketIndex = 0
+    const pickDivisionIdForUnit = (
+        unit: PlacementUnit,
+        preferredDivisionIndex: number | null
+    ) => {
+        const divisionOrder = divisions
+            .map((division, index) => ({ division, index }))
+            .sort((a, b) => {
+                if (
+                    preferredDivisionIndex === null ||
+                    preferredDivisionIndex === undefined
+                ) {
+                    return a.index - b.index
+                }
 
-    for (const unit of units.filter((entry) => !entry.lockedDivisionId)) {
-        while (
-            preferredBucketIndex < nonLastBuckets.length &&
-            nonLastBuckets[preferredBucketIndex].size >=
-                nonLastBuckets[preferredBucketIndex].targetSize
-        ) {
-            preferredBucketIndex += 1
-        }
+                const aDistance = Math.abs(a.index - preferredDivisionIndex)
+                const bDistance = Math.abs(b.index - preferredDivisionIndex)
 
-        const strictBucketIndex = nonLastBuckets.findIndex(
-            (bucket, index) =>
-                index >= preferredBucketIndex && canFitStrict(bucket, unit)
-        )
+                if (aDistance !== bDistance) {
+                    return aDistance - bDistance
+                }
 
-        if (strictBucketIndex !== -1) {
-            addUnitToPlacement(nonLastBuckets[strictBucketIndex], unit)
-            continue
-        }
+                return a.index - b.index
+            })
 
-        const relaxedBucketIndex = nonLastBuckets.findIndex(
-            (bucket, index) =>
-                index >= preferredBucketIndex && canFitSizeOnly(bucket, unit)
-        )
+        let bestDivisionId: number | null = null
+        let bestTuple: [number, number, number, number, number] | null = null
 
-        if (relaxedBucketIndex !== -1) {
-            addUnitToPlacement(nonLastBuckets[relaxedBucketIndex], unit)
-            continue
-        }
-
-        const fallbackBucket = [...placement.values()].find((bucket) =>
-            canFitSizeOnly(bucket, unit)
-        )
-
-        if (fallbackBucket) {
-            addUnitToPlacement(fallbackBucket, unit)
-            continue
-        }
-
-        addUnitToPlacement(
-            placement.get(lastDivision.id) as DivisionPlacement,
-            unit
-        )
-    }
-
-    const lastBucket = placement.get(lastDivision.id)
-
-    if (lastBucket) {
-        for (const division of nonLastDivisions) {
+        for (const { division, index } of divisionOrder) {
             const bucket = placement.get(division.id)
             if (!bucket) {
                 continue
             }
 
-            while (bucket.size < bucket.targetSize) {
-                const candidateUnit = lastBucket.units.find((unit) => {
-                    if (unit.lockedDivisionId) {
-                        return false
-                    }
+            const projectedSize = bucket.size + unit.size
+            const projectedMale = bucket.maleCount + unit.maleCount
+            const projectedNonMale = bucket.nonMaleCount + unit.nonMaleCount
 
-                    if (!canFitSizeOnly(bucket, unit)) {
-                        return false
-                    }
+            const overflowPenalty = Math.max(
+                0,
+                projectedSize - bucket.targetSize
+            )
+            const genderPenalty =
+                Math.abs(projectedMale - bucket.targetMale) +
+                Math.abs(projectedNonMale - bucket.targetNonMale)
+            const sizePenalty = Math.abs(projectedSize - bucket.targetSize)
+            const distancePenalty =
+                preferredDivisionIndex === null ||
+                preferredDivisionIndex === undefined
+                    ? 0
+                    : Math.abs(index - preferredDivisionIndex)
 
-                    return canFitStrict(bucket, unit)
-                })
+            const tuple: [number, number, number, number, number] = [
+                overflowPenalty,
+                genderPenalty,
+                sizePenalty,
+                distancePenalty,
+                bucket.size
+            ]
 
-                if (!candidateUnit) {
-                    break
+            if (
+                !bestTuple ||
+                tuple[0] < bestTuple[0] ||
+                (tuple[0] === bestTuple[0] && tuple[1] < bestTuple[1]) ||
+                (tuple[0] === bestTuple[0] &&
+                    tuple[1] === bestTuple[1] &&
+                    tuple[2] < bestTuple[2]) ||
+                (tuple[0] === bestTuple[0] &&
+                    tuple[1] === bestTuple[1] &&
+                    tuple[2] === bestTuple[2] &&
+                    tuple[3] < bestTuple[3]) ||
+                (tuple[0] === bestTuple[0] &&
+                    tuple[1] === bestTuple[1] &&
+                    tuple[2] === bestTuple[2] &&
+                    tuple[3] === bestTuple[3] &&
+                    tuple[4] < bestTuple[4])
+            ) {
+                bestTuple = tuple
+                bestDivisionId = division.id
+            }
+        }
+
+        return bestDivisionId
+    }
+
+    const moveUnitToDivision = (
+        unit: PlacementUnit,
+        targetDivisionId: number
+    ) => {
+        const currentDivisionId = unitDivisionMap.get(unit.id)
+        if (!currentDivisionId || currentDivisionId === targetDivisionId) {
+            return
+        }
+
+        const currentBucket = placement.get(currentDivisionId)
+        const targetBucket = placement.get(targetDivisionId)
+
+        if (!currentBucket || !targetBucket) {
+            return
+        }
+
+        removeUnitFromPlacement(currentBucket, unit)
+        addUnitToPlacement(targetBucket, unit)
+        unitDivisionMap.set(unit.id, targetDivisionId)
+    }
+
+    for (const unit of units) {
+        if (!unit.hasCaptain) {
+            continue
+        }
+
+        const preferredDivisionId = unit.captainDivisionId
+
+        const targetDivisionId =
+            (preferredDivisionId && placement.has(preferredDivisionId)
+                ? preferredDivisionId
+                : null) ?? pickDivisionIdForUnit(unit, null)
+
+        if (!targetDivisionId) {
+            continue
+        }
+
+        placeUnit(unit, targetDivisionId, "captain_locked", true)
+        if (unit.isMutualPair) {
+            for (const player of unit.players) {
+                if (!player.isCaptain) {
+                    reasonByUser.set(player.userId, "mutual_pair_locked")
                 }
-
-                removeUnitFromPlacement(lastBucket, candidateUnit)
-                addUnitToPlacement(bucket, candidateUnit)
             }
         }
     }
 
-    const orderedBuckets = divisions
-        .map((division) => placement.get(division.id))
-        .filter((bucket): bucket is DivisionPlacement => !!bucket)
-
-    const getSwapCandidate = (
-        bucket: DivisionPlacement,
-        male: boolean,
-        preference: "low" | "high"
-    ) => {
-        const candidates = bucket.units
-            .filter((unit) => {
-                if (unit.lockedDivisionId || unit.size !== 1) {
-                    return false
-                }
-
-                const player = unit.players[0]
-                return male ? player.male === true : player.male !== true
-            })
-            .sort((a, b) => a.averageScore - b.averageScore)
-
-        if (candidates.length === 0) {
-            return null
+    for (const unit of units) {
+        if (unitDivisionMap.has(unit.id)) {
+            continue
         }
 
-        return preference === "low"
-            ? candidates[0]
-            : candidates[candidates.length - 1]
+        if (!unit.preferredWeek2DivisionId) {
+            continue
+        }
+
+        if (!placement.has(unit.preferredWeek2DivisionId)) {
+            continue
+        }
+
+        placeUnit(
+            unit,
+            unit.preferredWeek2DivisionId,
+            "tryout2_same_division",
+            false
+        )
     }
 
-    const swapUnits = (
-        source: DivisionPlacement,
-        sourceUnit: PlacementUnit,
-        target: DivisionPlacement,
-        targetUnit: PlacementUnit
-    ) => {
-        removeUnitFromPlacement(source, sourceUnit)
-        removeUnitFromPlacement(target, targetUnit)
-        addUnitToPlacement(source, targetUnit)
-        addUnitToPlacement(target, sourceUnit)
+    const forcedCandidates = [...candidates]
+        .filter(
+            (candidate) =>
+                candidate.forcedMoveDirection === "up" ||
+                candidate.forcedMoveDirection === "down"
+        )
+        .sort(compareCandidates)
+
+    const processedForcedUnitIds = new Set<string>()
+
+    for (const candidate of forcedCandidates) {
+        if (lockedUserIds.has(candidate.userId)) {
+            continue
+        }
+
+        const unit = unitByPlayerId.get(candidate.userId)
+        if (!unit || processedForcedUnitIds.has(unit.id)) {
+            continue
+        }
+
+        const currentDivisionId = unitDivisionMap.get(unit.id)
+        if (!currentDivisionId) {
+            continue
+        }
+
+        const currentDivisionIndex = divisionIndexById.get(currentDivisionId)
+        if (currentDivisionIndex === undefined) {
+            continue
+        }
+
+        const offset = candidate.forcedMoveDirection === "up" ? -1 : 1
+        const targetDivisionIndex = Math.max(
+            0,
+            Math.min(divisions.length - 1, currentDivisionIndex + offset)
+        )
+
+        if (targetDivisionIndex === currentDivisionIndex) {
+            continue
+        }
+
+        const targetDivisionId = divisions[targetDivisionIndex].id
+        moveUnitToDivision(unit, targetDivisionId)
+        const forcedReason =
+            candidate.forcedMoveDirection === "up"
+                ? "forced_move_up"
+                : "forced_move_down"
+        for (const player of unit.players) {
+            reasonByUser.set(player.userId, forcedReason)
+        }
+        processedForcedUnitIds.add(unit.id)
     }
 
-    for (let pass = 0; pass < 6; pass++) {
-        let changed = false
+    const unassignedUnits = units.filter(
+        (unit) => !unitDivisionMap.has(unit.id)
+    )
 
-        for (let index = 0; index < orderedBuckets.length - 1; index++) {
-            const upper = orderedBuckets[index]
-            const lower = orderedBuckets[index + 1]
+    for (const unit of unassignedUnits) {
+        const targetLevel = Math.floor(unit.averageScore / 50) + 1
 
-            const upperMaleDelta = upper.maleCount - upper.targetMale
-            const lowerMaleDelta = lower.maleCount - lower.targetMale
-
-            if (upperMaleDelta > 0 && lowerMaleDelta < 0) {
-                const maleFromUpper = getSwapCandidate(upper, true, "high")
-                const nonMaleFromLower = getSwapCandidate(lower, false, "low")
-
-                if (maleFromUpper && nonMaleFromLower) {
-                    swapUnits(upper, maleFromUpper, lower, nonMaleFromLower)
-                    changed = true
-                }
-            } else if (upperMaleDelta < 0 && lowerMaleDelta > 0) {
-                const nonMaleFromUpper = getSwapCandidate(upper, false, "high")
-                const maleFromLower = getSwapCandidate(lower, true, "low")
-
-                if (nonMaleFromUpper && maleFromLower) {
-                    swapUnits(upper, nonMaleFromUpper, lower, maleFromLower)
-                    changed = true
-                }
+        const targetDivision = [...divisions].sort((a, b) => {
+            const aDistance = Math.abs(a.level - targetLevel)
+            const bDistance = Math.abs(b.level - targetLevel)
+            if (aDistance !== bDistance) {
+                return aDistance - bDistance
             }
+
+            return a.level - b.level
+        })[0]
+
+        if (!targetDivision) {
+            continue
         }
 
-        if (!changed) {
-            break
-        }
+        placeUnit(unit, targetDivision.id, "score_based", false)
     }
 
-    return placement
+    return {
+        placement,
+        reasonByUser,
+        lockedUserIds
+    }
 }
 
 function buildTeamUnits(players: TeamPlayer[]): Array<{
@@ -641,8 +788,8 @@ function getSnakeOrder(length: number, teamCount: number) {
 }
 
 function buildTeamsForDivision(
-    division: Week2Division,
-    players: Week2PlacedPlayer[]
+    division: Week3Division,
+    players: Week3PlacedPlayer[]
 ): TeamBucket[] {
     const teamCount = division.teamCount
     const teams: TeamBucket[] = Array.from(
@@ -1461,17 +1608,16 @@ function buildTeamsForDivision(
     return teams
 }
 
-export function CreateWeek2Form({
+export function CreateWeek3Form({
     seasonLabel,
     divisions,
     candidates,
     excludedPlayers
-}: CreateWeek2FormProps) {
+}: CreateWeek3FormProps) {
     const [step, setStep] = useState<1 | 2>(1)
     const [isSaving, setIsSaving] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const duplicateCounterRef = useRef(0)
 
     const eligibleMaleCount = useMemo(
         () => candidates.filter((candidate) => candidate.male === true).length,
@@ -1482,13 +1628,17 @@ export function CreateWeek2Form({
         [candidates.length, eligibleMaleCount]
     )
 
-    const placement = useMemo(
+    const placementResult = useMemo(
         () => buildDivisionPlacement(divisions, candidates),
         [divisions, candidates]
     )
+    const placement = placementResult.placement
+    const playerPlacementReasonById = placementResult.reasonByUser
+    const lockedPlayerIds = placementResult.lockedUserIds
+    const duplicateCounterRef = useRef(0)
 
     const initialDivisionPlayers = useMemo(() => {
-        const result = new Map<number, Week2PlacedPlayer[]>()
+        const result = new Map<number, Week3PlacedPlayer[]>()
 
         for (const division of divisions) {
             const bucket = placement.get(division.id)
@@ -1536,18 +1686,38 @@ export function CreateWeek2Form({
         return counts
     }, [editableDivisionPlayers])
 
-    const captainPairIds = useMemo(() => {
-        const captainIds = new Set(
-            candidates.filter((c) => c.isCaptain).map((c) => c.userId)
-        )
-        const result = new Set<string>()
-        for (const candidate of candidates) {
-            if (candidate.pairUserId && captainIds.has(candidate.pairUserId)) {
-                result.add(candidate.userId)
+    const divisionNameById = useMemo(
+        () =>
+            new Map(divisions.map((division) => [division.id, division.name])),
+        [divisions]
+    )
+
+    const getPlayerPlacementLabel = (
+        player: Week3PlacedPlayer,
+        reason: PlacementReason
+    ) => {
+        if (reason === "tryout2_same_division") {
+            const week2DivisionName =
+                player.week2DivisionId !== null
+                    ? (divisionNameById.get(player.week2DivisionId) ?? null)
+                    : null
+            return week2DivisionName
+                ? `Played in ${week2DivisionName} week 2`
+                : "Played in week 2"
+        }
+
+        if (reason === "forced_move_up" || reason === "forced_move_down") {
+            const week2DivisionName =
+                player.week2DivisionId !== null
+                    ? (divisionNameById.get(player.week2DivisionId) ?? null)
+                    : null
+            if (week2DivisionName) {
+                return `${placementReasonLabel[reason]} from ${week2DivisionName}`
             }
         }
-        return result
-    }, [candidates])
+
+        return placementReasonLabel[reason]
+    }
 
     const handleMoveDivision = (
         divisionIndex: number,
@@ -1581,19 +1751,14 @@ export function CreateWeek2Form({
             return
         }
 
-        if (
-            selectedPlayer.isCaptain ||
-            captainPairIds.has(selectedPlayer.sourceUserId)
-        ) {
-            setError(
-                "Captains and their paired partners cannot be moved between divisions."
-            )
+        if (lockedPlayerIds.has(selectedPlayer.sourceUserId)) {
+            setError("Locked players cannot be moved between divisions.")
             return
         }
 
-        const movingPlayers: Week2PlacedPlayer[] = [selectedPlayer]
+        const movingPlayers: Week3PlacedPlayer[] = [selectedPlayer]
 
-        if (selectedPlayer.pairUserId && !selectedPlayer.isDuplicateEntry) {
+        if (selectedPlayer.pairUserId) {
             const partner = sourcePlayersCurrent.find(
                 (player) =>
                     player.sourceUserId === selectedPlayer.pairUserId &&
@@ -1606,6 +1771,10 @@ export function CreateWeek2Form({
                 setError(
                     "Paired player move requires both pair members in the same division."
                 )
+                return
+            }
+            if (lockedPlayerIds.has(partner.sourceUserId)) {
+                setError("Locked players cannot be moved between divisions.")
                 return
             }
             movingPlayers.push(partner)
@@ -1649,11 +1818,8 @@ export function CreateWeek2Form({
             return
         }
 
-        if (
-            selectedPlayer.isCaptain ||
-            captainPairIds.has(selectedPlayer.sourceUserId)
-        ) {
-            setError("Captains and their paired partners cannot be duplicated.")
+        if (lockedPlayerIds.has(selectedPlayer.sourceUserId)) {
+            setError("Locked players cannot be duplicated.")
             return
         }
 
@@ -1673,7 +1839,7 @@ export function CreateWeek2Form({
         }
 
         const targetLevel = Math.floor(selectedPlayer.placementScore / 50) + 1
-        const getDistance = (division: Week2Division) =>
+        const getDistance = (division: Week3Division) =>
             Math.abs(division.level - targetLevel)
 
         let targetDivision = aboveDivision || belowDivision
@@ -1690,7 +1856,7 @@ export function CreateWeek2Form({
 
         duplicateCounterRef.current += 1
 
-        const duplicate: Week2PlacedPlayer = {
+        const duplicate: Week3PlacedPlayer = {
             ...selectedPlayer,
             entryId: `dup:${selectedPlayer.sourceUserId}:${duplicateCounterRef.current}`,
             sourceUserId: selectedPlayer.sourceUserId,
@@ -1740,10 +1906,10 @@ export function CreateWeek2Form({
     const pairAverageScoreByUser = useMemo(() => {
         const result = new Map<string, number>()
 
-        const playersById = new Map<string, Week2PlacedPlayer>()
+        const playersById = new Map<string, Week3Candidate>()
         for (const players of editableDivisionPlayers.values()) {
             for (const player of players) {
-                playersById.set(player.sourceUserId, player)
+                playersById.set(player.userId, player)
             }
         }
 
@@ -1755,14 +1921,14 @@ export function CreateWeek2Form({
             }
 
             const partner = playersById.get(player.pairUserId)
-            if (!partner || partner.pairUserId !== player.sourceUserId) {
+            if (!partner || partner.pairUserId !== player.userId) {
                 continue
             }
 
             const key =
-                player.sourceUserId < partner.sourceUserId
-                    ? `${player.sourceUserId}:${partner.sourceUserId}`
-                    : `${partner.sourceUserId}:${player.sourceUserId}`
+                player.userId < partner.userId
+                    ? `${player.userId}:${partner.userId}`
+                    : `${partner.userId}:${player.userId}`
 
             if (seen.has(key)) {
                 continue
@@ -1770,8 +1936,8 @@ export function CreateWeek2Form({
 
             seen.add(key)
             const average = (player.placementScore + partner.placementScore) / 2
-            result.set(player.sourceUserId, average)
-            result.set(partner.sourceUserId, average)
+            result.set(player.userId, average)
+            result.set(partner.userId, average)
         }
 
         return result
@@ -1808,8 +1974,8 @@ export function CreateWeek2Form({
         )
     }, [teamAssignments])
 
-    const savePayload = useMemo<Week2SavedAssignment[]>(() => {
-        const payload: Week2SavedAssignment[] = []
+    const savePayload = useMemo<Week3SavedAssignment[]>(() => {
+        const payload: Week3SavedAssignment[] = []
 
         for (const divisionResult of teamAssignments) {
             for (const team of divisionResult.teams) {
@@ -1838,7 +2004,7 @@ export function CreateWeek2Form({
 
         setIsSaving(true)
 
-        const result = await saveWeek2Rosters(savePayload)
+        const result = await saveWeek3Rosters(savePayload)
 
         if (result.status) {
             setMessage(result.message)
@@ -1892,198 +2058,257 @@ export function CreateWeek2Form({
             </Card>
 
             {step === 1 && (
-                <div className="grid gap-4 xl:grid-cols-2">
-                    {divisions.map((division, index) => {
-                        const bucket = placement.get(division.id)
-                        const players =
-                            editableDivisionPlayers.get(division.id) || []
-                        const targetLabel = "Dynamic team-size target"
-                        const actualMaleCount = players.filter(
-                            (player) => player.male === true
-                        ).length
-                        const actualNonMaleCount =
-                            players.length - actualMaleCount
+                <div className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Week 3 Placement Legend</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                                {placementReasonOrder.map((reason) => (
+                                    <span
+                                        key={reason}
+                                        className={cn(
+                                            "inline-flex items-center rounded-sm border px-2 py-1 font-medium text-xs",
+                                            placementReasonClasses[reason]
+                                        )}
+                                    >
+                                        {placementReasonLabel[reason]}
+                                    </span>
+                                ))}
+                            </div>
+                            <p className="text-muted-foreground text-xs">
+                                Only captains and their paired partners are
+                                locked for Week 3.
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                        return (
-                            <Card key={division.id}>
-                                <CardHeader>
-                                    <CardTitle>
-                                        {index + 1}. {division.name} |{" "}
-                                        {players.length} players
-                                    </CardTitle>
-                                    <p className="text-muted-foreground text-sm">
-                                        {targetLabel}
-                                        {bucket
-                                            ? ` | target ${bucket.targetSize} (${bucket.targetMale} male / ${bucket.targetNonMale} non-male) | actual ${actualMaleCount} male / ${actualNonMaleCount} non-male`
-                                            : ""}
-                                    </p>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-0.5">
-                                        {players.map((player) => (
-                                            <div
-                                                key={player.entryId}
-                                                className={cn(
-                                                    "flex items-center justify-between rounded-sm border px-2 py-0.5 text-xs",
-                                                    player.isCaptain &&
-                                                        "border-primary bg-primary/10"
-                                                )}
-                                            >
-                                                <div className="min-w-0 flex-1 truncate pr-2">
-                                                    <span className="font-medium">
-                                                        {getDisplayName(player)}
-                                                    </span>
-                                                    {player.oldId !== null && (
-                                                        <span className="ml-2 text-muted-foreground">
-                                                            [{player.oldId}]
-                                                        </span>
-                                                    )}
-                                                    {player.pairWithName && (
-                                                        <span className="ml-2 text-muted-foreground">
-                                                            pair:{" "}
-                                                            {
-                                                                player.pairWithName
-                                                            }
-                                                        </span>
-                                                    )}
-                                                    {player.isCaptain && (
-                                                        <span className="ml-2 font-semibold text-primary">
-                                                            CAPTAIN (locked)
-                                                        </span>
-                                                    )}
-                                                    {!player.isCaptain &&
-                                                        captainPairIds.has(
-                                                            player.sourceUserId
-                                                        ) && (
-                                                            <span className="ml-2 font-semibold text-primary">
-                                                                (locked with
-                                                                captain)
-                                                            </span>
-                                                        )}
-                                                    {(duplicateCountBySourceUserId.get(
+                    <div className="grid gap-4 xl:grid-cols-2">
+                        {divisions.map((division, index) => {
+                            const bucket = placement.get(division.id)
+                            const players =
+                                editableDivisionPlayers.get(division.id) || []
+                            const targetLabel = "Week 3 ideal target"
+                            const actualMaleCount = players.filter(
+                                (player) => player.male === true
+                            ).length
+                            const actualNonMaleCount =
+                                players.length - actualMaleCount
+
+                            return (
+                                <Card key={division.id}>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            {index + 1}. {division.name} |{" "}
+                                            {players.length} players
+                                        </CardTitle>
+                                        <p className="text-muted-foreground text-sm">
+                                            {targetLabel}
+                                            {bucket
+                                                ? ` | target ${bucket.targetSize} (${bucket.targetMale} male / ${bucket.targetNonMale} non-male) | actual ${actualMaleCount} male / ${actualNonMaleCount} non-male`
+                                                : ""}
+                                        </p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-0.5">
+                                            {players.map((player) => {
+                                                const reason =
+                                                    playerPlacementReasonById.get(
                                                         player.sourceUserId
-                                                    ) ?? 1) > 1 && (
-                                                        <span className="ml-2 font-semibold">
-                                                            plays twice
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="ml-2 flex items-center gap-1">
-                                                    <span className="text-muted-foreground">
-                                                        {Math.round(
-                                                            player.placementScore
+                                                    ) ?? "score_based"
+                                                const isLocked =
+                                                    lockedPlayerIds.has(
+                                                        player.sourceUserId
+                                                    )
+                                                const duplicateCount =
+                                                    duplicateCountBySourceUserId.get(
+                                                        player.sourceUserId
+                                                    ) ?? 1
+                                                const reasonLabel =
+                                                    getPlayerPlacementLabel(
+                                                        player,
+                                                        reason
+                                                    )
+
+                                                return (
+                                                    <div
+                                                        key={player.entryId}
+                                                        className={cn(
+                                                            "flex items-center justify-between rounded-sm border px-2 py-0.5 text-xs",
+                                                            placementReasonClasses[
+                                                                reason
+                                                            ]
                                                         )}
-                                                        {pairAverageScoreByUser.has(
-                                                            player.sourceUserId
-                                                        ) && (
-                                                            <span>
-                                                                {" "}
-                                                                (pair avg{" "}
-                                                                {Math.round(
-                                                                    pairAverageScoreByUser.get(
-                                                                        player.sourceUserId
-                                                                    ) || 0
+                                                    >
+                                                        <div className="min-w-0 flex-1 truncate pr-2">
+                                                            <span className="font-medium">
+                                                                {getDisplayName(
+                                                                    player
                                                                 )}
-                                                                )
                                                             </span>
-                                                        )}{" "}
-                                                        |{" "}
-                                                        {player.male === true
-                                                            ? "M"
-                                                            : "NM"}
-                                                    </span>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-6 px-1.5"
-                                                        onClick={() =>
-                                                            handleMoveDivision(
-                                                                index,
-                                                                player.entryId,
-                                                                -1
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            index === 0 ||
-                                                            player.isCaptain ||
-                                                            captainPairIds.has(
-                                                                player.sourceUserId
-                                                            )
-                                                        }
-                                                    >
-                                                        ↑
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-6 px-1.5"
-                                                        onClick={() =>
-                                                            handleMoveDivision(
-                                                                index,
-                                                                player.entryId,
-                                                                1
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            index ===
-                                                                divisions.length -
-                                                                    1 ||
-                                                            player.isCaptain ||
-                                                            captainPairIds.has(
-                                                                player.sourceUserId
-                                                            )
-                                                        }
-                                                    >
-                                                        ↓
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-6 px-1.5"
-                                                        onClick={() =>
-                                                            handleDuplicatePlayer(
-                                                                index,
-                                                                player.entryId
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            player.isCaptain ||
-                                                            captainPairIds.has(
-                                                                player.sourceUserId
-                                                            ) ||
-                                                            (duplicateCountBySourceUserId.get(
-                                                                player.sourceUserId
-                                                            ) ?? 1) >= 2
-                                                        }
-                                                    >
-                                                        <RiFileCopyLine className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    {player.isDuplicateEntry && (
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-6 px-1.5"
-                                                            onClick={() =>
-                                                                handleRemoveDuplicate(
-                                                                    player.entryId
-                                                                )
-                                                            }
-                                                        >
-                                                            <RiDeleteBinLine className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                                                            {player.oldId !==
+                                                                null && (
+                                                                <span className="ml-2 opacity-80">
+                                                                    [
+                                                                    {
+                                                                        player.oldId
+                                                                    }
+                                                                    ]
+                                                                </span>
+                                                            )}
+                                                            {player.pairWithName && (
+                                                                <span className="ml-2 opacity-80">
+                                                                    pair:{" "}
+                                                                    {
+                                                                        player.pairWithName
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            <span className="ml-2 font-semibold">
+                                                                {reasonLabel}
+                                                            </span>
+                                                            {duplicateCount >
+                                                                1 && (
+                                                                <span className="ml-2 font-semibold">
+                                                                    plays twice
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="ml-2 flex items-center gap-1">
+                                                            <span className="opacity-80">
+                                                                {Math.round(
+                                                                    player.placementScore
+                                                                )}
+                                                                {pairAverageScoreByUser.has(
+                                                                    player.sourceUserId
+                                                                ) && (
+                                                                    <span>
+                                                                        {" "}
+                                                                        (pair
+                                                                        avg{" "}
+                                                                        {Math.round(
+                                                                            pairAverageScoreByUser.get(
+                                                                                player.sourceUserId
+                                                                            ) ||
+                                                                                0
+                                                                        )}
+                                                                        )
+                                                                    </span>
+                                                                )}{" "}
+                                                                |{" "}
+                                                                {player.male ===
+                                                                true
+                                                                    ? "M"
+                                                                    : "NM"}
+                                                            </span>
+                                                            {player.recommendationUpCount >
+                                                                0 && (
+                                                                <span className="font-semibold text-green-700 dark:text-green-300">
+                                                                    ↑{" "}
+                                                                    {
+                                                                        player.recommendationUpCount
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            {player.recommendationDownCount >
+                                                                0 && (
+                                                                <span className="font-semibold text-red-700 dark:text-red-300">
+                                                                    ↓{" "}
+                                                                    {
+                                                                        player.recommendationDownCount
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 px-1.5"
+                                                                onClick={() =>
+                                                                    handleMoveDivision(
+                                                                        index,
+                                                                        player.entryId,
+                                                                        -1
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    index ===
+                                                                        0 ||
+                                                                    isLocked
+                                                                }
+                                                            >
+                                                                ↑
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 px-1.5"
+                                                                onClick={() =>
+                                                                    handleMoveDivision(
+                                                                        index,
+                                                                        player.entryId,
+                                                                        1
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    index ===
+                                                                        divisions.length -
+                                                                            1 ||
+                                                                    isLocked
+                                                                }
+                                                            >
+                                                                ↓
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 px-1.5"
+                                                                onClick={() =>
+                                                                    handleDuplicatePlayer(
+                                                                        index,
+                                                                        player.entryId
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    isLocked ||
+                                                                    duplicateCount >=
+                                                                        2 ||
+                                                                    (index ===
+                                                                        0 &&
+                                                                        divisions.length ===
+                                                                            1)
+                                                                }
+                                                            >
+                                                                <RiFileCopyLine className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            {player.isDuplicateEntry && (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-6 px-1.5"
+                                                                    onClick={() =>
+                                                                        handleRemoveDuplicate(
+                                                                            player.entryId
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <RiDeleteBinLine className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -2176,7 +2401,7 @@ export function CreateWeek2Form({
                             onClick={handleSave}
                             disabled={isSaving || savePayload.length === 0}
                         >
-                            {isSaving ? "Saving..." : "Save Week 2 Rosters"}
+                            {isSaving ? "Saving..." : "Save Week 3 Rosters"}
                         </Button>
                         {message && (
                             <span className="text-green-700 text-sm dark:text-green-300">
@@ -2196,7 +2421,7 @@ export function CreateWeek2Form({
                 <Card>
                     <CardHeader>
                         <CardTitle>
-                            Excluded (missing tryout 2 date):{" "}
+                            Excluded (missing tryout 3 date):{" "}
                             {excludedPlayers.length}
                         </CardTitle>
                     </CardHeader>
@@ -2204,7 +2429,7 @@ export function CreateWeek2Form({
                         {excludedPlayers.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
                                 No players were excluded for missing the tryout
-                                2 date.
+                                3 date.
                             </p>
                         ) : (
                             <div className="space-y-1">

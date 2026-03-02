@@ -2,7 +2,6 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig } from "@/lib/site-config"
 import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
@@ -28,12 +27,6 @@ export default async function DraftPreseasonWeek1Page() {
 
     if (!session) {
         redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await getIsCommissioner()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
     }
 
     const config = await getSeasonConfig()
