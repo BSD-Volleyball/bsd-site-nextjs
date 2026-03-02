@@ -11,10 +11,22 @@ import {
 } from "@/database/schema"
 import { and, eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import { hasCaptainPagesAccessBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import {
+    getEmptyPlayerRatingAverages,
+    type PlayerRatingAverages,
+    type PlayerRatingPrivateNote,
+    type PlayerRatingSharedNote
+} from "@/lib/player-ratings-shared"
+import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
+import type {
+    PlayerDetails as AdminPlayerDetails,
+    PlayerDraftHistory,
+    PlayerSignup
+} from "@/app/dashboard/player-lookup/actions"
 
 export interface SignupCsvEntry {
     oldId: number
@@ -517,6 +529,174 @@ export async function getSignupsData(): Promise<{
             groups: [],
             allSeasons: [],
             seasonLabel: ""
+        }
+    }
+}
+
+export async function getPlayerDetailsPublic(playerId: string): Promise<{
+    status: boolean
+    message?: string
+    player: AdminPlayerDetails | null
+    draftHistory: PlayerDraftHistory[]
+    signupHistory: PlayerSignup[]
+    ratingAverages: PlayerRatingAverages
+    sharedRatingNotes: PlayerRatingSharedNote[]
+    privateRatingNotes: PlayerRatingPrivateNote[]
+    pairPickName: string | null
+    pairReason: string | null
+}> {
+    const hasAccess = await checkCaptainPagesAccess()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "Unauthorized",
+            player: null,
+            draftHistory: [],
+            signupHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: [],
+            pairPickName: null,
+            pairReason: null
+        }
+    }
+
+    try {
+        const [userData] = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                preffered_name: users.preffered_name,
+                pronouns: users.pronouns,
+                experience: users.experience,
+                assessment: users.assessment,
+                height: users.height,
+                skill_setter: users.skill_setter,
+                skill_hitter: users.skill_hitter,
+                skill_passer: users.skill_passer,
+                skill_other: users.skill_other,
+                male: users.male,
+                picture: users.picture
+            })
+            .from(users)
+            .where(eq(users.id, playerId))
+            .limit(1)
+
+        if (!userData) {
+            return {
+                status: false,
+                message: "Player not found.",
+                player: null,
+                draftHistory: [],
+                signupHistory: [],
+                ratingAverages: getEmptyPlayerRatingAverages(),
+                sharedRatingNotes: [],
+                privateRatingNotes: [],
+                pairPickName: null,
+                pairReason: null
+            }
+        }
+
+        const player: AdminPlayerDetails = {
+            ...userData,
+            old_id: null,
+            name: null,
+            email: "",
+            emailVerified: false,
+            phone: null,
+            emergency_contact: null,
+            role: null,
+            onboarding_completed: null,
+            seasons_list: "",
+            notification_list: "",
+            captain_eligible: false,
+            createdAt: new Date(0),
+            updatedAt: new Date(0)
+        }
+
+        const config = await getSeasonConfig()
+        const viewerUserId = await getSessionUserId()
+        const ratingsSection = await getPlayerRatingsSectionData(
+            playerId,
+            config.seasonId ?? null,
+            viewerUserId
+        )
+
+        let pairPickName: string | null = null
+        let pairReason: string | null = null
+
+        const [mostRecentSignup] = await db
+            .select({
+                pairPickId: signups.pair_pick,
+                pairReason: signups.pair_reason
+            })
+            .from(signups)
+            .innerJoin(seasons, eq(signups.season, seasons.id))
+            .where(eq(signups.player, playerId))
+            .orderBy(desc(seasons.id))
+            .limit(1)
+
+        if (mostRecentSignup?.pairPickId) {
+            const [pairUser] = await db
+                .select({
+                    first_name: users.first_name,
+                    last_name: users.last_name
+                })
+                .from(users)
+                .where(eq(users.id, mostRecentSignup.pairPickId))
+                .limit(1)
+
+            if (pairUser) {
+                pairPickName = `${pairUser.first_name} ${pairUser.last_name}`
+            }
+        }
+
+        if (mostRecentSignup?.pairReason) {
+            pairReason = mostRecentSignup.pairReason
+        }
+
+        const draftData = await db
+            .select({
+                seasonId: seasons.id,
+                seasonYear: seasons.year,
+                seasonName: seasons.season,
+                divisionName: divisions.name,
+                teamName: teams.name,
+                round: drafts.round,
+                overall: drafts.overall
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .innerJoin(seasons, eq(teams.season, seasons.id))
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(eq(drafts.user, playerId))
+            .orderBy(seasons.year, seasons.id)
+
+        return {
+            status: true,
+            player,
+            draftHistory: draftData,
+            signupHistory: [],
+            ratingAverages: ratingsSection.averages,
+            sharedRatingNotes: ratingsSection.sharedNotes,
+            privateRatingNotes: ratingsSection.privateNotes,
+            pairPickName,
+            pairReason
+        }
+    } catch (error) {
+        console.error("Error fetching player details:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            player: null,
+            draftHistory: [],
+            signupHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: [],
+            pairPickName: null,
+            pairReason: null
         }
     }
 }

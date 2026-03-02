@@ -417,6 +417,26 @@ export const auditLog = pgTable("audit_log", {
         .notNull()
 })
 
+export const movingDay = pgTable("moving_day", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    submitted_by: text("submitted_by")
+        .notNull()
+        .references(() => users.id),
+    player: text("player")
+        .notNull()
+        .references(() => users.id),
+    direction: text("direction").notNull(), // 'up' | 'down'
+    is_forced: boolean("is_forced")
+        .$defaultFn(() => false)
+        .notNull(),
+    submitted_at: timestamp("submitted_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 export const emailTemplates = pgTable("email_templates", {
     id: serial("id").primaryKey(),
     name: text("name").notNull().unique(),
