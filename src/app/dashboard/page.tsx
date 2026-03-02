@@ -548,6 +548,7 @@ export default async function DashboardPage() {
     let adminCaptainStatuses: CaptainSelectionDivisionStatus[] = []
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
+    let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null = null
 
     if (session?.user) {
         signupStatus = await getSeasonSignup(session.user.id)
@@ -585,6 +586,23 @@ export default async function DashboardPage() {
                 .where(eq(week1Rosters.season, signupStatus.config.seasonId))
                 .limit(1)
             hasWeek1RosterData = !!week1RosterRow
+
+            if (signupStatus.config.phase === "prep_tryout_week_1") {
+                const [myWeek1Slot] = await db
+                    .select({
+                        sessionNumber: week1Rosters.session_number,
+                        courtNumber: week1Rosters.court_number
+                    })
+                    .from(week1Rosters)
+                    .where(
+                        and(
+                            eq(week1Rosters.season, signupStatus.config.seasonId),
+                            eq(week1Rosters.user, session.user.id)
+                        )
+                    )
+                    .limit(1)
+                userWeek1Roster = myWeek1Slot ?? null
+            }
 
             const [week2RosterRow] = await db
                 .select({ id: week2Rosters.id })
@@ -887,6 +905,59 @@ export default async function DashboardPage() {
                             </CardContent>
                         </Card>
                     )}
+
+                {userWeek1Roster && signupStatus && (
+                    <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
+                                    You're in Week 1 Tryouts!
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-orange-700 text-sm dark:text-orange-300">
+                                You have been assigned a spot in the Pre-Season Week 1 tryout.
+                            </p>
+                            <div className="rounded-md bg-orange-100 p-3 dark:bg-orange-900 space-y-1.5 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Session:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek1Roster.sessionNumber === 3
+                                            ? "Alternate"
+                                            : `Session ${userWeek1Roster.sessionNumber}`}
+                                    </span>
+                                </div>
+                                {userWeek1Roster.sessionNumber !== 3 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">Court:</span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            Court {userWeek1Roster.courtNumber}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Time:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek1Roster.sessionNumber === 1
+                                            ? signupStatus.config.tryout1Session1Time || "TBD"
+                                            : signupStatus.config.tryout1Session2Time || "TBD"}
+                                    </span>
+                                </div>
+                            </div>
+                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                                Please plan to arrive 10 minutes early.
+                            </p>
+                            <Link
+                                href="/dashboard/preseason-week-1"
+                                className="inline-flex items-center justify-center rounded-md bg-orange-600 px-4 py-2 font-medium text-sm text-white hover:bg-orange-700"
+                            >
+                                View Full Week 1 Roster
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {shouldShowWeek1TryoutSheetsCard && (
                     <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
