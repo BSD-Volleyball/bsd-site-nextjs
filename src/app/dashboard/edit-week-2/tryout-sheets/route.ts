@@ -14,7 +14,7 @@ import {
     week2Rosters
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatHeight } from "@/components/player-detail/format-height"
 
@@ -238,7 +238,7 @@ function getSessionMatchup(sessionNumber: 1 | 2 | 3): {
 }
 
 export async function GET() {
-    const hasAccess = await isAdminOrDirectorBySession()
+    const hasAccess = await hasCaptainPagesAccessBySession()
     if (!hasAccess) {
         return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
@@ -249,6 +249,30 @@ export async function GET() {
             return NextResponse.json(
                 { error: "No current season found." },
                 { status: 400 }
+            )
+        }
+
+        if (config.phase !== "prep_tryout_week_2") {
+            return NextResponse.json(
+                {
+                    error: "Week 2 tryout sheets are only available during Prepare for Tryout Week 2."
+                },
+                { status: 403 }
+            )
+        }
+
+        const [week2RosterRow] = await db
+            .select({ id: week2Rosters.id })
+            .from(week2Rosters)
+            .where(eq(week2Rosters.season, config.seasonId))
+            .limit(1)
+
+        if (!week2RosterRow) {
+            return NextResponse.json(
+                {
+                    error: "Week 2 tryout sheets are unavailable until week 2 roster records exist for this season."
+                },
+                { status: 404 }
             )
         }
 

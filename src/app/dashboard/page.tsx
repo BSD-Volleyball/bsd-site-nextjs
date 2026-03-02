@@ -10,11 +10,15 @@ import {
     drafts,
     teams,
     divisions,
+    individual_divisions,
     waitlist,
     champions,
-    evaluations
+    evaluations,
+    commissioners,
+    week1Rosters,
+    week2Rosters
 } from "@/database/schema"
-import { eq, and, desc, count, inArray } from "drizzle-orm"
+import { eq, and, desc, count, inArray, isNotNull } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
@@ -35,8 +39,9 @@ import { PreviousSeasonsCard } from "./previous-seasons-card"
 import {
     hasCaptainPagesAccessBySession,
     isAdminOrDirectorBySession,
-    isCommissionerBySession
+    isCommissionerForSeason
 } from "@/lib/rbac"
+import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -213,6 +218,130 @@ async function getNewPlayerEvalStats(
         )
 
     return { totalNew, ratedByUser: result?.total ?? 0 }
+}
+
+interface CaptainSelectionDivisionStatus {
+    divisionId: number
+    divisionName: string
+    requiredTeams: number
+    teamsWithCaptain: number
+    isComplete: boolean
+}
+
+async function getAllDivisionCaptainSelectionStatus(
+    seasonId: number
+): Promise<CaptainSelectionDivisionStatus[]> {
+    const divisionTargets = await db
+        .select({
+            divisionId: individual_divisions.division,
+            divisionName: divisions.name,
+            requiredTeams: individual_divisions.teams
+        })
+        .from(individual_divisions)
+        .innerJoin(divisions, eq(individual_divisions.division, divisions.id))
+        .where(eq(individual_divisions.season, seasonId))
+        .orderBy(divisions.level)
+
+    if (divisionTargets.length === 0) return []
+
+    const captainCounts = await db
+        .select({
+            divisionId: teams.division,
+            total: count()
+        })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, seasonId),
+                inArray(
+                    teams.division,
+                    divisionTargets.map((d) => d.divisionId)
+                ),
+                isNotNull(teams.captain)
+            )
+        )
+        .groupBy(teams.division)
+
+    const countByDivisionId = new Map(
+        captainCounts.map((row) => [row.divisionId, row.total])
+    )
+
+    return divisionTargets.map((division) => {
+        const teamsWithCaptain = countByDivisionId.get(division.divisionId) ?? 0
+        return {
+            divisionId: division.divisionId,
+            divisionName: division.divisionName,
+            requiredTeams: division.requiredTeams,
+            teamsWithCaptain,
+            isComplete:
+                division.requiredTeams > 0 &&
+                teamsWithCaptain === division.requiredTeams
+        }
+    })
+}
+
+async function getCommissionerCaptainSelectionStatus(
+    userId: string,
+    seasonId: number
+): Promise<CaptainSelectionDivisionStatus[]> {
+    const commissionerDivisions = await db
+        .select({
+            divisionId: commissioners.division,
+            divisionName: divisions.name,
+            requiredTeams: individual_divisions.teams
+        })
+        .from(commissioners)
+        .innerJoin(divisions, eq(commissioners.division, divisions.id))
+        .leftJoin(
+            individual_divisions,
+            and(
+                eq(individual_divisions.season, seasonId),
+                eq(individual_divisions.division, commissioners.division)
+            )
+        )
+        .where(
+            and(
+                eq(commissioners.season, seasonId),
+                eq(commissioners.commissioner, userId)
+            )
+        )
+        .orderBy(divisions.level)
+
+    if (commissionerDivisions.length === 0) return []
+
+    const captainCounts = await db
+        .select({
+            divisionId: teams.division,
+            total: count()
+        })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, seasonId),
+                inArray(
+                    teams.division,
+                    commissionerDivisions.map((d) => d.divisionId)
+                ),
+                isNotNull(teams.captain)
+            )
+        )
+        .groupBy(teams.division)
+
+    const countByDivisionId = new Map(
+        captainCounts.map((row) => [row.divisionId, row.total])
+    )
+
+    return commissionerDivisions.map((division) => {
+        const requiredTeams = division.requiredTeams ?? 0
+        const teamsWithCaptain = countByDivisionId.get(division.divisionId) ?? 0
+        return {
+            divisionId: division.divisionId,
+            divisionName: division.divisionName,
+            requiredTeams,
+            teamsWithCaptain,
+            isComplete: requiredTeams > 0 && teamsWithCaptain === requiredTeams
+        }
+    })
 }
 
 function RegistrationConfirmation({
@@ -408,15 +537,17 @@ export default async function DashboardPage() {
         ? await hasCaptainPagesAccessBySession()
         : false
     const isAdmin = session?.user ? await isAdminOrDirectorBySession() : false
-    const isCommissioner = session?.user
-        ? await isCommissionerBySession()
-        : false
+    let isCurrentSeasonCommissioner = false
 
     let signupStatus = null
     let userName: string | null = null
     let previousSeasons: PreviousSeason[] = []
     let evalStats: { totalNew: number; ratedByUser: number } | null = null
     let discount: Awaited<ReturnType<typeof getActiveDiscountForUser>> = null
+    let commissionerCaptainStatuses: CaptainSelectionDivisionStatus[] = []
+    let adminCaptainStatuses: CaptainSelectionDivisionStatus[] = []
+    let hasWeek1RosterData = false
+    let hasWeek2RosterData = false
 
     if (session?.user) {
         signupStatus = await getSeasonSignup(session.user.id)
@@ -441,6 +572,42 @@ export default async function DashboardPage() {
                 signupStatus.config.seasonId
             )
         }
+
+        if (signupStatus?.config.seasonId) {
+            isCurrentSeasonCommissioner = await isCommissionerForSeason(
+                session.user.id,
+                signupStatus.config.seasonId
+            )
+
+            const [week1RosterRow] = await db
+                .select({ id: week1Rosters.id })
+                .from(week1Rosters)
+                .where(eq(week1Rosters.season, signupStatus.config.seasonId))
+                .limit(1)
+            hasWeek1RosterData = !!week1RosterRow
+
+            const [week2RosterRow] = await db
+                .select({ id: week2Rosters.id })
+                .from(week2Rosters)
+                .where(eq(week2Rosters.season, signupStatus.config.seasonId))
+                .limit(1)
+            hasWeek2RosterData = !!week2RosterRow
+
+            if (signupStatus.config.phase === "select_captains") {
+                if (isAdmin) {
+                    adminCaptainStatuses =
+                        await getAllDivisionCaptainSelectionStatus(
+                            signupStatus.config.seasonId
+                        )
+                } else if (isCurrentSeasonCommissioner) {
+                    commissionerCaptainStatuses =
+                        await getCommissionerCaptainSelectionStatus(
+                            session.user.id,
+                            signupStatus.config.seasonId
+                        )
+                }
+            }
+        }
     }
 
     const seasonLabel = signupStatus
@@ -448,6 +615,59 @@ export default async function DashboardPage() {
         : null
 
     const waitlistSeasonId = signupStatus?.season?.id ?? null
+    const hasCompletedNewPlayerEvaluations = !!(
+        evalStats &&
+        evalStats.totalNew > 0 &&
+        evalStats.ratedByUser >= evalStats.totalNew
+    )
+    const commissionerDivisionsCompleted = commissionerCaptainStatuses.filter(
+        (status) => status.isComplete
+    ).length
+    const commissionerAllDivisionsCompleted =
+        commissionerCaptainStatuses.length > 0 &&
+        commissionerDivisionsCompleted === commissionerCaptainStatuses.length
+    const adminDivisionsCompleted = adminCaptainStatuses.filter(
+        (status) => status.isComplete
+    ).length
+    const adminAllDivisionsCompleted =
+        adminCaptainStatuses.length > 0 &&
+        adminDivisionsCompleted === adminCaptainStatuses.length
+    const adminCompletedDivisionNames = adminCaptainStatuses
+        .filter((status) => status.isComplete)
+        .map((status) => status.divisionName)
+        .join(", ")
+    const adminPendingDivisionNames = adminCaptainStatuses
+        .filter((status) => !status.isComplete)
+        .map((status) => status.divisionName)
+        .join(", ")
+    const shouldShowWeek1TryoutSheetsCard = !!(
+        hasTryoutSheetAccess &&
+        signupStatus &&
+        ["select_captains", "prep_tryout_week_1"].includes(
+            signupStatus.config.phase
+        ) &&
+        hasWeek1RosterData
+    )
+    const shouldShowWeek2TryoutSheetsCard = !!(
+        hasTryoutSheetAccess &&
+        signupStatus &&
+        signupStatus.config.phase === "prep_tryout_week_2" &&
+        hasWeek2RosterData
+    )
+    const shouldShowWeek1NametagCard = !!(
+        isAdmin &&
+        signupStatus &&
+        ["select_captains", "prep_tryout_week_1"].includes(
+            signupStatus.config.phase
+        ) &&
+        hasWeek1RosterData
+    )
+    const shouldShowWeek2NametagCard = !!(
+        isAdmin &&
+        signupStatus &&
+        signupStatus.config.phase === "prep_tryout_week_2" &&
+        hasWeek2RosterData
+    )
 
     const greeting = userName
         ? `Hi ${userName}, Welcome back 👋`
@@ -461,23 +681,139 @@ export default async function DashboardPage() {
             />
 
             <div className="flex flex-wrap gap-6">
-                {isCommissioner &&
+                {!isAdmin &&
+                    isCurrentSeasonCommissioner &&
                     signupStatus?.config.phase === "select_captains" && (
-                        <Card className="min-w-[280px] flex-1 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                        <Card
+                            className={cn(
+                                "min-w-[280px] flex-1",
+                                commissionerAllDivisionsCompleted
+                                    ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                                    : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+                            )}
+                        >
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-amber-700 text-lg dark:text-amber-300">
+                                <CardTitle
+                                    className={cn(
+                                        "text-lg",
+                                        commissionerAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
                                     Time to Select Captains
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <p className="text-amber-700 text-sm dark:text-amber-300">
-                                    It's time to select team captains for your
-                                    division. Review candidates and make your
-                                    selections.
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        commissionerAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    {commissionerAllDivisionsCompleted
+                                        ? "Great work. You've completed captain selection for all of your assigned divisions."
+                                        : `Captain selection is complete in ${commissionerDivisionsCompleted} of ${commissionerCaptainStatuses.length} assigned divisions.`}
+                                </p>
+                                {commissionerCaptainStatuses.length > 0 && (
+                                    <p
+                                        className={cn(
+                                            "text-sm",
+                                            commissionerAllDivisionsCompleted
+                                                ? "text-green-700 dark:text-green-300"
+                                                : "text-amber-700 dark:text-amber-300"
+                                        )}
+                                    >
+                                        {commissionerCaptainStatuses
+                                            .map(
+                                                (status) =>
+                                                    `${status.divisionName} (${status.teamsWithCaptain}/${status.requiredTeams})`
+                                            )
+                                            .join(", ")}
+                                    </p>
+                                )}
+                                <Link
+                                    href="/dashboard/select-captains"
+                                    className={cn(
+                                        "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                        commissionerAllDivisionsCompleted
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-amber-600 hover:bg-amber-700"
+                                    )}
+                                >
+                                    Select Captains
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                {isAdmin &&
+                    signupStatus?.config.phase === "select_captains" && (
+                        <Card
+                            className={cn(
+                                "min-w-[280px] flex-1",
+                                adminAllDivisionsCompleted
+                                    ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                                    : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+                            )}
+                        >
+                            <CardHeader className="pb-2">
+                                <CardTitle
+                                    className={cn(
+                                        "text-lg",
+                                        adminAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    Time to Select Captains
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        adminAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    {adminAllDivisionsCompleted
+                                        ? "All divisions have selected captains. Great work, and it's time to move the season to the next phase."
+                                        : `Captain selection is complete in ${adminDivisionsCompleted} of ${adminCaptainStatuses.length} divisions.`}
+                                </p>
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        adminAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    Completed divisions:{" "}
+                                    {adminCompletedDivisionNames || "None yet"}
+                                </p>
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        adminAllDivisionsCompleted
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    Pending divisions:{" "}
+                                    {adminPendingDivisionNames || "None"}
                                 </p>
                                 <Link
                                     href="/dashboard/select-captains"
-                                    className="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 font-medium text-sm text-white hover:bg-amber-700"
+                                    className={cn(
+                                        "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                        adminAllDivisionsCompleted
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-amber-600 hover:bg-amber-700"
+                                    )}
                                 >
                                     Select Captains
                                 </Link>
@@ -494,25 +830,57 @@ export default async function DashboardPage() {
                         "select_captains",
                         "prep_tryout_week_1"
                     ].includes(signupStatus.config.phase) && (
-                        <Card className="min-w-[280px] flex-1 border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
+                        <Card
+                            className={cn(
+                                "min-w-[280px] flex-1",
+                                hasCompletedNewPlayerEvaluations
+                                    ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                                    : "border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950"
+                            )}
+                        >
                             <CardHeader className="pb-2">
                                 <div className="flex items-center gap-2">
-                                    <RiStarLine className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                    <CardTitle className="text-lg text-purple-700 dark:text-purple-300">
+                                    <RiStarLine
+                                        className={cn(
+                                            "h-5 w-5",
+                                            hasCompletedNewPlayerEvaluations
+                                                ? "text-green-600 dark:text-green-400"
+                                                : "text-purple-600 dark:text-purple-400"
+                                        )}
+                                    />
+                                    <CardTitle
+                                        className={cn(
+                                            "text-lg",
+                                            hasCompletedNewPlayerEvaluations
+                                                ? "text-green-700 dark:text-green-300"
+                                                : "text-purple-700 dark:text-purple-300"
+                                        )}
+                                    >
                                         Evaluate New Players
                                     </CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                <p className="text-purple-700 text-sm dark:text-purple-300">
-                                    There are {evalStats.totalNew} new players
-                                    this season. You've evaluated{" "}
-                                    {evalStats.ratedByUser} of{" "}
-                                    {evalStats.totalNew}.
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        hasCompletedNewPlayerEvaluations
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-purple-700 dark:text-purple-300"
+                                    )}
+                                >
+                                    {hasCompletedNewPlayerEvaluations
+                                        ? `Great work. You have evaluated all ${evalStats.totalNew} current new players.`
+                                        : `There are ${evalStats.totalNew} new players this season. You've evaluated ${evalStats.ratedByUser} of ${evalStats.totalNew}.`}
                                 </p>
                                 <Link
                                     href="/dashboard/evaluate-players"
-                                    className="inline-flex items-center justify-center rounded-md bg-purple-600 px-4 py-2 font-medium text-sm text-white hover:bg-purple-700"
+                                    className={cn(
+                                        "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                        hasCompletedNewPlayerEvaluations
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-purple-600 hover:bg-purple-700"
+                                    )}
                                 >
                                     Evaluate New Players
                                 </Link>
@@ -520,7 +888,7 @@ export default async function DashboardPage() {
                         </Card>
                     )}
 
-                {hasTryoutSheetAccess && (
+                {shouldShowWeek1TryoutSheetsCard && (
                     <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
@@ -542,7 +910,7 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
-                {hasTryoutSheetAccess && (
+                {shouldShowWeek2TryoutSheetsCard && (
                     <Card className="min-w-[280px] flex-1 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-indigo-700 text-lg dark:text-indigo-300">
@@ -564,7 +932,7 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
-                {isAdmin && (
+                {shouldShowWeek1NametagCard && (
                     <Card className="min-w-[280px] flex-1">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-lg">
@@ -589,13 +957,13 @@ export default async function DashboardPage() {
                                 href="/dashboard/edit-week-1/nametags"
                                 className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
                             >
-                                Download Nametag PDF
+                                Download Week 1 Nametag PDF
                             </a>
                         </CardContent>
                     </Card>
                 )}
 
-                {isAdmin && (
+                {shouldShowWeek2NametagCard && (
                     <Card className="min-w-[280px] flex-1">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-lg">

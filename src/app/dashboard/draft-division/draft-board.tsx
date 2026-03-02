@@ -439,12 +439,17 @@ export function DraftBoard({
                                             userId
                                         )
                                         const editable = canEditCell(team.id)
+                                        const isActivePick =
+                                            currentTurn?.round === round &&
+                                            currentTurn?.team.id === team.id
                                         return (
                                             <td
                                                 key={team.id}
                                                 className={cn(
                                                     "border p-1",
-                                                    cellStyle
+                                                    isActivePick
+                                                        ? "bg-yellow-100 ring-2 ring-yellow-400 ring-inset dark:bg-yellow-900/30 dark:ring-yellow-500"
+                                                        : cellStyle
                                                 )}
                                             >
                                                 {editable ? (
