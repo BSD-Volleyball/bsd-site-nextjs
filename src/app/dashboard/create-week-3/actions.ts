@@ -11,39 +11,41 @@ import {
     teams,
     seasons,
     divisions,
-    week2Rosters
+    movingDay,
+    week2Rosters,
+    week3Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import type {
-    Week2Candidate,
-    Week2Division,
-    Week2ExcludedPlayer,
-    Week2SavedAssignment
-} from "./week2-types"
+    Week3Candidate,
+    Week3Division,
+    Week3ExcludedPlayer,
+    Week3SavedAssignment
+} from "./week3-types"
 
 interface DraftSeasonRecord {
     seasonId: number
     overall: number
 }
 
-function getDisplayName(candidate: Week2Candidate) {
+function getDisplayName(candidate: Week3Candidate) {
     if (candidate.preferredName) {
         return `${candidate.preferredName} ${candidate.lastName}`
     }
     return `${candidate.firstName} ${candidate.lastName}`
 }
 
-export async function getCreateWeek2Data(): Promise<{
+export async function getCreateWeek3Data(): Promise<{
     status: boolean
     message?: string
     seasonId: number
     seasonLabel: string
-    divisions: Week2Division[]
-    candidates: Week2Candidate[]
-    excludedPlayers: Week2ExcludedPlayer[]
+    divisions: Week3Division[]
+    candidates: Week3Candidate[]
+    excludedPlayers: Week3ExcludedPlayer[]
 }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
@@ -74,47 +76,85 @@ export async function getCreateWeek2Data(): Promise<{
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryout2 = config.tryout2Date.trim().toLowerCase()
+        const tryout3 = config.tryout3Date.trim().toLowerCase()
 
-        const [activeDivisions, signupRowsRaw, captainRows] = await Promise.all(
-            [
-                db
-                    .select({
-                        id: divisions.id,
-                        name: divisions.name,
-                        level: divisions.level
-                    })
-                    .from(divisions)
-                    .where(eq(divisions.active, true))
-                    .orderBy(divisions.level),
-                db
-                    .select({
-                        userId: signups.player,
-                        oldId: users.old_id,
-                        firstName: users.first_name,
-                        lastName: users.last_name,
-                        preferredName: users.preffered_name,
-                        male: users.male,
-                        datesMissing: signups.dates_missing,
-                        pairPickId: signups.pair_pick
-                    })
-                    .from(signups)
-                    .innerJoin(users, eq(signups.player, users.id))
-                    .where(eq(signups.season, config.seasonId))
-                    .orderBy(users.last_name, users.first_name),
-                db
-                    .select({
-                        userId: teams.captain,
-                        divisionId: teams.division,
-                        divisionName: divisions.name
-                    })
-                    .from(teams)
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(eq(teams.season, config.seasonId))
-            ]
-        )
+        const [
+            activeDivisions,
+            signupRowsRaw,
+            captainRows,
+            week2Rows,
+            forcedMoveRows,
+            recommendationRows
+        ] = await Promise.all([
+            db
+                .select({
+                    id: divisions.id,
+                    name: divisions.name,
+                    level: divisions.level
+                })
+                .from(divisions)
+                .where(eq(divisions.active, true))
+                .orderBy(divisions.level),
+            db
+                .select({
+                    userId: signups.player,
+                    oldId: users.old_id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preffered_name,
+                    male: users.male,
+                    datesMissing: signups.dates_missing,
+                    pairPickId: signups.pair_pick
+                })
+                .from(signups)
+                .innerJoin(users, eq(signups.player, users.id))
+                .where(eq(signups.season, config.seasonId))
+                .orderBy(users.last_name, users.first_name),
+            db
+                .select({
+                    userId: teams.captain,
+                    divisionId: teams.division,
+                    divisionName: divisions.name
+                })
+                .from(teams)
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(eq(teams.season, config.seasonId)),
+            db
+                .select({
+                    userId: week2Rosters.user,
+                    divisionId: week2Rosters.division
+                })
+                .from(week2Rosters)
+                .where(eq(week2Rosters.season, config.seasonId)),
+            db
+                .select({
+                    id: movingDay.id,
+                    userId: movingDay.player,
+                    direction: movingDay.direction
+                })
+                .from(movingDay)
+                .where(
+                    and(
+                        eq(movingDay.season, config.seasonId),
+                        eq(movingDay.is_forced, true)
+                    )
+                )
+                .orderBy(desc(movingDay.id)),
+            db
+                .select({
+                    userId: movingDay.player,
+                    direction: movingDay.direction
+                })
+                .from(movingDay)
+                .where(
+                    and(
+                        eq(movingDay.season, config.seasonId),
+                        eq(movingDay.is_forced, false)
+                    )
+                )
+        ])
 
-        const divisionsWithMeta: Week2Division[] = activeDivisions.map(
+        const divisionsWithMeta: Week3Division[] = activeDivisions.map(
             (division, index) => ({
                 ...division,
                 index,
@@ -130,10 +170,48 @@ export async function getCreateWeek2Data(): Promise<{
             captainDivisionNameByUser.set(row.userId, row.divisionName)
         }
 
-        const excludedPlayers: Week2ExcludedPlayer[] = []
+        const week2DivisionByUser = new Map<string, number>()
+        for (const row of week2Rows) {
+            if (!week2DivisionByUser.has(row.userId)) {
+                week2DivisionByUser.set(row.userId, row.divisionId)
+            }
+        }
+
+        const forcedMoveByUser = new Map<string, "up" | "down">()
+        for (const row of forcedMoveRows) {
+            if (
+                !forcedMoveByUser.has(row.userId) &&
+                (row.direction === "up" || row.direction === "down")
+            ) {
+                forcedMoveByUser.set(row.userId, row.direction)
+            }
+        }
+
+        const recommendationCountByUser = new Map<
+            string,
+            { up: number; down: number }
+        >()
+        for (const row of recommendationRows) {
+            if (row.direction !== "up" && row.direction !== "down") {
+                continue
+            }
+
+            const current = recommendationCountByUser.get(row.userId) || {
+                up: 0,
+                down: 0
+            }
+            if (row.direction === "up") {
+                current.up += 1
+            } else {
+                current.down += 1
+            }
+            recommendationCountByUser.set(row.userId, current)
+        }
+
+        const excludedPlayers: Week3ExcludedPlayer[] = []
 
         const signupRows = signupRowsRaw.filter((row) => {
-            if (!tryout2) {
+            if (!tryout3) {
                 return true
             }
 
@@ -142,7 +220,7 @@ export async function getCreateWeek2Data(): Promise<{
                 .map((value) => value.trim().toLowerCase())
                 .filter(Boolean)
 
-            const isExcluded = missingDates.includes(tryout2)
+            const isExcluded = missingDates.includes(tryout3)
             if (isExcluded) {
                 excludedPlayers.push({
                     userId: row.userId,
@@ -282,12 +360,18 @@ export async function getCreateWeek2Data(): Promise<{
             }
         }
 
-        const candidates: Week2Candidate[] = signupRows.map((row) => {
+        const candidates: Week3Candidate[] = signupRows.map((row) => {
             const history = draftsByUser.get(row.userId) || []
             const mostRecent = history[0] || null
             const placementScore = mostRecent
                 ? mostRecent.overall
                 : (evaluationScoreByUser.get(row.userId) ?? 200)
+            const recommendations = recommendationCountByUser.get(
+                row.userId
+            ) || {
+                up: 0,
+                down: 0
+            }
 
             return {
                 userId: row.userId,
@@ -307,7 +391,11 @@ export async function getCreateWeek2Data(): Promise<{
                     captainDivisionByUser.get(row.userId) || null,
                 captainDivisionName:
                     captainDivisionNameByUser.get(row.userId) || null,
-                isCaptain: captainDivisionByUser.has(row.userId)
+                isCaptain: captainDivisionByUser.has(row.userId),
+                week2DivisionId: week2DivisionByUser.get(row.userId) || null,
+                forcedMoveDirection: forcedMoveByUser.get(row.userId) || null,
+                recommendationUpCount: recommendations.up,
+                recommendationDownCount: recommendations.down
             }
         })
 
@@ -337,7 +425,7 @@ export async function getCreateWeek2Data(): Promise<{
             excludedPlayers
         }
     } catch (error) {
-        console.error("Error loading create week 2 data:", error)
+        console.error("Error loading create week 3 data:", error)
         return {
             status: false,
             message: "Something went wrong while loading data.",
@@ -350,8 +438,8 @@ export async function getCreateWeek2Data(): Promise<{
     }
 }
 
-export async function saveWeek2Rosters(
-    assignments: Week2SavedAssignment[]
+export async function saveWeek3Rosters(
+    assignments: Week3SavedAssignment[]
 ): Promise<{ status: boolean; message: string }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
@@ -450,10 +538,10 @@ export async function saveWeek2Rosters(
     try {
         await db.transaction(async (tx) => {
             await tx
-                .delete(week2Rosters)
-                .where(eq(week2Rosters.season, config.seasonId))
+                .delete(week3Rosters)
+                .where(eq(week3Rosters.season, config.seasonId))
 
-            await tx.insert(week2Rosters).values(
+            await tx.insert(week3Rosters).values(
                 assignments.map((assignment) => ({
                     season: config.seasonId,
                     user: assignment.userId,
@@ -470,20 +558,20 @@ export async function saveWeek2Rosters(
             await logAuditEntry({
                 userId: session.user.id,
                 action: "create",
-                entityType: "week2_rosters",
-                summary: `Created week 2 rosters for season ${config.seasonId}`
+                entityType: "week3_rosters",
+                summary: `Created week 3 rosters for season ${config.seasonId}`
             })
         }
 
         return {
             status: true,
-            message: "Week 2 rosters saved successfully."
+            message: "Week 3 rosters saved successfully."
         }
     } catch (error) {
-        console.error("Error saving week 2 rosters:", error)
+        console.error("Error saving week 3 rosters:", error)
         return {
             status: false,
-            message: "Something went wrong while saving week 2 rosters."
+            message: "Something went wrong while saving week 3 rosters."
         }
     }
 }

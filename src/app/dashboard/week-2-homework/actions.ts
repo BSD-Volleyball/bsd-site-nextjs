@@ -1,6 +1,7 @@
 "use server"
 
 import { and, asc, eq } from "drizzle-orm"
+import { alias } from "drizzle-orm/pg-core"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
@@ -8,6 +9,7 @@ import {
     divisions,
     movingDay,
     seasons,
+    signups,
     users,
     week2Rosters
 } from "@/database/schema"
@@ -23,6 +25,8 @@ export interface Week2Player {
     isCaptain: boolean
     teamNumber: number
     divisionId: number
+    pairPickName: string | null
+    pairPickUserId: string | null
 }
 
 export interface ExistingSubmission {
@@ -113,6 +117,8 @@ export async function getWeek2HomeworkData(): Promise<{
     const minLevel = Math.min(...levels)
     const maxLevel = Math.max(...levels)
 
+    const pairPickUser = alias(users, "pair_pick_user")
+
     const teamRosterRows = await db
         .select({
             userId: week2Rosters.user,
@@ -123,10 +129,22 @@ export async function getWeek2HomeworkData(): Promise<{
             male: users.male,
             isCaptain: week2Rosters.is_captain,
             teamNumber: week2Rosters.team_number,
-            divisionId: week2Rosters.division
+            divisionId: week2Rosters.division,
+            pairPickFirstName: pairPickUser.first_name,
+            pairPickLastName: pairPickUser.last_name,
+            pairPickPreferredName: pairPickUser.preffered_name,
+            pairPickUserId: pairPickUser.id
         })
         .from(week2Rosters)
         .innerJoin(users, eq(week2Rosters.user, users.id))
+        .leftJoin(
+            signups,
+            and(
+                eq(signups.player, week2Rosters.user),
+                eq(signups.season, config.seasonId)
+            )
+        )
+        .leftJoin(pairPickUser, eq(pairPickUser.id, signups.pair_pick))
         .where(
             and(
                 eq(week2Rosters.season, config.seasonId),
@@ -135,6 +153,27 @@ export async function getWeek2HomeworkData(): Promise<{
             )
         )
         .orderBy(asc(users.last_name), asc(users.first_name))
+
+    const mappedTeamRoster: Week2Player[] = teamRosterRows.map((row) => {
+        const pairName = row.pairPickFirstName
+            ? (row.pairPickPreferredName ?? row.pairPickFirstName) +
+              " " +
+              row.pairPickLastName
+            : null
+        return {
+            userId: row.userId,
+            firstName: row.firstName,
+            lastName: row.lastName,
+            preferredName: row.preferredName,
+            oldId: row.oldId,
+            male: row.male,
+            isCaptain: row.isCaptain,
+            teamNumber: row.teamNumber,
+            divisionId: row.divisionId,
+            pairPickName: pairName,
+            pairPickUserId: row.pairPickUserId ?? null
+        }
+    })
 
     const allTryoutPlayerRows = await db
         .select({
@@ -160,11 +199,13 @@ export async function getWeek2HomeworkData(): Promise<{
 
     // Deduplicate (players may appear in multiple teams)
     const seenUserIds = new Set<string>()
-    const dedupedAllTryoutPlayers = allTryoutPlayerRows.filter((row) => {
-        if (seenUserIds.has(row.userId)) return false
-        seenUserIds.add(row.userId)
-        return true
-    })
+    const dedupedAllTryoutPlayers: Week2Player[] = allTryoutPlayerRows
+        .filter((row) => {
+            if (seenUserIds.has(row.userId)) return false
+            seenUserIds.add(row.userId)
+            return true
+        })
+        .map((row) => ({ ...row, pairPickName: null, pairPickUserId: null }))
 
     const existingRows = await db
         .select({
@@ -196,7 +237,7 @@ export async function getWeek2HomeworkData(): Promise<{
             divisionLevel: divisionInfo.level,
             teamNumber: captainEntry.teamNumber,
             captainUserId: session.user.id,
-            teamRoster: teamRosterRows,
+            teamRoster: mappedTeamRoster,
             allTryoutPlayers: dedupedAllTryoutPlayers,
             isTopDivision: divisionInfo.level === minLevel,
             isBottomDivision: divisionInfo.level === maxLevel,

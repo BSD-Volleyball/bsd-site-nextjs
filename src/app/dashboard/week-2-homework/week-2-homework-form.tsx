@@ -1,10 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { RiAddLine, RiDeleteBinLine } from "@remixicon/react"
+import {
+    RiAddLine,
+    RiArrowDownSLine,
+    RiCloseLine,
+    RiDeleteBinLine
+} from "@remixicon/react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover"
 import {
     Select,
     SelectContent,
@@ -12,6 +23,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -22,6 +34,7 @@ import {
     type ExistingSubmission,
     type SeasonInfo
 } from "./actions"
+import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 
 interface Week2HomeworkFormProps {
     seasonId: number
@@ -133,6 +146,150 @@ function PlayerSelect({
     )
 }
 
+interface PlayerComboboxProps {
+    id: string
+    players: Week2Player[]
+    value: string
+    onValueChange: (val: string) => void
+    placeholder: string
+    onPlayerNameClick: (userId: string) => void
+}
+
+function PlayerCombobox({
+    players,
+    value,
+    onValueChange,
+    placeholder,
+    onPlayerNameClick
+}: PlayerComboboxProps) {
+    const [open, setOpen] = useState(false)
+    const [search, setSearch] = useState("")
+
+    const selectedPlayer = useMemo(
+        () => players.find((p) => p.userId === value) ?? null,
+        [players, value]
+    )
+
+    const filteredPlayers = useMemo(() => {
+        if (!search.trim()) return players
+        const lower = search.toLowerCase()
+        return players.filter((p) => {
+            const name =
+                `${p.preferredName ?? p.firstName} ${p.lastName}`.toLowerCase()
+            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
+            const oldId = String(p.oldId)
+            return (
+                name.includes(lower) ||
+                fullName.includes(lower) ||
+                oldId.includes(lower)
+            )
+        })
+    }, [players, search])
+
+    const handleSelect = (userId: string) => {
+        onValueChange(userId)
+        setOpen(false)
+        setSearch("")
+    }
+
+    const handleClear = () => {
+        onValueChange("")
+        setSearch("")
+    }
+
+    return (
+        <div className="flex items-center gap-2">
+            <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        className="w-72 justify-between font-normal"
+                    >
+                        <span
+                            className={cn(
+                                "truncate",
+                                !selectedPlayer && "text-muted-foreground"
+                            )}
+                        >
+                            {selectedPlayer
+                                ? getDisplayName(selectedPlayer)
+                                : placeholder}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                            {selectedPlayer && (
+                                <span
+                                    role="button"
+                                    tabIndex={0}
+                                    className="rounded-sm p-0.5 hover:bg-accent"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleClear()
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            e.key === "Enter" ||
+                                            e.key === " "
+                                        ) {
+                                            e.stopPropagation()
+                                            handleClear()
+                                        }
+                                    }}
+                                >
+                                    <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                                </span>
+                            )}
+                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                    className="w-(--radix-popover-trigger-width) p-2"
+                    align="start"
+                >
+                    <Input
+                        placeholder="Search by name or #ID..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="mb-2"
+                    />
+                    <div className="max-h-60 overflow-y-auto">
+                        {filteredPlayers.length === 0 ? (
+                            <p className="py-2 text-center text-muted-foreground text-sm">
+                                No players found
+                            </p>
+                        ) : (
+                            filteredPlayers.map((p) => (
+                                <button
+                                    key={p.userId}
+                                    type="button"
+                                    className={cn(
+                                        "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
+                                        value === p.userId && "bg-accent"
+                                    )}
+                                    onClick={() => handleSelect(p.userId)}
+                                >
+                                    {getDisplayName(p)}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </PopoverContent>
+            </Popover>
+            {selectedPlayer && (
+                <button
+                    type="button"
+                    onClick={() => onPlayerNameClick(selectedPlayer.userId)}
+                    className="text-primary text-sm underline underline-offset-2 hover:opacity-80"
+                >
+                    {getShortName(selectedPlayer)}
+                </button>
+            )}
+        </div>
+    )
+}
+
 export function Week2HomeworkForm({
     divisionName,
     teamNumber,
@@ -176,7 +333,7 @@ export function Week2HomeworkForm({
         text: string
     } | null>(null)
 
-    const modal = usePlayerDetailModal()
+    const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
     const nonCaptainTeamRoster = teamRoster.filter(
         (p) => p.userId !== captainUserId
@@ -259,16 +416,16 @@ export function Week2HomeworkForm({
                         <thead>
                             <tr className="border-b bg-muted/50">
                                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                    Old ID
+                                    ID
                                 </th>
                                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                     Name
                                 </th>
                                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                    Preferred Name
+                                    Gender
                                 </th>
                                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                    Gender
+                                    Pair Pick
                                 </th>
                                 <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                     Role
@@ -294,11 +451,10 @@ export function Week2HomeworkForm({
                                             }
                                             className="text-primary underline underline-offset-2 hover:opacity-80"
                                         >
-                                            {player.firstName} {player.lastName}
+                                            {player.preferredName
+                                                ? `${player.preferredName} ${player.lastName}`
+                                                : `${player.firstName} ${player.lastName}`}
                                         </button>
-                                    </td>
-                                    <td className="px-4 py-2 text-muted-foreground">
-                                        {player.preferredName ?? "—"}
                                     </td>
                                     <td className="px-4 py-2">
                                         {player.male === true
@@ -306,6 +462,23 @@ export function Week2HomeworkForm({
                                             : player.male === false
                                               ? "Non-Male"
                                               : "—"}
+                                    </td>
+                                    <td className="px-4 py-2 text-muted-foreground">
+                                        {player.pairPickUserId ? (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    modal.openPlayerDetail(
+                                                        player.pairPickUserId!
+                                                    )
+                                                }
+                                                className="text-primary underline underline-offset-2 hover:opacity-80"
+                                            >
+                                                {player.pairPickName ?? "—"}
+                                            </button>
+                                        ) : (
+                                            player.pairPickName ?? "—"
+                                        )}
                                     </td>
                                     <td className="px-4 py-2">
                                         {player.isCaptain ? (
@@ -449,111 +622,104 @@ export function Week2HomeworkForm({
                 </div>
 
                 <div className="space-y-3 rounded-md border bg-muted/20 p-4">
-                        <h3 className="font-medium text-base text-green-700 dark:text-green-400">
-                            Recommend to Move Up
-                        </h3>
-                        {recommendedMoveUp.length === 0 && (
-                            <p className="text-muted-foreground text-sm italic">
-                                No recommendations added yet.
-                            </p>
-                        )}
-                        <div className="space-y-2">
-                            {recommendedMoveUp.map((val, index) => (
-                                <div
-                                    key={`rec-up-${index}`}
-                                    className="flex items-center gap-2"
+                    <h3 className="font-medium text-base text-green-700 dark:text-green-400">
+                        Recommend to Move Up
+                    </h3>
+                    {recommendedMoveUp.length === 0 && (
+                        <p className="text-muted-foreground text-sm italic">
+                            No recommendations added yet.
+                        </p>
+                    )}
+                    <div className="space-y-2">
+                        {recommendedMoveUp.map((val, index) => (
+                            <div
+                                key={`rec-up-${index}`}
+                                className="flex items-center gap-2"
+                            >
+                                <PlayerCombobox
+                                    id={`rec_up_${index}`}
+                                    players={nonCaptainAllTryoutPlayers}
+                                    value={val}
+                                    onValueChange={(v) =>
+                                        handleRecommendedUpChange(index, v)
+                                    }
+                                    placeholder="Search player..."
+                                    onPlayerNameClick={modal.openPlayerDetail}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                        handleRemoveRecommendedUp(index)
+                                    }
+                                    className="shrink-0 text-muted-foreground hover:text-destructive"
                                 >
-                                    <PlayerSelect
-                                        id={`rec_up_${index}`}
-                                        players={nonCaptainAllTryoutPlayers}
-                                        value={val}
-                                        onValueChange={(v) =>
-                                            handleRecommendedUpChange(index, v)
-                                        }
-                                        placeholder="Select player..."
-                                        onPlayerNameClick={
-                                            modal.openPlayerDetail
-                                        }
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            handleRemoveRecommendedUp(index)
-                                        }
-                                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                                    >
-                                        <RiDeleteBinLine className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAddRecommendedUp}
-                        >
-                            <RiAddLine className="mr-1.5 h-4 w-4" />
-                            Add Player
-                        </Button>
+                                    <RiDeleteBinLine className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddRecommendedUp}
+                    >
+                        <RiAddLine className="mr-1.5 h-4 w-4" />
+                        Add Player
+                    </Button>
+                </div>
 
                 <div className="space-y-3 rounded-md border bg-muted/20 p-4">
-                        <h3 className="font-medium text-base text-orange-700 dark:text-orange-400">
-                            Recommend to Move Down
-                        </h3>
-                        {recommendedMoveDown.length === 0 && (
-                            <p className="text-muted-foreground text-sm italic">
-                                No recommendations added yet.
-                            </p>
-                        )}
-                        <div className="space-y-2">
-                            {recommendedMoveDown.map((val, index) => (
-                                <div
-                                    key={`rec-down-${index}`}
-                                    className="flex items-center gap-2"
+                    <h3 className="font-medium text-base text-orange-700 dark:text-orange-400">
+                        Recommend to Move Down
+                    </h3>
+                    {recommendedMoveDown.length === 0 && (
+                        <p className="text-muted-foreground text-sm italic">
+                            No recommendations added yet.
+                        </p>
+                    )}
+                    <div className="space-y-2">
+                        {recommendedMoveDown.map((val, index) => (
+                            <div
+                                key={`rec-down-${index}`}
+                                className="flex items-center gap-2"
+                            >
+                                <PlayerCombobox
+                                    id={`rec_down_${index}`}
+                                    players={nonCaptainAllTryoutPlayers}
+                                    value={val}
+                                    onValueChange={(v) =>
+                                        handleRecommendedDownChange(index, v)
+                                    }
+                                    placeholder="Search player..."
+                                    onPlayerNameClick={modal.openPlayerDetail}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                        handleRemoveRecommendedDown(index)
+                                    }
+                                    className="shrink-0 text-muted-foreground hover:text-destructive"
                                 >
-                                    <PlayerSelect
-                                        id={`rec_down_${index}`}
-                                        players={nonCaptainAllTryoutPlayers}
-                                        value={val}
-                                        onValueChange={(v) =>
-                                            handleRecommendedDownChange(
-                                                index,
-                                                v
-                                            )
-                                        }
-                                        placeholder="Select player..."
-                                        onPlayerNameClick={
-                                            modal.openPlayerDetail
-                                        }
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            handleRemoveRecommendedDown(index)
-                                        }
-                                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                                    >
-                                        <RiDeleteBinLine className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAddRecommendedDown}
-                        >
-                            <RiAddLine className="mr-1.5 h-4 w-4" />
-                            Add Player
-                        </Button>
+                                    <RiDeleteBinLine className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
                     </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddRecommendedDown}
+                    >
+                        <RiAddLine className="mr-1.5 h-4 w-4" />
+                        Add Player
+                    </Button>
+                </div>
             </section>
 
             {/* Submit */}
