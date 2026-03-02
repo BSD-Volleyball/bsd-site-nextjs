@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
     getSignupsCsvData,
+    getPlayerDetailsPublic,
     type SignupGroup,
     type SignupCsvEntry
 } from "./actions"
@@ -115,7 +116,7 @@ export function SignupsList({
     playerPicUrl,
     seasonLabel
 }: SignupsListProps) {
-    const modal = usePlayerDetailModal()
+    const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
     const [isExporting, setIsExporting] = useState(false)
 
     const handleDownloadCsv = async () => {

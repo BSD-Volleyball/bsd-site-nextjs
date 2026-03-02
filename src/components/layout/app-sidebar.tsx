@@ -242,6 +242,11 @@ const captainPagesNavItems = [
         icon: RiStarLine
     },
     {
+        title: "Week 2 Homework",
+        url: "/dashboard/week-2-homework",
+        icon: RiEditLine
+    },
+    {
         title: "Live Draft",
         url: "/dashboard/draft-division",
         icon: RiFileList3Line
