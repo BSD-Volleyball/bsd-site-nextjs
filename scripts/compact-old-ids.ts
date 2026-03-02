@@ -1,5 +1,5 @@
 import "dotenv/config"
-import * as readline from "readline"
+import * as readline from "node:readline"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { users } from "../src/database/schema"
 import { sql, isNotNull, gt } from "drizzle-orm"
@@ -29,7 +29,9 @@ async function main() {
         .limit(1)
 
     if (withPicture.length === 0 || withPicture[0].old_id === null) {
-        console.log("No users with both a picture and an old_id found. Nothing to do.")
+        console.log(
+            "No users with both a picture and an old_id found. Nothing to do."
+        )
         process.exit(0)
     }
 
@@ -72,10 +74,7 @@ async function main() {
         5,
         ...mappings.map((m) => (m.email ?? "").length)
     )
-    const nameWidth = Math.max(
-        4,
-        ...mappings.map((m) => (m.name ?? "").length)
-    )
+    const nameWidth = Math.max(4, ...mappings.map((m) => (m.name ?? "").length))
     const header = [
         " OLD old_id".padEnd(12),
         " NEW old_id".padEnd(12),
@@ -102,7 +101,9 @@ async function main() {
     )
 
     // Step 4: Confirm before applying
-    const answer = await prompt("\nApply these changes? Type 'yes' to confirm: ")
+    const answer = await prompt(
+        "\nApply these changes? Type 'yes' to confirm: "
+    )
     if (answer.trim().toLowerCase() !== "yes") {
         console.log("Aborted. No changes made.")
         process.exit(0)

@@ -1,12 +1,13 @@
 "use server"
 
 import { db } from "@/database/db"
-import { users } from "@/database/schema"
-import { eq, or, sql } from "drizzle-orm"
+import { users, signups } from "@/database/schema"
+import { and, eq, inArray, ne, or, sql } from "drizzle-orm"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getSeasonConfig } from "@/lib/site-config"
 
 export interface GoogleMembershipUser {
     id: string
@@ -27,6 +28,7 @@ export async function getGoogleMembershipUsers(params?: {
     query?: string
     page?: number
     limit?: number
+    filter?: "notification" | "season" | ""
 }): Promise<{
     status: boolean
     message?: string
@@ -36,6 +38,7 @@ export async function getGoogleMembershipUsers(params?: {
     limit: number
     totalPages: number
     query: string
+    filter: string
 }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -47,12 +50,14 @@ export async function getGoogleMembershipUsers(params?: {
             page: 1,
             limit: 50,
             totalPages: 1,
-            query: ""
+            query: "",
+            filter: ""
         }
     }
 
     try {
         const query = params?.query?.trim() ?? ""
+        const filter = params?.filter ?? ""
         const normalizedPage =
             Number.isInteger(params?.page) && (params?.page ?? 0) > 0
                 ? (params?.page as number)
@@ -61,7 +66,8 @@ export async function getGoogleMembershipUsers(params?: {
             Number.isInteger(params?.limit) && (params?.limit ?? 0) > 0
                 ? Math.min(params?.limit as number, 200)
                 : 50
-        const whereClause =
+
+        const searchCondition =
             query.length >= 2
                 ? or(
                       sql`CAST(${users.old_id} AS TEXT) LIKE ${`%${query}%`}`,
@@ -71,6 +77,51 @@ export async function getGoogleMembershipUsers(params?: {
                       sql`LOWER(${users.email}) LIKE ${`%${query.toLowerCase()}%`}`
                   )
                 : undefined
+
+        let filterCondition: ReturnType<typeof and> | undefined
+
+        if (filter === "notification") {
+            filterCondition = ne(users.notification_list, "Y")
+        } else if (filter === "season") {
+            const config = await getSeasonConfig()
+            const currentSeasonId = config.seasonId
+
+            const signedUpUserIds = currentSeasonId
+                ? (
+                      await db
+                          .select({ player: signups.player })
+                          .from(signups)
+                          .where(eq(signups.season, currentSeasonId))
+                  ).map((r) => r.player)
+                : []
+
+            if (signedUpUserIds.length === 0) {
+                return {
+                    status: true,
+                    users: [],
+                    total: 0,
+                    page: 1,
+                    limit: normalizedLimit,
+                    totalPages: 1,
+                    query,
+                    filter
+                }
+            }
+
+            filterCondition = and(
+                inArray(users.id, signedUpUserIds),
+                ne(users.seasons_list, "Y")
+            )
+        }
+
+        const whereClause =
+            searchCondition && filterCondition
+                ? and(searchCondition, filterCondition)
+                : searchCondition
+                  ? searchCondition
+                  : filterCondition
+                    ? filterCondition
+                    : undefined
 
         const [countResult] = whereClause
             ? await db
@@ -124,7 +175,8 @@ export async function getGoogleMembershipUsers(params?: {
             page: effectivePage,
             limit: normalizedLimit,
             totalPages,
-            query
+            query,
+            filter
         }
     } catch (error) {
         console.error("Error loading Google Membership users:", error)
@@ -136,7 +188,8 @@ export async function getGoogleMembershipUsers(params?: {
             page: 1,
             limit: 50,
             totalPages: 1,
-            query: ""
+            query: "",
+            filter: ""
         }
     }
 }

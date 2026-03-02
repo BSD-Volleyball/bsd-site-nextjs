@@ -105,66 +105,64 @@ export async function getCreateTeamsData(): Promise<{
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        const [allDivisions, signedUpUsers, commissionerRows, existingTeamRows] =
-            await Promise.all([
-                db
-                    .select({
-                        id: divisions.id,
-                        name: divisions.name,
-                        level: divisions.level,
-                        gender_split: individual_divisions.gender_split
-                    })
-                    .from(divisions)
-                    .leftJoin(
-                        individual_divisions,
-                        and(
-                            eq(
-                                individual_divisions.division,
-                                divisions.id
-                            ),
-                            eq(
-                                individual_divisions.season,
-                                config.seasonId
-                            )
-                        )
+        const [
+            allDivisions,
+            signedUpUsers,
+            commissionerRows,
+            existingTeamRows
+        ] = await Promise.all([
+            db
+                .select({
+                    id: divisions.id,
+                    name: divisions.name,
+                    level: divisions.level,
+                    gender_split: individual_divisions.gender_split
+                })
+                .from(divisions)
+                .leftJoin(
+                    individual_divisions,
+                    and(
+                        eq(individual_divisions.division, divisions.id),
+                        eq(individual_divisions.season, config.seasonId)
                     )
-                    .where(eq(divisions.active, true))
-                    .orderBy(divisions.level),
-                db
-                    .selectDistinct({
-                        id: users.id,
-                        old_id: users.old_id,
-                        first_name: users.first_name,
-                        last_name: users.last_name,
-                        preffered_name: users.preffered_name,
-                        email: users.email
-                    })
-                    .from(signups)
-                    .innerJoin(users, eq(signups.player, users.id))
-                    .where(eq(signups.season, config.seasonId))
-                    .orderBy(users.last_name, users.first_name),
-                db
-                    .select({
-                        divisionId: commissioners.division,
-                        userId: commissioners.commissioner,
-                        firstName: users.first_name,
-                        preferredName: users.preffered_name
-                    })
-                    .from(commissioners)
-                    .innerJoin(users, eq(commissioners.commissioner, users.id))
-                    .where(eq(commissioners.season, config.seasonId)),
-                db
-                    .select({
-                        id: teams.id,
-                        number: teams.number,
-                        captain: teams.captain,
-                        name: teams.name,
-                        division: teams.division
-                    })
-                    .from(teams)
-                    .where(eq(teams.season, config.seasonId))
-                    .orderBy(teams.number)
-            ])
+                )
+                .where(eq(divisions.active, true))
+                .orderBy(divisions.level),
+            db
+                .selectDistinct({
+                    id: users.id,
+                    old_id: users.old_id,
+                    first_name: users.first_name,
+                    last_name: users.last_name,
+                    preffered_name: users.preffered_name,
+                    email: users.email
+                })
+                .from(signups)
+                .innerJoin(users, eq(signups.player, users.id))
+                .where(eq(signups.season, config.seasonId))
+                .orderBy(users.last_name, users.first_name),
+            db
+                .select({
+                    divisionId: commissioners.division,
+                    userId: commissioners.commissioner,
+                    firstName: users.first_name,
+                    preferredName: users.preffered_name
+                })
+                .from(commissioners)
+                .innerJoin(users, eq(commissioners.commissioner, users.id))
+                .where(eq(commissioners.season, config.seasonId)),
+            db
+                .select({
+                    id: teams.id,
+                    number: teams.number,
+                    captain: teams.captain,
+                    name: teams.name,
+                    division: teams.division
+                })
+                .from(teams)
+                .where(eq(teams.season, config.seasonId))
+                .orderBy(teams.number)
+        ])
 
         const divisionCommissioners: DivisionCommissioner[] =
             commissionerRows.map((row) => ({
