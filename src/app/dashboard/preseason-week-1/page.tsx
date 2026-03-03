@@ -235,7 +235,12 @@ export default async function DraftPreseasonWeek1Page() {
             ))}
 
             <section className="space-y-4">
-                <h2 className="font-semibold text-xl">Alternates</h2>
+                <h2 className="font-semibold text-xl">
+                    Alternates{" "}
+                    <span className="font-normal text-base text-muted-foreground">
+                        (we will contact you if a spot opens up)
+                    </span>
+                </h2>
                 <div className="rounded-lg border bg-card p-4">
                     {alternates.length === 0 ? (
                         <p className="text-muted-foreground text-sm">
