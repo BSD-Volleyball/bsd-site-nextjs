@@ -27,6 +27,7 @@ export interface DivisionOption {
     name: string
     level: number
     gender_split: string | null
+    coaches: boolean
 }
 
 export interface ExistingTeam {
@@ -58,6 +59,7 @@ export async function getCreateTeamsData(): Promise<{
     seasonLabel: string
     divisions: DivisionOption[]
     users: UserOption[]
+    allUsers: UserOption[]
     emailTemplate: string
     emailTemplateContent: LexicalEmailTemplateContent | null
     emailSubject: string
@@ -74,6 +76,7 @@ export async function getCreateTeamsData(): Promise<{
             seasonLabel: "",
             divisions: [],
             users: [],
+            allUsers: [],
             emailTemplate: "",
             emailTemplateContent: null,
             emailSubject: "",
@@ -94,6 +97,7 @@ export async function getCreateTeamsData(): Promise<{
                 seasonLabel: "",
                 divisions: [],
                 users: [],
+                allUsers: [],
                 emailTemplate: "",
                 emailTemplateContent: null,
                 emailSubject: "",
@@ -108,6 +112,7 @@ export async function getCreateTeamsData(): Promise<{
         const [
             allDivisions,
             signedUpUsers,
+            allUsersRows,
             commissionerRows,
             existingTeamRows
         ] = await Promise.all([
@@ -116,7 +121,8 @@ export async function getCreateTeamsData(): Promise<{
                     id: divisions.id,
                     name: divisions.name,
                     level: divisions.level,
-                    gender_split: individual_divisions.gender_split
+                    gender_split: individual_divisions.gender_split,
+                    coaches: individual_divisions.coaches
                 })
                 .from(divisions)
                 .leftJoin(
@@ -127,7 +133,10 @@ export async function getCreateTeamsData(): Promise<{
                     )
                 )
                 .where(eq(divisions.active, true))
-                .orderBy(divisions.level),
+                .orderBy(divisions.level)
+                .then((rows) =>
+                    rows.map((d) => ({ ...d, coaches: d.coaches ?? false }))
+                ),
             db
                 .selectDistinct({
                     id: users.id,
@@ -140,6 +149,17 @@ export async function getCreateTeamsData(): Promise<{
                 .from(signups)
                 .innerJoin(users, eq(signups.player, users.id))
                 .where(eq(signups.season, config.seasonId))
+                .orderBy(users.last_name, users.first_name),
+            db
+                .select({
+                    id: users.id,
+                    old_id: users.old_id,
+                    first_name: users.first_name,
+                    last_name: users.last_name,
+                    preffered_name: users.preffered_name,
+                    email: users.email
+                })
+                .from(users)
                 .orderBy(users.last_name, users.first_name),
             db
                 .select({
@@ -220,6 +240,7 @@ export async function getCreateTeamsData(): Promise<{
             seasonLabel,
             divisions: allDivisions,
             users: signedUpUsers,
+            allUsers: allUsersRows,
             emailTemplate,
             emailTemplateContent,
             emailSubject,
@@ -236,6 +257,7 @@ export async function getCreateTeamsData(): Promise<{
             seasonLabel: "",
             divisions: [],
             users: [],
+            allUsers: [],
             emailTemplate: "",
             emailTemplateContent: null,
             emailSubject: "",
@@ -248,6 +270,7 @@ export async function getCreateTeamsData(): Promise<{
 
 interface TeamToCreate {
     captainId: string
+    coach2Id?: string
     teamName: string
 }
 
@@ -299,59 +322,100 @@ export async function createTeams(
         }
     }
 
-    const expectedTeamCount =
-        selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
+    const numTeams = selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
 
-    if (teamsToCreate.length !== expectedTeamCount) {
-        return {
-            status: false,
-            message: `Division ${selectedDivision.name} requires ${expectedTeamCount} teams.`
-        }
-    }
-
-    // Validate all teams have captains and names
-    for (let i = 0; i < teamsToCreate.length; i++) {
-        const team = teamsToCreate[i]
-        if (!team.captainId) {
-            return {
-                status: false,
-                message: `Please select a captain for team ${i + 1}.`
-            }
-        }
-        if (!team.teamName.trim()) {
-            return {
-                status: false,
-                message: `Please enter a name for team ${i + 1}.`
-            }
-        }
-    }
-
-    const captainIds = teamsToCreate.map((team) => team.captainId)
-    const uniqueCaptainIds = new Set(captainIds)
-
-    if (uniqueCaptainIds.size !== captainIds.length) {
-        return {
-            status: false,
-            message: "Each team must have a unique captain."
-        }
-    }
-
-    const signedUpCaptains = await db
-        .select({ playerId: signups.player })
-        .from(signups)
+    // Look up whether this division uses coaches mode
+    const [indivDiv] = await db
+        .select({ coaches: individual_divisions.coaches })
+        .from(individual_divisions)
         .where(
             and(
-                eq(signups.season, config.seasonId),
-                inArray(signups.player, [...uniqueCaptainIds])
+                eq(individual_divisions.season, config.seasonId),
+                eq(individual_divisions.division, divisionId)
             )
         )
+        .limit(1)
 
-    if (signedUpCaptains.length !== uniqueCaptainIds.size) {
-        return {
-            status: false,
-            message:
-                "All selected captains must be signed up for the current season."
+    const isCoachesDiv = indivDiv?.coaches ?? false
+
+    if (!isCoachesDiv) {
+        // Strict validation for standard captain mode
+        if (teamsToCreate.length !== numTeams) {
+            return {
+                status: false,
+                message: `Division ${selectedDivision.name} requires ${numTeams} teams.`
+            }
         }
+
+        for (let i = 0; i < teamsToCreate.length; i++) {
+            const team = teamsToCreate[i]
+            if (!team.captainId) {
+                return {
+                    status: false,
+                    message: `Please select a captain for team ${i + 1}.`
+                }
+            }
+            if (!team.teamName.trim()) {
+                return {
+                    status: false,
+                    message: `Please enter a name for team ${i + 1}.`
+                }
+            }
+        }
+
+        const captainIds = teamsToCreate.map((team) => team.captainId)
+        const uniqueCaptainIds = new Set(captainIds)
+
+        if (uniqueCaptainIds.size !== captainIds.length) {
+            return {
+                status: false,
+                message: "Each team must have a unique captain."
+            }
+        }
+
+        const signedUpCaptains = await db
+            .select({ playerId: signups.player })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    inArray(signups.player, [...uniqueCaptainIds])
+                )
+            )
+
+        if (signedUpCaptains.length !== uniqueCaptainIds.size) {
+            return {
+                status: false,
+                message:
+                    "All selected captains must be signed up for the current season."
+            }
+        }
+    } else {
+        // Lenient validation for coaches mode — partial saves are allowed
+        for (let i = 0; i < teamsToCreate.length; i++) {
+            const team = teamsToCreate[i]
+            const hasAnyCoach = team.captainId || team.coach2Id
+            if (hasAnyCoach && !team.teamName.trim()) {
+                return {
+                    status: false,
+                    message: `Please enter a name for team ${i + 1}.`
+                }
+            }
+        }
+
+        const allCoachIds = teamsToCreate.flatMap((t) =>
+            [t.captainId, t.coach2Id ?? ""].filter(Boolean)
+        )
+        const uniqueCoachIds = new Set(allCoachIds)
+
+        if (uniqueCoachIds.size !== allCoachIds.length) {
+            return {
+                status: false,
+                message: "Each coach must be unique across all teams."
+            }
+        }
+
+        // Coaches are drawn from the full user population — no sign-up check needed
     }
 
     try {
@@ -374,32 +438,86 @@ export async function createTeams(
             }
         }
 
-        for (let i = 0; i < teamsToCreate.length; i++) {
-            const team = teamsToCreate[i]
-            const number = i + 1
-            const existingId = existingByNumber.get(number)
+        if (isCoachesDiv) {
+            // Coach 1 occupies team numbers 1..numTeams
+            // Coach 2 occupies team numbers numTeams+1..2*numTeams
+            for (let i = 0; i < teamsToCreate.length; i++) {
+                const team = teamsToCreate[i]
+                const primaryNumber = i + 1
+                const secondaryNumber = i + 1 + numTeams
 
-            if (existingId !== undefined) {
-                await db
-                    .update(teams)
-                    .set({
+                if (team.captainId) {
+                    const existingId = existingByNumber.get(primaryNumber)
+                    if (existingId !== undefined) {
+                        await db
+                            .update(teams)
+                            .set({
+                                captain: team.captainId,
+                                name: team.teamName.trim()
+                            })
+                            .where(eq(teams.id, existingId))
+                        existingByNumber.delete(primaryNumber)
+                    } else {
+                        await db.insert(teams).values({
+                            season: config.seasonId,
+                            captain: team.captainId,
+                            division: divisionId,
+                            name: team.teamName.trim(),
+                            number: primaryNumber
+                        })
+                    }
+                }
+
+                if (team.coach2Id) {
+                    const existingId = existingByNumber.get(secondaryNumber)
+                    if (existingId !== undefined) {
+                        await db
+                            .update(teams)
+                            .set({
+                                captain: team.coach2Id,
+                                name: team.teamName.trim()
+                            })
+                            .where(eq(teams.id, existingId))
+                        existingByNumber.delete(secondaryNumber)
+                    } else {
+                        await db.insert(teams).values({
+                            season: config.seasonId,
+                            captain: team.coach2Id,
+                            division: divisionId,
+                            name: team.teamName.trim(),
+                            number: secondaryNumber
+                        })
+                    }
+                }
+            }
+        } else {
+            for (let i = 0; i < teamsToCreate.length; i++) {
+                const team = teamsToCreate[i]
+                const number = i + 1
+                const existingId = existingByNumber.get(number)
+
+                if (existingId !== undefined) {
+                    await db
+                        .update(teams)
+                        .set({
+                            captain: team.captainId,
+                            name: team.teamName.trim()
+                        })
+                        .where(eq(teams.id, existingId))
+                    existingByNumber.delete(number)
+                } else {
+                    await db.insert(teams).values({
+                        season: config.seasonId,
                         captain: team.captainId,
-                        name: team.teamName.trim()
+                        division: divisionId,
+                        name: team.teamName.trim(),
+                        number
                     })
-                    .where(eq(teams.id, existingId))
-                existingByNumber.delete(number)
-            } else {
-                await db.insert(teams).values({
-                    season: config.seasonId,
-                    captain: team.captainId,
-                    division: divisionId,
-                    name: team.teamName.trim(),
-                    number
-                })
+                }
             }
         }
 
-        // Delete any stale teams (numbers beyond the new count)
+        // Delete any stale teams (slots no longer filled)
         const staleIds = [...existingByNumber.values()]
         if (staleIds.length > 0) {
             await db.delete(teams).where(inArray(teams.id, staleIds))
@@ -412,13 +530,13 @@ export async function createTeams(
                 userId: session.user.id,
                 action: isUpdate ? "update" : "create",
                 entityType: "teams",
-                summary: `${isUpdate ? "Updated" : "Created"} ${teamsToCreate.length} teams for current season ${config.seasonId}, division ${divisionId}`
+                summary: `${isUpdate ? "Updated" : "Created"} teams for current season ${config.seasonId}, division ${divisionId}${isCoachesDiv ? " (coaches mode)" : ""}`
             })
         }
 
         return {
             status: true,
-            message: `Successfully ${isUpdate ? "updated" : "created"} ${teamsToCreate.length} teams!`
+            message: `Successfully ${isUpdate ? "updated" : "created"} teams!`
         }
     } catch (error) {
         console.error("Error saving teams:", error)

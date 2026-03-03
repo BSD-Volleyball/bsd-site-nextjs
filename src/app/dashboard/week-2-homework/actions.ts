@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, eq } from "drizzle-orm"
+import { and, asc, count, eq } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -72,6 +72,18 @@ export async function getWeek2HomeworkData(): Promise<{
 
     if (!config.seasonId) {
         return { status: false, message: "No active season found" }
+    }
+
+    const [{ seasonRosterCount }] = await db
+        .select({ seasonRosterCount: count() })
+        .from(week2Rosters)
+        .where(eq(week2Rosters.season, config.seasonId))
+
+    if (seasonRosterCount === 0) {
+        return {
+            status: false,
+            message: "Teams haven't been created yet for this season. Check back after Week 2 tryouts."
+        }
     }
 
     const [captainEntry] = await db

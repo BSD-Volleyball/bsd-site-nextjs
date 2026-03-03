@@ -52,6 +52,7 @@ export default async function SelectCaptainsPage() {
                 seasonLabel={result.seasonLabel || ""}
                 divisions={result.divisions}
                 users={result.users}
+                allUsers={result.allUsers}
                 emailTemplate={result.emailTemplate || ""}
                 emailTemplateContent={result.emailTemplateContent}
                 emailSubject={result.emailSubject || ""}
