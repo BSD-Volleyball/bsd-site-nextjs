@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,12 @@ import {
     PopoverTrigger
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
+import {
+    RiAddLine,
+    RiArrowDownSLine,
+    RiCloseLine,
+    RiDeleteBinLine
+} from "@remixicon/react"
 import {
     updateWeek2Rosters,
     type Week2EditablePlayer,
@@ -20,6 +25,15 @@ import {
 interface EditWeek2FormProps {
     players: Week2EditablePlayer[]
     slots: Week2EditableSlot[]
+}
+
+interface LocalSlot {
+    localKey: string
+    divisionId: number
+    divisionName: string
+    teamNumber: number
+    userId: string
+    isCaptain: boolean
 }
 
 function getPlayerLabel(player: Week2EditablePlayer) {
@@ -155,28 +169,42 @@ export function EditWeek2Form({ players, slots }: EditWeek2FormProps) {
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
-    const [slotAssignments, setSlotAssignments] = useState(() =>
-        slots.map((slot) => ({ ...slot }))
+    const nextKey = useRef(0)
+
+    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
+        slots.map((slot) => ({
+            localKey: `db-${slot.id}`,
+            divisionId: slot.divisionId,
+            divisionName: slot.divisionName,
+            teamNumber: slot.teamNumber,
+            userId: slot.userId,
+            isCaptain: slot.isCaptain
+        }))
     )
 
-    const selectedUserIds = useMemo(
-        () => slotAssignments.map((slot) => slot.userId).filter(Boolean),
-        [slotAssignments]
-    )
+    const duplicateUserIds = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const slot of slotAssignments) {
+            if (slot.userId) {
+                counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
+            }
+        }
+        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id))
+    }, [slotAssignments])
 
     const groupedSlots = useMemo(() => {
         const divisionMap = new Map<
             number,
             {
                 divisionName: string
-                teams: Map<number, typeof slotAssignments>
+                teams: Map<number, LocalSlot[]>
             }
         >()
 
         for (const slot of slotAssignments) {
             const current = divisionMap.get(slot.divisionId) || {
                 divisionName: slot.divisionName,
-                teams: new Map<number, typeof slotAssignments>()
+                teams: new Map<number, LocalSlot[]>()
             }
 
             const teamSlots = current.teams.get(slot.teamNumber) || []
@@ -185,22 +213,38 @@ export function EditWeek2Form({ players, slots }: EditWeek2FormProps) {
             divisionMap.set(slot.divisionId, current)
         }
 
-        for (const entry of divisionMap.values()) {
-            for (const [teamNumber, teamSlots] of entry.teams.entries()) {
-                entry.teams.set(
-                    teamNumber,
-                    [...teamSlots].sort((a, b) => a.id - b.id)
-                )
-            }
-        }
-
         return [...divisionMap.entries()].sort((a, b) => a[0] - b[0])
     }, [slotAssignments])
 
-    const onChangeSlot = (slotId: number, userId: string) => {
+    const addSlot = (
+        divisionId: number,
+        divisionName: string,
+        teamNumber: number
+    ) => {
+        const key = `new-${nextKey.current++}`
+        setSlotAssignments((prev) => [
+            ...prev,
+            {
+                localKey: key,
+                divisionId,
+                divisionName,
+                teamNumber,
+                userId: "",
+                isCaptain: false
+            }
+        ])
+    }
+
+    const removeSlot = (localKey: string) => {
+        setSlotAssignments((prev) =>
+            prev.filter((slot) => slot.localKey !== localKey)
+        )
+    }
+
+    const onChangeSlot = (localKey: string, userId: string) => {
         setSlotAssignments((prev) =>
             prev.map((slot) =>
-                slot.id === slotId ? { ...slot, userId } : slot
+                slot.localKey === localKey ? { ...slot, userId } : slot
             )
         )
     }
@@ -208,18 +252,15 @@ export function EditWeek2Form({ players, slots }: EditWeek2FormProps) {
     const handleSubmit = async () => {
         setError(null)
         setSuccess(null)
-
-        if (slotAssignments.some((slot) => !slot.userId)) {
-            setError("All slots must have a player selected.")
-            return
-        }
-
         setIsSaving(true)
 
+        const filledSlots = slotAssignments.filter((slot) => slot.userId)
         const result = await updateWeek2Rosters(
-            slotAssignments.map((slot) => ({
-                id: slot.id,
-                userId: slot.userId
+            filledSlots.map((slot) => ({
+                divisionId: slot.divisionId,
+                teamNumber: slot.teamNumber,
+                userId: slot.userId,
+                isCaptain: slot.isCaptain
             }))
         )
 
@@ -253,38 +294,71 @@ export function EditWeek2Form({ players, slots }: EditWeek2FormProps) {
                                         <div className="space-y-2">
                                             {teamSlots.map((slot, idx) => (
                                                 <div
-                                                    key={slot.id}
-                                                    className="space-y-1"
+                                                    key={slot.localKey}
+                                                    className="flex items-end gap-1"
                                                 >
-                                                    <p className="text-muted-foreground text-xs">
-                                                        Slot {idx + 1}
-                                                        {slot.isCaptain && (
-                                                            <span className="ml-2 font-semibold text-primary">
-                                                                Captain slot
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                    <PlayerCombobox
-                                                        players={players}
-                                                        value={slot.userId}
-                                                        onChange={(userId) =>
-                                                            onChangeSlot(
-                                                                slot.id,
+                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                        <p className="text-muted-foreground text-xs">
+                                                            Slot {idx + 1}
+                                                            {slot.isCaptain && (
+                                                                <span className="ml-2 font-semibold text-primary">
+                                                                    Captain slot
+                                                                </span>
+                                                            )}
+                                                        </p>
+                                                        <PlayerCombobox
+                                                            players={players}
+                                                            value={slot.userId}
+                                                            onChange={(
                                                                 userId
+                                                            ) =>
+                                                                onChangeSlot(
+                                                                    slot.localKey,
+                                                                    userId
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                slot.isCaptain
+                                                            }
+                                                        />
+                                                        {slot.userId && duplicateUserIds.has(slot.userId) && (
+                                                            <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                                Playing twice
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="shrink-0"
+                                                        onClick={() =>
+                                                            removeSlot(
+                                                                slot.localKey
                                                             )
                                                         }
-                                                        excludeIds={selectedUserIds.filter(
-                                                            (id) =>
-                                                                id !==
-                                                                slot.userId
-                                                        )}
-                                                        disabled={
-                                                            slot.isCaptain
-                                                        }
-                                                    />
+                                                    >
+                                                        <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
+                                                    </Button>
                                                 </div>
                                             ))}
                                         </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full"
+                                            onClick={() =>
+                                                addSlot(
+                                                    divisionId,
+                                                    divisionData.divisionName,
+                                                    teamNumber
+                                                )
+                                            }
+                                        >
+                                            <RiAddLine className="mr-1 h-4 w-4" />
+                                            Add Player
+                                        </Button>
                                     </div>
                                 )
                             )}
@@ -299,7 +373,7 @@ export function EditWeek2Form({ players, slots }: EditWeek2FormProps) {
                     onClick={handleSubmit}
                     disabled={isSaving}
                 >
-                    {isSaving ? "Updating..." : "Update Week 2"}
+                    {isSaving ? "Saving..." : "Save Week 2"}
                 </Button>
                 {success && (
                     <span className="text-green-700 text-sm dark:text-green-300">

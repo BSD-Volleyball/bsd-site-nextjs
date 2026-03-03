@@ -17,24 +17,26 @@ import {
     RiDeleteBinLine
 } from "@remixicon/react"
 import {
-    updateWeek1Rosters,
-    type Week1EditablePlayer,
-    type Week1EditableSlot
+    updateWeek3Rosters,
+    type Week3EditablePlayer,
+    type Week3EditableSlot
 } from "./actions"
 
-interface EditWeek1FormProps {
-    players: Week1EditablePlayer[]
-    slots: Week1EditableSlot[]
+interface EditWeek3FormProps {
+    players: Week3EditablePlayer[]
+    slots: Week3EditableSlot[]
 }
 
 interface LocalSlot {
     localKey: string
-    sessionNumber: number
-    courtNumber: number
+    divisionId: number
+    divisionName: string
+    teamNumber: number
     userId: string
+    isCaptain: boolean
 }
 
-function getPlayerLabel(player: Week1EditablePlayer) {
+function getPlayerLabel(player: Week3EditablePlayer) {
     if (player.preferredName) {
         return `${player.preferredName} ${player.lastName}`
     }
@@ -45,12 +47,14 @@ function PlayerCombobox({
     players,
     value,
     onChange,
-    excludeIds = []
+    excludeIds = [],
+    disabled = false
 }: {
-    players: Week1EditablePlayer[]
+    players: Week3EditablePlayer[]
     value: string
     onChange: (userId: string) => void
     excludeIds?: string[]
+    disabled?: boolean
 }) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState("")
@@ -83,6 +87,7 @@ function PlayerCombobox({
                     role="combobox"
                     aria-expanded={open}
                     className="w-full justify-between font-normal"
+                    disabled={disabled}
                 >
                     <span
                         className={cn(
@@ -95,7 +100,7 @@ function PlayerCombobox({
                             : "Select player..."}
                     </span>
                     <div className="flex items-center gap-1">
-                        {selectedPlayer && (
+                        {selectedPlayer && !disabled && (
                             <span
                                 role="button"
                                 tabIndex={0}
@@ -160,7 +165,7 @@ function PlayerCombobox({
     )
 }
 
-export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
+export function EditWeek3Form({ players, slots }: EditWeek3FormProps) {
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -169,53 +174,64 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
     const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
         slots.map((slot) => ({
             localKey: `db-${slot.id}`,
-            sessionNumber: slot.sessionNumber,
-            courtNumber: slot.courtNumber,
-            userId: slot.userId
+            divisionId: slot.divisionId,
+            divisionName: slot.divisionName,
+            teamNumber: slot.teamNumber,
+            userId: slot.userId,
+            isCaptain: slot.isCaptain
         }))
     )
 
-    const selectedUserIds = useMemo(
-        () => slotAssignments.map((slot) => slot.userId).filter(Boolean),
-        [slotAssignments]
-    )
+    const duplicateUserIds = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const slot of slotAssignments) {
+            if (slot.userId) {
+                counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
+            }
+        }
+        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id))
+    }, [slotAssignments])
 
     const groupedSlots = useMemo(() => {
-        const sessionMap = new Map<number, Map<number, LocalSlot[]>>()
+        const divisionMap = new Map<
+            number,
+            {
+                divisionName: string
+                teams: Map<number, LocalSlot[]>
+            }
+        >()
 
         for (const slot of slotAssignments) {
-            if (slot.sessionNumber === 3) continue
-            const courtMap =
-                sessionMap.get(slot.sessionNumber) ||
-                new Map<number, LocalSlot[]>()
-            const list = courtMap.get(slot.courtNumber) || []
-            list.push(slot)
-            courtMap.set(slot.courtNumber, list)
-            sessionMap.set(slot.sessionNumber, courtMap)
+            const current = divisionMap.get(slot.divisionId) || {
+                divisionName: slot.divisionName,
+                teams: new Map<number, LocalSlot[]>()
+            }
+
+            const teamSlots = current.teams.get(slot.teamNumber) || []
+            teamSlots.push(slot)
+            current.teams.set(slot.teamNumber, teamSlots)
+            divisionMap.set(slot.divisionId, current)
         }
 
-        return [1, 2].map((sessionNumber) => ({
-            sessionNumber,
-            courtMap: sessionMap.get(sessionNumber) || new Map<number, LocalSlot[]>()
-        }))
+        return [...divisionMap.entries()].sort((a, b) => a[0] - b[0])
     }, [slotAssignments])
 
-    const alternateCourtMap = useMemo(() => {
-        const courtMap = new Map<number, LocalSlot[]>()
-        for (const slot of slotAssignments) {
-            if (slot.sessionNumber !== 3) continue
-            const list = courtMap.get(slot.courtNumber) || []
-            list.push(slot)
-            courtMap.set(slot.courtNumber, list)
-        }
-        return courtMap
-    }, [slotAssignments])
-
-    const addSlot = (sessionNumber: number, courtNumber: number) => {
+    const addSlot = (
+        divisionId: number,
+        divisionName: string,
+        teamNumber: number
+    ) => {
         const key = `new-${nextKey.current++}`
         setSlotAssignments((prev) => [
             ...prev,
-            { localKey: key, sessionNumber, courtNumber, userId: "" }
+            {
+                localKey: key,
+                divisionId,
+                divisionName,
+                teamNumber,
+                userId: "",
+                isCaptain: false
+            }
         ])
     }
 
@@ -236,23 +252,15 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
     const handleSubmit = async () => {
         setError(null)
         setSuccess(null)
-
-        const filledSlots = slotAssignments.filter((slot) => slot.userId)
-        const userIds = filledSlots.map((s) => s.userId)
-        const uniqueIds = new Set(userIds)
-
-        if (uniqueIds.size !== userIds.length) {
-            setError("A player cannot be assigned to multiple slots.")
-            return
-        }
-
         setIsSaving(true)
 
-        const result = await updateWeek1Rosters(
+        const filledSlots = slotAssignments.filter((slot) => slot.userId)
+        const result = await updateWeek3Rosters(
             filledSlots.map((slot) => ({
-                sessionNumber: slot.sessionNumber,
-                courtNumber: slot.courtNumber,
-                userId: slot.userId
+                divisionId: slot.divisionId,
+                teamNumber: slot.teamNumber,
+                userId: slot.userId,
+                isCaptain: slot.isCaptain
             }))
         )
 
@@ -267,27 +275,24 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
 
     return (
         <div className="space-y-6">
-            {groupedSlots.map(({ sessionNumber, courtMap }) => (
-                <Card key={`session-${sessionNumber}`}>
+            {groupedSlots.map(([divisionId, divisionData]) => (
+                <Card key={`division-${divisionId}`}>
                     <CardHeader>
-                        <CardTitle>Session {sessionNumber}</CardTitle>
+                        <CardTitle>{divisionData.divisionName}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            {[1, 2, 3, 4].map((courtNumber) => {
-                                const courtSlots =
-                                    courtMap.get(courtNumber) || []
-
-                                return (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {Array.from(divisionData.teams.entries()).map(
+                                ([teamNumber, teamSlots]) => (
                                     <div
-                                        key={`session-${sessionNumber}-court-${courtNumber}`}
+                                        key={`division-${divisionId}-team-${teamNumber}`}
                                         className="space-y-2 rounded-md border p-3"
                                     >
                                         <h3 className="font-semibold text-sm">
-                                            Court {courtNumber}
+                                            Team {teamNumber}
                                         </h3>
                                         <div className="space-y-2">
-                                            {courtSlots.map((slot, idx) => (
+                                            {teamSlots.map((slot, idx) => (
                                                 <div
                                                     key={slot.localKey}
                                                     className="flex items-end gap-1"
@@ -295,6 +300,11 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                                     <div className="min-w-0 flex-1 space-y-1">
                                                         <p className="text-muted-foreground text-xs">
                                                             Slot {idx + 1}
+                                                            {slot.isCaptain && (
+                                                                <span className="ml-2 font-semibold text-primary">
+                                                                    Captain slot
+                                                                </span>
+                                                            )}
                                                         </p>
                                                         <PlayerCombobox
                                                             players={players}
@@ -307,12 +317,15 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                                                     userId
                                                                 )
                                                             }
-                                                            excludeIds={selectedUserIds.filter(
-                                                                (id) =>
-                                                                    id !==
-                                                                    slot.userId
-                                                            )}
+                                                            disabled={
+                                                                slot.isCaptain
+                                                            }
                                                         />
+                                                        {slot.userId && duplicateUserIds.has(slot.userId) && (
+                                                            <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                                Playing twice
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <Button
                                                         type="button"
@@ -337,8 +350,9 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                             className="w-full"
                                             onClick={() =>
                                                 addSlot(
-                                                    sessionNumber,
-                                                    courtNumber
+                                                    divisionId,
+                                                    divisionData.divisionName,
+                                                    teamNumber
                                                 )
                                             }
                                         >
@@ -347,88 +361,11 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                         </Button>
                                     </div>
                                 )
-                            })}
+                            )}
                         </div>
                     </CardContent>
                 </Card>
             ))}
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Alternates</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        {[1, 2, 3, 4].map((courtNumber) => {
-                            const courtSlots =
-                                alternateCourtMap.get(courtNumber) || []
-
-                            return (
-                                <div
-                                    key={`alternates-court-${courtNumber}`}
-                                    className="space-y-2 rounded-md border p-3"
-                                >
-                                    <h3 className="font-semibold text-sm">
-                                        Court {courtNumber}
-                                    </h3>
-                                    <div className="space-y-2">
-                                        {courtSlots.map((slot, idx) => (
-                                            <div
-                                                key={slot.localKey}
-                                                className="flex items-end gap-1"
-                                            >
-                                                <div className="min-w-0 flex-1 space-y-1">
-                                                    <p className="text-muted-foreground text-xs">
-                                                        Slot {idx + 1}
-                                                    </p>
-                                                    <PlayerCombobox
-                                                        players={players}
-                                                        value={slot.userId}
-                                                        onChange={(userId) =>
-                                                            onChangeSlot(
-                                                                slot.localKey,
-                                                                userId
-                                                            )
-                                                        }
-                                                        excludeIds={selectedUserIds.filter(
-                                                            (id) =>
-                                                                id !==
-                                                                slot.userId
-                                                        )}
-                                                    />
-                                                </div>
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="shrink-0"
-                                                    onClick={() =>
-                                                        removeSlot(slot.localKey)
-                                                    }
-                                                >
-                                                    <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full"
-                                        onClick={() =>
-                                            addSlot(3, courtNumber)
-                                        }
-                                    >
-                                        <RiAddLine className="mr-1 h-4 w-4" />
-                                        Add Player
-                                    </Button>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </CardContent>
-            </Card>
 
             <div className="flex flex-wrap items-center gap-3">
                 <Button
@@ -436,7 +373,7 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                     onClick={handleSubmit}
                     disabled={isSaving}
                 >
-                    {isSaving ? "Saving..." : "Save Week 1"}
+                    {isSaving ? "Saving..." : "Save Week 3"}
                 </Button>
                 {success && (
                     <span className="text-green-700 text-sm dark:text-green-300">

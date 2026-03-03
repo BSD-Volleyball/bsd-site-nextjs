@@ -6,7 +6,7 @@ import { db } from "@/database/db"
 import {
     signups,
     users,
-    week2Rosters,
+    week3Rosters,
     teams,
     divisions
 } from "@/database/schema"
@@ -15,14 +15,14 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 
-export interface Week2EditablePlayer {
+export interface Week3EditablePlayer {
     id: string
     firstName: string
     lastName: string
     preferredName: string | null
 }
 
-export interface Week2EditableSlot {
+export interface Week3EditableSlot {
     id: number
     divisionId: number
     divisionName: string
@@ -31,20 +31,20 @@ export interface Week2EditableSlot {
     isCaptain: boolean
 }
 
-export interface Week2RosterEntry {
+export interface Week3RosterEntry {
     divisionId: number
     teamNumber: number
     userId: string
     isCaptain: boolean
 }
 
-export async function getEditWeek2Data(): Promise<{
+export async function getEditWeek3Data(): Promise<{
     status: boolean
     message?: string
     seasonId: number
     seasonLabel: string
-    players: Week2EditablePlayer[]
-    slots: Week2EditableSlot[]
+    players: Week3EditablePlayer[]
+    slots: Week3EditableSlot[]
 }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
@@ -72,7 +72,7 @@ export async function getEditWeek2Data(): Promise<{
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryout2 = config.tryout2Date.trim().toLowerCase()
+        const tryout3 = config.tryout3Date.trim().toLowerCase()
 
         const [signupPlayersRaw, rosterSlots] = await Promise.all([
             db
@@ -89,26 +89,26 @@ export async function getEditWeek2Data(): Promise<{
                 .orderBy(users.last_name, users.first_name),
             db
                 .select({
-                    id: week2Rosters.id,
-                    divisionId: week2Rosters.division,
+                    id: week3Rosters.id,
+                    divisionId: week3Rosters.division,
                     divisionName: divisions.name,
-                    teamNumber: week2Rosters.team_number,
-                    userId: week2Rosters.user,
-                    isCaptain: week2Rosters.is_captain
+                    teamNumber: week3Rosters.team_number,
+                    userId: week3Rosters.user,
+                    isCaptain: week3Rosters.is_captain
                 })
-                .from(week2Rosters)
-                .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-                .where(eq(week2Rosters.season, config.seasonId))
+                .from(week3Rosters)
+                .innerJoin(divisions, eq(week3Rosters.division, divisions.id))
+                .where(eq(week3Rosters.season, config.seasonId))
                 .orderBy(
                     divisions.level,
-                    week2Rosters.team_number,
-                    week2Rosters.id
+                    week3Rosters.team_number,
+                    week3Rosters.id
                 )
         ])
 
         const signupPlayers = signupPlayersRaw
             .filter((player) => {
-                if (!tryout2) {
+                if (!tryout3) {
                     return true
                 }
 
@@ -117,7 +117,7 @@ export async function getEditWeek2Data(): Promise<{
                     .map((value) => value.trim().toLowerCase())
                     .filter(Boolean)
 
-                return !missingDates.includes(tryout2)
+                return !missingDates.includes(tryout3)
             })
             .map((player) => ({
                 id: player.id,
@@ -134,7 +134,7 @@ export async function getEditWeek2Data(): Promise<{
             slots: rosterSlots
         }
     } catch (error) {
-        console.error("Error loading edit week 2 data:", error)
+        console.error("Error loading edit week 3 data:", error)
         return {
             status: false,
             message: "Something went wrong while loading data.",
@@ -146,8 +146,8 @@ export async function getEditWeek2Data(): Promise<{
     }
 }
 
-export async function updateWeek2Rosters(
-    slots: Array<Week2RosterEntry>
+export async function updateWeek3Rosters(
+    slots: Array<Week3RosterEntry>
 ): Promise<{ status: boolean; message: string }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
@@ -220,11 +220,11 @@ export async function updateWeek2Rosters(
     try {
         await db.transaction(async (tx) => {
             await tx
-                .delete(week2Rosters)
-                .where(eq(week2Rosters.season, config.seasonId))
+                .delete(week3Rosters)
+                .where(eq(week3Rosters.season, config.seasonId))
 
             if (filledSlots.length > 0) {
-                await tx.insert(week2Rosters).values(
+                await tx.insert(week3Rosters).values(
                     filledSlots.map((slot) => ({
                         season: config.seasonId,
                         user: slot.userId,
@@ -241,20 +241,20 @@ export async function updateWeek2Rosters(
             await logAuditEntry({
                 userId: session.user.id,
                 action: "update",
-                entityType: "week2_rosters",
-                summary: `Replaced week 2 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
+                entityType: "week3_rosters",
+                summary: `Replaced week 3 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
             })
         }
 
         return {
             status: true,
-            message: "Week 2 rosters saved successfully."
+            message: "Week 3 rosters saved successfully."
         }
     } catch (error) {
-        console.error("Error saving week 2 rosters:", error)
+        console.error("Error saving week 3 rosters:", error)
         return {
             status: false,
-            message: "Something went wrong while saving week 2 rosters."
+            message: "Something went wrong while saving week 3 rosters."
         }
     }
 }

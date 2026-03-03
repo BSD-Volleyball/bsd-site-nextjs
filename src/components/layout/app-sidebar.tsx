@@ -166,6 +166,11 @@ const adminDangerNavItems = [
         icon: RiEditLine
     },
     {
+        title: "Edit Week 3",
+        url: "/dashboard/edit-week-3",
+        icon: RiEditLine
+    },
+    {
         title: "Admin Create Teams",
         url: "/dashboard/admin-create-teams",
         icon: RiTeamLine
