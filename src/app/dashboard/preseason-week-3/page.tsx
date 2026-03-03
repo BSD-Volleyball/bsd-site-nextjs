@@ -4,17 +4,17 @@ import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
 import { db } from "@/database/db"
-import { week2Rosters, users, divisions } from "@/database/schema"
+import { week3Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Pre-Season Week 2"
+    title: "Pre-Season Week 3"
 }
 
 export const dynamic = "force-dynamic"
 
-interface Week2RosterRow {
+interface Week3RosterRow {
     userId: string
     displayName: string
     lastName: string
@@ -28,7 +28,7 @@ interface Week2RosterRow {
 
 interface DivisionTeam {
     teamNumber: number
-    players: Week2RosterRow[]
+    players: Week3RosterRow[]
 }
 
 interface DivisionGroup {
@@ -74,7 +74,7 @@ function buildDivisionSchedule(
     }))
 }
 
-export default async function PreseasonWeek2Page() {
+export default async function PreseasonWeek3Page() {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
@@ -87,8 +87,8 @@ export default async function PreseasonWeek2Page() {
         return (
             <div className="space-y-6">
                 <PageHeader
-                    title="Pre-Season Week 2"
-                    description="Preseason week 2 roster assignments grouped by division."
+                    title="Pre-Season Week 3"
+                    description="Preseason week 3 roster assignments grouped by division."
                 />
                 <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
                     No current season found.
@@ -99,30 +99,30 @@ export default async function PreseasonWeek2Page() {
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
     const sessionTimes = [
-        config.tryout2Session1Time,
-        config.tryout2Session2Time,
-        config.tryout2Session3Time
+        config.tryout3Session1Time,
+        config.tryout3Session2Time,
+        config.tryout3Session3Time
     ]
 
     const rosterRows = await db
         .select({
-            userId: week2Rosters.user,
+            userId: week3Rosters.user,
             firstName: users.first_name,
             lastName: users.last_name,
             preferredName: users.preffered_name,
-            divisionId: week2Rosters.division,
+            divisionId: week3Rosters.division,
             divisionName: divisions.name,
             divisionLevel: divisions.level,
-            teamNumber: week2Rosters.team_number,
-            isCaptain: week2Rosters.is_captain
+            teamNumber: week3Rosters.team_number,
+            isCaptain: week3Rosters.is_captain
         })
-        .from(week2Rosters)
-        .innerJoin(users, eq(week2Rosters.user, users.id))
-        .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-        .where(eq(week2Rosters.season, config.seasonId))
+        .from(week3Rosters)
+        .innerJoin(users, eq(week3Rosters.user, users.id))
+        .innerJoin(divisions, eq(week3Rosters.division, divisions.id))
+        .where(eq(week3Rosters.season, config.seasonId))
         .orderBy(
             asc(divisions.level),
-            asc(week2Rosters.team_number),
+            asc(week3Rosters.team_number),
             asc(users.last_name),
             asc(users.first_name)
         )
@@ -134,7 +134,7 @@ export default async function PreseasonWeek2Page() {
         userAssignmentCounts.set(row.userId, currentCount + 1)
     }
 
-    const normalizedRows: Week2RosterRow[] = rosterRows
+    const normalizedRows: Week3RosterRow[] = rosterRows
         .map((row) => {
             const baseName = row.preferredName
                 ? `${row.preferredName} ${row.lastName}`
@@ -171,7 +171,7 @@ export default async function PreseasonWeek2Page() {
             divisionId: number
             divisionName: string
             divisionLevel: number
-            teams: Map<number, Week2RosterRow[]>
+            teams: Map<number, Week3RosterRow[]>
         }
     >()
 
@@ -180,7 +180,7 @@ export default async function PreseasonWeek2Page() {
             divisionId: row.divisionId,
             divisionName: row.divisionName,
             divisionLevel: row.divisionLevel,
-            teams: new Map<number, Week2RosterRow[]>()
+            teams: new Map<number, Week3RosterRow[]>()
         }
 
         const teamPlayers = divisionGroup.teams.get(row.teamNumber) || []
@@ -207,36 +207,77 @@ export default async function PreseasonWeek2Page() {
     return (
         <div className="space-y-8">
             <PageHeader
-                title={`${seasonLabel} Pre-Season Week 2`}
-                description="Preseason week 2 roster assignments grouped by division and team."
+                title={`${seasonLabel} Pre-Season Week 3`}
+                description="Preseason week 3 roster assignments grouped by division and team."
             />
 
             <div className="space-y-4 rounded-lg border bg-muted/20 p-5">
                 <h2 className="font-semibold text-sm uppercase tracking-wide">
-                    ABOUT THE PRESEASON ROSTERS FOR WEEK 2 - Preseason
-                    &quot;Automated&quot; Draft
+                    ABOUT THE PRESEASON ROSTERS FOR WEEK 3 - Preseason
+                    &quot;Moving Day&quot; Draft
                 </h2>
                 <p className="text-sm">
-                    The league has conducted an &quot;automated&quot; draft into
-                    regular divisions. Returning players were placed in the
-                    division they most recently played in. New players were
-                    placed in divisions based on feedback from the Captains
-                    after Preseason Week 1. The league may have made some
-                    limited adjustments to accommodate Pair Requests and fill in
-                    roster gaps where necessary.
+                    The league has conducted another preseason draft into
+                    regular divisions. After preseason play last week, the
+                    Captains were asked to nominate players to move up one
+                    division level. To make room for the rising players,
+                    Captains also nominated players to move down one division
+                    level for this week of preseason play (&quot;Moving
+                    Day&quot;).
                 </p>
                 <p className="text-sm">
-                    Each team will play one match with no refs and capped at 50
-                    minutes. Captains at all levels will be invited to observe
-                    the matches when their teams are not playing. There will be
-                    a new roster of preseason teams next week with over 40% of
-                    players moving into new divisions (half moving up and half
-                    moving down) based on feedback from the Captains.
+                    The purpose of &quot;Moving Day&quot; is to provide
+                    opportunities for players to demonstrate their skills at
+                    different levels of play. This format will also provide
+                    Captains the opportunity to see more players in different
+                    environments. The league may also have made some limited
+                    adjustments to accommodate Pair Requests and fill in roster
+                    gaps where necessary.
                 </p>
                 <p className="text-sm">
-                    All registered players will be placed on the roster for
-                    Preseason Week 3.
+                    Each team will play one match (three games) with no refs
+                    and capped at 50 minutes. Captains at all levels will be
+                    invited to observe the matches when their teams are not
+                    playing. This is the final week of preseason play. Over the
+                    next two weeks, the Captain will draft their teams for the
+                    regular season. Regular season play begins on{" "}
+                    {config.season1Date || "TBD"}.
                 </p>
+                <p className="text-sm">
+                    Please note that these &quot;Moving Day&quot; assignments
+                    are for this week only. Division assignments for this week
+                    do not determine where you play in the regular season. How
+                    you play and how Captains perceive your play will determine
+                    that. Captains are free to draft any players of their
+                    choosing, regardless of their preseason division
+                    assignments:
+                </p>
+                <ul className="space-y-1 pl-5 text-sm list-disc">
+                    <li>
+                        <span className="font-semibold">
+                            Players Moving Up
+                        </span>{" "}
+                        - Take it as a compliment that some Captains want to
+                        see you compete at the next level. Good luck! No
+                        promises :)
+                    </li>
+                    <li>
+                        <span className="font-semibold">
+                            Players Staying Put
+                        </span>{" "}
+                        - Captains were only allowed to move a fixed number of
+                        players. Keep up the good work! No promises :)
+                    </li>
+                    <li>
+                        <span className="font-semibold">
+                            Players Moving Down
+                        </span>{" "}
+                        - Captains were forced to move a fixed number of
+                        players down to make room for other players moving up.
+                        This week you have an opportunity for your skills to
+                        stand out. Good luck in the draft! No promises :)
+                    </li>
+                </ul>
                 <p className="font-semibold text-sm">
                     Players marked with an asterisk (*) are scheduled for two
                     matches.
@@ -244,12 +285,12 @@ export default async function PreseasonWeek2Page() {
             </div>
 
             <h2 className="font-semibold text-xl">
-                Preseason Week 2 - {config.tryout2Date || "Date TBD"}
+                Preseason Week 3 - {config.tryout3Date || "Date TBD"}
             </h2>
 
             {divisionGroups.length === 0 ? (
                 <div className="rounded-lg border bg-card p-4 text-muted-foreground text-sm">
-                    No Week 2 roster assignments were found for the current
+                    No Week 3 roster assignments were found for the current
                     season.
                 </div>
             ) : (
