@@ -50,6 +50,7 @@ interface SelectCaptainsFormProps {
     seasonLabel: string
     divisions: DivisionOption[]
     users: UserOption[]
+    allUsers: UserOption[]
     emailTemplate: string
     emailTemplateContent: LexicalEmailTemplateContent | null
     emailSubject: string
@@ -62,6 +63,7 @@ interface SelectCaptainsFormProps {
 
 interface CaptainSelection {
     captainId: string | null
+    coach2Id: string | null
     teamName: string
 }
 
@@ -205,6 +207,7 @@ export function SelectCaptainsForm({
     seasonLabel = "",
     divisions,
     users,
+    allUsers,
     emailTemplate,
     emailTemplateContent,
     emailSubject,
@@ -231,7 +234,7 @@ export function SelectCaptainsForm({
     const [captains, setCaptains] = useState<CaptainSelection[]>(
         Array(6)
             .fill(null)
-            .map(() => ({ captainId: null, teamName: "" }))
+            .map(() => ({ captainId: null, coach2Id: null, teamName: "" }))
     )
 
     const selectedDivision = useMemo(
@@ -247,12 +250,22 @@ export function SelectCaptainsForm({
         return selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
     }, [selectedDivision])
 
+    const isCoachesMode = useMemo(
+        () => selectedDivision?.coaches ?? false,
+        [selectedDivision]
+    )
+
     useEffect(() => {
         const parsedId = parseInt(divisionId)
         const existing =
             divisionId && !Number.isNaN(parsedId)
                 ? (existingTeamsByDivision?.[parsedId] ?? [])
                 : []
+
+        const div =
+            divisions.find((d) => d.id.toString() === divisionId) || null
+        const isCoaches = div?.coaches ?? false
+        const nTeams = div?.name.trim().toUpperCase() === "BB" ? 4 : 6
 
         const byNumber = new Map(existing.map((t) => [t.number, t]))
 
@@ -263,42 +276,75 @@ export function SelectCaptainsForm({
         setCaptains(() => {
             const next: CaptainSelection[] = Array(6)
                 .fill(null)
-                .map(() => ({ captainId: null, teamName: "" }))
+                .map(() => ({ captainId: null, coach2Id: null, teamName: "" }))
             for (let i = 0; i < 6; i++) {
-                const team = byNumber.get(i + 1)
-                if (team) {
+                const primaryTeam = byNumber.get(i + 1)
+                const coach2Team = isCoaches
+                    ? byNumber.get(i + 1 + nTeams)
+                    : null
+                if (primaryTeam || coach2Team) {
                     next[i] = {
-                        captainId: team.captainId,
-                        teamName: team.teamName
+                        captainId: primaryTeam?.captainId ?? null,
+                        coach2Id: coach2Team?.captainId ?? null,
+                        teamName:
+                            primaryTeam?.teamName ?? coach2Team?.teamName ?? ""
                     }
                 }
             }
             return next
         })
-    }, [divisionId, existingTeamsByDivision])
+    }, [divisionId, existingTeamsByDivision, divisions])
 
     const selectedCaptainIds = useMemo(
         () =>
-            captains
-                .slice(0, numTeams)
-                .map((c) => c.captainId)
-                .filter((id): id is string => id !== null),
+            captains.slice(0, numTeams).flatMap((c) => {
+                const ids: string[] = []
+                if (c.captainId) ids.push(c.captainId)
+                if (c.coach2Id) ids.push(c.coach2Id)
+                return ids
+            }),
         [captains, numTeams]
     )
 
     const selectedCaptains = useMemo(() => {
         return selectedCaptainIds
-            .map((captainId) => users.find((user) => user.id === captainId))
+            .map((captainId) => allUsers.find((user) => user.id === captainId))
             .filter((user): user is UserOption => user !== undefined)
-    }, [selectedCaptainIds, users])
+    }, [selectedCaptainIds, allUsers])
+
+    // For coaches mode: pairs of (coach1, coach2) per team slot, used for the
+    // captain_names template variable and the email modal list.
+    const selectedCoachPairs = useMemo(() => {
+        if (!isCoachesMode) return null
+        return captains
+            .slice(0, numTeams)
+            .map((c) => ({
+                coach1: c.captainId
+                    ? (allUsers.find((u) => u.id === c.captainId) ?? null)
+                    : null,
+                coach2: c.coach2Id
+                    ? (allUsers.find((u) => u.id === c.coach2Id) ?? null)
+                    : null
+            }))
+            .filter((p) => p.coach1 || p.coach2)
+    }, [captains, numTeams, isCoachesMode, allUsers])
 
     const variableValues = useMemo(() => {
-        const captainNames =
-            selectedCaptains.length > 0
-                ? selectedCaptains
-                      .map((u) => `• ${u.first_name} ${u.last_name}`)
-                      .join("\n")
-                : ""
+        const captainNames = isCoachesMode
+            ? (selectedCoachPairs ?? [])
+                  .map(({ coach1, coach2 }) => {
+                      const names = [coach1, coach2]
+                          .filter(Boolean)
+                          .map((u) => `${u!.first_name} ${u!.last_name}`)
+                          .join(" & ")
+                      return `• ${names}`
+                  })
+                  .join("\n")
+            : selectedCaptains.length > 0
+              ? selectedCaptains
+                    .map((u) => `• ${u.first_name} ${u.last_name}`)
+                    .join("\n")
+              : ""
 
         const otherCommissioner =
             selectedDivision && divisionCommissioners
@@ -385,6 +431,8 @@ export function SelectCaptainsForm({
     }, [
         selectedDivision,
         selectedCaptains,
+        selectedCoachPairs,
+        isCoachesMode,
         seasonConfig,
         commissionerName,
         currentUserId,
@@ -499,14 +547,25 @@ export function SelectCaptainsForm({
 
     const handleCaptainChange = (
         index: number,
+        field: "captainId" | "coach2Id",
         userId: string | null,
         user: UserOption | null
     ) => {
         setCaptains((prev) => {
             const newCaptains = [...prev]
-            newCaptains[index] = {
-                captainId: userId,
-                teamName: user ? `Team ${user.last_name}` : ""
+            if (field === "captainId") {
+                newCaptains[index] = {
+                    ...newCaptains[index],
+                    captainId: userId,
+                    teamName: user
+                        ? `Team ${user.last_name}`
+                        : newCaptains[index].teamName || ""
+                }
+            } else {
+                newCaptains[index] = {
+                    ...newCaptains[index],
+                    coach2Id: userId
+                }
             }
             return newCaptains
         })
@@ -536,18 +595,31 @@ export function SelectCaptainsForm({
 
         const teamsToCreate = captains.slice(0, numTeams).map((c) => ({
             captainId: c.captainId || "",
+            coach2Id: c.coach2Id || "",
             teamName: c.teamName
         }))
 
-        // Check all captains are selected
-        for (let i = 0; i < numTeams; i++) {
-            if (!teamsToCreate[i].captainId) {
-                setError(`Please select a captain for Team ${i + 1}.`)
-                return
+        if (isCoachesMode) {
+            // In coaches mode, only require a name if at least one coach is set
+            for (let i = 0; i < numTeams; i++) {
+                const hasAnyCoach =
+                    teamsToCreate[i].captainId || teamsToCreate[i].coach2Id
+                if (hasAnyCoach && !teamsToCreate[i].teamName.trim()) {
+                    setError(`Please enter a name for Team ${i + 1}.`)
+                    return
+                }
             }
-            if (!teamsToCreate[i].teamName.trim()) {
-                setError(`Please enter a name for Team ${i + 1}.`)
-                return
+        } else {
+            // Check all captains are selected
+            for (let i = 0; i < numTeams; i++) {
+                if (!teamsToCreate[i].captainId) {
+                    setError(`Please select a captain for Team ${i + 1}.`)
+                    return
+                }
+                if (!teamsToCreate[i].teamName.trim()) {
+                    setError(`Please enter a name for Team ${i + 1}.`)
+                    return
+                }
             }
         }
 
@@ -557,12 +629,6 @@ export function SelectCaptainsForm({
 
         if (result.status) {
             setSuccess(result.message)
-            // Reset form
-            setCaptains(
-                Array(6)
-                    .fill(null)
-                    .map(() => ({ captainId: null, teamName: "" }))
-            )
         } else {
             setError(result.message)
         }
@@ -576,8 +642,9 @@ export function SelectCaptainsForm({
                 <CardHeader>
                     <CardTitle>Team Configuration</CardTitle>
                     <CardDescription>
-                        Select captains for the current season by choosing a
-                        division and players.
+                        {isCoachesMode
+                            ? "Select up to two coaches per team for the current season. All fields are optional — save at any time."
+                            : "Select captains for the current season by choosing a division and players."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -616,10 +683,86 @@ export function SelectCaptainsForm({
                     </div>
 
                     <div className="border-t pt-6">
-                        <h3 className="mb-4 font-semibold">Captains</h3>
+                        <h3 className="mb-4 font-semibold">
+                            {isCoachesMode ? "Coaches" : "Captains"}
+                        </h3>
                         <div className="space-y-4">
-                            {Array.from({ length: numTeams }).map(
-                                (_, index) => (
+                            {Array.from({ length: numTeams }).map((_, index) =>
+                                isCoachesMode ? (
+                                    <div
+                                        key={index}
+                                        className="space-y-3 rounded-md border p-3"
+                                    >
+                                        <div className="space-y-2">
+                                            <Label
+                                                htmlFor={`team-name-${index}`}
+                                            >
+                                                Team {index + 1} Name
+                                            </Label>
+                                            <Input
+                                                id={`team-name-${index}`}
+                                                value={captains[index].teamName}
+                                                onChange={(e) =>
+                                                    handleTeamNameChange(
+                                                        index,
+                                                        e.target.value
+                                                    )
+                                                }
+                                                placeholder="Team name"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-2">
+                                                <Label>Coach 1</Label>
+                                                <UserCombobox
+                                                    users={allUsers}
+                                                    value={
+                                                        captains[index]
+                                                            .captainId
+                                                    }
+                                                    onChange={(userId, user) =>
+                                                        handleCaptainChange(
+                                                            index,
+                                                            "captainId",
+                                                            userId,
+                                                            user
+                                                        )
+                                                    }
+                                                    placeholder="Select a coach..."
+                                                    excludeIds={
+                                                        selectedCaptainIds
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>
+                                                    Coach 2{" "}
+                                                    <span className="text-muted-foreground text-xs">
+                                                        (optional)
+                                                    </span>
+                                                </Label>
+                                                <UserCombobox
+                                                    users={allUsers}
+                                                    value={
+                                                        captains[index].coach2Id
+                                                    }
+                                                    onChange={(userId, user) =>
+                                                        handleCaptainChange(
+                                                            index,
+                                                            "coach2Id",
+                                                            userId,
+                                                            user
+                                                        )
+                                                    }
+                                                    placeholder="Select a coach..."
+                                                    excludeIds={
+                                                        selectedCaptainIds
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
                                     <div
                                         key={index}
                                         className="grid grid-cols-2 items-end gap-4"
@@ -639,6 +782,7 @@ export function SelectCaptainsForm({
                                                 onChange={(userId, user) =>
                                                     handleCaptainChange(
                                                         index,
+                                                        "captainId",
                                                         userId,
                                                         user
                                                     )

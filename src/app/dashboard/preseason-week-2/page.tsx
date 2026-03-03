@@ -298,7 +298,11 @@ export default async function PreseasonWeek2Page() {
                                             {team.players.map((player) => (
                                                 <li
                                                     key={`${player.userId}-${division.divisionId}-${team.teamNumber}`}
-                                                    className="rounded-sm bg-background px-2 py-1"
+                                                    className={
+                                                        player.userId === session.user.id
+                                                            ? "rounded-sm bg-primary/15 px-2 py-1 font-semibold ring-1 ring-primary/50"
+                                                            : "rounded-sm bg-background px-2 py-1"
+                                                    }
                                                 >
                                                     {player.displayName}
                                                 </li>
