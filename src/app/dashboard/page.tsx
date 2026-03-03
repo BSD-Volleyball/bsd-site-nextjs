@@ -1115,9 +1115,6 @@ export default async function DashboardPage() {
                                     {seasonLabel} Season
                                 </CardTitle>
                             </div>
-                            <p className="text-muted-foreground text-xs">
-                                {PHASE_CONFIG[signupStatus.config.phase].label}
-                            </p>
                         </CardHeader>
                         <CardContent>
                             {signupStatus.config.phase === "off_season" ? (
