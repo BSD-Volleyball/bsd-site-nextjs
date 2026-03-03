@@ -32,7 +32,6 @@ import {
     getCurrentSeasonAmount,
     isLatePricing
 } from "@/lib/site-config"
-import { PHASE_CONFIG } from "@/lib/season-phases"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
@@ -1151,21 +1150,9 @@ export default async function DashboardPage() {
                               signupStatus.config.phase ===
                                   "prep_tryout_week_3" ? (
                                 signupStatus.signup ? (
-                                    <div className="space-y-4">
-                                        <RegistrationConfirmation
-                                            signupStatus={signupStatus}
-                                        />
-                                        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-                                            <p className="font-medium text-blue-700 text-sm dark:text-blue-300">
-                                                {
-                                                    PHASE_CONFIG[
-                                                        signupStatus.config
-                                                            .phase
-                                                    ].description
-                                                }
-                                            </p>
-                                        </div>
-                                    </div>
+                                    <RegistrationConfirmation
+                                        signupStatus={signupStatus}
+                                    />
                                 ) : signupStatus.season ? (
                                     <div className="space-y-3">
                                         <p className="text-muted-foreground">
