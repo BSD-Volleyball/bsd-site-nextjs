@@ -911,7 +911,7 @@ export default async function DashboardPage() {
                             <div className="flex items-center gap-2">
                                 <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                                 <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
-                                    You're in Week 1 Tryouts!
+                                    You're in Week 1 Tryouts this Thursday!
                                 </CardTitle>
                             </div>
                         </CardHeader>
@@ -920,6 +920,14 @@ export default async function DashboardPage() {
                                 You have been assigned a spot in the Pre-Season Week 1 tryout.
                             </p>
                             <div className="rounded-md bg-orange-100 p-3 dark:bg-orange-900 space-y-1.5 text-sm">
+                                {signupStatus.config.tryout1Date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">Date:</span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {signupStatus.config.tryout1Date}
+                                        </span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between">
                                     <span className="text-orange-700 dark:text-orange-300">Session:</span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">

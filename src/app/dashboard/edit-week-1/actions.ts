@@ -23,6 +23,12 @@ export interface Week1EditableSlot {
     userId: string
 }
 
+export interface Week1RosterEntry {
+    sessionNumber: number
+    courtNumber: number
+    userId: string
+}
+
 export async function getEditWeek1Data(): Promise<{
     status: boolean
     message?: string
@@ -107,20 +113,13 @@ export async function getEditWeek1Data(): Promise<{
 }
 
 export async function updateWeek1Rosters(
-    updates: Array<{ id: number; userId: string }>
+    slots: Array<Week1RosterEntry>
 ): Promise<{ status: boolean; message: string }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return {
             status: false,
             message: "You don't have permission to perform this action."
-        }
-    }
-
-    if (updates.length === 0) {
-        return {
-            status: false,
-            message: "No updates provided."
         }
     }
 
@@ -132,7 +131,8 @@ export async function updateWeek1Rosters(
         }
     }
 
-    const userIds = updates.map((item) => item.userId)
+    const filledSlots = slots.filter((s) => s.userId)
+    const userIds = filledSlots.map((s) => s.userId)
     const uniqueUserIds = new Set(userIds)
 
     if (uniqueUserIds.size !== userIds.length) {
@@ -142,36 +142,41 @@ export async function updateWeek1Rosters(
         }
     }
 
-    const signedUpRows = await db
-        .select({ playerId: signups.player })
-        .from(signups)
-        .where(
-            and(
-                eq(signups.season, config.seasonId),
-                inArray(signups.player, [...uniqueUserIds])
+    if (uniqueUserIds.size > 0) {
+        const signedUpRows = await db
+            .select({ playerId: signups.player })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    inArray(signups.player, [...uniqueUserIds])
+                )
             )
-        )
 
-    if (signedUpRows.length !== uniqueUserIds.size) {
-        return {
-            status: false,
-            message:
-                "All selected players must be signed up for the current season."
+        if (signedUpRows.length !== uniqueUserIds.size) {
+            return {
+                status: false,
+                message:
+                    "All selected players must be signed up for the current season."
+            }
         }
     }
 
     try {
         await db.transaction(async (tx) => {
-            for (const update of updates) {
-                await tx
-                    .update(week1Rosters)
-                    .set({ user: update.userId })
-                    .where(
-                        and(
-                            eq(week1Rosters.id, update.id),
-                            eq(week1Rosters.season, config.seasonId)
-                        )
-                    )
+            await tx
+                .delete(week1Rosters)
+                .where(eq(week1Rosters.season, config.seasonId))
+
+            if (filledSlots.length > 0) {
+                await tx.insert(week1Rosters).values(
+                    filledSlots.map((slot) => ({
+                        season: config.seasonId,
+                        user: slot.userId,
+                        session_number: slot.sessionNumber,
+                        court_number: slot.courtNumber
+                    }))
+                )
             }
         })
 
@@ -181,19 +186,19 @@ export async function updateWeek1Rosters(
                 userId: session.user.id,
                 action: "update",
                 entityType: "week1_rosters",
-                summary: `Updated week 1 rosters for season ${config.seasonId}`
+                summary: `Replaced week 1 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
             })
         }
 
         return {
             status: true,
-            message: "Week 1 rosters updated successfully."
+            message: "Week 1 rosters saved successfully."
         }
     } catch (error) {
-        console.error("Error updating week 1 rosters:", error)
+        console.error("Error saving week 1 rosters:", error)
         return {
             status: false,
-            message: "Something went wrong while updating week 1 rosters."
+            message: "Something went wrong while saving week 1 rosters."
         }
     }
 }

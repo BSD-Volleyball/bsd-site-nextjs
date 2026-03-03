@@ -3,17 +3,17 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
-import { getEditWeek1Data } from "./actions"
-import { EditWeek1Form } from "./edit-week-1-form"
+import { getEditWeek3Data } from "./actions"
+import { EditWeek3Form } from "./edit-week-3-form"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Edit Week 1"
+    title: "Edit Week 3"
 }
 
 export const dynamic = "force-dynamic"
 
-export default async function EditWeek1Page() {
+export default async function EditWeek3Page() {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
@@ -26,17 +26,17 @@ export default async function EditWeek1Page() {
         redirect("/dashboard")
     }
 
-    const result = await getEditWeek1Data()
+    const result = await getEditWeek3Data()
 
     if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader
-                    title="Edit Week 1"
-                    description="Edit preseason week 1 roster assignments for the current season."
+                    title="Edit Week 3"
+                    description="Edit tryout 3 team assignments for the current season."
                 />
                 <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
-                    {result.message || "Failed to load week 1 roster data."}
+                    {result.message || "Failed to load week 3 roster data."}
                 </div>
             </div>
         )
@@ -45,10 +45,16 @@ export default async function EditWeek1Page() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Edit Week 1`}
-                description="Edit player assignments for each session and court, then save changes."
+                title={`${result.seasonLabel} Edit Week 3`}
+                description="Edit player assignments by division/team, then save changes."
             />
-            <EditWeek1Form players={result.players} slots={result.slots} />
+            {result.slots.length === 0 ? (
+                <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
+                    No week 3 roster slots found for this season.
+                </div>
+            ) : (
+                <EditWeek3Form players={result.players} slots={result.slots} />
+            )}
         </div>
     )
 }
