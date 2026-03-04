@@ -31,6 +31,7 @@ interface TryoutSheetRow {
     lastSeasonLabel: string
     lastDivisionLabel: string
     hasBlankHistory: boolean
+    lastSeasonId: number | null
 }
 
 function capitalize(value: string): string {
@@ -318,10 +319,31 @@ export async function GET() {
                 genderLabel: getGenderLabel(row.male),
                 lastSeasonLabel: latestDraft?.seasonLabel ?? "",
                 lastDivisionLabel: latestDraft?.divisionLabel ?? "",
-                hasBlankHistory: !latestDraft
+                hasBlankHistory: !latestDraft,
+                lastSeasonId: latestDraft?.seasonId ?? null
             })
 
             pageRowsBySessionCourt.set(key, currentRows)
+        }
+
+        const genderOrder = (label: string) =>
+            label === "M" ? 0 : label === "NM" ? 1 : 2
+
+        for (const [key, rows] of pageRowsBySessionCourt) {
+            pageRowsBySessionCourt.set(
+                key,
+                [...rows].sort((a, b) => {
+                    if (a.hasBlankHistory !== b.hasBlankHistory) {
+                        return a.hasBlankHistory ? -1 : 1
+                    }
+                    if (a.hasBlankHistory) {
+                        return genderOrder(a.genderLabel) - genderOrder(b.genderLabel)
+                    }
+                    const gapA = config.seasonId - (a.lastSeasonId ?? config.seasonId)
+                    const gapB = config.seasonId - (b.lastSeasonId ?? config.seasonId)
+                    return gapB - gapA
+                })
+            )
         }
 
         const pdfDoc = await PDFDocument.create()
