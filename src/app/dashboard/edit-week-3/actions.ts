@@ -20,6 +20,7 @@ export interface Week3EditablePlayer {
     firstName: string
     lastName: string
     preferredName: string | null
+    male: boolean | null
 }
 
 export interface Week3EditableSlot {
@@ -81,6 +82,7 @@ export async function getEditWeek3Data(): Promise<{
                     firstName: users.first_name,
                     lastName: users.last_name,
                     preferredName: users.preffered_name,
+                    male: users.male,
                     datesMissing: signups.dates_missing
                 })
                 .from(signups)
@@ -123,7 +125,8 @@ export async function getEditWeek3Data(): Promise<{
                 id: player.id,
                 firstName: player.firstName,
                 lastName: player.lastName,
-                preferredName: player.preferredName
+                preferredName: player.preferredName,
+                male: player.male
             }))
 
         return {

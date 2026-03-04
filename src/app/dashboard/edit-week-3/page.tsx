@@ -53,7 +53,11 @@ export default async function EditWeek3Page() {
                     No week 3 roster slots found for this season.
                 </div>
             ) : (
-                <EditWeek3Form players={result.players} slots={result.slots} />
+                <EditWeek3Form
+                    players={result.players}
+                    slots={result.slots}
+                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                />
             )}
         </div>
     )

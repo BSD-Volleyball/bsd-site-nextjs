@@ -53,7 +53,11 @@ export default async function EditWeek2Page() {
                     No week 2 roster slots found for this season.
                 </div>
             ) : (
-                <EditWeek2Form players={result.players} slots={result.slots} />
+                <EditWeek2Form
+                    players={result.players}
+                    slots={result.slots}
+                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                />
             )}
         </div>
     )

@@ -48,7 +48,11 @@ export default async function EditWeek1Page() {
                 title={`${result.seasonLabel} Edit Week 1`}
                 description="Edit player assignments for each session and court, then save changes."
             />
-            <EditWeek1Form players={result.players} slots={result.slots} />
+            <EditWeek1Form
+                players={result.players}
+                slots={result.slots}
+                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+            />
         </div>
     )
 }
