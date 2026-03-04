@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
@@ -8,7 +8,6 @@ import {
     divisions,
     drafts,
     draftHomework,
-    evaluations,
     individual_divisions,
     seasons,
     signups,
@@ -16,6 +15,7 @@ import {
     users
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
+import { fetchPlayerScores } from "@/lib/player-score"
 
 export interface DraftHomeworkPlayer {
     userId: string
@@ -174,81 +174,16 @@ export async function getDraftHomeworkData(): Promise<{
         .map((p) => ({ ...p, oldId: p.oldId ?? 0 }))
         .sort(sortByLastName)
 
-    // --- Score calculation (same algorithm as edit-week-1) ---
+    // --- Score calculation ---
     const userIds = playerRows.map((p) => p.userId)
-
-    const draftRows =
-        userIds.length > 0
-            ? await db
-                  .select({
-                      userId: drafts.user,
-                      seasonId: seasons.id,
-                      overall: drafts.overall
-                  })
-                  .from(drafts)
-                  .innerJoin(teams, eq(drafts.team, teams.id))
-                  .innerJoin(seasons, eq(teams.season, seasons.id))
-                  .where(inArray(drafts.user, userIds))
-                  .orderBy(desc(seasons.id))
-            : []
-
-    const mostRecentOverallByUser = new Map<string, number>()
-    for (const row of draftRows) {
-        if (!mostRecentOverallByUser.has(row.userId)) {
-            mostRecentOverallByUser.set(row.userId, row.overall)
-        }
-    }
-
-    const usersWithoutDraft = userIds.filter(
-        (id) => !mostRecentOverallByUser.has(id)
-    )
-    const evalScoreByUser = new Map<string, number>()
-    if (usersWithoutDraft.length > 0) {
-        const evalRows = await db
-            .select({
-                playerId: evaluations.player,
-                divisionLevel: divisions.level
-            })
-            .from(evaluations)
-            .innerJoin(divisions, eq(evaluations.division, divisions.id))
-            .where(
-                and(
-                    eq(evaluations.season, config.seasonId),
-                    inArray(evaluations.player, usersWithoutDraft)
-                )
-            )
-
-        const aggregates = new Map<string, { sum: number; count: number }>()
-        for (const row of evalRows) {
-            const current = aggregates.get(row.playerId) || {
-                sum: 0,
-                count: 0
-            }
-            current.sum += row.divisionLevel
-            current.count += 1
-            aggregates.set(row.playerId, current)
-        }
-        for (const [playerId, agg] of aggregates.entries()) {
-            evalScoreByUser.set(playerId, (agg.sum / agg.count - 1) * 50)
-        }
-    }
-
-    const scoreByUser = new Map<string, number>()
-    for (const p of playerRows) {
-        const score =
-            mostRecentOverallByUser.get(p.userId) ??
-            evalScoreByUser.get(p.userId)
-        if (score !== undefined) {
-            scoreByUser.set(p.userId, score)
-        }
-    }
+    const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
     const sortByScore = (
         a: DraftHomeworkPlayer,
         b: DraftHomeworkPlayer
     ): number => {
-        const aScore = scoreByUser.get(a.userId) ?? Number.POSITIVE_INFINITY
-        const bScore = scoreByUser.get(b.userId) ?? Number.POSITIVE_INFINITY
+        const aScore = scoreByUser.get(a.userId) ?? 200
+        const bScore = scoreByUser.get(b.userId) ?? 200
         return aScore - bScore
     }
 

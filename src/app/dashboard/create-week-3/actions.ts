@@ -7,7 +7,6 @@ import {
     users,
     signups,
     drafts,
-    evaluations,
     teams,
     seasons,
     divisions,
@@ -17,6 +16,7 @@ import {
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import type {
@@ -276,45 +276,7 @@ export async function getCreateWeek3Data(): Promise<{
             }
         }
 
-        const usersWithoutDraft = userIds.filter(
-            (userId) => !draftsByUser.has(userId)
-        )
-
-        const evaluationScoreByUser = new Map<string, number>()
-        if (usersWithoutDraft.length > 0) {
-            const evaluationRows = await db
-                .select({
-                    playerId: evaluations.player,
-                    divisionLevel: divisions.level
-                })
-                .from(evaluations)
-                .innerJoin(divisions, eq(evaluations.division, divisions.id))
-                .where(
-                    and(
-                        eq(evaluations.season, config.seasonId),
-                        inArray(evaluations.player, usersWithoutDraft)
-                    )
-                )
-
-            const aggregates = new Map<string, { sum: number; count: number }>()
-            for (const row of evaluationRows) {
-                const current = aggregates.get(row.playerId) || {
-                    sum: 0,
-                    count: 0
-                }
-                current.sum += row.divisionLevel
-                current.count += 1
-                aggregates.set(row.playerId, current)
-            }
-
-            for (const [playerId, aggregate] of aggregates.entries()) {
-                const averageDivisionLevel = aggregate.sum / aggregate.count
-                evaluationScoreByUser.set(
-                    playerId,
-                    (averageDivisionLevel - 1) * 50
-                )
-            }
-        }
+        const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
         const mutualPairMap = new Map<string, string>()
         const pairPickMap = new Map(
@@ -363,9 +325,7 @@ export async function getCreateWeek3Data(): Promise<{
         const candidates: Week3Candidate[] = signupRows.map((row) => {
             const history = draftsByUser.get(row.userId) || []
             const mostRecent = history[0] || null
-            const placementScore = mostRecent
-                ? mostRecent.overall
-                : (evaluationScoreByUser.get(row.userId) ?? 200)
+            const placementScore = scoreByUser.get(row.userId) ?? 200
             const recommendations = recommendationCountByUser.get(
                 row.userId
             ) || {
