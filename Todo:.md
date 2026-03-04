@@ -2,19 +2,9 @@ Todo:
 
 - Handle emailing for captains process
 - get interest in volunteering for various roles, especially week 1
+- pick court managers for week 1 and send them email
 - add feature to handle bans
 - consider moving to tanstack start
+- handle ref scheduling
 
 
-Create state machine:
-
-- between seasons
-- registration open
-- registration full
-- after week 1 tryout
-- after week 2 tryout
-- after week 3 tryout
-- after drafts
-- Regular season
-- Playoffs
-- 

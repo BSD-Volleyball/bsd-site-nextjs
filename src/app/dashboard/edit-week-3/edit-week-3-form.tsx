@@ -14,17 +14,23 @@ import {
     RiAddLine,
     RiArrowDownSLine,
     RiCloseLine,
-    RiDeleteBinLine
+    RiDeleteBinLine,
+    RiUserLine
 } from "@remixicon/react"
 import {
     updateWeek3Rosters,
     type Week3EditablePlayer,
     type Week3EditableSlot
 } from "./actions"
+import {
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup
+} from "@/components/player-detail"
 
 interface EditWeek3FormProps {
     players: Week3EditablePlayer[]
     slots: Week3EditableSlot[]
+    playerPicUrl: string
 }
 
 interface LocalSlot {
@@ -41,6 +47,12 @@ function getPlayerLabel(player: Week3EditablePlayer) {
         return `${player.preferredName} ${player.lastName}`
     }
     return `${player.firstName} ${player.lastName}`
+}
+
+function getGenderClass(male: boolean | null) {
+    if (male === true) return "bg-blue-50 dark:bg-blue-950/40"
+    if (male === false) return "bg-pink-50 dark:bg-pink-950/40"
+    return ""
 }
 
 function PlayerCombobox({
@@ -86,7 +98,10 @@ function PlayerCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between font-normal"
+                    className={cn(
+                        "w-full justify-between font-normal",
+                        selectedPlayer && getGenderClass(selectedPlayer.male)
+                    )}
                     disabled={disabled}
                 >
                     <span
@@ -146,8 +161,14 @@ function PlayerCombobox({
                                 key={player.id}
                                 type="button"
                                 className={cn(
-                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                    value === player.id && "bg-accent"
+                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm",
+                                    value === player.id
+                                        ? "bg-accent"
+                                        : player.male === true
+                                          ? "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60"
+                                          : player.male === false
+                                            ? "bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-950/60"
+                                            : "hover:bg-accent"
                                 )}
                                 onClick={() => {
                                     onChange(player.id)
@@ -165,7 +186,8 @@ function PlayerCombobox({
     )
 }
 
-export function EditWeek3Form({ players, slots }: EditWeek3FormProps) {
+export function EditWeek3Form({ players, slots, playerPicUrl }: EditWeek3FormProps) {
+    const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -327,6 +349,21 @@ export function EditWeek3Form({ players, slots }: EditWeek3FormProps) {
                                                             </p>
                                                         )}
                                                     </div>
+                                                    {slot.userId && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="shrink-0"
+                                                            onClick={() =>
+                                                                modal.openPlayerDetail(
+                                                                    slot.userId
+                                                                )
+                                                            }
+                                                        >
+                                                            <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
@@ -386,6 +423,19 @@ export function EditWeek3Form({ players, slots }: EditWeek3FormProps) {
                     </span>
                 )}
             </div>
+
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+            />
         </div>
     )
 }

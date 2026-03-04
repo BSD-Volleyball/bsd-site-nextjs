@@ -14,17 +14,23 @@ import {
     RiAddLine,
     RiArrowDownSLine,
     RiCloseLine,
-    RiDeleteBinLine
+    RiDeleteBinLine,
+    RiUserLine
 } from "@remixicon/react"
 import {
     updateWeek1Rosters,
     type Week1EditablePlayer,
     type Week1EditableSlot
 } from "./actions"
+import {
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup
+} from "@/components/player-detail"
 
 interface EditWeek1FormProps {
     players: Week1EditablePlayer[]
     slots: Week1EditableSlot[]
+    playerPicUrl: string
 }
 
 interface LocalSlot {
@@ -35,10 +41,19 @@ interface LocalSlot {
 }
 
 function getPlayerLabel(player: Week1EditablePlayer) {
-    if (player.preferredName) {
-        return `${player.preferredName} ${player.lastName}`
+    const name = player.preferredName
+        ? `${player.preferredName} ${player.lastName}`
+        : `${player.firstName} ${player.lastName}`
+    if (player.placementScore !== null) {
+        return `${name} (${Math.round(player.placementScore)})`
     }
-    return `${player.firstName} ${player.lastName}`
+    return name
+}
+
+function getGenderClass(male: boolean | null) {
+    if (male === true) return "bg-blue-50 dark:bg-blue-950/40"
+    if (male === false) return "bg-pink-50 dark:bg-pink-950/40"
+    return ""
 }
 
 function PlayerCombobox({
@@ -82,7 +97,10 @@ function PlayerCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-full justify-between font-normal"
+                    className={cn(
+                        "w-full justify-between font-normal",
+                        selectedPlayer && getGenderClass(selectedPlayer.male)
+                    )}
                 >
                     <span
                         className={cn(
@@ -141,8 +159,14 @@ function PlayerCombobox({
                                 key={player.id}
                                 type="button"
                                 className={cn(
-                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                    value === player.id && "bg-accent"
+                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm",
+                                    value === player.id
+                                        ? "bg-accent"
+                                        : player.male === true
+                                          ? "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60"
+                                          : player.male === false
+                                            ? "bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-950/60"
+                                            : "hover:bg-accent"
                                 )}
                                 onClick={() => {
                                     onChange(player.id)
@@ -160,7 +184,70 @@ function PlayerCombobox({
     )
 }
 
-export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
+function UnassignedWeek1Players({
+    players,
+    assignedUserIds,
+    onPlayerClick
+}: {
+    players: Week1EditablePlayer[]
+    assignedUserIds: string[]
+    onPlayerClick: (userId: string) => void
+}) {
+    const unassigned = useMemo(
+        () =>
+            players
+                .filter(
+                    (p) => p.playFirstWeek && !assignedUserIds.includes(p.id)
+                )
+                .sort((a, b) => {
+                    const aScore = a.placementScore ?? Number.POSITIVE_INFINITY
+                    const bScore = b.placementScore ?? Number.POSITIVE_INFINITY
+                    return aScore - bScore
+                }),
+        [players, assignedUserIds]
+    )
+
+    if (unassigned.length === 0) return null
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>
+                    Unassigned Week 1 Players ({unassigned.length})
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex flex-wrap gap-2">
+                    {unassigned.map((player) => (
+                        <button
+                            key={player.id}
+                            type="button"
+                            onClick={() => onPlayerClick(player.id)}
+                            className={cn(
+                                "rounded-md border px-2 py-1 text-left text-sm transition-opacity hover:opacity-80",
+                                player.male === true
+                                    ? "border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40"
+                                    : player.male === false
+                                      ? "border-pink-300 bg-pink-50 dark:border-pink-800 dark:bg-pink-950/40"
+                                      : "border-border bg-muted"
+                            )}
+                        >
+                            {getPlayerLabel(player)}
+                            <span className="ml-1.5 text-muted-foreground text-xs">
+                                {player.seasonsPlayed === 0
+                                    ? "new"
+                                    : `${player.seasonsPlayed}s`}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
+export function EditWeek1Form({ players, slots, playerPicUrl }: EditWeek1FormProps) {
+    const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
@@ -314,6 +401,21 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                                             )}
                                                         />
                                                     </div>
+                                                    {slot.userId && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="shrink-0"
+                                                            onClick={() =>
+                                                                modal.openPlayerDetail(
+                                                                    slot.userId
+                                                                )
+                                                            }
+                                                        >
+                                                            <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
@@ -397,6 +499,21 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                                                         )}
                                                     />
                                                 </div>
+                                                {slot.userId && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="shrink-0"
+                                                        onClick={() =>
+                                                            modal.openPlayerDetail(
+                                                                slot.userId
+                                                            )
+                                                        }
+                                                    >
+                                                        <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
@@ -430,6 +547,12 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                 </CardContent>
             </Card>
 
+            <UnassignedWeek1Players
+                players={players}
+                assignedUserIds={selectedUserIds}
+                onPlayerClick={modal.openPlayerDetail}
+            />
+
             <div className="flex flex-wrap items-center gap-3">
                 <Button
                     type="button"
@@ -449,6 +572,19 @@ export function EditWeek1Form({ players, slots }: EditWeek1FormProps) {
                     </span>
                 )}
             </div>
+
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+            />
         </div>
     )
 }
