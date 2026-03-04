@@ -44,10 +44,7 @@ function getPlayerLabel(player: Week1EditablePlayer) {
     const name = player.preferredName
         ? `${player.preferredName} ${player.lastName}`
         : `${player.firstName} ${player.lastName}`
-    if (player.placementScore !== null) {
-        return `${name} (${Math.round(player.placementScore)})`
-    }
-    return name
+    return `${name} (${Math.round(player.placementScore)})`
 }
 
 function getGenderClass(male: boolean | null) {
@@ -200,9 +197,7 @@ function UnassignedWeek1Players({
                     (p) => p.playFirstWeek && !assignedUserIds.includes(p.id)
                 )
                 .sort((a, b) => {
-                    const aScore = a.placementScore ?? Number.POSITIVE_INFINITY
-                    const bScore = b.placementScore ?? Number.POSITIVE_INFINITY
-                    return aScore - bScore
+                    return a.placementScore - b.placementScore
                 }),
         [players, assignedUserIds]
     )
@@ -246,7 +241,11 @@ function UnassignedWeek1Players({
     )
 }
 
-export function EditWeek1Form({ players, slots, playerPicUrl }: EditWeek1FormProps) {
+export function EditWeek1Form({
+    players,
+    slots,
+    playerPicUrl
+}: EditWeek1FormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -283,7 +282,8 @@ export function EditWeek1Form({ players, slots, playerPicUrl }: EditWeek1FormPro
 
         return [1, 2].map((sessionNumber) => ({
             sessionNumber,
-            courtMap: sessionMap.get(sessionNumber) || new Map<number, LocalSlot[]>()
+            courtMap:
+                sessionMap.get(sessionNumber) || new Map<number, LocalSlot[]>()
         }))
     }, [slotAssignments])
 
@@ -520,7 +520,9 @@ export function EditWeek1Form({ players, slots, playerPicUrl }: EditWeek1FormPro
                                                     size="icon"
                                                     className="shrink-0"
                                                     onClick={() =>
-                                                        removeSlot(slot.localKey)
+                                                        removeSlot(
+                                                            slot.localKey
+                                                        )
                                                     }
                                                 >
                                                     <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
@@ -533,9 +535,7 @@ export function EditWeek1Form({ players, slots, playerPicUrl }: EditWeek1FormPro
                                         variant="outline"
                                         size="sm"
                                         className="w-full"
-                                        onClick={() =>
-                                            addSlot(3, courtNumber)
-                                        }
+                                        onClick={() => addSlot(3, courtNumber)}
                                     >
                                         <RiAddLine className="mr-1 h-4 w-4" />
                                         Add Player

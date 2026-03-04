@@ -65,7 +65,6 @@ export function DivisionHistoryChart({
     const firstSeasonId = draftHistory[0].seasonId
     const lastSeasonId = draftHistory[draftHistory.length - 1].seasonId
     const seasonsInRange = [...allSeasons]
-        .reverse()
         .filter((s) => s.id >= firstSeasonId && s.id <= lastSeasonId)
 
     const chartData = seasonsInRange.map((s) => {

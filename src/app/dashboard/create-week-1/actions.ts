@@ -7,7 +7,6 @@ import {
     users,
     signups,
     drafts,
-    evaluations,
     commissioners,
     teams,
     seasons,
@@ -16,6 +15,7 @@ import {
 } from "@/database/schema"
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -265,43 +265,7 @@ export async function getCreateWeek1Data(): Promise<{
                 )
             }
         }
-        const usersWithoutDraft = signupRows
-            .map((row) => row.userId)
-            .filter((userId) => !draftsByUser.has(userId))
-
-        const newPlayerEvaluationScoreByUser = new Map<string, number>()
-        if (usersWithoutDraft.length > 0) {
-            const evaluationRows = await db
-                .select({
-                    playerId: evaluations.player,
-                    divisionLevel: divisions.level
-                })
-                .from(evaluations)
-                .innerJoin(divisions, eq(evaluations.division, divisions.id))
-                .where(
-                    and(
-                        eq(evaluations.season, config.seasonId),
-                        inArray(evaluations.player, usersWithoutDraft)
-                    )
-                )
-
-            const aggregates = new Map<string, { sum: number; count: number }>()
-            for (const row of evaluationRows) {
-                const current = aggregates.get(row.playerId) || {
-                    sum: 0,
-                    count: 0
-                }
-                current.sum += row.divisionLevel
-                current.count += 1
-                aggregates.set(row.playerId, current)
-            }
-
-            for (const [playerId, aggregate] of aggregates.entries()) {
-                const averageDivisionLevel = aggregate.sum / aggregate.count
-                const placementScore = (averageDivisionLevel - 1) * 50
-                newPlayerEvaluationScoreByUser.set(playerId, placementScore)
-            }
-        }
+        const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
         const candidates: Week1Candidate[] = []
 
@@ -312,9 +276,7 @@ export async function getCreateWeek1Data(): Promise<{
             const hasAnyDraft = history.length > 0
             const playFirstWeek = row.playFirstWeek === true
             const seasonsPlayedCount = history.length
-            const placementScore = hasAnyDraft
-                ? (mostRecentDraft?.overall ?? 200)
-                : (newPlayerEvaluationScoreByUser.get(row.userId) ?? 200)
+            const placementScore = scoreByUser.get(row.userId) ?? 200
 
             const missingDates = (row.datesMissing || "")
                 .split(",")

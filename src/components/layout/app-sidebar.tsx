@@ -222,11 +222,6 @@ const seasonNavItems = [
 
 const commissionerNavItems = [
     {
-        title: "Draft Division",
-        url: "/dashboard/draft-division",
-        icon: RiFileList3Line
-    },
-    {
         title: "Add Pictures",
         url: "/dashboard/add-pictures",
         icon: RiEditLine

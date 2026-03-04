@@ -3,9 +3,17 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { signups, users, week1Rosters, drafts, teams, seasons, divisions, evaluations } from "@/database/schema"
+import {
+    signups,
+    users,
+    week1Rosters,
+    drafts,
+    teams,
+    seasons
+} from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 
@@ -15,7 +23,7 @@ export interface Week1EditablePlayer {
     lastName: string
     preferredName: string | null
     male: boolean | null
-    placementScore: number | null
+    placementScore: number
     playFirstWeek: boolean
     seasonsPlayed: number
 }
@@ -100,74 +108,43 @@ export async function getEditWeek1Data(): Promise<{
 
         const userIds = signupPlayersRaw.map((p) => p.id)
 
-        const draftRows = userIds.length > 0
-            ? await db
-                .select({
-                    userId: drafts.user,
-                    seasonId: seasons.id,
-                    overall: drafts.overall
-                })
-                .from(drafts)
-                .innerJoin(teams, eq(drafts.team, teams.id))
-                .innerJoin(seasons, eq(teams.season, seasons.id))
-                .where(inArray(drafts.user, userIds))
-                .orderBy(desc(seasons.id))
-            : []
+        const draftRows =
+            userIds.length > 0
+                ? await db
+                      .select({
+                          userId: drafts.user,
+                          seasonId: seasons.id,
+                          overall: drafts.overall
+                      })
+                      .from(drafts)
+                      .innerJoin(teams, eq(drafts.team, teams.id))
+                      .innerJoin(seasons, eq(teams.season, seasons.id))
+                      .where(inArray(drafts.user, userIds))
+                      .orderBy(desc(seasons.id))
+                : []
 
-        const mostRecentOverallByUser = new Map<string, number>()
         const seasonsPlayedByUser = new Map<string, Set<number>>()
         for (const row of draftRows) {
-            if (!mostRecentOverallByUser.has(row.userId)) {
-                mostRecentOverallByUser.set(row.userId, row.overall)
-            }
-            const seasons = seasonsPlayedByUser.get(row.userId) || new Set<number>()
-            seasons.add(row.seasonId)
-            seasonsPlayedByUser.set(row.userId, seasons)
+            const played =
+                seasonsPlayedByUser.get(row.userId) || new Set<number>()
+            played.add(row.seasonId)
+            seasonsPlayedByUser.set(row.userId, played)
         }
 
-        const usersWithoutDraft = userIds.filter(
-            (id) => !mostRecentOverallByUser.has(id)
+        const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
+
+        const signupPlayers: Week1EditablePlayer[] = signupPlayersRaw.map(
+            (p) => ({
+                id: p.id,
+                firstName: p.firstName,
+                lastName: p.lastName,
+                preferredName: p.preferredName,
+                male: p.male,
+                playFirstWeek: p.playFirstWeek ?? false,
+                seasonsPlayed: seasonsPlayedByUser.get(p.id)?.size ?? 0,
+                placementScore: scoreByUser.get(p.id) ?? 200
+            })
         )
-        const evalScoreByUser = new Map<string, number>()
-        if (usersWithoutDraft.length > 0) {
-            const evalRows = await db
-                .select({
-                    playerId: evaluations.player,
-                    divisionLevel: divisions.level
-                })
-                .from(evaluations)
-                .innerJoin(divisions, eq(evaluations.division, divisions.id))
-                .where(
-                    and(
-                        eq(evaluations.season, config.seasonId),
-                        inArray(evaluations.player, usersWithoutDraft)
-                    )
-                )
-
-            const aggregates = new Map<string, { sum: number; count: number }>()
-            for (const row of evalRows) {
-                const current = aggregates.get(row.playerId) || { sum: 0, count: 0 }
-                current.sum += row.divisionLevel
-                current.count += 1
-                aggregates.set(row.playerId, current)
-            }
-            for (const [playerId, agg] of aggregates.entries()) {
-                evalScoreByUser.set(playerId, (agg.sum / agg.count - 1) * 50)
-            }
-        }
-
-        const signupPlayers: Week1EditablePlayer[] = signupPlayersRaw.map((p) => ({
-            id: p.id,
-            firstName: p.firstName,
-            lastName: p.lastName,
-            preferredName: p.preferredName,
-            male: p.male,
-            playFirstWeek: p.playFirstWeek ?? false,
-            seasonsPlayed: seasonsPlayedByUser.get(p.id)?.size ?? 0,
-            placementScore: mostRecentOverallByUser.get(p.id)
-                ?? evalScoreByUser.get(p.id)
-                ?? null
-        }))
 
         return {
             status: true,
