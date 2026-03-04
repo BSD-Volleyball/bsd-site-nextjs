@@ -18,6 +18,8 @@ interface PlayerComboboxProps {
     onChange: (userId: string | null) => void
     placeholder?: string
     excludeIds?: string[]
+    draftedIds?: string[]
+    isInvalid?: boolean
 }
 
 export function PlayerCombobox({
@@ -25,7 +27,9 @@ export function PlayerCombobox({
     value,
     onChange,
     placeholder = "Select a player...",
-    excludeIds = []
+    excludeIds = [],
+    draftedIds = [],
+    isInvalid = false
 }: PlayerComboboxProps) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState("")
@@ -37,7 +41,9 @@ export function PlayerCombobox({
 
     const filteredPlayers = useMemo(() => {
         const filtered = players.filter(
-            (p) => !excludeIds.includes(p.userId) || p.userId === value
+            (p) =>
+                (!excludeIds.includes(p.userId) || p.userId === value) &&
+                !draftedIds.includes(p.userId)
         )
         if (!search) return filtered
         const lowerSearch = search.toLowerCase()
@@ -51,7 +57,7 @@ export function PlayerCombobox({
                 oldIdStr.includes(lowerSearch)
             )
         })
-    }, [players, search, excludeIds, value])
+    }, [players, search, excludeIds, draftedIds, value])
 
     const getDisplayName = (p: DraftHomeworkPlayer) => {
         const oldIdPart = p.oldId ? `[${p.oldId}] ` : ""
@@ -77,7 +83,12 @@ export function PlayerCombobox({
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
-                    className="h-8 w-full justify-between border-0 bg-transparent font-normal text-xs shadow-none hover:bg-black/5 dark:hover:bg-white/5"
+                    className={cn(
+                        "h-8 w-full justify-between border-0 font-normal text-xs shadow-none",
+                        isInvalid
+                            ? "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60"
+                            : "bg-transparent hover:bg-black/5 dark:hover:bg-white/5"
+                    )}
                 >
                     <span
                         className={cn(

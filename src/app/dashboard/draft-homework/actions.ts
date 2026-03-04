@@ -55,6 +55,7 @@ export interface DraftHomeworkData {
     suggestedMalePlayers: DraftHomeworkPlayer[]
     suggestedNonMalePlayers: DraftHomeworkPlayer[]
     allSeasons: SeasonInfo[]
+    draftedPlayerIds: string[]
 }
 
 function parseSplit(genderSplit: string): { male: number; nonMale: number } {
@@ -285,11 +286,23 @@ export async function getDraftHomeworkData(): Promise<{
         ? sortedNonMales.length
         : nonMalesBefore + captainNonMaleCount + BUFFER
 
+    // --- Players already drafted this season ---
+    const draftedRows = await db
+        .select({ userId: drafts.user })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .where(eq(teams.season, config.seasonId))
+
+    const draftedPlayerIds = draftedRows.map((r) => r.userId)
+    const draftedSet = new Set(draftedPlayerIds)
+
     const suggestedMalePlayers = sortedMales
         .slice(maleStart, maleEnd)
+        .filter((p) => !draftedSet.has(p.userId))
         .sort(sortByLastName)
     const suggestedNonMalePlayers = sortedNonMales
         .slice(nonMaleStart, nonMaleEnd)
+        .filter((p) => !draftedSet.has(p.userId))
         .sort(sortByLastName)
 
     // --- All seasons (for player detail popup) ---
@@ -340,6 +353,7 @@ export async function getDraftHomeworkData(): Promise<{
             lastUpdatedAt,
             suggestedMalePlayers,
             suggestedNonMalePlayers,
+            draftedPlayerIds,
             allSeasons: allSeasonRows.map((s) => ({
                 id: s.id,
                 year: s.year,

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { RiDeleteBin2Line } from "@remixicon/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -97,9 +98,11 @@ interface RoundGroupProps {
     players: DraftHomeworkPlayer[]
     selections: Selections
     excludeIds: string[]
+    draftedIds: string[]
     playerPicUrl: string
     onChange: (key: string, userId: string | null) => void
     onOpenPlayer: (userId: string) => void
+    isDynamic?: boolean
 }
 
 function RoundGroup({
@@ -110,11 +113,34 @@ function RoundGroup({
     players,
     selections,
     excludeIds,
+    draftedIds,
     playerPicUrl,
     onChange,
-    onOpenPlayer
+    onOpenPlayer,
+    isDynamic = false
 }: RoundGroupProps) {
-    const slots = Array.from({ length: numTeams }, (_, i) => i)
+    const [dynamicCount, setDynamicCount] = useState(() => {
+        if (!isDynamic) return numTeams
+        const existing = Object.keys(selections).filter((k) =>
+            k.startsWith(`${tabKey}-${round}-`)
+        ).length
+        return Math.max(1, existing)
+    })
+
+    const slotCount = isDynamic ? dynamicCount : numTeams
+    const slots = Array.from({ length: slotCount }, (_, i) => i)
+    const draftedSet = useMemo(() => new Set(draftedIds), [draftedIds])
+
+    const handleRemoveSlot = (slotToRemove: number) => {
+        for (let j = slotToRemove; j < dynamicCount - 1; j++) {
+            onChange(
+                `${tabKey}-${round}-${j}`,
+                selections[`${tabKey}-${round}-${j + 1}`] ?? null
+            )
+        }
+        onChange(`${tabKey}-${round}-${dynamicCount - 1}`, null)
+        setDynamicCount((c) => c - 1)
+    }
 
     const selectedPlayers = slots
         .map((slot) => {
@@ -127,7 +153,7 @@ function RoundGroup({
         .filter((p): p is DraftHomeworkPlayer => p !== null)
 
     // Each combobox is h-8 = 32px, gap-1 = 4px
-    const totalHeightPx = numTeams * 32 + (numTeams - 1) * 4
+    const totalHeightPx = slotCount * 32 + (slotCount - 1) * 4
 
     return (
         <div className="mb-4">
@@ -140,16 +166,44 @@ function RoundGroup({
                 >
                     {slots.map((slot) => {
                         const key = `${tabKey}-${round}-${slot}`
+                        const uid = selections[key] ?? null
+                        const isInvalid = !!uid && draftedSet.has(uid)
                         return (
-                            <PlayerCombobox
-                                key={key}
-                                players={players}
-                                value={selections[key] ?? null}
-                                onChange={(userId) => onChange(key, userId)}
-                                excludeIds={excludeIds}
-                            />
+                            <div key={key} className="flex items-center">
+                                <div className="min-w-0 flex-1">
+                                    <PlayerCombobox
+                                        players={players}
+                                        value={uid}
+                                        onChange={(userId) =>
+                                            onChange(key, userId)
+                                        }
+                                        excludeIds={excludeIds}
+                                        draftedIds={draftedIds}
+                                        isInvalid={isInvalid}
+                                    />
+                                </div>
+                                {isDynamic && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveSlot(slot)}
+                                        className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                                        title="Remove"
+                                    >
+                                        <RiDeleteBin2Line className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
                         )
                     })}
+                    {isDynamic && (
+                        <button
+                            type="button"
+                            onClick={() => setDynamicCount((c) => c + 1)}
+                            className="px-2 py-1 text-left text-muted-foreground text-xs hover:text-foreground"
+                        >
+                            + Add player
+                        </button>
+                    )}
                 </div>
 
                 {/* Player pictures */}
@@ -229,6 +283,7 @@ interface TabContentProps {
     players: DraftHomeworkPlayer[]
     suggestedPlayers: DraftHomeworkPlayer[]
     selections: Selections
+    draftedIds: string[]
     playerPicUrl: string
     onChange: (key: string, userId: string | null) => void
     onOpenPlayer: (userId: string) => void
@@ -241,6 +296,7 @@ function HomeworkTabContent({
     players,
     suggestedPlayers,
     selections,
+    draftedIds,
     playerPicUrl,
     onChange,
     onOpenPlayer
@@ -274,6 +330,7 @@ function HomeworkTabContent({
                     players={players}
                     selections={selections}
                     excludeIds={allSelectedIds}
+                    draftedIds={draftedIds}
                     playerPicUrl={playerPicUrl}
                     onChange={onChange}
                     onOpenPlayer={onOpenPlayer}
@@ -287,9 +344,11 @@ function HomeworkTabContent({
                 players={players}
                 selections={selections}
                 excludeIds={allSelectedIds}
+                draftedIds={draftedIds}
                 playerPicUrl={playerPicUrl}
                 onChange={onChange}
                 onOpenPlayer={onOpenPlayer}
+                isDynamic
             />
 
             {suggestedPlayers.length > 0 && (
@@ -300,7 +359,7 @@ function HomeworkTabContent({
                     <p className="mb-3 text-muted-foreground text-xs">
                         You are free to select any registered player above. As
                         an aid here are players that based on historical data
-                        and captain&apos;s ratings that may end up in this
+                        and captain&apos;s ratings may end up in this
                         division. Players you&apos;ve already selected are
                         hidden. Click a photo to view their profile.
                     </p>
@@ -351,12 +410,27 @@ export function DraftHomeworkForm({
     }
 
     const [maleRounds, nonMaleRounds] = parseGenderSplit(data.genderSplit)
+    const draftedSet = useMemo(
+        () => new Set(data.draftedPlayerIds),
+        [data.draftedPlayerIds]
+    )
+    const draftedIds = data.draftedPlayerIds
 
     const handleChange = (key: string, userId: string | null) => {
         setSelections((prev) => ({ ...prev, [key]: userId }))
     }
 
     const handleSave = async () => {
+        const hasInvalid = Object.values(selections).some(
+            (uid) => uid && draftedSet.has(uid)
+        )
+        if (hasInvalid) {
+            toast.error(
+                "Please remove or replace drafted players (highlighted in red) before saving."
+            )
+            return
+        }
+
         setSaving(true)
         try {
             const selectionEntries = Object.entries(selections)
@@ -539,10 +613,16 @@ export function DraftHomeworkForm({
 
             <Tabs defaultValue="males">
                 <TabsList>
-                    <TabsTrigger value="males">
+                    <TabsTrigger
+                        value="males"
+                        className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 dark:data-[state=active]:bg-blue-900/40 dark:data-[state=active]:text-blue-300"
+                    >
                         Males ({maleRounds} rounds)
                     </TabsTrigger>
-                    <TabsTrigger value="non-males">
+                    <TabsTrigger
+                        value="non-males"
+                        className="data-[state=active]:bg-pink-100 data-[state=active]:text-pink-800 dark:data-[state=active]:bg-pink-900/40 dark:data-[state=active]:text-pink-300"
+                    >
                         Non-Males ({nonMaleRounds} rounds)
                     </TabsTrigger>
                 </TabsList>
@@ -555,6 +635,7 @@ export function DraftHomeworkForm({
                         players={data.malePlayers}
                         suggestedPlayers={data.suggestedMalePlayers}
                         selections={selections}
+                        draftedIds={draftedIds}
                         playerPicUrl={playerPicUrl}
                         onChange={handleChange}
                         onOpenPlayer={modal.openPlayerDetail}
@@ -569,6 +650,7 @@ export function DraftHomeworkForm({
                         players={data.nonMalePlayers}
                         suggestedPlayers={data.suggestedNonMalePlayers}
                         selections={selections}
+                        draftedIds={draftedIds}
                         playerPicUrl={playerPicUrl}
                         onChange={handleChange}
                         onOpenPlayer={modal.openPlayerDetail}
