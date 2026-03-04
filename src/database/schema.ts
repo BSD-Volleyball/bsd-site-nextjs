@@ -454,6 +454,28 @@ export const movingDay = pgTable("moving_day", {
         .notNull()
 })
 
+export const draftHomework = pgTable("draft_homework", {
+    id: serial("id").primaryKey(),
+    season: integer("season")
+        .notNull()
+        .references(() => seasons.id),
+    captain: text("captain")
+        .notNull()
+        .references(() => users.id),
+    division: integer("division")
+        .notNull()
+        .references(() => divisions.id),
+    round: integer("round").notNull(),
+    slot: integer("slot").notNull(),
+    player: text("player")
+        .notNull()
+        .references(() => users.id),
+    is_male_tab: boolean("is_male_tab").notNull(),
+    updated_at: timestamp("updated_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 export const emailTemplates = pgTable("email_templates", {
     id: serial("id").primaryKey(),
     name: text("name").notNull().unique(),
