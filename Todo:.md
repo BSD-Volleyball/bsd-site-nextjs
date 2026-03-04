@@ -6,5 +6,5 @@ Todo:
 - add feature to handle bans
 - consider moving to tanstack start
 - handle ref scheduling
-
+- ask week 1 reason on signup
 

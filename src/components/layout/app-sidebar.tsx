@@ -265,6 +265,11 @@ const captainPagesNavItems = [
         icon: RiEditLine
     },
     {
+        title: "Draft Homework",
+        url: "/dashboard/draft-homework",
+        icon: RiEditLine
+    },
+    {
         title: "Live Draft",
         url: "/dashboard/draft-division",
         icon: RiFileList3Line
