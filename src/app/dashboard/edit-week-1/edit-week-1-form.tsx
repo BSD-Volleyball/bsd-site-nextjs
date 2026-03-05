@@ -584,6 +584,7 @@ export function EditWeek1Form({
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
             />
         </div>
     )

@@ -22,7 +22,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface PlayerLookupSignupsFormProps {
@@ -54,6 +55,9 @@ export function PlayerLookupSignupsForm({
     const [privateRatingNotes, setPrivateRatingNotes] = useState<
         PlayerRatingPrivateNote[]
     >([])
+    const [viewerRating, setViewerRating] = useState<PlayerViewerRating | null>(
+        null
+    )
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -94,6 +98,7 @@ export function PlayerLookupSignupsForm({
             setRatingAverages(result.ratingAverages)
             setSharedRatingNotes(result.sharedRatingNotes)
             setPrivateRatingNotes(result.privateRatingNotes)
+            setViewerRating(result.viewerRating)
             setPairPickName(result.pairPickName)
             setPairReason(result.pairReason)
         } else {
@@ -103,6 +108,7 @@ export function PlayerLookupSignupsForm({
             setRatingAverages(getEmptyPlayerRatingAverages())
             setSharedRatingNotes([])
             setPrivateRatingNotes([])
+            setViewerRating(null)
             setPairPickName(null)
             setPairReason(null)
         }
@@ -231,6 +237,7 @@ export function PlayerLookupSignupsForm({
                 ratingAverages={ratingAverages}
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
+                viewerRating={viewerRating}
                 inline
             />
         </div>

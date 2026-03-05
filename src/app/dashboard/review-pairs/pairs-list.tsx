@@ -503,6 +503,7 @@ export function PairsList({
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
             />
         </div>
     )

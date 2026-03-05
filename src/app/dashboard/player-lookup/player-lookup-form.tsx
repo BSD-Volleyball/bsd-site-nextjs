@@ -22,7 +22,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface PlayerLookupFormProps {
@@ -53,6 +54,9 @@ export function PlayerLookupForm({
     const [privateRatingNotes, setPrivateRatingNotes] = useState<
         PlayerRatingPrivateNote[]
     >([])
+    const [viewerRating, setViewerRating] = useState<PlayerViewerRating | null>(
+        null
+    )
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -92,6 +96,7 @@ export function PlayerLookupForm({
             setRatingAverages(result.ratingAverages)
             setSharedRatingNotes(result.sharedRatingNotes)
             setPrivateRatingNotes(result.privateRatingNotes)
+            setViewerRating(result.viewerRating)
         } else {
             setError(result.message || "Failed to load player details")
             setPlayerDetails(null)
@@ -100,6 +105,7 @@ export function PlayerLookupForm({
             setRatingAverages(getEmptyPlayerRatingAverages())
             setSharedRatingNotes([])
             setPrivateRatingNotes([])
+            setViewerRating(null)
         }
 
         setIsLoading(false)
@@ -234,6 +240,7 @@ export function PlayerLookupForm({
                 ratingAverages={ratingAverages}
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
+                viewerRating={viewerRating}
                 inline
             />
 

@@ -12,7 +12,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface SeasonInfo {
@@ -50,6 +51,7 @@ interface PlayerDetailPopupProps {
     ratingAverages?: PlayerRatingAverages
     sharedRatingNotes?: PlayerRatingSharedNote[]
     privateRatingNotes?: PlayerRatingPrivateNote[]
+    viewerRating?: PlayerViewerRating | null
     inline?: boolean
     children?: React.ReactNode
 }
@@ -67,6 +69,7 @@ export function PlayerDetailPopup({
     ratingAverages = getEmptyPlayerRatingAverages(),
     sharedRatingNotes = [],
     privateRatingNotes = [],
+    viewerRating = null,
     inline = false,
     children
 }: PlayerDetailPopupProps) {
@@ -233,6 +236,7 @@ export function PlayerDetailPopup({
                             ratingAverages={ratingAverages}
                             sharedRatingNotes={sharedRatingNotes}
                             privateRatingNotes={privateRatingNotes}
+                            viewerRating={viewerRating}
                         />
 
                         {/* Division History Chart */}
