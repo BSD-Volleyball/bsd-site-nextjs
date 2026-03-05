@@ -276,6 +276,7 @@ export async function getRatePlayerData(): Promise<{
         }
 
         const players = signupRows
+            .filter((row) => row.id !== evaluatorId)
             .map(
                 (row): RatePlayerEntry => ({
                     id: row.id,
@@ -425,6 +426,10 @@ export async function savePlayerSkillRating(
         return { status: false, message: context.message }
     }
 
+    if (playerId === context.evaluatorId) {
+        return { status: false, message: "You cannot rate yourself." }
+    }
+
     if (!Number.isFinite(value) || value < 0 || value > 6) {
         return {
             status: false,
@@ -498,6 +503,10 @@ export async function savePlayerSkillRatings(
     const context = await getSaveContext()
     if (!context.status) {
         return { status: false, message: context.message }
+    }
+
+    if (playerId === context.evaluatorId) {
+        return { status: false, message: "You cannot rate yourself." }
     }
 
     const skillValues = [
@@ -597,6 +606,10 @@ export async function savePlayerRatingNote(
     const context = await getSaveContext()
     if (!context.status) {
         return { status: false, message: context.message }
+    }
+
+    if (playerId === context.evaluatorId) {
+        return { status: false, message: "You cannot rate yourself." }
     }
 
     try {
