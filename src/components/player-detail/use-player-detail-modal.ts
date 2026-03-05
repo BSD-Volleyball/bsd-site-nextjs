@@ -11,7 +11,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface FetchResult {
@@ -22,6 +23,7 @@ interface FetchResult {
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
+    viewerRating?: PlayerViewerRating | null
     pairPickName?: string | null
     pairReason?: string | null
 }
@@ -38,6 +40,7 @@ export interface PlayerDetailModalState {
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
+    viewerRating: PlayerViewerRating | null
     pairPickName: string | null
     pairReason: string | null
     isLoading: boolean
@@ -89,6 +92,9 @@ export function usePlayerDetailModal(
     const [privateRatingNotes, setPrivateRatingNotes] = useState<
         PlayerRatingPrivateNote[]
     >([])
+    const [viewerRating, setViewerRating] = useState<PlayerViewerRating | null>(
+        null
+    )
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
@@ -106,6 +112,7 @@ export function usePlayerDetailModal(
             setRatingAverages(getEmptyPlayerRatingAverages())
             setSharedRatingNotes([])
             setPrivateRatingNotes([])
+            setViewerRating(null)
             setPairPickName(null)
             setPairReason(null)
 
@@ -118,6 +125,7 @@ export function usePlayerDetailModal(
                 setRatingAverages(result.ratingAverages)
                 setSharedRatingNotes(result.sharedRatingNotes)
                 setPrivateRatingNotes(result.privateRatingNotes)
+                setViewerRating(result.viewerRating ?? null)
                 setPairPickName(result.pairPickName ?? null)
                 setPairReason(result.pairReason ?? null)
             }
@@ -135,6 +143,7 @@ export function usePlayerDetailModal(
         setRatingAverages(getEmptyPlayerRatingAverages())
         setSharedRatingNotes([])
         setPrivateRatingNotes([])
+        setViewerRating(null)
         setPairPickName(null)
         setPairReason(null)
     }, [])
@@ -161,6 +170,7 @@ export function usePlayerDetailModal(
         ratingAverages,
         sharedRatingNotes,
         privateRatingNotes,
+        viewerRating,
         pairPickName,
         pairReason,
         isLoading,

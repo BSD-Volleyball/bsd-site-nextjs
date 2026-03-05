@@ -16,7 +16,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 
@@ -140,6 +141,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
+    viewerRating: PlayerViewerRating | null
 }> {
     const hasAccess = await checkAdminOrCommissionerAccess()
     if (!hasAccess) {
@@ -151,7 +153,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
-            privateRatingNotes: []
+            privateRatingNotes: [],
+            viewerRating: null
         }
     }
 
@@ -199,7 +202,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 draftHistory: [],
                 ratingAverages: getEmptyPlayerRatingAverages(),
                 sharedRatingNotes: [],
-                privateRatingNotes: []
+                privateRatingNotes: [],
+                viewerRating: null
             }
         }
 
@@ -286,7 +290,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             draftHistory: draftData,
             ratingAverages: ratingsSection.averages,
             sharedRatingNotes: ratingsSection.sharedNotes,
-            privateRatingNotes: ratingsSection.privateNotes
+            privateRatingNotes: ratingsSection.privateNotes,
+            viewerRating: ratingsSection.viewerRating
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -298,7 +303,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
-            privateRatingNotes: []
+            privateRatingNotes: [],
+            viewerRating: null
         }
     }
 }

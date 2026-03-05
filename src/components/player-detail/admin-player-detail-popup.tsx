@@ -17,7 +17,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface AdminPlayerDetailPopupProps {
@@ -33,6 +34,7 @@ interface AdminPlayerDetailPopupProps {
     ratingAverages?: PlayerRatingAverages
     sharedRatingNotes?: PlayerRatingSharedNote[]
     privateRatingNotes?: PlayerRatingPrivateNote[]
+    viewerRating?: PlayerViewerRating | null
     inline?: boolean
     children?: React.ReactNode
 }
@@ -56,6 +58,7 @@ export function AdminPlayerDetailPopup({
     ratingAverages = getEmptyPlayerRatingAverages(),
     sharedRatingNotes = [],
     privateRatingNotes = [],
+    viewerRating = null,
     inline = false,
     children
 }: AdminPlayerDetailPopupProps) {
@@ -285,6 +288,7 @@ export function AdminPlayerDetailPopup({
                             ratingAverages={ratingAverages}
                             sharedRatingNotes={sharedRatingNotes}
                             privateRatingNotes={privateRatingNotes}
+                            viewerRating={viewerRating}
                         />
 
                         {/* Pair Request */}

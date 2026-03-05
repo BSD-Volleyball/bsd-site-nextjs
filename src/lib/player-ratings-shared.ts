@@ -26,10 +26,21 @@ export interface PlayerRatingPrivateNote {
     updatedAt: Date
 }
 
+export interface PlayerViewerRating {
+    overall: number | null
+    passing: number | null
+    setting: number | null
+    hitting: number | null
+    serving: number | null
+    privateNote: string | null
+    seasonLabel: string
+}
+
 export interface PlayerRatingsSectionData {
     averages: PlayerRatingAverages
     sharedNotes: PlayerRatingSharedNote[]
     privateNotes: PlayerRatingPrivateNote[]
+    viewerRating: PlayerViewerRating | null
 }
 
 export function getEmptyPlayerRatingAverages(): PlayerRatingAverages {

@@ -435,6 +435,7 @@ export function EditWeek3Form({ players, slots, playerPicUrl }: EditWeek3FormPro
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
             />
         </div>
     )

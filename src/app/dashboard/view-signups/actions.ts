@@ -19,7 +19,8 @@ import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
     type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote
+    type PlayerRatingSharedNote,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 import type {
@@ -542,6 +543,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
+    viewerRating: PlayerViewerRating | null
     pairPickName: string | null
     pairReason: string | null
 }> {
@@ -556,6 +558,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
             privateRatingNotes: [],
+            viewerRating: null,
             pairPickName: null,
             pairReason: null
         }
@@ -593,6 +596,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
                 ratingAverages: getEmptyPlayerRatingAverages(),
                 sharedRatingNotes: [],
                 privateRatingNotes: [],
+                viewerRating: null,
                 pairPickName: null,
                 pairReason: null
             }
@@ -681,6 +685,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             ratingAverages: ratingsSection.averages,
             sharedRatingNotes: ratingsSection.sharedNotes,
             privateRatingNotes: ratingsSection.privateNotes,
+            viewerRating: ratingsSection.viewerRating,
             pairPickName,
             pairReason
         }
@@ -695,6 +700,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
             privateRatingNotes: [],
+            viewerRating: null,
             pairPickName: null,
             pairReason: null
         }

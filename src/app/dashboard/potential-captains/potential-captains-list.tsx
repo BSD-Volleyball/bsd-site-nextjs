@@ -460,6 +460,7 @@ export function PotentialCaptainsList({
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
             />
 
             {/* Email Modal */}

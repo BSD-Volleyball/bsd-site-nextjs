@@ -1,13 +1,15 @@
 import type {
     PlayerRatingAverages,
     PlayerRatingPrivateNote,
-    PlayerRatingSharedNote
+    PlayerRatingSharedNote,
+    PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 interface PlayerRatingsSectionProps {
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
+    viewerRating?: PlayerViewerRating | null
 }
 
 const divisionByScore: Record<number, string> = {
@@ -33,7 +35,8 @@ function formatRatingValue(value: number | null): string {
 export function PlayerRatingsSection({
     ratingAverages,
     sharedRatingNotes,
-    privateRatingNotes
+    privateRatingNotes,
+    viewerRating = null
 }: PlayerRatingsSectionProps) {
     const hasAnyAverage =
         ratingAverages.overall !== null ||
@@ -121,21 +124,65 @@ export function PlayerRatingsSection({
                 )}
             </div>
 
-            {privateRatingNotes.length > 0 && (
-                <div className="mt-4 space-y-2">
-                    <p className="font-semibold text-sm">Private Notes</p>
-                    <div className="space-y-2">
-                        {privateRatingNotes.map((note, index) => (
-                            <div
-                                key={`${note.evaluatorId}-${note.updatedAt}-${index}`}
-                            >
-                                <p className="text-sm">{note.note}</p>
-                                <p className="text-muted-foreground text-xs">
-                                    {note.seasonLabel} • {note.evaluatorName}
-                                </p>
-                            </div>
-                        ))}
+
+            {viewerRating && (
+                <div className="mt-4 space-y-2 rounded-md border p-3">
+                    <p className="font-semibold text-sm">
+                        Your Rating{" "}
+                        <span className="font-normal text-muted-foreground">
+                            ({viewerRating.seasonLabel})
+                        </span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                            <span className="text-muted-foreground">
+                                Overall:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.overall)}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">
+                                Passing:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.passing)}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">
+                                Setting:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.setting)}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">
+                                Hitting:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.hitting)}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">
+                                Serving:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.serving)}
+                            </span>
+                        </div>
                     </div>
+                    {viewerRating.privateNote && (
+                        <div className="mt-2 space-y-1 border-t pt-2">
+                            <p className="font-semibold text-sm">
+                                Your Private Note
+                            </p>
+                            <p className="text-sm">{viewerRating.privateNote}</p>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -4,7 +4,8 @@ import { playerRatings, seasons, users } from "@/database/schema"
 import { and, desc, eq, inArray, lte } from "drizzle-orm"
 import {
     getEmptyPlayerRatingAverages,
-    type PlayerRatingsSectionData
+    type PlayerRatingsSectionData,
+    type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
 function formatSeasonLabel(seasonName: string, seasonYear: number): string {
@@ -46,7 +47,8 @@ export async function getPlayerRatingsSectionData(
         return {
             averages: getEmptyPlayerRatingAverages(),
             sharedNotes: [],
-            privateNotes: []
+            privateNotes: [],
+            viewerRating: null
         }
     }
 
@@ -101,6 +103,24 @@ export async function getPlayerRatingsSectionData(
         }
     }
 
+    const viewerRow = viewerUserId
+        ? ratingRows.find((row) => row.evaluatorId === viewerUserId) ?? null
+        : null
+
+    const viewerRating: PlayerViewerRating | null = viewerRow
+        ? {
+              overall: viewerRow.overall,
+              passing: viewerRow.passing,
+              setting: viewerRow.setting,
+              hitting: viewerRow.hitting,
+              serving: viewerRow.serving,
+              privateNote: viewerRow.privateNote?.trim() || null,
+              seasonLabel:
+                  seasonLabelById.get(viewerRow.seasonId) ||
+                  `Season ${viewerRow.seasonId}`
+          }
+        : null
+
     return {
         averages: {
             overall: average(ratingRows.map((row) => row.overall)),
@@ -143,6 +163,7 @@ export async function getPlayerRatingsSectionData(
                 evaluatorName:
                     evaluatorNameById.get(row.evaluatorId) || row.evaluatorId,
                 updatedAt: row.updatedAt
-            }))
+            })),
+        viewerRating
     }
 }

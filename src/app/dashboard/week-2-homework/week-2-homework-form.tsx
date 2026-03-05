@@ -768,6 +768,7 @@ export function Week2HomeworkForm({
                 pairReason={modal.pairReason}
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
+                viewerRating={modal.viewerRating}
             />
         </div>
     )
