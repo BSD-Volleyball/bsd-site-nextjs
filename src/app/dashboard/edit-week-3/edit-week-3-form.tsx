@@ -43,10 +43,10 @@ interface LocalSlot {
 }
 
 function getPlayerLabel(player: Week3EditablePlayer) {
-    if (player.preferredName) {
-        return `${player.preferredName} ${player.lastName}`
-    }
-    return `${player.firstName} ${player.lastName}`
+    const name = player.preferredName
+        ? `${player.preferredName} ${player.lastName}`
+        : `${player.firstName} ${player.lastName}`
+    return player.hasPairPick ? `${name} [PP]` : name
 }
 
 function getGenderClass(male: boolean | null) {

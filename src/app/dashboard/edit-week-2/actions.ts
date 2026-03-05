@@ -21,6 +21,7 @@ export interface Week2EditablePlayer {
     lastName: string
     preferredName: string | null
     male: boolean | null
+    hasPairPick: boolean
 }
 
 export interface Week2EditableSlot {
@@ -83,7 +84,8 @@ export async function getEditWeek2Data(): Promise<{
                     lastName: users.last_name,
                     preferredName: users.preffered_name,
                     male: users.male,
-                    datesMissing: signups.dates_missing
+                    datesMissing: signups.dates_missing,
+                    pairPick: signups.pair_pick
                 })
                 .from(signups)
                 .innerJoin(users, eq(signups.player, users.id))
@@ -126,7 +128,8 @@ export async function getEditWeek2Data(): Promise<{
                 firstName: player.firstName,
                 lastName: player.lastName,
                 preferredName: player.preferredName,
-                male: player.male
+                male: player.male,
+                hasPairPick: !!player.pairPick
             }))
 
         return {

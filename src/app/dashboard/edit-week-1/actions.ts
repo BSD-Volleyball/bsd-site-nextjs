@@ -26,6 +26,7 @@ export interface Week1EditablePlayer {
     placementScore: number
     playFirstWeek: boolean
     seasonsPlayed: number
+    hasPairPick: boolean
 }
 
 export interface Week1EditableSlot {
@@ -84,7 +85,8 @@ export async function getEditWeek1Data(): Promise<{
                     lastName: users.last_name,
                     preferredName: users.preffered_name,
                     male: users.male,
-                    playFirstWeek: signups.play_1st_week
+                    playFirstWeek: signups.play_1st_week,
+                    pairPick: signups.pair_pick
                 })
                 .from(signups)
                 .innerJoin(users, eq(signups.player, users.id))
@@ -142,7 +144,8 @@ export async function getEditWeek1Data(): Promise<{
                 male: p.male,
                 playFirstWeek: p.playFirstWeek ?? false,
                 seasonsPlayed: seasonsPlayedByUser.get(p.id)?.size ?? 0,
-                placementScore: scoreByUser.get(p.id) ?? 200
+                placementScore: scoreByUser.get(p.id) ?? 200,
+                hasPairPick: !!p.pairPick
             })
         )
 
