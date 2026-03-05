@@ -25,7 +25,7 @@ function formatRatingValue(value: number | null): string {
         return "—"
     }
 
-    const rounded = Math.max(0, Math.min(6, Math.round(value)))
+    const rounded = Math.max(0, Math.min(6, Math.ceil(value)))
     const division = divisionByScore[rounded] || "Unrated"
     return `${division} (${value.toFixed(1)})`
 }
