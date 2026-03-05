@@ -63,6 +63,9 @@ export default async function DraftHomeworkPage() {
                         Saving replaces all previous selections. You can update
                         any time before the draft.
                     </li>
+                    <li>
+                        You have access to last season's draft for reference.
+                    </li>
                 </ul>
             </div>
 

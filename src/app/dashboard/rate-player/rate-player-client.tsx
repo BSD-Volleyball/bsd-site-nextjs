@@ -32,7 +32,6 @@ import {
     type LookupType,
     type PlayerRatingValues,
     type RatePlayerEntry,
-    type RatingNoteType,
     type RatingSkill,
     type TryoutSessionGroup
 } from "./actions"
@@ -173,13 +172,13 @@ function SkillSlider({
         <div className="space-y-2">
             <div className="flex items-center justify-between">
                 <Label>{label}</Label>
-                <span className="font-semibold text-sm">{value}</span>
+                <span className="font-semibold text-sm">{value.toFixed(1)}</span>
             </div>
             <input
                 type="range"
                 min={0}
                 max={6}
-                step={1}
+                step={0.2}
                 value={value}
                 onChange={(event) => onChange(Number(event.target.value))}
                 disabled={disabled}
@@ -224,9 +223,7 @@ export function RatePlayerClient({
     const [sharedNotes, setSharedNotes] = useState("")
     const [privateNotes, setPrivateNotes] = useState("")
     const [hasPendingSkillSave, setHasPendingSkillSave] = useState(false)
-    const [savingSkills, setSavingSkills] = useState(false)
-    const [savingSharedNotes, setSavingSharedNotes] = useState(false)
-    const [savingPrivateNotes, setSavingPrivateNotes] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const [modalMessage, setModalMessage] = useState<{
         type: "success" | "error"
         text: string
@@ -248,7 +245,7 @@ export function RatePlayerClient({
         saveTimeoutRef.current = setTimeout(async () => {
             const requestId = latestSaveRequestIdRef.current + 1
             latestSaveRequestIdRef.current = requestId
-            setSavingSkills(true)
+            setIsSaving(true)
 
             const result = await savePlayerSkillRatings(selectedPlayerId, {
                 overall,
@@ -262,13 +259,13 @@ export function RatePlayerClient({
                 return
             }
 
-            setSavingSkills(false)
+            setIsSaving(false)
             setHasPendingSkillSave(false)
             setModalMessage({
                 type: result.status ? "success" : "error",
                 text: result.message
             })
-        }, 2000)
+        }, 3000)
 
         return () => {
             if (saveTimeoutRef.current) {
@@ -366,7 +363,7 @@ export function RatePlayerClient({
             saveTimeoutRef.current = null
         }
         setHasPendingSkillSave(false)
-        setSavingSkills(false)
+        setIsSaving(false)
         setIsDialogOpen(false)
         setSelectedPlayer(null)
         setModalMessage(null)
@@ -411,50 +408,7 @@ export function RatePlayerClient({
         setHasPendingSkillSave(true)
     }
 
-    const handleSaveNotes = async (noteType: RatingNoteType) => {
-        if (!selectedPlayer) {
-            return
-        }
-
-        const noteText = noteType === "shared" ? sharedNotes : privateNotes
-
-        if (noteType === "shared") {
-            setSavingSharedNotes(true)
-        } else {
-            setSavingPrivateNotes(true)
-        }
-
-        setModalMessage(null)
-
-        const result = await savePlayerRatingNote(
-            selectedPlayer.id,
-            noteType,
-            noteText
-        )
-
-        if (noteType === "shared") {
-            setSavingSharedNotes(false)
-            if (result.status) {
-                updateRatingStateForPlayer(selectedPlayer.id, {
-                    sharedNotes: noteText.trim() || null
-                })
-            }
-        } else {
-            setSavingPrivateNotes(false)
-            if (result.status) {
-                updateRatingStateForPlayer(selectedPlayer.id, {
-                    privateNotes: noteText.trim() || null
-                })
-            }
-        }
-
-        setModalMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
-    }
-
-    const handleSaveSharedRatings = async () => {
+    const handleSaveAll = async () => {
         if (!selectedPlayer) {
             return
         }
@@ -465,26 +419,27 @@ export function RatePlayerClient({
         }
 
         setHasPendingSkillSave(false)
-        setSavingSkills(true)
-        setSavingSharedNotes(true)
+        setIsSaving(true)
         setModalMessage(null)
 
-        const skillResult = await savePlayerSkillRatings(selectedPlayer.id, {
-            overall,
-            passing,
-            setting,
-            hitting,
-            serving
-        })
+        const [skillResult, sharedNoteResult, privateNoteResult] =
+            await Promise.all([
+                savePlayerSkillRatings(selectedPlayer.id, {
+                    overall,
+                    passing,
+                    setting,
+                    hitting,
+                    serving
+                }),
+                savePlayerRatingNote(selectedPlayer.id, "shared", sharedNotes),
+                savePlayerRatingNote(
+                    selectedPlayer.id,
+                    "private",
+                    privateNotes
+                )
+            ])
 
-        const sharedNoteResult = await savePlayerRatingNote(
-            selectedPlayer.id,
-            "shared",
-            sharedNotes
-        )
-
-        setSavingSkills(false)
-        setSavingSharedNotes(false)
+        setIsSaving(false)
 
         if (skillResult.status) {
             updateRatingStateForPlayer(selectedPlayer.id, {
@@ -502,18 +457,22 @@ export function RatePlayerClient({
             })
         }
 
-        if (skillResult.status && sharedNoteResult.status) {
-            setModalMessage({
-                type: "success",
-                text: "Shared ratings and note saved."
+        if (privateNoteResult.status) {
+            updateRatingStateForPlayer(selectedPlayer.id, {
+                privateNotes: privateNotes.trim() || null
             })
+        }
+
+        if (skillResult.status && sharedNoteResult.status && privateNoteResult.status) {
+            setModalMessage({ type: "success", text: "All ratings and notes saved." })
             return
         }
 
-        setModalMessage({
-            type: "error",
-            text: `${skillResult.status ? "" : `${skillResult.message} `}${sharedNoteResult.status ? "" : sharedNoteResult.message}`.trim()
-        })
+        const errors = [skillResult, sharedNoteResult, privateNoteResult]
+            .filter((r) => !r.status)
+            .map((r) => r.message)
+            .join(" ")
+        setModalMessage({ type: "error", text: errors })
     }
 
     return (
@@ -746,7 +705,7 @@ export function RatePlayerClient({
                                     }
                                 />
 
-                                {savingSkills && (
+                                {isSaving && (
                                     <p className="text-muted-foreground text-sm">
                                         Saving ratings...
                                     </p>
@@ -768,15 +727,12 @@ export function RatePlayerClient({
                                         <Button
                                             type="button"
                                             size="sm"
-                                            onClick={handleSaveSharedRatings}
-                                            disabled={
-                                                savingSharedNotes ||
-                                                savingSkills
-                                            }
+                                            onClick={handleSaveAll}
+                                            disabled={isSaving}
                                         >
-                                            {savingSharedNotes || savingSkills
+                                            {isSaving
                                                 ? "Saving..."
-                                                : "Save Shared Ratings"}
+                                                : "Save All Ratings"}
                                         </Button>
                                     </div>
                                 </div>
@@ -803,14 +759,12 @@ export function RatePlayerClient({
                                         <Button
                                             type="button"
                                             size="sm"
-                                            onClick={() =>
-                                                handleSaveNotes("private")
-                                            }
-                                            disabled={savingPrivateNotes}
+                                            onClick={handleSaveAll}
+                                            disabled={isSaving}
                                         >
-                                            {savingPrivateNotes
+                                            {isSaving
                                                 ? "Saving..."
-                                                : "Save Private Note"}
+                                                : "Save All Ratings"}
                                         </Button>
                                     </div>
                                 </div>

@@ -425,7 +425,7 @@ export async function savePlayerSkillRating(
         return { status: false, message: context.message }
     }
 
-    if (!Number.isInteger(value) || value < 0 || value > 6) {
+    if (!Number.isFinite(value) || value < 0 || value > 6) {
         return {
             status: false,
             message: "Skill values must be between 0 and 6."
@@ -509,7 +509,7 @@ export async function savePlayerSkillRatings(
     ]
 
     const areValuesValid = skillValues.every(
-        (value) => Number.isInteger(value) && value >= 0 && value <= 6
+        (value) => Number.isFinite(value) && value >= 0 && value <= 6
     )
 
     if (!areValuesValid) {
