@@ -183,3 +183,38 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  @page {
+    size: portrait;
+    margin: 0.5in 0.3in;
+  }
+
+  /* Hide sidebar and top nav header when printing */
+  [data-slot="sidebar"] {
+    display: none !important;
+  }
+
+  [data-slot="sidebar-inset"] header {
+    display: none !important;
+  }
+
+  /* Remove all min-heights and overflow constraints that force blank second pages */
+  [data-slot="sidebar-inset"],
+  [data-slot="sidebar-wrapper"],
+  [data-slot="sidebar-wrapper"] > * {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  /* Remove container max-width and padding so content fills the full page width */
+  .container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
