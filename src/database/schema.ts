@@ -6,6 +6,7 @@ import {
     integer,
     serial,
     numeric,
+    real,
     uniqueIndex,
     jsonb
 } from "drizzle-orm/pg-core"
@@ -389,11 +390,11 @@ export const playerRatings = pgTable(
         evaluator: text("evaluator")
             .notNull()
             .references(() => users.id),
-        overall: integer("overall"),
-        passing: integer("passing"),
-        setting: integer("setting"),
-        hitting: integer("hitting"),
-        serving: integer("serving"),
+        overall: real("overall"),
+        passing: real("passing"),
+        setting: real("setting"),
+        hitting: real("hitting"),
+        serving: real("serving"),
         shared_notes: text("shared_notes"),
         private_notes: text("private_notes"),
         updated_at: timestamp("updated_at")

@@ -42,7 +42,7 @@ export async function getPlayerRatingsSectionData(
         ? await seasonQuery.where(lte(seasons.id, currentSeasonId))
         : await seasonQuery
 
-    if (seasonWindowRows.length === 0) {
+    if (seasonWindowRows.length === 0 || playerId === viewerUserId) {
         return {
             averages: getEmptyPlayerRatingAverages(),
             sharedNotes: [],
