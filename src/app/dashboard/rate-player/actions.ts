@@ -98,27 +98,33 @@ function sortPlayersByOldIdThenName(
     return aDisplay.localeCompare(bDisplay)
 }
 
+function toNullableRating(value: number): number | null {
+    return value === 0 ? null : value
+}
+
 function getRatingSkillUpdate(
     skill: RatingSkill,
     value: number
 ): Partial<typeof playerRatings.$inferInsert> {
+    const nullableValue = toNullableRating(value)
+
     if (skill === "overall") {
-        return { overall: value }
+        return { overall: nullableValue }
     }
 
     if (skill === "passing") {
-        return { passing: value }
+        return { passing: nullableValue }
     }
 
     if (skill === "setting") {
-        return { setting: value }
+        return { setting: nullableValue }
     }
 
     if (skill === "hitting") {
-        return { hitting: value }
+        return { hitting: nullableValue }
     }
 
-    return { serving: value }
+    return { serving: nullableValue }
 }
 
 function getRatingNoteUpdate(
@@ -549,11 +555,11 @@ export async function savePlayerSkillRatings(
                 season: context.seasonId,
                 player: playerId,
                 evaluator: context.evaluatorId,
-                overall: values.overall,
-                passing: values.passing,
-                setting: values.setting,
-                hitting: values.hitting,
-                serving: values.serving,
+                overall: toNullableRating(values.overall),
+                passing: toNullableRating(values.passing),
+                setting: toNullableRating(values.setting),
+                hitting: toNullableRating(values.hitting),
+                serving: toNullableRating(values.serving),
                 updated_at: now
             })
             .onConflictDoUpdate({
@@ -563,11 +569,11 @@ export async function savePlayerSkillRatings(
                     playerRatings.evaluator
                 ],
                 set: {
-                    overall: values.overall,
-                    passing: values.passing,
-                    setting: values.setting,
-                    hitting: values.hitting,
-                    serving: values.serving,
+                    overall: toNullableRating(values.overall),
+                    passing: toNullableRating(values.passing),
+                    setting: toNullableRating(values.setting),
+                    hitting: toNullableRating(values.hitting),
+                    serving: toNullableRating(values.serving),
                     updated_at: now
                 }
             })
