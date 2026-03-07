@@ -275,9 +275,11 @@ export async function getRatePlayerData(): Promise<{
             .orderBy(desc(teams.season), desc(drafts.id))
 
         const lastDivisionByPlayerId = new Map<string, string>()
+        const lastSeasonIdByPlayerId = new Map<string, number>()
         for (const row of draftRows) {
             if (!lastDivisionByPlayerId.has(row.userId)) {
                 lastDivisionByPlayerId.set(row.userId, row.divisionName)
+                lastSeasonIdByPlayerId.set(row.userId, row.seasonId)
             }
         }
 
@@ -382,6 +384,34 @@ export async function getRatePlayerData(): Promise<{
             sessionMap.get(row.sessionNumber)!.get(courtNumber)!.push(player)
         }
 
+        const genderOrder = (male: boolean | null) =>
+            male === true ? 0 : male === false ? 1 : 2
+
+        const sortPlayersByTryoutSheetOrder = (
+            a: RatePlayerEntry,
+            b: RatePlayerEntry
+        ): number => {
+            const aHasHistory = lastDivisionByPlayerId.has(a.id)
+            const bHasHistory = lastDivisionByPlayerId.has(b.id)
+
+            if (aHasHistory !== bHasHistory) {
+                return aHasHistory ? 1 : -1
+            }
+
+            if (!aHasHistory) {
+                return genderOrder(a.male) - genderOrder(b.male)
+            }
+
+            const aLastSeasonId =
+                lastSeasonIdByPlayerId.get(a.id) ?? config.seasonId
+            const bLastSeasonId =
+                lastSeasonIdByPlayerId.get(b.id) ?? config.seasonId
+            const gapA = config.seasonId - aLastSeasonId
+            const gapB = config.seasonId - bLastSeasonId
+
+            return gapB - gapA
+        }
+
         const tryout1Sessions: TryoutSessionGroup[] = [...sessionMap.entries()]
             .sort((a, b) => a[0] - b[0])
             .map(([sessionNumber, courtMap]) => ({
@@ -389,7 +419,7 @@ export async function getRatePlayerData(): Promise<{
                 courts: ([1, 2, 3, 4] as const).map((courtNumber) => ({
                     courtNumber,
                     players: [...(courtMap.get(courtNumber) || [])].sort(
-                        sortPlayersByOldIdThenName
+                        sortPlayersByTryoutSheetOrder
                     )
                 }))
             }))

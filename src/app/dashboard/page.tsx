@@ -376,8 +376,8 @@ function RegistrationConfirmation({
                         {signupStatus.signup!.captain === "yes"
                             ? "Yes"
                             : signupStatus.signup!.captain === "only_if_needed"
-                              ? "Only if needed"
-                              : "No"}
+                                ? "Only if needed"
+                                : "No"}
                     </span>
                 </div>
 
@@ -684,6 +684,13 @@ export default async function DashboardPage() {
         signupStatus &&
         signupStatus.config.phase === "prep_tryout_week_2" &&
         hasWeek2RosterData
+    )
+    const shouldShowRatePlayersCard = !!(
+        signupStatus &&
+        ["prep_tryout_week_2", "prep_tryout_week_3"].includes(
+            signupStatus.config.phase
+        ) &&
+        (isAdmin || isCurrentSeasonCommissioner || hasTryoutSheetAccess)
     )
 
     const greeting = userName
@@ -1072,6 +1079,30 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
+                {shouldShowRatePlayersCard && (
+                    <Card className="min-w-[280px] flex-1 border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiStarLine className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                                <CardTitle className="text-lg text-violet-700 dark:text-violet-300">
+                                    Rate Players
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-sm text-violet-700 dark:text-violet-300">
+                                Please take time to rate players on the Rate Player page. Your ratings help place playeres in the appropriate groups for the remaining tryouts.
+                            </p>
+                            <Link
+                                href="/dashboard/rate-player"
+                                className="inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2 font-medium text-sm text-white hover:bg-violet-700"
+                            >
+                                Rate Players
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {discount && signupStatus && !signupStatus.signup && (
                     <Card className="min-w-[280px] flex-1 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
                         <CardHeader className="pb-2">
@@ -1101,13 +1132,13 @@ export default async function DashboardPage() {
                                 )}
                                 {signupStatus.config.phase ===
                                     "registration_open" && (
-                                    <Link
-                                        href="/dashboard/pay-season"
-                                        className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
-                                    >
-                                        Use Discount Now
-                                    </Link>
-                                )}
+                                        <Link
+                                            href="/dashboard/pay-season"
+                                            className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
+                                        >
+                                            Use Discount Now
+                                        </Link>
+                                    )}
                             </div>
                         </CardContent>
                     </Card>
@@ -1129,14 +1160,14 @@ export default async function DashboardPage() {
                                     Check back soon for the next season!
                                 </p>
                             ) : signupStatus.config.phase ===
-                              "registration_open" ? (
+                                "registration_open" ? (
                                 /* Registration phase: signup confirmation, waitlist, or signup CTA */
                                 signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
                                     />
                                 ) : signupStatus.seasonFull &&
-                                  signupStatus.season ? (
+                                    signupStatus.season ? (
                                     <WaitlistContent
                                         signupStatus={signupStatus}
                                         seasonLabel={seasonLabel}
@@ -1149,14 +1180,14 @@ export default async function DashboardPage() {
                                     />
                                 )
                             ) : signupStatus.config.phase ===
-                                  "select_commissioners" ||
-                              signupStatus.config.phase === "select_captains" ||
-                              signupStatus.config.phase ===
-                                  "prep_tryout_week_1" ||
-                              signupStatus.config.phase ===
-                                  "prep_tryout_week_2" ||
-                              signupStatus.config.phase ===
-                                  "prep_tryout_week_3" ? (
+                                "select_commissioners" ||
+                                signupStatus.config.phase === "select_captains" ||
+                                signupStatus.config.phase ===
+                                "prep_tryout_week_1" ||
+                                signupStatus.config.phase ===
+                                "prep_tryout_week_2" ||
+                                signupStatus.config.phase ===
+                                "prep_tryout_week_3" ? (
                                 signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
@@ -1228,7 +1259,7 @@ export default async function DashboardPage() {
                                     </p>
                                 </div>
                             ) : signupStatus.config.phase ===
-                              "regular_season" ? (
+                                "regular_season" ? (
                                 <div className="space-y-3">
                                     <p className="font-medium text-sm">
                                         Regular season is underway!
