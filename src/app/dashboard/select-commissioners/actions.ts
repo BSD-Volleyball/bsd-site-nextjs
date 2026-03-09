@@ -1,8 +1,14 @@
 "use server"
 
 import { db } from "@/database/db"
-import { seasons, divisions, commissioners, users } from "@/database/schema"
-import { eq, desc, inArray, notInArray } from "drizzle-orm"
+import {
+    seasons,
+    divisions,
+    commissioners,
+    users,
+    userRoles
+} from "@/database/schema"
+import { eq, desc, inArray, notInArray, and } from "drizzle-orm"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
@@ -253,11 +259,28 @@ export async function saveCommissioners(data: {
             .delete(commissioners)
             .where(eq(commissioners.season, data.seasonId))
 
+        // Also remove from user_roles (the new system)
+        await db
+            .delete(userRoles)
+            .where(
+                and(
+                    eq(userRoles.role, "commissioner"),
+                    eq(userRoles.season_id, data.seasonId)
+                )
+            )
+
         // Insert new commissioner assignments
         const insertValues: Array<{
             season: number
             division: number
             commissioner: string
+        }> = []
+
+        const userRoleValues: Array<{
+            user_id: string
+            role: string
+            season_id: number
+            division_id: number
         }> = []
 
         for (const assignment of data.assignments) {
@@ -267,6 +290,12 @@ export async function saveCommissioners(data: {
                     division: assignment.divisionId,
                     commissioner: assignment.commissioner1
                 })
+                userRoleValues.push({
+                    user_id: assignment.commissioner1,
+                    role: "commissioner",
+                    season_id: data.seasonId,
+                    division_id: assignment.divisionId
+                })
             }
             if (assignment.commissioner2) {
                 insertValues.push({
@@ -274,11 +303,20 @@ export async function saveCommissioners(data: {
                     division: assignment.divisionId,
                     commissioner: assignment.commissioner2
                 })
+                userRoleValues.push({
+                    user_id: assignment.commissioner2,
+                    role: "commissioner",
+                    season_id: data.seasonId,
+                    division_id: assignment.divisionId
+                })
             }
         }
 
         if (insertValues.length > 0) {
             await db.insert(commissioners).values(insertValues)
+        }
+        if (userRoleValues.length > 0) {
+            await db.insert(userRoles).values(userRoleValues)
         }
 
         // Log the action

@@ -1,60 +1,132 @@
-import { and, eq } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
+import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
-import { commissioners, sessions, teams, users } from "@/database/schema"
+import { sessions, teams, userRoles, users } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
+import { type Permission, type Role, ROLE_PERMISSIONS } from "@/lib/permissions"
 
 export async function getSessionUserId(): Promise<string | null> {
     const session = await auth.api.getSession({ headers: await headers() })
     return session?.user?.id ?? null
 }
 
-export async function isAdminOrDirector(userId: string): Promise<boolean> {
+// ---------------------------------------------------------------------------
+// Core: load all role assignments for a user (cached per request)
+// ---------------------------------------------------------------------------
+
+type UserRoleRow = {
+    role: string
+    season_id: number | null
+    division_id: number | null
+}
+
+// cache() memoizes per React request — avoids repeated DB hits when multiple
+// permission checks fire within the same server action or page render.
+const getUserRoleRows = cache(
+    async (userId: string): Promise<UserRoleRow[]> => {
+        return db
+            .select({
+                role: userRoles.role,
+                season_id: userRoles.season_id,
+                division_id: userRoles.division_id
+            })
+            .from(userRoles)
+            .where(eq(userRoles.user_id, userId))
+    }
+)
+
+// ---------------------------------------------------------------------------
+// Core: permission check
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the user holds any role that grants the requested permission.
+ *
+ * context.seasonId — when provided, role rows must match this season (or be global).
+ * context.divisionId — when provided, role rows must be league-wide (division_id IS NULL)
+ *                      OR match this specific division.
+ */
+export async function hasPermission(
+    userId: string,
+    permission: Permission,
+    context?: { seasonId?: number; divisionId?: number }
+): Promise<boolean> {
+    const rows = await getUserRoleRows(userId)
+
+    for (const row of rows) {
+        // Season filter: global roles (season_id = null) always match;
+        // season-bound roles only match the requested season.
+        if (context?.seasonId !== undefined && row.season_id !== null) {
+            if (row.season_id !== context.seasonId) continue
+        }
+
+        // Division filter: league-wide roles (division_id = null) always match;
+        // division-bound roles only match the requested division.
+        if (context?.divisionId !== undefined && row.division_id !== null) {
+            if (row.division_id !== context.divisionId) continue
+        }
+
+        const role = row.role as Role
+        const perms = ROLE_PERMISSIONS[role]
+        if (perms?.includes(permission)) return true
+    }
+
+    // Fall back to legacy users.role column during transition (admin/director).
+    // This ensures the system works even before user_roles is fully populated.
+    const legacyRole = await getLegacyRole(userId)
+    if (legacyRole === "admin" || legacyRole === "director") return true
+
+    return false
+}
+
+export async function hasPermissionBySession(
+    permission: Permission,
+    context?: { seasonId?: number; divisionId?: number }
+): Promise<boolean> {
+    const userId = await getSessionUserId()
+    if (!userId) return false
+    return hasPermission(userId, permission, context)
+}
+
+// ---------------------------------------------------------------------------
+// Legacy fallback: read users.role column during transition
+// ---------------------------------------------------------------------------
+
+const getLegacyRole = cache(async (userId: string): Promise<string | null> => {
     const [user] = await db
         .select({ role: users.role })
         .from(users)
         .where(eq(users.id, userId))
         .limit(1)
+    return user?.role ?? null
+})
 
-    return user?.role === "admin" || user?.role === "director"
+// ---------------------------------------------------------------------------
+// Backward-compatible helpers (signatures unchanged — zero action changes needed)
+// ---------------------------------------------------------------------------
+
+export async function isAdminOrDirector(userId: string): Promise<boolean> {
+    return hasPermission(userId, "season:control")
 }
 
 export async function isAdminOrDirectorBySession(): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return false
-    }
-
-    return isAdminOrDirector(userId)
+    return hasPermissionBySession("season:control")
 }
 
 export async function isCommissionerForSeason(
     userId: string,
     seasonId: number
 ): Promise<boolean> {
-    const [commissionerRecord] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
-            )
-        )
-        .limit(1)
-
-    return !!commissionerRecord
+    return hasPermission(userId, "draft:manage", { seasonId })
 }
 
 export async function isCommissionerForCurrentSeason(
     userId: string
 ): Promise<boolean> {
     const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return false
-    }
-
+    if (!config.seasonId) return false
     return isCommissionerForSeason(userId, config.seasonId)
 }
 
@@ -62,6 +134,14 @@ export async function isCaptainForSeason(
     userId: string,
     seasonId: number
 ): Promise<boolean> {
+    // Check user_roles first (new system)
+    const rows = await getUserRoleRows(userId)
+    const hasCaptainRole = rows.some(
+        (r) => r.role === "captain" && r.season_id === seasonId
+    )
+    if (hasCaptainRole) return true
+
+    // Fall back to legacy teams table lookup during transition
     const [captainRecord] = await db
         .select({ id: teams.id })
         .from(teams)
@@ -73,16 +153,14 @@ export async function isCaptainForSeason(
 
 export async function isCommissionerBySession(): Promise<boolean> {
     const userId = await getSessionUserId()
-    if (!userId) {
-        return false
-    }
+    if (!userId) return false
 
-    const isAdmin = await isAdminOrDirector(userId)
-    if (isAdmin) {
-        return true
-    }
+    // Admins are implicitly commissioners
+    if (await isAdminOrDirector(userId)) return true
 
-    return isCommissionerForCurrentSeason(userId)
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return isCommissionerForSeason(userId, config.seasonId)
 }
 
 export async function hasAdministrativeAccessBySession(): Promise<boolean> {
@@ -90,32 +168,83 @@ export async function hasAdministrativeAccessBySession(): Promise<boolean> {
 }
 
 export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return false
-    }
-
-    const isAdmin = await isAdminOrDirector(userId)
-    if (isAdmin) {
-        return true
-    }
-
-    const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return false
-    }
-
-    const [isCommissioner, isCaptain] = await Promise.all([
-        isCommissionerForSeason(userId, config.seasonId),
-        isCaptainForSeason(userId, config.seasonId)
-    ])
-
-    return isCommissioner || isCaptain
+    return hasPermissionBySession("signups:view")
 }
 
 export async function hasViewSignupsAccessBySession(): Promise<boolean> {
-    return hasCaptainPagesAccessBySession()
+    return hasPermissionBySession("signups:view")
 }
+
+// ---------------------------------------------------------------------------
+// Role assignment helpers (used by manage-roles and dual-write actions)
+// ---------------------------------------------------------------------------
+
+export async function grantRole(
+    userId: string,
+    role: Role,
+    options?: {
+        seasonId?: number
+        divisionId?: number
+        grantedBy?: string
+    }
+): Promise<void> {
+    // Avoid duplicates: check if the row already exists
+    const conditions = [
+        eq(userRoles.user_id, userId),
+        eq(userRoles.role, role),
+        options?.seasonId !== undefined
+            ? eq(userRoles.season_id, options.seasonId)
+            : isNull(userRoles.season_id),
+        options?.divisionId !== undefined
+            ? eq(userRoles.division_id, options.divisionId)
+            : isNull(userRoles.division_id)
+    ]
+
+    const [existing] = await db
+        .select({ id: userRoles.id })
+        .from(userRoles)
+        .where(and(...conditions))
+        .limit(1)
+
+    if (existing) return
+
+    await db.insert(userRoles).values({
+        user_id: userId,
+        role,
+        season_id: options?.seasonId ?? null,
+        division_id: options?.divisionId ?? null,
+        granted_by: options?.grantedBy ?? null
+    })
+}
+
+export async function revokeRole(
+    userId: string,
+    role: Role,
+    options?: { seasonId?: number; divisionId?: number }
+): Promise<void> {
+    const conditions = [
+        eq(userRoles.user_id, userId),
+        eq(userRoles.role, role),
+        options?.seasonId !== undefined
+            ? eq(userRoles.season_id, options.seasonId)
+            : isNull(userRoles.season_id),
+        options?.divisionId !== undefined
+            ? eq(userRoles.division_id, options.divisionId)
+            : isNull(userRoles.division_id)
+    ]
+
+    await db.delete(userRoles).where(and(...conditions))
+}
+
+export async function getUserRolesForUser(
+    userId: string
+): Promise<UserRoleRow[]> {
+    return getUserRoleRows(userId)
+}
+
+// ---------------------------------------------------------------------------
+// Session management
+// ---------------------------------------------------------------------------
 
 export async function invalidateAllSessionsForUser(
     userId: string

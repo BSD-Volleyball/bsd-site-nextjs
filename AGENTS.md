@@ -50,16 +50,19 @@ npx @better-auth/cli generate
 - Keep auth and RBAC checks explicit in actions/components.
 - Prefer centralized authorization helpers in `src/lib/rbac.ts` instead of duplicating role checks in each file.
 - Use `auth.api.getSession({ headers: await headers() })` directly only when session data is needed for action payloads/logging.
-- Admin authorization is role-based via `users.role` (`admin` or `director`).
-- Commissioner/captain/admin access policy checks should go through shared helpers (for example `isCommissionerBySession`, `hasAdministrativeAccessBySession`, `hasViewSignupsAccessBySession`).
+- Authorization uses a permission-based system: roles are stored in the `user_roles` table and permissions are defined in `src/lib/permissions.ts`. Use `hasPermissionBySession(permission)` or `hasPermission(userId, permission, context?)` for new checks.
+- Backward-compatible helpers (`isAdminOrDirectorBySession`, `isCommissionerBySession`, `hasCaptainPagesAccessBySession`, `hasViewSignupsAccessBySession`) remain available and route through the new system.
+- To add a new role: add it to the `Role` type and `ROLE_PERMISSIONS` map in `src/lib/permissions.ts`. No server action changes needed.
+- Assign/revoke roles via the admin UI at `/dashboard/manage-roles/` or programmatically via `grantRole()`/`revokeRole()` from `src/lib/rbac.ts`.
 - Administrative mutations should log audit entries through `logAuditEntry` when appropriate.
 
 ## Security Patterns
 
 - Every exported server action must enforce authorization at the action boundary, even if the route/page is already protected.
 - For season-bound actions, validate incoming `seasonId` (positive integer) before querying.
-- Current commissioner policy is league-wide commissioner access for the active season (not division-scoped yet).
-- Role updates that change privilege should invalidate active sessions for the affected user.
+- Commissioner division-scoping is configurable: a commissioner row with `division_id = NULL` in `user_roles` has league-wide access; a row with a specific `division_id` is restricted to that division. Pass `{ seasonId, divisionId }` context to `hasPermission()` to enforce division-level checks.
+- Role updates that change privilege should invalidate active sessions for the affected user (call `invalidateAllSessionsForUser`).
+- Roles are stored in the `user_roles` table. The legacy `users.role` column and `commissioners` table are read as fallbacks during transition; the `user_roles` table is authoritative for new role checks.
 - Baseline HTTP security headers are configured in `next.config.ts` (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
 
 ## Database Conventions
@@ -69,6 +72,7 @@ npx @better-auth/cli generate
 - Preserve existing legacy spellings/table names unless explicitly migrating them:
   - `users.preffered_name`
   - `matchs` table
+- The `user_roles` table is the authoritative source for role assignments. Schema: `(id, user_id, role, season_id, division_id, granted_by, granted_at)`. `season_id = NULL` means a global/permanent role; `division_id = NULL` means league-wide for that season.
 - For schema changes:
   1. Update `src/database/schema.ts`.
   2. Generate migration with `npx drizzle-kit generate`.

@@ -93,6 +93,11 @@ const adminNavItems = [
         icon: RiSettings3Line
     },
     {
+        title: "Manage Roles",
+        url: "/dashboard/manage-roles",
+        icon: RiUserSettingsLine
+    },
+    {
         title: "Admin Player Lookup",
         url: "/dashboard/player-lookup",
         icon: RiSearchLine

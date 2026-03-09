@@ -13,14 +13,17 @@ import {
     evaluations,
     commissioners,
     sessions,
-    accounts
+    accounts,
+    userRoles
 } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     invalidateAllSessionsForUser,
-    isAdminOrDirectorBySession
+    isAdminOrDirectorBySession,
+    grantRole,
+    revokeRole
 } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
@@ -374,6 +377,10 @@ export async function updateUser(
                     .update(commissioners)
                     .set({ commissioner: newId })
                     .where(eq(commissioners.commissioner, originalId))
+                await tx
+                    .update(userRoles)
+                    .set({ user_id: newId })
+                    .where(eq(userRoles.user_id, originalId))
 
                 // Now update the user record itself (including ID and other fields)
                 const { id: _newId, ...otherFields } = data
@@ -423,6 +430,14 @@ export async function updateUser(
         }
 
         if (roleWillChange) {
+            // Sync admin role to user_roles (new RBAC system).
+            // Remove any existing admin role, then re-grant if the new role is admin/director.
+            await revokeRole(effectiveId, "admin")
+            if (data.role === "admin" || data.role === "director") {
+                await grantRole(effectiveId, "admin", {
+                    grantedBy: session?.user?.id
+                })
+            }
             await invalidateAllSessionsForUser(effectiveId)
         }
 

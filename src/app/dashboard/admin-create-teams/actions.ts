@@ -3,7 +3,7 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { users, seasons, divisions, teams } from "@/database/schema"
+import { users, seasons, divisions, teams, userRoles } from "@/database/schema"
 import { desc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
@@ -160,6 +160,19 @@ export async function createTeams(
                 number: index + 1
             }))
         )
+
+        // Sync captain roles to user_roles (new RBAC system)
+        await db
+            .insert(userRoles)
+            .values(
+                teamsToCreate.map((team) => ({
+                    user_id: team.captainId,
+                    role: "captain",
+                    season_id: seasonId,
+                    division_id: divisionId
+                }))
+            )
+            .onConflictDoNothing()
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {
