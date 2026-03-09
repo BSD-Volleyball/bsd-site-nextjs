@@ -108,7 +108,7 @@ export default function ConductCommitteeFAQPage() {
                         determines appropriate next steps, which may include a
                         private conversation with the individuals involved, a
                         formal warning, suspension, or removal from the league.
-                        Because reports are anonymous by default, the committee
+                        Because reports can be anonymous, the committee
                         may not be able to follow up with reporters directly
                         unless they provide contact information. All reports are
                         documented and taken seriously, even if immediate action
