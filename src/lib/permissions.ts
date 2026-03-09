@@ -99,8 +99,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // Season-scoped: view signups, participate in draft, rate players
     captain: ["signups:view", "draft:read", "draft:manage", "players:rate"],
 
-    // Season-scoped: rate/evaluate players during tryouts
-    court_manager: ["players:rate", "players:evaluate", "player:lookup"],
+    // Season-scoped: rate/evaluate players during tryouts, and upload pictures
+    court_manager: [
+        "players:rate",
+        "players:evaluate",
+        "player:lookup",
+        "signups:view",
+        "pictures:manage"
+    ],
 
     // Season-scoped: handle player concerns and disputes
     ombudsman: [

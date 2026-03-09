@@ -6,7 +6,7 @@ import { and, eq, isNull, or } from "drizzle-orm"
 import { db } from "@/database/db"
 import { signups, users } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
-import { isCommissionerBySession } from "@/lib/rbac"
+import { hasPermissionBySession } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
     getPlayerPictureDbPath,
@@ -26,7 +26,7 @@ export interface MissingPicturePlayer {
 }
 
 async function checkAddPicturesAccess(): Promise<boolean> {
-    return isCommissionerBySession()
+    return hasPermissionBySession("pictures:manage")
 }
 
 function getSeasonLabel(seasonName: string, seasonYear: number): string {

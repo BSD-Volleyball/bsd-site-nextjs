@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { hasPermissionBySession } from "@/lib/rbac"
 import { PageHeader } from "@/components/layout/page-header"
 import { AddPicturesList } from "./add-pictures-list"
 import { getPlayersNeedingPictures } from "./actions"
@@ -20,7 +20,7 @@ export default async function AddPicturesPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await getIsCommissioner()
+    const hasAccess = await hasPermissionBySession("pictures:manage")
 
     if (!hasAccess) {
         redirect("/dashboard")

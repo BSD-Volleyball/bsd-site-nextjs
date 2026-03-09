@@ -57,6 +57,7 @@ import {
     getIsAdminOrDirector,
     getIsCommissioner,
     getHasCaptainPagesAccess,
+    getHasPicturesAccess,
     getRecentSeasonsNav,
     getSeasonPhase,
     type SeasonNavItem
@@ -225,12 +226,13 @@ const seasonNavItems = [
     }
 ]
 
+const addPicturesNavItem = {
+    title: "Add Pictures",
+    url: "/dashboard/add-pictures",
+    icon: RiEditLine
+}
+
 const commissionerNavItems = [
-    {
-        title: "Add Pictures",
-        url: "/dashboard/add-pictures",
-        icon: RiEditLine
-    },
     {
         title: "Potential Captains",
         url: "/dashboard/potential-captains",
@@ -407,6 +409,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isAdmin, setIsAdmin] = useState(false)
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
+    const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
 
@@ -415,6 +418,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         getIsAdminOrDirector().then(setIsAdmin)
         getIsCommissioner().then(setIsCommissioner)
         getHasCaptainPagesAccess().then(setHasCaptainPagesAccess)
+        getHasPicturesAccess().then(setHasPicturesAccess)
         getRecentSeasonsNav().then(setSeasonNav)
         getSeasonPhase().then(setPhase)
     }, [])
@@ -452,7 +456,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            <NavItems items={seasonNavItems} pathname={pathname} />
+                            <NavItems
+                                items={seasonNavItems}
+                                pathname={pathname}
+                            />
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
@@ -489,6 +496,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 <SidebarMenu>
                                     <NavItems
                                         items={captainPagesNavItems}
+                                        pathname={pathname}
+                                    />
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
+                    )}
+
+                {hasPicturesAccess &&
+                    phaseConfig &&
+                    (phaseConfig.showTryoutTools ||
+                        phaseConfig.showDraftTools) && (
+                        <SidebarGroup>
+                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                                Pictures
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    <NavItems
+                                        items={[addPicturesNavItem]}
                                         pathname={pathname}
                                     />
                                 </SidebarMenu>
