@@ -19,7 +19,8 @@ import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasAdministrativeAccessBySession,
-    hasCaptainPagesAccessBySession
+    hasCaptainPagesAccessBySession,
+    hasPermissionBySession
 } from "@/lib/rbac"
 import type { SeasonPhase } from "@/lib/season-phases"
 
@@ -47,6 +48,10 @@ export async function getHasAdministrativeAccess(): Promise<boolean> {
 
 export async function getHasCaptainPagesAccess(): Promise<boolean> {
     return hasCaptainPagesAccessBySession()
+}
+
+export async function getHasPicturesAccess(): Promise<boolean> {
+    return hasPermissionBySession("pictures:manage")
 }
 
 export async function getSeasonPhase(): Promise<SeasonPhase | null> {
