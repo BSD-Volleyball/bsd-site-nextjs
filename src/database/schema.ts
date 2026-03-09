@@ -491,6 +491,54 @@ export const emailTemplates = pgTable("email_templates", {
         .notNull()
 })
 
+export const concerns = pgTable("concerns", {
+    id: serial("id").primaryKey(),
+    // null = submitted anonymously
+    user_id: text("user_id").references(() => users.id, {
+        onDelete: "set null"
+    }),
+    anonymous: boolean("anonymous")
+        .$defaultFn(() => false)
+        .notNull(),
+    // Contact info for non-anonymous or anonymous-with-followup
+    contact_name: text("contact_name"),
+    contact_email: text("contact_email"),
+    contact_phone: text("contact_phone"),
+    want_followup: boolean("want_followup")
+        .$defaultFn(() => false)
+        .notNull(),
+    incident_date: text("incident_date").notNull(),
+    location: text("location").notNull(),
+    person_involved: text("person_involved").notNull(),
+    witnesses: text("witnesses"),
+    team_match: text("team_match"),
+    description: text("description").notNull(),
+    status: text("status")
+        .$defaultFn(() => "new")
+        .notNull(), // 'new' | 'active' | 'closed'
+    assigned_to: text("assigned_to").references(() => users.id),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull(),
+    updated_at: timestamp("updated_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+export const concernComments = pgTable("concern_comments", {
+    id: serial("id").primaryKey(),
+    concern_id: integer("concern_id")
+        .notNull()
+        .references(() => concerns.id, { onDelete: "cascade" }),
+    author_id: text("author_id")
+        .notNull()
+        .references(() => users.id),
+    content: text("content").notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 // user_roles: multi-role assignment table supporting season/division scoping.
 // Replaces users.role column and commissioners table as the source of truth
 // for authorization. Permissions are defined in src/lib/permissions.ts.
