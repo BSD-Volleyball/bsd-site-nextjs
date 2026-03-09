@@ -3,7 +3,13 @@ import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
-import { sessions, teams, userRoles, users } from "@/database/schema"
+import {
+    commissioners,
+    sessions,
+    teams,
+    userRoles,
+    users
+} from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { type Permission, type Role, ROLE_PERMISSIONS } from "@/lib/permissions"
 
@@ -119,7 +125,27 @@ export async function isCommissionerForSeason(
     userId: string,
     seasonId: number
 ): Promise<boolean> {
-    return hasPermission(userId, "draft:manage", { seasonId })
+    // Check user_roles for an explicit commissioner role for this season
+    const rows = await getUserRoleRows(userId)
+    if (
+        rows.some((r) => r.role === "commissioner" && r.season_id === seasonId)
+    ) {
+        return true
+    }
+
+    // Fall back to legacy commissioners table during transition
+    const [record] = await db
+        .select({ id: commissioners.id })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, seasonId),
+                eq(commissioners.commissioner, userId)
+            )
+        )
+        .limit(1)
+
+    return !!record
 }
 
 export async function isCommissionerForCurrentSeason(
