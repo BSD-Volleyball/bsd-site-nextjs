@@ -8,7 +8,8 @@ import {
     numeric,
     real,
     uniqueIndex,
-    jsonb
+    jsonb,
+    index
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -489,3 +490,29 @@ export const emailTemplates = pgTable("email_templates", {
         .$defaultFn(() => new Date())
         .notNull()
 })
+
+// user_roles: multi-role assignment table supporting season/division scoping.
+// Replaces users.role column and commissioners table as the source of truth
+// for authorization. Permissions are defined in src/lib/permissions.ts.
+export const userRoles = pgTable(
+    "user_roles",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        role: text("role").notNull(),
+        // null = global/permanent role (e.g. admin)
+        season_id: integer("season_id").references(() => seasons.id),
+        // null = league-wide access for the season; set to restrict to one division
+        division_id: integer("division_id").references(() => divisions.id),
+        granted_by: text("granted_by").references(() => users.id),
+        granted_at: timestamp("granted_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        userRolesUserIdx: index("user_roles_user_idx").on(table.user_id),
+        userRolesSeasonIdx: index("user_roles_season_idx").on(table.season_id)
+    })
+)
