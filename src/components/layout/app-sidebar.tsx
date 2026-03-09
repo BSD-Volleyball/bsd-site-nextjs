@@ -24,7 +24,9 @@ import {
     RiUserSettingsLine,
     RiMailLine,
     RiTrophyLine,
-    RiSettings3Line
+    RiSettings3Line,
+    RiAlertLine,
+    RiFileWarningLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -58,6 +60,7 @@ import {
     getIsCommissioner,
     getHasCaptainPagesAccess,
     getHasPicturesAccess,
+    getHasConcernsAccess,
     getRecentSeasonsNav,
     getSeasonPhase,
     type SeasonNavItem
@@ -78,6 +81,19 @@ const baseNavItems = [
         title: "Hall of Champions",
         url: "/dashboard/hall-of-champions",
         icon: RiTrophyLine
+    },
+    {
+        title: "Report a Concern",
+        url: "/dashboard/report-concern",
+        icon: RiAlertLine
+    }
+]
+
+const concernsNavItems = [
+    {
+        title: "Manage Concerns",
+        url: "/dashboard/manage-concerns",
+        icon: RiFileWarningLine
     }
 ]
 
@@ -410,6 +426,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
     const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
+    const [hasConcernsAccess, setHasConcernsAccess] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
 
@@ -419,6 +436,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         getIsCommissioner().then(setIsCommissioner)
         getHasCaptainPagesAccess().then(setHasCaptainPagesAccess)
         getHasPicturesAccess().then(setHasPicturesAccess)
+        getHasConcernsAccess().then(setHasConcernsAccess)
         getRecentSeasonsNav().then(setSeasonNav)
         getSeasonPhase().then(setPhase)
     }, [])
@@ -550,6 +568,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={adminNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {hasConcernsAccess && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Concerns
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={concernsNavItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

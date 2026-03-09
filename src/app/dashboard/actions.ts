@@ -54,6 +54,10 @@ export async function getHasPicturesAccess(): Promise<boolean> {
     return hasPermissionBySession("pictures:manage")
 }
 
+export async function getHasConcernsAccess(): Promise<boolean> {
+    return hasPermissionBySession("concerns:view")
+}
+
 export async function getSeasonPhase(): Promise<SeasonPhase | null> {
     const config = await getSeasonConfig()
     if (!config.seasonId) return null

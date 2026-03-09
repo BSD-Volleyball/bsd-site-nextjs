@@ -15,6 +15,7 @@ import {
     champions,
     evaluations,
     commissioners,
+    concerns,
     week1Rosters,
     week2Rosters
 } from "@/database/schema"
@@ -37,6 +38,7 @@ import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
 import {
     hasCaptainPagesAccessBySession,
+    hasPermissionBySession,
     isAdminOrDirectorBySession,
     isCommissionerForSeason
 } from "@/lib/rbac"
@@ -548,6 +550,7 @@ export default async function DashboardPage() {
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null = null
+    let assignedActiveConcernsCount = 0
 
     if (session?.user) {
         signupStatus = await getSeasonSignup(session.user.id)
@@ -565,6 +568,21 @@ export default async function DashboardPage() {
             .limit(1)
 
         userName = user?.preffered_name || user?.first_name || null
+
+        const canViewConcerns = await hasPermissionBySession("concerns:view")
+        if (canViewConcerns) {
+            const [assignedConcernCount] = await db
+                .select({ total: count() })
+                .from(concerns)
+                .where(
+                    and(
+                        eq(concerns.assigned_to, session.user.id),
+                        eq(concerns.status, "active")
+                    )
+                )
+
+            assignedActiveConcernsCount = assignedConcernCount?.total ?? 0
+        }
 
         if (isAdmin && signupStatus?.config.seasonId) {
             evalStats = await getNewPlayerEvalStats(
@@ -692,6 +710,7 @@ export default async function DashboardPage() {
         ) &&
         (isAdmin || isCurrentSeasonCommissioner || hasTryoutSheetAccess)
     )
+    const shouldShowAssignedConcernsCard = assignedActiveConcernsCount > 0
 
     const greeting = userName
         ? `Hi ${userName}, Welcome back 👋`
@@ -911,6 +930,31 @@ export default async function DashboardPage() {
                             </CardContent>
                         </Card>
                     )}
+
+                {shouldShowAssignedConcernsCard && (
+                    <Card className="min-w-[280px] flex-1 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/30">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-amber-900 text-lg dark:text-amber-100">
+                                Active Concerns Assigned
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-amber-800 text-sm dark:text-amber-200">
+                                You have {assignedActiveConcernsCount} active{" "}
+                                {assignedActiveConcernsCount === 1
+                                    ? "concern"
+                                    : "concerns"}{" "}
+                                assigned to you.
+                            </p>
+                            <Link
+                                href="/dashboard/manage-concerns"
+                                className="inline-flex items-center justify-center rounded-md bg-amber-700 px-4 py-2 font-medium text-sm text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+                            >
+                                Open Manage Concerns
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {userWeek1Roster && signupStatus && (
                     <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
