@@ -218,8 +218,8 @@ export default async function PreseasonWeek2Page() {
                 </h2>
                 <p className="text-sm">
                     The league has conducted an &quot;automated&quot; draft into
-                    regular divisions. Returning players were placed in the
-                    division they most recently played in. New players were
+                    regular divisions. Returning players were mostly placed in the
+                    division they recently played in. New players were
                     placed in divisions based on feedback from the Captains
                     after Preseason Week 1. The league may have made some
                     limited adjustments to accommodate Pair Requests and fill in

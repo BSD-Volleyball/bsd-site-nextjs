@@ -53,6 +53,7 @@ export default async function CreateWeek2Page() {
                 divisions={result.divisions}
                 candidates={result.candidates}
                 excludedPlayers={result.excludedPlayers}
+                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>
     )

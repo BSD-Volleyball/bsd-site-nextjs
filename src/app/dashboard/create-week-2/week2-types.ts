@@ -5,6 +5,7 @@ export interface Week2Division {
     index: number
     teamCount: number
     isLast: boolean
+    isCoachDiv: boolean
 }
 
 export interface Week2Candidate {
@@ -22,6 +23,7 @@ export interface Week2Candidate {
     captainDivisionId: number | null
     captainDivisionName: string | null
     isCaptain: boolean
+    lastDivisionName: string | null
 }
 
 export interface Week2SavedAssignment {

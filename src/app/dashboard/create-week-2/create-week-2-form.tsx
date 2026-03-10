@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { saveWeek2Rosters } from "./actions"
+import {
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup
+} from "@/components/player-detail"
 import type {
     Week2Candidate,
     Week2Division,
@@ -18,6 +22,7 @@ interface CreateWeek2FormProps {
     divisions: Week2Division[]
     candidates: Week2Candidate[]
     excludedPlayers: Week2ExcludedPlayer[]
+    playerPicUrl: string
 }
 
 interface Week2PlacedPlayer extends Week2Candidate {
@@ -734,6 +739,12 @@ function buildTeamsForDivision(
         }
     }
 
+    const teamsWithCaptain = new Set(
+        captains
+            .slice(0, teamCount)
+            .map((_, i) => i)
+    )
+
     const remaining = divisionPlayers.filter(
         (player) => !assignedCaptainIds.has(player.entryId)
     )
@@ -871,6 +882,14 @@ function buildTeamsForDivision(
                     continue
                 }
 
+                if (
+                    !division.isCoachDiv &&
+                    sourcePlayer.isNew &&
+                    !teamsWithCaptain.has(teamIndex)
+                ) {
+                    continue
+                }
+
                 const targetTeam = teams[teamIndex]
                 const targetCandidates = targetTeam.players
                     .map((player, playerIndex) => ({ player, playerIndex }))
@@ -878,7 +897,12 @@ function buildTeamsForDivision(
                         ({ player }) =>
                             !player.isCaptain &&
                             !player.pairEntryId &&
-                            player.assignmentUserId !== assignmentUserId
+                            player.assignmentUserId !== assignmentUserId &&
+                            !(
+                                !division.isCoachDiv &&
+                                player.isNew &&
+                                !teamsWithCaptain.has(source.teamIndex)
+                            )
                     )
                     .sort((a, b) => {
                         const aMismatch =
@@ -955,6 +979,14 @@ function buildTeamsForDivision(
             const teamNewTarget = teamNewTargets[teamIndex]
 
             if (projectedSize > teamCapacity) {
+                continue
+            }
+
+            if (
+                !division.isCoachDiv &&
+                unit.newCount > 0 &&
+                !teamsWithCaptain.has(teamIndex)
+            ) {
                 continue
             }
 
@@ -1039,22 +1071,34 @@ function buildTeamsForDivision(
         }
 
         if (!bestTuple) {
-            const fallbackIndex = teams
+            const fallbackCandidates = teams
                 .map((entry, index) => ({
                     index,
                     remaining: teamCapacities[index] - entry.players.length,
                     duplicatePenalty: getDuplicatePlacementPenalty(
                         unit.players,
                         index
-                    )
+                    ),
+                    hasCaptain: teamsWithCaptain.has(index)
                 }))
                 .filter((entry) => entry.remaining >= unit.size)
-                .sort((a, b) => {
-                    if (a.duplicatePenalty !== b.duplicatePenalty) {
-                        return a.duplicatePenalty - b.duplicatePenalty
-                    }
-                    return b.remaining - a.remaining
-                })[0]?.index
+
+            const preferCaptained =
+                !division.isCoachDiv && unit.newCount > 0
+                    ? fallbackCandidates.filter((entry) => entry.hasCaptain)
+                    : []
+
+            const pool =
+                preferCaptained.length > 0
+                    ? preferCaptained
+                    : fallbackCandidates
+
+            const fallbackIndex = pool.sort((a, b) => {
+                if (a.duplicatePenalty !== b.duplicatePenalty) {
+                    return a.duplicatePenalty - b.duplicatePenalty
+                }
+                return b.remaining - a.remaining
+            })[0]?.index
 
             if (fallbackIndex !== undefined) {
                 bestTeamIndex = fallbackIndex
@@ -1085,7 +1129,12 @@ function buildTeamsForDivision(
                 ({ player }) =>
                     player.male !== true &&
                     !player.isCaptain &&
-                    !player.pairEntryId
+                    !player.pairEntryId &&
+                    !(
+                        !division.isCoachDiv &&
+                        player.isNew &&
+                        !teamsWithCaptain.has(targetIndex)
+                    )
             )
 
         const targetCandidates = targetTeam.players
@@ -1094,7 +1143,12 @@ function buildTeamsForDivision(
                 ({ player }) =>
                     player.male === true &&
                     !player.isCaptain &&
-                    !player.pairEntryId
+                    !player.pairEntryId &&
+                    !(
+                        !division.isCoachDiv &&
+                        player.isNew &&
+                        !teamsWithCaptain.has(sourceIndex)
+                    )
             )
 
         if (sourceCandidates.length === 0 || targetCandidates.length === 0) {
@@ -1289,6 +1343,12 @@ function buildTeamsForDivision(
 
         for (const source of surpluses) {
             for (const target of deficits) {
+                if (
+                    !division.isCoachDiv &&
+                    !teamsWithCaptain.has(target.index)
+                ) {
+                    continue
+                }
                 if (trySwapNewPlayer(source.index, target.index)) {
                     changed = true
                     break
@@ -1314,11 +1374,29 @@ function buildTeamsForDivision(
 
         const highCandidates = highTeam.players
             .map((player, index) => ({ player, index }))
-            .filter(({ player }) => !player.isCaptain && !player.pairEntryId)
+            .filter(
+                ({ player }) =>
+                    !player.isCaptain &&
+                    !player.pairEntryId &&
+                    !(
+                        !division.isCoachDiv &&
+                        player.isNew &&
+                        !teamsWithCaptain.has(lowIndex)
+                    )
+            )
 
         const lowCandidates = lowTeam.players
             .map((player, index) => ({ player, index }))
-            .filter(({ player }) => !player.isCaptain && !player.pairEntryId)
+            .filter(
+                ({ player }) =>
+                    !player.isCaptain &&
+                    !player.pairEntryId &&
+                    !(
+                        !division.isCoachDiv &&
+                        player.isNew &&
+                        !teamsWithCaptain.has(highIndex)
+                    )
+            )
 
         if (highCandidates.length === 0 || lowCandidates.length === 0) {
             return false
@@ -1465,9 +1543,11 @@ export function CreateWeek2Form({
     seasonLabel,
     divisions,
     candidates,
-    excludedPlayers
+    excludedPlayers,
+    playerPicUrl
 }: CreateWeek2FormProps) {
     const [step, setStep] = useState<1 | 2>(1)
+    const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -1930,14 +2010,37 @@ export function CreateWeek2Form({
                                                 )}
                                             >
                                                 <div className="min-w-0 flex-1 truncate pr-2">
-                                                    <span className="font-medium">
+                                                    <button
+                                                        type="button"
+                                                        className="font-medium underline-offset-2 hover:underline"
+                                                        onClick={() =>
+                                                            modal.openPlayerDetail(
+                                                                player.sourceUserId
+                                                            )
+                                                        }
+                                                    >
                                                         {getDisplayName(player)}
-                                                    </span>
-                                                    {player.oldId !== null && (
-                                                        <span className="ml-2 text-muted-foreground">
-                                                            [{player.oldId}]
+                                                    </button>
+                                                    {player.seasonsPlayedCount ===
+                                                    0 ? (
+                                                        <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                                                            NEW
                                                         </span>
-                                                    )}
+                                                    ) : player.lastDivisionName ? (
+                                                        <span
+                                                            className={cn(
+                                                                "ml-2",
+                                                                player.lastDivisionName !==
+                                                                    division.name
+                                                                    ? "font-semibold text-red-600 dark:text-red-400"
+                                                                    : "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {
+                                                                player.lastDivisionName
+                                                            }
+                                                        </span>
+                                                    ) : null}
                                                     {player.pairWithName && (
                                                         <span className="ml-2 text-muted-foreground">
                                                             pair:{" "}
@@ -2230,6 +2333,21 @@ export function CreateWeek2Form({
                     </CardContent>
                 </Card>
             )}
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                pairPickName={modal.pairPickName}
+                pairReason={modal.pairReason}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
+            />
         </div>
     )
 }
