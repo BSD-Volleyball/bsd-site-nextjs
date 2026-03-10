@@ -142,6 +142,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
     viewerRating: PlayerViewerRating | null
+    playoffDates: string[]
 }> {
     const hasAccess = await checkAdminOrCommissionerAccess()
     if (!hasAccess) {
@@ -154,7 +155,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
             privateRatingNotes: [],
-            viewerRating: null
+            viewerRating: null,
+            playoffDates: []
         }
     }
 
@@ -203,7 +205,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 ratingAverages: getEmptyPlayerRatingAverages(),
                 sharedRatingNotes: [],
                 privateRatingNotes: [],
-                viewerRating: null
+                viewerRating: null,
+                playoffDates: []
             }
         }
 
@@ -283,6 +286,12 @@ export async function getPlayerDetails(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
+        const playoffDates = [
+            config.playoff1Date,
+            config.playoff2Date,
+            config.playoff3Date
+        ].filter(Boolean)
+
         return {
             status: true,
             player,
@@ -291,7 +300,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             ratingAverages: ratingsSection.averages,
             sharedRatingNotes: ratingsSection.sharedNotes,
             privateRatingNotes: ratingsSection.privateNotes,
-            viewerRating: ratingsSection.viewerRating
+            viewerRating: ratingsSection.viewerRating,
+            playoffDates
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -304,7 +314,8 @@ export async function getPlayerDetails(playerId: string): Promise<{
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
             privateRatingNotes: [],
-            viewerRating: null
+            viewerRating: null,
+            playoffDates: []
         }
     }
 }

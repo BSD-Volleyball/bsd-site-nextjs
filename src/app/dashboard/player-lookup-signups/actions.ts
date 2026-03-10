@@ -139,6 +139,8 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
     player: PlayerDetails | null
     pairPickName: string | null
     pairReason: string | null
+    datesMissing: string | null
+    playoffDates: string[]
     draftHistory: PlayerDraftHistory[]
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
@@ -153,6 +155,8 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
+            datesMissing: null,
+            playoffDates: [],
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],
@@ -190,6 +194,8 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
                 player: null,
                 pairPickName: null,
                 pairReason: null,
+                datesMissing: null,
+                playoffDates: [],
                 draftHistory: [],
                 ratingAverages: getEmptyPlayerRatingAverages(),
                 sharedRatingNotes: [],
@@ -209,11 +215,13 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
         // Get pair info from most recent signup
         let pairPickName: string | null = null
         let pairReason: string | null = null
+        let datesMissing: string | null = null
 
         const [mostRecentSignup] = await db
             .select({
                 pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason
+                pairReason: signups.pair_reason,
+                datesMissing: signups.dates_missing
             })
             .from(signups)
             .innerJoin(seasons, eq(signups.season, seasons.id))
@@ -240,6 +248,10 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             pairReason = mostRecentSignup.pairReason
         }
 
+        if (mostRecentSignup?.datesMissing) {
+            datesMissing = mostRecentSignup.datesMissing
+        }
+
         // Fetch draft history
         const draftData = await db
             .select({
@@ -258,11 +270,19 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
+        const playoffDates = [
+            config.playoff1Date,
+            config.playoff2Date,
+            config.playoff3Date
+        ].filter(Boolean)
+
         return {
             status: true,
             player,
             pairPickName,
             pairReason,
+            datesMissing,
+            playoffDates,
             draftHistory: draftData,
             ratingAverages: ratingsSection.averages,
             sharedRatingNotes: ratingsSection.sharedNotes,
@@ -277,6 +297,8 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
+            datesMissing: null,
+            playoffDates: [],
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),
             sharedRatingNotes: [],

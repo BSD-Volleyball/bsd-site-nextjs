@@ -26,6 +26,8 @@ interface FetchResult {
     viewerRating?: PlayerViewerRating | null
     pairPickName?: string | null
     pairReason?: string | null
+    datesMissing?: string | null
+    playoffDates?: string[]
 }
 
 interface UsePlayerDetailModalOptions {
@@ -43,6 +45,8 @@ export interface PlayerDetailModalState {
     viewerRating: PlayerViewerRating | null
     pairPickName: string | null
     pairReason: string | null
+    datesMissing: string | null
+    playoffDates: string[]
     isLoading: boolean
     showImageModal: boolean
     setShowImageModal: (v: boolean) => void
@@ -55,10 +59,12 @@ const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
     let pairPickName: string | null = null
     let pairReason: string | null = null
 
+    let datesMissing: string | null = null
     if (result.status && result.signupHistory.length > 0) {
         const mostRecentSignup = result.signupHistory[0]
         pairPickName = mostRecentSignup.pairPickName
         pairReason = mostRecentSignup.pairReason
+        datesMissing = mostRecentSignup.datesMissing
     }
 
     return {
@@ -70,7 +76,9 @@ const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
         sharedRatingNotes: result.sharedRatingNotes,
         privateRatingNotes: result.privateRatingNotes,
         pairPickName,
-        pairReason
+        pairReason,
+        datesMissing,
+        playoffDates: result.playoffDates ?? []
     }
 }
 
@@ -97,6 +105,8 @@ export function usePlayerDetailModal(
     )
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
+    const [datesMissing, setDatesMissing] = useState<string | null>(null)
+    const [playoffDates, setPlayoffDates] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
 
@@ -115,6 +125,8 @@ export function usePlayerDetailModal(
             setViewerRating(null)
             setPairPickName(null)
             setPairReason(null)
+            setDatesMissing(null)
+            setPlayoffDates([])
 
             const result = await fetchFn(playerId)
 
@@ -128,6 +140,8 @@ export function usePlayerDetailModal(
                 setViewerRating(result.viewerRating ?? null)
                 setPairPickName(result.pairPickName ?? null)
                 setPairReason(result.pairReason ?? null)
+                setDatesMissing(result.datesMissing ?? null)
+                setPlayoffDates(result.playoffDates ?? [])
             }
 
             setIsLoading(false)
@@ -146,6 +160,8 @@ export function usePlayerDetailModal(
         setViewerRating(null)
         setPairPickName(null)
         setPairReason(null)
+        setDatesMissing(null)
+        setPlayoffDates([])
     }, [])
 
     useEffect(() => {
@@ -173,6 +189,8 @@ export function usePlayerDetailModal(
         viewerRating,
         pairPickName,
         pairReason,
+        datesMissing,
+        playoffDates,
         isLoading,
         showImageModal,
         setShowImageModal,

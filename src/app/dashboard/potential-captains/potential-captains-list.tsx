@@ -457,6 +457,8 @@ export function PotentialCaptainsList({
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
                 pairReason={modal.pairReason}
+                datesMissing={modal.datesMissing}
+                playoffDates={modal.playoffDates}
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}

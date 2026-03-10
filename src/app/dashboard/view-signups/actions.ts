@@ -546,6 +546,8 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
     viewerRating: PlayerViewerRating | null
     pairPickName: string | null
     pairReason: string | null
+    datesMissing: string | null
+    playoffDates: string[]
 }> {
     const hasAccess = await checkCaptainPagesAccess()
     if (!hasAccess) {
@@ -560,7 +562,9 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             privateRatingNotes: [],
             viewerRating: null,
             pairPickName: null,
-            pairReason: null
+            pairReason: null,
+            datesMissing: null,
+            playoffDates: []
         }
     }
 
@@ -598,7 +602,9 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
                 privateRatingNotes: [],
                 viewerRating: null,
                 pairPickName: null,
-                pairReason: null
+                pairReason: null,
+                datesMissing: null,
+                playoffDates: []
             }
         }
 
@@ -629,11 +635,13 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
 
         let pairPickName: string | null = null
         let pairReason: string | null = null
+        let datesMissing: string | null = null
 
         const [mostRecentSignup] = await db
             .select({
                 pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason
+                pairReason: signups.pair_reason,
+                datesMissing: signups.dates_missing
             })
             .from(signups)
             .innerJoin(seasons, eq(signups.season, seasons.id))
@@ -660,6 +668,10 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             pairReason = mostRecentSignup.pairReason
         }
 
+        if (mostRecentSignup?.datesMissing) {
+            datesMissing = mostRecentSignup.datesMissing
+        }
+
         const draftData = await db
             .select({
                 seasonId: seasons.id,
@@ -677,6 +689,12 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
+        const playoffDates = [
+            config.playoff1Date,
+            config.playoff2Date,
+            config.playoff3Date
+        ].filter(Boolean)
+
         return {
             status: true,
             player,
@@ -687,7 +705,9 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             privateRatingNotes: ratingsSection.privateNotes,
             viewerRating: ratingsSection.viewerRating,
             pairPickName,
-            pairReason
+            pairReason,
+            datesMissing,
+            playoffDates
         }
     } catch (error) {
         console.error("Error fetching player details:", error)
@@ -702,7 +722,9 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             privateRatingNotes: [],
             viewerRating: null,
             pairPickName: null,
-            pairReason: null
+            pairReason: null,
+            datesMissing: null,
+            playoffDates: []
         }
     }
 }

@@ -60,6 +60,8 @@ export function PlayerLookupSignupsForm({
     )
     const [pairPickName, setPairPickName] = useState<string | null>(null)
     const [pairReason, setPairReason] = useState<string | null>(null)
+    const [datesMissing, setDatesMissing] = useState<string | null>(null)
+    const [playoffDates, setPlayoffDates] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -101,6 +103,8 @@ export function PlayerLookupSignupsForm({
             setViewerRating(result.viewerRating)
             setPairPickName(result.pairPickName)
             setPairReason(result.pairReason)
+            setDatesMissing(result.datesMissing)
+            setPlayoffDates(result.playoffDates)
         } else {
             setError(result.message || "Failed to load player details")
             setPlayerDetails(null)
@@ -111,6 +115,8 @@ export function PlayerLookupSignupsForm({
             setViewerRating(null)
             setPairPickName(null)
             setPairReason(null)
+            setDatesMissing(null)
+            setPlayoffDates([])
         }
 
         setIsLoading(false)
@@ -125,6 +131,8 @@ export function PlayerLookupSignupsForm({
         setPrivateRatingNotes([])
         setPairPickName(null)
         setPairReason(null)
+        setDatesMissing(null)
+        setPlayoffDates([])
         setSearch("")
         setError(null)
     }
@@ -234,6 +242,8 @@ export function PlayerLookupSignupsForm({
                 isLoading={isLoading}
                 pairPickName={pairPickName}
                 pairReason={pairReason}
+                datesMissing={datesMissing}
+                playoffDates={playoffDates}
                 ratingAverages={ratingAverages}
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
