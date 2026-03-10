@@ -10,6 +10,7 @@ import {
     teams,
     seasons,
     divisions,
+    individual_divisions,
     week2Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
@@ -27,6 +28,7 @@ import type {
 interface DraftSeasonRecord {
     seasonId: number
     overall: number
+    divisionName: string
 }
 
 function getDisplayName(candidate: Week2Candidate) {
@@ -76,8 +78,8 @@ export async function getCreateWeek2Data(): Promise<{
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
         const tryout2 = config.tryout2Date.trim().toLowerCase()
 
-        const [activeDivisions, signupRowsRaw, captainRows] = await Promise.all(
-            [
+        const [activeDivisions, signupRowsRaw, captainRows, indivDivRows] =
+            await Promise.all([
                 db
                     .select({
                         id: divisions.id,
@@ -106,12 +108,32 @@ export async function getCreateWeek2Data(): Promise<{
                     .select({
                         userId: teams.captain,
                         divisionId: teams.division,
-                        divisionName: divisions.name
+                        divisionName: divisions.name,
+                        isCoachDiv: individual_divisions.coaches
                     })
                     .from(teams)
                     .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(eq(teams.season, config.seasonId))
-            ]
+                    .leftJoin(
+                        individual_divisions,
+                        and(
+                            eq(individual_divisions.division, teams.division),
+                            eq(individual_divisions.season, config.seasonId)
+                        )
+                    )
+                    .where(eq(teams.season, config.seasonId)),
+                db
+                    .select({
+                        divisionId: individual_divisions.division,
+                        coaches: individual_divisions.coaches
+                    })
+                    .from(individual_divisions)
+                    .where(eq(individual_divisions.season, config.seasonId))
+            ])
+
+        const coachDivisionIds = new Set(
+            indivDivRows
+                .filter((row) => row.coaches)
+                .map((row) => row.divisionId)
         )
 
         const divisionsWithMeta: Week2Division[] = activeDivisions.map(
@@ -119,15 +141,18 @@ export async function getCreateWeek2Data(): Promise<{
                 ...division,
                 index,
                 teamCount: index === activeDivisions.length - 1 ? 4 : 6,
-                isLast: index === activeDivisions.length - 1
+                isLast: index === activeDivisions.length - 1,
+                isCoachDiv: coachDivisionIds.has(division.id)
             })
         )
 
         const captainDivisionByUser = new Map<string, number>()
         const captainDivisionNameByUser = new Map<string, string>()
         for (const row of captainRows) {
-            captainDivisionByUser.set(row.userId, row.divisionId)
-            captainDivisionNameByUser.set(row.userId, row.divisionName)
+            if (!row.isCoachDiv) {
+                captainDivisionByUser.set(row.userId, row.divisionId)
+                captainDivisionNameByUser.set(row.userId, row.divisionName)
+            }
         }
 
         const excludedPlayers: Week2ExcludedPlayer[] = []
@@ -173,11 +198,13 @@ export async function getCreateWeek2Data(): Promise<{
             .select({
                 userId: drafts.user,
                 seasonId: seasons.id,
-                overall: drafts.overall
+                overall: drafts.overall,
+                divisionName: divisions.name
             })
             .from(drafts)
             .innerJoin(teams, eq(drafts.team, teams.id))
             .innerJoin(seasons, eq(teams.season, seasons.id))
+            .innerJoin(divisions, eq(teams.division, divisions.id))
             .where(inArray(drafts.user, userIds))
             .orderBy(desc(seasons.id), drafts.overall)
 
@@ -192,7 +219,8 @@ export async function getCreateWeek2Data(): Promise<{
             if (!hasSeasonAlready) {
                 records.push({
                     seasonId: row.seasonId,
-                    overall: row.overall
+                    overall: row.overall,
+                    divisionName: row.divisionName
                 })
                 draftsByUser.set(row.userId, records)
             }
@@ -267,7 +295,8 @@ export async function getCreateWeek2Data(): Promise<{
                     captainDivisionByUser.get(row.userId) || null,
                 captainDivisionName:
                     captainDivisionNameByUser.get(row.userId) || null,
-                isCaptain: captainDivisionByUser.has(row.userId)
+                isCaptain: captainDivisionByUser.has(row.userId),
+                lastDivisionName: history[0]?.divisionName ?? null
             }
         })
 
@@ -358,9 +387,17 @@ export async function saveWeek2Rosters(
         db
             .select({
                 userId: teams.captain,
-                divisionId: teams.division
+                divisionId: teams.division,
+                isCoachDiv: individual_divisions.coaches
             })
             .from(teams)
+            .leftJoin(
+                individual_divisions,
+                and(
+                    eq(individual_divisions.division, teams.division),
+                    eq(individual_divisions.season, config.seasonId)
+                )
+            )
             .where(eq(teams.season, config.seasonId))
     ])
 
@@ -389,7 +426,9 @@ export async function saveWeek2Rosters(
 
     const captainDivisionByUser = new Map<string, number>()
     for (const row of captainRows) {
-        captainDivisionByUser.set(row.userId, row.divisionId)
+        if (!row.isCoachDiv) {
+            captainDivisionByUser.set(row.userId, row.divisionId)
+        }
     }
 
     for (const assignment of assignments) {

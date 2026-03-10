@@ -550,6 +550,7 @@ export default async function DashboardPage() {
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null = null
+    let userWeek2Roster: { divisionName: string; teamNumber: number; captainName: string | null } | null = null
     let assignedActiveConcernsCount = 0
 
     if (session?.user) {
@@ -627,6 +628,62 @@ export default async function DashboardPage() {
                 .where(eq(week2Rosters.season, signupStatus.config.seasonId))
                 .limit(1)
             hasWeek2RosterData = !!week2RosterRow
+
+            if (
+                signupStatus.config.phase === "prep_tryout_week_2" &&
+                hasWeek2RosterData
+            ) {
+                const [myWeek2Slot] = await db
+                    .select({
+                        divisionId: week2Rosters.division,
+                        divisionName: divisions.name,
+                        teamNumber: week2Rosters.team_number
+                    })
+                    .from(week2Rosters)
+                    .innerJoin(
+                        divisions,
+                        eq(week2Rosters.division, divisions.id)
+                    )
+                    .where(
+                        and(
+                            eq(week2Rosters.season, signupStatus.config.seasonId),
+                            eq(week2Rosters.user, session.user.id)
+                        )
+                    )
+                    .limit(1)
+
+                if (myWeek2Slot) {
+                    const [captainRow] = await db
+                        .select({
+                            firstName: users.first_name,
+                            lastName: users.last_name,
+                            preferredName: users.preffered_name
+                        })
+                        .from(week2Rosters)
+                        .innerJoin(users, eq(week2Rosters.user, users.id))
+                        .where(
+                            and(
+                                eq(week2Rosters.season, signupStatus.config.seasonId),
+                                eq(week2Rosters.division, myWeek2Slot.divisionId),
+                                eq(week2Rosters.team_number, myWeek2Slot.teamNumber),
+                                eq(week2Rosters.is_captain, true)
+                            )
+                        )
+                        .limit(1)
+
+                    const captainName = captainRow
+                        ? captainRow.preferredName
+                            ? `${captainRow.preferredName} ${captainRow.lastName}`
+                            : `${captainRow.firstName} ${captainRow.lastName}`
+                        : null
+
+                    userWeek2Roster = {
+                        divisionName: myWeek2Slot.divisionName,
+                        teamNumber: myWeek2Slot.teamNumber,
+                        captainName
+                    }
+                }
+            }
 
             if (signupStatus.config.phase === "select_captains") {
                 if (isAdmin) {
@@ -951,6 +1008,73 @@ export default async function DashboardPage() {
                                 className="inline-flex items-center justify-center rounded-md bg-amber-700 px-4 py-2 font-medium text-sm text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
                             >
                                 Open Manage Concerns
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {userWeek2Roster && signupStatus && (
+                    <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
+                                    You're in Week 2 Tryouts this Saturday!
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-orange-700 text-sm dark:text-orange-300">
+                                You have been assigned a spot in the Pre-Season Week 2 tryout.
+                            </p>
+                            <div className="rounded-md bg-orange-100 p-3 dark:bg-orange-900 space-y-1.5 text-sm">
+                                {signupStatus.config.tryout2Date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">Date:</span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {signupStatus.config.tryout2Date}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Time:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek2Roster.teamNumber <= 2
+                                            ? signupStatus.config.tryout2Session1Time || "TBD"
+                                            : userWeek2Roster.teamNumber <= 4
+                                              ? signupStatus.config.tryout2Session2Time || "TBD"
+                                              : signupStatus.config.tryout2Session3Time || "TBD"}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Division:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek2Roster.divisionName}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Team:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Team {userWeek2Roster.teamNumber}
+                                    </span>
+                                </div>
+                                {userWeek2Roster.captainName && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">Captain:</span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {userWeek2Roster.captainName}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                                Please plan to arrive 10 minutes early.
+                            </p>
+                            <Link
+                                href="/dashboard/preseason-week-2"
+                                className="inline-flex items-center justify-center rounded-md bg-orange-600 px-4 py-2 font-medium text-sm text-white hover:bg-orange-700"
+                            >
+                                View Full Week 2 Roster
                             </Link>
                         </CardContent>
                     </Card>
