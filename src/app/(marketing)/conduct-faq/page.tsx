@@ -1,3 +1,5 @@
+import Image from "next/image"
+
 export const metadata = {
     title: "BSD Conduct Committee Webpage FAQ - Bump Set Drink Volleyball",
     description:
@@ -155,6 +157,22 @@ export default function ConductCommitteeFAQPage() {
                             </li>
                         </ul>
                     </div>
+                </section>
+
+                <section className="mt-16 text-center">
+                    <div className="mx-auto max-w-[70%] overflow-hidden rounded-xl border bg-background shadow-sm">
+                        <Image
+                            src="/bsd-ombuds.jpeg"
+                            alt="The Spring 2026 BSD Conduct Committee"
+                            width={1600}
+                            height={1200}
+                            className="h-auto w-full"
+                        />
+                    </div>
+                    <p className="mt-4 text-muted-foreground text-sm leading-relaxed">
+                        The Spring 2026 BSD Conduct Committee: Jacob Aley,
+                        Alice Hung, and Jessie Jamieson (Director)
+                    </p>
                 </section>
             </div>
         </div>

@@ -48,6 +48,8 @@ interface PlayerDetailPopupProps {
     isLoading: boolean
     pairPickName?: string | null
     pairReason?: string | null
+    datesMissing?: string | null
+    playoffDates?: string[]
     ratingAverages?: PlayerRatingAverages
     sharedRatingNotes?: PlayerRatingSharedNote[]
     privateRatingNotes?: PlayerRatingPrivateNote[]
@@ -66,6 +68,8 @@ export function PlayerDetailPopup({
     isLoading,
     pairPickName,
     pairReason,
+    datesMissing,
+    playoffDates = [],
     ratingAverages = getEmptyPlayerRatingAverages(),
     sharedRatingNotes = [],
     privateRatingNotes = [],
@@ -150,11 +154,11 @@ export function PlayerDetailPopup({
                             </div>
                         </div>
 
-                        {/* Pair Request */}
-                        {(pairPickName || pairReason) && (
+                        {/* Pair Request / Signup Info */}
+                        {(pairPickName || pairReason || datesMissing) && (
                             <div>
                                 <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                                    Pair Request
+                                    Signup Info
                                 </h3>
                                 <div className="grid grid-cols-1 gap-3 text-sm">
                                     {pairPickName && (
@@ -174,6 +178,43 @@ export function PlayerDetailPopup({
                                             </span>
                                             <span className="ml-2 font-medium">
                                                 {pairReason}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {datesMissing && (
+                                        <div>
+                                            <span className="text-muted-foreground">
+                                                Dates Missing:
+                                            </span>
+                                            <span className="ml-2 font-medium">
+                                                {datesMissing
+                                                    .split(",")
+                                                    .map((d) => d.trim())
+                                                    .filter(Boolean)
+                                                    .map((date, i, arr) => {
+                                                        const isPlayoff =
+                                                            playoffDates.some(
+                                                                (pd) =>
+                                                                    pd.toLowerCase() ===
+                                                                    date.toLowerCase()
+                                                            )
+                                                        return (
+                                                            <span
+                                                                key={date}
+                                                                className={
+                                                                    isPlayoff
+                                                                        ? "text-destructive"
+                                                                        : undefined
+                                                                }
+                                                            >
+                                                                {date}
+                                                                {i <
+                                                                    arr.length -
+                                                                        1 &&
+                                                                    ", "}
+                                                            </span>
+                                                        )
+                                                    })}
                                             </span>
                                         </div>
                                     )}
