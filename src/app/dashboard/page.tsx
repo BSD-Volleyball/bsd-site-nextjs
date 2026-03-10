@@ -550,7 +550,7 @@ export default async function DashboardPage() {
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null = null
-    let userWeek2Roster: { divisionName: string; teamNumber: number; captainName: string | null } | null = null
+    let userWeek2Roster: { divisionName: string; teamNumber: number; captainName: string | null; courtNumber: number; sessionTime: string } | null = null
     let assignedActiveConcernsCount = 0
 
     if (session?.user) {
@@ -653,23 +653,50 @@ export default async function DashboardPage() {
                     .limit(1)
 
                 if (myWeek2Slot) {
-                    const [captainRow] = await db
-                        .select({
-                            firstName: users.first_name,
-                            lastName: users.last_name,
-                            preferredName: users.preffered_name
-                        })
-                        .from(week2Rosters)
-                        .innerJoin(users, eq(week2Rosters.user, users.id))
-                        .where(
-                            and(
-                                eq(week2Rosters.season, signupStatus.config.seasonId),
-                                eq(week2Rosters.division, myWeek2Slot.divisionId),
-                                eq(week2Rosters.team_number, myWeek2Slot.teamNumber),
-                                eq(week2Rosters.is_captain, true)
+                    const legacyCourtByDivision: Record<string, number> = {
+                        AA: 1, A: 2, ABA: 3, ABB: 4, BB: 7, BBB: 8
+                    }
+
+                    const [[captainRow], week2Divisions] = await Promise.all([
+                        db
+                            .select({
+                                firstName: users.first_name,
+                                lastName: users.last_name,
+                                preferredName: users.preffered_name
+                            })
+                            .from(week2Rosters)
+                            .innerJoin(users, eq(week2Rosters.user, users.id))
+                            .where(
+                                and(
+                                    eq(week2Rosters.season, signupStatus.config.seasonId),
+                                    eq(week2Rosters.division, myWeek2Slot.divisionId),
+                                    eq(week2Rosters.team_number, myWeek2Slot.teamNumber),
+                                    eq(week2Rosters.is_captain, true)
+                                )
                             )
-                        )
-                        .limit(1)
+                            .limit(1),
+                        db
+                            .selectDistinct({ id: divisions.id, level: divisions.level })
+                            .from(week2Rosters)
+                            .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
+                            .where(eq(week2Rosters.season, signupStatus.config.seasonId))
+                            .orderBy(divisions.level)
+                    ])
+
+                    const divisionIndex = week2Divisions.findIndex(
+                        (d) => d.id === myWeek2Slot.divisionId
+                    )
+                    const courtNumber =
+                        legacyCourtByDivision[myWeek2Slot.divisionName] ??
+                        (divisionIndex >= 0 ? divisionIndex + 1 : 1)
+
+                    const sessionTimes = [
+                        signupStatus.config.tryout2Session1Time,
+                        signupStatus.config.tryout2Session2Time,
+                        signupStatus.config.tryout2Session3Time
+                    ]
+                    const matchupIndex = Math.floor((myWeek2Slot.teamNumber - 1) / 2)
+                    const sessionTime = sessionTimes[matchupIndex] || "TBD"
 
                     const captainName = captainRow
                         ? captainRow.preferredName
@@ -680,7 +707,9 @@ export default async function DashboardPage() {
                     userWeek2Roster = {
                         divisionName: myWeek2Slot.divisionName,
                         teamNumber: myWeek2Slot.teamNumber,
-                        captainName
+                        captainName,
+                        courtNumber,
+                        sessionTime
                     }
                 }
             }
@@ -1019,7 +1048,7 @@ export default async function DashboardPage() {
                             <div className="flex items-center gap-2">
                                 <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                                 <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
-                                    You're in Week 2 Tryouts this Saturday!
+                                    You're in Week 2 Tryouts this Thursday!
                                 </CardTitle>
                             </div>
                         </CardHeader>
@@ -1039,11 +1068,13 @@ export default async function DashboardPage() {
                                 <div className="flex justify-between">
                                     <span className="text-orange-700 dark:text-orange-300">Time:</span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        {userWeek2Roster.teamNumber <= 2
-                                            ? signupStatus.config.tryout2Session1Time || "TBD"
-                                            : userWeek2Roster.teamNumber <= 4
-                                              ? signupStatus.config.tryout2Session2Time || "TBD"
-                                              : signupStatus.config.tryout2Session3Time || "TBD"}
+                                        {userWeek2Roster.sessionTime}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">Court:</span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Court {userWeek2Roster.courtNumber}
                                     </span>
                                 </div>
                                 <div className="flex justify-between">
