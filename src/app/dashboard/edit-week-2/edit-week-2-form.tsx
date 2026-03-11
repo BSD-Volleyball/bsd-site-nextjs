@@ -106,18 +106,37 @@ function PlayerCombobox({
                 >
                     {selectedPlayer ? (
                         <span className="flex min-w-0 flex-1 items-baseline gap-2 truncate">
-                            <span className="truncate">{getPlayerLabel(selectedPlayer)}</span>
+                            <span className="truncate">
+                                {getPlayerLabel(selectedPlayer)}
+                            </span>
                             <span className="shrink-0 text-muted-foreground text-xs">
                                 {selectedPlayer.seasonsPlayedCount === 0 ? (
-                                    <span className="font-semibold text-green-600 dark:text-green-400">NEW</span>
+                                    <span className="font-semibold text-green-600 dark:text-green-400">
+                                        NEW
+                                    </span>
                                 ) : selectedPlayer.lastDivisionName ? (
-                                    <span>{selectedPlayer.lastDivisionName}</span>
+                                    <span>
+                                        {selectedPlayer.lastDivisionName}
+                                    </span>
                                 ) : null}
-                                <span className="ml-1">{Math.round(selectedPlayer.placementScore)}</span>
+                                <span className="ml-1">
+                                    {Math.round(selectedPlayer.placementScore)}
+                                </span>
+                                {selectedPlayer.seasonsPlayedCount > 0 &&
+                                    selectedPlayer.ratingScore !== null && (
+                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                            R
+                                            {Math.round(
+                                                selectedPlayer.ratingScore
+                                            )}
+                                        </span>
+                                    )}
                             </span>
                         </span>
                     ) : (
-                        <span className="truncate text-muted-foreground">Select player...</span>
+                        <span className="truncate text-muted-foreground">
+                            Select player...
+                        </span>
                     )}
                     <div className="flex items-center gap-1">
                         {selectedPlayer && !disabled && (
@@ -185,11 +204,26 @@ function PlayerCombobox({
                                     <span>{getPlayerLabel(player)}</span>
                                     <span className="shrink-0 text-muted-foreground text-xs">
                                         {player.seasonsPlayedCount === 0 ? (
-                                            <span className="font-semibold text-green-600 dark:text-green-400">NEW</span>
+                                            <span className="font-semibold text-green-600 dark:text-green-400">
+                                                NEW
+                                            </span>
                                         ) : player.lastDivisionName ? (
-                                            <span>{player.lastDivisionName}</span>
+                                            <span>
+                                                {player.lastDivisionName}
+                                            </span>
                                         ) : null}
-                                        <span className="ml-1">{Math.round(player.placementScore)}</span>
+                                        <span className="ml-1">
+                                            {Math.round(player.placementScore)}
+                                        </span>
+                                        {player.seasonsPlayedCount > 0 &&
+                                            player.ratingScore !== null && (
+                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                    R
+                                                    {Math.round(
+                                                        player.ratingScore
+                                                    )}
+                                                </span>
+                                            )}
                                     </span>
                                 </span>
                             </button>
@@ -201,7 +235,11 @@ function PlayerCombobox({
     )
 }
 
-export function EditWeek2Form({ players, slots, playerPicUrl }: EditWeek2FormProps) {
+export function EditWeek2Form({
+    players,
+    slots,
+    playerPicUrl
+}: EditWeek2FormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -226,7 +264,9 @@ export function EditWeek2Form({ players, slots, playerPicUrl }: EditWeek2FormPro
                 counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
             }
         }
-        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id))
+        return new Set(
+            [...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id)
+        )
     }, [slotAssignments])
 
     const groupedSlots = useMemo(() => {
@@ -358,11 +398,15 @@ export function EditWeek2Form({ players, slots, playerPicUrl }: EditWeek2FormPro
                                                                 slot.isCaptain
                                                             }
                                                         />
-                                                        {slot.userId && duplicateUserIds.has(slot.userId) && (
-                                                            <p className="text-amber-600 text-xs dark:text-amber-400">
-                                                                Playing twice
-                                                            </p>
-                                                        )}
+                                                        {slot.userId &&
+                                                            duplicateUserIds.has(
+                                                                slot.userId
+                                                            ) && (
+                                                                <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                                    Playing
+                                                                    twice
+                                                                </p>
+                                                            )}
                                                     </div>
                                                     {slot.userId && (
                                                         <Button

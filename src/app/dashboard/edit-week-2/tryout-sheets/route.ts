@@ -23,6 +23,8 @@ export const runtime = "nodejs"
 interface TryoutSheetRow {
     idLabel: string
     name: string
+    lastName: string
+    isMale: boolean
     pairName: string
     hasPair: boolean
     positionsLabel: string
@@ -382,6 +384,8 @@ export async function GET() {
             currentRows.push({
                 idLabel: row.oldId === null ? "—" : String(row.oldId),
                 name: getDisplayName(row),
+                lastName: row.lastName,
+                isMale: !!row.male,
                 pairName: row.pairPickId
                     ? (pairNameById.get(row.pairPickId) ?? "—")
                     : "",
@@ -407,7 +411,16 @@ export async function GET() {
                 if (a.teamNumber !== b.teamNumber) {
                     return a.teamNumber - b.teamNumber
                 }
-                return a.name.localeCompare(b.name)
+                // New players (no draft history) before returning players
+                const aNew = a.hasBlankHistory ? 0 : 1
+                const bNew = b.hasBlankHistory ? 0 : 1
+                if (aNew !== bNew) return aNew - bNew
+                // Male players before non-male
+                const aMale = a.isMale ? 0 : 1
+                const bMale = b.isMale ? 0 : 1
+                if (aMale !== bMale) return aMale - bMale
+                // Alphabetical by last name
+                return a.lastName.localeCompare(b.lastName)
             })
         }
 

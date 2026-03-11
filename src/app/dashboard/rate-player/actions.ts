@@ -79,23 +79,21 @@ function buildSeasonLabel(seasonName: string, seasonYear: number): string {
     return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
 }
 
-function sortPlayersByOldIdThenName(
+function sortPlayers(
     a: RatePlayerEntry,
-    b: RatePlayerEntry
+    b: RatePlayerEntry,
+    hasHistoryFn: (entry: RatePlayerEntry) => boolean
 ): number {
-    const aOldId = a.oldId ?? Number.MAX_SAFE_INTEGER
-    const bOldId = b.oldId ?? Number.MAX_SAFE_INTEGER
-
-    if (aOldId !== bOldId) {
-        return aOldId - bOldId
-    }
-
-    const aDisplay =
-        `${a.preferredName || a.firstName} ${a.lastName}`.toLowerCase()
-    const bDisplay =
-        `${b.preferredName || b.firstName} ${b.lastName}`.toLowerCase()
-
-    return aDisplay.localeCompare(bDisplay)
+    // New players (no draft history) before returning players
+    const aNew = hasHistoryFn(a) ? 1 : 0
+    const bNew = hasHistoryFn(b) ? 1 : 0
+    if (aNew !== bNew) return aNew - bNew
+    // Male players before non-male
+    const aMale = a.male === true ? 0 : 1
+    const bMale = b.male === true ? 0 : 1
+    if (aMale !== bMale) return aMale - bMale
+    // Alphabetical by last name
+    return a.lastName.localeCompare(b.lastName)
 }
 
 function toNullableRating(value: number): number | null {
@@ -264,7 +262,6 @@ export async function getRatePlayerData(): Promise<{
         const draftRows = await db
             .select({
                 userId: drafts.user,
-                seasonId: teams.season,
                 divisionName: divisions.name,
                 draftId: drafts.id
             })
@@ -275,11 +272,9 @@ export async function getRatePlayerData(): Promise<{
             .orderBy(desc(teams.season), desc(drafts.id))
 
         const lastDivisionByPlayerId = new Map<string, string>()
-        const lastSeasonIdByPlayerId = new Map<string, number>()
         for (const row of draftRows) {
             if (!lastDivisionByPlayerId.has(row.userId)) {
                 lastDivisionByPlayerId.set(row.userId, row.divisionName)
-                lastSeasonIdByPlayerId.set(row.userId, row.seasonId)
             }
         }
 
@@ -298,7 +293,9 @@ export async function getRatePlayerData(): Promise<{
                     lastDivisionName: lastDivisionByPlayerId.get(row.id) || null
                 })
             )
-            .sort(sortPlayersByOldIdThenName)
+            .sort((a, b) =>
+                sortPlayers(a, b, (p) => lastDivisionByPlayerId.has(p.id))
+            )
 
         const playersById = new Map(
             players.map((player) => [player.id, player])
@@ -384,34 +381,6 @@ export async function getRatePlayerData(): Promise<{
             sessionMap.get(row.sessionNumber)!.get(courtNumber)!.push(player)
         }
 
-        const genderOrder = (male: boolean | null) =>
-            male === true ? 0 : male === false ? 1 : 2
-
-        const sortPlayersByTryoutSheetOrder = (
-            a: RatePlayerEntry,
-            b: RatePlayerEntry
-        ): number => {
-            const aHasHistory = lastDivisionByPlayerId.has(a.id)
-            const bHasHistory = lastDivisionByPlayerId.has(b.id)
-
-            if (aHasHistory !== bHasHistory) {
-                return aHasHistory ? 1 : -1
-            }
-
-            if (!aHasHistory) {
-                return genderOrder(a.male) - genderOrder(b.male)
-            }
-
-            const aLastSeasonId =
-                lastSeasonIdByPlayerId.get(a.id) ?? config.seasonId
-            const bLastSeasonId =
-                lastSeasonIdByPlayerId.get(b.id) ?? config.seasonId
-            const gapA = config.seasonId - aLastSeasonId
-            const gapB = config.seasonId - bLastSeasonId
-
-            return gapB - gapA
-        }
-
         const tryout1Sessions: TryoutSessionGroup[] = [...sessionMap.entries()]
             .sort((a, b) => a[0] - b[0])
             .map(([sessionNumber, courtMap]) => ({
@@ -419,7 +388,12 @@ export async function getRatePlayerData(): Promise<{
                 courts: ([1, 2, 3, 4] as const).map((courtNumber) => ({
                     courtNumber,
                     players: [...(courtMap.get(courtNumber) || [])].sort(
-                        sortPlayersByTryoutSheetOrder
+                        (a, b) =>
+                            sortPlayers(
+                                a,
+                                b,
+                                (p) => lastDivisionByPlayerId.has(p.id)
+                            )
                     )
                 }))
             }))
