@@ -740,9 +740,7 @@ function buildTeamsForDivision(
     }
 
     const teamsWithCaptain = new Set(
-        captains
-            .slice(0, teamCount)
-            .map((_, i) => i)
+        captains.slice(0, teamCount).map((_, i) => i)
     )
 
     const remaining = divisionPlayers.filter(
@@ -2076,6 +2074,17 @@ export function CreateWeek2Form({
                                                         {Math.round(
                                                             player.placementScore
                                                         )}
+                                                        {player.overallMostRecent !==
+                                                            null &&
+                                                            player.ratingScore !==
+                                                                null && (
+                                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                                    R
+                                                                    {Math.round(
+                                                                        player.ratingScore
+                                                                    )}
+                                                                </span>
+                                                            )}
                                                         {pairAverageScoreByUser.has(
                                                             player.sourceUserId
                                                         ) && (

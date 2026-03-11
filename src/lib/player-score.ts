@@ -13,6 +13,56 @@ import {
 const DEFAULT_SCORE = 200
 
 /**
+ * Returns a rating-based placement score for each userId using current-season
+ * player ratings: `((6 - avgOverall) * 50) + 1`, where director ratings count
+ * double. Users with no ratings are omitted from the result.
+ */
+export async function fetchRatingBasedScores(
+    userIds: string[],
+    seasonId: number
+): Promise<Map<string, number>> {
+    if (userIds.length === 0) return new Map()
+
+    const ratingRows = await db
+        .select({
+            playerId: playerRatings.player,
+            overall: playerRatings.overall,
+            evaluatorRole: users.role
+        })
+        .from(playerRatings)
+        .innerJoin(users, eq(playerRatings.evaluator, users.id))
+        .where(
+            and(
+                eq(playerRatings.season, seasonId),
+                inArray(playerRatings.player, userIds),
+                isNotNull(playerRatings.overall)
+            )
+        )
+
+    const aggregates = new Map<
+        string,
+        { weightedSum: number; totalWeight: number }
+    >()
+    for (const row of ratingRows) {
+        if (row.overall === null) continue
+        const weight = row.evaluatorRole === "director" ? 2 : 1
+        const current = aggregates.get(row.playerId) || {
+            weightedSum: 0,
+            totalWeight: 0
+        }
+        current.weightedSum += row.overall * weight
+        current.totalWeight += weight
+        aggregates.set(row.playerId, current)
+    }
+
+    const result = new Map<string, number>()
+    for (const [playerId, agg] of aggregates.entries()) {
+        result.set(playerId, (6 - agg.weightedSum / agg.totalWeight) * 50 + 1)
+    }
+    return result
+}
+
+/**
  * Returns a placement score for each userId.
  *
  * Algorithm:

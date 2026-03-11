@@ -23,6 +23,8 @@ export const runtime = "nodejs"
 interface TryoutSheetRow {
     idLabel: string
     name: string
+    lastName: string
+    isMale: boolean
     pairName: string
     hasPair: boolean
     positionsLabel: string
@@ -306,6 +308,8 @@ export async function GET() {
             currentRows.push({
                 idLabel: row.oldId === null ? "—" : String(row.oldId),
                 name: getDisplayName(row),
+                lastName: row.lastName,
+                isMale: !!row.male,
                 pairName: row.pairPickId
                     ? (pairNameById.get(row.pairPickId) ?? "—")
                     : "",
@@ -326,22 +330,20 @@ export async function GET() {
             pageRowsBySessionCourt.set(key, currentRows)
         }
 
-        const genderOrder = (label: string) =>
-            label === "M" ? 0 : label === "NM" ? 1 : 2
-
         for (const [key, rows] of pageRowsBySessionCourt) {
             pageRowsBySessionCourt.set(
                 key,
                 [...rows].sort((a, b) => {
-                    if (a.hasBlankHistory !== b.hasBlankHistory) {
-                        return a.hasBlankHistory ? -1 : 1
-                    }
-                    if (a.hasBlankHistory) {
-                        return genderOrder(a.genderLabel) - genderOrder(b.genderLabel)
-                    }
-                    const gapA = config.seasonId - (a.lastSeasonId ?? config.seasonId)
-                    const gapB = config.seasonId - (b.lastSeasonId ?? config.seasonId)
-                    return gapB - gapA
+                    // New players (no draft history) before returning players
+                    const aNew = a.hasBlankHistory ? 0 : 1
+                    const bNew = b.hasBlankHistory ? 0 : 1
+                    if (aNew !== bNew) return aNew - bNew
+                    // Male players before non-male
+                    const aMale = a.isMale ? 0 : 1
+                    const bMale = b.isMale ? 0 : 1
+                    if (aMale !== bMale) return aMale - bMale
+                    // Alphabetical by last name
+                    return a.lastName.localeCompare(b.lastName)
                 })
             )
         }

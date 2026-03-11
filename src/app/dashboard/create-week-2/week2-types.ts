@@ -19,6 +19,7 @@ export interface Week2Candidate {
     pairWithName: string | null
     overallMostRecent: number | null
     placementScore: number
+    ratingScore: number | null
     seasonsPlayedCount: number
     captainDivisionId: number | null
     captainDivisionName: string | null

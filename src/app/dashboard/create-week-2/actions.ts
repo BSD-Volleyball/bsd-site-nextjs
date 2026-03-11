@@ -15,7 +15,7 @@ import {
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { fetchPlayerScores } from "@/lib/player-score"
+import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import type {
@@ -228,6 +228,15 @@ export async function getCreateWeek2Data(): Promise<{
 
         const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
+        const existingPlayerIds = userIds.filter((id) => draftsByUser.has(id))
+        const ratingScoreByUser =
+            existingPlayerIds.length > 0
+                ? await fetchRatingBasedScores(
+                      existingPlayerIds,
+                      config.seasonId
+                  )
+                : new Map<string, number>()
+
         const mutualPairMap = new Map<string, string>()
         const pairPickMap = new Map(
             signupRows
@@ -290,6 +299,7 @@ export async function getCreateWeek2Data(): Promise<{
                     : null,
                 overallMostRecent: mostRecent?.overall ?? null,
                 placementScore,
+                ratingScore: ratingScoreByUser.get(row.userId) ?? null,
                 seasonsPlayedCount: history.length,
                 captainDivisionId:
                     captainDivisionByUser.get(row.userId) || null,

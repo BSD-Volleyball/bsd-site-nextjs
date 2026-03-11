@@ -17,7 +17,7 @@ import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
-import { fetchPlayerScores } from "@/lib/player-score"
+import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 
 export interface Week2EditablePlayer {
     id: string
@@ -27,6 +27,7 @@ export interface Week2EditablePlayer {
     male: boolean | null
     hasPairPick: boolean
     placementScore: number
+    ratingScore: number | null
     lastDivisionName: string | null
     seasonsPlayedCount: number
 }
@@ -152,6 +153,17 @@ export async function getEditWeek2Data(): Promise<{
                 : Promise.resolve(new Map<string, number>())
         ])
 
+        const existingPlayerIds = userIds.filter((id) =>
+            draftRows.some((r) => r.userId === id)
+        )
+        const ratingScoreByUser =
+            existingPlayerIds.length > 0
+                ? await fetchRatingBasedScores(
+                      existingPlayerIds,
+                      config.seasonId
+                  )
+                : new Map<string, number>()
+
         const lastDivisionByUser = new Map<string, string>()
         const seasonsCountByUser = new Map<string, Set<number>>()
         for (const row of draftRows) {
@@ -175,9 +187,9 @@ export async function getEditWeek2Data(): Promise<{
                 male: player.male,
                 hasPairPick: !!player.pairPick,
                 placementScore: scoreByUser.get(player.id) ?? 200,
+                ratingScore: ratingScoreByUser.get(player.id) ?? null,
                 lastDivisionName: lastDivisionByUser.get(player.id) ?? null,
-                seasonsPlayedCount:
-                    seasonsCountByUser.get(player.id)?.size ?? 0
+                seasonsPlayedCount: seasonsCountByUser.get(player.id)?.size ?? 0
             })),
             slots: rosterSlots
         }
@@ -266,10 +278,7 @@ export async function updateWeek2Rosters(
         for (const slot of filledSlots) {
             if (slot.isCaptain) {
                 const expectedDivision = captainDivisionByUser.get(slot.userId)
-                if (
-                    !expectedDivision ||
-                    expectedDivision !== slot.divisionId
-                ) {
+                if (!expectedDivision || expectedDivision !== slot.divisionId) {
                     const slotDivisionName =
                         divisionNameById.get(slot.divisionId) ??
                         `Division ${slot.divisionId}`
