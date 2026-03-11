@@ -51,6 +51,8 @@ export default async function RatePlayerPage() {
             <RatePlayerClient
                 players={result.players}
                 tryout1Sessions={result.tryout1Sessions}
+                tryout2Divisions={result.tryout2Divisions}
+                tryout3Divisions={result.tryout3Divisions}
                 initialRatings={result.ratingsByPlayer}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />

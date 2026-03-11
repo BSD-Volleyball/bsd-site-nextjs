@@ -457,12 +457,8 @@ export async function GET() {
                             homeTeam: matchup.homeTeam,
                             awayTeam: matchup.awayTeam
                         },
-                        homeRows: [...homeRows].sort((a, b) =>
-                            a.name.localeCompare(b.name)
-                        ),
-                        awayRows: [...awayRows].sort((a, b) =>
-                            a.name.localeCompare(b.name)
-                        )
+                        homeRows: [...homeRows],
+                        awayRows: [...awayRows]
                     })
                 }
 
