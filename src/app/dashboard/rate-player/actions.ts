@@ -8,7 +8,9 @@ import {
     signups,
     teams,
     users,
-    week1Rosters
+    week1Rosters,
+    week2Rosters,
+    week3Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -47,6 +49,16 @@ export interface TryoutCourt {
 export interface TryoutSessionGroup {
     sessionNumber: number
     courts: TryoutCourt[]
+}
+
+export interface TryoutTeam {
+    teamNumber: number
+    players: RatePlayerEntry[]
+}
+
+export interface TryoutDivisionGroup {
+    divisionName: string
+    teams: TryoutTeam[]
 }
 
 export type RatingSkill =
@@ -94,6 +106,56 @@ function sortPlayers(
     if (aMale !== bMale) return aMale - bMale
     // Alphabetical by last name
     return a.lastName.localeCompare(b.lastName)
+}
+
+function buildDivisionGroups(
+    rosterRows: Array<{
+        userId: string
+        divisionName: string
+        divisionLevel: number
+        teamNumber: number
+    }>,
+    playersById: Map<string, RatePlayerEntry>,
+    lastDivisionByPlayerId: Map<string, string>
+): TryoutDivisionGroup[] {
+    const divisionMap = new Map<
+        string,
+        { level: number; teams: Map<number, RatePlayerEntry[]> }
+    >()
+
+    for (const row of rosterRows) {
+        const player = playersById.get(row.userId)
+        if (!player) continue
+
+        if (!divisionMap.has(row.divisionName)) {
+            divisionMap.set(row.divisionName, {
+                level: row.divisionLevel,
+                teams: new Map()
+            })
+        }
+
+        const divEntry = divisionMap.get(row.divisionName)!
+        if (!divEntry.teams.has(row.teamNumber)) {
+            divEntry.teams.set(row.teamNumber, [])
+        }
+        divEntry.teams.get(row.teamNumber)!.push(player)
+    }
+
+    return [...divisionMap.entries()]
+        .sort((a, b) => a[1].level - b[1].level)
+        .map(([divisionName, { teams }]) => ({
+            divisionName,
+            teams: [...teams.entries()]
+                .sort((a, b) => a[0] - b[0])
+                .map(([teamNumber, players]) => ({
+                    teamNumber,
+                    players: [...players].sort((a, b) =>
+                        sortPlayers(a, b, (p) =>
+                            lastDivisionByPlayerId.has(p.id)
+                        )
+                    )
+                }))
+        }))
 }
 
 function toNullableRating(value: number): number | null {
@@ -188,6 +250,8 @@ export async function getRatePlayerData(): Promise<{
     seasonLabel: string
     players: RatePlayerEntry[]
     tryout1Sessions: TryoutSessionGroup[]
+    tryout2Divisions: TryoutDivisionGroup[]
+    tryout3Divisions: TryoutDivisionGroup[]
     ratingsByPlayer: Record<string, PlayerRatingValues>
 }> {
     const hasAccess = await hasCaptainPagesAccessBySession()
@@ -198,6 +262,8 @@ export async function getRatePlayerData(): Promise<{
             seasonLabel: "",
             players: [],
             tryout1Sessions: [],
+            tryout2Divisions: [],
+            tryout3Divisions: [],
             ratingsByPlayer: {}
         }
     }
@@ -210,6 +276,8 @@ export async function getRatePlayerData(): Promise<{
             seasonLabel: "",
             players: [],
             tryout1Sessions: [],
+            tryout2Divisions: [],
+            tryout3Divisions: [],
             ratingsByPlayer: {}
         }
     }
@@ -223,6 +291,8 @@ export async function getRatePlayerData(): Promise<{
                 seasonLabel: "",
                 players: [],
                 tryout1Sessions: [],
+                tryout2Divisions: [],
+                tryout3Divisions: [],
                 ratingsByPlayer: {}
             }
         }
@@ -253,6 +323,8 @@ export async function getRatePlayerData(): Promise<{
                 seasonLabel,
                 players: [],
                 tryout1Sessions: [],
+                tryout2Divisions: [],
+                tryout3Divisions: [],
                 ratingsByPlayer: {}
             }
         }
@@ -398,11 +470,49 @@ export async function getRatePlayerData(): Promise<{
                 }))
             }))
 
+        const [week2RosterRows, week3RosterRows] = await Promise.all([
+            db
+                .select({
+                    userId: week2Rosters.user,
+                    divisionName: divisions.name,
+                    divisionLevel: divisions.level,
+                    teamNumber: week2Rosters.team_number
+                })
+                .from(week2Rosters)
+                .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
+                .where(eq(week2Rosters.season, config.seasonId))
+                .orderBy(divisions.level, week2Rosters.team_number),
+            db
+                .select({
+                    userId: week3Rosters.user,
+                    divisionName: divisions.name,
+                    divisionLevel: divisions.level,
+                    teamNumber: week3Rosters.team_number
+                })
+                .from(week3Rosters)
+                .innerJoin(divisions, eq(week3Rosters.division, divisions.id))
+                .where(eq(week3Rosters.season, config.seasonId))
+                .orderBy(divisions.level, week3Rosters.team_number)
+        ])
+
+        const tryout2Divisions = buildDivisionGroups(
+            week2RosterRows,
+            playersById,
+            lastDivisionByPlayerId
+        )
+        const tryout3Divisions = buildDivisionGroups(
+            week3RosterRows,
+            playersById,
+            lastDivisionByPlayerId
+        )
+
         return {
             status: true,
             seasonLabel,
             players,
             tryout1Sessions,
+            tryout2Divisions,
+            tryout3Divisions,
             ratingsByPlayer
         }
     } catch (error) {
@@ -413,6 +523,8 @@ export async function getRatePlayerData(): Promise<{
             seasonLabel: "",
             players: [],
             tryout1Sessions: [],
+            tryout2Divisions: [],
+            tryout3Divisions: [],
             ratingsByPlayer: {}
         }
     }

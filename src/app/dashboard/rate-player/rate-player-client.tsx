@@ -33,12 +33,15 @@ import {
     type PlayerRatingValues,
     type RatePlayerEntry,
     type RatingSkill,
+    type TryoutDivisionGroup,
     type TryoutSessionGroup
 } from "./actions"
 
 interface RatePlayerClientProps {
     players: RatePlayerEntry[]
     tryout1Sessions: TryoutSessionGroup[]
+    tryout2Divisions: TryoutDivisionGroup[]
+    tryout3Divisions: TryoutDivisionGroup[]
     initialRatings: Record<string, PlayerRatingValues>
     playerPicUrl: string
 }
@@ -215,6 +218,8 @@ function SkillSlider({
 export function RatePlayerClient({
     players,
     tryout1Sessions,
+    tryout2Divisions,
+    tryout3Divisions,
     initialRatings,
     playerPicUrl
 }: RatePlayerClientProps) {
@@ -307,15 +312,37 @@ export function RatePlayerClient({
         []
     )
 
-    useEffect(() => {
-        if (
-            lookupType === "tryout1" &&
-            tryoutSessionValue === "none" &&
-            tryout1Sessions.length > 0
-        ) {
-            setTryoutSessionValue(String(tryout1Sessions[0].sessionNumber))
+    const activeGroupOptions = useMemo(() => {
+        if (lookupType === "tryout1") {
+            return tryout1Sessions.map((s) => ({
+                value: String(s.sessionNumber),
+                label: `Session ${s.sessionNumber}`
+            }))
         }
-    }, [lookupType, tryoutSessionValue, tryout1Sessions])
+        if (lookupType === "tryout2") {
+            return tryout2Divisions.map((d) => ({
+                value: d.divisionName,
+                label: d.divisionName
+            }))
+        }
+        if (lookupType === "tryout3") {
+            return tryout3Divisions.map((d) => ({
+                value: d.divisionName,
+                label: d.divisionName
+            }))
+        }
+        return []
+    }, [lookupType, tryout1Sessions, tryout2Divisions, tryout3Divisions])
+
+    useEffect(() => {
+        if (lookupType === "direct") return
+        const validValues = new Set(activeGroupOptions.map((o) => o.value))
+        if (!validValues.has(tryoutSessionValue)) {
+            setTryoutSessionValue(
+                activeGroupOptions.length > 0 ? activeGroupOptions[0].value : "none"
+            )
+        }
+    }, [lookupType, activeGroupOptions, tryoutSessionValue])
 
     const filteredPlayers = useMemo(() => {
         if (!search.trim()) {
@@ -352,6 +379,24 @@ export function RatePlayerClient({
             ) || null,
         [tryout1Sessions, tryoutSessionValue]
     )
+
+    const selectedTryoutDivision = useMemo(() => {
+        if (lookupType === "tryout2") {
+            return (
+                tryout2Divisions.find(
+                    (d) => d.divisionName === tryoutSessionValue
+                ) || null
+            )
+        }
+        if (lookupType === "tryout3") {
+            return (
+                tryout3Divisions.find(
+                    (d) => d.divisionName === tryoutSessionValue
+                ) || null
+            )
+        }
+        return null
+    }, [lookupType, tryout2Divisions, tryout3Divisions, tryoutSessionValue])
 
     const openRateDialog = (player: RatePlayerEntry) => {
         const rating = ratingsByPlayer[player.id] || getEmptyRating()
@@ -515,28 +560,28 @@ export function RatePlayerClient({
 
                 {lookupType !== "direct" && (
                     <div className="space-y-2">
-                        <Label htmlFor="session_number">Session</Label>
+                        <Label htmlFor="session_number">
+                            {lookupType === "tryout1" ? "Session" : "Division"}
+                        </Label>
                         <Select
                             value={tryoutSessionValue}
                             onValueChange={setTryoutSessionValue}
                         >
                             <SelectTrigger id="session_number">
-                                <SelectValue placeholder="Select session" />
+                                <SelectValue placeholder="Select..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {tryout1Sessions.length === 0 ? (
+                                {activeGroupOptions.length === 0 ? (
                                     <SelectItem value="none" disabled>
-                                        No sessions available
+                                        No data available
                                     </SelectItem>
                                 ) : (
-                                    tryout1Sessions.map((session) => (
+                                    activeGroupOptions.map((option) => (
                                         <SelectItem
-                                            key={session.sessionNumber}
-                                            value={String(
-                                                session.sessionNumber
-                                            )}
+                                            key={option.value}
+                                            value={option.value}
                                         >
-                                            Session {session.sessionNumber}
+                                            {option.label}
                                         </SelectItem>
                                     ))
                                 )}
@@ -603,15 +648,44 @@ export function RatePlayerClient({
                 </div>
             )}
 
-            {lookupType === "tryout2" && (
-                <div className="rounded-md border bg-muted/50 p-5 text-muted-foreground text-sm">
-                    Tryout 2 lookup is a placeholder for now.
-                </div>
-            )}
+            {(lookupType === "tryout2" || lookupType === "tryout3") && (
+                <div className="space-y-3">
+                    {!selectedTryoutDivision ? (
+                        <div className="rounded-md border bg-muted/50 p-5 text-muted-foreground text-sm">
+                            No{" "}
+                            {lookupType === "tryout2" ? "Tryout 2" : "Tryout 3"}{" "}
+                            division data found for the active season.
+                        </div>
+                    ) : (
+                        <Accordion type="multiple" className="w-full">
+                            {selectedTryoutDivision.teams.map((team) => {
+                                const filteredTeamPlayers =
+                                    team.players.filter((player) =>
+                                        filteredPlayerIds.has(player.id)
+                                    )
 
-            {lookupType === "tryout3" && (
-                <div className="rounded-md border bg-muted/50 p-5 text-muted-foreground text-sm">
-                    Tryout 3 lookup is a placeholder for now.
+                                return (
+                                    <AccordionItem
+                                        key={team.teamNumber}
+                                        value={`team-${team.teamNumber}`}
+                                    >
+                                        <AccordionTrigger>
+                                            <span>
+                                                Team {team.teamNumber} (
+                                                {filteredTeamPlayers.length})
+                                            </span>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <PlayerTable
+                                                players={filteredTeamPlayers}
+                                                onRate={openRateDialog}
+                                            />
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )
+                            })}
+                        </Accordion>
+                    )}
                 </div>
             )}
 
