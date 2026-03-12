@@ -176,7 +176,9 @@ function SkillSlider({
         <div className="space-y-1">
             <div className="flex items-center justify-between">
                 <Label>{label}</Label>
-                <span className="font-semibold text-sm">{value.toFixed(1)}</span>
+                <span className="font-semibold text-sm">
+                    {value.toFixed(1)}
+                </span>
             </div>
             <input
                 type="range"
@@ -339,7 +341,9 @@ export function RatePlayerClient({
         const validValues = new Set(activeGroupOptions.map((o) => o.value))
         if (!validValues.has(tryoutSessionValue)) {
             setTryoutSessionValue(
-                activeGroupOptions.length > 0 ? activeGroupOptions[0].value : "none"
+                activeGroupOptions.length > 0
+                    ? activeGroupOptions[0].value
+                    : "none"
             )
         }
     }, [lookupType, activeGroupOptions, tryoutSessionValue])
@@ -492,11 +496,7 @@ export function RatePlayerClient({
                     serving
                 }),
                 savePlayerRatingNote(selectedPlayer.id, "shared", sharedNotes),
-                savePlayerRatingNote(
-                    selectedPlayer.id,
-                    "private",
-                    privateNotes
-                )
+                savePlayerRatingNote(selectedPlayer.id, "private", privateNotes)
             ])
 
         setIsSaving(false)
@@ -523,8 +523,15 @@ export function RatePlayerClient({
             })
         }
 
-        if (skillResult.status && sharedNoteResult.status && privateNoteResult.status) {
-            setModalMessage({ type: "success", text: "All ratings and notes saved." })
+        if (
+            skillResult.status &&
+            sharedNoteResult.status &&
+            privateNoteResult.status
+        ) {
+            setModalMessage({
+                type: "success",
+                text: "All ratings and notes saved."
+            })
             return
         }
 
@@ -659,10 +666,9 @@ export function RatePlayerClient({
                     ) : (
                         <Accordion type="multiple" className="w-full">
                             {selectedTryoutDivision.teams.map((team) => {
-                                const filteredTeamPlayers =
-                                    team.players.filter((player) =>
-                                        filteredPlayerIds.has(player.id)
-                                    )
+                                const filteredTeamPlayers = team.players.filter(
+                                    (player) => filteredPlayerIds.has(player.id)
+                                )
 
                                 return (
                                     <AccordionItem

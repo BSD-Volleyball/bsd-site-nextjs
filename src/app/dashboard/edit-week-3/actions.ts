@@ -209,10 +209,7 @@ export async function updateWeek3Rosters(
         for (const slot of filledSlots) {
             if (slot.isCaptain) {
                 const expectedDivision = captainDivisionByUser.get(slot.userId)
-                if (
-                    !expectedDivision ||
-                    expectedDivision !== slot.divisionId
-                ) {
+                if (!expectedDivision || expectedDivision !== slot.divisionId) {
                     return {
                         status: false,
                         message:

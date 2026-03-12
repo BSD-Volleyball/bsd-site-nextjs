@@ -223,29 +223,30 @@ export default async function PreseasonWeek2Page() {
                         &quot;Automated&quot; Draft
                     </h2>
                     <p className="text-sm">
-                        The league has conducted an &quot;automated&quot; draft into
-                        regular divisions. Returning players were mostly placed in the
-                        division they recently played in. New players were
-                        placed in divisions based on feedback from the Captains
-                        after Preseason Week 1. The league may have made some
-                        limited adjustments to accommodate Pair Requests and fill in
-                        roster gaps where necessary.
+                        The league has conducted an &quot;automated&quot; draft
+                        into regular divisions. Returning players were mostly
+                        placed in the division they recently played in. New
+                        players were placed in divisions based on feedback from
+                        the Captains after Preseason Week 1. The league may have
+                        made some limited adjustments to accommodate Pair
+                        Requests and fill in roster gaps where necessary.
                     </p>
                     <p className="text-sm">
-                        Each team will play one match with no refs and capped at 50
-                        minutes. Captains at all levels will be invited to observe
-                        the matches when their teams are not playing. There will be
-                        a new roster of preseason teams next week with over 40% of
-                        players moving into new divisions (half moving up and half
-                        moving down) based on feedback from the Captains.
+                        Each team will play one match with no refs and capped at
+                        50 minutes. Captains at all levels will be invited to
+                        observe the matches when their teams are not playing.
+                        There will be a new roster of preseason teams next week
+                        with over 40% of players moving into new divisions (half
+                        moving up and half moving down) based on feedback from
+                        the Captains.
                     </p>
                     <p className="text-sm">
                         All registered players will be placed on the roster for
                         Preseason Week 3.
                     </p>
                     <p className="font-semibold text-sm">
-                        Players marked with an asterisk (*) are scheduled for two
-                        matches.
+                        Players marked with an asterisk (*) are scheduled for
+                        two matches.
                     </p>
                 </div>
 
@@ -300,12 +301,21 @@ export default async function PreseasonWeek2Page() {
                                                     <li
                                                         key={`${player.userId}-${division.divisionId}-${team.teamNumber}`}
                                                         className={
-                                                            player.userId === session.user.id
+                                                            player.userId ===
+                                                            session.user.id
                                                                 ? "rounded-sm bg-primary/15 px-2 py-1 font-semibold ring-1 ring-primary/50"
                                                                 : "rounded-sm bg-background px-2 py-1"
                                                         }
                                                     >
-                                                        {player.displayName}{player.hasAsterisk && <> <strong>*</strong></>}
+                                                        {player.displayName}
+                                                        {player.hasAsterisk && (
+                                                            <>
+                                                                {" "}
+                                                                <strong>
+                                                                    *
+                                                                </strong>
+                                                            </>
+                                                        )}
                                                     </li>
                                                 ))}
                                             </ol>
@@ -330,22 +340,30 @@ export default async function PreseasonWeek2Page() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {scheduleRows.map((scheduleRow) => (
-                                                    <tr
-                                                        key={`${division.divisionId}-${scheduleRow.matchLabel}`}
-                                                        className="border-t"
-                                                    >
-                                                        <td className="px-3 py-2">
-                                                            {scheduleRow.time}
-                                                        </td>
-                                                        <td className="px-3 py-2">
-                                                            {scheduleRow.courtNumber}
-                                                        </td>
-                                                        <td className="px-3 py-2">
-                                                            {scheduleRow.matchLabel}
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                {scheduleRows.map(
+                                                    (scheduleRow) => (
+                                                        <tr
+                                                            key={`${division.divisionId}-${scheduleRow.matchLabel}`}
+                                                            className="border-t"
+                                                        >
+                                                            <td className="px-3 py-2">
+                                                                {
+                                                                    scheduleRow.time
+                                                                }
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                {
+                                                                    scheduleRow.courtNumber
+                                                                }
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                {
+                                                                    scheduleRow.matchLabel
+                                                                }
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -393,7 +411,10 @@ export default async function PreseasonWeek2Page() {
                     )
 
                     return (
-                        <div key={`print-${division.divisionId}`} className="pw2-page">
+                        <div
+                            key={`print-${division.divisionId}`}
+                            className="pw2-page"
+                        >
                             <div className="pw2-header">
                                 <div className="pw2-title">
                                     {seasonLabel} Pre-Season Week 2
@@ -407,14 +428,21 @@ export default async function PreseasonWeek2Page() {
                                 {division.divisionName} Division
                             </div>
 
-                            <div className={maxTeamNumber >= 5 ? "pw2-teams-3col" : "pw2-teams-2col"}>
+                            <div
+                                className={
+                                    maxTeamNumber >= 5
+                                        ? "pw2-teams-3col"
+                                        : "pw2-teams-2col"
+                                }
+                            >
                                 {division.teams.map((team) => (
                                     <div
                                         key={`print-${division.divisionId}-${team.teamNumber}`}
                                         className="pw2-team"
                                     >
                                         <div className="pw2-team-name">
-                                            Team {division.divisionName}-{team.teamNumber}
+                                            Team {division.divisionName}-
+                                            {team.teamNumber}
                                         </div>
                                         <ol style={{ margin: 0, padding: 0 }}>
                                             {team.players.map((player) => (
@@ -422,7 +450,8 @@ export default async function PreseasonWeek2Page() {
                                                     key={`print-${player.userId}-${division.divisionId}-${team.teamNumber}`}
                                                     className="pw2-player"
                                                 >
-                                                    {player.displayName}{player.hasAsterisk && " *"}
+                                                    {player.displayName}
+                                                    {player.hasAsterisk && " *"}
                                                 </li>
                                             ))}
                                         </ol>
@@ -432,7 +461,9 @@ export default async function PreseasonWeek2Page() {
 
                             {scheduleRows.length > 0 && (
                                 <div>
-                                    <div className="pw2-schedule-title">Schedule</div>
+                                    <div className="pw2-schedule-title">
+                                        Schedule
+                                    </div>
                                     <table className="pw2-schedule">
                                         <thead>
                                             <tr>
@@ -443,10 +474,18 @@ export default async function PreseasonWeek2Page() {
                                         </thead>
                                         <tbody>
                                             {scheduleRows.map((scheduleRow) => (
-                                                <tr key={`print-${division.divisionId}-${scheduleRow.matchLabel}`}>
+                                                <tr
+                                                    key={`print-${division.divisionId}-${scheduleRow.matchLabel}`}
+                                                >
                                                     <td>{scheduleRow.time}</td>
-                                                    <td>{scheduleRow.courtNumber}</td>
-                                                    <td>{scheduleRow.matchLabel}</td>
+                                                    <td>
+                                                        {
+                                                            scheduleRow.courtNumber
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        {scheduleRow.matchLabel}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>

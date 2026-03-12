@@ -110,11 +110,11 @@ export default function ConductCommitteeFAQPage() {
                         determines appropriate next steps, which may include a
                         private conversation with the individuals involved, a
                         formal warning, suspension, or removal from the league.
-                        Because reports can be anonymous, the committee
-                        may not be able to follow up with reporters directly
-                        unless they provide contact information. All reports are
-                        documented and taken seriously, even if immediate action
-                        isn&apos;t visible.
+                        Because reports can be anonymous, the committee may not
+                        be able to follow up with reporters directly unless they
+                        provide contact information. All reports are documented
+                        and taken seriously, even if immediate action isn&apos;t
+                        visible.
                     </p>
                 </section>
 
@@ -170,8 +170,8 @@ export default function ConductCommitteeFAQPage() {
                         />
                     </div>
                     <p className="mt-4 text-muted-foreground text-sm leading-relaxed">
-                        The Spring 2026 BSD Conduct Committee: Jacob Aley,
-                        Alice Hung, and Jessie Jamieson (Director)
+                        The Spring 2026 BSD Conduct Committee: Jacob Aley, Alice
+                        Hung, and Jessie Jamieson (Director)
                     </p>
                 </section>
             </div>

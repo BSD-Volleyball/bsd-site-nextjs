@@ -53,7 +53,8 @@ export default async function DraftHomeworkPage() {
                         each round of th edraft.
                     </li>
                     <li>
-                        Each round has {result.data.numTeams} slots.  Order within a round does not matter.
+                        Each round has {result.data.numTeams} slots. Order
+                        within a round does not matter.
                     </li>
                     <li>
                         Use the <strong>Considering</strong> group at the bottom

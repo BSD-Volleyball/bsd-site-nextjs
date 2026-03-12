@@ -186,7 +186,11 @@ function PlayerCombobox({
     )
 }
 
-export function EditWeek3Form({ players, slots, playerPicUrl }: EditWeek3FormProps) {
+export function EditWeek3Form({
+    players,
+    slots,
+    playerPicUrl
+}: EditWeek3FormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -211,7 +215,9 @@ export function EditWeek3Form({ players, slots, playerPicUrl }: EditWeek3FormPro
                 counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
             }
         }
-        return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id))
+        return new Set(
+            [...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id)
+        )
     }, [slotAssignments])
 
     const groupedSlots = useMemo(() => {
@@ -343,11 +349,15 @@ export function EditWeek3Form({ players, slots, playerPicUrl }: EditWeek3FormPro
                                                                 slot.isCaptain
                                                             }
                                                         />
-                                                        {slot.userId && duplicateUserIds.has(slot.userId) && (
-                                                            <p className="text-amber-600 text-xs dark:text-amber-400">
-                                                                Playing twice
-                                                            </p>
-                                                        )}
+                                                        {slot.userId &&
+                                                            duplicateUserIds.has(
+                                                                slot.userId
+                                                            ) && (
+                                                                <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                                    Playing
+                                                                    twice
+                                                                </p>
+                                                            )}
                                                     </div>
                                                     {slot.userId && (
                                                         <Button

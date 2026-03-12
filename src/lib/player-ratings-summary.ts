@@ -104,7 +104,7 @@ export async function getPlayerRatingsSectionData(
     }
 
     const viewerRow = viewerUserId
-        ? ratingRows.find((row) => row.evaluatorId === viewerUserId) ?? null
+        ? (ratingRows.find((row) => row.evaluatorId === viewerUserId) ?? null)
         : null
 
     const viewerRating: PlayerViewerRating | null = viewerRow

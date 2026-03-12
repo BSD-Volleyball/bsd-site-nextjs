@@ -378,8 +378,8 @@ function RegistrationConfirmation({
                         {signupStatus.signup!.captain === "yes"
                             ? "Yes"
                             : signupStatus.signup!.captain === "only_if_needed"
-                                ? "Only if needed"
-                                : "No"}
+                              ? "Only if needed"
+                              : "No"}
                     </span>
                 </div>
 
@@ -549,8 +549,15 @@ export default async function DashboardPage() {
     let adminCaptainStatuses: CaptainSelectionDivisionStatus[] = []
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
-    let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null = null
-    let userWeek2Roster: { divisionName: string; teamNumber: number; captainName: string | null; courtNumber: number; sessionTime: string } | null = null
+    let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
+        null
+    let userWeek2Roster: {
+        divisionName: string
+        teamNumber: number
+        captainName: string | null
+        courtNumber: number
+        sessionTime: string
+    } | null = null
     let assignedActiveConcernsCount = 0
 
     if (session?.user) {
@@ -614,7 +621,10 @@ export default async function DashboardPage() {
                     .from(week1Rosters)
                     .where(
                         and(
-                            eq(week1Rosters.season, signupStatus.config.seasonId),
+                            eq(
+                                week1Rosters.season,
+                                signupStatus.config.seasonId
+                            ),
                             eq(week1Rosters.user, session.user.id)
                         )
                     )
@@ -646,7 +656,10 @@ export default async function DashboardPage() {
                     )
                     .where(
                         and(
-                            eq(week2Rosters.season, signupStatus.config.seasonId),
+                            eq(
+                                week2Rosters.season,
+                                signupStatus.config.seasonId
+                            ),
                             eq(week2Rosters.user, session.user.id)
                         )
                     )
@@ -654,7 +667,12 @@ export default async function DashboardPage() {
 
                 if (myWeek2Slot) {
                     const legacyCourtByDivision: Record<string, number> = {
-                        AA: 1, A: 2, ABA: 3, ABB: 4, BB: 7, BBB: 8
+                        AA: 1,
+                        A: 2,
+                        ABA: 3,
+                        ABB: 4,
+                        BB: 7,
+                        BBB: 8
                     }
 
                     const [[captainRow], week2Divisions] = await Promise.all([
@@ -668,18 +686,38 @@ export default async function DashboardPage() {
                             .innerJoin(users, eq(week2Rosters.user, users.id))
                             .where(
                                 and(
-                                    eq(week2Rosters.season, signupStatus.config.seasonId),
-                                    eq(week2Rosters.division, myWeek2Slot.divisionId),
-                                    eq(week2Rosters.team_number, myWeek2Slot.teamNumber),
+                                    eq(
+                                        week2Rosters.season,
+                                        signupStatus.config.seasonId
+                                    ),
+                                    eq(
+                                        week2Rosters.division,
+                                        myWeek2Slot.divisionId
+                                    ),
+                                    eq(
+                                        week2Rosters.team_number,
+                                        myWeek2Slot.teamNumber
+                                    ),
                                     eq(week2Rosters.is_captain, true)
                                 )
                             )
                             .limit(1),
                         db
-                            .selectDistinct({ id: divisions.id, level: divisions.level })
+                            .selectDistinct({
+                                id: divisions.id,
+                                level: divisions.level
+                            })
                             .from(week2Rosters)
-                            .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-                            .where(eq(week2Rosters.season, signupStatus.config.seasonId))
+                            .innerJoin(
+                                divisions,
+                                eq(week2Rosters.division, divisions.id)
+                            )
+                            .where(
+                                eq(
+                                    week2Rosters.season,
+                                    signupStatus.config.seasonId
+                                )
+                            )
                             .orderBy(divisions.level)
                     ])
 
@@ -695,7 +733,9 @@ export default async function DashboardPage() {
                         signupStatus.config.tryout2Session2Time,
                         signupStatus.config.tryout2Session3Time
                     ]
-                    const matchupIndex = Math.floor((myWeek2Slot.teamNumber - 1) / 2)
+                    const matchupIndex = Math.floor(
+                        (myWeek2Slot.teamNumber - 1) / 2
+                    )
                     const sessionTime = sessionTimes[matchupIndex] || "TBD"
 
                     const captainName = captainRow
@@ -1054,44 +1094,57 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-orange-700 text-sm dark:text-orange-300">
-                                You have been assigned a spot in the Pre-Season Week 2 tryout.
+                                You have been assigned a spot in the Pre-Season
+                                Week 2 tryout.
                             </p>
-                            <div className="rounded-md bg-orange-100 p-3 dark:bg-orange-900 space-y-1.5 text-sm">
+                            <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
                                 {signupStatus.config.tryout2Date && (
                                     <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">Date:</span>
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Date:
+                                        </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
                                             {signupStatus.config.tryout2Date}
                                         </span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Time:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Time:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         {userWeek2Roster.sessionTime}
                                     </span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Court:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Court:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         Court {userWeek2Roster.courtNumber}
                                     </span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Division:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Division:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         {userWeek2Roster.divisionName}
                                     </span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Team:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Team:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         Team {userWeek2Roster.teamNumber}
                                     </span>
                                 </div>
                                 {userWeek2Roster.captainName && (
                                     <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">Captain:</span>
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Captain:
+                                        </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
                                             {userWeek2Roster.captainName}
                                         </span>
@@ -1123,19 +1176,24 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-orange-700 text-sm dark:text-orange-300">
-                                You have been assigned a spot in the Pre-Season Week 1 tryout.
+                                You have been assigned a spot in the Pre-Season
+                                Week 1 tryout.
                             </p>
-                            <div className="rounded-md bg-orange-100 p-3 dark:bg-orange-900 space-y-1.5 text-sm">
+                            <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
                                 {signupStatus.config.tryout1Date && (
                                     <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">Date:</span>
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Date:
+                                        </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
                                             {signupStatus.config.tryout1Date}
                                         </span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Session:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Session:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         {userWeek1Roster.sessionNumber === 3
                                             ? "Alternate"
@@ -1144,18 +1202,24 @@ export default async function DashboardPage() {
                                 </div>
                                 {userWeek1Roster.sessionNumber !== 3 && (
                                     <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">Court:</span>
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Court:
+                                        </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
                                             Court {userWeek1Roster.courtNumber}
                                         </span>
                                     </div>
                                 )}
                                 <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">Time:</span>
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Time:
+                                    </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
                                         {userWeek1Roster.sessionNumber === 1
-                                            ? signupStatus.config.tryout1Session1Time || "TBD"
-                                            : signupStatus.config.tryout1Session2Time || "TBD"}
+                                            ? signupStatus.config
+                                                  .tryout1Session1Time || "TBD"
+                                            : signupStatus.config
+                                                  .tryout1Session2Time || "TBD"}
                                     </span>
                                 </div>
                             </div>
@@ -1290,7 +1354,10 @@ export default async function DashboardPage() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-sm text-violet-700 dark:text-violet-300">
-                                Please take time to rate players on the Rate Player page. Your ratings help place playeres in the appropriate groups for the remaining tryouts.
+                                Please take time to rate players on the Rate
+                                Player page. Your ratings help place playeres in
+                                the appropriate groups for the remaining
+                                tryouts.
                             </p>
                             <Link
                                 href="/dashboard/rate-player"
@@ -1331,13 +1398,13 @@ export default async function DashboardPage() {
                                 )}
                                 {signupStatus.config.phase ===
                                     "registration_open" && (
-                                        <Link
-                                            href="/dashboard/pay-season"
-                                            className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
-                                        >
-                                            Use Discount Now
-                                        </Link>
-                                    )}
+                                    <Link
+                                        href="/dashboard/pay-season"
+                                        className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
+                                    >
+                                        Use Discount Now
+                                    </Link>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -1359,14 +1426,14 @@ export default async function DashboardPage() {
                                     Check back soon for the next season!
                                 </p>
                             ) : signupStatus.config.phase ===
-                                "registration_open" ? (
+                              "registration_open" ? (
                                 /* Registration phase: signup confirmation, waitlist, or signup CTA */
                                 signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
                                     />
                                 ) : signupStatus.seasonFull &&
-                                    signupStatus.season ? (
+                                  signupStatus.season ? (
                                     <WaitlistContent
                                         signupStatus={signupStatus}
                                         seasonLabel={seasonLabel}
@@ -1379,14 +1446,14 @@ export default async function DashboardPage() {
                                     />
                                 )
                             ) : signupStatus.config.phase ===
-                                "select_commissioners" ||
-                                signupStatus.config.phase === "select_captains" ||
-                                signupStatus.config.phase ===
-                                "prep_tryout_week_1" ||
-                                signupStatus.config.phase ===
-                                "prep_tryout_week_2" ||
-                                signupStatus.config.phase ===
-                                "prep_tryout_week_3" ? (
+                                  "select_commissioners" ||
+                              signupStatus.config.phase === "select_captains" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_1" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_2" ||
+                              signupStatus.config.phase ===
+                                  "prep_tryout_week_3" ? (
                                 signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
@@ -1458,7 +1525,7 @@ export default async function DashboardPage() {
                                     </p>
                                 </div>
                             ) : signupStatus.config.phase ===
-                                "regular_season" ? (
+                              "regular_season" ? (
                                 <div className="space-y-3">
                                     <p className="font-medium text-sm">
                                         Regular season is underway!

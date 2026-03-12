@@ -35,7 +35,7 @@ function formatRatingValue(value: number | null): string {
 export function PlayerRatingsSection({
     ratingAverages,
     sharedRatingNotes,
-    privateRatingNotes,
+    privateRatingNotes: _privateRatingNotes,
     viewerRating = null
 }: PlayerRatingsSectionProps) {
     const hasAnyAverage =
@@ -124,7 +124,6 @@ export function PlayerRatingsSection({
                 )}
             </div>
 
-
             {viewerRating && (
                 <div className="mt-4 space-y-2 rounded-md border p-3">
                     <p className="font-semibold text-sm">
@@ -180,7 +179,9 @@ export function PlayerRatingsSection({
                             <p className="font-semibold text-sm">
                                 Your Private Note
                             </p>
-                            <p className="text-sm">{viewerRating.privateNote}</p>
+                            <p className="text-sm">
+                                {viewerRating.privateNote}
+                            </p>
                         </div>
                     )}
                 </div>
