@@ -17,9 +17,14 @@ import { logAuditEntry } from "@/lib/audit-log"
 
 export const runtime = "nodejs"
 
-interface NametagRow {
-    sessionNumber: number
+interface CourtEntry {
     courtNumber: number
+    sessionNumber: number
+}
+
+interface NametagRow {
+    primarySessionNumber: number
+    courtEntries: CourtEntry[]
     oldId: number | null
     firstName: string
     lastName: string
@@ -222,7 +227,7 @@ function drawNametag({
     width,
     height,
     row,
-    sessionTime,
+    sessionTimes,
     initialsFont,
     idFont,
     detailsFont
@@ -233,7 +238,7 @@ function drawNametag({
     width: number
     height: number
     row: NametagRow
-    sessionTime: string
+    sessionTimes: Record<number, string>
     initialsFont: PDFFont
     idFont: PDFFont
     detailsFont: PDFFont
@@ -251,8 +256,13 @@ function drawNametag({
         fullName.length > 25
             ? `${normalizedLast.toUpperCase()}, ${normalizedFirst.charAt(0).toUpperCase()}.`
             : `${normalizedLast.toUpperCase()}, ${normalizedFirst.toUpperCase()}`
-    const courtLabel = `Court ${row.courtNumber}`
-    const sessionTimeLabel = sessionTime.trim()
+
+    const courtEntries = [...row.courtEntries]
+        .sort((a, b) => a.sessionNumber - b.sessionNumber)
+        .map((entry) => ({
+            courtLabel: `Court ${entry.courtNumber}`,
+            timeLabel: (sessionTimes[entry.sessionNumber] ?? "").trim()
+        }))
 
     const contentWidth = width - 20
     const centerX = x + width / 2
@@ -305,6 +315,10 @@ function drawNametag({
         fillColor: rgb(0.7, 0.7, 0.7)
     })
 
+    const entryLineSpacing = 22
+    // Shift the court/time block upward so additional entries don't overlap the ID number
+    const entryShiftUp = (courtEntries.length - 1) * 16
+
     if (missingPicture) {
         const headlineWidth = initialsFont.widthOfTextAtSize(
             headline,
@@ -312,7 +326,7 @@ function drawNametag({
         )
         const iconShiftX = 18
         const iconX = centerX + headlineWidth / 2 + 16 + iconShiftX
-        const iconY = initialsY + headlineSize * 0.42 - 6.5
+        const iconY = initialsY + headlineSize * 0.42 - 6.5 + entryShiftUp
         const iconStroke = rgb(0, 0, 0)
 
         page.drawRectangle({
@@ -341,26 +355,30 @@ function drawNametag({
             borderColor: iconStroke
         })
 
-        drawCenteredText({
-            page,
-            text: courtLabel,
-            centerX: iconX + 9,
-            y: iconY - 14,
-            size: 9,
-            font: detailsFont,
-            color: rgb(0.15, 0.15, 0.15)
-        })
-
-        if (sessionTimeLabel) {
+        const entryCenterX = iconX + 9
+        let entryY = iconY - 14
+        for (const { courtLabel, timeLabel } of courtEntries) {
             drawCenteredText({
                 page,
-                text: sessionTimeLabel,
-                centerX: iconX + 9,
-                y: iconY - 24,
-                size: 8,
+                text: courtLabel,
+                centerX: entryCenterX,
+                y: entryY,
+                size: 9,
                 font: detailsFont,
                 color: rgb(0.15, 0.15, 0.15)
             })
+            if (timeLabel) {
+                drawCenteredText({
+                    page,
+                    text: timeLabel,
+                    centerX: entryCenterX,
+                    y: entryY - 10,
+                    size: 8,
+                    font: detailsFont,
+                    color: rgb(0.15, 0.15, 0.15)
+                })
+            }
+            entryY -= entryLineSpacing
         }
     } else {
         const headlineWidth = initialsFont.widthOfTextAtSize(
@@ -368,28 +386,29 @@ function drawNametag({
             headlineSize
         )
         const labelCenterX = centerX + headlineWidth / 2 + 25 + 18
-        const labelY = initialsY + headlineSize * 0.42 - 20.5
-
-        drawCenteredText({
-            page,
-            text: courtLabel,
-            centerX: labelCenterX,
-            y: labelY,
-            size: 9,
-            font: detailsFont,
-            color: rgb(0.15, 0.15, 0.15)
-        })
-
-        if (sessionTimeLabel) {
+        let entryY = initialsY + headlineSize * 0.42 - 20.5 + entryShiftUp
+        for (const { courtLabel, timeLabel } of courtEntries) {
             drawCenteredText({
                 page,
-                text: sessionTimeLabel,
+                text: courtLabel,
                 centerX: labelCenterX,
-                y: labelY - 10,
-                size: 8,
+                y: entryY,
+                size: 9,
                 font: detailsFont,
                 color: rgb(0.15, 0.15, 0.15)
             })
+            if (timeLabel) {
+                drawCenteredText({
+                    page,
+                    text: timeLabel,
+                    centerX: labelCenterX,
+                    y: entryY - 10,
+                    size: 8,
+                    font: detailsFont,
+                    color: rgb(0.15, 0.15, 0.15)
+                })
+            }
+            entryY -= entryLineSpacing
         }
     }
 
@@ -431,8 +450,9 @@ export async function GET() {
             )
         }
 
-        const rosterRows = await db
+        const rawRows = await db
             .select({
+                userId: users.id,
                 teamNumber: week2Rosters.team_number,
                 divisionId: week2Rosters.division,
                 divisionName: divisions.name,
@@ -454,18 +474,46 @@ export async function GET() {
                 users.first_name
             )
 
-        const normalizedRows: NametagRow[] = rosterRows.map((row) => ({
-            sessionNumber: getSessionNumberFromTeam(row.teamNumber),
-            courtNumber:
-                LEGACY_COURT_BY_DIVISION[row.divisionName] ??
-                row.divisionLevel ??
-                row.divisionId,
-            oldId: row.oldId,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            preferredName: row.preferredName,
-            picture: row.picture
-        }))
+        // Group by user so players scheduled for multiple courts/times get one nametag
+        const userMap = new Map<string, NametagRow>()
+        for (const raw of rawRows) {
+            const sessionNumber = getSessionNumberFromTeam(raw.teamNumber)
+            const courtNumber =
+                LEGACY_COURT_BY_DIVISION[raw.divisionName] ??
+                raw.divisionLevel ??
+                raw.divisionId
+
+            const existing = userMap.get(raw.userId)
+            if (existing) {
+                existing.courtEntries.push({ courtNumber, sessionNumber })
+                if (sessionNumber < existing.primarySessionNumber) {
+                    existing.primarySessionNumber = sessionNumber
+                }
+            } else {
+                userMap.set(raw.userId, {
+                    primarySessionNumber: sessionNumber,
+                    courtEntries: [{ courtNumber, sessionNumber }],
+                    oldId: raw.oldId,
+                    firstName: raw.firstName,
+                    lastName: raw.lastName,
+                    preferredName: raw.preferredName,
+                    picture: raw.picture
+                })
+            }
+        }
+
+        const normalizedRows = Array.from(userMap.values()).sort((a, b) => {
+            if (a.primarySessionNumber !== b.primarySessionNumber) {
+                return a.primarySessionNumber - b.primarySessionNumber
+            }
+            const lastCmp = normalizeName(a.lastName).localeCompare(
+                normalizeName(b.lastName)
+            )
+            if (lastCmp !== 0) return lastCmp
+            return normalizeName(a.firstName).localeCompare(
+                normalizeName(b.firstName)
+            )
+        })
 
         const sessionTimes: Record<number, string> = {
             1: config.tryout2Session1Time.trim(),
@@ -501,7 +549,7 @@ export async function GET() {
 
         for (const sessionNumber of [1, 2, 3]) {
             const sessionRows = normalizedRows.filter(
-                (row) => row.sessionNumber === sessionNumber
+                (row) => row.primarySessionNumber === sessionNumber
             )
 
             if (sessionRows.length === 0) {
@@ -534,7 +582,7 @@ export async function GET() {
                         width: labelWidth,
                         height: labelHeight,
                         row,
-                        sessionTime,
+                        sessionTimes,
                         initialsFont: regularFont,
                         idFont: regularFont,
                         detailsFont: regularFont
