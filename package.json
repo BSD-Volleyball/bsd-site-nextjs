@@ -1,6 +1,6 @@
 {
-    "name": "indiesaas",
-    "version": "0.0.1",
+    "name": "bsd-site-nextjs",
+    "version": "0.0.5",
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack",
