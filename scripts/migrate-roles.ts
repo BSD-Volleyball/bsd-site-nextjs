@@ -43,7 +43,7 @@ async function main() {
         .select({
             userId: commissioners.commissioner,
             seasonId: commissioners.season,
-            divisionId: commissioners.division,
+            divisionId: commissioners.division
         })
         .from(commissioners)
 
@@ -51,7 +51,7 @@ async function main() {
     for (const row of commissionerRows) {
         await grantRole(row.userId, "commissioner", {
             seasonId: row.seasonId,
-            divisionId: row.divisionId,
+            divisionId: row.divisionId
         })
         commissionerCount++
     }
@@ -62,7 +62,7 @@ async function main() {
         .select({
             captainId: teams.captain,
             seasonId: teams.season,
-            divisionId: teams.division,
+            divisionId: teams.division
         })
         .from(teams)
 
@@ -70,7 +70,7 @@ async function main() {
     for (const row of teamRows) {
         await grantRole(row.captainId, "captain", {
             seasonId: row.seasonId,
-            divisionId: row.divisionId,
+            divisionId: row.divisionId
         })
         captainCount++
     }

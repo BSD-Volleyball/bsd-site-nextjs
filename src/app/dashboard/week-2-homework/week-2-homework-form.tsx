@@ -477,7 +477,7 @@ export function Week2HomeworkForm({
                                                 {player.pairPickName ?? "—"}
                                             </button>
                                         ) : (
-                                            player.pairPickName ?? "—"
+                                            (player.pairPickName ?? "—")
                                         )}
                                     </td>
                                     <td className="px-4 py-2">
@@ -529,7 +529,11 @@ export function Week2HomeworkForm({
                                         value={forcedMoveUpMale}
                                         onValueChange={setForcedMoveUpMale}
                                         placeholder="Select male player..."
-                                        exclude={[forcedMoveUpNonMale, forcedMoveDownMale, forcedMoveDownNonMale]}
+                                        exclude={[
+                                            forcedMoveUpNonMale,
+                                            forcedMoveDownMale,
+                                            forcedMoveDownNonMale
+                                        ]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -548,7 +552,11 @@ export function Week2HomeworkForm({
                                         value={forcedMoveUpNonMale}
                                         onValueChange={setForcedMoveUpNonMale}
                                         placeholder="Select non-male player..."
-                                        exclude={[forcedMoveUpMale, forcedMoveDownMale, forcedMoveDownNonMale]}
+                                        exclude={[
+                                            forcedMoveUpMale,
+                                            forcedMoveDownMale,
+                                            forcedMoveDownNonMale
+                                        ]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -577,7 +585,11 @@ export function Week2HomeworkForm({
                                         value={forcedMoveDownMale}
                                         onValueChange={setForcedMoveDownMale}
                                         placeholder="Select male player..."
-                                        exclude={[forcedMoveDownNonMale, forcedMoveUpMale, forcedMoveUpNonMale]}
+                                        exclude={[
+                                            forcedMoveDownNonMale,
+                                            forcedMoveUpMale,
+                                            forcedMoveUpNonMale
+                                        ]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -596,7 +608,11 @@ export function Week2HomeworkForm({
                                         value={forcedMoveDownNonMale}
                                         onValueChange={setForcedMoveDownNonMale}
                                         placeholder="Select non-male player..."
-                                        exclude={[forcedMoveDownMale, forcedMoveUpMale, forcedMoveUpNonMale]}
+                                        exclude={[
+                                            forcedMoveDownMale,
+                                            forcedMoveUpMale,
+                                            forcedMoveUpNonMale
+                                        ]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }

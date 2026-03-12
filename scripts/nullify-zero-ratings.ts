@@ -28,7 +28,9 @@ async function main() {
             )
         )
 
-    console.log(`Found ${rows.length} rating row(s) with at least one zero skill.`)
+    console.log(
+        `Found ${rows.length} rating row(s) with at least one zero skill.`
+    )
 
     let updatedCount = 0
 

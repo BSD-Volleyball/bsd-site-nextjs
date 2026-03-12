@@ -82,7 +82,8 @@ export async function getWeek2HomeworkData(): Promise<{
     if (seasonRosterCount === 0) {
         return {
             status: false,
-            message: "Teams haven't been created yet for this season. Check back after Week 2 tryouts."
+            message:
+                "Teams haven't been created yet for this season. Check back after Week 2 tryouts."
         }
     }
 
@@ -360,7 +361,11 @@ export async function submitWeek2Homework(
                 message: "Please select a male player to move up"
             }
         }
-        if (nonMaleCount > 0 && !canShareNonMale && !input.forcedMoveUpNonMale) {
+        if (
+            nonMaleCount > 0 &&
+            !canShareNonMale &&
+            !input.forcedMoveUpNonMale
+        ) {
             return {
                 status: false,
                 message: "Please select a non-male player to move up"

@@ -11,7 +11,7 @@ import "dotenv/config"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { users } from "../src/database/schema"
 import { inArray, sql } from "drizzle-orm"
-import { createInterface } from "readline"
+import { createInterface } from "node:readline"
 
 async function readStdin(): Promise<string[]> {
     const rl = createInterface({ input: process.stdin, terminal: false })

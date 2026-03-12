@@ -461,10 +461,8 @@ export async function getRatePlayerData(): Promise<{
                     courtNumber,
                     players: [...(courtMap.get(courtNumber) || [])].sort(
                         (a, b) =>
-                            sortPlayers(
-                                a,
-                                b,
-                                (p) => lastDivisionByPlayerId.has(p.id)
+                            sortPlayers(a, b, (p) =>
+                                lastDivisionByPlayerId.has(p.id)
                             )
                     )
                 }))

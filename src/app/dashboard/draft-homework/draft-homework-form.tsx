@@ -359,9 +359,9 @@ function HomeworkTabContent({
                     <p className="mb-3 text-muted-foreground text-xs">
                         You are free to select any registered player above. As
                         an aid here are players that based on historical data
-                        and captain&apos;s ratings may end up in this
-                        division. Players you&apos;ve already selected are
-                        hidden. Click a photo to view their profile.
+                        and captain&apos;s ratings may end up in this division.
+                        Players you&apos;ve already selected are hidden. Click a
+                        photo to view their profile.
                     </p>
                     <SuggestedPlayerList
                         players={suggestedPlayers}
@@ -571,7 +571,7 @@ export function DraftHomeworkForm({
                                     ).map((round) => (
                                         <tr
                                             key={round}
-                                            className="border-t border-border/50"
+                                            className="border-border/50 border-t"
                                         >
                                             <td className="py-1.5 pr-4 font-medium text-muted-foreground">
                                                 {round}

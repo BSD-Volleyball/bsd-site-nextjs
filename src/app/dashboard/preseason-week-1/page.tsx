@@ -231,17 +231,15 @@ export default async function DraftPreseasonWeek1Page() {
                                             </p>
                                         ) : (
                                             <ol className="pw1-list">
-                                                {courtPlayers.map(
-                                                    (player) => (
-                                                        <li
-                                                            key={player.userId}
-                                                            className="pw1-player"
-                                                        >
-                                                            {player.oldId}.{" "}
-                                                            {player.displayName}
-                                                        </li>
-                                                    )
-                                                )}
+                                                {courtPlayers.map((player) => (
+                                                    <li
+                                                        key={player.userId}
+                                                        className="pw1-player"
+                                                    >
+                                                        {player.oldId}.{" "}
+                                                        {player.displayName}
+                                                    </li>
+                                                ))}
                                             </ol>
                                         )}
                                     </div>
