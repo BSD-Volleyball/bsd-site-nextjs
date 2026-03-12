@@ -389,7 +389,7 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
     if (!canView) return []
 
     try {
-        // Get all users with admin or ombudsman roles
+        // Get only users with the ombudsman role
         const rows = await db
             .select({
                 id: userRoles.user_id,
@@ -398,15 +398,7 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
             })
             .from(userRoles)
             .leftJoin(users, eq(userRoles.user_id, users.id))
-            .where(
-                or(eq(userRoles.role, "admin"), eq(userRoles.role, "ombudsman"))
-            )
-
-        // Also include legacy admin users
-        const legacyAdmins = await db
-            .select({ id: users.id, name: users.name })
-            .from(users)
-            .where(or(eq(users.role, "admin"), eq(users.role, "director")))
+            .where(eq(userRoles.role, "ombudsman"))
 
         const seen = new Set<string>()
         const result: AssignableUser[] = []
@@ -415,13 +407,6 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
             if (!seen.has(r.id)) {
                 seen.add(r.id)
                 result.push({ id: r.id, name: r.name ?? r.id, role: r.role })
-            }
-        }
-
-        for (const r of legacyAdmins) {
-            if (!seen.has(r.id)) {
-                seen.add(r.id)
-                result.push({ id: r.id, name: r.name ?? r.id, role: "admin" })
             }
         }
 

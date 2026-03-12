@@ -71,9 +71,7 @@ const ALL_PERMISSIONS: Permission[] = [
     "emails:edit",
     "audit:view",
     "google:manage",
-    "attrition:view",
-    "concerns:view",
-    "concerns:manage"
+    "attrition:view"
 ]
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
