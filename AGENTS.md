@@ -8,6 +8,10 @@ Guidance for coding agents working in this repository.
 - Scope: player onboarding, season signup/payment, drafting, rosters, scheduling, playoffs, admin tooling.
 - Primary stack: Next.js 16, React 19, TypeScript, PostgreSQL, Drizzle ORM, better-auth, shadcn/ui, Tailwind CSS v4, Biome.
 
+## Package Manager
+
+This project uses **pnpm** exclusively. Never use `npm install` or `npm add` — doing so will create a `package-lock.json` and bypass pnpm's strict dependency resolution. Always use `pnpm add <pkg>` to install new packages.
+
 ## Working Commands
 
 ```bash
