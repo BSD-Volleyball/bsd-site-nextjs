@@ -42,7 +42,6 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@remixicon/react": "^4.9.0",
         "@swc/core": "^1.15.18",
-        "@uploadthing/react": "^7.3.2",
         "@vercel/analytics": "^2.0.1",
         "@vercel/speed-insights": "^2.0.0",
         "better-auth": "1.4.21",
@@ -51,7 +50,6 @@
         "clsx": "^2.1.1",
         "drizzle-orm": "^0.44.7",
         "embla-carousel-react": "^8.6.0",
-        "framer-motion": "^12.36.0",
         "input-otp": "^1.4.2",
         "lexical": "^0.41.0",
         "lucide-react": "^0.518.0",
@@ -73,7 +71,6 @@
         "sonner": "^2.0.5",
         "square": "^44.0.1",
         "tailwind-merge": "^3.5.0",
-        "uploadthing": "^7.7.3",
         "zod": "^4.3.6"
     },
     "devDependencies": {
