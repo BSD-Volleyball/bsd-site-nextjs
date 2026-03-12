@@ -529,7 +529,7 @@ export function Week2HomeworkForm({
                                         value={forcedMoveUpMale}
                                         onValueChange={setForcedMoveUpMale}
                                         placeholder="Select male player..."
-                                        exclude={[forcedMoveUpNonMale]}
+                                        exclude={[forcedMoveUpNonMale, forcedMoveDownMale, forcedMoveDownNonMale]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -548,7 +548,7 @@ export function Week2HomeworkForm({
                                         value={forcedMoveUpNonMale}
                                         onValueChange={setForcedMoveUpNonMale}
                                         placeholder="Select non-male player..."
-                                        exclude={[forcedMoveUpMale]}
+                                        exclude={[forcedMoveUpMale, forcedMoveDownMale, forcedMoveDownNonMale]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -577,7 +577,7 @@ export function Week2HomeworkForm({
                                         value={forcedMoveDownMale}
                                         onValueChange={setForcedMoveDownMale}
                                         placeholder="Select male player..."
-                                        exclude={[forcedMoveDownNonMale]}
+                                        exclude={[forcedMoveDownNonMale, forcedMoveUpMale, forcedMoveUpNonMale]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }
@@ -596,7 +596,7 @@ export function Week2HomeworkForm({
                                         value={forcedMoveDownNonMale}
                                         onValueChange={setForcedMoveDownNonMale}
                                         placeholder="Select non-male player..."
-                                        exclude={[forcedMoveDownMale]}
+                                        exclude={[forcedMoveDownMale, forcedMoveUpMale, forcedMoveUpNonMale]}
                                         onPlayerNameClick={
                                             modal.openPlayerDetail
                                         }

@@ -332,6 +332,27 @@ export async function submitWeek2Homework(
     const isTopDivision = divisionInfo?.level === minLevel
     const isBottomDivision = divisionInfo?.level === maxLevel
 
+    const teamNonCaptainRows = await db
+        .select({ male: users.male })
+        .from(week2Rosters)
+        .innerJoin(users, eq(week2Rosters.user, users.id))
+        .where(
+            and(
+                eq(week2Rosters.season, config.seasonId),
+                eq(week2Rosters.division, captainEntry.divisionId),
+                eq(week2Rosters.team_number, captainEntry.teamNumber),
+                eq(week2Rosters.is_captain, false)
+            )
+        )
+
+    const nonMaleCount = teamNonCaptainRows.filter(
+        (r) => r.male !== true
+    ).length
+    // When a team has exactly 1 non-male and both directions apply, that
+    // player only needs to be assigned to one direction.
+    const canShareNonMale =
+        nonMaleCount === 1 && !isTopDivision && !isBottomDivision
+
     if (!isTopDivision) {
         if (!input.forcedMoveUpMale) {
             return {
@@ -339,7 +360,7 @@ export async function submitWeek2Homework(
                 message: "Please select a male player to move up"
             }
         }
-        if (!input.forcedMoveUpNonMale) {
+        if (nonMaleCount > 0 && !canShareNonMale && !input.forcedMoveUpNonMale) {
             return {
                 status: false,
                 message: "Please select a non-male player to move up"
@@ -354,11 +375,27 @@ export async function submitWeek2Homework(
                 message: "Please select a male player to move down"
             }
         }
-        if (!input.forcedMoveDownNonMale) {
+        if (
+            nonMaleCount > 0 &&
+            !canShareNonMale &&
+            !input.forcedMoveDownNonMale
+        ) {
             return {
                 status: false,
                 message: "Please select a non-male player to move down"
             }
+        }
+    }
+
+    if (
+        canShareNonMale &&
+        !input.forcedMoveUpNonMale &&
+        !input.forcedMoveDownNonMale
+    ) {
+        return {
+            status: false,
+            message:
+                "Please select your non-male player to move either up or down"
         }
     }
 
