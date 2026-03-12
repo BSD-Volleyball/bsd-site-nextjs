@@ -27,8 +27,8 @@ export function Providers({ children }: { children: ReactNode }) {
                 onSessionChange={() => {
                     router.refresh()
                 }}
-                settings={{
-                    url: "/dashboard/account"
+                account={{
+                    basePath: "/dashboard/account"
                 }}
                 social={{
                     providers: ["google"]
