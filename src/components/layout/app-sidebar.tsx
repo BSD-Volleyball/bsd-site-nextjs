@@ -105,16 +105,6 @@ const signupNavItem = {
 
 const adminNavItems = [
     {
-        title: "Season Control",
-        url: "/dashboard/season-control",
-        icon: RiSettings3Line
-    },
-    {
-        title: "Manage Roles",
-        url: "/dashboard/manage-roles",
-        icon: RiUserSettingsLine
-    },
-    {
         title: "Admin Player Lookup",
         url: "/dashboard/player-lookup",
         icon: RiSearchLine
@@ -162,6 +152,16 @@ const adminNavItems = [
 ]
 
 const adminDangerNavItems = [
+    {
+        title: "Season Control",
+        url: "/dashboard/season-control",
+        icon: RiSettings3Line
+    },
+    {
+        title: "Manage Roles",
+        url: "/dashboard/manage-roles",
+        icon: RiUserSettingsLine
+    },
     {
         title: "Create Week 1",
         url: "/dashboard/create-week-1",
@@ -559,22 +559,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarGroup>
                     )}
 
-                {isAdmin && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Admin
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <NavItems
-                                    items={adminNavItems}
-                                    pathname={pathname}
-                                />
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
-
                 {hasConcernsAccess && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
@@ -584,6 +568,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={concernsNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isAdmin && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Admin
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={adminNavItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>
