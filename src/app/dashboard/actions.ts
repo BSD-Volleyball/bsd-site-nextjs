@@ -51,11 +51,19 @@ export async function getHasCaptainPagesAccess(): Promise<boolean> {
 }
 
 export async function getHasPicturesAccess(): Promise<boolean> {
-    return hasPermissionBySession("pictures:manage")
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return hasPermissionBySession("pictures:manage", {
+        seasonId: config.seasonId
+    })
 }
 
 export async function getHasConcernsAccess(): Promise<boolean> {
-    return hasPermissionBySession("concerns:view")
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return hasPermissionBySession("concerns:view", {
+        seasonId: config.seasonId
+    })
 }
 
 export async function getSeasonPhase(): Promise<SeasonPhase | null> {

@@ -4,6 +4,15 @@ import { db } from "@/database/db"
 import { concerns, concernComments, users, userRoles } from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
+import { getSeasonConfig } from "@/lib/site-config"
+
+async function hasConcernPermission(
+    permission: "concerns:view" | "concerns:manage"
+): Promise<boolean> {
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return hasPermissionBySession(permission, { seasonId: config.seasonId })
+}
 
 export interface ConcernRow {
     id: number
@@ -48,7 +57,7 @@ export async function getConcerns(): Promise<{
     message?: string
     concerns: ConcernRow[]
 }> {
-    const canView = await hasPermissionBySession("concerns:view")
+    const canView = await hasConcernPermission("concerns:view")
     if (!canView) {
         return { status: false, message: "Unauthorized.", concerns: [] }
     }
@@ -138,7 +147,7 @@ export async function getConcerns(): Promise<{
 export async function getConcernComments(
     concernId: number
 ): Promise<{ status: boolean; comments: ConcernComment[] }> {
-    const canView = await hasPermissionBySession("concerns:view")
+    const canView = await hasConcernPermission("concerns:view")
     if (!canView) {
         return { status: false, comments: [] }
     }
@@ -179,8 +188,8 @@ export async function addConcernComment(
     concernId: number,
     content: string
 ): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasPermissionBySession("concerns:manage")
-    const canView = await hasPermissionBySession("concerns:view")
+    const canManage = await hasConcernPermission("concerns:manage")
+    const canView = await hasConcernPermission("concerns:view")
     if (!canManage && !canView) {
         return { status: false, message: "Unauthorized." }
     }
@@ -211,7 +220,7 @@ export async function updateConcernStatus(
     concernId: number,
     status: "new" | "active" | "closed"
 ): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasPermissionBySession("concerns:manage")
+    const canManage = await hasConcernPermission("concerns:manage")
     if (!canManage) {
         return { status: false, message: "Unauthorized." }
     }
@@ -232,7 +241,7 @@ export async function assignConcern(
     concernId: number,
     assigneeId: string | null
 ): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasPermissionBySession("concerns:manage")
+    const canManage = await hasConcernPermission("concerns:manage")
     if (!canManage) {
         return { status: false, message: "Unauthorized." }
     }
@@ -309,7 +318,7 @@ export async function assignConcern(
 export async function closeConcern(
     concernId: number
 ): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasPermissionBySession("concerns:manage")
+    const canManage = await hasConcernPermission("concerns:manage")
     if (!canManage) {
         return { status: false, message: "Unauthorized." }
     }
@@ -348,7 +357,7 @@ export async function closeConcern(
 export async function reopenConcern(
     concernId: number
 ): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasPermissionBySession("concerns:manage")
+    const canManage = await hasConcernPermission("concerns:manage")
     if (!canManage) {
         return { status: false, message: "Unauthorized." }
     }
@@ -385,7 +394,7 @@ export async function reopenConcern(
 }
 
 export async function getAssignableUsers(): Promise<AssignableUser[]> {
-    const canView = await hasPermissionBySession("concerns:view")
+    const canView = await hasConcernPermission("concerns:view")
     if (!canView) return []
 
     try {
@@ -418,5 +427,5 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
 }
 
 export async function getHasConcernsAccess(): Promise<boolean> {
-    return hasPermissionBySession("concerns:view")
+    return hasConcernPermission("concerns:view")
 }

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { hasPermissionBySession } from "@/lib/rbac"
+import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageConcernsClient } from "./manage-concerns-client"
 import { getConcerns, getAssignableUsers } from "./actions"
@@ -20,7 +21,12 @@ export default async function ManageConcernsPage() {
         redirect("/auth/sign-in")
     }
 
-    const canView = await hasPermissionBySession("concerns:view")
+    const config = await getSeasonConfig()
+    const canView =
+        !!config.seasonId &&
+        (await hasPermissionBySession("concerns:view", {
+            seasonId: config.seasonId
+        }))
     if (!canView) {
         redirect("/dashboard")
     }

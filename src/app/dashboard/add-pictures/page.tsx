@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { hasPermissionBySession } from "@/lib/rbac"
+import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { AddPicturesList } from "./add-pictures-list"
 import { getPlayersNeedingPictures } from "./actions"
@@ -20,7 +21,12 @@ export default async function AddPicturesPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await hasPermissionBySession("pictures:manage")
+    const config = await getSeasonConfig()
+    const hasAccess =
+        !!config.seasonId &&
+        (await hasPermissionBySession("pictures:manage", {
+            seasonId: config.seasonId
+        }))
 
     if (!hasAccess) {
         redirect("/dashboard")
