@@ -549,6 +549,7 @@ export default async function DashboardPage() {
     let adminCaptainStatuses: CaptainSelectionDivisionStatus[] = []
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
+    let isWeek2Captain = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -638,6 +639,27 @@ export default async function DashboardPage() {
                 .where(eq(week2Rosters.season, signupStatus.config.seasonId))
                 .limit(1)
             hasWeek2RosterData = !!week2RosterRow
+
+            if (
+                signupStatus.config.phase === "prep_tryout_week_3" &&
+                hasWeek2RosterData
+            ) {
+                const [week2CaptainEntry] = await db
+                    .select({ userId: week2Rosters.user })
+                    .from(week2Rosters)
+                    .where(
+                        and(
+                            eq(
+                                week2Rosters.season,
+                                signupStatus.config.seasonId
+                            ),
+                            eq(week2Rosters.user, session.user.id),
+                            eq(week2Rosters.is_captain, true)
+                        )
+                    )
+                    .limit(1)
+                isWeek2Captain = !!week2CaptainEntry
+            }
 
             if (
                 signupStatus.config.phase === "prep_tryout_week_2" &&
@@ -835,6 +857,11 @@ export default async function DashboardPage() {
             signupStatus.config.phase
         ) &&
         (isAdmin || isCurrentSeasonCommissioner || hasTryoutSheetAccess)
+    )
+    const shouldShowWeek2HomeworkCard = !!(
+        signupStatus &&
+        signupStatus.config.phase === "prep_tryout_week_3" &&
+        isWeek2Captain
     )
     const shouldShowAssignedConcernsCard = assignedActiveConcernsCount > 0
 
@@ -1077,6 +1104,28 @@ export default async function DashboardPage() {
                                 className="inline-flex items-center justify-center rounded-md bg-amber-700 px-4 py-2 font-medium text-sm text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
                             >
                                 Open Manage Concerns
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {shouldShowWeek2HomeworkCard && (
+                    <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                                Submit Your Week 2 Homework
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-blue-700 text-sm dark:text-blue-300">
+                                As a Week 2 captain, please submit your player
+                                movement recommendations before the draft.
+                            </p>
+                            <Link
+                                href="/dashboard/week-2-homework"
+                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
+                            >
+                                Go to Week 2 Homework
                             </Link>
                         </CardContent>
                     </Card>
