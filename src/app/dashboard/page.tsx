@@ -579,7 +579,11 @@ export default async function DashboardPage() {
 
         userName = user?.preffered_name || user?.first_name || null
 
-        const canViewConcerns = await hasPermissionBySession("concerns:view")
+        const canViewConcerns =
+            !!signupStatus?.config.seasonId &&
+            (await hasPermissionBySession("concerns:view", {
+                seasonId: signupStatus.config.seasonId
+            }))
         if (canViewConcerns) {
             const [assignedConcernCount] = await db
                 .select({ total: count() })

@@ -26,7 +26,11 @@ export interface MissingPicturePlayer {
 }
 
 async function checkAddPicturesAccess(): Promise<boolean> {
-    return hasPermissionBySession("pictures:manage")
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return hasPermissionBySession("pictures:manage", {
+        seasonId: config.seasonId
+    })
 }
 
 function getSeasonLabel(seasonName: string, seasonYear: number): string {
