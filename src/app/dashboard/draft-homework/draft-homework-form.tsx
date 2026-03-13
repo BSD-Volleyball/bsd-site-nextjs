@@ -499,6 +499,7 @@ export function DraftHomeworkForm({
                     {" · "}
                     {data.numTeams} teams ({data.genderSplit} split)
                 </p>
+                {/* Last Season's Draft button — temporarily hidden, re-enable when needed
                 <Button
                     variant="outline"
                     size="sm"
@@ -506,8 +507,10 @@ export function DraftHomeworkForm({
                 >
                     Last Season&apos;s Draft
                 </Button>
+                */}
             </div>
 
+            {/* Last Season's Draft dialog — temporarily hidden, re-enable when needed
             <Dialog
                 open={lastSeasonDraftOpen}
                 onOpenChange={setLastSeasonDraftOpen}
@@ -610,6 +613,7 @@ export function DraftHomeworkForm({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            */}
 
             <Tabs defaultValue="males">
                 <TabsList>
