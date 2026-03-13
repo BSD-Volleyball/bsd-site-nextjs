@@ -550,6 +550,7 @@ export default async function DashboardPage() {
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
     let isWeek2Captain = false
+    let isSeasonCaptain = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -659,6 +660,24 @@ export default async function DashboardPage() {
                     )
                     .limit(1)
                 isWeek2Captain = !!week2CaptainEntry
+            }
+
+            if (
+                ["prep_tryout_week_3", "draft"].includes(
+                    signupStatus.config.phase
+                )
+            ) {
+                const [captainTeamEntry] = await db
+                    .select({ id: teams.id })
+                    .from(teams)
+                    .where(
+                        and(
+                            eq(teams.season, signupStatus.config.seasonId),
+                            eq(teams.captain, session.user.id)
+                        )
+                    )
+                    .limit(1)
+                isSeasonCaptain = !!captainTeamEntry
             }
 
             if (
@@ -862,6 +881,11 @@ export default async function DashboardPage() {
         signupStatus &&
         signupStatus.config.phase === "prep_tryout_week_3" &&
         isWeek2Captain
+    )
+    const shouldShowDraftHomeworkCard = !!(
+        signupStatus &&
+        ["prep_tryout_week_3", "draft"].includes(signupStatus.config.phase) &&
+        isSeasonCaptain
     )
     const shouldShowAssignedConcernsCard = assignedActiveConcernsCount > 0
 
@@ -1119,13 +1143,36 @@ export default async function DashboardPage() {
                         <CardContent className="space-y-3">
                             <p className="text-blue-700 text-sm dark:text-blue-300">
                                 As a Week 2 captain, please submit your player
-                                movement recommendations before the draft.
+                                movement recommendations by Monday morning.
                             </p>
                             <Link
                                 href="/dashboard/week-2-homework"
                                 className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                             >
                                 Go to Week 2 Homework
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {shouldShowDraftHomeworkCard && (
+                    <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                                Complete Your Draft Homework
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-blue-700 text-sm dark:text-blue-300">
+                                As a captain, please review the available
+                                players and plan your draft picks before the
+                                live draft begins.
+                            </p>
+                            <Link
+                                href="/dashboard/draft-homework"
+                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
+                            >
+                                Go to Draft Homework
                             </Link>
                         </CardContent>
                     </Card>
