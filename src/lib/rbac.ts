@@ -194,11 +194,13 @@ export async function hasAdministrativeAccessBySession(): Promise<boolean> {
 }
 
 export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
-    return hasPermissionBySession("signups:view")
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return false
+    return hasPermissionBySession("signups:view", { seasonId: config.seasonId })
 }
 
 export async function hasViewSignupsAccessBySession(): Promise<boolean> {
-    return hasPermissionBySession("signups:view")
+    return hasCaptainPagesAccessBySession()
 }
 
 // ---------------------------------------------------------------------------
