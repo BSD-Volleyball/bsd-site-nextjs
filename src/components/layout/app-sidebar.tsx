@@ -258,6 +258,11 @@ const commissionerNavItems = [
         title: "Select Captains",
         url: "/dashboard/select-captains",
         icon: RiTeamLine
+    },
+    {
+        title: "Prepare for Draft",
+        url: "/dashboard/prepare-for-draft",
+        icon: RiFileList3Line
     }
 ]
 
