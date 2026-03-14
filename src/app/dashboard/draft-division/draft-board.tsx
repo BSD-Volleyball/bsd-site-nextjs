@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,7 +18,12 @@ import {
 } from "@/lib/liveblocks.config"
 import { PresenceBar } from "./presence-bar"
 import { toast } from "sonner"
-import type { TeamOption, UserOption, DivisionSplitConfig } from "./actions"
+import type {
+    TeamOption,
+    UserOption,
+    DivisionSplitConfig,
+    PairEntry
+} from "./actions"
 
 const ROUNDS = 8
 
@@ -33,6 +38,29 @@ interface DraftBoardProps {
     role: "commissioner" | "captain"
     captainTeamIds: number[]
     onPicksChange: (picks: Record<string, string | null>) => void
+    initialPicks: Record<string, string>
+    pairMap: PairEntry[]
+}
+
+function findAvailablePairSlot(
+    targetRound: number,
+    teamId: number,
+    currentPicks: Record<string, string | null>,
+    excludeRound: number
+): number | null {
+    const candidates = [
+        targetRound,
+        targetRound - 1,
+        targetRound + 1,
+        targetRound - 2,
+        targetRound + 2
+    ]
+    for (const r of candidates) {
+        if (r < 1 || r > ROUNDS) continue
+        if (r === excludeRound) continue
+        if (!currentPicks[`${r}-${teamId}`]) return r
+    }
+    return null
 }
 
 function UserCombobox({
@@ -178,7 +206,9 @@ export function DraftBoard({
     divisionId,
     role,
     captainTeamIds,
-    onPicksChange
+    onPicksChange,
+    initialPicks,
+    pairMap
 }: DraftBoardProps) {
     const [enlargedPlayer, setEnlargedPlayer] = useState<UserOption | null>(
         null
@@ -187,14 +217,35 @@ export function DraftBoard({
     // Shared Liveblocks state
     const picks = useStorage((root) => root.picks)
 
-    const updatePick = useMutation(
-        ({ storage }, round: number, teamId: number, userId: string | null) => {
+    const hasSeededRef = useRef(false)
+
+    const seedPicks = useMutation(
+        ({ storage }, seedData: Record<string, string>) => {
             const current =
                 (storage.get("picks") as Record<string, string | null>) ?? {}
-            storage.set("picks", {
-                ...current,
-                [`${round}-${teamId}`]: userId
-            })
+            const hasAnyPick = Object.values(current).some((v) => v !== null)
+            if (hasAnyPick) return
+            storage.set("picks", { ...current, ...seedData })
+        },
+        []
+    )
+
+    const updatePick = useMutation(
+        (
+            { storage },
+            round: number,
+            teamId: number,
+            userId: string | null,
+            pairId: string | null,
+            pairRound: number | null
+        ) => {
+            const current =
+                (storage.get("picks") as Record<string, string | null>) ?? {}
+            const updated = { ...current, [`${round}-${teamId}`]: userId }
+            if (pairId !== null && pairRound !== null) {
+                updated[`${pairRound}-${teamId}`] = pairId
+            }
+            storage.set("picks", updated)
         },
         []
     )
@@ -208,12 +259,57 @@ export function DraftBoard({
         }
     })
 
+    // One-time seeding for existing-but-empty rooms
+    useEffect(() => {
+        if (
+            hasSeededRef.current ||
+            picks === null ||
+            Object.keys(initialPicks).length === 0
+        )
+            return
+        const hasAnyPick = Object.values(picks).some((v) => v !== null)
+        if (hasAnyPick) {
+            hasSeededRef.current = true
+            return
+        }
+        hasSeededRef.current = true
+        seedPicks(initialPicks)
+    }, [picks, initialPicks, seedPicks])
+
     // Notify parent of pick changes for submit
     useEffect(() => {
         if (picks) {
             onPicksChange(picks as Record<string, string | null>)
         }
     }, [picks, onPicksChange])
+
+    const handlePickChange = (
+        round: number,
+        teamId: number,
+        userId: string | null
+    ) => {
+        if (userId !== null) {
+            const entry = pairMap.find((e) => e.playerId === userId)
+            if (entry) {
+                const targetRound = Math.min(round + entry.diff, ROUNDS)
+                const availableRound = findAvailablePairSlot(
+                    targetRound,
+                    teamId,
+                    picksObj,
+                    round
+                )
+                if (availableRound === null) {
+                    toast.warning(
+                        "No available slot for this player's pair partner on your team. Clear a slot first."
+                    )
+                    return
+                }
+                updatePick(round, teamId, userId, entry.pairId, availableRound)
+                return
+            }
+        }
+        updatePick(round, teamId, userId, null, null)
+    }
 
     const divisionSplitsMap = useMemo(
         () =>
@@ -457,7 +553,7 @@ export function DraftBoard({
                                                         users={users}
                                                         value={userId}
                                                         onChange={(newUserId) =>
-                                                            updatePick(
+                                                            handlePickChange(
                                                                 round,
                                                                 team.id,
                                                                 newUserId

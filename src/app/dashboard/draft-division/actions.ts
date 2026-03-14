@@ -8,7 +8,10 @@ import {
     divisions,
     individual_divisions,
     teams,
-    drafts
+    drafts,
+    draftCaptRounds,
+    draftPairDiffs,
+    signups
 } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -35,6 +38,12 @@ export interface TeamOption {
     id: number
     name: string
     number: number | null
+}
+
+export interface PairEntry {
+    playerId: string
+    pairId: string
+    diff: number
 }
 
 export interface UserOption {
@@ -176,18 +185,27 @@ export async function getDraftDivisionData(): Promise<{
                 })
                 .from(divisions)
                 .orderBy(divisions.level),
-            db
-                .select({
-                    id: users.id,
-                    old_id: users.old_id,
-                    first_name: users.first_name,
-                    last_name: users.last_name,
-                    preffered_name: users.preffered_name,
-                    male: users.male,
-                    picture: users.picture
-                })
-                .from(users)
-                .orderBy(users.last_name, users.first_name),
+            seasonId > 0
+                ? db
+                      .select({
+                          id: users.id,
+                          old_id: users.old_id,
+                          first_name: users.first_name,
+                          last_name: users.last_name,
+                          preffered_name: users.preffered_name,
+                          male: users.male,
+                          picture: users.picture
+                      })
+                      .from(users)
+                      .innerJoin(
+                          signups,
+                          and(
+                              eq(signups.player, users.id),
+                              eq(signups.season, seasonId)
+                          )
+                      )
+                      .orderBy(users.last_name, users.first_name)
+                : Promise.resolve([]),
             seasonId > 0
                 ? db
                       .select({
@@ -272,6 +290,184 @@ export async function getTeamsForSeasonAndDivision(
             status: false,
             message: "Something went wrong.",
             teams: []
+        }
+    }
+}
+
+export async function getDraftInitData(
+    seasonId: number,
+    divisionId: number
+): Promise<{
+    status: boolean
+    message?: string
+    teams: TeamOption[]
+    initialPicks: Record<string, string>
+    pairMap: PairEntry[]
+}> {
+    const hasAccess = await checkDraftReadAccess()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "You don't have permission to access this page.",
+            teams: [],
+            initialPicks: {},
+            pairMap: []
+        }
+    }
+
+    if (
+        !Number.isInteger(seasonId) ||
+        seasonId <= 0 ||
+        !Number.isInteger(divisionId) ||
+        divisionId <= 0
+    ) {
+        return {
+            status: false,
+            message: "Invalid season or division ID.",
+            teams: [],
+            initialPicks: {},
+            pairMap: []
+        }
+    }
+
+    try {
+        const [teamsList, captRounds, pairDiffs, signupPairs] =
+            await Promise.all([
+                db
+                    .select({
+                        id: teams.id,
+                        name: teams.name,
+                        number: teams.number,
+                        captain: teams.captain
+                    })
+                    .from(teams)
+                    .where(
+                        and(
+                            eq(teams.season, seasonId),
+                            eq(teams.division, divisionId)
+                        )
+                    )
+                    .orderBy(teams.number),
+                db
+                    .select({
+                        captain: draftCaptRounds.captain,
+                        round: draftCaptRounds.round
+                    })
+                    .from(draftCaptRounds)
+                    .where(
+                        and(
+                            eq(draftCaptRounds.season, seasonId),
+                            eq(draftCaptRounds.division, divisionId)
+                        )
+                    ),
+                db
+                    .select({
+                        player1: draftPairDiffs.player1,
+                        player2: draftPairDiffs.player2,
+                        diff: draftPairDiffs.diff
+                    })
+                    .from(draftPairDiffs)
+                    .where(
+                        and(
+                            eq(draftPairDiffs.season, seasonId),
+                            eq(draftPairDiffs.division, divisionId)
+                        )
+                    ),
+                db
+                    .select({
+                        player: signups.player,
+                        pair_pick: signups.pair_pick
+                    })
+                    .from(signups)
+                    .where(
+                        and(
+                            eq(signups.season, seasonId),
+                            eq(signups.pair, true)
+                        )
+                    )
+            ])
+
+        const DRAFT_ROUNDS = 8
+
+        const captainRoundMap = new Map(
+            captRounds.map((r) => [r.captain, r.round])
+        )
+
+        const pairPickMap = new Map<string, string>()
+        for (const s of signupPairs) {
+            if (s.pair_pick !== null) {
+                pairPickMap.set(s.player, s.pair_pick)
+            }
+        }
+
+        const pairDiffLookup = new Map<string, number>()
+        for (const pd of pairDiffs) {
+            const key = [pd.player1, pd.player2].sort().join(":")
+            pairDiffLookup.set(key, pd.diff)
+        }
+
+        const initialPicks: Record<string, string> = {}
+        for (const team of teamsList) {
+            const captainRound = captainRoundMap.get(team.captain)
+            if (!captainRound) continue
+
+            initialPicks[`${captainRound}-${team.id}`] = team.captain
+
+            const pairId = pairPickMap.get(team.captain)
+            if (pairId && pairId !== team.captain) {
+                const key = [team.captain, pairId].sort().join(":")
+                const diff = pairDiffLookup.get(key) ?? 8
+                const pairRound = Math.min(captainRound + diff, DRAFT_ROUNDS)
+                if (!initialPicks[`${pairRound}-${team.id}`]) {
+                    initialPicks[`${pairRound}-${team.id}`] = pairId
+                }
+            }
+        }
+
+        const pairMapEntries = new Map<string, PairEntry>()
+        for (const s of signupPairs) {
+            if (!s.pair_pick) continue
+            const player = s.player
+            const pairId = s.pair_pick
+            const key = [player, pairId].sort().join(":")
+            const diff = pairDiffLookup.get(key) ?? 8
+
+            const forwardKey = `${player}:${pairId}`
+            if (!pairMapEntries.has(forwardKey)) {
+                pairMapEntries.set(forwardKey, {
+                    playerId: player,
+                    pairId,
+                    diff
+                })
+            }
+            const reverseKey = `${pairId}:${player}`
+            if (!pairMapEntries.has(reverseKey)) {
+                pairMapEntries.set(reverseKey, {
+                    playerId: pairId,
+                    pairId: player,
+                    diff
+                })
+            }
+        }
+
+        return {
+            status: true,
+            teams: teamsList.map(({ id, name, number }) => ({
+                id,
+                name,
+                number
+            })),
+            initialPicks,
+            pairMap: Array.from(pairMapEntries.values())
+        }
+    } catch (error) {
+        console.error("Error fetching draft init data:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            teams: [],
+            initialPicks: {},
+            pairMap: []
         }
     }
 }
