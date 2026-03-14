@@ -539,6 +539,70 @@ export const concernComments = pgTable("concern_comments", {
         .notNull()
 })
 
+export const draftCaptRounds = pgTable(
+    "draft_capt_rounds",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        saved_by: text("saved_by")
+            .notNull()
+            .references(() => users.id),
+        captain: text("captain")
+            .notNull()
+            .references(() => users.id),
+        round: integer("round").notNull(),
+        updated_at: timestamp("updated_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        uniq: uniqueIndex("draft_capt_rounds_season_div_captain_uniq").on(
+            table.season,
+            table.division,
+            table.captain
+        )
+    })
+)
+
+export const draftPairDiffs = pgTable(
+    "draft_pair_diffs",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        saved_by: text("saved_by")
+            .notNull()
+            .references(() => users.id),
+        player1: text("player1")
+            .notNull()
+            .references(() => users.id),
+        player2: text("player2")
+            .notNull()
+            .references(() => users.id),
+        diff: integer("diff").notNull(),
+        updated_at: timestamp("updated_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        uniq: uniqueIndex("draft_pair_diffs_season_div_players_uniq").on(
+            table.season,
+            table.division,
+            table.player1,
+            table.player2
+        )
+    })
+)
+
 // user_roles: multi-role assignment table supporting season/division scoping.
 // Replaces users.role column and commissioners table as the source of truth
 // for authorization. Permissions are defined in src/lib/permissions.ts.
