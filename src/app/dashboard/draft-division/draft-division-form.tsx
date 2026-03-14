@@ -21,12 +21,13 @@ import {
 import { RiFullscreenLine, RiFullscreenExitLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
-    getTeamsForSeasonAndDivision,
+    getDraftInitData,
     submitDraft,
     type DivisionOption,
     type TeamOption,
     type UserOption,
-    type DivisionSplitConfig
+    type DivisionSplitConfig,
+    type PairEntry
 } from "./actions"
 import { DraftRoomProvider } from "./draft-room-provider"
 import { DraftBoard } from "./draft-board"
@@ -64,6 +65,8 @@ export function DraftDivisionForm({
         defaultDivisionId ? defaultDivisionId.toString() : ""
     )
     const [teamsList, setTeamsList] = useState<TeamOption[]>([])
+    const [initialPicks, setInitialPicks] = useState<Record<string, string>>({})
+    const [pairMap, setPairMap] = useState<PairEntry[]>([])
 
     // Picks snapshot maintained by DraftBoard via onPicksChange callback
     const picksRef = useRef<Record<string, string | null>>({})
@@ -92,20 +95,24 @@ export function DraftDivisionForm({
     const handleDivisionChange = async (value: string) => {
         setDivisionId(value)
         setTeamsList([])
+        setInitialPicks({})
+        setPairMap([])
         setError(null)
         setSuccess(null)
         picksRef.current = {}
 
         if (value) {
-            await loadTeams(currentSeasonId, parseInt(value))
+            await loadDraftInitData(currentSeasonId, parseInt(value))
         }
     }
 
-    const loadTeams = async (season: number, division: number) => {
+    const loadDraftInitData = async (season: number, division: number) => {
         setIsLoadingTeams(true)
-        const result = await getTeamsForSeasonAndDivision(season, division)
+        const result = await getDraftInitData(season, division)
         if (result.status) {
             setTeamsList(result.teams)
+            setInitialPicks(result.initialPicks)
+            setPairMap(result.pairMap)
         } else {
             setError(result.message || "Failed to load teams.")
         }
@@ -115,7 +122,7 @@ export function DraftDivisionForm({
     // Load default division teams on mount if captain has a pre-selected division
     useState(() => {
         if (defaultDivisionId && divisionId) {
-            loadTeams(currentSeasonId, defaultDivisionId)
+            loadDraftInitData(currentSeasonId, defaultDivisionId)
         }
     })
 
@@ -274,6 +281,7 @@ export function DraftDivisionForm({
                                 <DraftRoomProvider
                                     seasonId={currentSeasonId}
                                     divisionId={parseInt(divisionId)}
+                                    initialPicks={initialPicks}
                                 >
                                     <DraftBoardWithBroadcast
                                         teams={teamsList}
@@ -284,6 +292,8 @@ export function DraftDivisionForm({
                                         role={role}
                                         captainTeamIds={captainTeamIds}
                                         onPicksChange={handlePicksChange}
+                                        initialPicks={initialPicks}
+                                        pairMap={pairMap}
                                     />
                                 </DraftRoomProvider>
                             </div>
@@ -337,6 +347,8 @@ function DraftBoardWithBroadcast(props: {
     role: "commissioner" | "captain"
     captainTeamIds: number[]
     onPicksChange: (picks: Record<string, string | null>) => void
+    initialPicks: Record<string, string>
+    pairMap: PairEntry[]
 }) {
     return <DraftBoard {...props} />
 }

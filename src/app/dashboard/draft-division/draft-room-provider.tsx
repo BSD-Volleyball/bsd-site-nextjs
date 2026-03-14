@@ -7,12 +7,14 @@ import { ClientSideSuspense } from "@liveblocks/react"
 interface DraftRoomProviderProps {
     seasonId: number
     divisionId: number
+    initialPicks: Record<string, string>
     children: ReactNode
 }
 
 export function DraftRoomProvider({
     seasonId,
     divisionId,
+    initialPicks,
     children
 }: DraftRoomProviderProps) {
     const roomId = `draft-s${seasonId}-d${divisionId}`
@@ -26,7 +28,7 @@ export function DraftRoomProvider({
                 role: "captain"
             }}
             initialStorage={{
-                picks: {}
+                picks: initialPicks
             }}
         >
             <ClientSideSuspense
