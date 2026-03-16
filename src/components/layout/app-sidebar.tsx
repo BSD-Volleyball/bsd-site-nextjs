@@ -26,7 +26,8 @@ import {
     RiTrophyLine,
     RiSettings3Line,
     RiAlertLine,
-    RiFileWarningLine
+    RiFileWarningLine,
+    RiCheckboxLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -262,6 +263,16 @@ const commissionerNavItems = [
     {
         title: "Prepare for Draft",
         url: "/dashboard/prepare-for-draft",
+        icon: RiFileList3Line
+    },
+    {
+        title: "Homework Status",
+        url: "/dashboard/homework-status",
+        icon: RiCheckboxLine
+    },
+    {
+        title: "Draft Day",
+        url: "/dashboard/draft-day",
         icon: RiFileList3Line
     }
 ]

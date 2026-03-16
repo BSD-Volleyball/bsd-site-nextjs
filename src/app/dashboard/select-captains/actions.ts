@@ -16,6 +16,7 @@ import { eq, and, inArray, asc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+import { getCommissionerDivisionAccess } from "@/lib/rbac"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,
@@ -109,6 +110,47 @@ export async function getCreateTeamsData(): Promise<{
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return {
+                status: false,
+                message: "Not authenticated.",
+                seasonId: 0,
+                seasonLabel: "",
+                divisions: [],
+                users: [],
+                allUsers: [],
+                emailTemplate: "",
+                emailTemplateContent: null,
+                emailSubject: "",
+                seasonConfig: null,
+                divisionCommissioners: [],
+                existingTeamsByDivision: {}
+            }
+        }
+
+        const divisionAccess = await getCommissionerDivisionAccess(
+            session.user.id,
+            config.seasonId
+        )
+        if (divisionAccess.type === "denied") {
+            return {
+                status: false,
+                message: "You don't have permission to access this page.",
+                seasonId: 0,
+                seasonLabel: "",
+                divisions: [],
+                users: [],
+                allUsers: [],
+                emailTemplate: "",
+                emailTemplateContent: null,
+                emailSubject: "",
+                seasonConfig: null,
+                divisionCommissioners: [],
+                existingTeamsByDivision: {}
+            }
+        }
+
         const [
             allDivisions,
             signedUpUsers,
@@ -132,7 +174,14 @@ export async function getCreateTeamsData(): Promise<{
                         eq(individual_divisions.season, config.seasonId)
                     )
                 )
-                .where(eq(divisions.active, true))
+                .where(
+                    divisionAccess.type === "division_specific"
+                        ? and(
+                              eq(divisions.active, true),
+                              eq(divisions.id, divisionAccess.divisionId)
+                          )
+                        : eq(divisions.active, true)
+                )
                 .orderBy(divisions.level)
                 .then((rows) =>
                     rows.map((d) => ({ ...d, coaches: d.coaches ?? false }))

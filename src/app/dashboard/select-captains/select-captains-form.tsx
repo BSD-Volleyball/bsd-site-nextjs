@@ -230,7 +230,9 @@ export function SelectCaptainsForm({
     const baseEmailTemplateContent =
         emailTemplateContent || normalizeEmailTemplateContent(emailTemplate)
 
-    const [divisionId, setDivisionId] = useState<string>("")
+    const [divisionId, setDivisionId] = useState<string>(
+        divisions.length === 1 ? divisions[0].id.toString() : ""
+    )
     const [captains, setCaptains] = useState<CaptainSelection[]>(
         Array(6)
             .fill(null)
@@ -658,29 +660,45 @@ export function SelectCaptainsForm({
                         />
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="division">
-                            Division <span className="text-destructive">*</span>
-                        </Label>
-                        <Select
-                            value={divisionId}
-                            onValueChange={setDivisionId}
-                        >
-                            <SelectTrigger id="division">
-                                <SelectValue placeholder="Select a division" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {divisions.map((division) => (
-                                    <SelectItem
-                                        key={division.id}
-                                        value={division.id.toString()}
-                                    >
-                                        {division.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    {divisions.length > 1 ? (
+                        <div className="space-y-2">
+                            <Label htmlFor="division">
+                                Division{" "}
+                                <span className="text-destructive">*</span>
+                            </Label>
+                            <Select
+                                value={divisionId}
+                                onValueChange={setDivisionId}
+                            >
+                                <SelectTrigger id="division">
+                                    <SelectValue placeholder="Select a division" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {divisions.map((division) => (
+                                        <SelectItem
+                                            key={division.id}
+                                            value={division.id.toString()}
+                                        >
+                                            {division.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <Label>Division</Label>
+                            <Input
+                                value={
+                                    divisions.length === 1
+                                        ? divisions[0].name
+                                        : ""
+                                }
+                                readOnly
+                                className="bg-muted"
+                            />
+                        </div>
+                    )}
 
                     <div className="border-t pt-6">
                         <h3 className="mb-4 font-semibold">
