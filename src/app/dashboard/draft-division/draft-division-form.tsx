@@ -227,7 +227,10 @@ export function DraftDivisionForm({
                                 <Select
                                     value={divisionId}
                                     onValueChange={handleDivisionChange}
-                                    disabled={role === "captain"}
+                                    disabled={
+                                        role === "captain" ||
+                                        divisions.length <= 1
+                                    }
                                 >
                                     <SelectTrigger id="division">
                                         <SelectValue placeholder="Select a division" />

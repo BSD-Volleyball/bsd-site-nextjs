@@ -204,6 +204,67 @@ export async function hasViewSignupsAccessBySession(): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// Commissioner division scoping
+// ---------------------------------------------------------------------------
+
+export type CommissionerDivisionAccess =
+    | { type: "league_wide" }
+    | { type: "division_specific"; divisionId: number }
+    | { type: "denied" }
+
+/**
+ * Returns the division scope for a commissioner in a given season.
+ * Admins/directors are always league-wide. Division-specific commissioners
+ * are scoped to their one division. Falls back to the legacy commissioners
+ * table if no user_roles row is found.
+ */
+export async function getCommissionerDivisionAccess(
+    userId: string,
+    seasonId: number
+): Promise<CommissionerDivisionAccess> {
+    if (await isAdminOrDirector(userId)) {
+        return { type: "league_wide" }
+    }
+
+    const roleRows = await db
+        .select({ divisionId: userRoles.division_id })
+        .from(userRoles)
+        .where(
+            and(
+                eq(userRoles.user_id, userId),
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, seasonId)
+            )
+        )
+
+    if (roleRows.length > 0) {
+        const hasLeagueWide = roleRows.some((r) => r.divisionId === null)
+        if (hasLeagueWide) return { type: "league_wide" }
+        return {
+            type: "division_specific",
+            divisionId: roleRows[0].divisionId!
+        }
+    }
+
+    const [legacyRow] = await db
+        .select({ divisionId: commissioners.division })
+        .from(commissioners)
+        .where(
+            and(
+                eq(commissioners.season, seasonId),
+                eq(commissioners.commissioner, userId)
+            )
+        )
+        .limit(1)
+
+    if (legacyRow) {
+        return { type: "division_specific", divisionId: legacyRow.divisionId }
+    }
+
+    return { type: "denied" }
+}
+
+// ---------------------------------------------------------------------------
 // Role assignment helpers (used by manage-roles and dual-write actions)
 // ---------------------------------------------------------------------------
 

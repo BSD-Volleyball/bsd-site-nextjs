@@ -20,7 +20,8 @@ import {
     isAdminOrDirector,
     isCommissionerBySession,
     isCommissionerForCurrentSeason,
-    isCaptainForSeason
+    isCaptainForSeason,
+    getCommissionerDivisionAccess
 } from "@/lib/rbac"
 
 export interface DivisionSplitConfig {
@@ -84,6 +85,7 @@ export async function hasDraftPageAccess(): Promise<{
     role: "commissioner" | "captain" | null
     captainTeamIds: number[]
     captainDivisionId: number | null
+    commissionerDivisionId: number | null
 }> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
@@ -91,7 +93,8 @@ export async function hasDraftPageAccess(): Promise<{
             hasAccess: false,
             role: null,
             captainTeamIds: [],
-            captainDivisionId: null
+            captainDivisionId: null,
+            commissionerDivisionId: null
         }
     }
 
@@ -102,7 +105,8 @@ export async function hasDraftPageAccess(): Promise<{
             hasAccess: false,
             role: null,
             captainTeamIds: [],
-            captainDivisionId: null
+            captainDivisionId: null,
+            commissionerDivisionId: null
         }
     }
 
@@ -114,7 +118,8 @@ export async function hasDraftPageAccess(): Promise<{
             hasAccess: true,
             role: "commissioner",
             captainTeamIds: [],
-            captainDivisionId: null
+            captainDivisionId: null,
+            commissionerDivisionId: null
         }
     }
 
@@ -127,11 +132,14 @@ export async function hasDraftPageAccess(): Promise<{
     ])
 
     if (isCommissioner) {
+        const access = await getCommissionerDivisionAccess(userId, seasonId)
         return {
             hasAccess: true,
             role: "commissioner",
             captainTeamIds: [],
-            captainDivisionId: null
+            captainDivisionId: null,
+            commissionerDivisionId:
+                access.type === "division_specific" ? access.divisionId : null
         }
     }
 
@@ -140,7 +148,8 @@ export async function hasDraftPageAccess(): Promise<{
             hasAccess: true,
             role: "captain",
             captainTeamIds: captainTeams.map((t) => t.id),
-            captainDivisionId: captainTeams[0].division
+            captainDivisionId: captainTeams[0].division,
+            commissionerDivisionId: null
         }
     }
 
@@ -148,11 +157,12 @@ export async function hasDraftPageAccess(): Promise<{
         hasAccess: false,
         role: null,
         captainTeamIds: [],
-        captainDivisionId: null
+        captainDivisionId: null,
+        commissionerDivisionId: null
     }
 }
 
-export async function getDraftDivisionData(): Promise<{
+export async function getDraftDivisionData(filterDivisionId?: number): Promise<{
     status: boolean
     message?: string
     currentSeasonId: number
@@ -223,6 +233,12 @@ export async function getDraftDivisionData(): Promise<{
                 .map((r) => r.divisionId as number)
         )
 
+        const filteredDivisions = allDivisions.filter(
+            (d) =>
+                configuredDivisionIds.has(d.id) &&
+                (filterDivisionId === undefined || d.id === filterDivisionId)
+        )
+
         return {
             status: true,
             currentSeasonId: seasonId,
@@ -232,9 +248,7 @@ export async function getDraftDivisionData(): Promise<{
                     divisionId: r.divisionId as number,
                     genderSplit: r.genderSplit ?? "5-3"
                 })),
-            divisions: allDivisions.filter((d) =>
-                configuredDivisionIds.has(d.id)
-            ),
+            divisions: filteredDivisions,
             users: allUsers
         }
     } catch (error) {

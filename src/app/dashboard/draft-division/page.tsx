@@ -25,7 +25,9 @@ export default async function DraftDivisionPage() {
         redirect("/dashboard")
     }
 
-    const result = await getDraftDivisionData()
+    const filterDivisionId =
+        access.captainDivisionId ?? access.commissionerDivisionId ?? undefined
+    const result = await getDraftDivisionData(filterDivisionId)
 
     if (!result.status) {
         return (
@@ -59,7 +61,11 @@ export default async function DraftDivisionPage() {
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
                 role={access.role!}
                 captainTeamIds={access.captainTeamIds}
-                defaultDivisionId={access.captainDivisionId ?? undefined}
+                defaultDivisionId={
+                    access.captainDivisionId ??
+                    access.commissionerDivisionId ??
+                    undefined
+                }
             />
         </div>
     )

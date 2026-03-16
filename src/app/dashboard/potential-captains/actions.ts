@@ -20,6 +20,9 @@ import {
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
+import { getCommissionerDivisionAccess } from "@/lib/rbac"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -406,7 +409,34 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             return mostRecent4.every((draft) => draft.divisionId === divisionId)
         }
 
-        // 7. Get all divisions
+        // 7. Get all divisions, filtered by commissioner scope
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return {
+                status: false,
+                message: "Unauthorized",
+                seasonLabel: "",
+                divisions: [],
+                allSeasons: [],
+                divisionCommissioners: []
+            }
+        }
+
+        const divisionAccess = await getCommissionerDivisionAccess(
+            session.user.id,
+            targetSeason.id
+        )
+        if (divisionAccess.type === "denied") {
+            return {
+                status: false,
+                message: "Unauthorized",
+                seasonLabel: "",
+                divisions: [],
+                allSeasons: [],
+                divisionCommissioners: []
+            }
+        }
+
         const allDivisions = await db
             .select({
                 id: divisions.id,
@@ -425,10 +455,15 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             .where(eq(divisions.active, true))
             .orderBy(divisions.level)
 
+        const visibleDivisions =
+            divisionAccess.type === "division_specific"
+                ? allDivisions.filter((d) => d.id === divisionAccess.divisionId)
+                : allDivisions
+
         // 8. Build division data
         const divisionData: DivisionCaptains[] = []
 
-        for (const division of allDivisions) {
+        for (const division of visibleDivisions) {
             // List 1: "yes" captain + played in this division last season
             const list1Players: PotentialCaptain[] = []
 
