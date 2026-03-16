@@ -5,12 +5,13 @@ export interface Week3Division {
     index: number
     teamCount: number
     isLast: boolean
+    usesCoaches: boolean
 }
 
 export interface Week3Candidate {
     userId: string
-    oldId: number | null
     firstName: string
+    consecutiveSeasonsInTopDiv: number
     lastName: string
     preferredName: string | null
     male: boolean | null
@@ -18,6 +19,7 @@ export interface Week3Candidate {
     pairWithName: string | null
     overallMostRecent: number | null
     placementScore: number
+    ratingScore: number | null
     seasonsPlayedCount: number
     captainDivisionId: number | null
     captainDivisionName: string | null
@@ -37,7 +39,6 @@ export interface Week3SavedAssignment {
 
 export interface Week3ExcludedPlayer {
     userId: string
-    oldId: number | null
     firstName: string
     lastName: string
     preferredName: string | null

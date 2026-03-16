@@ -10,13 +10,14 @@ import {
     teams,
     seasons,
     divisions,
+    individual_divisions,
     movingDay,
     week2Rosters,
     week3Rosters
 } from "@/database/schema"
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray, lt } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import { fetchPlayerScores } from "@/lib/player-score"
+import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import type {
@@ -80,6 +81,7 @@ export async function getCreateWeek3Data(): Promise<{
 
         const [
             activeDivisions,
+            individualDivisionRows,
             signupRowsRaw,
             captainRows,
             week2Rows,
@@ -97,8 +99,14 @@ export async function getCreateWeek3Data(): Promise<{
                 .orderBy(divisions.level),
             db
                 .select({
+                    divisionId: individual_divisions.division,
+                    coaches: individual_divisions.coaches
+                })
+                .from(individual_divisions)
+                .where(eq(individual_divisions.season, config.seasonId)),
+            db
+                .select({
                     userId: signups.player,
-                    oldId: users.old_id,
                     firstName: users.first_name,
                     lastName: users.last_name,
                     preferredName: users.preffered_name,
@@ -154,18 +162,31 @@ export async function getCreateWeek3Data(): Promise<{
                 )
         ])
 
+        const coachesDivisionIds = new Set(
+            individualDivisionRows
+                .filter((r) => r.coaches)
+                .map((r) => r.divisionId)
+        )
+
         const divisionsWithMeta: Week3Division[] = activeDivisions.map(
             (division, index) => ({
                 ...division,
                 index,
                 teamCount: index === activeDivisions.length - 1 ? 4 : 6,
-                isLast: index === activeDivisions.length - 1
+                isLast: index === activeDivisions.length - 1,
+                usesCoaches: coachesDivisionIds.has(division.id)
             })
         )
 
         const captainDivisionByUser = new Map<string, number>()
         const captainDivisionNameByUser = new Map<string, string>()
         for (const row of captainRows) {
+            const existing = captainDivisionByUser.get(row.userId)
+            // If we already have a non-coaches captain entry, keep it;
+            // only overwrite if the stored entry is itself a coaches division
+            if (existing && !coachesDivisionIds.has(existing)) {
+                continue
+            }
             captainDivisionByUser.set(row.userId, row.divisionId)
             captainDivisionNameByUser.set(row.userId, row.divisionName)
         }
@@ -224,7 +245,6 @@ export async function getCreateWeek3Data(): Promise<{
             if (isExcluded) {
                 excludedPlayers.push({
                     userId: row.userId,
-                    oldId: row.oldId,
                     firstName: row.firstName,
                     lastName: row.lastName,
                     preferredName: row.preferredName
@@ -277,6 +297,63 @@ export async function getCreateWeek3Data(): Promise<{
         }
 
         const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
+
+        const existingPlayerIds = userIds.filter((id) => draftsByUser.has(id))
+        const ratingScoreByUser =
+            existingPlayerIds.length > 0
+                ? await fetchRatingBasedScores(
+                      existingPlayerIds,
+                      config.seasonId
+                  )
+                : new Map<string, number>()
+
+        // Compute consecutive seasons in top division for each candidate
+        const topDivisionId = activeDivisions[0]?.id ?? null
+
+        const [pastSeasonRows, topDivHistoryRows] = await Promise.all([
+            db
+                .select({ id: seasons.id })
+                .from(seasons)
+                .where(lt(seasons.id, config.seasonId))
+                .orderBy(desc(seasons.id)),
+            topDivisionId && userIds.length > 0
+                ? db
+                      .select({
+                          userId: week3Rosters.user,
+                          seasonId: week3Rosters.season
+                      })
+                      .from(week3Rosters)
+                      .where(
+                          and(
+                              inArray(week3Rosters.user, userIds),
+                              eq(week3Rosters.division, topDivisionId)
+                          )
+                      )
+                : Promise.resolve([])
+        ])
+
+        const topDivSeasonsByUser = new Map<string, Set<number>>()
+        for (const row of topDivHistoryRows) {
+            const set = topDivSeasonsByUser.get(row.userId) ?? new Set<number>()
+            set.add(row.seasonId)
+            topDivSeasonsByUser.set(row.userId, set)
+        }
+
+        const pastSeasonIds = pastSeasonRows.map((s) => s.id)
+        const consecutiveSeasonsInTopDivByUser = new Map<string, number>()
+        for (const userId of userIds) {
+            const userSeasons =
+                topDivSeasonsByUser.get(userId) ?? new Set<number>()
+            let count = 0
+            for (const seasonId of pastSeasonIds) {
+                if (userSeasons.has(seasonId)) {
+                    count++
+                } else {
+                    break
+                }
+            }
+            consecutiveSeasonsInTopDivByUser.set(userId, count)
+        }
 
         const mutualPairMap = new Map<string, string>()
         const pairPickMap = new Map(
@@ -335,7 +412,6 @@ export async function getCreateWeek3Data(): Promise<{
 
             return {
                 userId: row.userId,
-                oldId: row.oldId,
                 firstName: row.firstName,
                 lastName: row.lastName,
                 preferredName: row.preferredName,
@@ -346,6 +422,9 @@ export async function getCreateWeek3Data(): Promise<{
                     : null,
                 overallMostRecent: mostRecent?.overall ?? null,
                 placementScore,
+                ratingScore: ratingScoreByUser.get(row.userId) ?? null,
+                consecutiveSeasonsInTopDiv:
+                    consecutiveSeasonsInTopDivByUser.get(row.userId) ?? 0,
                 seasonsPlayedCount: history.length,
                 captainDivisionId:
                     captainDivisionByUser.get(row.userId) || null,
@@ -429,28 +508,36 @@ export async function saveWeek3Rosters(
         }
     }
 
-    const [validSignups, activeDivisions, captainRows] = await Promise.all([
-        db
-            .select({ userId: signups.player })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    inArray(signups.player, [...uniqueUsers])
-                )
-            ),
-        db
-            .select({ id: divisions.id })
-            .from(divisions)
-            .where(eq(divisions.active, true)),
-        db
-            .select({
-                userId: teams.captain,
-                divisionId: teams.division
-            })
-            .from(teams)
-            .where(eq(teams.season, config.seasonId))
-    ])
+    const [validSignups, activeDivisions, captainRows, individualDivRows] =
+        await Promise.all([
+            db
+                .select({ userId: signups.player })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        inArray(signups.player, [...uniqueUsers])
+                    )
+                ),
+            db
+                .select({ id: divisions.id })
+                .from(divisions)
+                .where(eq(divisions.active, true)),
+            db
+                .select({
+                    userId: teams.captain,
+                    divisionId: teams.division
+                })
+                .from(teams)
+                .where(eq(teams.season, config.seasonId)),
+            db
+                .select({
+                    divisionId: individual_divisions.division,
+                    coaches: individual_divisions.coaches
+                })
+                .from(individual_divisions)
+                .where(eq(individual_divisions.season, config.seasonId))
+        ])
 
     if (validSignups.length !== uniqueUsers.size) {
         return {
@@ -475,17 +562,31 @@ export async function saveWeek3Rosters(
         }
     }
 
+    const saveCoachesDivisionIds = new Set(
+        individualDivRows.filter((r) => r.coaches).map((r) => r.divisionId)
+    )
+
     const captainDivisionByUser = new Map<string, number>()
     for (const row of captainRows) {
+        const existing = captainDivisionByUser.get(row.userId)
+        if (existing && !saveCoachesDivisionIds.has(existing)) {
+            continue
+        }
         captainDivisionByUser.set(row.userId, row.divisionId)
     }
 
     for (const assignment of assignments) {
         const captainDivisionId = captainDivisionByUser.get(assignment.userId)
+        if (!captainDivisionId) {
+            continue
+        }
+        // Coaches are treated as regular players — no division or flag constraint
+        if (saveCoachesDivisionIds.has(captainDivisionId)) {
+            continue
+        }
         if (
-            captainDivisionId &&
-            (assignment.divisionId !== captainDivisionId ||
-                !assignment.isCaptain)
+            assignment.divisionId !== captainDivisionId ||
+            !assignment.isCaptain
         ) {
             return {
                 status: false,
