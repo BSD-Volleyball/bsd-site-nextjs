@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, type Dispatch, type SetStateAction } from "react"
 import { RiDeleteBin2Line } from "@remixicon/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -103,6 +103,8 @@ interface RoundGroupProps {
     onChange: (key: string, userId: string | null) => void
     onOpenPlayer: (userId: string) => void
     isDynamic?: boolean
+    controlledDynamicCount?: number
+    onControlledDynamicCountChange?: Dispatch<SetStateAction<number>>
 }
 
 function RoundGroup({
@@ -117,15 +119,26 @@ function RoundGroup({
     playerPicUrl,
     onChange,
     onOpenPlayer,
-    isDynamic = false
+    isDynamic = false,
+    controlledDynamicCount,
+    onControlledDynamicCountChange
 }: RoundGroupProps) {
-    const [dynamicCount, setDynamicCount] = useState(() => {
+    const [internalDynamicCount, setInternalDynamicCount] = useState(() => {
         if (!isDynamic) return numTeams
         const existing = Object.keys(selections).filter((k) =>
             k.startsWith(`${tabKey}-${round}-`)
         ).length
         return Math.max(1, existing)
     })
+
+    const dynamicCount =
+        isDynamic && controlledDynamicCount !== undefined
+            ? controlledDynamicCount
+            : internalDynamicCount
+    const setDynamicCount: Dispatch<SetStateAction<number>> =
+        isDynamic && onControlledDynamicCountChange !== undefined
+            ? onControlledDynamicCountChange
+            : setInternalDynamicCount
 
     const slotCount = isDynamic ? dynamicCount : numTeams
     const slots = Array.from({ length: slotCount }, (_, i) => i)
@@ -231,13 +244,15 @@ interface SuggestedPlayerListProps {
     selectedIds: Set<string>
     playerPicUrl: string
     onOpenPlayer: (userId: string) => void
+    onQuickAdd: (userId: string) => void
 }
 
 function SuggestedPlayerList({
     players,
     selectedIds,
     playerPicUrl,
-    onOpenPlayer
+    onOpenPlayer,
+    onQuickAdd
 }: SuggestedPlayerListProps) {
     const visible = players.filter((p) => !selectedIds.has(p.userId))
 
@@ -266,9 +281,19 @@ function SuggestedPlayerList({
                             height="5rem"
                             onOpen={onOpenPlayer}
                         />
-                        <span className="max-w-16 text-muted-foreground text-xs leading-tight">
-                            {displayName}
-                        </span>
+                        <div className="flex items-center gap-0.5">
+                            <span className="max-w-16 text-muted-foreground text-xs leading-tight">
+                                {displayName}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => onQuickAdd(player.userId)}
+                                title={`Add ${displayName} to next open slot`}
+                                className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xs leading-none hover:bg-primary/20"
+                            >
+                                +
+                            </button>
+                        </div>
                     </div>
                 )
             })}
@@ -316,6 +341,38 @@ function HomeworkTabContent({
         [allSelectedIds]
     )
 
+    const [consideringCount, setConsideringCount] = useState(() => {
+        const existing = Object.keys(selections).filter((k) =>
+            k.startsWith(`${tabKey}-${CONSIDERING_ROUND}-`)
+        ).length
+        return Math.max(1, existing)
+    })
+
+    const handleQuickAdd = (userId: string) => {
+        // Try regular rounds first (round 1..numRounds, slots 0..numTeams-1)
+        for (let round = 1; round <= numRounds; round++) {
+            for (let slot = 0; slot < numTeams; slot++) {
+                const key = `${tabKey}-${round}-${slot}`
+                if (!selections[key]) {
+                    onChange(key, userId)
+                    return
+                }
+            }
+        }
+        // Fall back to Considering — find first empty slot or append
+        for (let slot = 0; slot < consideringCount; slot++) {
+            const key = `${tabKey}-${CONSIDERING_ROUND}-${slot}`
+            if (!selections[key]) {
+                onChange(key, userId)
+                return
+            }
+        }
+        // All considering slots filled, append a new one
+        const newSlot = consideringCount
+        setConsideringCount((c) => c + 1)
+        onChange(`${tabKey}-${CONSIDERING_ROUND}-${newSlot}`, userId)
+    }
+
     const rounds = Array.from({ length: numRounds }, (_, i) => i + 1)
 
     return (
@@ -349,6 +406,8 @@ function HomeworkTabContent({
                 onChange={onChange}
                 onOpenPlayer={onOpenPlayer}
                 isDynamic
+                controlledDynamicCount={consideringCount}
+                onControlledDynamicCountChange={setConsideringCount}
             />
 
             {suggestedPlayers.length > 0 && (
@@ -368,6 +427,7 @@ function HomeworkTabContent({
                         selectedIds={selectedIdSet}
                         playerPicUrl={playerPicUrl}
                         onOpenPlayer={onOpenPlayer}
+                        onQuickAdd={handleQuickAdd}
                     />
                 </div>
             )}
