@@ -14,6 +14,10 @@ const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_BASE_URL,
+    session: {
+        expiresIn: 60 * 60 * 24 * 30, // 30 days
+        updateAge: 60 * 60 * 24        // refresh the session daily
+    },
     database: drizzleAdapter(db, {
         provider: "pg",
         usePlural: true,

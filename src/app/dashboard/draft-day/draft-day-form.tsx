@@ -13,7 +13,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { CaptainRow, DivisionData } from "./actions"
-import { saveDraftOrder } from "./actions"
+import { saveDraftOrder, getDraftSheetData } from "./actions"
+import {
+    generateBlankDraftSheet,
+    generatePrefilledDraftSheet
+} from "./pdf-sheets"
 
 interface DraftDayFormProps {
     divisions: DivisionData[]
@@ -62,6 +66,10 @@ export function DraftDayForm({
     const [isSaving, setIsSaving] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [isError, setIsError] = useState(false)
+    const [isGenerating, setIsGenerating] = useState<
+        "blank" | "prefilled" | null
+    >(null)
+    const [sheetError, setSheetError] = useState<string | null>(null)
 
     const handleDivisionChange = (divId: number) => {
         setSelectedDivisionId(divId)
@@ -118,6 +126,46 @@ export function DraftDayForm({
         if (result.status) {
             router.refresh()
         }
+    }
+
+    const downloadPdf = (bytes: Uint8Array, filename: string) => {
+        const blob = new Blob([new Uint8Array(bytes)], {
+            type: "application/pdf"
+        })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+    }
+
+    const handleBlankSheet = async () => {
+        setIsGenerating("blank")
+        setSheetError(null)
+        const result = await getDraftSheetData(selectedDivisionId ?? undefined)
+        if (!result.status) {
+            setSheetError(result.message ?? "Failed to load sheet data.")
+            setIsGenerating(null)
+            return
+        }
+        const bytes = await generateBlankDraftSheet(result)
+        downloadPdf(bytes, "blank-draft-sheet.pdf")
+        setIsGenerating(null)
+    }
+
+    const handlePrefilledSheet = async () => {
+        setIsGenerating("prefilled")
+        setSheetError(null)
+        const result = await getDraftSheetData(selectedDivisionId ?? undefined)
+        if (!result.status) {
+            setSheetError(result.message ?? "Failed to load sheet data.")
+            setIsGenerating(null)
+            return
+        }
+        const bytes = await generatePrefilledDraftSheet(result)
+        downloadPdf(bytes, "prefilled-draft-sheet.pdf")
+        setIsGenerating(null)
     }
 
     return (
@@ -258,6 +306,45 @@ export function DraftDayForm({
                         >
                             {message}
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Draft Sheets</CardTitle>
+                    <CardDescription>
+                        Download printable draft tracking sheets (landscape
+                        8.5×11).
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-3">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleBlankSheet}
+                            disabled={isGenerating !== null}
+                        >
+                            {isGenerating === "blank"
+                                ? "Generating…"
+                                : "Blank Draft Sheet"}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handlePrefilledSheet}
+                            disabled={isGenerating !== null}
+                        >
+                            {isGenerating === "prefilled"
+                                ? "Generating…"
+                                : "Pre-filled Draft Sheets"}
+                        </Button>
+                    </div>
+                    {sheetError && (
+                        <p className="mt-2 text-red-600 text-sm dark:text-red-400">
+                            {sheetError}
+                        </p>
                     )}
                 </CardContent>
             </Card>
