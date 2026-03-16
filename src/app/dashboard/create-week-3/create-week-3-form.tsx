@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { saveWeek3Rosters } from "./actions"
+import {
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup
+} from "@/components/player-detail"
 import type {
     Week3Candidate,
     Week3Division,
@@ -18,6 +22,7 @@ interface CreateWeek3FormProps {
     divisions: Week3Division[]
     candidates: Week3Candidate[]
     excludedPlayers: Week3ExcludedPlayer[]
+    playerPicUrl: string
 }
 
 interface Week3PlacedPlayer extends Week3Candidate {
@@ -56,6 +61,8 @@ interface TeamPlayer {
     displayName: string
     male: boolean | null
     placementScore: number
+    ratingScore: number | null
+    consecutiveSeasonsInTopDiv: number
     isCaptain: boolean
     isNew: boolean
     pairEntryId: string | null
@@ -412,6 +419,9 @@ function buildDivisionPlacement(
 } {
     const units = buildPlacementUnits(candidates)
     const targets = getDivisionTargets(divisions, candidates)
+    const coachesDivisionIds = new Set(
+        divisions.filter((d) => d.usesCoaches).map((d) => d.id)
+    )
     const placement = new Map<number, DivisionPlacement>(
         divisions.map((division) => [
             division.id,
@@ -570,6 +580,14 @@ function buildDivisionPlacement(
 
     for (const unit of units) {
         if (!unit.hasCaptain) {
+            continue
+        }
+
+        // In coaches divisions the "captains" are coaches — treat as normal players
+        if (
+            unit.captainDivisionId &&
+            coachesDivisionIds.has(unit.captainDivisionId)
+        ) {
             continue
         }
 
@@ -789,7 +807,8 @@ function getSnakeOrder(length: number, teamCount: number) {
 
 function buildTeamsForDivision(
     division: Week3Division,
-    players: Week3PlacedPlayer[]
+    players: Week3PlacedPlayer[],
+    isTopDivision = false
 ): TeamBucket[] {
     const teamCount = division.teamCount
     const teams: TeamBucket[] = Array.from(
@@ -816,7 +835,10 @@ function buildTeamsForDivision(
         displayName: getDisplayName(player),
         male: player.male,
         placementScore: player.placementScore,
-        isCaptain: player.isCaptain,
+        ratingScore: player.ratingScore,
+        consecutiveSeasonsInTopDiv: player.consecutiveSeasonsInTopDiv,
+        // Coaches are treated as regular players in team building
+        isCaptain: division.usesCoaches ? false : player.isCaptain,
         isNew: player.overallMostRecent === null,
         pairEntryId: null,
         pairName: null,
@@ -847,12 +869,141 @@ function buildTeamsForDivision(
             : null
     }
 
+    // Pre-assign teams 5 and 6 for the top division (AA):
+    // fill them with the most experienced non-captains before the main loop runs.
+    const preAssignedEntryIds = new Set<string>()
+    // Back-court per-team gender targets (populated below when isTopDivision)
+    let backTeam4NonMaleTarget = 0
+    let backTeam5NonMaleTarget = 0
+
+    if (isTopDivision && teamCount === 6) {
+        const BACK_START = 4
+        const backCourtCapacity =
+            teamCapacities[BACK_START] + teamCapacities[BACK_START + 1]
+
+        const totalMaleForBack = players.filter((p) => p.male === true).length
+        const nonMaleRatioForBack =
+            players.length > 0
+                ? (players.length - totalMaleForBack) / players.length
+                : 0.5
+        const backNonMaleTarget = Math.min(
+            backCourtCapacity,
+            Math.round(backCourtCapacity * nonMaleRatioForBack)
+        )
+        const backMaleTarget = backCourtCapacity - backNonMaleTarget
+
+        // Per-team non-male targets for teams 5 and 6 (used later for gender balance)
+        backTeam4NonMaleTarget = Math.round(
+            teamCapacities[BACK_START] * nonMaleRatioForBack
+        )
+        backTeam5NonMaleTarget = backNonMaleTarget - backTeam4NonMaleTarget
+
+        // Build units from non-captains, excluding new players and players
+        // paired with a captain or a new player (who must stay on teams 1–4).
+        const captainEntryIds = new Set(
+            divisionPlayers.filter((p) => p.isCaptain).map((p) => p.entryId)
+        )
+        const newPlayerEntryIds = new Set(
+            divisionPlayers.filter((p) => p.isNew).map((p) => p.entryId)
+        )
+        const eligibleUnits = buildTeamUnits(
+            divisionPlayers.filter(
+                (p) =>
+                    !p.isCaptain &&
+                    !p.isNew &&
+                    !(p.pairEntryId && captainEntryIds.has(p.pairEntryId)) &&
+                    !(p.pairEntryId && newPlayerEntryIds.has(p.pairEntryId))
+            )
+        )
+        eligibleUnits.sort((a, b) => {
+            const aMax = Math.max(
+                ...a.players.map((p) => p.consecutiveSeasonsInTopDiv)
+            )
+            const bMax = Math.max(
+                ...b.players.map((p) => p.consecutiveSeasonsInTopDiv)
+            )
+            if (aMax !== bMax) {
+                return bMax - aMax
+            }
+            return a.averageScore - b.averageScore
+        })
+
+        // Greedily select units respecting gender targets
+        const backCourtUnits: (typeof eligibleUnits)[number][] = []
+        let bcMale = 0
+        let bcNonMale = 0
+
+        for (const unit of eligibleUnits) {
+            if (bcMale + bcNonMale >= backCourtCapacity) {
+                break
+            }
+            if (bcMale + bcNonMale + unit.size > backCourtCapacity) {
+                continue
+            }
+            const unitMale = unit.maleCount
+            const unitNonMale = unit.nonMaleCount
+            if (
+                bcMale + unitMale <= backMaleTarget &&
+                bcNonMale + unitNonMale <= backNonMaleTarget
+            ) {
+                backCourtUnits.push(unit)
+                bcMale += unitMale
+                bcNonMale += unitNonMale
+            }
+        }
+
+        // Relax gender constraints if back court is not full
+        if (bcMale + bcNonMale < backCourtCapacity) {
+            const selectedIds = new Set(backCourtUnits.map((u) => u.id))
+            for (const unit of eligibleUnits) {
+                if (selectedIds.has(unit.id)) {
+                    continue
+                }
+                if (bcMale + bcNonMale + unit.size > backCourtCapacity) {
+                    continue
+                }
+                backCourtUnits.push(unit)
+                bcMale += unit.maleCount
+                bcNonMale += unit.nonMaleCount
+                if (bcMale + bcNonMale >= backCourtCapacity) {
+                    break
+                }
+            }
+        }
+
+        // Assign back court units to teams 5 and 6 via snake order
+        backCourtUnits.sort((a, b) => a.averageScore - b.averageScore)
+        const backSnake = getSnakeOrder(backCourtUnits.length, 2)
+
+        for (let i = 0; i < backCourtUnits.length; i++) {
+            const unit = backCourtUnits[i]
+            const teamIndex = BACK_START + backSnake[i]
+
+            for (const player of unit.players) {
+                teams[teamIndex].players.push(player)
+                teams[teamIndex].scoreSum += player.placementScore
+                if (player.male === true) {
+                    teams[teamIndex].maleCount += 1
+                } else {
+                    teams[teamIndex].nonMaleCount += 1
+                }
+                if (player.isNew) {
+                    teams[teamIndex].newCount += 1
+                }
+                preAssignedEntryIds.add(player.entryId)
+            }
+        }
+    }
+
     const captains = divisionPlayers
         .filter((player) => player.isCaptain)
         .sort((a, b) => a.placementScore - b.placementScore)
 
+    const captainTeamLimit = isTopDivision
+        ? Math.min(teamCount - 2, teamCount)
+        : teamCount
     const assignedCaptainIds = new Set<string>()
-    for (let i = 0; i < captains.length && i < teamCount; i++) {
+    for (let i = 0; i < captains.length && i < captainTeamLimit; i++) {
         const captain = captains[i]
         const captainMutualPair = captain.pairEntryId
             ? (divisionPlayers.find(
@@ -882,7 +1033,9 @@ function buildTeamsForDivision(
     }
 
     const remaining = divisionPlayers.filter(
-        (player) => !assignedCaptainIds.has(player.entryId)
+        (player) =>
+            !assignedCaptainIds.has(player.entryId) &&
+            !preAssignedEntryIds.has(player.entryId)
     )
     const units = buildTeamUnits(remaining)
     const snakeOrder = getSnakeOrder(units.length, teamCount)
@@ -1300,7 +1453,10 @@ function buildTeamsForDivision(
     }
 
     for (let pass = 0; pass < 20; pass++) {
-        const surpluses = teams
+        const balanceSlice = isTopDivision
+            ? teams.slice(0, teamCount - 2)
+            : teams
+        const surpluses = balanceSlice
             .map((team, index) => ({
                 index,
                 delta: team.nonMaleCount - teamNonMaleTargets[index]
@@ -1308,7 +1464,7 @@ function buildTeamsForDivision(
             .filter((entry) => entry.delta > 0)
             .sort((a, b) => b.delta - a.delta)
 
-        const deficits = teams
+        const deficits = balanceSlice
             .map((team, index) => ({
                 index,
                 delta: team.nonMaleCount - teamNonMaleTargets[index]
@@ -1412,7 +1568,10 @@ function buildTeamsForDivision(
     }
 
     for (let pass = 0; pass < 12; pass++) {
-        const surpluses = teams
+        const newBalanceSlice = isTopDivision
+            ? teams.slice(0, teamCount - 2)
+            : teams
+        const surpluses = newBalanceSlice
             .map((team, index) => ({
                 index,
                 delta: team.newCount - teamNewTargets[index]
@@ -1420,7 +1579,7 @@ function buildTeamsForDivision(
             .filter((entry) => entry.delta > 0)
             .sort((a, b) => b.delta - a.delta)
 
-        const deficits = teams
+        const deficits = newBalanceSlice
             .map((team, index) => ({
                 index,
                 delta: team.newCount - teamNewTargets[index]
@@ -1451,7 +1610,11 @@ function buildTeamsForDivision(
         }
     }
 
-    const trySwapScoreBalance = (highIndex: number, lowIndex: number) => {
+    const trySwapScoreBalance = (
+        highIndex: number,
+        lowIndex: number,
+        subset?: number[]
+    ) => {
         const highTeam = teams[highIndex]
         const lowTeam = teams[lowIndex]
 
@@ -1471,9 +1634,11 @@ function buildTeamsForDivision(
             return false
         }
 
+        const scoreIndices = subset ?? teams.map((_team, index) => index)
+
         const currentSpread =
-            Math.max(...teams.map((team) => team.scoreSum)) -
-            Math.min(...teams.map((team) => team.scoreSum))
+            Math.max(...scoreIndices.map((i) => teams[i].scoreSum)) -
+            Math.min(...scoreIndices.map((i) => teams[i].scoreSum))
 
         let bestSwap: {
             highPlayerIndex: number
@@ -1500,14 +1665,14 @@ function buildTeamsForDivision(
                     lowCandidate.player.placementScore +
                     highCandidate.player.placementScore
 
-                const projectedSums = teams.map((team, index) => {
-                    if (index === highIndex) {
+                const projectedSums = scoreIndices.map((i) => {
+                    if (i === highIndex) {
                         return highProjected
                     }
-                    if (index === lowIndex) {
+                    if (i === lowIndex) {
                         return lowProjected
                     }
-                    return team.scoreSum
+                    return teams[i].scoreSum
                 })
 
                 const projectedSpread =
@@ -1544,9 +1709,16 @@ function buildTeamsForDivision(
         return true
     }
 
+    // For top division: balance passes stay within each group (front/back court).
+    // For other divisions: balance all teams together.
+    const frontIndices = isTopDivision
+        ? Array.from({ length: teamCount - 2 }, (_, i) => i)
+        : Array.from({ length: teamCount }, (_, i) => i)
+    const backIndices = isTopDivision ? [teamCount - 2, teamCount - 1] : null
+
     for (let pass = 0; pass < 24; pass++) {
-        const orderedByScore = teams
-            .map((team, index) => ({ index, scoreSum: team.scoreSum }))
+        const orderedByScore = frontIndices
+            .map((index) => ({ index, scoreSum: teams[index].scoreSum }))
             .sort((a, b) => b.scoreSum - a.scoreSum)
 
         const high = orderedByScore[0]
@@ -1556,9 +1728,74 @@ function buildTeamsForDivision(
             break
         }
 
-        const changed = trySwapScoreBalance(high.index, low.index)
+        const changed = trySwapScoreBalance(high.index, low.index, frontIndices)
         if (!changed) {
             break
+        }
+    }
+
+    // Score balance within back court (teams 5–6) for top division
+    if (backIndices) {
+        for (let pass = 0; pass < 8; pass++) {
+            const orderedByScore = backIndices
+                .map((index) => ({ index, scoreSum: teams[index].scoreSum }))
+                .sort((a, b) => b.scoreSum - a.scoreSum)
+
+            const high = orderedByScore[0]
+            const low = orderedByScore[orderedByScore.length - 1]
+
+            if (!high || !low || high.scoreSum <= low.scoreSum) {
+                break
+            }
+
+            const changed = trySwapScoreBalance(
+                high.index,
+                low.index,
+                backIndices
+            )
+            if (!changed) {
+                break
+            }
+        }
+
+        // Gender balance within back court (teams 5–6)
+        const backTeamNonMaleTargetsMap: Record<number, number> = {
+            [backIndices[0]]: backTeam4NonMaleTarget,
+            [backIndices[1]]: backTeam5NonMaleTarget
+        }
+        for (let pass = 0; pass < 10; pass++) {
+            const surpluses = backIndices
+                .map((i) => ({
+                    index: i,
+                    delta: teams[i].nonMaleCount - backTeamNonMaleTargetsMap[i]
+                }))
+                .filter((e) => e.delta > 0)
+                .sort((a, b) => b.delta - a.delta)
+            const deficits = backIndices
+                .map((i) => ({
+                    index: i,
+                    delta: teams[i].nonMaleCount - backTeamNonMaleTargetsMap[i]
+                }))
+                .filter((e) => e.delta < 0)
+                .sort((a, b) => a.delta - b.delta)
+            if (surpluses.length === 0 || deficits.length === 0) {
+                break
+            }
+            let bcGenderChanged = false
+            for (const source of surpluses) {
+                for (const target of deficits) {
+                    if (trySwapGender(source.index, target.index)) {
+                        bcGenderChanged = true
+                        break
+                    }
+                }
+                if (bcGenderChanged) {
+                    break
+                }
+            }
+            if (!bcGenderChanged) {
+                break
+            }
         }
     }
 
@@ -1612,12 +1849,14 @@ export function CreateWeek3Form({
     seasonLabel,
     divisions,
     candidates,
-    excludedPlayers
+    excludedPlayers,
+    playerPicUrl
 }: CreateWeek3FormProps) {
     const [step, setStep] = useState<1 | 2>(1)
     const [isSaving, setIsSaving] = useState(false)
     const [message, setMessage] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const modal = usePlayerDetailModal()
 
     const eligibleMaleCount = useMemo(
         () => candidates.filter((candidate) => candidate.male === true).length,
@@ -1948,7 +2187,8 @@ export function CreateWeek3Form({
             division,
             teams: buildTeamsForDivision(
                 division,
-                editableDivisionPlayers.get(division.id) || []
+                editableDivisionPlayers.get(division.id) || [],
+                division.index === 0 && division.teamCount === 6
             )
         }))
     }, [editableDivisionPlayers, divisions])
@@ -2142,19 +2382,23 @@ export function CreateWeek3Form({
                                                         )}
                                                     >
                                                         <div className="min-w-0 flex-1 truncate pr-2">
-                                                            <span className="font-medium">
+                                                            <button
+                                                                type="button"
+                                                                className="font-medium underline-offset-2 hover:underline"
+                                                                onClick={() =>
+                                                                    modal.openPlayerDetail(
+                                                                        player.sourceUserId
+                                                                    )
+                                                                }
+                                                            >
                                                                 {getDisplayName(
                                                                     player
                                                                 )}
-                                                            </span>
-                                                            {player.oldId !==
-                                                                null && (
-                                                                <span className="ml-2 opacity-80">
-                                                                    [
-                                                                    {
-                                                                        player.oldId
-                                                                    }
-                                                                    ]
+                                                            </button>
+                                                            {player.seasonsPlayedCount ===
+                                                                0 && (
+                                                                <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                                                                    NEW
                                                                 </span>
                                                             )}
                                                             {player.pairWithName && (
@@ -2180,6 +2424,17 @@ export function CreateWeek3Form({
                                                                 {Math.round(
                                                                     player.placementScore
                                                                 )}
+                                                                {player.overallMostRecent !==
+                                                                    null &&
+                                                                    player.ratingScore !==
+                                                                        null && (
+                                                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                                            R
+                                                                            {Math.round(
+                                                                                player.ratingScore
+                                                                            )}
+                                                                        </span>
+                                                                    )}
                                                                 {pairAverageScoreByUser.has(
                                                                     player.sourceUserId
                                                                 ) && (
@@ -2352,7 +2607,19 @@ export function CreateWeek3Form({
                                                         )}
                                                     >
                                                         <span className="truncate">
-                                                            {player.displayName}
+                                                            <button
+                                                                type="button"
+                                                                className="font-medium underline-offset-2 hover:underline"
+                                                                onClick={() =>
+                                                                    modal.openPlayerDetail(
+                                                                        player.assignmentUserId
+                                                                    )
+                                                                }
+                                                            >
+                                                                {
+                                                                    player.displayName
+                                                                }
+                                                            </button>
                                                             {player.pairName && (
                                                                 <span className="ml-2 opacity-90">
                                                                     (pair:{" "}
@@ -2363,8 +2630,8 @@ export function CreateWeek3Form({
                                                                 </span>
                                                             )}
                                                             {player.isNew && (
-                                                                <span className="ml-2 font-semibold">
-                                                                    *NEW*
+                                                                <span className="ml-2 font-semibold text-green-600 dark:text-green-400">
+                                                                    NEW
                                                                 </span>
                                                             )}
                                                             {player.isCaptain && (
@@ -2383,6 +2650,15 @@ export function CreateWeek3Form({
                                                         <span className="text-muted-foreground">
                                                             {Math.round(
                                                                 player.placementScore
+                                                            )}
+                                                            {player.ratingScore !==
+                                                                null && (
+                                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                                    R
+                                                                    {Math.round(
+                                                                        player.ratingScore
+                                                                    )}
+                                                                </span>
                                                             )}
                                                         </span>
                                                     </div>
@@ -2443,11 +2719,6 @@ export function CreateWeek3Form({
                                                 ? `${player.preferredName} ${player.lastName}`
                                                 : `${player.firstName} ${player.lastName}`}
                                         </span>
-                                        {player.oldId !== null && (
-                                            <span className="ml-2 text-muted-foreground">
-                                                [{player.oldId}]
-                                            </span>
-                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -2455,6 +2726,21 @@ export function CreateWeek3Form({
                     </CardContent>
                 </Card>
             )}
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                pairPickName={modal.pairPickName}
+                pairReason={modal.pairReason}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
+            />
         </div>
     )
 }
