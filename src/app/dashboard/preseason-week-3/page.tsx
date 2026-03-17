@@ -100,9 +100,9 @@ export default async function PreseasonWeek3Page() {
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
     const sessionTimes = [
-        config.tryout3Session1Time,
-        config.tryout3Session2Time,
-        config.tryout3Session3Time
+        config.tryout2Session1Time,
+        config.tryout2Session2Time,
+        config.tryout2Session3Time
     ]
 
     const rosterRows = await db
