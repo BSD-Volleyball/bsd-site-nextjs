@@ -17,7 +17,8 @@ import {
     commissioners,
     concerns,
     week1Rosters,
-    week2Rosters
+    week2Rosters,
+    week3Rosters
 } from "@/database/schema"
 import { eq, and, desc, count, inArray, isNotNull } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -549,11 +550,19 @@ export default async function DashboardPage() {
     let adminCaptainStatuses: CaptainSelectionDivisionStatus[] = []
     let hasWeek1RosterData = false
     let hasWeek2RosterData = false
+    let hasWeek3RosterData = false
     let isWeek2Captain = false
     let isSeasonCaptain = false
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
+        divisionName: string
+        teamNumber: number
+        captainName: string | null
+        courtNumber: number
+        sessionTime: string
+    } | null = null
+    let userWeek3Roster: {
         divisionName: string
         teamNumber: number
         captainName: string | null
@@ -644,6 +653,13 @@ export default async function DashboardPage() {
                 .where(eq(week2Rosters.season, signupStatus.config.seasonId))
                 .limit(1)
             hasWeek2RosterData = !!week2RosterRow
+
+            const [week3RosterRow] = await db
+                .select({ id: week3Rosters.id })
+                .from(week3Rosters)
+                .where(eq(week3Rosters.season, signupStatus.config.seasonId))
+                .limit(1)
+            hasWeek3RosterData = !!week3RosterRow
 
             if (
                 signupStatus.config.phase === "prep_tryout_week_3" &&
@@ -792,6 +808,121 @@ export default async function DashboardPage() {
                     userWeek2Roster = {
                         divisionName: myWeek2Slot.divisionName,
                         teamNumber: myWeek2Slot.teamNumber,
+                        captainName,
+                        courtNumber,
+                        sessionTime
+                    }
+                }
+            }
+
+            if (
+                signupStatus.config.phase === "prep_tryout_week_3" &&
+                hasWeek3RosterData
+            ) {
+                const [myWeek3Slot] = await db
+                    .select({
+                        divisionId: week3Rosters.division,
+                        divisionName: divisions.name,
+                        teamNumber: week3Rosters.team_number
+                    })
+                    .from(week3Rosters)
+                    .innerJoin(
+                        divisions,
+                        eq(week3Rosters.division, divisions.id)
+                    )
+                    .where(
+                        and(
+                            eq(
+                                week3Rosters.season,
+                                signupStatus.config.seasonId
+                            ),
+                            eq(week3Rosters.user, session.user.id)
+                        )
+                    )
+                    .limit(1)
+
+                if (myWeek3Slot) {
+                    const legacyCourtByDivision: Record<string, number> = {
+                        AA: 1,
+                        A: 2,
+                        ABA: 3,
+                        ABB: 4,
+                        BB: 7,
+                        BBB: 8
+                    }
+
+                    const [[captainRow], week3Divisions] = await Promise.all([
+                        db
+                            .select({
+                                firstName: users.first_name,
+                                lastName: users.last_name,
+                                preferredName: users.preffered_name
+                            })
+                            .from(week3Rosters)
+                            .innerJoin(users, eq(week3Rosters.user, users.id))
+                            .where(
+                                and(
+                                    eq(
+                                        week3Rosters.season,
+                                        signupStatus.config.seasonId
+                                    ),
+                                    eq(
+                                        week3Rosters.division,
+                                        myWeek3Slot.divisionId
+                                    ),
+                                    eq(
+                                        week3Rosters.team_number,
+                                        myWeek3Slot.teamNumber
+                                    ),
+                                    eq(week3Rosters.is_captain, true)
+                                )
+                            )
+                            .limit(1),
+                        db
+                            .selectDistinct({
+                                id: divisions.id,
+                                level: divisions.level
+                            })
+                            .from(week3Rosters)
+                            .innerJoin(
+                                divisions,
+                                eq(week3Rosters.division, divisions.id)
+                            )
+                            .where(
+                                eq(
+                                    week3Rosters.season,
+                                    signupStatus.config.seasonId
+                                )
+                            )
+                            .orderBy(divisions.level)
+                    ])
+
+                    const divisionIndex = week3Divisions.findIndex(
+                        (d) => d.id === myWeek3Slot.divisionId
+                    )
+                    const courtNumber =
+                        legacyCourtByDivision[myWeek3Slot.divisionName] ??
+                        (divisionIndex >= 0 ? divisionIndex + 1 : 1)
+
+                    const sessionTimes = [
+                        signupStatus.config.tryout3Session1Time,
+                        signupStatus.config.tryout3Session2Time,
+                        signupStatus.config.tryout3Session3Time
+                    ]
+                    const matchupIndex = Math.floor(
+                        (myWeek3Slot.teamNumber - 1) / 2
+                    )
+                    const sessionTime = sessionTimes[matchupIndex] || "TBD"
+
+                    const captainName = captainRow
+                        ? captainRow.preferredName
+                            ? `${captainRow.preferredName} ${captainRow.lastName}`
+                            : `${captainRow.firstName} ${captainRow.lastName}`
+                        : null
+
+                    userWeek3Roster = {
+                        divisionName: myWeek3Slot.divisionName,
+                        teamNumber: myWeek3Slot.teamNumber,
                         captainName,
                         courtNumber,
                         sessionTime
@@ -1177,6 +1308,88 @@ export default async function DashboardPage() {
                                 className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                             >
                                 Go to Draft Homework
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {userWeek3Roster && signupStatus && (
+                    <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
+                                    You're in Week 3 Tryouts this Thursday!
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-orange-700 text-sm dark:text-orange-300">
+                                You have been assigned a spot in the Pre-Season
+                                Week 3 tryout.
+                            </p>
+                            <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
+                                {signupStatus.config.tryout3Date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Date:
+                                        </span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {signupStatus.config.tryout3Date}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Time:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek3Roster.sessionTime}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Court:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Court {userWeek3Roster.courtNumber}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Division:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek3Roster.divisionName}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Team:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Team {userWeek3Roster.teamNumber}
+                                    </span>
+                                </div>
+                                {userWeek3Roster.captainName && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Captain:
+                                        </span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {userWeek3Roster.captainName}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                                Please plan to arrive 10 minutes early.
+                            </p>
+                            <Link
+                                href="/dashboard/preseason-week-3"
+                                className="inline-flex items-center justify-center rounded-md bg-orange-600 px-4 py-2 font-medium text-sm text-white hover:bg-orange-700"
+                            >
+                                View Full Week 3 Roster
                             </Link>
                         </CardContent>
                     </Card>

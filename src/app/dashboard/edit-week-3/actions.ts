@@ -8,12 +8,15 @@ import {
     users,
     week3Rosters,
     teams,
-    divisions
+    divisions,
+    drafts,
+    seasons
 } from "@/database/schema"
-import { and, eq, inArray } from "drizzle-orm"
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
+import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 
 export interface Week3EditablePlayer {
     id: string
@@ -22,6 +25,10 @@ export interface Week3EditablePlayer {
     preferredName: string | null
     male: boolean | null
     hasPairPick: boolean
+    placementScore: number
+    ratingScore: number | null
+    lastDivisionName: string | null
+    seasonsPlayedCount: number
 }
 
 export interface Week3EditableSlot {
@@ -110,33 +117,79 @@ export async function getEditWeek3Data(): Promise<{
                 )
         ])
 
-        const signupPlayers = signupPlayersRaw
-            .filter((player) => {
-                if (!tryout3) {
-                    return true
-                }
+        const signupPlayers = signupPlayersRaw.filter((player) => {
+            if (!tryout3) {
+                return true
+            }
 
-                const missingDates = (player.datesMissing || "")
-                    .split(",")
-                    .map((value) => value.trim().toLowerCase())
-                    .filter(Boolean)
+            const missingDates = (player.datesMissing || "")
+                .split(",")
+                .map((value) => value.trim().toLowerCase())
+                .filter(Boolean)
 
-                return !missingDates.includes(tryout3)
-            })
-            .map((player) => ({
-                id: player.id,
-                firstName: player.firstName,
-                lastName: player.lastName,
-                preferredName: player.preferredName,
-                male: player.male,
-                hasPairPick: !!player.pairPick
-            }))
+            return !missingDates.includes(tryout3)
+        })
+
+        const userIds = signupPlayers.map((p) => p.id)
+
+        const [draftRows, scoreByUser] = await Promise.all([
+            userIds.length > 0
+                ? db
+                      .select({
+                          userId: drafts.user,
+                          seasonId: seasons.id,
+                          divisionName: divisions.name
+                      })
+                      .from(drafts)
+                      .innerJoin(teams, eq(drafts.team, teams.id))
+                      .innerJoin(seasons, eq(teams.season, seasons.id))
+                      .innerJoin(divisions, eq(teams.division, divisions.id))
+                      .where(inArray(drafts.user, userIds))
+                      .orderBy(desc(seasons.id), drafts.overall)
+                : Promise.resolve([]),
+            userIds.length > 0
+                ? fetchPlayerScores(userIds, config.seasonId)
+                : Promise.resolve(new Map<string, number>())
+        ])
+
+        const existingPlayerIds = userIds.filter((id) =>
+            draftRows.some((r) => r.userId === id)
+        )
+        const ratingScoreByUser =
+            existingPlayerIds.length > 0
+                ? await fetchRatingBasedScores(
+                      existingPlayerIds,
+                      config.seasonId
+                  )
+                : new Map<string, number>()
+
+        const lastDivisionByUser = new Map<string, string>()
+        const seasonsCountByUser = new Map<string, Set<number>>()
+        for (const row of draftRows) {
+            if (!lastDivisionByUser.has(row.userId)) {
+                lastDivisionByUser.set(row.userId, row.divisionName)
+            }
+            const seasonSet = seasonsCountByUser.get(row.userId) || new Set()
+            seasonSet.add(row.seasonId)
+            seasonsCountByUser.set(row.userId, seasonSet)
+        }
 
         return {
             status: true,
             seasonId: config.seasonId,
             seasonLabel,
-            players: signupPlayers,
+            players: signupPlayers.map((player) => ({
+                id: player.id,
+                firstName: player.firstName,
+                lastName: player.lastName,
+                preferredName: player.preferredName,
+                male: player.male,
+                hasPairPick: !!player.pairPick,
+                placementScore: scoreByUser.get(player.id) ?? 200,
+                ratingScore: ratingScoreByUser.get(player.id) ?? null,
+                lastDivisionName: lastDivisionByUser.get(player.id) ?? null,
+                seasonsPlayedCount: seasonsCountByUser.get(player.id)?.size ?? 0
+            })),
             slots: rosterSlots
         }
     } catch (error) {
@@ -175,47 +228,21 @@ export async function updateWeek3Rosters(
     const uniqueUserIds = new Set(filledSlots.map((s) => s.userId))
 
     if (uniqueUserIds.size > 0) {
-        const [signedUpRows, captainRows] = await Promise.all([
-            db
-                .select({ playerId: signups.player })
-                .from(signups)
-                .where(
-                    and(
-                        eq(signups.season, config.seasonId),
-                        inArray(signups.player, [...uniqueUserIds])
-                    )
-                ),
-            db
-                .select({
-                    userId: teams.captain,
-                    divisionId: teams.division
-                })
-                .from(teams)
-                .where(eq(teams.season, config.seasonId))
-        ])
+        const signedUpRows = await db
+            .select({ playerId: signups.player })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    inArray(signups.player, [...uniqueUserIds])
+                )
+            )
 
         if (signedUpRows.length !== uniqueUserIds.size) {
             return {
                 status: false,
                 message:
                     "All selected players must be signed up for the current season."
-            }
-        }
-
-        const captainDivisionByUser = new Map(
-            captainRows.map((row) => [row.userId, row.divisionId])
-        )
-
-        for (const slot of filledSlots) {
-            if (slot.isCaptain) {
-                const expectedDivision = captainDivisionByUser.get(slot.userId)
-                if (!expectedDivision || expectedDivision !== slot.divisionId) {
-                    return {
-                        status: false,
-                        message:
-                            "Captain slots must contain captains assigned to that same division."
-                    }
-                }
             }
         }
     }

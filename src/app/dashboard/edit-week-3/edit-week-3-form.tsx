@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import {
     Popover,
@@ -104,16 +105,40 @@ function PlayerCombobox({
                     )}
                     disabled={disabled}
                 >
-                    <span
-                        className={cn(
-                            "truncate",
-                            !selectedPlayer && "text-muted-foreground"
-                        )}
-                    >
-                        {selectedPlayer
-                            ? getPlayerLabel(selectedPlayer)
-                            : "Select player..."}
-                    </span>
+                    {selectedPlayer ? (
+                        <span className="flex min-w-0 flex-1 items-baseline gap-2 truncate">
+                            <span className="truncate">
+                                {getPlayerLabel(selectedPlayer)}
+                            </span>
+                            <span className="shrink-0 text-muted-foreground text-xs">
+                                {selectedPlayer.seasonsPlayedCount === 0 ? (
+                                    <span className="font-semibold text-green-600 dark:text-green-400">
+                                        NEW
+                                    </span>
+                                ) : selectedPlayer.lastDivisionName ? (
+                                    <span>
+                                        {selectedPlayer.lastDivisionName}
+                                    </span>
+                                ) : null}
+                                <span className="ml-1">
+                                    {Math.round(selectedPlayer.placementScore)}
+                                </span>
+                                {selectedPlayer.seasonsPlayedCount > 0 &&
+                                    selectedPlayer.ratingScore !== null && (
+                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                            R
+                                            {Math.round(
+                                                selectedPlayer.ratingScore
+                                            )}
+                                        </span>
+                                    )}
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="truncate text-muted-foreground">
+                            Select player...
+                        </span>
+                    )}
                     <div className="flex items-center gap-1">
                         {selectedPlayer && !disabled && (
                             <span
@@ -176,7 +201,32 @@ function PlayerCombobox({
                                     setSearch("")
                                 }}
                             >
-                                {getPlayerLabel(player)}
+                                <span className="flex items-baseline justify-between gap-2">
+                                    <span>{getPlayerLabel(player)}</span>
+                                    <span className="shrink-0 text-muted-foreground text-xs">
+                                        {player.seasonsPlayedCount === 0 ? (
+                                            <span className="font-semibold text-green-600 dark:text-green-400">
+                                                NEW
+                                            </span>
+                                        ) : player.lastDivisionName ? (
+                                            <span>
+                                                {player.lastDivisionName}
+                                            </span>
+                                        ) : null}
+                                        <span className="ml-1">
+                                            {Math.round(player.placementScore)}
+                                        </span>
+                                        {player.seasonsPlayedCount > 0 &&
+                                            player.ratingScore !== null && (
+                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                    R
+                                                    {Math.round(
+                                                        player.ratingScore
+                                                    )}
+                                                </span>
+                                            )}
+                                    </span>
+                                </span>
                             </button>
                         ))
                     )}
@@ -277,6 +327,16 @@ export function EditWeek3Form({
         )
     }
 
+    const toggleCaptain = (localKey: string) => {
+        setSlotAssignments((prev) =>
+            prev.map((slot) =>
+                slot.localKey === localKey
+                    ? { ...slot, isCaptain: !slot.isCaptain }
+                    : slot
+            )
+        )
+    }
+
     const handleSubmit = async () => {
         setError(null)
         setSuccess(null)
@@ -328,11 +388,6 @@ export function EditWeek3Form({
                                                     <div className="min-w-0 flex-1 space-y-1">
                                                         <p className="text-muted-foreground text-xs">
                                                             Slot {idx + 1}
-                                                            {slot.isCaptain && (
-                                                                <span className="ml-2 font-semibold text-primary">
-                                                                    Captain slot
-                                                                </span>
-                                                            )}
                                                         </p>
                                                         <PlayerCombobox
                                                             players={players}
@@ -345,9 +400,6 @@ export function EditWeek3Form({
                                                                     userId
                                                                 )
                                                             }
-                                                            disabled={
-                                                                slot.isCaptain
-                                                            }
                                                         />
                                                         {slot.userId &&
                                                             duplicateUserIds.has(
@@ -358,6 +410,21 @@ export function EditWeek3Form({
                                                                     twice
                                                                 </p>
                                                             )}
+                                                        {slot.userId && (
+                                                            <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                                                <Checkbox
+                                                                    checked={
+                                                                        slot.isCaptain
+                                                                    }
+                                                                    onCheckedChange={() =>
+                                                                        toggleCaptain(
+                                                                            slot.localKey
+                                                                        )
+                                                                    }
+                                                                />
+                                                                Captain
+                                                            </label>
+                                                        )}
                                                     </div>
                                                     {slot.userId && (
                                                         <Button

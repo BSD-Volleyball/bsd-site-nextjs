@@ -4,6 +4,7 @@ import { RiDeleteBinLine, RiFileCopyLine } from "@remixicon/react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { saveWeek3Rosters } from "./actions"
 import {
@@ -1858,18 +1859,66 @@ export function CreateWeek3Form({
     const [error, setError] = useState<string | null>(null)
     const modal = usePlayerDetailModal()
 
+    const aaDivision = divisions[0] ?? null
+    const aaCaptains = useMemo(
+        () =>
+            candidates
+                .filter(
+                    (c) =>
+                        c.isCaptain &&
+                        aaDivision !== null &&
+                        c.captainDivisionId === aaDivision.id
+                )
+                .sort((a, b) =>
+                    getDisplayName(a)
+                        .toLowerCase()
+                        .localeCompare(getDisplayName(b).toLowerCase())
+                ),
+        [candidates, aaDivision]
+    )
+
+    const [includedAaCaptainIds, setIncludedAaCaptainIds] = useState<
+        Set<string>
+    >(new Set())
+
+    const toggleAaCaptain = (userId: string) => {
+        setIncludedAaCaptainIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(userId)) {
+                next.delete(userId)
+            } else {
+                next.add(userId)
+            }
+            return next
+        })
+    }
+
+    const effectiveCandidates = useMemo(
+        () =>
+            candidates.filter(
+                (c) =>
+                    !c.isCaptain ||
+                    aaDivision === null ||
+                    c.captainDivisionId !== aaDivision.id ||
+                    includedAaCaptainIds.has(c.userId)
+            ),
+        [candidates, aaDivision, includedAaCaptainIds]
+    )
+
     const eligibleMaleCount = useMemo(
-        () => candidates.filter((candidate) => candidate.male === true).length,
-        [candidates]
+        () =>
+            effectiveCandidates.filter((candidate) => candidate.male === true)
+                .length,
+        [effectiveCandidates]
     )
     const eligibleNonMaleCount = useMemo(
-        () => candidates.length - eligibleMaleCount,
-        [candidates.length, eligibleMaleCount]
+        () => effectiveCandidates.length - eligibleMaleCount,
+        [effectiveCandidates.length, eligibleMaleCount]
     )
 
     const placementResult = useMemo(
-        () => buildDivisionPlacement(divisions, candidates),
-        [divisions, candidates]
+        () => buildDivisionPlacement(divisions, effectiveCandidates),
+        [divisions, effectiveCandidates]
     )
     const placement = placementResult.placement
     const playerPlacementReasonById = placementResult.reasonByUser
@@ -2257,11 +2306,47 @@ export function CreateWeek3Form({
 
     return (
         <div className="space-y-6">
+            {aaDivision && aaCaptains.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>
+                            AA Captains — Week 3 Participation
+                        </CardTitle>
+                        <p className="text-muted-foreground text-sm">
+                            Check each AA captain who is participating in Week
+                            3. Unchecked captains will not appear in any
+                            division.
+                        </p>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-col gap-2">
+                            {aaCaptains.map((captain) => (
+                                <label
+                                    key={captain.userId}
+                                    className="flex cursor-pointer items-center gap-2"
+                                >
+                                    <Checkbox
+                                        checked={includedAaCaptainIds.has(
+                                            captain.userId
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleAaCaptain(captain.userId)
+                                        }
+                                    />
+                                    <span className="text-sm">
+                                        {getDisplayName(captain)}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
             <Card>
                 <CardHeader>
                     <CardTitle>
                         Season: {seasonLabel} | Eligible Players:{" "}
-                        {candidates.length} ({eligibleMaleCount} male /{" "}
+                        {effectiveCandidates.length} ({eligibleMaleCount} male /{" "}
                         {eligibleNonMaleCount} non-male)
                     </CardTitle>
                 </CardHeader>
