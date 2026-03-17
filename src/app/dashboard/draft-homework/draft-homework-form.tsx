@@ -239,6 +239,206 @@ function RoundGroup({
     )
 }
 
+// ─── Print layout components ────────────────────────────────────────────────
+
+function getPlayersForRound(
+    tabKey: "m" | "f",
+    round: number,
+    selections: Selections,
+    players: DraftHomeworkPlayer[]
+): DraftHomeworkPlayer[] {
+    const result: DraftHomeworkPlayer[] = []
+    for (let slot = 0; slot < 30; slot++) {
+        const userId = selections[`${tabKey}-${round}-${slot}`]
+        if (userId) {
+            const player = players.find((p) => p.userId === userId)
+            if (player) result.push(player)
+        }
+    }
+    return result
+}
+
+function PrintPlayerCard({
+    player,
+    playerPicUrl
+}: {
+    player: DraftHomeworkPlayer
+    playerPicUrl: string
+}) {
+    const src = player.picture ? `${playerPicUrl}${player.picture}` : null
+    const displayName = player.preferredName
+        ? `${player.preferredName} ${player.lastName}`
+        : `${player.firstName} ${player.lastName}`
+    return (
+        <div style={{ textAlign: "center", width: "1.05in" }}>
+            {src ? (
+                <img
+                    src={src}
+                    alt={displayName}
+                    style={{
+                        width: "1in",
+                        height: "1.25in",
+                        objectFit: "cover",
+                        objectPosition: "top",
+                        borderRadius: "3px",
+                        display: "block"
+                    }}
+                />
+            ) : (
+                <div
+                    style={{
+                        width: "1in",
+                        height: "1.25in",
+                        background: "#e5e7eb",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "16pt",
+                        borderRadius: "3px"
+                    }}
+                >
+                    {player.firstName[0]}
+                    {player.lastName[0]}
+                </div>
+            )}
+            <div
+                style={{
+                    fontSize: "7.5pt",
+                    marginTop: "3px",
+                    lineHeight: 1.25,
+                    wordBreak: "break-word"
+                }}
+            >
+                {displayName}
+            </div>
+            {player.oldId > 0 && (
+                <div
+                    style={{
+                        fontSize: "7pt",
+                        color: "#888",
+                        lineHeight: 1.2
+                    }}
+                >
+                    #{player.oldId}
+                </div>
+            )}
+        </div>
+    )
+}
+
+function PrintTabSection({
+    tabKey,
+    numRounds,
+    players,
+    selections,
+    playerPicUrl
+}: {
+    tabKey: "m" | "f"
+    numRounds: number
+    players: DraftHomeworkPlayer[]
+    selections: Selections
+    playerPicUrl: string
+}) {
+    const rounds = Array.from({ length: numRounds }, (_, i) => i + 1)
+    const consideringPlayers = getPlayersForRound(
+        tabKey,
+        CONSIDERING_ROUND,
+        selections,
+        players
+    )
+
+    // Auto-scale to guarantee content fits within 10in of usable page height.
+    // Each round row ≈ 1.85in (label + 1.25in photo + name + margin).
+    // Header ≈ 0.45in. Considering section adds another ~1.85in if present.
+    const hasConsidering = consideringPlayers.length > 0
+    const estimatedHeightIn =
+        numRounds * 1.85 + (hasConsidering ? 1.85 : 0)
+    const zoom = Math.min(1, 10.25 / estimatedHeightIn)
+
+    return (
+        <div style={{ zoom: zoom }}>
+            {rounds.map((round) => {
+                const roundPlayers = getPlayersForRound(
+                    tabKey,
+                    round,
+                    selections,
+                    players
+                )
+                if (roundPlayers.length === 0) return null
+                return (
+                    <div key={round} style={{ marginBottom: "0.18in" }}>
+                        <div
+                            style={{
+                                fontSize: "9pt",
+                                fontWeight: "bold",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.04em",
+                                color: "#444",
+                                marginBottom: "0.08in",
+                                borderBottom: "1px solid #ccc",
+                                paddingBottom: "2px"
+                            }}
+                        >
+                            Round {round}
+                        </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "0.1in"
+                            }}
+                        >
+                            {roundPlayers.map((player) => (
+                                <PrintPlayerCard
+                                    key={player.userId}
+                                    player={player}
+                                    playerPicUrl={playerPicUrl}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )
+            })}
+
+            {consideringPlayers.length > 0 && (
+                <div style={{ marginTop: "0.1in" }}>
+                    <div
+                        style={{
+                            fontSize: "9pt",
+                            fontWeight: "bold",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            color: "#444",
+                            marginBottom: "0.08in",
+                            borderBottom: "1px solid #ccc",
+                            paddingBottom: "2px"
+                        }}
+                    >
+                        Considering
+                    </div>
+                    <div
+                        style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "0.1in"
+                        }}
+                    >
+                        {consideringPlayers.map((player) => (
+                            <PrintPlayerCard
+                                key={player.userId}
+                                player={player}
+                                playerPicUrl={playerPicUrl}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── End print layout components ─────────────────────────────────────────────
+
 interface SuggestedPlayerListProps {
     players: DraftHomeworkPlayer[]
     selectedIds: Set<string>
@@ -536,30 +736,69 @@ export function DraftHomeworkForm({
     const hasExisting = data.existingSelections.length > 0
 
     return (
-        <div className="space-y-4">
-            {data.lastUpdatedAt && (
-                <p className="text-muted-foreground text-sm">
-                    Last saved:{" "}
-                    {new Date(data.lastUpdatedAt).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit"
-                    })}
-                </p>
-            )}
+        <>
+            <style>{`@media print { @page { size: letter portrait; margin: 0.25in 0.5in 0.5in 0.5in; } }`}</style>
 
-            <div className="flex items-center gap-3 rounded-md border bg-card p-4">
-                <p className="flex-1 text-muted-foreground text-sm">
-                    Division:{" "}
-                    <span className="font-medium text-foreground">
-                        {data.divisionName}
-                    </span>
-                    {" · "}
-                    {data.numTeams} teams ({data.genderSplit} split)
-                </p>
-                {/* Last Season's Draft button — temporarily hidden, re-enable when needed
+            {/* ── Print-only layout ── */}
+            <div
+                className="hidden print:block"
+                style={{ fontFamily: "sans-serif" }}
+            >
+                <div style={{ breakAfter: "page" }}>
+                    <PrintTabSection
+                        tabKey="m"
+                        numRounds={maleRounds}
+                        players={data.malePlayers}
+                        selections={selections}
+                        playerPicUrl={playerPicUrl}
+                    />
+                </div>
+                <div>
+                    <PrintTabSection
+                        tabKey="f"
+                        numRounds={nonMaleRounds}
+                        players={data.nonMalePlayers}
+                        selections={selections}
+                        playerPicUrl={playerPicUrl}
+                    />
+                </div>
+            </div>
+
+            {/* ── Screen layout ── */}
+            <div className="space-y-4 print:hidden">
+                {data.lastUpdatedAt && (
+                    <p className="text-muted-foreground text-sm">
+                        Last saved:{" "}
+                        {new Date(data.lastUpdatedAt).toLocaleString(
+                            undefined,
+                            {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit"
+                            }
+                        )}
+                    </p>
+                )}
+
+                <div className="flex items-center gap-3 rounded-md border bg-card p-4">
+                    <p className="flex-1 text-muted-foreground text-sm">
+                        Division:{" "}
+                        <span className="font-medium text-foreground">
+                            {data.divisionName}
+                        </span>
+                        {" · "}
+                        {data.numTeams} teams ({data.genderSplit} split)
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.print()}
+                    >
+                        Print
+                    </Button>
+                    {/* Last Season's Draft button — temporarily hidden, re-enable when needed
                 <Button
                     variant="outline"
                     size="sm"
@@ -568,9 +807,9 @@ export function DraftHomeworkForm({
                     Last Season&apos;s Draft
                 </Button>
                 */}
-            </div>
+                </div>
 
-            {/* Last Season's Draft dialog — temporarily hidden, re-enable when needed
+                {/* Last Season's Draft dialog — temporarily hidden, re-enable when needed
             <Dialog
                 open={lastSeasonDraftOpen}
                 onOpenChange={setLastSeasonDraftOpen}
@@ -675,100 +914,101 @@ export function DraftHomeworkForm({
             </Dialog>
             */}
 
-            <Tabs defaultValue="males">
-                <TabsList>
-                    <TabsTrigger
-                        value="males"
-                        className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 dark:data-[state=active]:bg-blue-900/40 dark:data-[state=active]:text-blue-300"
-                    >
-                        Males ({maleRounds} rounds)
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="non-males"
-                        className="data-[state=active]:bg-pink-100 data-[state=active]:text-pink-800 dark:data-[state=active]:bg-pink-900/40 dark:data-[state=active]:text-pink-300"
-                    >
-                        Non-Males ({nonMaleRounds} rounds)
-                    </TabsTrigger>
-                </TabsList>
+                <Tabs defaultValue="males">
+                    <TabsList>
+                        <TabsTrigger
+                            value="males"
+                            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 dark:data-[state=active]:bg-blue-900/40 dark:data-[state=active]:text-blue-300"
+                        >
+                            Males ({maleRounds} rounds)
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="non-males"
+                            className="data-[state=active]:bg-pink-100 data-[state=active]:text-pink-800 dark:data-[state=active]:bg-pink-900/40 dark:data-[state=active]:text-pink-300"
+                        >
+                            Non-Males ({nonMaleRounds} rounds)
+                        </TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="males">
-                    <HomeworkTabContent
-                        tabKey="m"
-                        numRounds={maleRounds}
-                        numTeams={data.numTeams}
-                        players={data.malePlayers}
-                        suggestedPlayers={data.suggestedMalePlayers}
-                        selections={selections}
-                        draftedIds={draftedIds}
-                        playerPicUrl={playerPicUrl}
-                        onChange={handleChange}
-                        onOpenPlayer={modal.openPlayerDetail}
-                    />
-                </TabsContent>
+                    <TabsContent value="males">
+                        <HomeworkTabContent
+                            tabKey="m"
+                            numRounds={maleRounds}
+                            numTeams={data.numTeams}
+                            players={data.malePlayers}
+                            suggestedPlayers={data.suggestedMalePlayers}
+                            selections={selections}
+                            draftedIds={draftedIds}
+                            playerPicUrl={playerPicUrl}
+                            onChange={handleChange}
+                            onOpenPlayer={modal.openPlayerDetail}
+                        />
+                    </TabsContent>
 
-                <TabsContent value="non-males">
-                    <HomeworkTabContent
-                        tabKey="f"
-                        numRounds={nonMaleRounds}
-                        numTeams={data.numTeams}
-                        players={data.nonMalePlayers}
-                        suggestedPlayers={data.suggestedNonMalePlayers}
-                        selections={selections}
-                        draftedIds={draftedIds}
-                        playerPicUrl={playerPicUrl}
-                        onChange={handleChange}
-                        onOpenPlayer={modal.openPlayerDetail}
-                    />
-                </TabsContent>
-            </Tabs>
+                    <TabsContent value="non-males">
+                        <HomeworkTabContent
+                            tabKey="f"
+                            numRounds={nonMaleRounds}
+                            numTeams={data.numTeams}
+                            players={data.nonMalePlayers}
+                            suggestedPlayers={data.suggestedNonMalePlayers}
+                            selections={selections}
+                            draftedIds={draftedIds}
+                            playerPicUrl={playerPicUrl}
+                            onChange={handleChange}
+                            onOpenPlayer={modal.openPlayerDetail}
+                        />
+                    </TabsContent>
+                </Tabs>
 
-            <div className="flex items-center gap-3 pt-2">
-                <Button onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : hasExisting ? "Update" : "Save"}
-                </Button>
+                <div className="flex items-center gap-3 pt-2">
+                    <Button onClick={handleSave} disabled={saving}>
+                        {saving ? "Saving..." : hasExisting ? "Update" : "Save"}
+                    </Button>
+                </div>
+
+                <Dialog
+                    open={showIncompleteDialog}
+                    onOpenChange={setShowIncompleteDialog}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>
+                                Homework Saved — Not Yet Complete
+                            </DialogTitle>
+                            <DialogDescription>
+                                Your selections have been saved, but your draft
+                                homework is not complete until all round slots
+                                are filled for both the Males and Non-Males
+                                tabs. The Considering section is optional.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button>Got it</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <PlayerDetailPopup
+                    open={!!modal.selectedUserId}
+                    onClose={modal.closePlayerDetail}
+                    playerDetails={modal.playerDetails}
+                    draftHistory={modal.draftHistory}
+                    allSeasons={data.allSeasons}
+                    playerPicUrl={playerPicUrl}
+                    isLoading={modal.isLoading}
+                    pairPickName={modal.pairPickName}
+                    pairReason={modal.pairReason}
+                    datesMissing={modal.datesMissing}
+                    playoffDates={modal.playoffDates}
+                    ratingAverages={modal.ratingAverages}
+                    sharedRatingNotes={modal.sharedRatingNotes}
+                    privateRatingNotes={modal.privateRatingNotes}
+                    viewerRating={modal.viewerRating}
+                />
             </div>
-
-            <Dialog
-                open={showIncompleteDialog}
-                onOpenChange={setShowIncompleteDialog}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Homework Saved — Not Yet Complete
-                        </DialogTitle>
-                        <DialogDescription>
-                            Your selections have been saved, but your draft
-                            homework is not complete until all round slots are
-                            filled for both the Males and Non-Males tabs. The
-                            Considering section is optional.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <DialogClose asChild>
-                            <Button>Got it</Button>
-                        </DialogClose>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            <PlayerDetailPopup
-                open={!!modal.selectedUserId}
-                onClose={modal.closePlayerDetail}
-                playerDetails={modal.playerDetails}
-                draftHistory={modal.draftHistory}
-                allSeasons={data.allSeasons}
-                playerPicUrl={playerPicUrl}
-                isLoading={modal.isLoading}
-                pairPickName={modal.pairPickName}
-                pairReason={modal.pairReason}
-                datesMissing={modal.datesMissing}
-                playoffDates={modal.playoffDates}
-                ratingAverages={modal.ratingAverages}
-                sharedRatingNotes={modal.sharedRatingNotes}
-                privateRatingNotes={modal.privateRatingNotes}
-                viewerRating={modal.viewerRating}
-            />
-        </div>
+        </>
     )
 }

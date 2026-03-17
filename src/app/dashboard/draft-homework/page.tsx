@@ -39,12 +39,14 @@ export default async function DraftHomeworkPage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader
-                title="Draft Homework"
-                description={`${result.data.divisionName} Division — plan your picks before the live draft.`}
-            />
+            <div className="print:hidden">
+                <PageHeader
+                    title="Draft Homework"
+                    description={`${result.data.divisionName} Division — plan your picks before the live draft.`}
+                />
+            </div>
 
-            <div className="rounded-md border bg-muted/30 p-4 text-sm">
+            <div className="rounded-md border bg-muted/30 p-4 text-sm print:hidden">
                 <p className="font-medium">Instructions</p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
                     <li>
@@ -71,7 +73,7 @@ export default async function DraftHomeworkPage() {
             </div>
 
             {hasSubmitted && (
-                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-green-800 text-sm dark:border-green-900 dark:bg-green-950 dark:text-green-200">
+                <div className="rounded-md border border-green-200 bg-green-50 p-3 text-green-800 text-sm dark:border-green-900 dark:bg-green-950 dark:text-green-200 print:hidden">
                     You have already saved draft homework. Your selections are
                     shown below and can be updated at any time.
                 </div>
