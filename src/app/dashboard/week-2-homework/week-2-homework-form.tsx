@@ -152,6 +152,7 @@ interface PlayerComboboxProps {
     value: string
     onValueChange: (val: string) => void
     placeholder: string
+    exclude?: string[]
     onPlayerNameClick: (userId: string) => void
 }
 
@@ -160,10 +161,16 @@ function PlayerCombobox({
     value,
     onValueChange,
     placeholder,
+    exclude = [],
     onPlayerNameClick
 }: PlayerComboboxProps) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState("")
+
+    const availablePlayers = useMemo(
+        () => players.filter((p) => !exclude.includes(p.userId)),
+        [players, exclude]
+    )
 
     const selectedPlayer = useMemo(
         () => players.find((p) => p.userId === value) ?? null,
@@ -171,9 +178,9 @@ function PlayerCombobox({
     )
 
     const filteredPlayers = useMemo(() => {
-        if (!search.trim()) return players
+        if (!search.trim()) return availablePlayers
         const lower = search.toLowerCase()
-        return players.filter((p) => {
+        return availablePlayers.filter((p) => {
             const name =
                 `${p.preferredName ?? p.firstName} ${p.lastName}`.toLowerCase()
             const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
@@ -184,7 +191,7 @@ function PlayerCombobox({
                 oldId.includes(lower)
             )
         })
-    }, [players, search])
+    }, [availablePlayers, search])
 
     const handleSelect = (userId: string) => {
         onValueChange(userId)
@@ -345,6 +352,25 @@ export function Week2HomeworkForm({
     const nonCaptainAllTryoutPlayers = allTryoutPlayers.filter(
         (p) => p.userId !== captainUserId
     )
+
+    const forcedSelections = [
+        forcedMoveUpMale,
+        forcedMoveUpNonMale,
+        forcedMoveDownMale,
+        forcedMoveDownNonMale
+    ].filter(Boolean)
+
+    const getExcludeForRecUp = (index: number): string[] => [
+        ...forcedSelections,
+        ...recommendedMoveUp.filter((v, i) => i !== index && Boolean(v)),
+        ...recommendedMoveDown.filter(Boolean)
+    ]
+
+    const getExcludeForRecDown = (index: number): string[] => [
+        ...forcedSelections,
+        ...recommendedMoveDown.filter((v, i) => i !== index && Boolean(v)),
+        ...recommendedMoveUp.filter(Boolean)
+    ]
 
     const handleAddRecommendedUp = () => {
         setRecommendedMoveUp((prev) => [...prev, ""])
@@ -660,6 +686,7 @@ export function Week2HomeworkForm({
                                         handleRecommendedUpChange(index, v)
                                     }
                                     placeholder="Search player..."
+                                    exclude={getExcludeForRecUp(index)}
                                     onPlayerNameClick={modal.openPlayerDetail}
                                 />
                                 <Button
@@ -710,6 +737,7 @@ export function Week2HomeworkForm({
                                         handleRecommendedDownChange(index, v)
                                     }
                                     placeholder="Search player..."
+                                    exclude={getExcludeForRecDown(index)}
                                     onPlayerNameClick={modal.openPlayerDetail}
                                 />
                                 <Button
