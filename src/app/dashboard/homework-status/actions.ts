@@ -39,7 +39,33 @@ export interface HomeworkStatusData {
     status: boolean
     message?: string
     seasonLabel: string
+    seasonId: number
     divisions: DivisionStatus[]
+}
+
+export interface RatedPlayer {
+    playerId: string
+    playerName: string
+}
+
+export interface RatePlayersDetailResult {
+    status: boolean
+    message?: string
+    players: RatedPlayer[]
+}
+
+export interface MovingDayPlayer {
+    playerId: string
+    playerName: string
+}
+
+export interface MovingDayDetailResult {
+    status: boolean
+    message?: string
+    forcedUp: MovingDayPlayer[]
+    forcedDown: MovingDayPlayer[]
+    recommendedUp: MovingDayPlayer[]
+    recommendedDown: MovingDayPlayer[]
 }
 
 export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
@@ -50,6 +76,7 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
             status: false,
             message: "Unauthorized",
             seasonLabel: "",
+            seasonId: 0,
             divisions: []
         }
     }
@@ -85,6 +112,7 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 status: false,
                 message: "No season found.",
                 seasonLabel: "",
+                seasonId: 0,
                 divisions: []
             }
         }
@@ -99,6 +127,7 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 status: false,
                 message: "Unauthorized",
                 seasonLabel: "",
+                seasonId: 0,
                 divisions: []
             }
         }
@@ -112,6 +141,7 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 status: false,
                 message: "Unauthorized",
                 seasonLabel: "",
+                seasonId: 0,
                 divisions: []
             }
         }
@@ -351,6 +381,7 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
         return {
             status: true,
             seasonLabel,
+            seasonId,
             divisions: divisionStatuses
         }
     } catch (error) {
@@ -359,7 +390,167 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
             status: false,
             message: "Something went wrong.",
             seasonLabel: "",
+            seasonId: 0,
             divisions: []
+        }
+    }
+}
+
+export async function getRatePlayersDetail(
+    captainId: string,
+    seasonId: number
+): Promise<RatePlayersDetailResult> {
+    const hasAccess = await getIsCommissioner()
+    if (!hasAccess) {
+        return { status: false, message: "Unauthorized", players: [] }
+    }
+
+    try {
+        const ratings = await db
+            .select({ player: playerRatings.player })
+            .from(playerRatings)
+            .where(
+                and(
+                    eq(playerRatings.season, seasonId),
+                    eq(playerRatings.evaluator, captainId)
+                )
+            )
+
+        const playerIds = ratings.map((r) => r.player)
+        if (playerIds.length === 0) {
+            return { status: true, players: [] }
+        }
+
+        const playerUsers = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                preffered_name: users.preffered_name
+            })
+            .from(users)
+            .where(inArray(users.id, playerIds))
+
+        const userMap = new Map(playerUsers.map((u) => [u.id, u]))
+
+        const players = playerIds
+            .map((id) => {
+                const u = userMap.get(id)
+                const displayFirst = u?.preffered_name || u?.first_name || ""
+                return {
+                    playerId: id,
+                    playerName: u ? `${displayFirst} ${u.last_name}`.trim() : id
+                }
+            })
+            .sort((a, b) => a.playerName.localeCompare(b.playerName))
+
+        return { status: true, players }
+    } catch (error) {
+        console.error("Error fetching rate players detail:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            players: []
+        }
+    }
+}
+
+export async function getMovingDayDetail(
+    captainId: string,
+    seasonId: number
+): Promise<MovingDayDetailResult> {
+    const hasAccess = await getIsCommissioner()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "Unauthorized",
+            forcedUp: [],
+            forcedDown: [],
+            recommendedUp: [],
+            recommendedDown: []
+        }
+    }
+
+    try {
+        const entries = await db
+            .select({
+                player: movingDay.player,
+                direction: movingDay.direction,
+                isForced: movingDay.is_forced
+            })
+            .from(movingDay)
+            .where(
+                and(
+                    eq(movingDay.season, seasonId),
+                    eq(movingDay.submitted_by, captainId)
+                )
+            )
+
+        const playerIds = [...new Set(entries.map((e) => e.player))]
+        if (playerIds.length === 0) {
+            return {
+                status: true,
+                forcedUp: [],
+                forcedDown: [],
+                recommendedUp: [],
+                recommendedDown: []
+            }
+        }
+
+        const playerUsers = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                preffered_name: users.preffered_name
+            })
+            .from(users)
+            .where(inArray(users.id, playerIds))
+
+        const userMap = new Map(playerUsers.map((u) => [u.id, u]))
+
+        const getPlayerName = (id: string) => {
+            const u = userMap.get(id)
+            const displayFirst = u?.preffered_name || u?.first_name || ""
+            return u ? `${displayFirst} ${u.last_name}`.trim() : id
+        }
+
+        const toPlayer = (e: { player: string }): MovingDayPlayer => ({
+            playerId: e.player,
+            playerName: getPlayerName(e.player)
+        })
+
+        const sortByName = (a: MovingDayPlayer, b: MovingDayPlayer) =>
+            a.playerName.localeCompare(b.playerName)
+
+        return {
+            status: true,
+            forcedUp: entries
+                .filter((e) => e.isForced && e.direction === "up")
+                .map(toPlayer)
+                .sort(sortByName),
+            forcedDown: entries
+                .filter((e) => e.isForced && e.direction === "down")
+                .map(toPlayer)
+                .sort(sortByName),
+            recommendedUp: entries
+                .filter((e) => !e.isForced && e.direction === "up")
+                .map(toPlayer)
+                .sort(sortByName),
+            recommendedDown: entries
+                .filter((e) => !e.isForced && e.direction === "down")
+                .map(toPlayer)
+                .sort(sortByName)
+        }
+    } catch (error) {
+        console.error("Error fetching moving day detail:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            forcedUp: [],
+            forcedDown: [],
+            recommendedUp: [],
+            recommendedDown: []
         }
     }
 }

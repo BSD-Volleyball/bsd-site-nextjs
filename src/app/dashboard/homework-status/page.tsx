@@ -48,7 +48,10 @@ export default async function HomeworkStatusPage() {
                 title={`${result.seasonLabel} Homework Status`}
                 description="Track whether each captain has completed their pre-draft homework tasks."
             />
-            <HomeworkStatusView divisions={result.divisions} />
+            <HomeworkStatusView
+                divisions={result.divisions}
+                seasonId={result.seasonId}
+            />
         </div>
     )
 }
