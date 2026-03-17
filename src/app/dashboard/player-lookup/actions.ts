@@ -10,7 +10,11 @@ import {
     divisions
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import { getSessionUserId, isCommissionerBySession } from "@/lib/rbac"
+import {
+    getSessionUserId,
+    isCommissionerBySession,
+    isAdminOrDirectorBySession
+} from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     getEmptyPlayerRatingAverages,
@@ -292,9 +296,24 @@ export async function getPlayerDetails(playerId: string): Promise<{
             config.playoff3Date
         ].filter(Boolean)
 
+        const isAdmin = await isAdminOrDirectorBySession()
+        const sanitizedPlayer = isAdmin
+            ? player
+            : {
+                  ...player,
+                  email: "",
+                  emailVerified: false,
+                  phone: null,
+                  emergency_contact: null,
+                  role: null,
+                  onboarding_completed: null,
+                  createdAt: new Date(0),
+                  updatedAt: new Date(0)
+              }
+
         return {
             status: true,
-            player,
+            player: sanitizedPlayer,
             signupHistory,
             draftHistory: draftData,
             ratingAverages: ratingsSection.averages,
