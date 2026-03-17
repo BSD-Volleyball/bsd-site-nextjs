@@ -702,7 +702,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             signupHistory: [],
             ratingAverages: ratingsSection.averages,
             sharedRatingNotes: ratingsSection.sharedNotes,
-            privateRatingNotes: ratingsSection.privateNotes,
+            privateRatingNotes: [],
             viewerRating: ratingsSection.viewerRating,
             pairPickName,
             pairReason,
