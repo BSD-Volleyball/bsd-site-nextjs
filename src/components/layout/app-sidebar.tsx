@@ -66,7 +66,11 @@ import {
     getSeasonPhase,
     type SeasonNavItem
 } from "@/app/dashboard/actions"
-import { PHASE_CONFIG, type SeasonPhase } from "@/lib/season-phases"
+import {
+    PHASE_CONFIG,
+    SEASON_PHASES,
+    type SeasonPhase
+} from "@/lib/season-phases"
 
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
@@ -141,11 +145,6 @@ const adminNavItems = [
         icon: RiStarLine
     },
     {
-        title: "Attrition",
-        url: "/dashboard/attrition",
-        icon: RiUserUnfollowLine
-    },
-    {
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
@@ -194,11 +193,6 @@ const adminDangerNavItems = [
         icon: RiEditLine
     },
     {
-        title: "Admin Create Teams",
-        url: "/dashboard/admin-create-teams",
-        icon: RiTeamLine
-    },
-    {
         title: "Select Commissioners",
         url: "/dashboard/select-commissioners",
         icon: RiUserSettingsLine
@@ -225,23 +219,35 @@ const adminDangerNavItems = [
     }
 ]
 
-const seasonNavItems = [
+// These items are never shown in normal sidebar sections — always in the admin hidden section
+const alwaysHiddenAdminItems = [
     {
-        title: "Pre-Season Week 1",
-        url: "/dashboard/preseason-week-1",
-        icon: RiCalendarLine
+        title: "Attrition",
+        url: "/dashboard/attrition",
+        icon: RiUserUnfollowLine
     },
     {
-        title: "Pre-Season Week 2",
-        url: "/dashboard/preseason-week-2",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Pre-Season Week 3",
-        url: "/dashboard/preseason-week-3",
-        icon: RiCalendarLine
+        title: "Admin Create Teams",
+        url: "/dashboard/admin-create-teams",
+        icon: RiTeamLine
     }
 ]
+
+const week1NavItem = {
+    title: "Pre-Season Week 1",
+    url: "/dashboard/preseason-week-1",
+    icon: RiCalendarLine
+}
+const week2NavItem = {
+    title: "Pre-Season Week 2",
+    url: "/dashboard/preseason-week-2",
+    icon: RiCalendarLine
+}
+const week3NavItem = {
+    title: "Pre-Season Week 3",
+    url: "/dashboard/preseason-week-3",
+    icon: RiCalendarLine
+}
 
 const addPicturesNavItem = {
     title: "Add Pictures",
@@ -459,12 +465,170 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     const phaseConfig = phase ? PHASE_CONFIG[phase] : null
 
+    // Phase range helper
+    const phaseIdx = phase ? SEASON_PHASES.indexOf(phase) : -1
+    const inRange = (start: SeasonPhase, end: SeasonPhase): boolean => {
+        if (phaseIdx < 0) return false
+        return (
+            phaseIdx >= SEASON_PHASES.indexOf(start) &&
+            phaseIdx <= SEASON_PHASES.indexOf(end)
+        )
+    }
+
+    // Per-item phase visibility
+    const showWeek1 = inRange("select_commissioners", "prep_tryout_week_1")
+    const showWeek2 = phase === "prep_tryout_week_2"
+    const showWeek3 = phase === "prep_tryout_week_3"
+    const showWeek2Homework = phase === "prep_tryout_week_3"
+    const showDraftItems = inRange("prep_tryout_week_2", "draft")
+    const showPictures =
+        hasPicturesAccess && inRange("prep_tryout_week_1", "draft")
+    const showReviewPairs = isAdmin && inRange("select_commissioners", "draft")
+    const showEvaluatePlayers =
+        isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
+
+    // Captain pages — per-item filtering
+    const captainBaseVisible =
+        hasCaptainPagesAccess &&
+        !!phaseConfig &&
+        (phaseConfig.showTryoutTools ||
+            phaseConfig.showDraftTools ||
+            phaseConfig.showSeasonTools)
+    const visibleCaptainItems = [
+        ...(captainBaseVisible ? captainPagesNavItems.slice(0, 3) : []),
+        ...(hasCaptainPagesAccess && showWeek2Homework
+            ? [captainPagesNavItems[3]]
+            : []),
+        ...(hasCaptainPagesAccess && showDraftItems
+            ? captainPagesNavItems.slice(4)
+            : [])
+    ]
+
+    // Commissioner section — per-item filtering
+    const showCommissionerSection =
+        isCommissioner &&
+        !!phaseConfig &&
+        (phaseConfig.showTryoutTools || phaseConfig.showDraftTools)
+    const visibleCommissionerItems = showCommissionerSection
+        ? commissionerNavItems.filter((item) => {
+              if (
+                  item.url === "/dashboard/potential-captains" ||
+                  item.url === "/dashboard/select-captains"
+              )
+                  return inRange("select_commissioners", "prep_tryout_week_1")
+              if (
+                  item.url === "/dashboard/prepare-for-draft" ||
+                  item.url === "/dashboard/draft-day"
+              )
+                  return inRange("prep_tryout_week_3", "draft")
+              return true // Homework Status: unchanged
+          })
+        : []
+
     // Build nav items dynamically
     let navItems = [...baseNavItems]
 
     // Insert signup after Dashboard if eligible
     if (showSignupLink) {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
+    }
+
+    // Admin hidden section — collect all currently-suppressed items by group
+    type NavItem = { title: string; url: string; icon: typeof RiSpeedUpLine }
+    const hiddenGroups: { label: string; items: NavItem[] }[] = []
+
+    if (isAdmin) {
+        // Always hidden
+        hiddenGroups.push({
+            label: "Always Hidden",
+            items: alwaysHiddenAdminItems
+        })
+
+        // Season week pages currently suppressed
+        const hiddenSeasonItems = [
+            ...(!showWeek1 ? [week1NavItem] : []),
+            ...(!showWeek2 ? [week2NavItem] : []),
+            ...(!showWeek3 ? [week3NavItem] : [])
+        ]
+        if (hiddenSeasonItems.length > 0)
+            hiddenGroups.push({
+                label: "Season Weeks",
+                items: hiddenSeasonItems
+            })
+
+        // Danger Zone week pages currently suppressed
+        const hiddenDangerWeekItems = adminDangerNavItems.filter(
+            (item) =>
+                ([
+                    "/dashboard/create-week-1",
+                    "/dashboard/edit-week-1"
+                ].includes(item.url) &&
+                    !showWeek1) ||
+                ([
+                    "/dashboard/create-week-2",
+                    "/dashboard/edit-week-2"
+                ].includes(item.url) &&
+                    !showWeek2) ||
+                ([
+                    "/dashboard/create-week-3",
+                    "/dashboard/edit-week-3"
+                ].includes(item.url) &&
+                    !showWeek3)
+        )
+        if (hiddenDangerWeekItems.length > 0)
+            hiddenGroups.push({
+                label: "Danger Zone (Weeks)",
+                items: hiddenDangerWeekItems
+            })
+
+        // Captain page items currently suppressed
+        const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
+            if (item.url === "/dashboard/week-2-homework")
+                return !showWeek2Homework
+            if (
+                item.url === "/dashboard/draft-homework" ||
+                item.url === "/dashboard/draft-division"
+            )
+                return !showDraftItems
+            // Base items hidden if the whole captain section is suppressed
+            return !captainBaseVisible
+        })
+        if (hiddenCaptainItems.length > 0)
+            hiddenGroups.push({
+                label: "Captain Pages",
+                items: hiddenCaptainItems
+            })
+
+        // Pictures
+        if (!showPictures)
+            hiddenGroups.push({
+                label: "Pictures",
+                items: [addPicturesNavItem]
+            })
+
+        // Commissioner items currently suppressed
+        const hiddenCommissionerItems = commissionerNavItems.filter(
+            (item) => !visibleCommissionerItems.includes(item)
+        )
+        if (hiddenCommissionerItems.length > 0)
+            hiddenGroups.push({
+                label: "Commissioner",
+                items: hiddenCommissionerItems
+            })
+
+        // Admin items: Review Pairs + Evaluate New Players if suppressed
+        const hiddenAdminItems = adminNavItems.filter(
+            (item) =>
+                (item.url === "/dashboard/review-pairs" && !showReviewPairs) ||
+                (item.url === "/dashboard/evaluate-players" &&
+                    !showEvaluatePlayers)
+        )
+        if (hiddenAdminItems.length > 0)
+            hiddenGroups.push({ label: "Admin", items: hiddenAdminItems })
+
+        // Sign-up link if admin's account isn't eligible
+        if (!showSignupLink)
+            hiddenGroups.push({ label: "Sign-Up", items: [signupNavItem] })
     }
 
     return (
@@ -484,19 +648,35 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                        Season
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <NavItems
-                                items={seasonNavItems}
-                                pathname={pathname}
-                            />
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
+                {(showWeek1 || showWeek2 || showWeek3) && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Season
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                {showWeek1 && (
+                                    <NavItems
+                                        items={[week1NavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                                {showWeek2 && (
+                                    <NavItems
+                                        items={[week2NavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                                {showWeek3 && (
+                                    <NavItems
+                                        items={[week3NavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
 
                 {seasonNav.length > 0 && (
                     <SidebarGroup>
@@ -517,63 +697,53 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                {hasCaptainPagesAccess &&
-                    phaseConfig &&
-                    (phaseConfig.showTryoutTools ||
-                        phaseConfig.showDraftTools ||
-                        phaseConfig.showSeasonTools) && (
-                        <SidebarGroup>
-                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                                Captain Pages
-                            </SidebarGroupLabel>
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    <NavItems
-                                        items={captainPagesNavItems}
-                                        pathname={pathname}
-                                    />
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
-                    )}
+                {visibleCaptainItems.length > 0 && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Captain Pages
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={visibleCaptainItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
 
-                {hasPicturesAccess &&
-                    phaseConfig &&
-                    (phaseConfig.showTryoutTools ||
-                        phaseConfig.showDraftTools) && (
-                        <SidebarGroup>
-                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                                Pictures
-                            </SidebarGroupLabel>
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    <NavItems
-                                        items={[addPicturesNavItem]}
-                                        pathname={pathname}
-                                    />
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
-                    )}
+                {showPictures && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Pictures
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={[addPicturesNavItem]}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
 
-                {isCommissioner &&
-                    phaseConfig &&
-                    (phaseConfig.showTryoutTools ||
-                        phaseConfig.showDraftTools) && (
-                        <SidebarGroup>
-                            <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                                Commissioners
-                            </SidebarGroupLabel>
-                            <SidebarGroupContent>
-                                <SidebarMenu>
-                                    <NavItems
-                                        items={commissionerNavItems}
-                                        pathname={pathname}
-                                    />
-                                </SidebarMenu>
-                            </SidebarGroupContent>
-                        </SidebarGroup>
-                    )}
+                {visibleCommissionerItems.length > 0 && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Commissioners
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={visibleCommissionerItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
 
                 {hasConcernsAccess && (
                     <SidebarGroup>
@@ -599,7 +769,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <NavItems
-                                    items={adminNavItems}
+                                    items={adminNavItems.filter((item) => {
+                                        if (
+                                            item.url ===
+                                            "/dashboard/review-pairs"
+                                        )
+                                            return showReviewPairs
+                                        if (
+                                            item.url ===
+                                            "/dashboard/evaluate-players"
+                                        )
+                                            return showEvaluatePlayers
+                                        return true
+                                    })}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>
@@ -616,22 +798,92 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={adminDangerNavItems.filter(
-                                        (item) =>
-                                            (item.url !==
-                                                "/dashboard/select-commissioners" ||
-                                                phase ===
-                                                    "select_commissioners") &&
-                                            (item.url !==
-                                                "/dashboard/create-divisions" ||
-                                                phase ===
-                                                    "select_commissioners" ||
-                                                phase === "select_captains")
+                                        (item) => {
+                                            if (
+                                                item.url ===
+                                                    "/dashboard/create-week-1" ||
+                                                item.url ===
+                                                    "/dashboard/edit-week-1"
+                                            )
+                                                return showWeek1
+                                            if (
+                                                item.url ===
+                                                    "/dashboard/create-week-2" ||
+                                                item.url ===
+                                                    "/dashboard/edit-week-2"
+                                            )
+                                                return showWeek2
+                                            if (
+                                                item.url ===
+                                                    "/dashboard/create-week-3" ||
+                                                item.url ===
+                                                    "/dashboard/edit-week-3"
+                                            )
+                                                return showWeek3
+                                            if (
+                                                item.url ===
+                                                "/dashboard/select-commissioners"
+                                            )
+                                                return (
+                                                    phase ===
+                                                    "select_commissioners"
+                                                )
+                                            if (
+                                                item.url ===
+                                                "/dashboard/create-divisions"
+                                            )
+                                                return (
+                                                    phase ===
+                                                        "select_commissioners" ||
+                                                    phase === "select_captains"
+                                                )
+                                            return true
+                                        }
                                     )}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
+                )}
+
+                {isAdmin && (
+                    <Collapsible
+                        defaultOpen={false}
+                        className="group/hidden-pages"
+                    >
+                        <SidebarGroup>
+                            <SidebarGroupLabel
+                                asChild
+                                className="cursor-pointer text-muted-foreground/65 uppercase hover:text-foreground"
+                            >
+                                <CollapsibleTrigger className="flex w-full items-center">
+                                    All Hidden Pages
+                                    <RiArrowDownSLine
+                                        className="ml-auto transition-transform duration-200 group-data-[state=open]/hidden-pages:rotate-180"
+                                        size={16}
+                                    />
+                                </CollapsibleTrigger>
+                            </SidebarGroupLabel>
+                            <CollapsibleContent>
+                                <SidebarGroupContent>
+                                    {hiddenGroups.map((group) => (
+                                        <div key={group.label}>
+                                            <p className="px-2 pt-2 pb-1 text-muted-foreground/50 text-xs">
+                                                {group.label}
+                                            </p>
+                                            <SidebarMenu>
+                                                <NavItems
+                                                    items={group.items}
+                                                    pathname={pathname}
+                                                />
+                                            </SidebarMenu>
+                                        </div>
+                                    ))}
+                                </SidebarGroupContent>
+                            </CollapsibleContent>
+                        </SidebarGroup>
+                    </Collapsible>
                 )}
             </SidebarContent>
             <SidebarFooter>
