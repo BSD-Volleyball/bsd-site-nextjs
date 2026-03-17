@@ -52,6 +52,7 @@ export default async function EditWeek1Page() {
                 players={result.players}
                 slots={result.slots}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                seasonLabel={result.seasonLabel}
             />
         </div>
     )

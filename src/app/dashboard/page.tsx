@@ -1036,6 +1036,88 @@ export default async function DashboardPage() {
             />
 
             <div className="flex flex-wrap gap-6">
+                {userWeek3Roster && signupStatus && (
+                    <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
+                                    You're in Week 3 Tryouts this Thursday!
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-orange-700 text-sm dark:text-orange-300">
+                                You have been assigned a spot in the Pre-Season
+                                Week 3 tryout.
+                            </p>
+                            <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
+                                {signupStatus.config.tryout3Date && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Date:
+                                        </span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {signupStatus.config.tryout3Date}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Time:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek3Roster.sessionTime}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Court:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Court {userWeek3Roster.courtNumber}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Division:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        {userWeek3Roster.divisionName}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-orange-700 dark:text-orange-300">
+                                        Team:
+                                    </span>
+                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                        Team {userWeek3Roster.teamNumber}
+                                    </span>
+                                </div>
+                                {userWeek3Roster.captainName && (
+                                    <div className="flex justify-between">
+                                        <span className="text-orange-700 dark:text-orange-300">
+                                            Captain:
+                                        </span>
+                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
+                                            {userWeek3Roster.captainName}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                                Please plan to arrive 10 minutes early.
+                            </p>
+                            <Link
+                                href="/dashboard/preseason-week-3"
+                                className="inline-flex items-center justify-center rounded-md bg-orange-600 px-4 py-2 font-medium text-sm text-white hover:bg-orange-700"
+                            >
+                                View Full Week 3 Roster
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {!isAdmin &&
                     isCurrentSeasonCommissioner &&
                     signupStatus?.config.phase === "select_captains" && (
@@ -1308,88 +1390,6 @@ export default async function DashboardPage() {
                                 className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600"
                             >
                                 Go to Draft Homework
-                            </Link>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {userWeek3Roster && signupStatus && (
-                    <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center gap-2">
-                                <RiCalendarLine className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                                <CardTitle className="text-lg text-orange-700 dark:text-orange-300">
-                                    You're in Week 3 Tryouts this Thursday!
-                                </CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-orange-700 text-sm dark:text-orange-300">
-                                You have been assigned a spot in the Pre-Season
-                                Week 3 tryout.
-                            </p>
-                            <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
-                                {signupStatus.config.tryout3Date && (
-                                    <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">
-                                            Date:
-                                        </span>
-                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                            {signupStatus.config.tryout3Date}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">
-                                        Time:
-                                    </span>
-                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        {userWeek3Roster.sessionTime}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">
-                                        Court:
-                                    </span>
-                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        Court {userWeek3Roster.courtNumber}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">
-                                        Division:
-                                    </span>
-                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        {userWeek3Roster.divisionName}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-orange-700 dark:text-orange-300">
-                                        Team:
-                                    </span>
-                                    <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        Team {userWeek3Roster.teamNumber}
-                                    </span>
-                                </div>
-                                {userWeek3Roster.captainName && (
-                                    <div className="flex justify-between">
-                                        <span className="text-orange-700 dark:text-orange-300">
-                                            Captain:
-                                        </span>
-                                        <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                            {userWeek3Roster.captainName}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                            <p className="text-orange-600 text-xs dark:text-orange-400">
-                                Please plan to arrive 10 minutes early.
-                            </p>
-                            <Link
-                                href="/dashboard/preseason-week-3"
-                                className="inline-flex items-center justify-center rounded-md bg-orange-600 px-4 py-2 font-medium text-sm text-white hover:bg-orange-700"
-                            >
-                                View Full Week 3 Roster
                             </Link>
                         </CardContent>
                     </Card>
