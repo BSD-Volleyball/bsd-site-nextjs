@@ -19,6 +19,7 @@ import {
 } from "@remixicon/react"
 import {
     updateWeek2Rosters,
+    sendWeek2RosterNotifications,
     type Week2EditablePlayer,
     type Week2EditableSlot
 } from "./actions"
@@ -26,11 +27,16 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
+import {
+    RosterNotificationDialog,
+    type RosterChangeEntry
+} from "@/components/roster-notification"
 
 interface EditWeek2FormProps {
     players: Week2EditablePlayer[]
     slots: Week2EditableSlot[]
     playerPicUrl: string
+    seasonLabel: string
 }
 
 interface LocalSlot {
@@ -235,19 +241,111 @@ function PlayerCombobox({
     )
 }
 
+function computeWeek2Diff(
+    oldSlots: LocalSlot[],
+    newSlots: LocalSlot[],
+    players: Week2EditablePlayer[]
+): RosterChangeEntry[] {
+    const playerName = (userId: string) => {
+        const p = players.find((pl) => pl.id === userId)
+        if (!p) return userId
+        return p.preferredName
+            ? `${p.preferredName} ${p.lastName}`
+            : `${p.firstName} ${p.lastName}`
+    }
+
+    type DivEntry = {
+        divisionId: number
+        divisionName: string
+        teamNumber: number
+    }
+    const buildUserMap = (slots: LocalSlot[]) => {
+        const m = new Map<string, DivEntry[]>()
+        for (const s of slots) {
+            if (!s.userId) continue
+            const list = m.get(s.userId) || []
+            list.push({
+                divisionId: s.divisionId,
+                divisionName: s.divisionName,
+                teamNumber: s.teamNumber
+            })
+            m.set(s.userId, list)
+        }
+        return m
+    }
+    const serialize = (entries: DivEntry[]) =>
+        entries
+            .map((e) => `${e.divisionId}-${e.teamNumber}`)
+            .sort()
+            .join(",")
+
+    const oldByUser = buildUserMap(oldSlots)
+    const newByUser = buildUserMap(newSlots)
+    const changes: RosterChangeEntry[] = []
+
+    for (const [userId, newEntries] of newByUser) {
+        const oldEntries = oldByUser.get(userId)
+        if (!oldEntries) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "added",
+                week1Assignment: null,
+                divisionAssignments: newEntries.map((e) => ({
+                    divisionId: e.divisionId,
+                    divisionName: e.divisionName,
+                    teamNumber: e.teamNumber
+                }))
+            })
+        } else if (serialize(oldEntries) !== serialize(newEntries)) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "changed",
+                week1Assignment: null,
+                divisionAssignments: newEntries.map((e) => ({
+                    divisionId: e.divisionId,
+                    divisionName: e.divisionName,
+                    teamNumber: e.teamNumber
+                }))
+            })
+        }
+    }
+
+    for (const [userId] of oldByUser) {
+        if (!newByUser.has(userId)) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "removed",
+                week1Assignment: null,
+                divisionAssignments: null
+            })
+        }
+    }
+
+    return changes
+}
+
 export function EditWeek2Form({
     players,
     slots,
-    playerPicUrl
+    playerPicUrl,
+    seasonLabel
 }: EditWeek2FormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [notifyDialogOpen, setNotifyDialogOpen] = useState(false)
+    const [pendingChanges, setPendingChanges] = useState<RosterChangeEntry[]>(
+        []
+    )
+    const [isSendingNotifications, setIsSendingNotifications] = useState(false)
     const nextKey = useRef(0)
 
-    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
-        slots.map((slot) => ({
+    const toLocalSlots = (rawSlots: typeof slots): LocalSlot[] =>
+        rawSlots.map((slot) => ({
             localKey: `db-${slot.id}`,
             divisionId: slot.divisionId,
             divisionName: slot.divisionName,
@@ -255,7 +353,13 @@ export function EditWeek2Form({
             userId: slot.userId,
             isCaptain: slot.isCaptain
         }))
+
+    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
+        toLocalSlots(slots)
     )
+
+    // Tracks the last successfully saved state for diff computation
+    const lastSavedSlots = useRef<LocalSlot[]>(toLocalSlots(slots))
 
     const duplicateUserIds = useMemo(() => {
         const counts = new Map<string, number>()
@@ -329,9 +433,10 @@ export function EditWeek2Form({
     const handleSubmit = async () => {
         setError(null)
         setSuccess(null)
-        setIsSaving(true)
 
         const filledSlots = slotAssignments.filter((slot) => slot.userId)
+        setIsSaving(true)
+
         const result = await updateWeek2Rosters(
             filledSlots.map((slot) => ({
                 divisionId: slot.divisionId,
@@ -343,11 +448,44 @@ export function EditWeek2Form({
 
         if (result.status) {
             setSuccess(result.message)
+            const changes = computeWeek2Diff(
+                lastSavedSlots.current.filter((s) => s.userId),
+                filledSlots,
+                players
+            )
+            lastSavedSlots.current = filledSlots
+            if (changes.length > 0) {
+                setPendingChanges(changes)
+                setNotifyDialogOpen(true)
+            }
         } else {
             setError(result.message)
         }
 
         setIsSaving(false)
+    }
+
+    const handleSendNotifications = async (selectedUserIds: string[]) => {
+        setIsSendingNotifications(true)
+        const toNotify = pendingChanges.filter((c) =>
+            selectedUserIds.includes(c.userId)
+        )
+        const assignments = toNotify
+            .filter((c) => c.changeKind !== "removed" && c.divisionAssignments)
+            .flatMap((c) =>
+                (c.divisionAssignments || []).map((a) => ({
+                    userId: c.userId,
+                    divisionId: a.divisionId,
+                    divisionName: a.divisionName,
+                    teamNumber: a.teamNumber
+                }))
+            )
+        const removedIds = toNotify
+            .filter((c) => c.changeKind === "removed")
+            .map((c) => c.userId)
+        await sendWeek2RosterNotifications(assignments, removedIds, seasonLabel)
+        setIsSendingNotifications(false)
+        setNotifyDialogOpen(false)
     }
 
     return (
@@ -495,6 +633,16 @@ export function EditWeek2Form({
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
                 viewerRating={modal.viewerRating}
+            />
+
+            <RosterNotificationDialog
+                open={notifyDialogOpen}
+                weekNumber={2}
+                seasonLabel={seasonLabel}
+                changes={pendingChanges}
+                isSending={isSendingNotifications}
+                onConfirm={handleSendNotifications}
+                onClose={() => setNotifyDialogOpen(false)}
             />
         </div>
     )

@@ -19,6 +19,7 @@ import {
 } from "@remixicon/react"
 import {
     updateWeek1Rosters,
+    sendWeek1RosterNotifications,
     type Week1EditablePlayer,
     type Week1EditableSlot
 } from "./actions"
@@ -26,11 +27,16 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
+import {
+    RosterNotificationDialog,
+    type RosterChangeEntry
+} from "@/components/roster-notification"
 
 interface EditWeek1FormProps {
     players: Week1EditablePlayer[]
     slots: Week1EditableSlot[]
     playerPicUrl: string
+    seasonLabel: string
 }
 
 interface LocalSlot {
@@ -241,25 +247,108 @@ function UnassignedWeek1Players({
     )
 }
 
+function computeWeek1Diff(
+    oldSlots: LocalSlot[],
+    newSlots: LocalSlot[],
+    players: Week1EditablePlayer[]
+): RosterChangeEntry[] {
+    const playerName = (userId: string) => {
+        const p = players.find((pl) => pl.id === userId)
+        if (!p) return userId
+        return p.preferredName
+            ? `${p.preferredName} ${p.lastName}`
+            : `${p.firstName} ${p.lastName}`
+    }
+
+    const oldByUser = new Map(
+        oldSlots
+            .filter((s) => s.userId)
+            .map((s) => [
+                s.userId,
+                { sessionNumber: s.sessionNumber, courtNumber: s.courtNumber }
+            ])
+    )
+    const newByUser = new Map(
+        newSlots
+            .filter((s) => s.userId)
+            .map((s) => [
+                s.userId,
+                { sessionNumber: s.sessionNumber, courtNumber: s.courtNumber }
+            ])
+    )
+
+    const changes: RosterChangeEntry[] = []
+
+    for (const [userId, newAssignment] of newByUser) {
+        const oldAssignment = oldByUser.get(userId)
+        if (!oldAssignment) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "added",
+                week1Assignment: newAssignment,
+                divisionAssignments: null
+            })
+        } else if (
+            oldAssignment.sessionNumber !== newAssignment.sessionNumber ||
+            oldAssignment.courtNumber !== newAssignment.courtNumber
+        ) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "changed",
+                week1Assignment: newAssignment,
+                divisionAssignments: null
+            })
+        }
+    }
+
+    for (const [userId] of oldByUser) {
+        if (!newByUser.has(userId)) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "removed",
+                week1Assignment: null,
+                divisionAssignments: null
+            })
+        }
+    }
+
+    return changes
+}
+
 export function EditWeek1Form({
     players,
     slots,
-    playerPicUrl
+    playerPicUrl,
+    seasonLabel
 }: EditWeek1FormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
+    const [notifyDialogOpen, setNotifyDialogOpen] = useState(false)
+    const [pendingChanges, setPendingChanges] = useState<RosterChangeEntry[]>(
+        []
+    )
+    const [isSendingNotifications, setIsSendingNotifications] = useState(false)
     const nextKey = useRef(0)
 
-    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
-        slots.map((slot) => ({
+    const toLocalSlots = (rawSlots: typeof slots): LocalSlot[] =>
+        rawSlots.map((slot) => ({
             localKey: `db-${slot.id}`,
             sessionNumber: slot.sessionNumber,
             courtNumber: slot.courtNumber,
             userId: slot.userId
         }))
+
+    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
+        toLocalSlots(slots)
     )
+
+    // Tracks the last successfully saved state for diff computation
+    const lastSavedSlots = useRef<LocalSlot[]>(toLocalSlots(slots))
 
     const selectedUserIds = useMemo(
         () => slotAssignments.map((slot) => slot.userId).filter(Boolean),
@@ -345,11 +434,41 @@ export function EditWeek1Form({
 
         if (result.status) {
             setSuccess(result.message)
+            const changes = computeWeek1Diff(
+                lastSavedSlots.current.filter((s) => s.userId),
+                filledSlots,
+                players
+            )
+            lastSavedSlots.current = filledSlots
+            if (changes.length > 0) {
+                setPendingChanges(changes)
+                setNotifyDialogOpen(true)
+            }
         } else {
             setError(result.message)
         }
 
         setIsSaving(false)
+    }
+
+    const handleSendNotifications = async (selectedUserIds: string[]) => {
+        setIsSendingNotifications(true)
+        const toNotify = pendingChanges.filter((c) =>
+            selectedUserIds.includes(c.userId)
+        )
+        const assignments = toNotify
+            .filter((c) => c.changeKind !== "removed" && c.week1Assignment)
+            .map((c) => ({
+                userId: c.userId,
+                sessionNumber: c.week1Assignment!.sessionNumber,
+                courtNumber: c.week1Assignment!.courtNumber
+            }))
+        const removedIds = toNotify
+            .filter((c) => c.changeKind === "removed")
+            .map((c) => c.userId)
+        await sendWeek1RosterNotifications(assignments, removedIds, seasonLabel)
+        setIsSendingNotifications(false)
+        setNotifyDialogOpen(false)
     }
 
     return (
@@ -585,6 +704,16 @@ export function EditWeek1Form({
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
                 viewerRating={modal.viewerRating}
+            />
+
+            <RosterNotificationDialog
+                open={notifyDialogOpen}
+                weekNumber={1}
+                seasonLabel={seasonLabel}
+                changes={pendingChanges}
+                isSending={isSendingNotifications}
+                onConfirm={handleSendNotifications}
+                onClose={() => setNotifyDialogOpen(false)}
             />
         </div>
     )
