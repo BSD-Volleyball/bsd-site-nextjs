@@ -18,6 +18,11 @@ import {
 } from "@/lib/liveblocks.config"
 import { PresenceBar } from "./presence-bar"
 import { toast } from "sonner"
+import {
+    usePlayerDetailModal,
+    PlayerDetailPopup
+} from "@/components/player-detail"
+import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import type {
     TeamOption,
     UserOption,
@@ -213,6 +218,7 @@ export function DraftBoard({
     const [enlargedPlayer, setEnlargedPlayer] = useState<UserOption | null>(
         null
     )
+    const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
     // Shared Liveblocks state
     const picks = useStorage((root) => root.picks)
@@ -653,35 +659,49 @@ export function DraftBoard({
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {players.map((player) => (
-                                            <button
-                                                type="button"
+                                            <div
                                                 key={player.id}
-                                                onClick={() =>
-                                                    setEnlargedPlayer(player)
-                                                }
                                                 className={cn(
-                                                    "flex cursor-pointer flex-col items-center rounded-lg border p-1.5 transition-opacity hover:opacity-80",
+                                                    "flex flex-col items-center rounded-lg border p-1.5",
                                                     player.male === true
                                                         ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
                                                         : "border-pink-200 bg-pink-50 dark:border-pink-800 dark:bg-pink-900/20"
                                                 )}
                                             >
-                                                {player.picture ? (
-                                                    <img
-                                                        src={`${playerPicUrl}${player.picture}`}
-                                                        alt={`${player.first_name} ${player.last_name}`}
-                                                        className="h-18 w-12 rounded object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="flex h-18 w-12 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
-                                                        No photo
-                                                    </div>
-                                                )}
-                                                <span className="mt-1 max-w-14 truncate text-center text-xs">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setEnlargedPlayer(
+                                                            player
+                                                        )
+                                                    }
+                                                    className="transition-opacity hover:opacity-80"
+                                                >
+                                                    {player.picture ? (
+                                                        <img
+                                                            src={`${playerPicUrl}${player.picture}`}
+                                                            alt={`${player.first_name} ${player.last_name}`}
+                                                            className="h-18 w-12 rounded object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex h-18 w-12 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
+                                                            No photo
+                                                        </div>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        modal.openPlayerDetail(
+                                                            player.id
+                                                        )
+                                                    }
+                                                    className="mt-1 max-w-14 truncate text-center text-xs hover:underline"
+                                                >
                                                     {player.preffered_name ||
                                                         player.first_name}
-                                                </span>
-                                            </button>
+                                                </button>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
@@ -744,6 +764,24 @@ export function DraftBoard({
                     </div>
                 </div>
             )}
+
+            <PlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                allSeasons={[]}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                pairPickName={modal.pairPickName}
+                pairReason={modal.pairReason}
+                datesMissing={modal.datesMissing}
+                playoffDates={modal.playoffDates}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
+            />
         </div>
     )
 }
