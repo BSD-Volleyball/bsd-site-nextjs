@@ -218,3 +218,9 @@ body {
     padding-right: 0 !important;
   }
 }
+
+/* Hide Liveblocks branding when not on the live draft page */
+body:not([data-draft-active]) [class^="lb-"],
+body:not([data-draft-active]) [class*=" lb-"] {
+  display: none !important;
+}

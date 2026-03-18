@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import { RoomProvider } from "@/lib/liveblocks.config"
 import { ClientSideSuspense } from "@liveblocks/react"
 
@@ -18,6 +18,13 @@ export function DraftRoomProvider({
     children
 }: DraftRoomProviderProps) {
     const roomId = `draft-s${seasonId}-d${divisionId}`
+
+    useEffect(() => {
+        document.body.setAttribute("data-draft-active", "true")
+        return () => {
+            document.body.removeAttribute("data-draft-active")
+        }
+    }, [])
 
     return (
         <RoomProvider
