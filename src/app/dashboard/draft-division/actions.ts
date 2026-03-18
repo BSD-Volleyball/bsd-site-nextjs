@@ -11,9 +11,11 @@ import {
     drafts,
     draftCaptRounds,
     draftPairDiffs,
-    signups
+    draftHomework,
+    signups,
+    seasons
 } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, inArray, desc, lt } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -482,6 +484,333 @@ export async function getDraftInitData(
             teams: [],
             initialPicks: {},
             pairMap: []
+        }
+    }
+}
+
+// Maps homework round number → actual draft round number (same as prepare-for-draft)
+const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
+const NON_MALE_ROUND_MAP: Record<number, number> = { 1: 3, 2: 5, 3: 8 }
+
+export interface WatchlistPlayer {
+    userId: string
+    displayName: string
+    round: number // mapped draft round (1–9)
+}
+
+export interface WatchlistData {
+    malePlayers: WatchlistPlayer[] // all ranked males, sorted best-first
+    nonMalePlayers: WatchlistPlayer[] // all ranked non-males, sorted best-first
+    draftedUserIds: string[]
+    view: "captain" | "commissioner"
+}
+
+export async function getDraftWatchlistData(
+    seasonId: number,
+    divisionId: number
+): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
+    const hasAccess = await checkDraftReadAccess()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "You don't have permission to access this page."
+        }
+    }
+
+    if (
+        !Number.isInteger(seasonId) ||
+        seasonId <= 0 ||
+        !Number.isInteger(divisionId) ||
+        divisionId <= 0
+    ) {
+        return { status: false, message: "Invalid season or division ID." }
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return { status: false, message: "Not authenticated." }
+    const userId = session.user.id
+
+    try {
+        // Check if user is a captain in this specific division (captain view takes priority)
+        const [[captainTeam], draftedRows] = await Promise.all([
+            db
+                .select({ id: teams.id })
+                .from(teams)
+                .where(
+                    and(
+                        eq(teams.season, seasonId),
+                        eq(teams.division, divisionId),
+                        eq(teams.captain, userId)
+                    )
+                )
+                .limit(1),
+            db
+                .select({ userId: drafts.user })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .where(eq(teams.season, seasonId))
+        ])
+
+        const draftedUserIds = [...new Set(draftedRows.map((r) => r.userId))]
+
+        if (captainTeam) {
+            return buildCaptainWatchlist(
+                userId,
+                seasonId,
+                divisionId,
+                draftedUserIds
+            )
+        }
+        return buildCommissionerWatchlist(seasonId, divisionId, draftedUserIds)
+    } catch (error) {
+        console.error("Error fetching watchlist data:", error)
+        return { status: false, message: "Something went wrong." }
+    }
+}
+
+async function buildCaptainWatchlist(
+    captainId: string,
+    seasonId: number,
+    divisionId: number,
+    draftedUserIds: string[]
+): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
+    const homeworkRows = await db
+        .select({
+            playerId: draftHomework.player,
+            round: draftHomework.round,
+            isMaleTab: draftHomework.is_male_tab,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preffered_name,
+            male: users.male
+        })
+        .from(draftHomework)
+        .innerJoin(users, eq(draftHomework.player, users.id))
+        .where(
+            and(
+                eq(draftHomework.season, seasonId),
+                eq(draftHomework.division, divisionId),
+                eq(draftHomework.captain, captainId)
+            )
+        )
+
+    // Deduplicate: keep lowest mapped round per player
+    const playerBest = new Map<
+        string,
+        { displayName: string; round: number; isMale: boolean }
+    >()
+    for (const row of homeworkRows) {
+        const isMale = row.male === true
+        // Skip cross-gender entries (player gender must match the tab)
+        if ((isMale && !row.isMaleTab) || (!isMale && row.isMaleTab)) continue
+        const mappedRound = row.isMaleTab
+            ? (MALE_ROUND_MAP[row.round] ?? 9)
+            : (NON_MALE_ROUND_MAP[row.round] ?? 9)
+        const existing = playerBest.get(row.playerId)
+        if (!existing || mappedRound < existing.round) {
+            playerBest.set(row.playerId, {
+                displayName: row.preferredName ?? row.firstName,
+                round: mappedRound,
+                isMale
+            })
+        }
+    }
+
+    const sorted = Array.from(playerBest.entries())
+        .map(([uid, data]) => ({ userId: uid, ...data }))
+        .sort((a, b) => a.round - b.round)
+
+    const malePlayers = sorted
+        .filter((p) => p.isMale)
+        .map(({ userId, displayName, round }) => ({
+            userId,
+            displayName,
+            round
+        }))
+    const nonMalePlayers = sorted
+        .filter((p) => !p.isMale)
+        .map(({ userId, displayName, round }) => ({
+            userId,
+            displayName,
+            round
+        }))
+
+    return {
+        status: true,
+        data: {
+            malePlayers,
+            nonMalePlayers,
+            draftedUserIds,
+            view: "captain" as const
+        }
+    }
+}
+
+async function buildCommissionerWatchlist(
+    seasonId: number,
+    divisionId: number,
+    draftedUserIds: string[]
+): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
+    const [homeworkRows, signupRows, priorSeasonRows] = await Promise.all([
+        db
+            .select({
+                captainId: draftHomework.captain,
+                playerId: draftHomework.player,
+                round: draftHomework.round,
+                isMaleTab: draftHomework.is_male_tab
+            })
+            .from(draftHomework)
+            .where(
+                and(
+                    eq(draftHomework.season, seasonId),
+                    eq(draftHomework.division, divisionId)
+                )
+            ),
+        db
+            .select({
+                userId: users.id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name,
+                male: users.male
+            })
+            .from(signups)
+            .innerJoin(users, eq(signups.player, users.id))
+            .where(eq(signups.season, seasonId)),
+        db
+            .select({ id: seasons.id })
+            .from(seasons)
+            .where(lt(seasons.id, seasonId))
+            .orderBy(desc(seasons.id))
+            .limit(3)
+    ])
+
+    const priorSeasonIds = priorSeasonRows.map((r) => r.id)
+    const playerIds = signupRows.map((r) => r.userId)
+
+    // Build player gender lookup for cross-tab validation
+    const playerGenderMap = new Map(
+        signupRows.map((r) => [r.userId, r.male === true])
+    )
+
+    // Weighted draft history
+    const draftHistMap = new Map<string, Map<number, number>>()
+    if (priorSeasonIds.length > 0 && playerIds.length > 0) {
+        const priorDraftRows = await db
+            .select({
+                userId: drafts.user,
+                seasonId: teams.season,
+                round: drafts.round
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .where(
+                and(
+                    inArray(drafts.user, playerIds),
+                    inArray(teams.season, priorSeasonIds),
+                    eq(teams.division, divisionId)
+                )
+            )
+
+        for (const row of priorDraftRows) {
+            if (!draftHistMap.has(row.userId)) {
+                draftHistMap.set(row.userId, new Map())
+            }
+            draftHistMap.get(row.userId)!.set(row.seasonId, row.round)
+        }
+    }
+
+    // Build per-captain best round for each player (deduplicated)
+    const captainPlayerBest = new Map<string, Map<string, number>>()
+    for (const hw of homeworkRows) {
+        const isMale = playerGenderMap.get(hw.playerId) ?? false
+        if ((isMale && !hw.isMaleTab) || (!isMale && hw.isMaleTab)) continue
+        const mappedRound = hw.isMaleTab
+            ? (MALE_ROUND_MAP[hw.round] ?? 9)
+            : (NON_MALE_ROUND_MAP[hw.round] ?? 9)
+        if (!captainPlayerBest.has(hw.captainId)) {
+            captainPlayerBest.set(hw.captainId, new Map())
+        }
+        const captainMap = captainPlayerBest.get(hw.captainId)!
+        const existing = captainMap.get(hw.playerId)
+        if (existing === undefined || mappedRound < existing) {
+            captainMap.set(hw.playerId, mappedRound)
+        }
+    }
+
+    // Aggregate to playerId → [one round per captain]
+    const playerCaptainRoundsAgg = new Map<string, number[]>()
+    for (const [, captainMap] of captainPlayerBest) {
+        for (const [playerId, mappedRound] of captainMap) {
+            if (!playerCaptainRoundsAgg.has(playerId)) {
+                playerCaptainRoundsAgg.set(playerId, [])
+            }
+            playerCaptainRoundsAgg.get(playerId)!.push(mappedRound)
+        }
+    }
+
+    const WEIGHTS = [3, 2, 1]
+
+    const rankedPlayers = signupRows
+        .map((player) => {
+            const captainRounds =
+                playerCaptainRoundsAgg.get(player.userId) ?? []
+            const captainAvg =
+                captainRounds.length > 0
+                    ? captainRounds.reduce((sum, r) => sum + r, 0) /
+                      captainRounds.length
+                    : 9
+
+            const playerHistory = draftHistMap.get(player.userId)
+            let weightedSum = 0
+            let totalWeight = 0
+            if (playerHistory) {
+                for (let i = 0; i < priorSeasonIds.length; i++) {
+                    const round = playerHistory.get(priorSeasonIds[i])
+                    if (round !== undefined) {
+                        weightedSum += round * WEIGHTS[i]
+                        totalWeight += WEIGHTS[i]
+                    }
+                }
+            }
+            const historyAvg =
+                totalWeight > 0 ? weightedSum / totalWeight : null
+            const recommendedRound =
+                historyAvg !== null
+                    ? captainAvg * 0.6 + historyAvg * 0.4
+                    : captainAvg
+
+            return {
+                userId: player.userId,
+                displayName: player.preferredName ?? player.firstName,
+                isMale: player.male === true,
+                round: Math.round(recommendedRound)
+            }
+        })
+        .sort((a, b) => a.round - b.round)
+
+    const malePlayers = rankedPlayers
+        .filter((p) => p.isMale)
+        .map(({ userId, displayName, round }) => ({
+            userId,
+            displayName,
+            round
+        }))
+    const nonMalePlayers = rankedPlayers
+        .filter((p) => !p.isMale)
+        .map(({ userId, displayName, round }) => ({
+            userId,
+            displayName,
+            round
+        }))
+
+    return {
+        status: true,
+        data: {
+            malePlayers,
+            nonMalePlayers,
+            draftedUserIds,
+            view: "commissioner" as const
         }
     }
 }

@@ -16,17 +16,13 @@ import {
     DialogClose
 } from "@/components/ui/dialog"
 import { PlayerCombobox } from "./player-combobox"
-import { saveDraftHomework, getLastSeasonDraft } from "./actions"
+import { saveDraftHomework } from "./actions"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
 } from "@/components/player-detail"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
-import type {
-    DraftHomeworkData,
-    DraftHomeworkPlayer,
-    LastSeasonDraftData
-} from "./actions"
+import type { DraftHomeworkData, DraftHomeworkPlayer } from "./actions"
 
 interface DraftHomeworkFormProps {
     data: DraftHomeworkData
@@ -351,8 +347,7 @@ function PrintTabSection({
     // Each round row ≈ 1.85in (label + 1.25in photo + name + margin).
     // Header ≈ 0.45in. Considering section adds another ~1.85in if present.
     const hasConsidering = consideringPlayers.length > 0
-    const estimatedHeightIn =
-        numRounds * 1.85 + (hasConsidering ? 1.85 : 0)
+    const estimatedHeightIn = numRounds * 1.85 + (hasConsidering ? 1.85 : 0)
     const zoom = Math.min(1, 10.25 / estimatedHeightIn)
 
     return (
@@ -645,29 +640,7 @@ export function DraftHomeworkForm({
     )
     const [saving, setSaving] = useState(false)
     const [showIncompleteDialog, setShowIncompleteDialog] = useState(false)
-    const [lastSeasonDraft, setLastSeasonDraft] =
-        useState<LastSeasonDraftData | null>(null)
-    const [lastSeasonDraftOpen, setLastSeasonDraftOpen] = useState(false)
-    const [lastSeasonDraftLoading, setLastSeasonDraftLoading] = useState(false)
-    const [lastSeasonDraftError, setLastSeasonDraftError] = useState<
-        string | null
-    >(null)
-
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
-
-    const handleOpenLastSeasonDraft = async () => {
-        setLastSeasonDraftOpen(true)
-        if (lastSeasonDraft) return
-        setLastSeasonDraftLoading(true)
-        setLastSeasonDraftError(null)
-        const result = await getLastSeasonDraft()
-        if (result.status && result.data) {
-            setLastSeasonDraft(result.data)
-        } else {
-            setLastSeasonDraftError(result.message)
-        }
-        setLastSeasonDraftLoading(false)
-    }
 
     const [maleRounds, nonMaleRounds] = parseGenderSplit(data.genderSplit)
     const draftedSet = useMemo(

@@ -22,15 +22,18 @@ import { RiFullscreenLine, RiFullscreenExitLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import {
     getDraftInitData,
+    getDraftWatchlistData,
     submitDraft,
     type DivisionOption,
     type TeamOption,
     type UserOption,
     type DivisionSplitConfig,
-    type PairEntry
+    type PairEntry,
+    type WatchlistData
 } from "./actions"
 import { DraftRoomProvider } from "./draft-room-provider"
 import { DraftBoard } from "./draft-board"
+import { DraftWatchlist } from "./draft-watchlist"
 
 interface DraftDivisionFormProps {
     currentSeasonId: number
@@ -67,6 +70,9 @@ export function DraftDivisionForm({
     const [teamsList, setTeamsList] = useState<TeamOption[]>([])
     const [initialPicks, setInitialPicks] = useState<Record<string, string>>({})
     const [pairMap, setPairMap] = useState<PairEntry[]>([])
+    const [watchlistData, setWatchlistData] = useState<WatchlistData | null>(
+        null
+    )
 
     // Picks snapshot maintained by DraftBoard via onPicksChange callback
     const picksRef = useRef<Record<string, string | null>>({})
@@ -97,6 +103,7 @@ export function DraftDivisionForm({
         setTeamsList([])
         setInitialPicks({})
         setPairMap([])
+        setWatchlistData(null)
         setError(null)
         setSuccess(null)
         picksRef.current = {}
@@ -108,13 +115,19 @@ export function DraftDivisionForm({
 
     const loadDraftInitData = async (season: number, division: number) => {
         setIsLoadingTeams(true)
-        const result = await getDraftInitData(season, division)
+        const [result, watchlistResult] = await Promise.all([
+            getDraftInitData(season, division),
+            getDraftWatchlistData(season, division)
+        ])
         if (result.status) {
             setTeamsList(result.teams)
             setInitialPicks(result.initialPicks)
             setPairMap(result.pairMap)
         } else {
             setError(result.message || "Failed to load teams.")
+        }
+        if (watchlistResult.status && watchlistResult.data) {
+            setWatchlistData(watchlistResult.data)
         }
         setIsLoadingTeams(false)
     }
@@ -298,6 +311,39 @@ export function DraftDivisionForm({
                                         initialPicks={initialPicks}
                                         pairMap={pairMap}
                                     />
+                                    {watchlistData && (
+                                        <div className="mt-6 border-t pt-6">
+                                            <div className="mb-4">
+                                                <h3 className="font-semibold">
+                                                    Your Watchlist{" "}
+                                                    <span className="font-normal text-muted-foreground">
+                                                        {watchlistData.view ===
+                                                        "captain"
+                                                            ? "(Individual Captains View)"
+                                                            : "(Commissioners View)"}
+                                                    </span>
+                                                </h3>
+                                                <p className="text-muted-foreground text-sm">
+                                                    Only visible to you — not
+                                                    shared with other
+                                                    participants.
+                                                </p>
+                                            </div>
+                                            <DraftWatchlist
+                                                malePlayers={
+                                                    watchlistData.malePlayers
+                                                }
+                                                nonMalePlayers={
+                                                    watchlistData.nonMalePlayers
+                                                }
+                                                draftedUserIds={
+                                                    watchlistData.draftedUserIds
+                                                }
+                                                users={users}
+                                                playerPicUrl={playerPicUrl}
+                                            />
+                                        </div>
+                                    )}
                                 </DraftRoomProvider>
                             </div>
                         )}
