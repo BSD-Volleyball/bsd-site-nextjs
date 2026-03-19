@@ -53,7 +53,7 @@ export function PlayerRatingsSection({
         ratingAverages.serving !== null
 
     const hasRatingEvaluators =
-        showRatingEvaluators && ratingAverages.sampleEvaluatorNames.length > 0
+        showRatingEvaluators && ratingAverages.sampleEvaluators.length > 0
 
     return (
         <div>
@@ -96,12 +96,13 @@ export function PlayerRatingsSection({
                                     className="max-w-64 space-y-1"
                                 >
                                     <p className="font-medium">Submitted by</p>
-                                    {ratingAverages.sampleEvaluatorNames.map(
-                                        (evaluatorName, index) => (
+                                    {ratingAverages.sampleEvaluators.map(
+                                        (sample, index) => (
                                             <p
-                                                key={`${evaluatorName}-${index}`}
+                                                key={`${sample.evaluatorName}-${sample.seasonCode}-${index}`}
                                             >
-                                                {evaluatorName}
+                                                {sample.evaluatorName} (
+                                                {sample.seasonCode})
                                             </p>
                                         )
                                     )}

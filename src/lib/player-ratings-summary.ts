@@ -32,6 +32,7 @@ export async function getPlayerRatingsSectionData(
     const seasonQuery = db
         .select({
             id: seasons.id,
+            seasonCode: seasons.code,
             seasonName: seasons.season,
             seasonYear: seasons.year
         })
@@ -82,6 +83,9 @@ export async function getPlayerRatingsSectionData(
             formatSeasonLabel(season.seasonName, season.seasonYear)
         ])
     )
+    const seasonCodeById = new Map(
+        seasonWindowRows.map((season) => [season.id, season.seasonCode])
+    )
 
     const evaluatorIds = [...new Set(ratingRows.map((row) => row.evaluatorId))]
 
@@ -129,10 +133,12 @@ export async function getPlayerRatingsSectionData(
             hitting: average(ratingRows.map((row) => row.hitting)),
             serving: average(ratingRows.map((row) => row.serving)),
             sampleCount: ratingRows.length,
-            sampleEvaluatorNames: ratingRows.map(
-                (row) =>
-                    evaluatorNameById.get(row.evaluatorId) || row.evaluatorId
-            ),
+            sampleEvaluators: ratingRows.map((row) => ({
+                evaluatorName:
+                    evaluatorNameById.get(row.evaluatorId) || row.evaluatorId,
+                seasonCode:
+                    seasonCodeById.get(row.seasonId) || `S${row.seasonId}`
+            })),
             seasonLabels: seasonWindowRows.map((season) =>
                 formatSeasonLabel(season.seasonName, season.seasonYear)
             )
