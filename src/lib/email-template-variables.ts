@@ -194,6 +194,33 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         description: "Third playoff date"
     },
 
+    // Draft
+    {
+        key: "captain_rounds",
+        label: "Captain Rounds",
+        category: "Draft",
+        description: "Bulleted list of captains and their assigned draft rounds"
+    },
+    {
+        key: "pair_diffs",
+        label: "Pair Differentials",
+        category: "Draft",
+        description:
+            "Bulleted list of pair picks and their assigned differentials"
+    },
+    {
+        key: "team_members",
+        label: "Team Members",
+        category: "Draft",
+        description: "Bulleted list of players on the team sorted by last name"
+    },
+    {
+        key: "team_name",
+        label: "Team Name",
+        category: "Draft",
+        description: "Name of the captain's team"
+    },
+
     // Session Times
     {
         key: "tryout_1_s1_time",

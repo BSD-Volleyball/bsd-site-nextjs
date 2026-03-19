@@ -11,6 +11,7 @@ import {
     draftHomework,
     draftPairDiffs,
     drafts,
+    emailTemplates,
     individual_divisions,
     seasons,
     signups,
@@ -19,6 +20,11 @@ import {
     users
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
+import {
+    type LexicalEmailTemplateContent,
+    normalizeEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent
+} from "@/lib/email-template-content"
 import { isAdminOrDirector, isCommissionerBySession } from "@/lib/rbac"
 
 // Maps homework round number → actual draft round number
@@ -30,6 +36,7 @@ export interface CaptainInfo {
     userId: string
     displayName: string
     lastName: string
+    email: string
 }
 
 export interface PlayerRow {
@@ -73,6 +80,9 @@ export interface PrepareForDraftData {
     isLeagueWide: boolean
     savedCaptainRounds: Record<string, number>
     savedPairDiffs: Record<string, number>
+    emailTemplate: string
+    emailTemplateContent: LexicalEmailTemplateContent | null
+    emailSubject: string
 }
 
 type AccessResult =
@@ -312,7 +322,8 @@ export async function getPrepareForDraftData(
             captainId: teams.captain,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name
+            preferredName: users.preffered_name,
+            email: users.email
         })
         .from(teams)
         .innerJoin(users, eq(teams.captain, users.id))
@@ -321,7 +332,8 @@ export async function getPrepareForDraftData(
     const captains: CaptainInfo[] = captainRows.map((r) => ({
         userId: r.captainId,
         displayName: r.preferredName ?? r.firstName,
-        lastName: r.lastName
+        lastName: r.lastName,
+        email: r.email
     }))
 
     // Query D1: 3 most recent prior season IDs (weighted: index 0 = ×3, 1 = ×2, 2 = ×1)
@@ -546,6 +558,36 @@ export async function getPrepareForDraftData(
         savedPairDiffs[`${row.player1}:${row.player2}`] = row.diff
     }
 
+    let emailTemplate = ""
+    let emailTemplateContent: LexicalEmailTemplateContent | null = null
+    let emailSubject = ""
+
+    try {
+        const [template] = await db
+            .select({
+                content: emailTemplates.content,
+                subject: emailTemplates.subject
+            })
+            .from(emailTemplates)
+            .where(eq(emailTemplates.name, "predraft to captains"))
+            .limit(1)
+
+        if (template) {
+            emailTemplateContent = normalizeEmailTemplateContent(
+                template.content
+            )
+            emailTemplate = extractPlainTextFromEmailTemplateContent(
+                template.content
+            )
+            emailSubject = template.subject || ""
+        }
+    } catch (templateError) {
+        console.error(
+            "Error fetching predraft to captains template:",
+            templateError
+        )
+    }
+
     return {
         status: true,
         message: "Success",
@@ -560,7 +602,10 @@ export async function getPrepareForDraftData(
             availableDivisions,
             isLeagueWide,
             savedCaptainRounds,
-            savedPairDiffs
+            savedPairDiffs,
+            emailTemplate,
+            emailTemplateContent,
+            emailSubject
         }
     }
 }
