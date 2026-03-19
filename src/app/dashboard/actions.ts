@@ -10,9 +10,10 @@ import {
     seasons,
     teams,
     drafts,
-    divisions
+    divisions,
+    emailTemplates
 } from "@/database/schema"
-import { eq, and, lte, desc, inArray } from "drizzle-orm"
+import { eq, and, lte, desc, inArray, asc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -23,6 +24,11 @@ import {
     hasPermissionBySession
 } from "@/lib/rbac"
 import type { SeasonPhase } from "@/lib/season-phases"
+import {
+    type LexicalEmailTemplateContent,
+    normalizeEmailTemplateContent,
+    extractPlainTextFromEmailTemplateContent
+} from "@/lib/email-template-content"
 
 export async function getSignupEligibility(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -239,6 +245,127 @@ export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
             teamName: "",
             players: []
         }
+    }
+}
+
+export interface CaptainWelcomeMember {
+    displayName: string
+    lastName: string
+    email: string
+}
+
+export interface CaptainWelcomeData {
+    teamName: string
+    divisionName: string
+    seasonLabel: string
+    members: CaptainWelcomeMember[]
+    emailTemplate: string
+    emailTemplateContent: LexicalEmailTemplateContent | null
+    emailSubject: string
+}
+
+export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return null
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return null
+
+    try {
+        const [teamRow] = await db
+            .select({
+                id: teams.id,
+                name: teams.name,
+                divisionId: teams.division
+            })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, config.seasonId),
+                    eq(teams.captain, session.user.id)
+                )
+            )
+            .limit(1)
+
+        if (!teamRow) return null
+
+        const [divisionRow] = await db
+            .select({ name: divisions.name })
+            .from(divisions)
+            .where(eq(divisions.id, teamRow.divisionId))
+            .limit(1)
+
+        const [seasonRow] = await db
+            .select({ year: seasons.year, season: seasons.season })
+            .from(seasons)
+            .where(eq(seasons.id, config.seasonId))
+            .limit(1)
+
+        const seasonLabel = seasonRow
+            ? `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+            : String(config.seasonId)
+
+        const draftRows = await db
+            .select({
+                userId: drafts.user,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name,
+                email: users.email
+            })
+            .from(drafts)
+            .innerJoin(users, eq(drafts.user, users.id))
+            .where(eq(drafts.team, teamRow.id))
+            .orderBy(asc(users.last_name), asc(users.first_name))
+
+        const members: CaptainWelcomeMember[] = draftRows.map((row) => ({
+            displayName: row.preferredName || row.firstName,
+            lastName: row.lastName,
+            email: row.email
+        }))
+
+        let emailTemplate = ""
+        let emailTemplateContent: LexicalEmailTemplateContent | null = null
+        let emailSubject = ""
+
+        try {
+            const [template] = await db
+                .select({
+                    content: emailTemplates.content,
+                    subject: emailTemplates.subject
+                })
+                .from(emailTemplates)
+                .where(eq(emailTemplates.name, "welcome from captains"))
+                .limit(1)
+
+            if (template) {
+                emailTemplateContent = normalizeEmailTemplateContent(
+                    template.content
+                )
+                emailTemplate = extractPlainTextFromEmailTemplateContent(
+                    template.content
+                )
+                emailSubject = template.subject || ""
+            }
+        } catch (templateError) {
+            console.error(
+                "Error fetching welcome from captains template:",
+                templateError
+            )
+        }
+
+        return {
+            teamName: teamRow.name,
+            divisionName: divisionRow?.name ?? "",
+            seasonLabel,
+            members,
+            emailTemplate,
+            emailTemplateContent,
+            emailSubject
+        }
+    } catch (error) {
+        console.error("Error fetching captain welcome data:", error)
+        return null
     }
 }
 

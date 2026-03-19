@@ -37,12 +37,14 @@ import {
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
+import { WelcomeTeamCard } from "./welcome-team-card"
 import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession,
     isAdminOrDirectorBySession,
     isCommissionerForSeason
 } from "@/lib/rbac"
+import { getCaptainWelcomeData, type CaptainWelcomeData } from "./actions"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -553,6 +555,7 @@ export default async function DashboardPage() {
     let hasWeek3RosterData = false
     let isWeek2Captain = false
     let isSeasonCaptain = false
+    let captainWelcomeData: CaptainWelcomeData | null = null
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -698,6 +701,10 @@ export default async function DashboardPage() {
                     )
                     .limit(1)
                 isSeasonCaptain = !!captainTeamEntry
+
+                if (isSeasonCaptain && signupStatus.config.phase === "draft") {
+                    captainWelcomeData = await getCaptainWelcomeData()
+                }
             }
 
             if (
@@ -1021,6 +1028,12 @@ export default async function DashboardPage() {
         signupStatus &&
         ["prep_tryout_week_3", "draft"].includes(signupStatus.config.phase) &&
         isSeasonCaptain
+    )
+    const shouldShowWelcomeTeamCard = !!(
+        signupStatus &&
+        signupStatus.config.phase === "draft" &&
+        isSeasonCaptain &&
+        captainWelcomeData
     )
     const shouldShowAssignedConcernsCard = assignedActiveConcernsCount > 0
 
@@ -1393,6 +1406,10 @@ export default async function DashboardPage() {
                             </Link>
                         </CardContent>
                     </Card>
+                )}
+
+                {shouldShowWelcomeTeamCard && captainWelcomeData && (
+                    <WelcomeTeamCard data={captainWelcomeData} />
                 )}
 
                 {userWeek2Roster && signupStatus && (
