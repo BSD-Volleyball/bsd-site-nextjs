@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, desc, eq, inArray, lt } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
@@ -57,15 +57,15 @@ export interface DivisionOption {
 }
 
 export interface PairDifferential {
-    player1UserId: string
+    player1UserId: string // higher-rated player (lower recommendedRound)
     player1DisplayName: string
     player1LastName: string
     player1Round: number
-    player2UserId: string
+    player2UserId: string // lower-rated player
     player2DisplayName: string
     player2LastName: string
     player2Round: number
-    difference: number
+    captainIsLower: boolean // true when captain is the lower-rated (player2), so player1 is pinned
 }
 
 export interface PrepareForDraftData {
@@ -472,6 +472,7 @@ export async function getPrepareForDraftData(
     )
 
     // Build pair differentials — one entry per unique pair, only for rated players
+    const captainIdSet = new Set(captains.map((c) => c.userId))
     const seenPairs = new Set<string>()
     const pairDifferentials: PairDifferential[] = []
 
@@ -487,19 +488,39 @@ export async function getPrepareForDraftData(
         const pairName = nameById.get(pairPickId)
         if (!pairName) continue // pair pick not in signups for this season
 
-        const player1Round = player.recommendedRound
-        const player2Round = recommendedRoundById.get(pairPickId) ?? 9
+        const roundA = player.recommendedRound
+        const roundB = recommendedRoundById.get(pairPickId) ?? 9
+
+        // player1 = higher-rated (lower recommendedRound), player2 = lower-rated
+        // Tiebreaker: alphabetical userId
+        const aIsHigher =
+            roundA < roundB || (roundA === roundB && player.userId < pairPickId)
+        const p1UserId = aIsHigher ? player.userId : pairPickId
+        const p1Round = aIsHigher ? roundA : roundB
+        const p1Name = aIsHigher
+            ? { displayName: player.displayName, lastName: player.lastName }
+            : pairName
+        const p2UserId = aIsHigher ? pairPickId : player.userId
+        const p2Round = aIsHigher ? roundB : roundA
+        const p2Name = aIsHigher
+            ? pairName
+            : { displayName: player.displayName, lastName: player.lastName }
+
+        // captainIsLower: the captain is the lower-rated player (player2).
+        // In this edge case, the non-captain (player1, higher-rated) is pinned instead.
+        const captainIsLower =
+            captainIdSet.has(p2UserId) && !captainIdSet.has(p1UserId)
 
         pairDifferentials.push({
-            player1UserId: player.userId,
-            player1DisplayName: player.displayName,
-            player1LastName: player.lastName,
-            player1Round,
-            player2UserId: pairPickId,
-            player2DisplayName: pairName.displayName,
-            player2LastName: pairName.lastName,
-            player2Round,
-            difference: Math.abs(player1Round - player2Round)
+            player1UserId: p1UserId,
+            player1DisplayName: p1Name.displayName,
+            player1LastName: p1Name.lastName,
+            player1Round: p1Round,
+            player2UserId: p2UserId,
+            player2DisplayName: p2Name.displayName,
+            player2LastName: p2Name.lastName,
+            player2Round: p2Round,
+            captainIsLower
         })
     }
 
@@ -679,32 +700,36 @@ export async function setPairDiff(input: {
     const config = await getSeasonConfig()
     const seasonId = config.seasonId!
 
-    const [p1, p2] = [input.player1Id, input.player2Id].sort()
-
+    // Delete both possible orderings to handle rating-order changes from prior saves
     await db
-        .insert(draftPairDiffs)
-        .values({
-            season: seasonId,
-            division: input.divisionId,
-            saved_by: userId,
-            player1: p1,
-            player2: p2,
-            diff: input.diff,
-            updated_at: new Date()
-        })
-        .onConflictDoUpdate({
-            target: [
-                draftPairDiffs.season,
-                draftPairDiffs.division,
-                draftPairDiffs.player1,
-                draftPairDiffs.player2
-            ],
-            set: {
-                diff: input.diff,
-                saved_by: userId,
-                updated_at: new Date()
-            }
-        })
+        .delete(draftPairDiffs)
+        .where(
+            and(
+                eq(draftPairDiffs.season, seasonId),
+                eq(draftPairDiffs.division, input.divisionId),
+                or(
+                    and(
+                        eq(draftPairDiffs.player1, input.player1Id),
+                        eq(draftPairDiffs.player2, input.player2Id)
+                    ),
+                    and(
+                        eq(draftPairDiffs.player1, input.player2Id),
+                        eq(draftPairDiffs.player2, input.player1Id)
+                    )
+                )
+            )
+        )
+
+    // Insert with player1 = higher-rated, player2 = lower-rated
+    await db.insert(draftPairDiffs).values({
+        season: seasonId,
+        division: input.divisionId,
+        saved_by: userId,
+        player1: input.player1Id,
+        player2: input.player2Id,
+        diff: input.diff,
+        updated_at: new Date()
+    })
 
     return { status: true, message: "Saved" }
 }

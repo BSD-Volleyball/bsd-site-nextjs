@@ -48,13 +48,7 @@ export default async function EditEmailsPage() {
                 title="Edit Emails"
                 description="Manage email templates for automated communications."
             />
-            {result.templates.length === 0 ? (
-                <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
-                    No email templates found.
-                </div>
-            ) : (
-                <EditEmailsForm templates={result.templates} />
-            )}
+            <EditEmailsForm templates={result.templates} />
         </div>
     )
 }

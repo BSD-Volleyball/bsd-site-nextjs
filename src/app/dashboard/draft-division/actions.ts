@@ -46,7 +46,8 @@ export interface TeamOption {
 export interface PairEntry {
     playerId: string
     pairId: string
-    diff: number
+    pinnedRound: number
+    playerIsPinned: boolean
 }
 
 export interface UserOption {
@@ -416,10 +417,14 @@ export async function getDraftInitData(
             }
         }
 
-        const pairDiffLookup = new Map<string, number>()
+        const pairDiffLookup = new Map<
+            string,
+            { round: number; higherPlayer: string }
+        >()
         for (const pd of pairDiffs) {
-            const key = [pd.player1, pd.player2].sort().join(":")
-            pairDiffLookup.set(key, pd.diff)
+            const info = { round: pd.diff, higherPlayer: pd.player1 }
+            pairDiffLookup.set(`${pd.player1}:${pd.player2}`, info)
+            pairDiffLookup.set(`${pd.player2}:${pd.player1}`, info)
         }
 
         const initialPicks: Record<string, string> = {}
@@ -431,9 +436,12 @@ export async function getDraftInitData(
 
             const pairId = pairPickMap.get(team.captain)
             if (pairId && pairId !== team.captain) {
-                const key = [team.captain, pairId].sort().join(":")
-                const diff = pairDiffLookup.get(key) ?? 8
-                const pairRound = Math.min(captainRound + diff, DRAFT_ROUNDS)
+                const key = `${team.captain}:${pairId}`
+                const pinnedRound = pairDiffLookup.get(key)?.round ?? 8
+                const pairRound =
+                    captainRound < pinnedRound
+                        ? pinnedRound
+                        : Math.min(captainRound + 1, DRAFT_ROUNDS)
                 if (!initialPicks[`${pairRound}-${team.id}`]) {
                     initialPicks[`${pairRound}-${team.id}`] = pairId
                 }
@@ -445,24 +453,44 @@ export async function getDraftInitData(
             if (!s.pair_pick) continue
             const player = s.player
             const pairId = s.pair_pick
-            const key = [player, pairId].sort().join(":")
-            const diff = pairDiffLookup.get(key) ?? 8
 
             const forwardKey = `${player}:${pairId}`
             if (!pairMapEntries.has(forwardKey)) {
+                const info = pairDiffLookup.get(forwardKey)
+                const pinnedRound = info?.round ?? 8
+                const higherPlayer = info?.higherPlayer
+
+                const playerIsCaptain = captainRoundMap.has(player)
+                const pairIsCaptain = captainRoundMap.has(pairId)
+
+                let playerIsPinned: boolean
+                if (playerIsCaptain) {
+                    playerIsPinned = false // captain is never pinned
+                } else if (pairIsCaptain) {
+                    playerIsPinned = true // non-captain is pinned
+                } else {
+                    // Non-captain pair: lower-rated player (NOT higherPlayer) is pinned
+                    playerIsPinned = higherPlayer
+                        ? player !== higherPlayer
+                        : true
+                }
+
                 pairMapEntries.set(forwardKey, {
                     playerId: player,
                     pairId,
-                    diff
+                    pinnedRound,
+                    playerIsPinned
                 })
-            }
-            const reverseKey = `${pairId}:${player}`
-            if (!pairMapEntries.has(reverseKey)) {
-                pairMapEntries.set(reverseKey, {
-                    playerId: pairId,
-                    pairId: player,
-                    diff
-                })
+
+                const reverseKey = `${pairId}:${player}`
+                if (!pairMapEntries.has(reverseKey)) {
+                    pairMapEntries.set(reverseKey, {
+                        playerId: pairId,
+                        pairId: player,
+                        pinnedRound,
+                        playerIsPinned: !playerIsPinned
+                    })
+                }
             }
         }
 

@@ -53,17 +53,32 @@ function findAvailablePairSlot(
     currentPicks: Record<string, string | null>,
     excludeRound: number
 ): number | null {
-    const candidates = [
-        targetRound,
-        targetRound - 1,
-        targetRound + 1,
-        targetRound - 2,
-        targetRound + 2
-    ]
-    for (const r of candidates) {
-        if (r < 1 || r > ROUNDS) continue
-        if (r === excludeRound) continue
-        if (!currentPicks[`${r}-${teamId}`]) return r
+    // Try target first, then search outward: +1, -1, +2, -2, ...
+    if (
+        targetRound >= 1 &&
+        targetRound <= ROUNDS &&
+        targetRound !== excludeRound &&
+        !currentPicks[`${targetRound}-${teamId}`]
+    ) {
+        return targetRound
+    }
+    for (let offset = 1; offset < ROUNDS; offset++) {
+        const up = targetRound + offset
+        if (
+            up >= 1 &&
+            up <= ROUNDS &&
+            up !== excludeRound &&
+            !currentPicks[`${up}-${teamId}`]
+        )
+            return up
+        const down = targetRound - offset
+        if (
+            down >= 1 &&
+            down <= ROUNDS &&
+            down !== excludeRound &&
+            !currentPicks[`${down}-${teamId}`]
+        )
+            return down
     }
     return null
 }
@@ -297,7 +312,14 @@ export function DraftBoard({
         if (userId !== null) {
             const entry = pairMap.find((e) => e.playerId === userId)
             if (entry) {
-                const targetRound = Math.min(round + entry.diff, ROUNDS)
+                // In both cases: if this pick lands before pinnedRound, place
+                // the partner at pinnedRound; if at/after pinnedRound, place
+                // the partner immediately after. This way captains don't need
+                // to pick in a specific order to get the intended placement.
+                const targetRound =
+                    round < entry.pinnedRound
+                        ? entry.pinnedRound
+                        : Math.min(round + 1, ROUNDS)
                 const availableRound = findAvailablePairSlot(
                     targetRound,
                     teamId,

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { RiArrowDownSLine } from "@remixicon/react"
+import { RiArrowDownSLine, RiAddLine } from "@remixicon/react"
 import {
     Collapsible,
     CollapsibleTrigger,
@@ -11,7 +11,15 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { updateEmailTemplate } from "./actions"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from "@/components/ui/dialog"
+import { updateEmailTemplate, createEmailTemplate } from "./actions"
 import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent
@@ -56,6 +64,10 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const [messages, setMessages] = useState<
         Record<number, { type: "success" | "error"; text: string }>
     >({})
+    const [createDialogOpen, setCreateDialogOpen] = useState(false)
+    const [newTemplateName, setNewTemplateName] = useState("")
+    const [createLoading, setCreateLoading] = useState(false)
+    const [createError, setCreateError] = useState<string | null>(null)
 
     const handleUpdate = async (templateId: number) => {
         setLoading((prev) => ({ ...prev, [templateId]: true }))
@@ -121,8 +133,81 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         })
     }
 
+    const handleCreate = async () => {
+        setCreateLoading(true)
+        setCreateError(null)
+        const result = await createEmailTemplate(newTemplateName)
+        setCreateLoading(false)
+        if (result.status) {
+            setCreateDialogOpen(false)
+            setNewTemplateName("")
+            router.refresh()
+        } else {
+            setCreateError(result.message)
+        }
+    }
+
     return (
         <div className="space-y-4">
+            <div className="flex justify-end">
+                <Button onClick={() => setCreateDialogOpen(true)}>
+                    <RiAddLine size={16} />
+                    Create New Template
+                </Button>
+            </div>
+
+            <Dialog
+                open={createDialogOpen}
+                onOpenChange={(open) => {
+                    setCreateDialogOpen(open)
+                    if (!open) {
+                        setNewTemplateName("")
+                        setCreateError(null)
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Create New Template</DialogTitle>
+                        <DialogDescription>
+                            Enter a unique name for the new email template. You
+                            can edit the subject and content after creation.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        <Label htmlFor="new-template-name">Template Name</Label>
+                        <Input
+                            id="new-template-name"
+                            value={newTemplateName}
+                            onChange={(e) => setNewTemplateName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !createLoading)
+                                    handleCreate()
+                            }}
+                            placeholder="e.g. welcome email"
+                            autoFocus
+                        />
+                        {createError && (
+                            <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
+                                {createError}
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCreateDialogOpen(false)}
+                            disabled={createLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={handleCreate} disabled={createLoading}>
+                            {createLoading ? "Creating..." : "Create"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {templates.map((template) => (
                 <Collapsible key={template.id}>
                     <div className="rounded-lg border bg-card shadow-sm">

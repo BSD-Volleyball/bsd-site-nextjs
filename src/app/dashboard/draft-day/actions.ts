@@ -479,10 +479,14 @@ export async function getDraftSheetData(
         for (const s of signupPairRows) {
             if (s.pairPick !== null) pairPickMap.set(s.player, s.pairPick)
         }
-        const pairDiffMap = new Map<string, number>()
+        const pairDiffMap = new Map<
+            string,
+            { round: number; higherPlayer: string }
+        >()
         for (const pd of pairDiffRows) {
-            const key = [pd.player1, pd.player2].sort().join(":")
-            pairDiffMap.set(key, pd.diff)
+            const info = { round: pd.diff, higherPlayer: pd.player1 }
+            pairDiffMap.set(`${pd.player1}:${pd.player2}`, info)
+            pairDiffMap.set(`${pd.player2}:${pd.player1}`, info)
         }
 
         // Collect all pair player IDs so we can batch-fetch their names
@@ -570,12 +574,13 @@ export async function getDraftSheetData(
 
                 const pairId = pairPickMap.get(row.captainId)
                 if (pairId && pairId !== row.captainId) {
-                    const diffKey = [row.captainId, pairId].sort().join(":")
-                    const diff = pairDiffMap.get(diffKey) ?? DRAFT_ROUNDS
-                    const pairRound = Math.min(
-                        captainRound + diff,
-                        DRAFT_ROUNDS
-                    )
+                    const key = `${row.captainId}:${pairId}`
+                    const pinnedRound =
+                        pairDiffMap.get(key)?.round ?? DRAFT_ROUNDS
+                    const pairRound =
+                        captainRound < pinnedRound
+                            ? pinnedRound
+                            : Math.min(captainRound + 1, DRAFT_ROUNDS)
                     const pairInfo = pairInfoMap.get(pairId)
                     if (pairInfo?.name) {
                         picks.push({

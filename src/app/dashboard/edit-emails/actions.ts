@@ -33,6 +33,11 @@ interface UpdateEmailTemplateResult {
     message: string
 }
 
+interface CreateEmailTemplateResult {
+    status: boolean
+    message: string
+}
+
 export async function getEmailTemplates(): Promise<GetEmailTemplatesResult> {
     try {
         const hasAccess = await getIsAdminOrDirector()
@@ -157,6 +162,78 @@ export async function updateEmailTemplate(
         return {
             status: false,
             message: "Failed to update email template."
+        }
+    }
+}
+
+export async function createEmailTemplate(
+    name: string
+): Promise<CreateEmailTemplateResult> {
+    try {
+        const hasAccess = await getIsAdminOrDirector()
+
+        if (!hasAccess) {
+            return {
+                status: false,
+                message: "Unauthorized"
+            }
+        }
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user?.id) {
+            return {
+                status: false,
+                message: "Not authenticated."
+            }
+        }
+
+        if (!name.trim()) {
+            return {
+                status: false,
+                message: "Template name is required."
+            }
+        }
+
+        const emptyContent = normalizeEmailTemplateContent("")
+
+        const [created] = await db
+            .insert(emailTemplates)
+            .values({
+                name: name.trim(),
+                subject: null,
+                content: emptyContent as unknown as Record<string, unknown>,
+                created_at: new Date(),
+                updated_at: new Date()
+            })
+            .returning({ id: emailTemplates.id })
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create",
+            entityType: "email_template",
+            entityId: created.id,
+            summary: `Created email template "${name.trim()}" (id ${created.id})`
+        })
+
+        return {
+            status: true,
+            message: "Email template created successfully."
+        }
+    } catch (error) {
+        if (
+            error instanceof Error &&
+            "code" in error &&
+            (error as { code: string }).code === "23505"
+        ) {
+            return {
+                status: false,
+                message: "A template with that name already exists."
+            }
+        }
+        console.error("Error creating email template:", error)
+        return {
+            status: false,
+            message: "Failed to create email template."
         }
     }
 }
