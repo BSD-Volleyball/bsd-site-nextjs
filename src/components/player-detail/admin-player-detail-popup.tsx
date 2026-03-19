@@ -289,6 +289,7 @@ export function AdminPlayerDetailPopup({
                             sharedRatingNotes={sharedRatingNotes}
                             privateRatingNotes={privateRatingNotes}
                             viewerRating={viewerRating}
+                            showRatingEvaluators
                         />
 
                         {/* Pair Request */}

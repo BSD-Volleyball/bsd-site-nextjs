@@ -249,6 +249,12 @@ const week3NavItem = {
     icon: RiCalendarLine
 }
 
+const currentRostersNavItem = {
+    title: "Rosters",
+    url: "/dashboard/rosters",
+    icon: RiTeamLine
+}
+
 const addPicturesNavItem = {
     title: "Add Pictures",
     url: "/dashboard/add-pictures",
@@ -479,6 +485,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showWeek1 = inRange("select_commissioners", "prep_tryout_week_1")
     const showWeek2 = phase === "prep_tryout_week_2"
     const showWeek3 = phase === "prep_tryout_week_3"
+    const showCurrentRosters = inRange("draft", "complete")
     const showWeek2Homework = phase === "prep_tryout_week_3"
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
     const showPictures =
@@ -548,7 +555,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         const hiddenSeasonItems = [
             ...(!showWeek1 ? [week1NavItem] : []),
             ...(!showWeek2 ? [week2NavItem] : []),
-            ...(!showWeek3 ? [week3NavItem] : [])
+            ...(!showWeek3 ? [week3NavItem] : []),
+            ...(!showCurrentRosters ? [currentRostersNavItem] : [])
         ]
         if (hiddenSeasonItems.length > 0)
             hiddenGroups.push({
@@ -648,7 +656,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroupContent>
                 </SidebarGroup>
 
-                {(showWeek1 || showWeek2 || showWeek3) && (
+                {(showWeek1 ||
+                    showWeek2 ||
+                    showWeek3 ||
+                    showCurrentRosters) && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
                             Season
@@ -670,6 +681,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 {showWeek3 && (
                                     <NavItems
                                         items={[week3NavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                                {showCurrentRosters && (
+                                    <NavItems
+                                        items={[currentRostersNavItem]}
                                         pathname={pathname}
                                     />
                                 )}

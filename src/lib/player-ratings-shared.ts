@@ -5,6 +5,7 @@ export interface PlayerRatingAverages {
     hitting: number | null
     serving: number | null
     sampleCount: number
+    sampleEvaluatorNames: string[]
     seasonLabels: string[]
 }
 
@@ -51,6 +52,7 @@ export function getEmptyPlayerRatingAverages(): PlayerRatingAverages {
         hitting: null,
         serving: null,
         sampleCount: 0,
+        sampleEvaluatorNames: [],
         seasonLabels: []
     }
 }
