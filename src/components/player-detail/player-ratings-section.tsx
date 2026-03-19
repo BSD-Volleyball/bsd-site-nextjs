@@ -4,12 +4,18 @@ import type {
     PlayerRatingSharedNote,
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger
+} from "@/components/ui/tooltip"
 
 interface PlayerRatingsSectionProps {
     ratingAverages: PlayerRatingAverages
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
     viewerRating?: PlayerViewerRating | null
+    showRatingEvaluators?: boolean
 }
 
 const divisionByScore: Record<number, string> = {
@@ -36,7 +42,8 @@ export function PlayerRatingsSection({
     ratingAverages,
     sharedRatingNotes,
     privateRatingNotes: _privateRatingNotes,
-    viewerRating = null
+    viewerRating = null,
+    showRatingEvaluators = false
 }: PlayerRatingsSectionProps) {
     const hasAnyAverage =
         ratingAverages.overall !== null ||
@@ -44,6 +51,9 @@ export function PlayerRatingsSection({
         ratingAverages.setting !== null ||
         ratingAverages.hitting !== null ||
         ratingAverages.serving !== null
+
+    const hasRatingEvaluators =
+        showRatingEvaluators && ratingAverages.sampleEvaluatorNames.length > 0
 
     return (
         <div>
@@ -66,10 +76,47 @@ export function PlayerRatingsSection({
                         </span>
                     </div>
                     <div>
-                        <span className="text-muted-foreground">Ratings:</span>
-                        <span className="ml-2 font-medium">
-                            {ratingAverages.sampleCount}
-                        </span>
+                        {hasRatingEvaluators ? (
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="-m-1 inline-flex items-center rounded-sm p-1 text-left"
+                                    >
+                                        <span className="text-muted-foreground">
+                                            Ratings:
+                                        </span>
+                                        <span className="ml-2 font-medium">
+                                            {ratingAverages.sampleCount}
+                                        </span>
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                    side="top"
+                                    className="max-w-64 space-y-1"
+                                >
+                                    <p className="font-medium">Submitted by</p>
+                                    {ratingAverages.sampleEvaluatorNames.map(
+                                        (evaluatorName, index) => (
+                                            <p
+                                                key={`${evaluatorName}-${index}`}
+                                            >
+                                                {evaluatorName}
+                                            </p>
+                                        )
+                                    )}
+                                </TooltipContent>
+                            </Tooltip>
+                        ) : (
+                            <>
+                                <span className="text-muted-foreground">
+                                    Ratings:
+                                </span>
+                                <span className="ml-2 font-medium">
+                                    {ratingAverages.sampleCount}
+                                </span>
+                            </>
+                        )}
                     </div>
                     <div>
                         <span className="text-muted-foreground">Passing:</span>

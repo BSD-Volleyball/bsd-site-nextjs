@@ -82,6 +82,7 @@ export function DynamicBreadcrumb() {
     // Don't show breadcrumbs for root path or season pages
     if (
         pathname === "/" ||
+        pathname === "/dashboard/rosters" ||
         pathname.startsWith("/dashboard/rosters/") ||
         pathname.startsWith("/dashboard/schedule/") ||
         pathname.startsWith("/dashboard/playoffs/")

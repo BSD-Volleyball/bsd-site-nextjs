@@ -129,6 +129,10 @@ export async function getPlayerRatingsSectionData(
             hitting: average(ratingRows.map((row) => row.hitting)),
             serving: average(ratingRows.map((row) => row.serving)),
             sampleCount: ratingRows.length,
+            sampleEvaluatorNames: ratingRows.map(
+                (row) =>
+                    evaluatorNameById.get(row.evaluatorId) || row.evaluatorId
+            ),
             seasonLabels: seasonWindowRows.map((season) =>
                 formatSeasonLabel(season.seasonName, season.seasonYear)
             )
