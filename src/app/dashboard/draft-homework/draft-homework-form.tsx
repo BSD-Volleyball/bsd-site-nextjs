@@ -167,7 +167,8 @@ function RoundGroup({
     return (
         <div className="mb-4">
             <p className="mb-1 font-medium text-sm">{label}</p>
-            <div className="flex items-start gap-3">
+            <div className="overflow-x-auto">
+            <div className="flex items-start gap-3" style={{ minWidth: "max-content" }}>
                 {/* Player selectors */}
                 <div
                     className="flex min-w-48 flex-col gap-1 rounded-md border bg-muted/30"
@@ -230,6 +231,7 @@ function RoundGroup({
                         />
                     ))}
                 </div>
+            </div>
             </div>
         </div>
     )
