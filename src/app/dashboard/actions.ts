@@ -13,7 +13,7 @@ import {
     divisions,
     emailTemplates
 } from "@/database/schema"
-import { eq, and, lte, desc, inArray, asc } from "drizzle-orm"
+import { eq, and, lt, desc, inArray, asc } from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -111,9 +111,9 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
                 season: seasons.season
             })
             .from(seasons)
-            .where(lte(seasons.id, config.seasonId))
+            .where(lt(seasons.id, config.seasonId))
             .orderBy(desc(seasons.id))
-            .limit(4)
+            .limit(3)
 
         if (recentSeasons.length === 0) {
             return []
