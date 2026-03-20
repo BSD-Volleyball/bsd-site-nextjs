@@ -45,6 +45,7 @@ import {
     resolveSubjectVariables
 } from "@/lib/email-template-variables"
 import type { SeasonConfig } from "@/lib/site-config"
+import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 
 interface SelectCaptainsFormProps {
     seasonLabel: string
@@ -520,14 +521,10 @@ export function SelectCaptainsForm({
             const plainText = extractPlainTextFromEmailTemplateContent(
                 resolvedEmailTemplateContent
             )
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    "text/html": new Blob([html], { type: "text/html" }),
-                    "text/plain": new Blob([plainText], {
-                        type: "text/plain"
-                    })
-                })
-            ])
+            const copied = await copyRichHtmlToClipboard(html, plainText)
+            if (!copied) {
+                throw new Error("Rich text clipboard copy is not supported")
+            }
             setCopyRichTextSuccess(true)
             setCopyReminder(true)
             setTimeout(() => setCopyRichTextSuccess(false), 2000)
