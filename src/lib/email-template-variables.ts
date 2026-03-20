@@ -323,7 +323,7 @@ export function getTemplateVariablesByCategory(): Map<
 function resolveInlineNode(
     node: LexicalInlineNode,
     values: TemplateVariableValues
-): LexicalTextNode {
+): LexicalInlineNode {
     if (node.type === "template-variable") {
         const resolved = values[node.variableKey] ?? `[${node.variableKey}]`
         return {
