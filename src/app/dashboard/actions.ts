@@ -14,7 +14,7 @@ import {
     emailTemplates
 } from "@/database/schema"
 import { eq, and, lte, desc, inArray, asc } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     isAdminOrDirectorBySession,
@@ -257,11 +257,15 @@ export interface CaptainWelcomeMember {
 export interface CaptainWelcomeData {
     teamName: string
     divisionName: string
+    divisionLevel: number | null
     seasonLabel: string
     members: CaptainWelcomeMember[]
     emailTemplate: string
     emailTemplateContent: LexicalEmailTemplateContent | null
     emailSubject: string
+    seasonConfig: SeasonConfig | null
+    currentUserPreferredName: string
+    currentUserLastName: string
 }
 
 export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null> {
@@ -290,9 +294,22 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
         if (!teamRow) return null
 
         const [divisionRow] = await db
-            .select({ name: divisions.name })
+            .select({
+                name: divisions.name,
+                level: divisions.level
+            })
             .from(divisions)
             .where(eq(divisions.id, teamRow.divisionId))
+            .limit(1)
+
+        const [currentUserRow] = await db
+            .select({
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name
+            })
+            .from(users)
+            .where(eq(users.id, session.user.id))
             .limit(1)
 
         const [seasonRow] = await db
@@ -357,11 +374,18 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
         return {
             teamName: teamRow.name,
             divisionName: divisionRow?.name ?? "",
+            divisionLevel: divisionRow?.level ?? null,
             seasonLabel,
             members,
             emailTemplate,
             emailTemplateContent,
-            emailSubject
+            emailSubject,
+            seasonConfig: config,
+            currentUserPreferredName:
+                currentUserRow?.preferredName ||
+                currentUserRow?.firstName ||
+                "",
+            currentUserLastName: currentUserRow?.lastName || ""
         }
     } catch (error) {
         console.error("Error fetching captain welcome data:", error)

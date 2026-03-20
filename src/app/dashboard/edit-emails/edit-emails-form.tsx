@@ -29,7 +29,9 @@ import { LexicalEmailEditor } from "@/components/email-template/lexical-email-ed
 const SUBJECT_VARIABLES = [
     { key: "division_name", label: "Division Name" },
     { key: "season_name", label: "Season Name" },
-    { key: "season_year", label: "Season Year" }
+    { key: "season_year", label: "Season Year" },
+    { key: "user_preffered_name", label: "User Preferred Name" },
+    { key: "user_last_name", label: "User Last Name" }
 ]
 
 interface EmailTemplate {

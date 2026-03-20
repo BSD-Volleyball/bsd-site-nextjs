@@ -31,17 +31,78 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
         [data.emailTemplateContent]
     )
 
-    const variableValues = useMemo(
-        () => ({
+    const variableValues = useMemo(() => {
+        const values: Record<string, string> = {
             team_name: data.teamName,
             division_name: data.divisionName,
             season_name: data.seasonLabel,
+            season_year: data.seasonConfig
+                ? String(data.seasonConfig.seasonYear)
+                : "",
+            user_preffered_name: data.currentUserPreferredName,
+            user_last_name: data.currentUserLastName,
             team_members: data.members
                 .map((m) => `\u2022 ${m.displayName} ${m.lastName}`)
                 .join("\n")
-        }),
-        [data.teamName, data.divisionName, data.seasonLabel, data.members]
-    )
+        }
+
+        if (data.seasonConfig) {
+            const divisionDraftDateByLevel: Record<number, string> = {
+                1: data.seasonConfig.draft1Date,
+                2: data.seasonConfig.draft2Date,
+                3: data.seasonConfig.draft3Date,
+                4: data.seasonConfig.draft4Date,
+                5: data.seasonConfig.draft5Date,
+                6: data.seasonConfig.draft6Date
+            }
+
+            values.tryout_1_date = data.seasonConfig.tryout1Date
+            values.tryout_2_date = data.seasonConfig.tryout2Date
+            values.tryout_3_date = data.seasonConfig.tryout3Date
+            values.season_1_date = data.seasonConfig.season1Date
+            values.season_2_date = data.seasonConfig.season2Date
+            values.season_3_date = data.seasonConfig.season3Date
+            values.season_4_date = data.seasonConfig.season4Date
+            values.season_5_date = data.seasonConfig.season5Date
+            values.season_6_date = data.seasonConfig.season6Date
+            values.playoff_1_date = data.seasonConfig.playoff1Date
+            values.playoff_2_date = data.seasonConfig.playoff2Date
+            values.playoff_3_date = data.seasonConfig.playoff3Date
+            values.captain_select_date = data.seasonConfig.captainSelectDate
+            values.draft_1_date = data.seasonConfig.draft1Date
+            values.draft_2_date = data.seasonConfig.draft2Date
+            values.draft_3_date = data.seasonConfig.draft3Date
+            values.draft_4_date = data.seasonConfig.draft4Date
+            values.draft_5_date = data.seasonConfig.draft5Date
+            values.draft_6_date = data.seasonConfig.draft6Date
+            values.tryout_1_s1_time = data.seasonConfig.tryout1Session1Time
+            values.tryout_1_s2_time = data.seasonConfig.tryout1Session2Time
+            values.tryout_2_s1_time = data.seasonConfig.tryout2Session1Time
+            values.tryout_2_s2_time = data.seasonConfig.tryout2Session2Time
+            values.tryout_2_s3_time = data.seasonConfig.tryout2Session3Time
+            values.tryout_3_s1_time = data.seasonConfig.tryout3Session1Time
+            values.tryout_3_s2_time = data.seasonConfig.tryout3Session2Time
+            values.tryout_3_s3_time = data.seasonConfig.tryout3Session3Time
+            values.season_s1_time = data.seasonConfig.seasonSession1Time
+            values.season_s2_time = data.seasonConfig.seasonSession2Time
+            values.season_s3_time = data.seasonConfig.seasonSession3Time
+            values.division_draft_date =
+                data.divisionLevel !== null
+                    ? (divisionDraftDateByLevel[data.divisionLevel] ?? "")
+                    : ""
+        }
+
+        return values
+    }, [
+        data.teamName,
+        data.divisionName,
+        data.divisionLevel,
+        data.seasonLabel,
+        data.seasonConfig,
+        data.currentUserPreferredName,
+        data.currentUserLastName,
+        data.members
+    ])
 
     const resolvedEmailTemplateContent = useMemo(
         () =>

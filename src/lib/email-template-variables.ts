@@ -70,6 +70,19 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         description:
             "First name of the other commissioner for this division (not the current user)"
     },
+    {
+        key: "user_preffered_name",
+        label: "User Preferred Name",
+        category: "People",
+        description:
+            "Logged-in user's preferred name if set, otherwise their first name"
+    },
+    {
+        key: "user_last_name",
+        label: "User Last Name",
+        category: "People",
+        description: "Logged-in user's last name"
+    },
 
     // Dates
     {
