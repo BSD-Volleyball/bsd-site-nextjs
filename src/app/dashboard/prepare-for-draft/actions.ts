@@ -68,6 +68,14 @@ export interface PairDifferential {
     captainIsLower: boolean // true when captain is the lower-rated (player2), so player1 is pinned
 }
 
+export interface ConsideredButUndraftedPlayer {
+    userId: string
+    displayName: string
+    lastName: string
+    consideredInDivisions: string[]
+    considerationCount: number
+}
+
 export interface PrepareForDraftData {
     seasonId: number
     seasonLabel: string
@@ -83,6 +91,11 @@ export interface PrepareForDraftData {
     emailTemplate: string
     emailTemplateContent: LexicalEmailTemplateContent | null
     emailSubject: string
+    consideredButUndrafted: {
+        isRelevant: boolean
+        message: string
+        players: ConsideredButUndraftedPlayer[]
+    }
 }
 
 type AccessResult =
@@ -238,6 +251,29 @@ export async function getPrepareForDraftData(
         .limit(1)
 
     const divisionName = divisionRow?.name ?? ""
+
+    const seasonDivisionRows = await db
+        .select({
+            id: divisions.id,
+            name: divisions.name,
+            level: divisions.level
+        })
+        .from(individual_divisions)
+        .innerJoin(divisions, eq(individual_divisions.division, divisions.id))
+        .where(eq(individual_divisions.season, seasonId))
+        .orderBy(asc(divisions.level))
+
+    const currentDivisionConfig =
+        seasonDivisionRows.find((row) => row.id === divisionId) ?? null
+    const higherDivisionRows = currentDivisionConfig
+        ? seasonDivisionRows.filter(
+              (row) => row.level < currentDivisionConfig.level
+          )
+        : []
+    const immediatelyHigherDivision =
+        higherDivisionRows.length > 0
+            ? higherDivisionRows[higherDivisionRows.length - 1]
+            : null
 
     // numTeams determines completion threshold: 5 male rounds + 3 non-male rounds = 8 slots per team
     const [indivDiv] = await db
@@ -609,6 +645,157 @@ export async function getPrepareForDraftData(
         )
     }
 
+    let consideredButUndrafted: PrepareForDraftData["consideredButUndrafted"] =
+        {
+            isRelevant: false,
+            message:
+                "This section is only relevant after the next higher division has drafted and before this division has drafted.",
+            players: []
+        }
+
+    if (!currentDivisionConfig || !immediatelyHigherDivision) {
+        consideredButUndrafted.message =
+            "This section is not relevant for this division right now."
+    } else {
+        const [currentDivisionDraftRows, higherDivisionDraftRows] =
+            await Promise.all([
+                db
+                    .select({ id: drafts.id })
+                    .from(drafts)
+                    .innerJoin(teams, eq(drafts.team, teams.id))
+                    .where(
+                        and(
+                            eq(teams.season, seasonId),
+                            eq(teams.division, divisionId)
+                        )
+                    )
+                    .limit(1),
+                db
+                    .select({ id: drafts.id })
+                    .from(drafts)
+                    .innerJoin(teams, eq(drafts.team, teams.id))
+                    .where(
+                        and(
+                            eq(teams.season, seasonId),
+                            eq(teams.division, immediatelyHigherDivision.id)
+                        )
+                    )
+                    .limit(1)
+            ])
+
+        const isCurrentDivisionDrafted = currentDivisionDraftRows.length > 0
+        const isImmediatelyHigherDivisionDrafted =
+            higherDivisionDraftRows.length > 0
+
+        if (!isImmediatelyHigherDivisionDrafted) {
+            consideredButUndrafted.message =
+                "This section will become relevant after the next higher division has drafted."
+        } else if (isCurrentDivisionDrafted) {
+            consideredButUndrafted.message =
+                "This section is no longer relevant because this division has already drafted."
+        } else {
+            const higherDivisionIds = higherDivisionRows.map((row) => row.id)
+            const higherDivisionNameById = new Map(
+                higherDivisionRows.map((row) => [row.id, row.name])
+            )
+
+            const [higherHomeworkRows, draftedThisSeasonRows] =
+                await Promise.all([
+                    higherDivisionIds.length > 0
+                        ? db
+                              .select({
+                                  userId: users.id,
+                                  firstName: users.first_name,
+                                  lastName: users.last_name,
+                                  preferredName: users.preffered_name,
+                                  divisionId: draftHomework.division
+                              })
+                              .from(draftHomework)
+                              .innerJoin(
+                                  users,
+                                  eq(draftHomework.player, users.id)
+                              )
+                              .where(
+                                  and(
+                                      eq(draftHomework.season, seasonId),
+                                      inArray(
+                                          draftHomework.division,
+                                          higherDivisionIds
+                                      )
+                                  )
+                              )
+                        : Promise.resolve([]),
+                    db
+                        .select({ userId: drafts.user })
+                        .from(drafts)
+                        .innerJoin(teams, eq(drafts.team, teams.id))
+                        .where(eq(teams.season, seasonId))
+                ])
+
+            const draftedThisSeason = new Set(
+                draftedThisSeasonRows.map((row) => row.userId)
+            )
+            const consideredMap = new Map<
+                string,
+                {
+                    userId: string
+                    displayName: string
+                    lastName: string
+                    consideredInDivisions: Set<string>
+                    considerationCount: number
+                }
+            >()
+
+            for (const row of higherHomeworkRows) {
+                if (draftedThisSeason.has(row.userId)) continue
+
+                const existing = consideredMap.get(row.userId)
+                const divisionName =
+                    higherDivisionNameById.get(row.divisionId) ?? "Unknown"
+
+                if (existing) {
+                    existing.consideredInDivisions.add(divisionName)
+                    existing.considerationCount += 1
+                    continue
+                }
+
+                consideredMap.set(row.userId, {
+                    userId: row.userId,
+                    displayName: row.preferredName ?? row.firstName,
+                    lastName: row.lastName,
+                    consideredInDivisions: new Set([divisionName]),
+                    considerationCount: 1
+                })
+            }
+
+            const players = Array.from(consideredMap.values())
+                .map((player) => ({
+                    userId: player.userId,
+                    displayName: player.displayName,
+                    lastName: player.lastName,
+                    consideredInDivisions: [...player.consideredInDivisions],
+                    considerationCount: player.considerationCount
+                }))
+                .sort((a, b) => {
+                    const considerationDiff =
+                        b.considerationCount - a.considerationCount
+                    if (considerationDiff !== 0) return considerationDiff
+                    const lastNameDiff = a.lastName.localeCompare(b.lastName)
+                    if (lastNameDiff !== 0) return lastNameDiff
+                    return a.displayName.localeCompare(b.displayName)
+                })
+
+            consideredButUndrafted = {
+                isRelevant: true,
+                message:
+                    players.length > 0
+                        ? "Players from higher-division draft homework who are still undrafted this season."
+                        : "No players from higher-division draft homework remain undrafted right now.",
+                players
+            }
+        }
+    }
+
     return {
         status: true,
         message: "Success",
@@ -626,7 +813,8 @@ export async function getPrepareForDraftData(
             savedPairDiffs,
             emailTemplate,
             emailTemplateContent,
-            emailSubject
+            emailSubject,
+            consideredButUndrafted
         }
     }
 }
