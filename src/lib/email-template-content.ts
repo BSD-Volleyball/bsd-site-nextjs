@@ -214,8 +214,8 @@ function getTextFromParagraph(paragraph: unknown): string {
     return parts.join("")
 }
 
-function escapeHtml(str: string): string {
-    return str
+function escapeHtml(str: string | null | undefined): string {
+    return (str ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
