@@ -2019,9 +2019,9 @@ export default async function DashboardPage() {
                                             Teams are being formed!
                                         </p>
                                         <p className="text-muted-foreground text-sm">
-                                            Commissioners are drafting players
-                                            onto teams. Check back soon for your
-                                            team assignment.
+                                            Captains are drafting players onto
+                                            teams. Check back soon for your team
+                                            assignment.
                                         </p>
                                     </div>
                                 )
