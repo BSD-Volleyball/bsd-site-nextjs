@@ -482,9 +482,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     // Per-item phase visibility
-    const showWeek1 = inRange("select_commissioners", "prep_tryout_week_1")
-    const showWeek2 = phase === "prep_tryout_week_2"
-    const showWeek3 = phase === "prep_tryout_week_3"
+    const showWeek1 = inRange("select_captains", "draft")
+    const showWeek2 = inRange("select_captains", "draft")
+    const showWeek3 = inRange("select_captains", "draft")
     const showCurrentRosters = inRange("draft", "complete")
     const showWeek2Homework = phase === "prep_tryout_week_3"
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
