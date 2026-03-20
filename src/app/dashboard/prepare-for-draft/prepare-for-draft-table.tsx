@@ -659,6 +659,9 @@ export function PrepareForDraftTable({
                                             Considered In
                                         </th>
                                         <th className="px-3 py-2 text-center font-medium">
+                                            Score
+                                        </th>
+                                        <th className="px-3 py-2 text-center font-medium">
                                             Homework Entries
                                         </th>
                                     </tr>
@@ -903,9 +906,18 @@ function ConsideredButUndraftedRow({
                 >
                     {player.displayName} {player.lastName}
                 </button>
+                {player.pairDisplayName && (
+                    <span className="text-muted-foreground">
+                        {" "}
+                        (pair: {player.pairDisplayName})
+                    </span>
+                )}
             </td>
             <td className="px-3 py-2 text-sm">
                 {player.consideredInDivisions.join(", ")}
+            </td>
+            <td className="px-3 py-2 text-center tabular-nums">
+                {Math.round(player.score)}
             </td>
             <td className="px-3 py-2 text-center tabular-nums">
                 {player.considerationCount}
