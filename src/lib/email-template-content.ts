@@ -14,7 +14,15 @@ export interface LexicalTemplateVariableNode {
     version: number
 }
 
-export type LexicalInlineNode = LexicalTextNode | LexicalTemplateVariableNode
+export interface LexicalLineBreakNode {
+    type: "linebreak"
+    version: number
+}
+
+export type LexicalInlineNode =
+    | LexicalTextNode
+    | LexicalTemplateVariableNode
+    | LexicalLineBreakNode
 
 export interface LexicalParagraphNode {
     children: LexicalInlineNode[]
@@ -172,6 +180,9 @@ export function normalizeEmailTemplateContent(
 
 function getInlineNodeText(node: unknown): string {
     if (!isObject(node)) return ""
+    if (node.type === "linebreak") {
+        return "\n"
+    }
     if (
         node.type === "template-variable" &&
         typeof node.variableKey === "string"
@@ -211,7 +222,7 @@ function getTextFromParagraph(paragraph: unknown): string {
         return getInlineNodeText(node)
     })
 
-    return parts.join("")
+    return parts.join("").replace(/^\n+|\n+$/g, "")
 }
 
 function escapeHtml(str: string | null | undefined): string {
@@ -231,6 +242,9 @@ function textNodeToHtml(node: LexicalTextNode): string {
 }
 
 function inlineNodeToHtml(node: LexicalInlineNode): string {
+    if (node.type === "linebreak") {
+        return "<br>"
+    }
     if (node.type === "template-variable") {
         return escapeHtml(`[${node.variableKey}]`)
     }
@@ -248,10 +262,13 @@ export function convertEmailTemplateContentToHtml(
         .map((child) => {
             if (child.type === "list") {
                 const tag = child.listType === "number" ? "ol" : "ul"
-                return `<${tag}>${child.children.map(listItemToHtml).join("")}</${tag}>`
+                return `<${tag} style="margin: 0; padding-left: 1.5rem;">${child.children.map(listItemToHtml).join("")}</${tag}>`
             }
-            const inner = child.children.map(inlineNodeToHtml).join("")
-            return `<p>${inner || "<br>"}</p>`
+            const inner = child.children
+                .map(inlineNodeToHtml)
+                .join("")
+                .replace(/^(<br>)+|(<br>)+$/g, "")
+            return `<div>${inner || "<br>"}</div>`
         })
         .join("")
 }
@@ -261,7 +278,7 @@ export function extractPlainTextFromEmailTemplateContent(
 ): string {
     const normalized = normalizeEmailTemplateContent(value)
 
-    const lines = normalized.root.children.map((child) => {
+    const blocks = normalized.root.children.map((child) => {
         if (child.type === "list") {
             return child.children
                 .map(
@@ -273,5 +290,5 @@ export function extractPlainTextFromEmailTemplateContent(
         return getTextFromParagraph(child)
     })
 
-    return lines.join("\n\n").trim()
+    return blocks.join("\n").trim()
 }
