@@ -25,6 +25,7 @@ import {
     normalizeEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent
 } from "@/lib/email-template-content"
+import { fetchPlayerScores } from "@/lib/player-score"
 import { isAdminOrDirector, isCommissionerBySession } from "@/lib/rbac"
 
 // Maps homework round number → actual draft round number
@@ -72,6 +73,8 @@ export interface ConsideredButUndraftedPlayer {
     userId: string
     displayName: string
     lastName: string
+    pairDisplayName: string | null
+    score: number
     consideredInDivisions: string[]
     considerationCount: number
 }
@@ -698,6 +701,15 @@ export async function getPrepareForDraftData(
             const higherDivisionNameById = new Map(
                 higherDivisionRows.map((row) => [row.id, row.name])
             )
+            const pairPickById = new Map(
+                signupRows.map((row) => [row.userId, row.pairPick ?? null])
+            )
+            const playerNameById = new Map(
+                signupRows.map((row) => [
+                    row.userId,
+                    `${row.preferredName ?? row.firstName} ${row.lastName}`
+                ])
+            )
 
             const [higherHomeworkRows, draftedThisSeasonRows] =
                 await Promise.all([
@@ -741,10 +753,17 @@ export async function getPrepareForDraftData(
                     userId: string
                     displayName: string
                     lastName: string
+                    pairDisplayName: string | null
+                    score: number
                     consideredInDivisions: Set<string>
                     considerationCount: number
                 }
             >()
+
+            const scoreByUser = await fetchPlayerScores(
+                signupRows.map((row) => row.userId),
+                seasonId
+            )
 
             for (const row of higherHomeworkRows) {
                 if (draftedThisSeason.has(row.userId)) continue
@@ -763,6 +782,11 @@ export async function getPrepareForDraftData(
                     userId: row.userId,
                     displayName: row.preferredName ?? row.firstName,
                     lastName: row.lastName,
+                    pairDisplayName:
+                        playerNameById.get(
+                            pairPickById.get(row.userId) ?? ""
+                        ) ?? null,
+                    score: scoreByUser.get(row.userId) ?? 200,
                     consideredInDivisions: new Set([divisionName]),
                     considerationCount: 1
                 })
@@ -773,6 +797,8 @@ export async function getPrepareForDraftData(
                     userId: player.userId,
                     displayName: player.displayName,
                     lastName: player.lastName,
+                    pairDisplayName: player.pairDisplayName,
+                    score: player.score,
                     consideredInDivisions: [...player.consideredInDivisions],
                     considerationCount: player.considerationCount
                 }))
@@ -780,6 +806,8 @@ export async function getPrepareForDraftData(
                     const considerationDiff =
                         b.considerationCount - a.considerationCount
                     if (considerationDiff !== 0) return considerationDiff
+                    const scoreDiff = a.score - b.score
+                    if (scoreDiff !== 0) return scoreDiff
                     const lastNameDiff = a.lastName.localeCompare(b.lastName)
                     if (lastNameDiff !== 0) return lastNameDiff
                     return a.displayName.localeCompare(b.displayName)
