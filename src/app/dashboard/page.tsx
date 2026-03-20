@@ -44,7 +44,12 @@ import {
     isAdminOrDirectorBySession,
     isCommissionerForSeason
 } from "@/lib/rbac"
-import { getCaptainWelcomeData, type CaptainWelcomeData } from "./actions"
+import {
+    getCaptainWelcomeData,
+    getPlayerTeamAssignment,
+    type CaptainWelcomeData,
+    type PlayerTeamAssignment
+} from "./actions"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -348,6 +353,63 @@ async function getCommissionerCaptainSelectionStatus(
     })
 }
 
+function TeamAssignmentDisplay({
+    assignment
+}: {
+    assignment: PlayerTeamAssignment
+}) {
+    return (
+        <div className="space-y-3">
+            <div>
+                <p className="font-semibold text-sm">{assignment.teamName}</p>
+                <p className="pl-5 text-muted-foreground text-sm">
+                    {assignment.divisionName} Division
+                </p>
+            </div>
+            <div>
+                <p className="mb-0.5 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                    Captain
+                </p>
+                <p className="pl-5 text-sm">
+                    {assignment.captainName}{" "}
+                    {assignment.captainEmail && (
+                        <a
+                            href={`mailto:${assignment.captainEmail}`}
+                            className="text-primary hover:underline"
+                        >
+                            {assignment.captainEmail}
+                        </a>
+                    )}
+                </p>
+            </div>
+            <div>
+                <p className="mb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                    Team Roster
+                </p>
+                <ul className="space-y-0.5">
+                    {assignment.roster.map((player) => (
+                        <li
+                            key={`${player.displayName}-${player.lastName}`}
+                            className="flex items-center gap-1.5 text-sm"
+                        >
+                            {player.isCaptain && (
+                                <RiStarLine className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span
+                                className={
+                                    player.isCaptain ? "font-medium" : "pl-5"
+                                }
+                            >
+                                {player.displayName} {player.lastName}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    )
+}
+
 function RegistrationConfirmation({
     signupStatus
 }: {
@@ -555,7 +617,9 @@ export default async function DashboardPage() {
     let hasWeek3RosterData = false
     let isWeek2Captain = false
     let isSeasonCaptain = false
+    let isDivisionDrafted = false
     let captainWelcomeData: CaptainWelcomeData | null = null
+    let playerTeamAssignment: PlayerTeamAssignment | null = null
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -691,7 +755,7 @@ export default async function DashboardPage() {
                 )
             ) {
                 const [captainTeamEntry] = await db
-                    .select({ id: teams.id })
+                    .select({ id: teams.id, divisionId: teams.division })
                     .from(teams)
                     .where(
                         and(
@@ -702,9 +766,35 @@ export default async function DashboardPage() {
                     .limit(1)
                 isSeasonCaptain = !!captainTeamEntry
 
-                if (isSeasonCaptain && signupStatus.config.phase === "draft") {
+                if (isSeasonCaptain && captainTeamEntry) {
+                    const [draftRecord] = await db
+                        .select({ id: drafts.id })
+                        .from(drafts)
+                        .innerJoin(teams, eq(drafts.team, teams.id))
+                        .where(
+                            and(
+                                eq(teams.season, signupStatus.config.seasonId),
+                                eq(teams.division, captainTeamEntry.divisionId)
+                            )
+                        )
+                        .limit(1)
+                    isDivisionDrafted = !!draftRecord
+                }
+
+                if (isSeasonCaptain && isDivisionDrafted) {
                     captainWelcomeData = await getCaptainWelcomeData()
                 }
+            }
+
+            if (
+                ["draft", "regular_season", "playoffs", "complete"].includes(
+                    signupStatus.config.phase
+                )
+            ) {
+                playerTeamAssignment = await getPlayerTeamAssignment(
+                    session.user.id,
+                    signupStatus.config.seasonId
+                )
             }
 
             if (
@@ -1039,12 +1129,14 @@ export default async function DashboardPage() {
     const shouldShowDraftHomeworkCard = !!(
         signupStatus &&
         ["prep_tryout_week_3", "draft"].includes(signupStatus.config.phase) &&
-        isSeasonCaptain
+        isSeasonCaptain &&
+        !isDivisionDrafted
     )
     const shouldShowWelcomeTeamCard = !!(
         signupStatus &&
-        signupStatus.config.phase === "draft" &&
+        ["prep_tryout_week_3", "draft"].includes(signupStatus.config.phase) &&
         isSeasonCaptain &&
+        isDivisionDrafted &&
         captainWelcomeData
     )
     const shouldShowAssignedConcernsCard = assignedActiveConcernsCount > 0
@@ -1917,16 +2009,22 @@ export default async function DashboardPage() {
                                     </p>
                                 )
                             ) : signupStatus.config.phase === "draft" ? (
-                                <div className="space-y-2">
-                                    <p className="font-medium text-sm">
-                                        Teams are being formed!
-                                    </p>
-                                    <p className="text-muted-foreground text-sm">
-                                        Commissioners are drafting players onto
-                                        teams. Check back soon for your team
-                                        assignment.
-                                    </p>
-                                </div>
+                                playerTeamAssignment ? (
+                                    <TeamAssignmentDisplay
+                                        assignment={playerTeamAssignment}
+                                    />
+                                ) : (
+                                    <div className="space-y-2">
+                                        <p className="font-medium text-sm">
+                                            Teams are being formed!
+                                        </p>
+                                        <p className="text-muted-foreground text-sm">
+                                            Commissioners are drafting players
+                                            onto teams. Check back soon for your
+                                            team assignment.
+                                        </p>
+                                    </div>
+                                )
                             ) : signupStatus.config.phase ===
                               "regular_season" ? (
                                 <div className="space-y-3">
@@ -1937,6 +2035,11 @@ export default async function DashboardPage() {
                                         Check the schedule and standings for the
                                         latest results.
                                     </p>
+                                    {playerTeamAssignment && (
+                                        <TeamAssignmentDisplay
+                                            assignment={playerTeamAssignment}
+                                        />
+                                    )}
                                 </div>
                             ) : signupStatus.config.phase === "playoffs" ? (
                                 <div className="space-y-3">
@@ -1947,12 +2050,24 @@ export default async function DashboardPage() {
                                         Check the playoff bracket for matchups
                                         and results.
                                     </p>
+                                    {playerTeamAssignment && (
+                                        <TeamAssignmentDisplay
+                                            assignment={playerTeamAssignment}
+                                        />
+                                    )}
                                 </div>
                             ) : signupStatus.config.phase === "complete" ? (
-                                <p className="text-muted-foreground">
-                                    The {seasonLabel} season is complete. Thanks
-                                    for playing!
-                                </p>
+                                <div className="space-y-3">
+                                    <p className="text-muted-foreground">
+                                        The {seasonLabel} season is complete.
+                                        Thanks for playing!
+                                    </p>
+                                    {playerTeamAssignment && (
+                                        <TeamAssignmentDisplay
+                                            assignment={playerTeamAssignment}
+                                        />
+                                    )}
+                                </div>
                             ) : (
                                 <p className="text-muted-foreground">
                                     Season information will be available soon.

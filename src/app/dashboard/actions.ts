@@ -369,6 +369,87 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
     }
 }
 
+export interface PlayerTeamAssignment {
+    teamName: string
+    divisionName: string
+    captainName: string
+    captainEmail: string
+    roster: { displayName: string; lastName: string; isCaptain: boolean }[]
+}
+
+export async function getPlayerTeamAssignment(
+    userId: string,
+    seasonId: number
+): Promise<PlayerTeamAssignment | null> {
+    try {
+        const [draftRecord] = await db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                captainId: teams.captain,
+                divisionId: teams.division
+            })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .where(and(eq(drafts.user, userId), eq(teams.season, seasonId)))
+            .limit(1)
+
+        if (!draftRecord) return null
+
+        const [divisionRow] = await db
+            .select({ name: divisions.name })
+            .from(divisions)
+            .where(eq(divisions.id, draftRecord.divisionId))
+            .limit(1)
+
+        const [captainRow] = await db
+            .select({
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name,
+                email: users.email
+            })
+            .from(users)
+            .where(eq(users.id, draftRecord.captainId))
+            .limit(1)
+
+        const captainName = captainRow
+            ? captainRow.preferredName
+                ? `${captainRow.preferredName} ${captainRow.lastName}`
+                : `${captainRow.firstName} ${captainRow.lastName}`
+            : ""
+
+        const rosterRows = await db
+            .select({
+                userId: drafts.user,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name
+            })
+            .from(drafts)
+            .innerJoin(users, eq(drafts.user, users.id))
+            .where(eq(drafts.team, draftRecord.teamId))
+            .orderBy(asc(users.last_name), asc(users.first_name))
+
+        const roster = rosterRows.map((row) => ({
+            displayName: row.preferredName || row.firstName,
+            lastName: row.lastName,
+            isCaptain: row.userId === draftRecord.captainId
+        }))
+
+        return {
+            teamName: draftRecord.teamName,
+            divisionName: divisionRow?.name ?? "",
+            captainName,
+            captainEmail: captainRow?.email ?? "",
+            roster
+        }
+    } catch (error) {
+        console.error("Error fetching player team assignment:", error)
+        return null
+    }
+}
+
 export async function expressWaitlistInterest(
     seasonId: number
 ): Promise<{ status: boolean; message: string }> {
