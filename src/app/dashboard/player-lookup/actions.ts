@@ -9,13 +9,14 @@ import {
     teams,
     divisions
 } from "@/database/schema"
-import { eq, desc } from "drizzle-orm"
+import { eq, desc, ne } from "drizzle-orm"
 import {
     getSessionUserId,
     isCommissionerBySession,
     isAdminOrDirectorBySession
 } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -120,6 +121,7 @@ export async function getPlayersForLookup(): Promise<{
                 preffered_name: users.preffered_name
             })
             .from(users)
+            .where(ne(users.id, GHOST_CAPTAIN_ID))
             .orderBy(users.last_name, users.first_name)
 
         return {

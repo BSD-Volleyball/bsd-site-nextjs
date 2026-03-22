@@ -27,6 +27,7 @@ import {
 } from "@/lib/email-template-content"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { isAdminOrDirector, isCommissionerBySession } from "@/lib/rbac"
+import { isGhostCaptain } from "@/lib/ghost-captain"
 
 // Maps homework round number → actual draft round number
 const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
@@ -368,12 +369,14 @@ export async function getPrepareForDraftData(
         .innerJoin(users, eq(teams.captain, users.id))
         .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
 
-    const captains: CaptainInfo[] = captainRows.map((r) => ({
-        userId: r.captainId,
-        displayName: r.preferredName ?? r.firstName,
-        lastName: r.lastName,
-        email: r.email
-    }))
+    const captains: CaptainInfo[] = captainRows
+        .filter((r) => !isGhostCaptain(r.captainId))
+        .map((r) => ({
+            userId: r.captainId,
+            displayName: r.preferredName ?? r.firstName,
+            lastName: r.lastName,
+            email: r.email
+        }))
 
     // Query D1: 3 most recent prior season IDs (weighted: index 0 = ×3, 1 = ×2, 2 = ×1)
     const priorSeasonRows = await db
