@@ -1,30 +1,11 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Input } from "@/components/ui/input"
+import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover"
-import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
-import {
-    getPlayerDetailsForSignups,
-    type PlayerListItem,
-    type PlayerDetails,
-    type PlayerDraftHistory,
-    type SeasonInfo
-} from "./actions"
-import { PlayerDetailPopup } from "@/components/player-detail"
-import {
-    getEmptyPlayerRatingAverages,
-    type PlayerRatingAverages,
-    type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote,
-    type PlayerViewerRating
-} from "@/lib/player-ratings-shared"
+import { RiAddLine } from "@remixicon/react"
+import type { PlayerListItem, SeasonInfo } from "./actions"
+import { usePlayerSlots } from "./use-player-slots"
+import { PlayerSlotColumn } from "./player-slot-column"
 
 interface PlayerLookupSignupsFormProps {
     players: PlayerListItem[]
@@ -37,219 +18,52 @@ export function PlayerLookupSignupsForm({
     allSeasons,
     playerPicUrl
 }: PlayerLookupSignupsFormProps) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState("")
-    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(
-        null
-    )
-    const [playerDetails, setPlayerDetails] = useState<PlayerDetails | null>(
-        null
-    )
-    const [draftHistory, setDraftHistory] = useState<PlayerDraftHistory[]>([])
-    const [ratingAverages, setRatingAverages] = useState<PlayerRatingAverages>(
-        getEmptyPlayerRatingAverages()
-    )
-    const [sharedRatingNotes, setSharedRatingNotes] = useState<
-        PlayerRatingSharedNote[]
-    >([])
-    const [privateRatingNotes, setPrivateRatingNotes] = useState<
-        PlayerRatingPrivateNote[]
-    >([])
-    const [viewerRating, setViewerRating] = useState<PlayerViewerRating | null>(
-        null
-    )
-    const [pairPickName, setPairPickName] = useState<string | null>(null)
-    const [pairReason, setPairReason] = useState<string | null>(null)
-    const [datesMissing, setDatesMissing] = useState<string | null>(null)
-    const [playoffDates, setPlayoffDates] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const { slots, dispatch } = usePlayerSlots()
 
-    const selectedPlayer = useMemo(
-        () => players.find((p) => p.id === selectedPlayerId),
-        [players, selectedPlayerId]
-    )
+    const hasAnySelection = slots.some((s) => s.selectedPlayerId !== null)
 
-    const filteredPlayers = useMemo(() => {
-        if (!search) return players
-        const lowerSearch = search.toLowerCase()
-        return players.filter((p) => {
-            const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
-            const preferredName = (p.preffered_name || "").toLowerCase()
-            const oldIdStr = p.old_id?.toString() || ""
-            return (
-                fullName.includes(lowerSearch) ||
-                preferredName.includes(lowerSearch) ||
-                oldIdStr.includes(lowerSearch)
-            )
+    const excludedIdsBySlot = useMemo(() => {
+        const allSelected = new Set(
+            slots
+                .map((s) => s.selectedPlayerId)
+                .filter((id): id is string => id !== null)
+        )
+        return slots.map((slot) => {
+            const excluded = new Set(allSelected)
+            if (slot.selectedPlayerId) {
+                excluded.delete(slot.selectedPlayerId)
+            }
+            return excluded
         })
-    }, [players, search])
-
-    const handleSelect = async (playerId: string) => {
-        setSelectedPlayerId(playerId)
-        setOpen(false)
-        setSearch("")
-        setIsLoading(true)
-        setError(null)
-
-        const result = await getPlayerDetailsForSignups(playerId)
-
-        if (result.status && result.player) {
-            setPlayerDetails(result.player)
-            setDraftHistory(result.draftHistory)
-            setRatingAverages(result.ratingAverages)
-            setSharedRatingNotes(result.sharedRatingNotes)
-            setPrivateRatingNotes(result.privateRatingNotes)
-            setViewerRating(result.viewerRating)
-            setPairPickName(result.pairPickName)
-            setPairReason(result.pairReason)
-            setDatesMissing(result.datesMissing)
-            setPlayoffDates(result.playoffDates)
-        } else {
-            setError(result.message || "Failed to load player details")
-            setPlayerDetails(null)
-            setDraftHistory([])
-            setRatingAverages(getEmptyPlayerRatingAverages())
-            setSharedRatingNotes([])
-            setPrivateRatingNotes([])
-            setViewerRating(null)
-            setPairPickName(null)
-            setPairReason(null)
-            setDatesMissing(null)
-            setPlayoffDates([])
-        }
-
-        setIsLoading(false)
-    }
-
-    const handleClear = () => {
-        setSelectedPlayerId(null)
-        setPlayerDetails(null)
-        setDraftHistory([])
-        setRatingAverages(getEmptyPlayerRatingAverages())
-        setSharedRatingNotes([])
-        setPrivateRatingNotes([])
-        setPairPickName(null)
-        setPairReason(null)
-        setDatesMissing(null)
-        setPlayoffDates([])
-        setSearch("")
-        setError(null)
-    }
-
-    const getDisplayName = (player: PlayerListItem) => {
-        const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
-        const preferredPart = player.preffered_name
-            ? ` (${player.preffered_name})`
-            : ""
-        return `${oldIdPart}${player.first_name}${preferredPart} ${player.last_name}`
-    }
+    }, [slots])
 
     return (
-        <div className="space-y-6">
-            <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
+        <div className="flex gap-6 overflow-x-auto pb-4">
+            {slots.map((slot, index) => (
+                <PlayerSlotColumn
+                    key={slot.id}
+                    slot={slot}
+                    players={players}
+                    allSeasons={allSeasons}
+                    playerPicUrl={playerPicUrl}
+                    dispatch={dispatch}
+                    showRemoveButton={slots.length > 1}
+                    excludedPlayerIds={excludedIdsBySlot[index]}
+                />
+            ))}
+
+            {hasAnySelection && (
+                <div className="flex shrink-0 items-start pt-0.5">
                     <Button
                         variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className="w-full max-w-md justify-between font-normal"
+                        className="gap-2"
+                        onClick={() => dispatch({ type: "ADD_SLOT" })}
                     >
-                        <span
-                            className={cn(
-                                !selectedPlayer && "text-muted-foreground"
-                            )}
-                        >
-                            {selectedPlayer
-                                ? getDisplayName(selectedPlayer)
-                                : "Search for a player..."}
-                        </span>
-                        <div className="flex items-center gap-1">
-                            {selectedPlayer && (
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    className="rounded-sm p-0.5 hover:bg-accent"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (
-                                            e.key === "Enter" ||
-                                            e.key === " "
-                                        ) {
-                                            e.stopPropagation()
-                                            handleClear()
-                                        }
-                                    }}
-                                >
-                                    <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                                </span>
-                            )}
-                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                        <RiAddLine className="h-4 w-4" />
+                        Add Player to Compare
                     </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                    className="w-(--radix-popover-trigger-width) p-2"
-                    align="start"
-                >
-                    <Input
-                        placeholder="Search by name or old ID..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        autoCorrect="off"
-                        className="mb-2"
-                    />
-                    <div className="max-h-60 overflow-y-auto">
-                        {filteredPlayers.length === 0 ? (
-                            <p className="py-2 text-center text-muted-foreground text-sm">
-                                No players found
-                            </p>
-                        ) : (
-                            filteredPlayers.map((player) => (
-                                <button
-                                    key={player.id}
-                                    type="button"
-                                    className={cn(
-                                        "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                        selectedPlayerId === player.id &&
-                                            "bg-accent"
-                                    )}
-                                    onClick={() => handleSelect(player.id)}
-                                >
-                                    {getDisplayName(player)}
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </PopoverContent>
-            </Popover>
-
-            {error && (
-                <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                    {error}
                 </div>
             )}
-
-            <PlayerDetailPopup
-                open={!!selectedPlayerId}
-                playerDetails={playerDetails}
-                draftHistory={draftHistory}
-                allSeasons={allSeasons}
-                playerPicUrl={playerPicUrl}
-                isLoading={isLoading}
-                pairPickName={pairPickName}
-                pairReason={pairReason}
-                datesMissing={datesMissing}
-                playoffDates={playoffDates}
-                ratingAverages={ratingAverages}
-                sharedRatingNotes={sharedRatingNotes}
-                privateRatingNotes={privateRatingNotes}
-                viewerRating={viewerRating}
-                inline
-            />
         </div>
     )
 }
