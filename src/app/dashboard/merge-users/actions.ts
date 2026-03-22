@@ -13,9 +13,10 @@ import {
     evaluations,
     commissioners
 } from "@/database/schema"
-import { eq, lt, gt } from "drizzle-orm"
+import { eq, lt, gt, and, ne } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirector } from "@/lib/rbac"
+import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 
 const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
 const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
@@ -54,7 +55,12 @@ export async function getOldUsers(): Promise<UserOption[]> {
             createdAt: users.createdAt
         })
         .from(users)
-        .where(lt(users.createdAt, OLD_USER_CUTOFF))
+        .where(
+            and(
+                lt(users.createdAt, OLD_USER_CUTOFF),
+                ne(users.id, GHOST_CAPTAIN_ID)
+            )
+        )
         .orderBy(users.last_name, users.first_name)
 
     return results.map((u) => ({
@@ -88,7 +94,12 @@ export async function getNewUsers(): Promise<UserOption[]> {
             createdAt: users.createdAt
         })
         .from(users)
-        .where(gt(users.createdAt, NEW_USER_CUTOFF))
+        .where(
+            and(
+                gt(users.createdAt, NEW_USER_CUTOFF),
+                ne(users.id, GHOST_CAPTAIN_ID)
+            )
+        )
         .orderBy(users.last_name, users.first_name)
 
     return results.map((u) => ({

@@ -17,6 +17,7 @@ import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getCommissionerDivisionAccess } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
+import { isGhostCaptain, getGhostDisplayName } from "@/lib/ghost-captain"
 
 export interface CaptainRow {
     teamId: number
@@ -164,6 +165,20 @@ export async function getDraftDayData(
             } else {
                 existing.captains.push(captainRow)
             }
+        }
+
+        // Assign ghost display names per-division (Ghost vs Ghost 1/Ghost 2)
+        for (const div of divisionMap.values()) {
+            const ghostIndices = div.captains
+                .map((c, i) => (isGhostCaptain(c.captainId) ? i : -1))
+                .filter((i) => i !== -1)
+            const totalGhosts = ghostIndices.length
+            ghostIndices.forEach((idx, ghostIdx) => {
+                div.captains[idx].captainName = getGhostDisplayName(
+                    ghostIdx,
+                    totalGhosts
+                )
+            })
         }
 
         const divisionList: DivisionData[] = [...divisionMap.entries()]
@@ -535,6 +550,8 @@ export async function getDraftSheetData(
         >()
         // key: "divisionId:teamName" → index in teams array (coaches dedup)
         const coachTeamIndex = new Map<string, number>()
+        // Track ghost indices per division for naming
+        const divisionGhostTeamIndices = new Map<number, number[]>()
 
         for (const row of teamRows) {
             const captainName =
@@ -594,13 +611,15 @@ export async function getDraftSheetData(
                 }
             }
 
+            const ghostCaptain = isGhostCaptain(row.captainId)
             const teamData: TeamSheetData = {
                 teamId: row.teamId,
                 teamNumber: row.teamNumber,
                 teamName: row.teamName,
-                captainName,
-                captainOldId: row.captainOldId,
-                captainIsMale: row.captainIsMale,
+                // captainName placeholder — ghost names resolved after grouping
+                captainName: ghostCaptain ? "" : captainName,
+                captainOldId: ghostCaptain ? null : row.captainOldId,
+                captainIsMale: ghostCaptain ? null : row.captainIsMale,
                 additionalCoaches: [],
                 picks
             }
@@ -615,13 +634,35 @@ export async function getDraftSheetData(
                 if (divIsCoaches) {
                     coachTeamIndex.set(`${row.divisionId}:${row.teamName}`, 0)
                 }
+                if (ghostCaptain) {
+                    divisionGhostTeamIndices.set(row.divisionId, [0])
+                }
             } else {
                 const idx = existing.teams.length
                 existing.teams.push(teamData)
                 if (divIsCoaches) {
                     coachTeamIndex.set(`${row.divisionId}:${row.teamName}`, idx)
                 }
+                if (ghostCaptain) {
+                    const ghostList =
+                        divisionGhostTeamIndices.get(row.divisionId) ?? []
+                    ghostList.push(idx)
+                    divisionGhostTeamIndices.set(row.divisionId, ghostList)
+                }
             }
+        }
+
+        // Assign ghost captain display names per-division
+        for (const [divId, ghostIndices] of divisionGhostTeamIndices) {
+            const div = divisionMap.get(divId)
+            if (!div) continue
+            const totalGhosts = ghostIndices.length
+            ghostIndices.forEach((idx, ghostIdx) => {
+                div.teams[idx].captainName = getGhostDisplayName(
+                    ghostIdx,
+                    totalGhosts
+                )
+            })
         }
 
         const divisionList: DivisionSheetData[] = [...divisionMap.entries()]

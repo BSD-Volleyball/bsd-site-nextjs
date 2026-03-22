@@ -12,7 +12,7 @@ import {
     emailTemplates,
     commissioners
 } from "@/database/schema"
-import { eq, and, inArray, asc } from "drizzle-orm"
+import { eq, and, inArray, asc, ne } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -22,6 +22,7 @@ import {
     extractPlainTextFromEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
+import { GHOST_CAPTAIN_ID, isGhostCaptain } from "@/lib/ghost-captain"
 
 export interface DivisionOption {
     id: number
@@ -209,6 +210,7 @@ export async function getCreateTeamsData(): Promise<{
                     email: users.email
                 })
                 .from(users)
+                .where(ne(users.id, GHOST_CAPTAIN_ID))
                 .orderBy(users.last_name, users.first_name),
             db
                 .select({
@@ -398,12 +400,6 @@ export async function createTeams(
 
         for (let i = 0; i < teamsToCreate.length; i++) {
             const team = teamsToCreate[i]
-            if (!team.captainId) {
-                return {
-                    status: false,
-                    message: `Please select a captain for team ${i + 1}.`
-                }
-            }
             if (!team.teamName.trim()) {
                 return {
                     status: false,
@@ -412,31 +408,36 @@ export async function createTeams(
             }
         }
 
-        const captainIds = teamsToCreate.map((team) => team.captainId)
-        const uniqueCaptainIds = new Set(captainIds)
+        // Only enforce uniqueness and signup checks for real (non-ghost) captains
+        const realCaptainIds = teamsToCreate
+            .map((team) => team.captainId || GHOST_CAPTAIN_ID)
+            .filter((id) => !isGhostCaptain(id))
+        const uniqueRealCaptainIds = new Set(realCaptainIds)
 
-        if (uniqueCaptainIds.size !== captainIds.length) {
+        if (uniqueRealCaptainIds.size !== realCaptainIds.length) {
             return {
                 status: false,
                 message: "Each team must have a unique captain."
             }
         }
 
-        const signedUpCaptains = await db
-            .select({ playerId: signups.player })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    inArray(signups.player, [...uniqueCaptainIds])
+        if (uniqueRealCaptainIds.size > 0) {
+            const signedUpCaptains = await db
+                .select({ playerId: signups.player })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        inArray(signups.player, [...uniqueRealCaptainIds])
+                    )
                 )
-            )
 
-        if (signedUpCaptains.length !== uniqueCaptainIds.size) {
-            return {
-                status: false,
-                message:
-                    "All selected captains must be signed up for the current season."
+            if (signedUpCaptains.length !== uniqueRealCaptainIds.size) {
+                return {
+                    status: false,
+                    message:
+                        "All selected captains must be signed up for the current season."
+                }
             }
         }
     } else {
@@ -544,12 +545,13 @@ export async function createTeams(
                 const team = teamsToCreate[i]
                 const number = i + 1
                 const existingId = existingByNumber.get(number)
+                const captainId = team.captainId || GHOST_CAPTAIN_ID
 
                 if (existingId !== undefined) {
                     await db
                         .update(teams)
                         .set({
-                            captain: team.captainId,
+                            captain: captainId,
                             name: team.teamName.trim()
                         })
                         .where(eq(teams.id, existingId))
@@ -557,7 +559,7 @@ export async function createTeams(
                 } else {
                     await db.insert(teams).values({
                         season: config.seasonId,
-                        captain: team.captainId,
+                        captain: captainId,
                         division: divisionId,
                         name: team.teamName.trim(),
                         number
