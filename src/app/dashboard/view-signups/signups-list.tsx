@@ -78,7 +78,14 @@ function generateCsvContent(
         "Last Division",
         "Last Captain",
         "Captain In",
-        "Drafted In"
+        "Drafted In",
+        "My Overall Rating",
+        "My Passing Rating",
+        "My Setting Rating",
+        "My Hitting Rating",
+        "My Serving Rating",
+        "My Shared Notes",
+        "My Private Notes"
     ]
 
     const rows = entries.map((entry) => [
@@ -102,7 +109,14 @@ function generateCsvContent(
         entry.lastDraftDivision || "",
         entry.lastDraftCaptain || "",
         entry.captainIn || "",
-        entry.draftedIn || ""
+        entry.draftedIn || "",
+        entry.viewerOverallRating ?? "",
+        entry.viewerPassingRating ?? "",
+        entry.viewerSettingRating ?? "",
+        entry.viewerHittingRating ?? "",
+        entry.viewerServingRating ?? "",
+        entry.viewerSharedNotes || "",
+        entry.viewerPrivateNotes || ""
     ])
 
     return [headers, ...rows]

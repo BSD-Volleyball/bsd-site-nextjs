@@ -7,7 +7,8 @@ import {
     drafts,
     teams,
     seasons,
-    divisions
+    divisions,
+    playerRatings
 } from "@/database/schema"
 import { and, eq, inArray, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -51,6 +52,13 @@ export interface SignupCsvEntry {
     lastDraftCaptain: string | null
     captainIn: string | null
     draftedIn: string | null
+    viewerOverallRating: number | null
+    viewerPassingRating: number | null
+    viewerSettingRating: number | null
+    viewerHittingRating: number | null
+    viewerServingRating: number | null
+    viewerSharedNotes: string | null
+    viewerPrivateNotes: string | null
 }
 
 export interface SignupPlayer {
@@ -129,6 +137,7 @@ export async function getSignupsCsvData(): Promise<{
             .orderBy(users.last_name, users.first_name)
 
         const userIds = signupRows.map((r) => r.userId)
+        const sessionUserId = await getSessionUserId()
 
         // Fetch pair pick user names
         const pairPickIds = signupRows
@@ -223,6 +232,53 @@ export async function getSignupsCsvData(): Promise<{
             }
         }
 
+        const viewerRatingsByPlayerId = new Map<
+            string,
+            {
+                overall: number | null
+                passing: number | null
+                setting: number | null
+                hitting: number | null
+                serving: number | null
+                sharedNotes: string | null
+                privateNotes: string | null
+            }
+        >()
+
+        if (userIds.length > 0 && sessionUserId) {
+            const ratingRows = await db
+                .select({
+                    playerId: playerRatings.player,
+                    overall: playerRatings.overall,
+                    passing: playerRatings.passing,
+                    setting: playerRatings.setting,
+                    hitting: playerRatings.hitting,
+                    serving: playerRatings.serving,
+                    sharedNotes: playerRatings.shared_notes,
+                    privateNotes: playerRatings.private_notes
+                })
+                .from(playerRatings)
+                .where(
+                    and(
+                        eq(playerRatings.season, config.seasonId),
+                        eq(playerRatings.evaluator, sessionUserId),
+                        inArray(playerRatings.player, userIds)
+                    )
+                )
+
+            for (const row of ratingRows) {
+                viewerRatingsByPlayerId.set(row.playerId, {
+                    overall: row.overall,
+                    passing: row.passing,
+                    setting: row.setting,
+                    hitting: row.hitting,
+                    serving: row.serving,
+                    sharedNotes: row.sharedNotes?.trim() || null,
+                    privateNotes: row.privateNotes?.trim() || null
+                })
+            }
+        }
+
         // Fetch current-season captain roles
         const captainDivisionMap = new Map<string, string>()
 
@@ -248,6 +304,7 @@ export async function getSignupsCsvData(): Promise<{
 
         const entries: SignupCsvEntry[] = signupRows.map((row) => {
             const lastDraft = lastDraftInfo.get(row.userId)
+            const viewerRating = viewerRatingsByPlayerId.get(row.userId)
             return {
                 oldId: row.oldId,
                 firstName: row.firstName,
@@ -271,7 +328,14 @@ export async function getSignupsCsvData(): Promise<{
                 lastDraftDivision: lastDraft?.division ?? null,
                 lastDraftCaptain: lastDraft?.captain ?? null,
                 captainIn: captainDivisionMap.get(row.userId) ?? null,
-                draftedIn: draftedInMap.get(row.userId) ?? null
+                draftedIn: draftedInMap.get(row.userId) ?? null,
+                viewerOverallRating: viewerRating?.overall ?? null,
+                viewerPassingRating: viewerRating?.passing ?? null,
+                viewerSettingRating: viewerRating?.setting ?? null,
+                viewerHittingRating: viewerRating?.hitting ?? null,
+                viewerServingRating: viewerRating?.serving ?? null,
+                viewerSharedNotes: viewerRating?.sharedNotes ?? null,
+                viewerPrivateNotes: viewerRating?.privateNotes ?? null
             }
         })
 
