@@ -15,7 +15,7 @@ import { eq, and, notInArray, desc, count, inArray } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { getCommissionerDivisionAccess } from "@/lib/rbac"
+import { getCommissionerDivisionScope } from "@/lib/rbac"
 
 export interface CaptainStatus {
     captainId: string
@@ -41,6 +41,9 @@ export interface HomeworkStatusData {
     seasonLabel: string
     seasonId: number
     divisions: DivisionStatus[]
+    availableDivisions: { divisionId: number; divisionName: string }[]
+    selectedDivisionId: number | null
+    canSelectDivision: boolean
 }
 
 export interface RatedPlayer {
@@ -68,7 +71,9 @@ export interface MovingDayDetailResult {
     recommendedDown: MovingDayPlayer[]
 }
 
-export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
+export async function getHomeworkStatusData(
+    requestedDivisionId?: number
+): Promise<HomeworkStatusData> {
     const hasAccess = await getIsCommissioner()
 
     if (!hasAccess) {
@@ -77,7 +82,10 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
             message: "Unauthorized",
             seasonLabel: "",
             seasonId: 0,
-            divisions: []
+            divisions: [],
+            availableDivisions: [],
+            selectedDivisionId: null,
+            canSelectDivision: false
         }
     }
 
@@ -113,7 +121,10 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 message: "No season found.",
                 seasonLabel: "",
                 seasonId: 0,
-                divisions: []
+                divisions: [],
+                availableDivisions: [],
+                selectedDivisionId: null,
+                canSelectDivision: false
             }
         }
 
@@ -128,11 +139,14 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 message: "Unauthorized",
                 seasonLabel: "",
                 seasonId: 0,
-                divisions: []
+                divisions: [],
+                availableDivisions: [],
+                selectedDivisionId: null,
+                canSelectDivision: false
             }
         }
 
-        const divisionAccess = await getCommissionerDivisionAccess(
+        const divisionAccess = await getCommissionerDivisionScope(
             session.user.id,
             seasonId
         )
@@ -142,9 +156,48 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 message: "Unauthorized",
                 seasonLabel: "",
                 seasonId: 0,
-                divisions: []
+                divisions: [],
+                availableDivisions: [],
+                selectedDivisionId: null,
+                canSelectDivision: false
             }
         }
+
+        const seasonDivisionRows = await db
+            .select({
+                divisionId: divisions.id,
+                divisionName: divisions.name,
+                divisionLevel: divisions.level
+            })
+            .from(individual_divisions)
+            .innerJoin(
+                divisions,
+                eq(individual_divisions.division, divisions.id)
+            )
+            .where(eq(individual_divisions.season, seasonId))
+
+        const availableDivisions = seasonDivisionRows
+            .filter(
+                (division) =>
+                    divisionAccess.type === "league_wide" ||
+                    divisionAccess.divisionIds.includes(division.divisionId)
+            )
+            .sort((a, b) => a.divisionLevel - b.divisionLevel)
+            .map((division) => ({
+                divisionId: division.divisionId,
+                divisionName: division.divisionName
+            }))
+
+        const selectedDivisionId =
+            availableDivisions.length === 0
+                ? null
+                : requestedDivisionId &&
+                    availableDivisions.some(
+                        (division) =>
+                            division.divisionId === requestedDivisionId
+                    )
+                  ? requestedDivisionId
+                  : availableDivisions[0].divisionId
 
         // 3. Run all data queries in parallel
         const [
@@ -175,8 +228,8 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
                 .where(
                     and(
                         eq(teams.season, seasonId),
-                        divisionAccess.type === "division_specific"
-                            ? eq(teams.division, divisionAccess.divisionId)
+                        selectedDivisionId !== null
+                            ? eq(teams.division, selectedDivisionId)
                             : undefined
                     )
                 ),
@@ -382,7 +435,10 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
             status: true,
             seasonLabel,
             seasonId,
-            divisions: divisionStatuses
+            divisions: divisionStatuses,
+            availableDivisions,
+            selectedDivisionId,
+            canSelectDivision: availableDivisions.length > 1
         }
     } catch (error) {
         console.error("Error fetching homework status data:", error)
@@ -391,7 +447,10 @@ export async function getHomeworkStatusData(): Promise<HomeworkStatusData> {
             message: "Something went wrong.",
             seasonLabel: "",
             seasonId: 0,
-            divisions: []
+            divisions: [],
+            availableDivisions: [],
+            selectedDivisionId: null,
+            canSelectDivision: false
         }
     }
 }

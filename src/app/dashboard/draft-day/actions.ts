@@ -15,7 +15,7 @@ import { getIsCommissioner } from "@/app/dashboard/actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
-import { getCommissionerDivisionAccess } from "@/lib/rbac"
+import { getCommissionerDivisionScope } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isGhostCaptain, getGhostDisplayName } from "@/lib/ghost-captain"
 
@@ -83,7 +83,7 @@ export async function getDraftDayData(
             }
         }
 
-        const divisionAccess = await getCommissionerDivisionAccess(
+        const divisionAccess = await getCommissionerDivisionScope(
             session.user.id,
             seasonId
         )
@@ -99,15 +99,20 @@ export async function getDraftDayData(
         }
 
         const commissionerDivisionId =
-            divisionAccess.type === "division_specific"
-                ? divisionAccess.divisionId
+            divisionAccess.type === "division_specific" &&
+            divisionAccess.divisionIds.length === 1
+                ? divisionAccess.divisionIds[0]
                 : null
-
-        // Determine which division to filter by
-        const targetDivisionId =
+        const allowedDivisionIds =
             divisionAccess.type === "division_specific"
-                ? divisionAccess.divisionId
-                : divisionId
+                ? divisionAccess.divisionIds
+                : null
+        const targetDivisionId =
+            divisionId !== undefined &&
+            (allowedDivisionIds === null ||
+                allowedDivisionIds.includes(divisionId))
+                ? divisionId
+                : undefined
 
         const rows = await db
             .select({
@@ -128,6 +133,9 @@ export async function getDraftDayData(
             .where(
                 and(
                     eq(teams.season, seasonId),
+                    allowedDivisionIds !== null
+                        ? inArray(teams.division, allowedDivisionIds)
+                        : undefined,
                     targetDivisionId !== undefined
                         ? eq(teams.division, targetDivisionId)
                         : undefined
@@ -230,7 +238,7 @@ export async function saveDraftOrder(
             return { status: false, message: "Unauthorized" }
         }
 
-        const divisionAccess = await getCommissionerDivisionAccess(
+        const divisionAccess = await getCommissionerDivisionScope(
             session.user.id,
             seasonId
         )
@@ -250,7 +258,7 @@ export async function saveDraftOrder(
                     eq(teams.season, seasonId),
                     inArray(teams.id, teamIds),
                     divisionAccess.type === "division_specific"
-                        ? eq(teams.division, divisionAccess.divisionId)
+                        ? inArray(teams.division, divisionAccess.divisionIds)
                         : undefined
                 )
             )
@@ -360,7 +368,7 @@ export async function getDraftSheetData(
             }
         }
 
-        const divisionAccess = await getCommissionerDivisionAccess(
+        const divisionAccess = await getCommissionerDivisionScope(
             session.user.id,
             seasonId
         )
@@ -373,10 +381,16 @@ export async function getDraftSheetData(
             }
         }
 
-        const targetDivisionId =
+        const allowedDivisionIds =
             divisionAccess.type === "division_specific"
-                ? divisionAccess.divisionId
-                : divisionId
+                ? divisionAccess.divisionIds
+                : null
+        const targetDivisionId =
+            divisionId !== undefined &&
+            (allowedDivisionIds === null ||
+                allowedDivisionIds.includes(divisionId))
+                ? divisionId
+                : undefined
 
         // Fetch teams with captain and division info
         const teamRows = await db
@@ -400,6 +414,9 @@ export async function getDraftSheetData(
             .where(
                 and(
                     eq(teams.season, seasonId),
+                    allowedDivisionIds !== null
+                        ? inArray(teams.division, allowedDivisionIds)
+                        : undefined,
                     targetDivisionId !== undefined
                         ? eq(teams.division, targetDivisionId)
                         : undefined

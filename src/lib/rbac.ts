@@ -212,16 +212,21 @@ export type CommissionerDivisionAccess =
     | { type: "division_specific"; divisionId: number }
     | { type: "denied" }
 
+export type CommissionerDivisionScope =
+    | { type: "league_wide" }
+    | { type: "division_specific"; divisionIds: number[] }
+    | { type: "denied" }
+
 /**
  * Returns the division scope for a commissioner in a given season.
  * Admins/directors are always league-wide. Division-specific commissioners
  * are scoped to their one division. Falls back to the legacy commissioners
  * table if no user_roles row is found.
  */
-export async function getCommissionerDivisionAccess(
+export async function getCommissionerDivisionScope(
     userId: string,
     seasonId: number
-): Promise<CommissionerDivisionAccess> {
+): Promise<CommissionerDivisionScope> {
     if (await isAdminOrDirector(userId)) {
         return { type: "league_wide" }
     }
@@ -240,13 +245,16 @@ export async function getCommissionerDivisionAccess(
     if (roleRows.length > 0) {
         const hasLeagueWide = roleRows.some((r) => r.divisionId === null)
         if (hasLeagueWide) return { type: "league_wide" }
+        const divisionIds = [...new Set(roleRows.map((r) => r.divisionId))]
+            .filter((divisionId): divisionId is number => divisionId !== null)
+            .sort((a, b) => a - b)
         return {
             type: "division_specific",
-            divisionId: roleRows[0].divisionId!
+            divisionIds
         }
     }
 
-    const [legacyRow] = await db
+    const legacyRows = await db
         .select({ divisionId: commissioners.division })
         .from(commissioners)
         .where(
@@ -255,13 +263,35 @@ export async function getCommissionerDivisionAccess(
                 eq(commissioners.commissioner, userId)
             )
         )
-        .limit(1)
 
-    if (legacyRow) {
-        return { type: "division_specific", divisionId: legacyRow.divisionId }
+    if (legacyRows.length > 0) {
+        return {
+            type: "division_specific",
+            divisionIds: [...new Set(legacyRows.map((row) => row.divisionId))]
+                .filter(
+                    (divisionId): divisionId is number => divisionId !== null
+                )
+                .sort((a, b) => a - b)
+        }
     }
 
     return { type: "denied" }
+}
+
+export async function getCommissionerDivisionAccess(
+    userId: string,
+    seasonId: number
+): Promise<CommissionerDivisionAccess> {
+    const scope = await getCommissionerDivisionScope(userId, seasonId)
+
+    if (scope.type === "league_wide" || scope.type === "denied") {
+        return scope
+    }
+
+    return {
+        type: "division_specific",
+        divisionId: scope.divisionIds[0]
+    }
 }
 
 // ---------------------------------------------------------------------------

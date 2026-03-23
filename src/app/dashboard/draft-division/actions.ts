@@ -23,7 +23,7 @@ import {
     isCommissionerBySession,
     isCommissionerForCurrentSeason,
     isCaptainForSeason,
-    getCommissionerDivisionAccess
+    getCommissionerDivisionScope
 } from "@/lib/rbac"
 
 export interface DivisionSplitConfig {
@@ -85,19 +85,21 @@ async function checkDraftReadAccess(): Promise<boolean> {
 
 export async function hasDraftPageAccess(): Promise<{
     hasAccess: boolean
-    role: "commissioner" | "captain" | null
-    captainTeamIds: number[]
-    captainDivisionId: number | null
-    commissionerDivisionId: number | null
+    isLeagueWideCommissioner: boolean
+    accessibleDivisionIds: number[]
+    divisionRoleById: Record<number, "commissioner" | "captain">
+    captainTeamIdsByDivision: Record<number, number[]>
+    defaultDivisionId: number | null
 }> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
         return {
             hasAccess: false,
-            role: null,
-            captainTeamIds: [],
-            captainDivisionId: null,
-            commissionerDivisionId: null
+            isLeagueWideCommissioner: false,
+            accessibleDivisionIds: [],
+            divisionRoleById: {},
+            captainTeamIdsByDivision: {},
+            defaultDivisionId: null
         }
     }
 
@@ -106,10 +108,11 @@ export async function hasDraftPageAccess(): Promise<{
     if (!config.seasonId) {
         return {
             hasAccess: false,
-            role: null,
-            captainTeamIds: [],
-            captainDivisionId: null,
-            commissionerDivisionId: null
+            isLeagueWideCommissioner: false,
+            accessibleDivisionIds: [],
+            divisionRoleById: {},
+            captainTeamIdsByDivision: {},
+            defaultDivisionId: null
         }
     }
 
@@ -119,10 +122,11 @@ export async function hasDraftPageAccess(): Promise<{
     if (isAdmin) {
         return {
             hasAccess: true,
-            role: "commissioner",
-            captainTeamIds: [],
-            captainDivisionId: null,
-            commissionerDivisionId: null
+            isLeagueWideCommissioner: true,
+            accessibleDivisionIds: [],
+            divisionRoleById: {},
+            captainTeamIdsByDivision: {},
+            defaultDivisionId: null
         }
     }
 
@@ -134,38 +138,100 @@ export async function hasDraftPageAccess(): Promise<{
             .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
     ])
 
+    const captainTeamIdsByDivision: Record<number, number[]> = {}
+    for (const team of captainTeams) {
+        captainTeamIdsByDivision[team.division] = [
+            ...(captainTeamIdsByDivision[team.division] ?? []),
+            team.id
+        ]
+    }
+
+    const captainDivisionIds = Object.keys(captainTeamIdsByDivision)
+        .map((divisionId) => Number(divisionId))
+        .sort((a, b) => a - b)
+    const divisionRoleById: Record<number, "commissioner" | "captain"> = {}
+    for (const divisionId of captainDivisionIds) {
+        divisionRoleById[divisionId] = "captain"
+    }
+
     if (isCommissioner) {
-        const access = await getCommissionerDivisionAccess(userId, seasonId)
-        return {
-            hasAccess: true,
-            role: "commissioner",
-            captainTeamIds: [],
-            captainDivisionId: null,
-            commissionerDivisionId:
-                access.type === "division_specific" ? access.divisionId : null
+        const scope = await getCommissionerDivisionScope(userId, seasonId)
+
+        if (scope.type === "league_wide") {
+            return {
+                hasAccess: true,
+                isLeagueWideCommissioner: true,
+                accessibleDivisionIds: captainDivisionIds,
+                divisionRoleById,
+                captainTeamIdsByDivision,
+                defaultDivisionId: captainDivisionIds[0] ?? null
+            }
+        }
+
+        if (scope.type === "division_specific") {
+            for (const divisionId of scope.divisionIds) {
+                divisionRoleById[divisionId] = "commissioner"
+            }
+
+            const accessibleDivisionIds = [
+                ...new Set([...scope.divisionIds, ...captainDivisionIds])
+            ].sort((a, b) => a - b)
+
+            return {
+                hasAccess: true,
+                isLeagueWideCommissioner: false,
+                accessibleDivisionIds,
+                divisionRoleById,
+                captainTeamIdsByDivision,
+                defaultDivisionId: accessibleDivisionIds[0] ?? null
+            }
         }
     }
 
-    if (captainTeams.length > 0) {
+    if (captainDivisionIds.length > 0) {
         return {
             hasAccess: true,
-            role: "captain",
-            captainTeamIds: captainTeams.map((t) => t.id),
-            captainDivisionId: captainTeams[0].division,
-            commissionerDivisionId: null
+            isLeagueWideCommissioner: false,
+            accessibleDivisionIds: captainDivisionIds,
+            divisionRoleById,
+            captainTeamIdsByDivision,
+            defaultDivisionId: captainDivisionIds[0] ?? null
         }
     }
 
     return {
         hasAccess: false,
-        role: null,
-        captainTeamIds: [],
-        captainDivisionId: null,
-        commissionerDivisionId: null
+        isLeagueWideCommissioner: false,
+        accessibleDivisionIds: [],
+        divisionRoleById: {},
+        captainTeamIdsByDivision: {},
+        defaultDivisionId: null
     }
 }
 
-export async function getDraftDivisionData(filterDivisionId?: number): Promise<{
+async function getDraftAccessContext() {
+    return hasDraftPageAccess()
+}
+
+function canReadDraftDivision(
+    access: Awaited<ReturnType<typeof hasDraftPageAccess>>,
+    divisionId: number
+): boolean {
+    if (access.isLeagueWideCommissioner) return true
+    return access.accessibleDivisionIds.includes(divisionId)
+}
+
+function canCommissionDraftDivision(
+    access: Awaited<ReturnType<typeof hasDraftPageAccess>>,
+    divisionId: number
+): boolean {
+    if (access.isLeagueWideCommissioner) return true
+    return access.divisionRoleById[divisionId] === "commissioner"
+}
+
+export async function getDraftDivisionData(
+    accessibleDivisionIds?: number[]
+): Promise<{
     status: boolean
     message?: string
     currentSeasonId: number
@@ -239,7 +305,8 @@ export async function getDraftDivisionData(filterDivisionId?: number): Promise<{
         const filteredDivisions = allDivisions.filter(
             (d) =>
                 configuredDivisionIds.has(d.id) &&
-                (filterDivisionId === undefined || d.id === filterDivisionId)
+                (accessibleDivisionIds === undefined ||
+                    accessibleDivisionIds.includes(d.id))
         )
 
         return {
@@ -285,6 +352,15 @@ export async function getTeamsForSeasonAndDivision(
     }
 
     try {
+        const access = await getDraftAccessContext()
+        if (!canReadDraftDivision(access, divisionId)) {
+            return {
+                status: false,
+                message: "You don't have permission to access this division.",
+                teams: []
+            }
+        }
+
         const teamsList = await db
             .select({
                 id: teams.id,
@@ -348,6 +424,17 @@ export async function getDraftInitData(
     }
 
     try {
+        const access = await getDraftAccessContext()
+        if (!canReadDraftDivision(access, divisionId)) {
+            return {
+                status: false,
+                message: "You don't have permission to access this division.",
+                teams: [],
+                initialPicks: {},
+                pairMap: []
+            }
+        }
+
         const [teamsList, captRounds, pairDiffs, signupPairs] =
             await Promise.all([
                 db
@@ -559,6 +646,14 @@ export async function getDraftWatchlistData(
     const userId = session.user.id
 
     try {
+        const access = await getDraftAccessContext()
+        if (!canReadDraftDivision(access, divisionId)) {
+            return {
+                status: false,
+                message: "You don't have permission to access this division."
+            }
+        }
+
         // Check if user is a captain in this specific division (captain view takes priority)
         const [[captainTeam], draftedRows] = await Promise.all([
             db
@@ -882,6 +977,27 @@ export async function submitDraft(
     const numTeams = new Set(picks.map((p) => p.teamId)).size
 
     try {
+        const access = await getDraftAccessContext()
+        const teamIds = [...new Set(picks.map((pick) => pick.teamId))]
+        const teamRows = await db
+            .select({ id: teams.id, divisionId: teams.division })
+            .from(teams)
+            .where(inArray(teams.id, teamIds))
+        const divisionIds = [
+            ...new Set(teamRows.map((team) => team.divisionId))
+        ]
+
+        if (
+            divisionIds.length !== 1 ||
+            !canCommissionDraftDivision(access, divisionIds[0])
+        ) {
+            return {
+                status: false,
+                message:
+                    "You don't have permission to submit this division's draft."
+            }
+        }
+
         // Calculate overall for each pick and insert
         // Snake draft: odd rounds go 1-N, even rounds go N-1
         await db.insert(drafts).values(

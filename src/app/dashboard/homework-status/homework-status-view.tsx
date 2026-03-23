@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { RiCheckLine, RiArrowUpLine, RiArrowDownLine } from "@remixicon/react"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -20,6 +21,9 @@ import { getRatePlayersDetail, getMovingDayDetail } from "./actions"
 interface HomeworkStatusViewProps {
     divisions: DivisionStatus[]
     seasonId: number
+    availableDivisions: { divisionId: number; divisionName: string }[]
+    selectedDivisionId: number | null
+    canSelectDivision: boolean
 }
 
 type DialogState =
@@ -29,8 +33,12 @@ type DialogState =
 
 export function HomeworkStatusView({
     divisions,
-    seasonId
+    seasonId,
+    availableDivisions,
+    selectedDivisionId,
+    canSelectDivision
 }: HomeworkStatusViewProps) {
+    const router = useRouter()
     const [dialogState, setDialogState] = useState<DialogState>(null)
     const [rateData, setRateData] = useState<RatePlayersDetailResult | null>(
         null
@@ -72,6 +80,36 @@ export function HomeworkStatusView({
 
     return (
         <>
+            {canSelectDivision && selectedDivisionId !== null && (
+                <div className="mb-6 flex items-center gap-2">
+                    <label
+                        htmlFor="division-select"
+                        className="font-medium text-sm"
+                    >
+                        Division
+                    </label>
+                    <select
+                        id="division-select"
+                        value={selectedDivisionId}
+                        onChange={(e) =>
+                            router.push(
+                                `/dashboard/homework-status?divisionId=${e.target.value}`
+                            )
+                        }
+                        className="rounded border bg-background px-2 py-1 text-sm"
+                    >
+                        {availableDivisions.map((division) => (
+                            <option
+                                key={division.divisionId}
+                                value={division.divisionId}
+                            >
+                                {division.divisionName}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
             <div className="space-y-8">
                 {divisions.map((division) => (
                     <div key={division.divisionId}>
