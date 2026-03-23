@@ -77,7 +77,7 @@ const infoPages: InfoPageProps[] = [
 
 const resourceLinks: RouteProps[] = [
     {
-        href: "/BSD-Volleyball-Rules.pdf",
+        href: "/rules",
         label: "Official League Rules"
     },
     {

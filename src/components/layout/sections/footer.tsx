@@ -34,7 +34,7 @@ const footerSections: FooterSectionProps[] = [
         links: [
             { href: "/captain-expectations", label: "Captain Guidelines" },
             { href: "/referee-expectations", label: "Referee Guidelines" },
-            { href: "/BSD-Volleyball-Rules.pdf", label: "Official Rules" },
+            { href: "/rules", label: "Official Rules" },
             { href: "/HandSignals.pdf", label: "Hand Signals" }
         ]
     },

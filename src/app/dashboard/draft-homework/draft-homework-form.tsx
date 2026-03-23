@@ -168,70 +168,75 @@ function RoundGroup({
         <div className="mb-4">
             <p className="mb-1 font-medium text-sm">{label}</p>
             <div className="overflow-x-auto">
-            <div className="flex items-start gap-3" style={{ minWidth: "max-content" }}>
-                {/* Player selectors */}
                 <div
-                    className="flex min-w-48 flex-col gap-1 rounded-md border bg-muted/30"
-                    style={{ width: "220px" }}
+                    className="flex items-start gap-3"
+                    style={{ minWidth: "max-content" }}
                 >
-                    {slots.map((slot) => {
-                        const key = `${tabKey}-${round}-${slot}`
-                        const uid = selections[key] ?? null
-                        const isInvalid = !!uid && draftedSet.has(uid)
-                        return (
-                            <div key={key} className="flex items-center">
-                                <div className="min-w-0 flex-1">
-                                    <PlayerCombobox
-                                        players={players}
-                                        value={uid}
-                                        onChange={(userId) =>
-                                            onChange(key, userId)
-                                        }
-                                        excludeIds={excludeIds}
-                                        draftedIds={draftedIds}
-                                        isInvalid={isInvalid}
-                                    />
+                    {/* Player selectors */}
+                    <div
+                        className="flex min-w-48 flex-col gap-1 rounded-md border bg-muted/30"
+                        style={{ width: "220px" }}
+                    >
+                        {slots.map((slot) => {
+                            const key = `${tabKey}-${round}-${slot}`
+                            const uid = selections[key] ?? null
+                            const isInvalid = !!uid && draftedSet.has(uid)
+                            return (
+                                <div key={key} className="flex items-center">
+                                    <div className="min-w-0 flex-1">
+                                        <PlayerCombobox
+                                            players={players}
+                                            value={uid}
+                                            onChange={(userId) =>
+                                                onChange(key, userId)
+                                            }
+                                            excludeIds={excludeIds}
+                                            draftedIds={draftedIds}
+                                            isInvalid={isInvalid}
+                                        />
+                                    </div>
+                                    {isDynamic && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleRemoveSlot(slot)
+                                            }
+                                            className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
+                                            title="Remove"
+                                        >
+                                            <RiDeleteBin2Line className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                 </div>
-                                {isDynamic && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveSlot(slot)}
-                                        className="shrink-0 p-1 text-muted-foreground hover:text-destructive"
-                                        title="Remove"
-                                    >
-                                        <RiDeleteBin2Line className="h-3.5 w-3.5" />
-                                    </button>
-                                )}
-                            </div>
-                        )
-                    })}
-                    {isDynamic && (
-                        <button
-                            type="button"
-                            onClick={() => setDynamicCount((c) => c + 1)}
-                            className="px-2 py-1 text-left text-muted-foreground text-xs hover:text-foreground"
-                        >
-                            + Add player
-                        </button>
-                    )}
-                </div>
+                            )
+                        })}
+                        {isDynamic && (
+                            <button
+                                type="button"
+                                onClick={() => setDynamicCount((c) => c + 1)}
+                                className="px-2 py-1 text-left text-muted-foreground text-xs hover:text-foreground"
+                            >
+                                + Add player
+                            </button>
+                        )}
+                    </div>
 
-                {/* Player pictures */}
-                <div
-                    className="flex items-stretch gap-1"
-                    style={{ height: `${totalHeightPx}px` }}
-                >
-                    {selectedPlayers.map((player) => (
-                        <PlayerPic
-                            key={player.userId}
-                            player={player}
-                            playerPicUrl={playerPicUrl}
-                            height="100%"
-                            onOpen={onOpenPlayer}
-                        />
-                    ))}
+                    {/* Player pictures */}
+                    <div
+                        className="flex items-stretch gap-1"
+                        style={{ height: `${totalHeightPx}px` }}
+                    >
+                        {selectedPlayers.map((player) => (
+                            <PlayerPic
+                                key={player.userId}
+                                player={player}
+                                playerPicUrl={playerPicUrl}
+                                height="100%"
+                                onOpen={onOpenPlayer}
+                            />
+                        ))}
+                    </div>
                 </div>
-            </div>
             </div>
         </div>
     )
