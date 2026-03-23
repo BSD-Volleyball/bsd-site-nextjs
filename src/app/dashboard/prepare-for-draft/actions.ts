@@ -48,7 +48,11 @@ export interface PlayerRow {
     lastName: string
     isMale: boolean
     isPairPick: boolean
-    captainRounds: { captainId: string; mappedRound: number }[]
+    captainRounds: {
+        captainId: string
+        mappedRound: number
+        captainCompletedHomework: boolean
+    }[]
     captainAverage: number
     draftHistoryAverage: number | null
     recommendedRound: number
@@ -399,7 +403,13 @@ export async function getPrepareForDraftData(
                     mappedRound = NON_MALE_ROUND_MAP[hw.round] ?? 9
                 }
             }
-            return { captainId: captain.userId, mappedRound }
+            return {
+                captainId: captain.userId,
+                mappedRound,
+                captainCompletedHomework: captainsFullyCompleted.has(
+                    captain.userId
+                )
+            }
         })
 
         // Only average over captains who have fully completed their homework.

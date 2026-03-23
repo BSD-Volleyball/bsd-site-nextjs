@@ -90,7 +90,9 @@ function PlayerTableRow({
                     className={`px-3 py-2 text-center ${getRoundClass(cr.mappedRound)}`}
                 >
                     {cr.mappedRound === 9 ? (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">
+                            {cr.captainCompletedHomework ? "— (9)" : "—"}
+                        </span>
                     ) : (
                         cr.mappedRound
                     )}
