@@ -5,7 +5,6 @@ import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import {
-    commissioners,
     divisions,
     draftCaptRounds,
     draftHomework,
@@ -16,7 +15,6 @@ import {
     seasons,
     signups,
     teams,
-    userRoles,
     users
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -26,7 +24,10 @@ import {
     extractPlainTextFromEmailTemplateContent
 } from "@/lib/email-template-content"
 import { fetchPlayerScores } from "@/lib/player-score"
-import { isAdminOrDirector, isCommissionerBySession } from "@/lib/rbac"
+import {
+    getCommissionerDivisionScope,
+    isCommissionerBySession
+} from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
 
 // Maps homework round number → actual draft round number
@@ -103,8 +104,11 @@ export interface PrepareForDraftData {
 }
 
 type AccessResult =
-    | { type: "league_wide"; availableDivisions: DivisionOption[] }
-    | { type: "division_specific"; divisionId: number }
+    | {
+          type: "allowed"
+          availableDivisions: DivisionOption[]
+          isLeagueWide: boolean
+      }
     | { type: "denied" }
 
 async function loadAvailableDivisions(
@@ -122,54 +126,21 @@ async function resolveCommissionerDivisionAccess(
     userId: string,
     seasonId: number
 ): Promise<AccessResult> {
-    // 1. Admins/directors get league-wide access
-    if (await isAdminOrDirector(userId)) {
+    const scope = await getCommissionerDivisionScope(userId, seasonId)
+
+    if (scope.type === "denied") {
+        return { type: "denied" }
+    }
+
+    if (scope.type === "league_wide") {
         const availableDivisions = await loadAvailableDivisions(seasonId)
-        return { type: "league_wide", availableDivisions }
+        return { type: "allowed", availableDivisions, isLeagueWide: true }
     }
 
-    // 2. Check user_roles for commissioner role this season
-    const roleRows = await db
-        .select({ divisionId: userRoles.division_id })
-        .from(userRoles)
-        .where(
-            and(
-                eq(userRoles.user_id, userId),
-                eq(userRoles.role, "commissioner"),
-                eq(userRoles.season_id, seasonId)
-            )
-        )
-
-    if (roleRows.length > 0) {
-        const hasLeagueWide = roleRows.some((r) => r.divisionId === null)
-        if (hasLeagueWide) {
-            const availableDivisions = await loadAvailableDivisions(seasonId)
-            return { type: "league_wide", availableDivisions }
-        }
-        // Division-specific: use first assigned division
-        return {
-            type: "division_specific",
-            divisionId: roleRows[0].divisionId!
-        }
-    }
-
-    // 3. Fall back to legacy commissioners table
-    const [legacyRow] = await db
-        .select({ divisionId: commissioners.division })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
-            )
-        )
-        .limit(1)
-
-    if (legacyRow) {
-        return { type: "division_specific", divisionId: legacyRow.divisionId }
-    }
-
-    return { type: "denied" }
+    const availableDivisions = (await loadAvailableDivisions(seasonId)).filter(
+        (division) => scope.divisionIds.includes(division.id)
+    )
+    return { type: "allowed", availableDivisions, isLeagueWide: false }
 }
 
 export async function getPrepareForDraftData(
@@ -206,34 +177,28 @@ export async function getPrepareForDraftData(
 
     // 4. Resolve divisionId and league-wide state
     let divisionId: number
-    let isLeagueWide: boolean
+    const isLeagueWide =
+        access.isLeagueWide || access.availableDivisions.length > 1
     let availableDivisions: DivisionOption[] = []
 
-    if (access.type === "league_wide") {
-        isLeagueWide = true
-        availableDivisions = access.availableDivisions
+    availableDivisions = access.availableDivisions
 
-        // Validate and use the divisionIdParam, or fall back to first division
-        const validParam =
-            divisionIdParam !== undefined &&
-            Number.isInteger(divisionIdParam) &&
-            divisionIdParam > 0
-        if (
-            validParam &&
-            availableDivisions.some((d) => d.id === divisionIdParam)
-        ) {
-            divisionId = divisionIdParam!
-        } else if (availableDivisions.length > 0) {
-            divisionId = availableDivisions[0].id
-        } else {
-            return {
-                status: false,
-                message: "No divisions found for this season."
-            }
-        }
+    const validParam =
+        divisionIdParam !== undefined &&
+        Number.isInteger(divisionIdParam) &&
+        divisionIdParam > 0
+    if (
+        validParam &&
+        availableDivisions.some((division) => division.id === divisionIdParam)
+    ) {
+        divisionId = divisionIdParam!
+    } else if (availableDivisions.length > 0) {
+        divisionId = availableDivisions[0].id
     } else {
-        isLeagueWide = false
-        divisionId = access.divisionId
+        return {
+            status: false,
+            message: "No divisions found for this season."
+        }
     }
 
     // Season label

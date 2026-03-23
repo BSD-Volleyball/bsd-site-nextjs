@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-export default async function HomeworkStatusPage() {
+export default async function HomeworkStatusPage({
+    searchParams
+}: {
+    searchParams: Promise<{ divisionId?: string }>
+}) {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session) {
@@ -26,7 +30,16 @@ export default async function HomeworkStatusPage() {
         redirect("/dashboard")
     }
 
-    const result = await getHomeworkStatusData()
+    const params = await searchParams
+    const parsed = params.divisionId
+        ? parseInt(params.divisionId, 10)
+        : undefined
+    const divisionIdParam =
+        parsed !== undefined && !Number.isNaN(parsed) && parsed > 0
+            ? parsed
+            : undefined
+
+    const result = await getHomeworkStatusData(divisionIdParam)
 
     if (!result.status) {
         return (
@@ -49,6 +62,9 @@ export default async function HomeworkStatusPage() {
                 description="Track whether each captain has completed their pre-draft homework tasks."
             />
             <HomeworkStatusView
+                availableDivisions={result.availableDivisions}
+                selectedDivisionId={result.selectedDivisionId}
+                canSelectDivision={result.canSelectDivision}
                 divisions={result.divisions}
                 seasonId={result.seasonId}
             />

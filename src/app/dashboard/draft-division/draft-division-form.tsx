@@ -41,8 +41,9 @@ interface DraftDivisionFormProps {
     divisions: DivisionOption[]
     users: UserOption[]
     playerPicUrl: string
-    role: "commissioner" | "captain"
-    captainTeamIds: number[]
+    divisionRoleById: Record<number, "commissioner" | "captain">
+    captainTeamIdsByDivision: Record<number, number[]>
+    hasLeagueWideCommissionerAccess: boolean
     defaultDivisionId?: number
 }
 
@@ -54,8 +55,9 @@ export function DraftDivisionForm({
     divisions,
     users,
     playerPicUrl,
-    role,
-    captainTeamIds,
+    divisionRoleById,
+    captainTeamIdsByDivision,
+    hasLeagueWideCommissionerAccess,
     defaultDivisionId
 }: DraftDivisionFormProps) {
     const [isLoading, setIsLoading] = useState(false)
@@ -81,6 +83,17 @@ export function DraftDivisionForm({
         () => divisions.find((d) => d.id.toString() === divisionId),
         [divisions, divisionId]
     )
+    const selectedDivisionId = divisionId ? parseInt(divisionId, 10) : null
+    const currentRole: "commissioner" | "captain" =
+        selectedDivisionId !== null &&
+        (hasLeagueWideCommissionerAccess ||
+            divisionRoleById[selectedDivisionId] === "commissioner")
+            ? "commissioner"
+            : "captain"
+    const currentCaptainTeamIds =
+        selectedDivisionId !== null
+            ? (captainTeamIdsByDivision[selectedDivisionId] ?? [])
+            : []
 
     const divisionSplitsMap = useMemo(
         () => new Map(divisionSplits.map((d) => [d.divisionId, d.genderSplit])),
@@ -203,7 +216,7 @@ export function DraftDivisionForm({
                         <div>
                             <CardTitle>Draft Configuration</CardTitle>
                             <CardDescription>
-                                {role === "commissioner"
+                                {currentRole === "commissioner"
                                     ? "Select a division to load the teams for the current season."
                                     : "Your division is pre-selected. Edit your team's picks in the draft board below."}
                             </CardDescription>
@@ -231,7 +244,7 @@ export function DraftDivisionForm({
                             <div className="flex-1 space-y-2">
                                 <Label htmlFor="division">
                                     Division{" "}
-                                    {role === "commissioner" && (
+                                    {currentRole === "commissioner" && (
                                         <span className="text-destructive">
                                             *
                                         </span>
@@ -240,10 +253,7 @@ export function DraftDivisionForm({
                                 <Select
                                     value={divisionId}
                                     onValueChange={handleDivisionChange}
-                                    disabled={
-                                        role === "captain" ||
-                                        divisions.length <= 1
-                                    }
+                                    disabled={divisions.length <= 1}
                                 >
                                     <SelectTrigger id="division">
                                         <SelectValue placeholder="Select a division" />
@@ -305,8 +315,8 @@ export function DraftDivisionForm({
                                         playerPicUrl={playerPicUrl}
                                         divisionSplits={divisionSplits}
                                         divisionId={divisionId}
-                                        role={role}
-                                        captainTeamIds={captainTeamIds}
+                                        role={currentRole}
+                                        captainTeamIds={currentCaptainTeamIds}
                                         onPicksChange={handlePicksChange}
                                         initialPicks={initialPicks}
                                         pairMap={pairMap}
@@ -368,7 +378,7 @@ export function DraftDivisionForm({
                             </div>
                         )}
                     </CardContent>
-                    {role === "commissioner" && (
+                    {currentRole === "commissioner" && (
                         <CardFooter className="border-t pt-6">
                             <Button
                                 type="submit"

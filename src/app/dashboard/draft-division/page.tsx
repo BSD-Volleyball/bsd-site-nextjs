@@ -25,9 +25,11 @@ export default async function DraftDivisionPage() {
         redirect("/dashboard")
     }
 
-    const filterDivisionId =
-        access.captainDivisionId ?? access.commissionerDivisionId ?? undefined
-    const result = await getDraftDivisionData(filterDivisionId)
+    const result = await getDraftDivisionData(
+        access.isLeagueWideCommissioner
+            ? undefined
+            : access.accessibleDivisionIds
+    )
 
     if (!result.status) {
         return (
@@ -47,11 +49,7 @@ export default async function DraftDivisionPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Draft Division"
-                description={
-                    access.role === "commissioner"
-                        ? "Conduct the draft for a division by selecting players for each team."
-                        : "View and make picks for your team in the live draft."
-                }
+                description="Conduct the draft for an authorized division or make picks for your team in the live draft."
             />
             <DraftDivisionForm
                 currentSeasonId={result.currentSeasonId}
@@ -59,13 +57,12 @@ export default async function DraftDivisionPage() {
                 divisions={result.divisions}
                 users={result.users}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
-                role={access.role!}
-                captainTeamIds={access.captainTeamIds}
-                defaultDivisionId={
-                    access.captainDivisionId ??
-                    access.commissionerDivisionId ??
-                    undefined
+                divisionRoleById={access.divisionRoleById}
+                captainTeamIdsByDivision={access.captainTeamIdsByDivision}
+                hasLeagueWideCommissionerAccess={
+                    access.isLeagueWideCommissioner
                 }
+                defaultDivisionId={access.defaultDivisionId ?? undefined}
             />
         </div>
     )
