@@ -88,6 +88,11 @@ const baseNavItems = [
         icon: RiTrophyLine
     },
     {
+        title: "League Rules",
+        url: "/dashboard/rules",
+        icon: RiFileList3Line
+    },
+    {
         title: "Report a Concern",
         url: "/dashboard/report-concern",
         icon: RiAlertLine

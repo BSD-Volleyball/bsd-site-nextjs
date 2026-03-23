@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { RiArrowDownSLine, RiAddLine } from "@remixicon/react"
 import {
@@ -66,6 +66,22 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const [messages, setMessages] = useState<
         Record<number, { type: "success" | "error"; text: string }>
     >({})
+    useEffect(() => {
+        setFormData((prev) => {
+            const updated = { ...prev }
+            for (const template of templates) {
+                if (!updated[template.id]) {
+                    updated[template.id] = {
+                        name: template.name,
+                        subject: template.subject || "",
+                        content: normalizeEmailTemplateContent(template.content)
+                    }
+                }
+            }
+            return updated
+        })
+    }, [templates])
+
     const [createDialogOpen, setCreateDialogOpen] = useState(false)
     const [newTemplateName, setNewTemplateName] = useState("")
     const [createLoading, setCreateLoading] = useState(false)

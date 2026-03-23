@@ -6,9 +6,9 @@ export const metadata = {
         "Official BSD Volleyball League rules and regulations for players, captains, and referees"
 }
 
-export default function RulesPage() {
+export default function DashboardRulesPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="max-w-4xl">
             <RulesContent />
         </div>
     )
