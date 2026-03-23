@@ -1,7 +1,6 @@
 import type {
     LexicalEmailTemplateContent,
     LexicalInlineNode,
-    LexicalTextNode,
     LexicalParagraphNode,
     LexicalListNode,
     LexicalListItemNode

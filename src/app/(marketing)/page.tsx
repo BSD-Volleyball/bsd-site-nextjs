@@ -49,7 +49,7 @@ const quickLinks = [
     {
         title: "League Rules",
         description: "Official BSD volleyball rules and regulations",
-        href: "/BSD-Volleyball-Rules.pdf",
+        href: "/rules",
         icon: FileText
     },
     {
