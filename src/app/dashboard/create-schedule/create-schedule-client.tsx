@@ -13,7 +13,9 @@ import {
     FOUR_TEAM_TIMES,
     SIX_TEAM_PLAYOFF,
     FOUR_TEAM_PLAYOFF,
-    REGULAR_SEASON_WEEKS
+    REGULAR_SEASON_WEEKS,
+    getPlayoffMatchTime,
+    getPairedCourt
 } from "./schedule-constants"
 import type { PlayoffMatchTemplate } from "./schedule-constants"
 
@@ -99,10 +101,6 @@ function buildRegularSeasonPreview(
     return matches
 }
 
-function getSecondCourt(primaryCourt: number): number {
-    return primaryCourt === 1 ? 2 : 1
-}
-
 function buildPlayoffPreview(
     division: DivisionWithTeams,
     playoffDates: string[]
@@ -116,8 +114,8 @@ function buildPlayoffPreview(
         week: pm.week,
         date:
             pm.week <= playoffDates.length ? playoffDates[pm.week - 1] : "TBD",
-        time: pm.time,
-        court: pm.useSecondCourt ? getSecondCourt(court) : court,
+        time: getPlayoffMatchTime(pm, court),
+        court: pm.useSecondCourt ? getPairedCourt(court) : court,
         homeLabel: pm.homeSeed,
         awayLabel: pm.awaySeed,
         bracket: pm.bracket,
@@ -162,6 +160,42 @@ export function CreateScheduleClient({
         (d) => d.teams.length !== d.teamCount
     )
     const allTeamsReady = incompleteDivisions.length === 0
+
+    // Build all playoff previews and check for court/time conflicts
+    const allPlayoffPreviews = divisions.map((div) => ({
+        division: div,
+        matches: buildPlayoffPreview(div, playoffDates)
+    }))
+
+    interface ConflictEntry {
+        divisionName: string
+        matchNum: number
+        homeLabel: string
+        awayLabel: string
+    }
+    const playoffConflicts: {
+        key: string
+        matches: ConflictEntry[]
+    }[] = []
+    const conflictMap = new Map<string, ConflictEntry[]>()
+    for (const { division, matches } of allPlayoffPreviews) {
+        for (const m of matches) {
+            if (!m.date || m.date === "TBD") continue
+            const key = `${m.date} | Court ${m.court} | ${m.time}`
+            if (!conflictMap.has(key)) conflictMap.set(key, [])
+            conflictMap.get(key)!.push({
+                divisionName: division.divisionName,
+                matchNum: m.matchNum,
+                homeLabel: m.homeLabel,
+                awayLabel: m.awayLabel
+            })
+        }
+    }
+    for (const [key, entries] of conflictMap) {
+        if (entries.length > 1) {
+            playoffConflicts.push({ key, matches: entries })
+        }
+    }
 
     async function handleWriteRegularSeason() {
         setRegularLoading(true)
@@ -227,6 +261,31 @@ export function CreateScheduleClient({
                             <li key={d.divisionId}>
                                 {d.divisionName}: {d.teams.length} of{" "}
                                 {d.teamCount} teams created
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {playoffConflicts.length > 0 && (
+                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                    <p className="font-semibold">
+                        ⚠ Court conflicts detected in the playoff schedule — two
+                        matches are assigned to the same court at the same time:
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm">
+                        {playoffConflicts.map((c) => (
+                            <li key={c.key}>
+                                <span className="font-mono font-semibold">
+                                    {c.key}
+                                </span>
+                                :{" "}
+                                {c.matches
+                                    .map(
+                                        (m) =>
+                                            `${m.divisionName} #${m.matchNum} (${m.homeLabel} vs ${m.awayLabel})`
+                                    )
+                                    .join(" · ")}
                             </li>
                         ))}
                     </ul>
@@ -377,49 +436,66 @@ export function CreateScheduleClient({
                     assignments are resolved when results are entered.
                 </p>
 
-                {divisions.map((div) => {
-                    const preview = buildPlayoffPreview(div, playoffDates)
-                    const weekGroups = new Map<number, PlayoffPreview[]>()
-                    for (const m of preview) {
-                        if (!weekGroups.has(m.week)) {
-                            weekGroups.set(m.week, [])
+                {allPlayoffPreviews.map(
+                    ({ division: div, matches: preview }) => {
+                        const weekGroups = new Map<number, PlayoffPreview[]>()
+                        for (const m of preview) {
+                            if (!weekGroups.has(m.week)) {
+                                weekGroups.set(m.week, [])
+                            }
+                            weekGroups.get(m.week)!.push(m)
                         }
-                        weekGroups.get(m.week)!.push(m)
-                    }
 
-                    return (
-                        <div key={div.divisionId} className="mb-8">
-                            <h3 className="mb-2 font-semibold text-lg">
-                                {div.divisionName}
-                                <span className="ml-2 font-normal text-muted-foreground text-sm">
-                                    ({div.teamCount} teams,{" "}
-                                    {div.teamCount === 4
-                                        ? "7 matches"
-                                        : "11 matches"}
-                                    , Court {div.level})
-                                </span>
-                            </h3>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b text-left">
-                                            <th className="px-3 py-2">Week</th>
-                                            <th className="px-3 py-2">Date</th>
-                                            <th className="px-3 py-2">#</th>
-                                            <th className="px-3 py-2">Time</th>
-                                            <th className="px-3 py-2">Court</th>
-                                            <th className="px-3 py-2">Home</th>
-                                            <th className="px-3 py-2">vs</th>
-                                            <th className="px-3 py-2">Away</th>
-                                            <th className="px-3 py-2">
-                                                Bracket
-                                            </th>
-                                            <th className="px-3 py-2">Work</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {Array.from(weekGroups.entries()).map(
-                                            ([week, matches]) =>
+                        return (
+                            <div key={div.divisionId} className="mb-8">
+                                <h3 className="mb-2 font-semibold text-lg">
+                                    {div.divisionName}
+                                    <span className="ml-2 font-normal text-muted-foreground text-sm">
+                                        ({div.teamCount} teams,{" "}
+                                        {div.teamCount === 4
+                                            ? "7 matches"
+                                            : "11 matches"}
+                                        , Court {div.level})
+                                    </span>
+                                </h3>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-left">
+                                                <th className="px-3 py-2">
+                                                    Week
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Date
+                                                </th>
+                                                <th className="px-3 py-2">#</th>
+                                                <th className="px-3 py-2">
+                                                    Time
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Court
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Home
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    vs
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Away
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Bracket
+                                                </th>
+                                                <th className="px-3 py-2">
+                                                    Work
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {Array.from(
+                                                weekGroups.entries()
+                                            ).map(([week, matches]) =>
                                                 matches.map((m, mIdx) => (
                                                     <tr
                                                         key={`${week}-${mIdx}`}
@@ -475,13 +551,14 @@ export function CreateScheduleClient({
                                                         </td>
                                                     </tr>
                                                 ))
-                                        )}
-                                    </tbody>
-                                </table>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    )
-                })}
+                        )
+                    }
+                )}
 
                 {playoffStatus && (
                     <div
