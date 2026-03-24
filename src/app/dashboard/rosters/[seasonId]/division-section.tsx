@@ -6,6 +6,7 @@ import {
     CollapsibleTrigger,
     CollapsibleContent
 } from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 
 interface RosterPlayer {
     id: string
@@ -29,9 +30,21 @@ interface DivisionData {
     teams: RosterTeam[]
 }
 
-export function DivisionSection({ division }: { division: DivisionData }) {
+export function DivisionSection({
+    division,
+    currentUserId
+}: {
+    division: DivisionData
+    currentUserId?: string
+}) {
+    const isUserInDivision =
+        !!currentUserId &&
+        division.teams.some((team) =>
+            team.players.some((player) => player.id === currentUserId)
+        )
+
     return (
-        <Collapsible>
+        <Collapsible defaultOpen={isUserInDivision}>
             <div className="rounded-lg border bg-card shadow-sm">
                 <CollapsibleTrigger className="flex w-full items-center justify-between p-4 transition-colors hover:bg-muted/50">
                     <h2 className="font-semibold text-xl">{division.name}</h2>
@@ -72,7 +85,13 @@ export function DivisionSection({ division }: { division: DivisionData }) {
                                                 {team.players.map((player) => (
                                                     <li
                                                         key={player.id}
-                                                        className="flex items-center gap-2 text-sm"
+                                                        className={cn(
+                                                            "flex items-center gap-2 rounded-sm px-2 py-1 text-sm",
+                                                            player.id ===
+                                                                currentUserId
+                                                                ? "bg-primary/15 font-semibold ring-1 ring-primary/50"
+                                                                : "bg-muted/40"
+                                                        )}
                                                     >
                                                         <span
                                                             className={
