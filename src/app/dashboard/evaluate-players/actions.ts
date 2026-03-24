@@ -95,7 +95,7 @@ export async function getNewPlayers(): Promise<{
                 userId: signups.player,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 male: users.male,
                 height: users.height,
                 experience: users.experience,
@@ -152,7 +152,7 @@ export async function getNewPlayers(): Promise<{
                     divisionName: divisions.name,
                     divisionLevel: divisions.level,
                     evaluatorFirstName: users.first_name,
-                    evaluatorPreferredName: users.preffered_name
+                    evaluatorPreferredName: users.preferred_name
                 })
                 .from(evaluations)
                 .innerJoin(divisions, eq(evaluations.division, divisions.id))

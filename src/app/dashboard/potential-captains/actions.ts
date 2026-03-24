@@ -28,7 +28,7 @@ export interface PotentialCaptainPlayerDetails {
     id: string
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     pronouns: string | null
     male: boolean | null
     experience: string | null
@@ -127,7 +127,7 @@ export async function getPotentialCaptainPlayerDetails(
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 pronouns: users.pronouns,
                 male: users.male,
                 experience: users.experience,
@@ -284,7 +284,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 captainEligible: users.captain_eligible,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email
             })
             .from(signups)
@@ -635,7 +635,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                         divisionId: commissioners.division,
                         userId: commissioners.commissioner,
                         firstName: users.first_name,
-                        preferredName: users.preffered_name
+                        preferredName: users.preferred_name
                     })
                     .from(commissioners)
                     .innerJoin(users, eq(commissioners.commissioner, users.id))

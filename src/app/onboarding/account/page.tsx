@@ -22,7 +22,7 @@ export default async function OnboardingAccountPage() {
     const [user] = await db
         .select({
             onboarding_completed: users.onboarding_completed,
-            preffered_name: users.preffered_name,
+            preferred_name: users.preferred_name,
             phone: users.phone,
             pronouns: users.pronouns,
             emergency_contact: users.emergency_contact,
@@ -51,7 +51,7 @@ export default async function OnboardingAccountPage() {
                 initialData={
                     user
                         ? {
-                              preffered_name: user.preffered_name,
+                              preferred_name: user.preferred_name,
                               phone: user.phone,
                               pronouns: user.pronouns,
                               emergency_contact: user.emergency_contact,

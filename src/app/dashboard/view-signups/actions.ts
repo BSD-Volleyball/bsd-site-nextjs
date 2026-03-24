@@ -117,7 +117,7 @@ export async function getSignupsCsvData(): Promise<{
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 male: users.male,
                 age: signups.age,
                 pairPickId: signups.pair_pick,
@@ -151,7 +151,7 @@ export async function getSignupsCsvData(): Promise<{
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
-                    preferredName: users.preffered_name
+                    preferredName: users.preferred_name
                 })
                 .from(users)
                 .where(inArray(users.id, pairPickIds))
@@ -180,7 +180,7 @@ export async function getSignupsCsvData(): Promise<{
                     divisionName: divisions.name,
                     captainFirstName: users.first_name,
                     captainLastName: users.last_name,
-                    captainPreferredName: users.preffered_name
+                    captainPreferredName: users.preferred_name
                 })
                 .from(drafts)
                 .innerJoin(teams, eq(drafts.team, teams.id))
@@ -406,7 +406,7 @@ export async function getSignupsData(): Promise<{
                 userId: signups.player,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 male: users.male,
                 age: signups.age,
                 height: users.height,
@@ -476,7 +476,7 @@ export async function getSignupsData(): Promise<{
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
-                    preferredName: users.preffered_name
+                    preferredName: users.preferred_name
                 })
                 .from(users)
                 .where(inArray(users.id, pairPickIds))
@@ -638,7 +638,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 pronouns: users.pronouns,
                 experience: users.experience,
                 assessment: users.assessment,

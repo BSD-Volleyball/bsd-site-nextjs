@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
     Select,
@@ -177,14 +178,9 @@ export function CommissionersForm({
     >({})
     const [isLoading, setIsLoading] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     const loadCommissioners = useCallback(async (seasonId: number) => {
         setIsLoading(true)
-        setMessage(null)
 
         const result = await getCommissionersForSeason(seasonId)
 
@@ -206,10 +202,7 @@ export function CommissionersForm({
 
             setAssignments(assignmentsMap)
         } else {
-            setMessage({
-                type: "error",
-                text: result.message || "Failed to load commissioners."
-            })
+            toast.error(result.message || "Failed to load commissioners.")
         }
 
         setIsLoading(false)
@@ -226,15 +219,11 @@ export function CommissionersForm({
         e.preventDefault()
 
         if (!selectedSeasonId) {
-            setMessage({
-                type: "error",
-                text: "Please select a season."
-            })
+            toast.error("Please select a season.")
             return
         }
 
         setIsSaving(true)
-        setMessage(null)
 
         const assignmentsArray = divisions.map((div) => ({
             divisionId: div.id,
@@ -248,13 +237,11 @@ export function CommissionersForm({
             assignments: assignmentsArray
         })
 
-        setMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
-
         if (result.status) {
+            toast.success(result.message)
             router.refresh()
+        } else {
+            toast.error(result.message)
         }
 
         setIsSaving(false)
@@ -355,18 +342,6 @@ export function CommissionersForm({
                             </CardContent>
                         </Card>
                     ))}
-                </div>
-            )}
-
-            {message && (
-                <div
-                    className={`rounded-md p-4 ${
-                        message.type === "success"
-                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                    }`}
-                >
-                    {message.text}
                 </div>
             )}
 

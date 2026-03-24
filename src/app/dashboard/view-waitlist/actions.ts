@@ -69,7 +69,7 @@ export async function getSeasonWaitlist(): Promise<{
                 userId: waitlist.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email,
                 male: users.male,
                 approved: waitlist.approved,

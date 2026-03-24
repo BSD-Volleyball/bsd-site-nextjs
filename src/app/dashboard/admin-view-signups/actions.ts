@@ -99,7 +99,7 @@ export async function getSeasonSignups(): Promise<{
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email,
                 phone: users.phone,
                 male: users.male,
@@ -181,7 +181,7 @@ export async function getSeasonSignups(): Promise<{
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
-                    preferredName: users.preffered_name
+                    preferredName: users.preferred_name
                 })
                 .from(users)
                 .where(inArray(users.id, pairPickIds))
@@ -219,7 +219,7 @@ export async function getSeasonSignups(): Promise<{
                     captainId: teams.captain,
                     captainFirstName: users.first_name,
                     captainLastName: users.last_name,
-                    captainPreferredName: users.preffered_name
+                    captainPreferredName: users.preferred_name
                 })
                 .from(drafts)
                 .innerJoin(teams, eq(drafts.team, teams.id))

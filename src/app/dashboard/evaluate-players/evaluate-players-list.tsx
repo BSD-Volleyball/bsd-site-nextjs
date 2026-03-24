@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -77,10 +78,6 @@ export function EvaluatePlayersList({
     const [search, setSearch] = useState("")
     const [showAverages, setShowAverages] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     // Track division selections per player (string IDs for Select compatibility)
     const [selections, setSelections] = useState<Record<string, string>>(() => {
@@ -108,7 +105,6 @@ export function EvaluatePlayersList({
     const handleSelectionChange = async (userId: string, division: string) => {
         setSelections((prev) => ({ ...prev, [userId]: division }))
         setIsLoading(true)
-        setMessage(null)
 
         const result = await saveEvaluations([
             {
@@ -120,10 +116,10 @@ export function EvaluatePlayersList({
         setIsLoading(false)
 
         if (result.status) {
-            setMessage({ type: "success", text: result.message })
+            toast.success(result.message)
             router.refresh()
         } else {
-            setMessage({ type: "error", text: result.message })
+            toast.error(result.message)
         }
     }
 
@@ -144,42 +140,26 @@ export function EvaluatePlayersList({
         )
 
         if (data.length === 0) {
-            setMessage({
-                type: "error",
-                text: "No evaluations to save."
-            })
+            toast.error("No evaluations to save.")
             return
         }
 
         setIsLoading(true)
-        setMessage(null)
 
         const result = await saveEvaluations(data)
 
         setIsLoading(false)
 
         if (result.status) {
-            setMessage({ type: "success", text: result.message })
+            toast.success(result.message)
             router.refresh()
         } else {
-            setMessage({ type: "error", text: result.message })
+            toast.error(result.message)
         }
     }
 
     return (
         <div className="space-y-4">
-            {message && (
-                <div
-                    className={`rounded-md p-3 text-sm ${
-                        message.type === "success"
-                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
-
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">

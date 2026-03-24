@@ -70,7 +70,7 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
             "First name of the other commissioner for this division (not the current user)"
     },
     {
-        key: "user_preffered_name",
+        key: "user_preferred_name",
         label: "User Preferred Name",
         category: "People",
         description:

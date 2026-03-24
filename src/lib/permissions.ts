@@ -48,7 +48,8 @@ export type Permission =
     | "concerns:view"
     | "concerns:manage"
 
-// All permissions — used for admin wildcard
+// All permissions — used for admin wildcard.
+// Keep in sync with the Permission type above.
 const ALL_PERMISSIONS: Permission[] = [
     "season:control",
     "player:lookup",
@@ -71,7 +72,9 @@ const ALL_PERMISSIONS: Permission[] = [
     "emails:edit",
     "audit:view",
     "google:manage",
-    "attrition:view"
+    "attrition:view",
+    "concerns:view",
+    "concerns:manage"
 ]
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -128,4 +131,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
 export function roleHasPermission(role: Role, permission: Permission): boolean {
     return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
+}
+
+const VALID_ROLES = new Set<string>(Object.keys(ROLE_PERMISSIONS))
+
+export function isValidRole(value: string): value is Role {
+    return VALID_ROLES.has(value)
 }

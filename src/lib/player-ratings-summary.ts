@@ -96,7 +96,7 @@ export async function getPlayerRatingsSectionData(
                 id: users.id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(users)
             .where(inArray(users.id, evaluatorIds))

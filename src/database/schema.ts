@@ -17,7 +17,7 @@ export const users = pgTable("users", {
     name: text("name"),
     first_name: text("first_name").notNull(),
     last_name: text("last_name").notNull(),
-    preffered_name: text("preffered_name"),
+    preferred_name: text("preferred_name"),
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified")
         .$defaultFn(() => false)
@@ -172,70 +172,95 @@ export const individual_divisions = pgTable("individual_divisions", {
     teams: integer("teams").notNull()
 })
 
-export const signups = pgTable("signups", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    player: text("player")
-        .notNull()
-        .references(() => users.id),
-    age: text("age"),
-    captain: text("captain"),
-    pair: boolean("pair"),
-    pair_pick: text("pair_pick").references(() => users.id),
-    pair_reason: text("pair_reason"),
-    dates_missing: text("dates_missing"),
-    play_1st_week: boolean("play_1st_week"),
-    order_id: text("order_id"),
-    amount_paid: numeric("amount_paid"),
-    created_at: timestamp("created_at").notNull()
-})
+export const signups = pgTable(
+    "signups",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        player: text("player")
+            .notNull()
+            .references(() => users.id),
+        age: text("age"),
+        captain: text("captain"),
+        pair: boolean("pair"),
+        pair_pick: text("pair_pick").references(() => users.id),
+        pair_reason: text("pair_reason"),
+        dates_missing: text("dates_missing"),
+        play_1st_week: boolean("play_1st_week"),
+        order_id: text("order_id"),
+        amount_paid: numeric("amount_paid"),
+        created_at: timestamp("created_at").notNull()
+    },
+    (table) => ({
+        signupsSeasonIdx: index("signups_season_idx").on(table.season),
+        signupsPlayerIdx: index("signups_player_idx").on(table.player)
+    })
+)
 
-export const teams = pgTable("teams", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    captain: text("captain")
-        .notNull()
-        .references(() => users.id),
-    captain2: text("captain2").references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    name: text("name").notNull(),
-    number: integer("number"),
-    rank: integer("rank")
-})
+export const teams = pgTable(
+    "teams",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        captain: text("captain")
+            .notNull()
+            .references(() => users.id),
+        captain2: text("captain2").references(() => users.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        name: text("name").notNull(),
+        number: integer("number"),
+        rank: integer("rank")
+    },
+    (table) => ({
+        teamsSeasonIdx: index("teams_season_idx").on(table.season),
+        teamsCaptainIdx: index("teams_captain_idx").on(table.captain)
+    })
+)
 
-export const matchs = pgTable("matchs", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    week: integer("week").notNull(),
-    date: text("date"),
-    time: text("time"),
-    court: integer("court"),
-    home_team: integer("home_team").references(() => teams.id),
-    away_team: integer("away_team").references(() => teams.id),
-    home_score: integer("home_score"),
-    away_score: integer("away_score"),
-    home_set1_score: integer("home_set1_score"),
-    away_set1_score: integer("away_set1_score"),
-    home_set2_score: integer("home_set2_score"),
-    away_set2_score: integer("away_set2_score"),
-    home_set3_score: integer("home_set3_score"),
-    away_set3_score: integer("away_set3_score"),
-    winner: integer("winner").references(() => teams.id),
-    playoff: boolean("playoff")
-        .$defaultFn(() => false)
-        .notNull()
-})
+export const matches = pgTable(
+    "matches",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        week: integer("week").notNull(),
+        date: text("date"),
+        time: text("time"),
+        court: integer("court"),
+        home_team: integer("home_team").references(() => teams.id),
+        away_team: integer("away_team").references(() => teams.id),
+        home_score: integer("home_score"),
+        away_score: integer("away_score"),
+        home_set1_score: integer("home_set1_score"),
+        away_set1_score: integer("away_set1_score"),
+        home_set2_score: integer("home_set2_score"),
+        away_set2_score: integer("away_set2_score"),
+        home_set3_score: integer("home_set3_score"),
+        away_set3_score: integer("away_set3_score"),
+        winner: integer("winner").references(() => teams.id),
+        playoff: boolean("playoff")
+            .$defaultFn(() => false)
+            .notNull()
+    },
+    (table) => ({
+        matchesSeasonIdx: index("matches_season_idx").on(table.season),
+        matchesDivisionIdx: index("matches_division_idx").on(table.division),
+        matchesSeasonDivisionIdx: index("matches_season_division_idx").on(
+            table.season,
+            table.division
+        )
+    })
+)
 
 export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
     id: serial("id").primaryKey(),
@@ -247,7 +272,7 @@ export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
         .references(() => divisions.id),
     week: integer("week").notNull(),
     match_num: integer("match_num").notNull(),
-    match_id: integer("match_id").references(() => matchs.id),
+    match_id: integer("match_id").references(() => matches.id),
     bracket: text("bracket"),
     home_source: text("home_source").notNull(),
     away_source: text("away_source").notNull(),
@@ -259,51 +284,75 @@ export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
         .notNull()
 })
 
-export const week1Rosters = pgTable("week1_rosters", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    session_number: integer("session_number").notNull(),
-    court_number: integer("court_number").notNull()
-})
+export const week1Rosters = pgTable(
+    "week1_rosters",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        user: text("user")
+            .notNull()
+            .references(() => users.id),
+        session_number: integer("session_number").notNull(),
+        court_number: integer("court_number").notNull()
+    },
+    (table) => ({
+        week1RostersSeasonIdx: index("week1_rosters_season_idx").on(
+            table.season
+        )
+    })
+)
 
-export const week2Rosters = pgTable("week2_rosters", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    team_number: integer("team_number").notNull(),
-    is_captain: boolean("is_captain")
-        .$defaultFn(() => false)
-        .notNull()
-})
+export const week2Rosters = pgTable(
+    "week2_rosters",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        user: text("user")
+            .notNull()
+            .references(() => users.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        team_number: integer("team_number").notNull(),
+        is_captain: boolean("is_captain")
+            .$defaultFn(() => false)
+            .notNull()
+    },
+    (table) => ({
+        week2RostersSeasonIdx: index("week2_rosters_season_idx").on(
+            table.season
+        )
+    })
+)
 
-export const week3Rosters = pgTable("week3_rosters", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    team_number: integer("team_number").notNull(),
-    is_captain: boolean("is_captain")
-        .$defaultFn(() => false)
-        .notNull()
-})
+export const week3Rosters = pgTable(
+    "week3_rosters",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        user: text("user")
+            .notNull()
+            .references(() => users.id),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id),
+        team_number: integer("team_number").notNull(),
+        is_captain: boolean("is_captain")
+            .$defaultFn(() => false)
+            .notNull()
+    },
+    (table) => ({
+        week3RostersSeasonIdx: index("week3_rosters_season_idx").on(
+            table.season
+        )
+    })
+)
 
 export const champions = pgTable("champions", {
     id: serial("id").primaryKey(),
@@ -321,17 +370,24 @@ export const champions = pgTable("champions", {
     caption: text("caption")
 })
 
-export const drafts = pgTable("drafts", {
-    id: serial("id").primaryKey(),
-    team: integer("team")
-        .notNull()
-        .references(() => teams.id),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    round: integer("round").notNull(),
-    overall: integer("overall").notNull()
-})
+export const drafts = pgTable(
+    "drafts",
+    {
+        id: serial("id").primaryKey(),
+        team: integer("team")
+            .notNull()
+            .references(() => teams.id),
+        user: text("user")
+            .notNull()
+            .references(() => users.id),
+        round: integer("round").notNull(),
+        overall: integer("overall").notNull()
+    },
+    (table) => ({
+        draftsTeamIdx: index("drafts_team_idx").on(table.team),
+        draftsUserIdx: index("drafts_user_idx").on(table.user)
+    })
+)
 
 export const waitlist = pgTable("waitlist", {
     id: serial("id").primaryKey(),

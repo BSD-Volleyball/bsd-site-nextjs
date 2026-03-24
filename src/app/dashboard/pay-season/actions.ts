@@ -154,7 +154,7 @@ async function sendSignupConfirmationEmail(
 }
 
 export interface PaymentResult {
-    success: boolean
+    status: boolean
     message: string
     paymentId?: string
     receiptUrl?: string
@@ -229,13 +229,13 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
             id: users.id,
             first_name: users.first_name,
             last_name: users.last_name,
-            preffered_name: users.preffered_name
+            preferred_name: users.preferred_name
         })
         .from(users)
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preffered_name ? ` (${u.preffered_name})` : ""
+        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
             name: `${u.first_name}${preferredPart} ${u.last_name}`
@@ -251,7 +251,7 @@ export async function submitSeasonPayment(
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session) {
         return {
-            success: false,
+            status: false,
             message: "You need to be logged in to make a payment."
         }
     }
@@ -284,7 +284,7 @@ export async function submitSeasonPayment(
 
         if (!config.seasonId) {
             return {
-                success: false,
+                status: false,
                 message: "Season not found."
             }
         }
@@ -297,7 +297,7 @@ export async function submitSeasonPayment(
 
         if (!availabilityCheck.ok) {
             return {
-                success: false,
+                status: false,
                 message:
                     availabilityCheck.message ||
                     "Signups are currently unavailable.",
@@ -360,7 +360,7 @@ export async function submitSeasonPayment(
                 const [user] = await db
                     .select({
                         firstName: users.first_name,
-                        preferredName: users.preffered_name
+                        preferredName: users.preferred_name
                     })
                     .from(users)
                     .where(eq(users.id, session.user.id))
@@ -384,7 +384,7 @@ export async function submitSeasonPayment(
             }
 
             return {
-                success: true,
+                status: true,
                 message:
                     "Payment successful! You are now registered for the season.",
                 paymentId: response.payment.id,
@@ -393,13 +393,13 @@ export async function submitSeasonPayment(
         }
 
         return {
-            success: false,
+            status: false,
             message: "Payment processing failed. Please try again."
         }
     } catch (error) {
         console.error("Payment error:", error)
         return {
-            success: false,
+            status: false,
             message:
                 "An error occurred while processing your payment. Please try again."
         }
@@ -413,7 +413,7 @@ export async function submitFreeSignup(
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session) {
         return {
-            success: false,
+            status: false,
             message: "You need to be logged in to register."
         }
     }
@@ -423,7 +423,7 @@ export async function submitFreeSignup(
         const discount = await getActiveDiscountForUser(session.user.id)
         if (!discount || discount.id !== discountId) {
             return {
-                success: false,
+                status: false,
                 message: "Invalid or expired discount."
             }
         }
@@ -431,7 +431,7 @@ export async function submitFreeSignup(
         const discountPercentage = parseFloat(discount.percentage)
         if (discountPercentage < 100) {
             return {
-                success: false,
+                status: false,
                 message: "This discount requires payment."
             }
         }
@@ -442,7 +442,7 @@ export async function submitFreeSignup(
 
         if (!config.seasonId) {
             return {
-                success: false,
+                status: false,
                 message: "Season not found."
             }
         }
@@ -455,7 +455,7 @@ export async function submitFreeSignup(
 
         if (!availabilityCheck.ok) {
             return {
-                success: false,
+                status: false,
                 message:
                     availabilityCheck.message ||
                     "Signups are currently unavailable.",
@@ -502,7 +502,7 @@ export async function submitFreeSignup(
         const [user] = await db
             .select({
                 firstName: users.first_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(users)
             .where(eq(users.id, session.user.id))
@@ -528,14 +528,14 @@ export async function submitFreeSignup(
         )
 
         return {
-            success: true,
+            status: true,
             message:
                 "Registration complete! You are now registered for the season."
         }
     } catch (error) {
         console.error("Free signup error:", error)
         return {
-            success: false,
+            status: false,
             message:
                 "An error occurred while processing your registration. Please try again."
         }

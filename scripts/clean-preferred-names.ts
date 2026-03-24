@@ -10,15 +10,15 @@ async function main() {
         .select({
             id: users.id,
             first_name: users.first_name,
-            preffered_name: users.preffered_name
+            preferred_name: users.preferred_name
         })
         .from(users)
-        .where(isNotNull(users.preffered_name))
+        .where(isNotNull(users.preferred_name))
 
     const toUpdate = rows.filter(
         (r) =>
-            r.preffered_name &&
-            r.preffered_name.trim().toLowerCase() ===
+            r.preferred_name &&
+            r.preferred_name.trim().toLowerCase() ===
                 r.first_name.trim().toLowerCase()
     )
 
@@ -28,11 +28,11 @@ async function main() {
 
     for (const row of toUpdate) {
         console.log(
-            `  Clearing "${row.preffered_name}" for user ${row.id} (first name: "${row.first_name}")`
+            `  Clearing "${row.preferred_name}" for user ${row.id} (first name: "${row.first_name}")`
         )
         await db
             .update(users)
-            .set({ preffered_name: null })
+            .set({ preferred_name: null })
             .where(sql`${users.id} = ${row.id}`)
     }
 

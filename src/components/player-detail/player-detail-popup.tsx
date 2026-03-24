@@ -25,7 +25,7 @@ interface SeasonInfo {
 interface PlayerInfo {
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     pronouns: string | null
     male: boolean | null
     experience: string | null
@@ -116,9 +116,9 @@ export function PlayerDetailPopup({
                             <CardTitle className="pt-1">
                                 {playerDetails.first_name}{" "}
                                 {playerDetails.last_name}
-                                {playerDetails.preffered_name && (
+                                {playerDetails.preferred_name && (
                                     <span className="ml-2 font-normal text-base text-muted-foreground">
-                                        ({playerDetails.preffered_name})
+                                        ({playerDetails.preferred_name})
                                     </span>
                                 )}
                             </CardTitle>

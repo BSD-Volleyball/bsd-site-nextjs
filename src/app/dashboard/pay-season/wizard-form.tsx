@@ -10,7 +10,7 @@ import {
     type PaymentResult,
     type SignupFormData
 } from "./actions"
-import { UserCombobox } from "./user-combobox"
+import { UserCombobox } from "@/components/user-combobox"
 import {
     Card,
     CardContent,
@@ -122,15 +122,15 @@ export function WizardForm({
 
     // Refresh the page data when payment succeeds to update sidebar
     useEffect(() => {
-        if (paymentResult?.success) {
+        if (paymentResult?.status) {
             router.refresh()
         }
-    }, [paymentResult?.success, router])
+    }, [paymentResult?.status, router])
 
     useEffect(() => {
         if (
             paymentResult &&
-            !paymentResult.success &&
+            !paymentResult.status &&
             paymentResult.shouldRefresh
         ) {
             router.refresh()
@@ -157,7 +157,7 @@ export function WizardForm({
         }
     }
 
-    if (paymentResult?.success) {
+    if (paymentResult?.status) {
         return (
             <Card className="max-w-md">
                 <CardHeader>
@@ -766,7 +766,7 @@ export function WizardForm({
                                 ))}
                         </div>
 
-                        {paymentResult && !paymentResult.success && (
+                        {paymentResult && !paymentResult.status && (
                             <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-destructive">
                                 <RiErrorWarningLine className="h-5 w-5" />
                                 <span className="text-sm">
@@ -798,7 +798,7 @@ export function WizardForm({
                                             setPaymentResult(result)
                                         } catch (_error) {
                                             setPaymentResult({
-                                                success: false,
+                                                status: false,
                                                 message:
                                                     "An unexpected error occurred. Please try again."
                                             })
@@ -825,7 +825,7 @@ export function WizardForm({
                                 ) => {
                                     if (tokenResult.status !== "OK") {
                                         setPaymentResult({
-                                            success: false,
+                                            status: false,
                                             message:
                                                 "Failed to process card. Please try again."
                                         })
@@ -845,7 +845,7 @@ export function WizardForm({
                                         setPaymentResult(result)
                                     } catch (_error) {
                                         setPaymentResult({
-                                            success: false,
+                                            status: false,
                                             message:
                                                 "An unexpected error occurred. Please try again."
                                         })

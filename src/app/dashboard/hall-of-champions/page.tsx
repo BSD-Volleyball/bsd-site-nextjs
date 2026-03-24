@@ -36,7 +36,7 @@ async function getChampions(): Promise<ChampionRow[]> {
             divisionLevel: divisions.level,
             captainFirstName: users.first_name,
             captainLastName: users.last_name,
-            captainPreferredName: users.preffered_name,
+            captainPreferredName: users.preferred_name,
             teamName: teams.name,
             picture: champions.picture,
             picture2: champions.picture2,

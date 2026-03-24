@@ -46,7 +46,7 @@ interface UserRow {
     id: string
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     email: string
 }
 
@@ -543,8 +543,8 @@ function findUserCandidatesByName(
 
     const exactFull = allUsers.filter((u) => {
         const legalFull = normalize(`${u.first_name} ${u.last_name}`)
-        const preferredFull = u.preffered_name
-            ? normalize(`${u.preffered_name} ${u.last_name}`)
+        const preferredFull = u.preferred_name
+            ? normalize(`${u.preferred_name} ${u.last_name}`)
             : ""
         return (
             legalFull === normalizedTarget || preferredFull === normalizedTarget
@@ -559,7 +559,7 @@ function findUserCandidatesByName(
     const byParts = allUsers.filter(
         (u) =>
             (normalize(u.first_name) === normalize(parsed.firstName) ||
-                normalize(u.preffered_name || "") ===
+                normalize(u.preferred_name || "") ===
                     normalize(parsed.firstName)) &&
             normalize(u.last_name) === normalize(parsed.lastName)
     )
@@ -662,7 +662,7 @@ async function ensureUserForName(
         id: randomUUID(),
         first_name: parsed.firstName,
         last_name: parsed.lastName,
-        preffered_name: null,
+        preferred_name: null,
         email
     }
 
@@ -934,7 +934,7 @@ async function main() {
             id: users.id,
             first_name: users.first_name,
             last_name: users.last_name,
-            preffered_name: users.preffered_name,
+            preferred_name: users.preferred_name,
             email: users.email
         })
         .from(users)

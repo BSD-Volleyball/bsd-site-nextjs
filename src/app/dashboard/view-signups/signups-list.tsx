@@ -15,6 +15,7 @@ import {
     PlayerDetailPopup,
     formatHeight
 } from "@/components/player-detail"
+import { buildPlayerPictureUrl, serializeCsvField } from "@/lib/utils"
 
 interface SeasonInfo {
     id: number
@@ -27,30 +28,6 @@ interface SignupsListProps {
     allSeasons: SeasonInfo[]
     playerPicUrl: string
     seasonLabel: string
-}
-
-function buildPlayerPictureUrl(
-    baseUrl: string,
-    picturePath: string | null
-): string {
-    if (!picturePath) return ""
-    if (/^https?:\/\//i.test(picturePath)) return picturePath
-    if (!baseUrl) return picturePath
-
-    const normalizedBaseUrl = baseUrl.endsWith("/")
-        ? baseUrl.slice(0, -1)
-        : baseUrl
-    const normalizedPicturePath = picturePath.startsWith("/")
-        ? picturePath
-        : `/${picturePath}`
-
-    return `${normalizedBaseUrl}${normalizedPicturePath}`
-}
-
-function serializeCsvField(value: unknown): string {
-    const stringValue =
-        value === null || value === undefined ? "" : String(value)
-    return `"${stringValue.replace(/"/g, '""')}"`
 }
 
 function generateCsvContent(

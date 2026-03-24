@@ -73,7 +73,7 @@ export async function getGoogleMembershipUsers(params?: {
                       sql`CAST(${users.old_id} AS TEXT) LIKE ${`%${query}%`}`,
                       sql`LOWER(${users.first_name}) LIKE ${`%${query.toLowerCase()}%`}`,
                       sql`LOWER(${users.last_name}) LIKE ${`%${query.toLowerCase()}%`}`,
-                      sql`LOWER(${users.preffered_name}) LIKE ${`%${query.toLowerCase()}%`}`,
+                      sql`LOWER(${users.preferred_name}) LIKE ${`%${query.toLowerCase()}%`}`,
                       sql`LOWER(${users.email}) LIKE ${`%${query.toLowerCase()}%`}`
                   )
                 : undefined
@@ -142,7 +142,7 @@ export async function getGoogleMembershipUsers(params?: {
                       oldId: users.old_id,
                       firstName: users.first_name,
                       lastName: users.last_name,
-                      preferredName: users.preffered_name,
+                      preferredName: users.preferred_name,
                       email: users.email,
                       seasonsList: users.seasons_list,
                       notificationList: users.notification_list
@@ -158,7 +158,7 @@ export async function getGoogleMembershipUsers(params?: {
                       oldId: users.old_id,
                       firstName: users.first_name,
                       lastName: users.last_name,
-                      preferredName: users.preffered_name,
+                      preferredName: users.preferred_name,
                       email: users.email,
                       seasonsList: users.seasons_list,
                       notificationList: users.notification_list

@@ -49,7 +49,7 @@ export async function getOldUsers(): Promise<UserOption[]> {
             id: users.id,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             email: users.email,
             phone: users.phone,
             createdAt: users.createdAt
@@ -88,7 +88,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
             id: users.id,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             email: users.email,
             phone: users.phone,
             createdAt: users.createdAt

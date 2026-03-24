@@ -6,7 +6,7 @@ import { db } from "@/database/db"
 import {
     divisions,
     teams,
-    matchs,
+    matches,
     playoffMatchesMeta,
     individual_divisions
 } from "@/database/schema"
@@ -388,7 +388,7 @@ export async function writeRegularSeasonSchedule(
             }
         }
 
-        await db.insert(matchs).values(allMatches)
+        await db.insert(matches).values(allMatches)
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {
@@ -473,7 +473,7 @@ export async function writePlayoffSchedule(
                 const matchTime = getPlayoffMatchTime(pm, court)
 
                 const [inserted] = await db
-                    .insert(matchs)
+                    .insert(matches)
                     .values({
                         season: seasonId,
                         division: div.divisionId,
@@ -483,7 +483,7 @@ export async function writePlayoffSchedule(
                         court: matchCourt,
                         playoff: true
                     })
-                    .returning({ id: matchs.id })
+                    .returning({ id: matches.id })
 
                 insertedMatches.push({
                     matchNum: pm.matchNum,

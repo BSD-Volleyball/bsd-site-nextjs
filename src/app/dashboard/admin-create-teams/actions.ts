@@ -26,7 +26,7 @@ export interface UserOption {
     old_id: number | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
 }
 
 async function checkAdminAccess(): Promise<boolean> {
@@ -76,7 +76,7 @@ export async function getCreateTeamsData(): Promise<{
                     old_id: users.old_id,
                     first_name: users.first_name,
                     last_name: users.last_name,
-                    preffered_name: users.preffered_name
+                    preferred_name: users.preferred_name
                 })
                 .from(users)
                 .orderBy(users.last_name, users.first_name)

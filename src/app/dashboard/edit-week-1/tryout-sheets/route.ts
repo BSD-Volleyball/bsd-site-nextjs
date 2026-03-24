@@ -201,7 +201,7 @@ export async function GET() {
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 pairPickId: signups.pair_pick,
                 height: users.height,
                 male: users.male,
@@ -256,7 +256,7 @@ export async function GET() {
                           id: users.id,
                           firstName: users.first_name,
                           lastName: users.last_name,
-                          preferredName: users.preffered_name
+                          preferredName: users.preferred_name
                       })
                       .from(users)
                       .where(inArray(users.id, pairIds))

@@ -7,7 +7,7 @@ import * as readline from "node:readline"
 import { db } from "../src/database/db"
 import {
     divisions,
-    matchs,
+    matches,
     playoffMatchesMeta,
     seasons,
     teams,
@@ -1053,14 +1053,14 @@ async function maybeReplaceExistingMatches(
 
     const [existingMatches, existingMeta] = await Promise.all([
         db
-            .select({ id: matchs.id, week: matchs.week })
-            .from(matchs)
+            .select({ id: matches.id, week: matches.week })
+            .from(matches)
             .where(
                 and(
-                    eq(matchs.season, seasonId),
-                    eq(matchs.division, divisionId),
-                    eq(matchs.playoff, true),
-                    inArray(matchs.week, uniqueWeeks)
+                    eq(matches.season, seasonId),
+                    eq(matches.division, divisionId),
+                    eq(matches.playoff, true),
+                    inArray(matches.week, uniqueWeeks)
                 )
             ),
         db
@@ -1105,7 +1105,7 @@ async function maybeReplaceExistingMatches(
                 `DRY RUN: would delete ${existingMatches.length} existing playoff match row(s) and ${existingMeta.length} meta row(s)`
             )
         } else {
-            // Delete meta first because it may reference matchs rows.
+            // Delete meta first because it may reference matches rows.
             await db
                 .delete(playoffMatchesMeta)
                 .where(
@@ -1117,13 +1117,13 @@ async function maybeReplaceExistingMatches(
                 )
 
             await db
-                .delete(matchs)
+                .delete(matches)
                 .where(
                     and(
-                        eq(matchs.season, seasonId),
-                        eq(matchs.division, divisionId),
-                        eq(matchs.playoff, true),
-                        inArray(matchs.week, uniqueWeeks)
+                        eq(matches.season, seasonId),
+                        eq(matches.division, divisionId),
+                        eq(matches.playoff, true),
+                        inArray(matches.week, uniqueWeeks)
                     )
                 )
             console.log(
@@ -1367,19 +1367,19 @@ async function main() {
             importedFiles++
             importedRows += rows.length
             console.log(
-                `DRY RUN: no rows inserted (would insert ${rows.length} matchs row(s) and ${metaRowsWithoutMatchId.length} playoff meta row(s))`
+                `DRY RUN: no rows inserted (would insert ${rows.length} matches row(s) and ${metaRowsWithoutMatchId.length} playoff meta row(s))`
             )
             continue
         }
 
         const insertedMatches = await db
-            .insert(matchs)
+            .insert(matches)
             .values(rows)
-            .returning({ id: matchs.id })
+            .returning({ id: matches.id })
 
         if (insertedMatches.length !== rows.length) {
             throw new Error(
-                `Inserted ${insertedMatches.length} matchs rows, expected ${rows.length}`
+                `Inserted ${insertedMatches.length} matches rows, expected ${rows.length}`
             )
         }
 

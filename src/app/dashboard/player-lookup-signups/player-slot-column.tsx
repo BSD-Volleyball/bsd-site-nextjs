@@ -20,8 +20,8 @@ import type { PlayerSlot, SlotAction } from "./use-player-slots"
 
 export function getDisplayName(player: PlayerListItem): string {
     const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
-    const preferredPart = player.preffered_name
-        ? ` (${player.preffered_name})`
+    const preferredPart = player.preferred_name
+        ? ` (${player.preferred_name})`
         : ""
     return `${oldIdPart}${player.first_name}${preferredPart} ${player.last_name}`
 }
@@ -56,7 +56,7 @@ export function PlayerSlotColumn({
         const lowerSearch = slot.search.toLowerCase()
         return available.filter((p) => {
             const fullName = `${p.first_name} ${p.last_name}`.toLowerCase()
-            const preferredName = (p.preffered_name || "").toLowerCase()
+            const preferredName = (p.preferred_name || "").toLowerCase()
             const oldIdStr = p.old_id?.toString() || ""
             return (
                 fullName.includes(lowerSearch) ||

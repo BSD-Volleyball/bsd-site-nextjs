@@ -164,7 +164,7 @@ async function getPreviousSeasonsPlayed(
             teamId: teams.id,
             captainFirstName: users.first_name,
             captainLastName: users.last_name,
-            captainPreferredName: users.preffered_name,
+            captainPreferredName: users.preferred_name,
             championId: champions.id,
             championPicture: champions.picture
         })
@@ -646,14 +646,14 @@ export default async function DashboardPage() {
         // Get user's preferred name or first name for greeting
         const [user] = await db
             .select({
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 first_name: users.first_name
             })
             .from(users)
             .where(eq(users.id, session.user.id))
             .limit(1)
 
-        userName = user?.preffered_name || user?.first_name || null
+        userName = user?.preferred_name || user?.first_name || null
 
         const canViewConcerns =
             !!signupStatus?.config.seasonId &&
@@ -838,7 +838,7 @@ export default async function DashboardPage() {
                             .select({
                                 firstName: users.first_name,
                                 lastName: users.last_name,
-                                preferredName: users.preffered_name
+                                preferredName: users.preferred_name
                             })
                             .from(week2Rosters)
                             .innerJoin(users, eq(week2Rosters.user, users.id))
@@ -953,7 +953,7 @@ export default async function DashboardPage() {
                             .select({
                                 firstName: users.first_name,
                                 lastName: users.last_name,
-                                preferredName: users.preffered_name
+                                preferredName: users.preferred_name
                             })
                             .from(week3Rosters)
                             .innerJoin(users, eq(week3Rosters.user, users.id))

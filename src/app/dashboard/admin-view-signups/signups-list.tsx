@@ -14,7 +14,7 @@ import {
     DialogTitle
 } from "@/components/ui/dialog"
 import { RiDownloadLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
+import { cn, buildPlayerPictureUrl, serializeCsvField } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup,
@@ -35,33 +35,9 @@ interface SignupsListProps {
     lateAmount: string
 }
 
-function buildPlayerPictureUrl(
-    baseUrl: string,
-    picturePath: string | null
-): string {
-    if (!picturePath) return ""
-    if (/^https?:\/\//i.test(picturePath)) return picturePath
-    if (!baseUrl) return picturePath
-
-    const normalizedBaseUrl = baseUrl.endsWith("/")
-        ? baseUrl.slice(0, -1)
-        : baseUrl
-    const normalizedPicturePath = picturePath.startsWith("/")
-        ? picturePath
-        : `/${picturePath}`
-
-    return `${normalizedBaseUrl}${normalizedPicturePath}`
-}
-
 function getDisplayName(entry: SignupEntry): string {
     const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
     return `${entry.firstName}${preferred} ${entry.lastName}`
-}
-
-function serializeCsvField(value: unknown): string {
-    const stringValue =
-        value === null || value === undefined ? "" : String(value)
-    return `"${stringValue.replace(/"/g, '""')}"`
 }
 
 function generateCsvContent(

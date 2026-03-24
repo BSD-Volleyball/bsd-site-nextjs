@@ -209,7 +209,7 @@ export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
                 userId: drafts.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(drafts)
             .innerJoin(users, eq(drafts.user, users.id))
@@ -306,7 +306,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             .select({
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(users)
             .where(eq(users.id, session.user.id))
@@ -327,7 +327,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 userId: drafts.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email
             })
             .from(drafts)
@@ -430,7 +430,7 @@ export async function getPlayerTeamAssignment(
             .select({
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email
             })
             .from(users)
@@ -448,7 +448,7 @@ export async function getPlayerTeamAssignment(
                 userId: drafts.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(drafts)
             .innerJoin(users, eq(drafts.user, users.id))

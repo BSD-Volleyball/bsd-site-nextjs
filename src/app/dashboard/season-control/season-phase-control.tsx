@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -25,26 +26,21 @@ export function SeasonPhaseControl({
     const router = useRouter()
     const [phase, setPhase] = useState<SeasonPhase>(initialPhase)
     const [loading, setLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        text: string
-        isError: boolean
-    } | null>(null)
 
     const currentConfig = PHASE_CONFIG[phase]
     const currentIndex = SEASON_PHASES.indexOf(phase)
 
     async function handleAdvance(targetPhase: SeasonPhase) {
         setLoading(true)
-        setMessage(null)
 
         const result = await advanceSeasonPhase(seasonId, targetPhase)
 
         if (result.status) {
             setPhase(targetPhase)
-            setMessage({ text: result.message, isError: false })
+            toast.success(result.message)
             router.refresh()
         } else {
-            setMessage({ text: result.message, isError: true })
+            toast.error(result.message)
         }
 
         setLoading(false)
@@ -52,16 +48,15 @@ export function SeasonPhaseControl({
 
     async function handleRevert(targetPhase: SeasonPhase) {
         setLoading(true)
-        setMessage(null)
 
         const result = await revertSeasonPhase(seasonId, targetPhase)
 
         if (result.status) {
             setPhase(targetPhase)
-            setMessage({ text: result.message, isError: false })
+            toast.success(result.message)
             router.refresh()
         } else {
-            setMessage({ text: result.message, isError: true })
+            toast.error(result.message)
         }
 
         setLoading(false)
@@ -154,18 +149,6 @@ export function SeasonPhaseControl({
                     <CardTitle className="text-base">Phase Controls</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {message && (
-                        <div
-                            className={`rounded-lg p-3 text-sm ${
-                                message.isError
-                                    ? "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-                                    : "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-                            }`}
-                        >
-                            {message.text}
-                        </div>
-                    )}
-
                     {currentConfig.nextPhases.length > 0 && (
                         <div className="space-y-2">
                             <p className="font-medium text-sm">

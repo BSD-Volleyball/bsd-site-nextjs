@@ -120,14 +120,14 @@ export async function getUsers(): Promise<{
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(users)
             .orderBy(users.last_name, users.first_name)
 
         const userList: User[] = allUsers.map((u) => {
-            const preferredPart = u.preffered_name
-                ? ` (${u.preffered_name})`
+            const preferredPart = u.preferred_name
+                ? ` (${u.preferred_name})`
                 : ""
             return {
                 id: u.id,

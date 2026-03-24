@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -22,10 +23,6 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
     const [players, setPlayers] = useState(initialPlayers)
     const [search, setSearch] = useState("")
     const [uploadingUserId, setUploadingUserId] = useState<string | null>(null)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
     const maxSourcePictureUploadBytes = 25 * 1024 * 1024
@@ -63,7 +60,6 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
     }
 
     const handleOpenCamera = (userId: string) => {
-        setMessage(null)
         const input = fileInputRefs.current[userId]
         if (!input) {
             return
@@ -80,25 +76,18 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
         }
 
         if (!isSupportedImageFile(file)) {
-            setMessage({
-                type: "error",
-                text: "Only image files are supported."
-            })
+            toast.error("Only image files are supported.")
             clearFileInput(player.userId)
             return
         }
 
         if (file.size > maxSourcePictureUploadBytes) {
-            setMessage({
-                type: "error",
-                text: "Image must be 25MB or smaller before compression."
-            })
+            toast.error("Image must be 25MB or smaller before compression.")
             clearFileInput(player.userId)
             return
         }
 
         setUploadingUserId(player.userId)
-        setMessage(null)
 
         try {
             let processedImage: { blob: Blob }
@@ -106,10 +95,9 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                 processedImage = await compressImageForUpload(file)
             } catch (error) {
                 console.error("Image compression failed:", error)
-                setMessage({
-                    type: "error",
-                    text: "Could not process that image. Please try another photo."
-                })
+                toast.error(
+                    "Could not process that image. Please try another photo."
+                )
                 return
             }
 
@@ -126,10 +114,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                     removePlayerFromList(player.userId)
                 }
 
-                setMessage({
-                    type: "error",
-                    text: uploadStartMessage
-                })
+                toast.error(uploadStartMessage)
                 return
             }
 
@@ -142,10 +127,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
             })
 
             if (!uploadResponse.ok) {
-                setMessage({
-                    type: "error",
-                    text: "Upload to storage failed. Please try again."
-                })
+                toast.error("Upload to storage failed. Please try again.")
                 return
             }
 
@@ -161,18 +143,12 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                     removePlayerFromList(player.userId)
                 }
 
-                setMessage({
-                    type: "error",
-                    text: finalizeResult.message
-                })
+                toast.error(finalizeResult.message)
                 return
             }
 
             removePlayerFromList(player.userId)
-            setMessage({
-                type: "success",
-                text: `Uploaded picture for ${player.displayName}.`
-            })
+            toast.success(`Uploaded picture for ${player.displayName}.`)
         } finally {
             clearFileInput(player.userId)
             setUploadingUserId(null)
@@ -181,18 +157,6 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
 
     return (
         <div className="space-y-4">
-            {message && (
-                <div
-                    className={`rounded-md p-3 text-sm ${
-                        message.type === "success"
-                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
-
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
                     {players.length} player{players.length === 1 ? "" : "s"}{" "}

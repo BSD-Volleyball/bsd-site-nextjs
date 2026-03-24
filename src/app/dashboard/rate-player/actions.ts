@@ -308,7 +308,7 @@ export async function getRatePlayerData(): Promise<{
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 male: users.male,
                 height: users.height,
                 picture: users.picture

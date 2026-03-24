@@ -1,7 +1,8 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
-import { UserCombobox } from "@/app/dashboard/manage-discounts/user-combobox"
+import { toast } from "sonner"
+import { UserCombobox } from "@/components/user-combobox"
 import {
     createPlayerPictureUpload,
     finalizePlayerPictureUpload,
@@ -35,7 +36,7 @@ interface FormData {
     name: string
     first_name: string
     last_name: string
-    preffered_name: string
+    preferred_name: string
     email: string
     emailVerified: boolean
     image: string
@@ -132,7 +133,7 @@ function userToFormData(user: UserDetails): FormData {
         name: user.name ?? "",
         first_name: user.first_name,
         last_name: user.last_name,
-        preffered_name: user.preffered_name ?? "",
+        preferred_name: user.preferred_name ?? "",
         email: user.email,
         emailVerified: user.emailVerified,
         image: user.image ?? "",
@@ -172,36 +173,21 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
     const [originalId, setOriginalId] = useState<string | null>(null)
     const [formData, setFormData] = useState<FormData | null>(null)
     const [loading, setLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        text: string
-        type: "success" | "error"
-    } | null>(null)
     const [signupData, setSignupData] = useState<SignupFormData | null>(null)
-    const [signupMessage, setSignupMessage] = useState<{
-        text: string
-        type: "success" | "error"
-    } | null>(null)
     const [isPending, startTransition] = useTransition()
     const [isSignupPending, startSignupTransition] = useTransition()
     const [isPictureUploadPending, startPictureUploadTransition] =
         useTransition()
     const [pictureFile, setPictureFile] = useState<File | null>(null)
-    const [pictureMessage, setPictureMessage] = useState<{
-        text: string
-        type: "success" | "error"
-    } | null>(null)
 
     const maxSourcePictureUploadBytes = 25 * 1024 * 1024
 
     const handleUserSelect = async (userId: string | null) => {
         setSelectedUserId(userId)
-        setMessage(null)
-        setSignupMessage(null)
         setFormData(null)
         setSignupData(null)
         setOriginalId(null)
         setPictureFile(null)
-        setPictureMessage(null)
         if (fileInputRef.current) {
             fileInputRef.current.value = ""
         }
@@ -219,10 +205,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             setFormData(userToFormData(userResult.user))
             setOriginalId(userResult.user.id)
         } else {
-            setMessage({
-                text: userResult.message || "Failed to load user.",
-                type: "error"
-            })
+            toast.error(userResult.message || "Failed to load user.")
         }
 
         if (signupResult.status && signupResult.signup) {
@@ -238,12 +221,12 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         if (
             field === "first_name" ||
             field === "last_name" ||
-            field === "preffered_name"
+            field === "preferred_name"
         ) {
             updated.name = computeDisplayName(
                 updated.first_name,
                 updated.last_name,
-                updated.preffered_name
+                updated.preferred_name
             )
         }
 
@@ -263,7 +246,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 name: formData.name || null,
                 first_name: formData.first_name,
                 last_name: formData.last_name,
-                preffered_name: formData.preffered_name || null,
+                preferred_name: formData.preferred_name || null,
                 email: formData.email,
                 emailVerified: formData.emailVerified,
                 old_id: formData.old_id ? parseInt(formData.old_id, 10) : 0,
@@ -287,9 +270,9 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             })
 
             if (result.status) {
-                setMessage({ text: result.message, type: "success" })
+                toast.success(result.message)
             } else {
-                setMessage({ text: result.message, type: "error" })
+                toast.error(result.message)
             }
         })
     }
@@ -300,31 +283,21 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         }
 
         if (!pictureFile) {
-            setPictureMessage({
-                text: "Select an image file before uploading.",
-                type: "error"
-            })
+            toast.error("Select an image file before uploading.")
             return
         }
 
         if (!pictureFile.type.startsWith("image/")) {
-            setPictureMessage({
-                text: "Only image files are supported.",
-                type: "error"
-            })
+            toast.error("Only image files are supported.")
             return
         }
 
         if (pictureFile.size > maxSourcePictureUploadBytes) {
-            setPictureMessage({
-                text: "Image must be 25MB or smaller before compression.",
-                type: "error"
-            })
+            toast.error("Image must be 25MB or smaller before compression.")
             return
         }
 
         const fileToUpload = pictureFile
-        setPictureMessage(null)
 
         startPictureUploadTransition(async () => {
             let processedImage: { blob: Blob }
@@ -332,10 +305,9 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 processedImage = await compressImageForUpload(fileToUpload)
             } catch (error) {
                 console.error("Image compression failed:", error)
-                setPictureMessage({
-                    text: "Could not process that image. Please try another photo.",
-                    type: "error"
-                })
+                toast.error(
+                    "Could not process that image. Please try another photo."
+                )
                 return
             }
 
@@ -345,10 +317,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 !uploadStart.uploadUrl ||
                 !uploadStart.pictureFilename
             ) {
-                setPictureMessage({
-                    text: uploadStart.message || "Failed to start upload.",
-                    type: "error"
-                })
+                toast.error(uploadStart.message || "Failed to start upload.")
                 return
             }
 
@@ -361,10 +330,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             })
 
             if (!uploadResponse.ok) {
-                setPictureMessage({
-                    text: "Upload to storage failed. Please try again.",
-                    type: "error"
-                })
+                toast.error("Upload to storage failed. Please try again.")
                 return
             }
 
@@ -374,10 +340,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             )
 
             if (!finalizeResult.status) {
-                setPictureMessage({
-                    text: finalizeResult.message,
-                    type: "error"
-                })
+                toast.error(finalizeResult.message)
                 return
             }
 
@@ -395,10 +358,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             if (fileInputRef.current) {
                 fileInputRef.current.value = ""
             }
-            setPictureMessage({
-                text: finalizeResult.message,
-                type: "success"
-            })
+            toast.success(finalizeResult.message)
         })
     }
 
@@ -434,9 +394,9 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             })
 
             if (result.status) {
-                setSignupMessage({ text: result.message, type: "success" })
+                toast.success(result.message)
             } else {
-                setSignupMessage({ text: result.message, type: "error" })
+                toast.error(result.message)
             }
         })
     }
@@ -445,7 +405,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         { key: "id", label: "ID" },
         { key: "first_name", label: "First Name" },
         { key: "last_name", label: "Last Name" },
-        { key: "preffered_name", label: "Preferred Name" },
+        { key: "preferred_name", label: "Preferred Name" },
         { key: "name", label: "Display Name" },
         { key: "email", label: "Email" },
         { key: "phone", label: "Phone" },
@@ -500,18 +460,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 </p>
             )}
 
-            {message && (
-                <div
-                    className={`rounded-md p-4 ${
-                        message.type === "success"
-                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
-
             {formData && (
                 <div className="space-y-8">
                     <div className="space-y-3 rounded-md border p-4">
@@ -545,7 +493,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                         const file =
                                             event.target.files?.[0] ?? null
                                         setPictureFile(file)
-                                        setPictureMessage(null)
                                     }}
                                     disabled={isPictureUploadPending}
                                 />
@@ -562,18 +509,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                 </Button>
                             </div>
                         </div>
-
-                        {pictureMessage && (
-                            <div
-                                className={`rounded-md p-3 text-sm ${
-                                    pictureMessage.type === "success"
-                                        ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                        : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                                }`}
-                            >
-                                {pictureMessage.text}
-                            </div>
-                        )}
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
@@ -716,18 +651,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                     <h2 className="font-semibold text-lg">
                         Current Season Signup ({signupData.seasonLabel})
                     </h2>
-
-                    {signupMessage && (
-                        <div
-                            className={`rounded-md p-4 ${
-                                signupMessage.type === "success"
-                                    ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                    : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                            }`}
-                        >
-                            {signupMessage.text}
-                        </div>
-                    )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>

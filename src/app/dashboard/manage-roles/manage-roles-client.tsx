@@ -7,6 +7,7 @@ import {
     RiSearchLine,
     RiUserLine
 } from "@remixicon/react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -72,10 +73,6 @@ export function ManageRolesClient({
     )
     const [assignments, setAssignments] = useState<UserRoleAssignment[]>([])
     const [isSearching, setIsSearching] = useState(false)
-    const [statusMessage, setStatusMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     // Add role form state
     const [newRole, setNewRole] = useState<Role | "">("")
@@ -108,7 +105,6 @@ export function ManageRolesClient({
         setSelectedUser(user)
         setSearchResults([])
         setSearchQuery("")
-        setStatusMessage(null)
         const roles = await getUserRoleAssignments(user.id)
         setAssignments(roles)
     }
@@ -117,7 +113,6 @@ export function ManageRolesClient({
         if (!selectedUser || !newRole) return
 
         startTransition(async () => {
-            setStatusMessage(null)
             const result = await addUserRole({
                 userId: selectedUser.id,
                 role: newRole as Role,
@@ -128,7 +123,7 @@ export function ManageRolesClient({
                         : undefined
             })
             if (result.status) {
-                setStatusMessage({ type: "success", text: result.message })
+                toast.success(result.message)
                 setNewRole("")
                 setNewSeasonId("")
                 setNewDivisionId("")
@@ -136,7 +131,7 @@ export function ManageRolesClient({
                 const updated = await getUserRoleAssignments(selectedUser.id)
                 setAssignments(updated)
             } else {
-                setStatusMessage({ type: "error", text: result.message })
+                toast.error(result.message)
             }
         })
     }
@@ -145,7 +140,6 @@ export function ManageRolesClient({
         if (!selectedUser) return
 
         startTransition(async () => {
-            setStatusMessage(null)
             const result = await removeUserRole({
                 userId: selectedUser.id,
                 roleRowId: assignment.id,
@@ -154,11 +148,11 @@ export function ManageRolesClient({
                 divisionId: assignment.division_id ?? undefined
             })
             if (result.status) {
-                setStatusMessage({ type: "success", text: result.message })
+                toast.success(result.message)
                 const updated = await getUserRoleAssignments(selectedUser.id)
                 setAssignments(updated)
             } else {
-                setStatusMessage({ type: "error", text: result.message })
+                toast.error(result.message)
             }
         })
     }
@@ -218,15 +212,6 @@ export function ManageRolesClient({
                             </p>
                         </div>
                     </div>
-
-                    {/* Status message */}
-                    {statusMessage && (
-                        <p
-                            className={`text-sm ${statusMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
-                        >
-                            {statusMessage.text}
-                        </p>
-                    )}
 
                     {/* Current roles */}
                     <div className="space-y-2">

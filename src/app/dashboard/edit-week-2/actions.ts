@@ -99,7 +99,7 @@ export async function getEditWeek2Data(): Promise<{
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
-                    preferredName: users.preffered_name,
+                    preferredName: users.preferred_name,
                     male: users.male,
                     datesMissing: signups.dates_missing,
                     pairPick: signups.pair_pick
@@ -377,7 +377,7 @@ export async function sendWeek2RosterNotifications(
             .select({
                 id: users.id,
                 firstName: users.first_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email
             })
             .from(users)
@@ -389,7 +389,7 @@ export async function sendWeek2RosterNotifications(
                       teamNumber: week2Rosters.team_number,
                       firstName: users.first_name,
                       lastName: users.last_name,
-                      preferredName: users.preffered_name
+                      preferredName: users.preferred_name
                   })
                   .from(week2Rosters)
                   .innerJoin(users, eq(week2Rosters.user, users.id))

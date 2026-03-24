@@ -13,6 +13,10 @@ export const authClient = createAuthClient({
                     type: "string",
                     required: true
                 },
+                preferred_name: {
+                    type: "string",
+                    required: false
+                },
                 onboarding_completed: {
                     type: "boolean",
                     required: false
