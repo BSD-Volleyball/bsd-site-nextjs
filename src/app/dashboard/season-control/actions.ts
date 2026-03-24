@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
@@ -58,6 +59,7 @@ export async function advanceSeasonPhase(
             summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
         })
 
+        revalidatePath("/dashboard/season-control")
         return {
             status: true,
             message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}"`
@@ -114,6 +116,7 @@ export async function revertSeasonPhase(
             summary: `Reverted season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
         })
 
+        revalidatePath("/dashboard/season-control")
         return {
             status: true,
             message: `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`

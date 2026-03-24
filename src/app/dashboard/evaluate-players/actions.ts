@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -303,6 +304,7 @@ export async function saveEvaluations(
             summary: `Saved ${data.length} player evaluations for current season`
         })
 
+        revalidatePath("/dashboard/evaluate-players")
         return {
             status: true,
             message: "Evaluations saved successfully."

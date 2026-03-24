@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
     seasons,
@@ -330,6 +331,7 @@ export async function saveCommissioners(data: {
             })
         }
 
+        revalidatePath("/dashboard/select-commissioners")
         return { status: true, message: "Commissioners updated successfully." }
     } catch (error) {
         console.error("Error saving commissioners:", error)

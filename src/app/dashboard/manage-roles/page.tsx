@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Manage Roles"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function ManageRolesPage() {
     const session = await auth.api.getSession({ headers: await headers() })

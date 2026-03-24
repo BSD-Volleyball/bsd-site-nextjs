@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -339,6 +340,7 @@ export async function saveDivisionSelections(
             })
         }
 
+        revalidatePath("/dashboard/create-divisions")
         return {
             status: true,
             message: `Division configuration saved — ${enabledSelections.length} division(s) configured.`

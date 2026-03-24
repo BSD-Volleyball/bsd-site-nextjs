@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -144,6 +145,7 @@ export async function createDiscount(data: {
             })
         }
 
+        revalidatePath("/dashboard/manage-discounts")
         return { status: true, message: "Discount created successfully." }
     } catch (error) {
         console.error("Error creating discount:", error)
@@ -196,6 +198,7 @@ export async function updateDiscount(data: {
             })
         }
 
+        revalidatePath("/dashboard/manage-discounts")
         return { status: true, message: "Discount updated successfully." }
     } catch (error) {
         console.error("Error updating discount:", error)
@@ -225,6 +228,7 @@ export async function deleteDiscount(
             })
         }
 
+        revalidatePath("/dashboard/manage-discounts")
         return { status: true, message: "Discount deleted successfully." }
     } catch (error) {
         console.error("Error deleting discount:", error)

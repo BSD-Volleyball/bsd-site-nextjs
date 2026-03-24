@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "Evaluate New Players"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 async function checkAdminAccess(userId: string): Promise<boolean> {
     const [user] = await db

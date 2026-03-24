@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -247,6 +248,7 @@ export async function finalizePlayerPictureUpload(
             })
         }
 
+        revalidatePath("/dashboard/edit-player")
         return {
             status: true,
             message: "Player picture uploaded.",
@@ -441,6 +443,7 @@ export async function updateUser(
             await invalidateAllSessionsForUser(effectiveId)
         }
 
+        revalidatePath("/dashboard/edit-player")
         return {
             status: true,
             message: roleWillChange
@@ -576,6 +579,7 @@ export async function updateSignup(
             })
         }
 
+        revalidatePath("/dashboard/edit-player")
         return { status: true, message: "Signup updated successfully." }
     } catch (error) {
         console.error("Error updating signup:", error)

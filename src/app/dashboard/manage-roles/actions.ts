@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
 import { desc, eq, asc } from "drizzle-orm"
@@ -183,6 +184,7 @@ export async function addUserRole(data: {
             summary: `Granted role "${data.role}" to user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
         })
 
+        revalidatePath("/dashboard/manage-roles")
         return { status: true, message: "Role granted successfully." }
     } catch (error) {
         console.error("Error granting role:", error)
@@ -218,6 +220,7 @@ export async function removeUserRole(data: {
             await invalidateAllSessionsForUser(data.userId)
         }
 
+        revalidatePath("/dashboard/manage-roles")
         return { status: true, message: "Role removed successfully." }
     } catch (error) {
         console.error("Error removing role:", error)

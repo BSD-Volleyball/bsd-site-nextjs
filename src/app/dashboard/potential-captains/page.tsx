@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Potential Captains"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function PotentialCaptainsPage() {
     const session = await auth.api.getSession({ headers: await headers() })

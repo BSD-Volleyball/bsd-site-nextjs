@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -233,6 +234,7 @@ export async function mergeUsers(
             summary: `Merged user ${oldUserId} into ${newUserId} (old user deleted)`
         })
 
+        revalidatePath("/dashboard/merge-users")
         return {
             status: true,
             message: "Users merged successfully."
