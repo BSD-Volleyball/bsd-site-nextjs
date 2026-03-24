@@ -52,7 +52,7 @@ export default async function DraftHomeworkPage() {
                     <li>
                         Use the <strong>Males</strong> and{" "}
                         <strong>Non-Males</strong> tabs to plan your picks for
-                        each round of th edraft.
+                        each round of the draft.
                     </li>
                     <li>
                         Each round has {result.data.numTeams} slots. Order
@@ -65,9 +65,6 @@ export default async function DraftHomeworkPage() {
                     <li>
                         Saving replaces all previous selections. You can update
                         any time before the draft.
-                    </li>
-                    <li>
-                        You have access to last season's draft for reference.
                     </li>
                 </ul>
             </div>
