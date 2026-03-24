@@ -78,11 +78,30 @@ export const FOUR_TEAM_WEEKS: [number, number][][] = [
 
 export const FOUR_TEAM_TIMES = ["8:10", "9:20"]
 
+// Courts that get the EARLY time slots in playoff week 2 (7:00 and 7:50).
+// Courts 1 (AA), 3 (ABA), 6 (BB) are early; courts 2 (A), 4 (ABB), 5 (BBB) are late.
+export const EARLY_PLAYOFF_COURTS = new Set([1, 3, 6])
+
+// Each court shares simultaneous playoff week-2 matches with its paired court.
+export const COURT_PAIR: Record<number, number> = {
+    1: 2,
+    2: 1,
+    3: 4,
+    4: 3,
+    5: 6,
+    6: 5
+}
+
+// Playoff week-2 time slots [slotIndex 0, slotIndex 1] for early and late divisions.
+export const PLAYOFF_WEEK2_EARLY_TIMES = ["7:00", "7:50"]
+export const PLAYOFF_WEEK2_LATE_TIMES = ["8:40", "9:30"]
+
 // 6-team playoff bracket: double-elimination, 10 scheduled matches + optional 11th
 export interface PlayoffMatchTemplate {
     matchNum: number
     week: number // 1-3
-    time: string
+    time: string // used for weeks 1 & 3; for week 2, week2SlotIndex overrides this
+    week2SlotIndex?: number // 0 or 1 — which of the two week-2 time slots this match uses
     homeSeed: string // e.g. "S4", "W1", "L2"
     awaySeed: string
     workTeam: string | null
@@ -90,6 +109,25 @@ export interface PlayoffMatchTemplate {
     nextMatchNum: number | null
     nextLoserMatchNum: number | null
     useSecondCourt: boolean
+}
+
+/** Returns the correct time for a playoff match given the division's court. */
+export function getPlayoffMatchTime(
+    pm: PlayoffMatchTemplate,
+    primaryCourt: number
+): string {
+    if (pm.week === 2 && pm.week2SlotIndex !== undefined) {
+        const times = EARLY_PLAYOFF_COURTS.has(primaryCourt)
+            ? PLAYOFF_WEEK2_EARLY_TIMES
+            : PLAYOFF_WEEK2_LATE_TIMES
+        return times[pm.week2SlotIndex]
+    }
+    return pm.time
+}
+
+/** Returns the paired second court for simultaneous playoff week-2 matches. */
+export function getPairedCourt(court: number): number {
+    return COURT_PAIR[court] ?? (court === 1 ? 2 : court - 1)
 }
 
 export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
@@ -142,11 +180,12 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
         nextLoserMatchNum: 6,
         useSecondCourt: false
     },
-    // Week 2
+    // Week 2 — times depend on division court (early courts: 7:00/7:50, late courts: 8:40/9:30)
     {
         matchNum: 5,
         week: 2,
-        time: "8:40",
+        time: "",
+        week2SlotIndex: 0,
         homeSeed: "L2",
         awaySeed: "L3",
         workTeam: "W2",
@@ -158,7 +197,8 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 6,
         week: 2,
-        time: "8:40",
+        time: "",
+        week2SlotIndex: 0,
         homeSeed: "L1",
         awaySeed: "L4",
         workTeam: "W4",
@@ -170,7 +210,8 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 7,
         week: 2,
-        time: "9:30",
+        time: "",
+        week2SlotIndex: 1,
         homeSeed: "W2",
         awaySeed: "W4",
         workTeam: "L5",
@@ -182,7 +223,8 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 8,
         week: 2,
-        time: "9:30",
+        time: "",
+        week2SlotIndex: 1,
         homeSeed: "W5",
         awaySeed: "W6",
         workTeam: "L6",
@@ -257,11 +299,12 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
         nextLoserMatchNum: 4,
         useSecondCourt: false
     },
-    // Week 2
+    // Week 2 — times depend on division court (early courts: 7:00/7:50, late courts: 8:40/9:30)
     {
         matchNum: 3,
         week: 2,
-        time: "7:00",
+        time: "",
+        week2SlotIndex: 0,
         homeSeed: "W1",
         awaySeed: "W2",
         workTeam: "L1",
@@ -273,7 +316,8 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 4,
         week: 2,
-        time: "7:50",
+        time: "",
+        week2SlotIndex: 1,
         homeSeed: "L1",
         awaySeed: "L2",
         workTeam: "L3",

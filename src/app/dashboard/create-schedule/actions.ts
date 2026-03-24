@@ -22,7 +22,9 @@ import {
     FOUR_TEAM_TIMES,
     SIX_TEAM_PLAYOFF,
     FOUR_TEAM_PLAYOFF,
-    REGULAR_SEASON_WEEKS
+    REGULAR_SEASON_WEEKS,
+    getPlayoffMatchTime,
+    getPairedCourt
 } from "./schedule-constants"
 import type { PlayoffMatchTemplate } from "./schedule-constants"
 
@@ -411,13 +413,6 @@ export async function writeRegularSeasonSchedule(
     }
 }
 
-function getSecondCourt(primaryCourt: number): number {
-    // In historical data, when simultaneous playoff matches happen,
-    // the second court is typically court 1 for most divisions.
-    // If the primary court IS court 1, use court 2 as fallback.
-    return primaryCourt === 1 ? 2 : 1
-}
-
 export async function writePlayoffSchedule(
     seasonId: number
 ): Promise<{ status: boolean; message: string }> {
@@ -473,8 +468,9 @@ export async function writePlayoffSchedule(
                         ? data.playoffDates[pm.week - 1]
                         : ""
                 const matchCourt = pm.useSecondCourt
-                    ? getSecondCourt(court)
+                    ? getPairedCourt(court)
                     : court
+                const matchTime = getPlayoffMatchTime(pm, court)
 
                 const [inserted] = await db
                     .insert(matchs)
@@ -483,7 +479,7 @@ export async function writePlayoffSchedule(
                         division: div.divisionId,
                         week: pm.week,
                         date,
-                        time: pm.time,
+                        time: matchTime,
                         court: matchCourt,
                         playoff: true
                     })
