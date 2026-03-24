@@ -55,7 +55,7 @@ export interface UserOption {
     old_id: number | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     male: boolean | null
     picture: string | null
 }
@@ -276,7 +276,7 @@ export async function getDraftDivisionData(
                           old_id: users.old_id,
                           first_name: users.first_name,
                           last_name: users.last_name,
-                          preffered_name: users.preffered_name,
+                          preferred_name: users.preferred_name,
                           male: users.male,
                           picture: users.picture
                       })
@@ -712,7 +712,7 @@ async function buildCaptainWatchlist(
             isMaleTab: draftHomework.is_male_tab,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             male: users.male
         })
         .from(draftHomework)
@@ -802,7 +802,7 @@ async function buildCommissionerWatchlist(
                 userId: users.id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 male: users.male
             })
             .from(signups)

@@ -110,7 +110,7 @@ export default async function PreseasonWeek2Page() {
             userId: week2Rosters.user,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             divisionId: week2Rosters.division,
             divisionName: divisions.name,
             divisionLevel: divisions.level,

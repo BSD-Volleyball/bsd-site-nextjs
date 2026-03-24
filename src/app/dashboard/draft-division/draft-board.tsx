@@ -112,7 +112,7 @@ function UserCombobox({
         const lowerSearch = search.toLowerCase()
         return filtered.filter((u) => {
             const fullName = `${u.first_name} ${u.last_name}`.toLowerCase()
-            const preferredName = u.preffered_name?.toLowerCase() || ""
+            const preferredName = u.preferred_name?.toLowerCase() || ""
             const oldIdStr = u.old_id?.toString() || ""
             return (
                 fullName.includes(lowerSearch) ||
@@ -124,8 +124,8 @@ function UserCombobox({
 
     const getDisplayName = (user: UserOption) => {
         const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        const preferredPart = user.preffered_name
-            ? ` (${user.preffered_name})`
+        const preferredPart = user.preferred_name
+            ? ` (${user.preferred_name})`
             : ""
         return `${oldIdPart}${user.first_name}${preferredPart} ${user.last_name}`
     }
@@ -602,8 +602,8 @@ export function DraftBoard({
                                                                       )
                                                                   if (!u)
                                                                       return userId
-                                                                  return u.preffered_name
-                                                                      ? `${u.first_name} (${u.preffered_name}) ${u.last_name}`
+                                                                  return u.preferred_name
+                                                                      ? `${u.first_name} (${u.preferred_name}) ${u.last_name}`
                                                                       : `${u.first_name} ${u.last_name}`
                                                               })()
                                                             : ""}
@@ -720,7 +720,7 @@ export function DraftBoard({
                                                     }
                                                     className="mt-1 max-w-14 truncate text-center text-xs hover:underline"
                                                 >
-                                                    {player.preffered_name ||
+                                                    {player.preferred_name ||
                                                         player.first_name}
                                                 </button>
                                             </div>
@@ -774,8 +774,8 @@ export function DraftBoard({
                             </div>
                         )}
                         <p className="mt-3 text-center font-medium">
-                            {enlargedPlayer.preffered_name
-                                ? `${enlargedPlayer.first_name} (${enlargedPlayer.preffered_name}) ${enlargedPlayer.last_name}`
+                            {enlargedPlayer.preferred_name
+                                ? `${enlargedPlayer.first_name} (${enlargedPlayer.preferred_name}) ${enlargedPlayer.last_name}`
                                 : `${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
                         </p>
                         {enlargedPlayer.old_id && (

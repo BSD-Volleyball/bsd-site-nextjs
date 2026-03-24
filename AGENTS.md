@@ -53,6 +53,9 @@ npx @better-auth/cli generate
 - After successful mutations, call `router.refresh()` in client components to resync server-rendered data.
 - Keep auth and RBAC checks explicit in actions/components.
 - Prefer centralized authorization helpers in `src/lib/rbac.ts` instead of duplicating role checks in each file.
+- **Server action helpers**: Use `requireSession()`, `requireAdmin()`, `requireSeasonConfig()`, and `withAction()` from `src/lib/action-helpers.ts` to reduce boilerplate. Return `ok(data)` / `fail(message)` for consistent `ActionResult<T>` response shapes.
+- **Shared utilities**: Use `formatPlayerName()`, `buildPlayerPictureUrl()`, `serializeCsvField()`, `splitByGender()` from `src/lib/utils.ts` instead of defining local copies.
+- **Shared components**: Use `UserCombobox` from `src/components/user-combobox.tsx` instead of local copies.
 - Use `auth.api.getSession({ headers: await headers() })` directly only when session data is needed for action payloads/logging.
 - Authorization uses a permission-based system: roles are stored in the `user_roles` table and permissions are defined in `src/lib/permissions.ts`. Use `hasPermissionBySession(permission)` or `hasPermission(userId, permission, context?)` for new checks.
 - Backward-compatible helpers (`isAdminOrDirectorBySession`, `isCommissionerBySession`, `hasCaptainPagesAccessBySession`, `hasViewSignupsAccessBySession`) remain available and route through the new system.
@@ -73,9 +76,9 @@ npx @better-auth/cli generate
 
 - Use Drizzle query builders (`eq`, `and`, `inArray`, `desc`, etc.) and typed selects.
 - Keep DB column naming conventions intact (snake_case in schema mappings).
-- Preserve existing legacy spellings/table names unless explicitly migrating them:
-  - `users.preffered_name`
-  - `matchs` table
+- Preserve existing legacy spellings/table names unless explicitly migrating them.
+  - ~~`users.preffered_name`~~ → migrated to `users.preferred_name`
+  - ~~`matchs` table~~ → migrated to `matches` table
 - The `user_roles` table is the authoritative source for role assignments. Schema: `(id, user_id, role, season_id, division_id, granted_by, granted_at)`. `season_id = NULL` means a global/permanent role; `division_id = NULL` means league-wide for that season.
 - For schema changes:
   1. Update `src/database/schema.ts`.

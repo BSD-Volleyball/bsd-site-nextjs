@@ -11,7 +11,12 @@ import {
     users
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
-import { type Permission, type Role, ROLE_PERMISSIONS } from "@/lib/permissions"
+import {
+    type Permission,
+    type Role,
+    ROLE_PERMISSIONS,
+    isValidRole
+} from "@/lib/permissions"
 
 export async function getSessionUserId(): Promise<string | null> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -74,7 +79,8 @@ export async function hasPermission(
             if (row.division_id !== context.divisionId) continue
         }
 
-        const role = row.role as Role
+        const role = row.role
+        if (!isValidRole(role)) continue
         const perms = ROLE_PERMISSIONS[role]
         if (perms?.includes(permission)) return true
     }

@@ -460,7 +460,7 @@ export async function GET() {
                 oldId: users.old_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 picture: users.picture
             })
             .from(week3Rosters)

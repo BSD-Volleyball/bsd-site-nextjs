@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
-import { divisions, matchs, seasons, teams } from "@/database/schema"
+import { divisions, matches, seasons, teams } from "@/database/schema"
 import { and, eq, inArray } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -227,31 +227,31 @@ export async function getSeasonScheduleData(
                 .orderBy(divisions.level),
             db
                 .select({
-                    id: matchs.id,
-                    divisionId: matchs.division,
-                    week: matchs.week,
-                    date: matchs.date,
-                    time: matchs.time,
-                    court: matchs.court,
-                    homeTeamId: matchs.home_team,
-                    awayTeamId: matchs.away_team,
-                    homeScore: matchs.home_score,
-                    awayScore: matchs.away_score,
-                    home_set1_score: matchs.home_set1_score,
-                    away_set1_score: matchs.away_set1_score,
-                    home_set2_score: matchs.home_set2_score,
-                    away_set2_score: matchs.away_set2_score,
-                    home_set3_score: matchs.home_set3_score,
-                    away_set3_score: matchs.away_set3_score
+                    id: matches.id,
+                    divisionId: matches.division,
+                    week: matches.week,
+                    date: matches.date,
+                    time: matches.time,
+                    court: matches.court,
+                    homeTeamId: matches.home_team,
+                    awayTeamId: matches.away_team,
+                    homeScore: matches.home_score,
+                    awayScore: matches.away_score,
+                    home_set1_score: matches.home_set1_score,
+                    away_set1_score: matches.away_set1_score,
+                    home_set2_score: matches.home_set2_score,
+                    away_set2_score: matches.away_set2_score,
+                    home_set3_score: matches.home_set3_score,
+                    away_set3_score: matches.away_set3_score
                 })
-                .from(matchs)
+                .from(matches)
                 .where(
                     and(
-                        eq(matchs.season, seasonId),
-                        inArray(matchs.division, divisionIds),
-                        eq(matchs.playoff, false),
-                        inArray(matchs.home_team, teamIds),
-                        inArray(matchs.away_team, teamIds)
+                        eq(matches.season, seasonId),
+                        inArray(matches.division, divisionIds),
+                        eq(matches.playoff, false),
+                        inArray(matches.home_team, teamIds),
+                        inArray(matches.away_team, teamIds)
                     )
                 )
         ])

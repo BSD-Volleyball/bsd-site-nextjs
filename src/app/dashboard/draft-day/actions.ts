@@ -125,7 +125,7 @@ export async function getDraftDayData(
                 divisionLevel: divisions.level,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(teams)
             .innerJoin(divisions, eq(teams.division, divisions.id))
@@ -404,7 +404,7 @@ export async function getDraftSheetData(
                 divisionLevel: divisions.level,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 captainOldId: users.old_id,
                 captainIsMale: users.male
             })
@@ -535,7 +535,7 @@ export async function getDraftSheetData(
                           id: users.id,
                           firstName: users.first_name,
                           lastName: users.last_name,
-                          preferredName: users.preffered_name,
+                          preferredName: users.preferred_name,
                           oldId: users.old_id,
                           isMale: users.male
                       })

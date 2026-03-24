@@ -57,7 +57,7 @@ export function OnboardingAccountForm({
     const [customPronouns, setCustomPronouns] = useState(initialCustomPronouns)
 
     const [formData, setFormData] = useState({
-        preffered_name: initialData?.preffered_name ?? "",
+        preferred_name: initialData?.preferred_name ?? "",
         phone: initialData?.phone ?? "",
         pronouns: initialData?.pronouns ?? "",
         emergency_contact: initialData?.emergency_contact ?? "",
@@ -86,7 +86,7 @@ export function OnboardingAccountForm({
         setIsLoading(true)
 
         const result = await updateOnboardingAccount({
-            preffered_name: formData.preffered_name || null,
+            preferred_name: formData.preferred_name || null,
             phone: formData.phone || null,
             pronouns: formData.pronouns || null,
             emergency_contact: formData.emergency_contact || null,
@@ -115,19 +115,19 @@ export function OnboardingAccountForm({
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="preffered_name">
+                        <Label htmlFor="preferred_name">
                             Preferred First Name (if different){" "}
                             <span className="text-muted-foreground">
                                 (optional)
                             </span>
                         </Label>
                         <Input
-                            id="preffered_name"
-                            value={formData.preffered_name}
+                            id="preferred_name"
+                            value={formData.preferred_name}
                             onChange={(e) =>
                                 setFormData({
                                     ...formData,
-                                    preffered_name: e.target.value
+                                    preferred_name: e.target.value
                                 })
                             }
                             placeholder="The name you'd like to be called"

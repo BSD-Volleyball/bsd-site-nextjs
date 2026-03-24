@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { submitConcern } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,11 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 export function ReportConcernForm() {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
-    const [statusMessage, setStatusMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
     const [submitted, setSubmitted] = useState(false)
+    const [submittedText, setSubmittedText] = useState("")
 
     // Form state
     const [anonymous, setAnonymous] = useState(false)
@@ -33,7 +31,6 @@ export function ReportConcernForm() {
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setStatusMessage(null)
 
         startTransition(async () => {
             const result = await submitConcern({
@@ -52,9 +49,10 @@ export function ReportConcernForm() {
 
             if (result.status) {
                 setSubmitted(true)
-                setStatusMessage({ type: "success", text: result.message })
+                setSubmittedText(result.message)
+                toast.success(result.message)
             } else {
-                setStatusMessage({ type: "error", text: result.message })
+                toast.error(result.message)
             }
         })
     }
@@ -66,7 +64,7 @@ export function ReportConcernForm() {
                     Concern Submitted
                 </h2>
                 <p className="text-green-700 dark:text-green-300">
-                    {statusMessage?.text}
+                    {submittedText}
                 </p>
                 <Button
                     className="mt-4"
@@ -256,12 +254,6 @@ export function ReportConcernForm() {
                     />
                 </div>
             </div>
-
-            {statusMessage?.type === "error" && (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
-                    {statusMessage.text}
-                </div>
-            )}
 
             <div className="flex items-center gap-4">
                 <Button type="submit" disabled={isPending}>

@@ -95,7 +95,7 @@ export async function getCreateWeek2Data(): Promise<{
                         oldId: users.old_id,
                         firstName: users.first_name,
                         lastName: users.last_name,
-                        preferredName: users.preffered_name,
+                        preferredName: users.preferred_name,
                         male: users.male,
                         datesMissing: signups.dates_missing,
                         pairPickId: signups.pair_pick
@@ -267,7 +267,7 @@ export async function getCreateWeek2Data(): Promise<{
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
-                    preferredName: users.preffered_name
+                    preferredName: users.preferred_name
                 })
                 .from(users)
                 .where(inArray(users.id, pairIds))

@@ -320,7 +320,7 @@ export async function getPrepareForDraftData(
             userId: users.id,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             male: users.male,
             pairPick: signups.pair_pick
         })
@@ -345,7 +345,7 @@ export async function getPrepareForDraftData(
             captain2Id: teams.captain2,
             c1FirstName: users.first_name,
             c1LastName: users.last_name,
-            c1PreferredName: users.preffered_name,
+            c1PreferredName: users.preferred_name,
             c1Email: users.email
         })
         .from(teams)
@@ -371,7 +371,7 @@ export async function getPrepareForDraftData(
                 id: users.id,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 email: users.email
             })
             .from(users)
@@ -808,7 +808,7 @@ export async function getPrepareForDraftData(
                                   userId: users.id,
                                   firstName: users.first_name,
                                   lastName: users.last_name,
-                                  preferredName: users.preffered_name,
+                                  preferredName: users.preferred_name,
                                   divisionId: draftHomework.division
                               })
                               .from(draftHomework)

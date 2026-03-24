@@ -120,7 +120,7 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
                 divisionId: commissioners.division,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(commissioners)
             .innerJoin(users, eq(commissioners.commissioner, users.id))
@@ -147,7 +147,7 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
                 userId: drafts.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name
+                preferredName: users.preferred_name
             })
             .from(drafts)
             .innerJoin(users, eq(drafts.user, users.id))

@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 
 export interface OnboardingAccountData {
-    preffered_name: string | null
+    preferred_name: string | null
     phone: string | null
     pronouns: string | null
     emergency_contact: string | null
@@ -24,7 +24,7 @@ export async function getOnboardingAccountData(): Promise<OnboardingAccountData 
 
     const [profile] = await db
         .select({
-            preffered_name: users.preffered_name,
+            preferred_name: users.preferred_name,
             phone: users.phone,
             pronouns: users.pronouns,
             emergency_contact: users.emergency_contact,
@@ -54,17 +54,17 @@ export async function updateOnboardingAccount(
             .where(eq(users.id, session.user.id))
             .limit(1)
 
-        const prefferedName =
-            data.preffered_name &&
-            data.preffered_name.trim().toLowerCase() ===
+        const preferredName =
+            data.preferred_name &&
+            data.preferred_name.trim().toLowerCase() ===
                 currentUser?.first_name?.toLowerCase()
                 ? null
-                : data.preffered_name || null
+                : data.preferred_name || null
 
         await db
             .update(users)
             .set({
-                preffered_name: prefferedName,
+                preferred_name: preferredName,
                 phone: data.phone || null,
                 pronouns: data.pronouns || null,
                 emergency_contact: data.emergency_contact || null,

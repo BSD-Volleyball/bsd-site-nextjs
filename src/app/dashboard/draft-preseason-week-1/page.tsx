@@ -63,7 +63,7 @@ export default async function DraftPreseasonWeek1Page() {
             userId: week1Rosters.user,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             sessionNumber: week1Rosters.session_number,
             courtNumber: week1Rosters.court_number
         })
@@ -81,7 +81,7 @@ export default async function DraftPreseasonWeek1Page() {
             userId: week1Rosters.user,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             sessionNumber: week1Rosters.session_number,
             courtNumber: week1Rosters.court_number
         })
@@ -99,7 +99,7 @@ export default async function DraftPreseasonWeek1Page() {
             userId: week1Rosters.user,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             sessionNumber: week1Rosters.session_number,
             courtNumber: week1Rosters.court_number
         })

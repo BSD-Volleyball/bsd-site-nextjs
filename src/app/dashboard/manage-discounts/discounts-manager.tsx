@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -12,7 +13,7 @@ import {
     RiCheckLine,
     RiCloseLine
 } from "@remixicon/react"
-import { UserCombobox } from "./user-combobox"
+import { UserCombobox } from "@/components/user-combobox"
 import {
     createDiscount,
     updateDiscount,
@@ -31,10 +32,6 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
     const [showAddForm, setShowAddForm] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     // Add form state
     const [newUserId, setNewUserId] = useState<string | null>(null)
@@ -55,15 +52,11 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
 
     const handleAddDiscount = async () => {
         if (!newUserId || !newPercentage) {
-            setMessage({
-                type: "error",
-                text: "Please select a user and enter a percentage."
-            })
+            toast.error("Please select a user and enter a percentage.")
             return
         }
 
         setIsLoading(true)
-        setMessage(null)
 
         const result = await createDiscount({
             userId: newUserId,
@@ -75,7 +68,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         setIsLoading(false)
 
         if (result.status) {
-            setMessage({ type: "success", text: result.message })
+            toast.success(result.message)
             setShowAddForm(false)
             setNewUserId(null)
             setNewPercentage("")
@@ -83,7 +76,7 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
             setNewReason("")
             router.refresh()
         } else {
-            setMessage({ type: "error", text: result.message })
+            toast.error(result.message)
         }
     }
 
@@ -96,7 +89,6 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                 : ""
         )
         setEditReason(discount.reason || "")
-        setMessage(null)
     }
 
     const handleCancelEdit = () => {
@@ -108,12 +100,11 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
 
     const handleSaveEdit = async (id: number) => {
         if (!editPercentage) {
-            setMessage({ type: "error", text: "Please enter a percentage." })
+            toast.error("Please enter a percentage.")
             return
         }
 
         setIsLoading(true)
-        setMessage(null)
 
         const result = await updateDiscount({
             id,
@@ -125,11 +116,11 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         setIsLoading(false)
 
         if (result.status) {
-            setMessage({ type: "success", text: result.message })
+            toast.success(result.message)
             setEditingId(null)
             router.refresh()
         } else {
-            setMessage({ type: "error", text: result.message })
+            toast.error(result.message)
         }
     }
 
@@ -139,17 +130,16 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
         }
 
         setIsLoading(true)
-        setMessage(null)
 
         const result = await deleteDiscount(id)
 
         setIsLoading(false)
 
         if (result.status) {
-            setMessage({ type: "success", text: result.message })
+            toast.success(result.message)
             router.refresh()
         } else {
-            setMessage({ type: "error", text: result.message })
+            toast.error(result.message)
         }
     }
 
@@ -165,18 +155,6 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
 
     return (
         <div className="space-y-4">
-            {message && (
-                <div
-                    className={`rounded-md p-3 text-sm ${
-                        message.type === "success"
-                            ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                    }`}
-                >
-                    {message.text}
-                </div>
-            )}
-
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
@@ -200,7 +178,6 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
                     <Button
                         onClick={() => {
                             setShowAddForm(!showAddForm)
-                            setMessage(null)
                         }}
                         size="sm"
                         className="gap-1"

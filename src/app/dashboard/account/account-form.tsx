@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -26,17 +27,13 @@ export function AccountForm({ profile, email }: AccountFormProps) {
     const [formData, setFormData] = useState<AccountProfileData>({
         first_name: profile?.first_name ?? null,
         last_name: profile?.last_name ?? null,
-        preffered_name: profile?.preffered_name ?? null,
+        preferred_name: profile?.preferred_name ?? null,
         email: email ?? null,
         phone: profile?.phone ?? null,
         pronouns: profile?.pronouns ?? null,
         emergency_contact: profile?.emergency_contact ?? null
     })
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     const handleChange = (field: keyof AccountProfileData, value: string) => {
         setFormData((prev) => ({
@@ -48,19 +45,15 @@ export function AccountForm({ profile, email }: AccountFormProps) {
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         setIsLoading(true)
-        setMessage(null)
 
         const result = await updateAccountProfile(formData)
 
-        setMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
-        setIsLoading(false)
-
         if (result.status) {
-            setTimeout(() => setMessage(null), 3000)
+            toast.success(result.message)
+        } else {
+            toast.error(result.message)
         }
+        setIsLoading(false)
     }
 
     return (
@@ -100,14 +93,14 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="preffered_name">
+                        <Label htmlFor="preferred_name">
                             Preferred First Name (if different than above)
                         </Label>
                         <Input
-                            id="preffered_name"
-                            value={formData.preffered_name ?? ""}
+                            id="preferred_name"
+                            value={formData.preferred_name ?? ""}
                             onChange={(e) =>
-                                handleChange("preffered_name", e.target.value)
+                                handleChange("preferred_name", e.target.value)
                             }
                             placeholder="The name you'd like to be called"
                         />
@@ -189,18 +182,6 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             </div>
                         </div>
                     </div>
-
-                    {message && (
-                        <div
-                            className={`rounded-md p-3 text-sm ${
-                                message.type === "success"
-                                    ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                    : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                            }`}
-                        >
-                            {message.text}
-                        </div>
-                    )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
                     <Button type="submit" disabled={isLoading}>

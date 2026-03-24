@@ -88,7 +88,7 @@ interface User {
     id: string
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
 }
 
 interface ParsedName {
@@ -346,7 +346,7 @@ function findUserByName(
     return allUsers.filter((u) => {
         const uFirst = u.first_name.toLowerCase()
         const uLast = u.last_name.toLowerCase()
-        const uPref = (u.preffered_name || "").toLowerCase()
+        const uPref = (u.preferred_name || "").toLowerCase()
 
         if (uLast !== normLast) return false
 
@@ -418,7 +418,7 @@ async function promptForUserId(
     if (candidates.length > 0) {
         console.log("Possible matches:")
         candidates.forEach((u, i) => {
-            const pref = u.preffered_name ? ` (${u.preffered_name})` : ""
+            const pref = u.preferred_name ? ` (${u.preferred_name})` : ""
             console.log(
                 `  ${i + 1}. ${u.first_name}${pref} ${u.last_name} [${u.id}]`
             )
@@ -820,7 +820,7 @@ async function main() {
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(users)
         console.log(`Loaded ${allUsers.length} users`)

@@ -31,7 +31,7 @@ export interface PlayerListItem {
     old_id: number | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
 }
 
 export interface PlayerDetails {
@@ -40,7 +40,7 @@ export interface PlayerDetails {
     name: string | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     email: string
     emailVerified: boolean
     phone: string | null
@@ -118,7 +118,7 @@ export async function getPlayersForLookup(): Promise<{
                 old_id: users.old_id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(users)
             .where(ne(users.id, GHOST_CAPTAIN_ID))
@@ -174,7 +174,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 name: users.name,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 email: users.email,
                 emailVerified: users.emailVerified,
                 phone: users.phone,

@@ -40,7 +40,7 @@ export async function getDiscounts(): Promise<{
                 userId: discounts.user,
                 firstName: users.first_name,
                 lastName: users.last_name,
-                preferredName: users.preffered_name,
+                preferredName: users.preferred_name,
                 percentage: discounts.percentage,
                 expiration: discounts.expiration,
                 reason: discounts.reason,
@@ -87,13 +87,13 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
             id: users.id,
             first_name: users.first_name,
             last_name: users.last_name,
-            preffered_name: users.preffered_name
+            preferred_name: users.preferred_name
         })
         .from(users)
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preffered_name ? ` (${u.preffered_name})` : ""
+        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
             name: `${u.first_name}${preferredPart} ${u.last_name}`

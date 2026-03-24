@@ -153,7 +153,7 @@ export async function getDraftHomeworkData(): Promise<{
             userId: users.id,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preffered_name,
+            preferredName: users.preferred_name,
             oldId: users.old_id,
             male: users.male,
             picture: users.picture
@@ -464,7 +464,7 @@ export async function getLastSeasonDraft(): Promise<{
             teamNumber: teams.number,
             captainFirstName: users.first_name,
             captainLastName: users.last_name,
-            captainPreferredName: users.preffered_name
+            captainPreferredName: users.preferred_name
         })
         .from(teams)
         .innerJoin(users, eq(teams.captain, users.id))
@@ -493,7 +493,7 @@ export async function getLastSeasonDraft(): Promise<{
             overall: drafts.overall,
             playerFirstName: users.first_name,
             playerLastName: users.last_name,
-            playerPreferredName: users.preffered_name,
+            playerPreferredName: users.preferred_name,
             playerMale: users.male
         })
         .from(drafts)

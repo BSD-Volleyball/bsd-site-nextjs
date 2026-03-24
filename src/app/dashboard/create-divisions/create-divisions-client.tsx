@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { saveDivisionSelections } from "./actions"
 import type {
     ActiveDivision,
@@ -213,10 +214,6 @@ export function CreateDivisionsClient({
     const [divStates, setDivStates] =
         useState<DivisionState[]>(buildInitialState)
     const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{
-        text: string
-        ok: boolean
-    } | null>(null)
 
     const updateDiv = (divisionId: number, patch: Partial<DivisionState>) => {
         setDivStates((prev) =>
@@ -227,7 +224,6 @@ export function CreateDivisionsClient({
     }
 
     const handleResetToDefaults = () => {
-        setMessage(null)
         setDivStates(
             computeDefaults(
                 activeDivisions,
@@ -255,21 +251,19 @@ export function CreateDivisionsClient({
 
     const handleSave = async () => {
         setSaving(true)
-        setMessage(null)
         try {
             const result = await saveDivisionSelections({
                 seasonId,
                 selections: divStates
             })
-            setMessage({ text: result.message, ok: result.status })
             if (result.status) {
+                toast.success(result.message)
                 router.refresh()
+            } else {
+                toast.error(result.message)
             }
         } catch {
-            setMessage({
-                text: "Unexpected error. Please try again.",
-                ok: false
-            })
+            toast.error("Unexpected error. Please try again.")
         } finally {
             setSaving(false)
         }
@@ -601,13 +595,6 @@ export function CreateDivisionsClient({
                 >
                     Reset to Defaults
                 </button>
-                {message && (
-                    <p
-                        className={`text-sm ${message.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}
-                    >
-                        {message.text}
-                    </p>
-                )}
             </div>
         </div>
     )

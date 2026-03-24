@@ -1,7 +1,7 @@
 import { db } from "@/database/db"
 import { seasons, signups, waitlist } from "@/database/schema"
 import { eq, desc, count, and } from "drizzle-orm"
-import type { SeasonPhase } from "@/lib/season-phases"
+import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
 
 export interface SeasonConfig {
     seasonId: number
@@ -102,7 +102,9 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         maxPlayers: season.max_players || "",
         seasonYear: season.year,
         seasonName: season.season,
-        phase: season.phase as SeasonPhase,
+        phase: SEASON_PHASES.includes(season.phase as SeasonPhase)
+            ? (season.phase as SeasonPhase)
+            : "off_season",
         tryout1Date: season.tryout_1_date || "",
         tryout1Session1Time: season.tryout_1_s1_time || "",
         tryout1Session2Time: season.tryout_1_s2_time || "",

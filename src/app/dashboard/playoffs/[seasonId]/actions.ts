@@ -5,7 +5,7 @@ import { db } from "@/database/db"
 import { auth } from "@/lib/auth"
 import {
     divisions,
-    matchs,
+    matches,
     playoffMatchesMeta,
     seasons,
     teams
@@ -917,27 +917,27 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
         const [playoffMatchRows, metaRows] = await Promise.all([
             db
                 .select({
-                    id: matchs.id,
-                    divisionId: matchs.division,
-                    week: matchs.week,
-                    date: matchs.date,
-                    time: matchs.time,
-                    court: matchs.court,
-                    homeTeamId: matchs.home_team,
-                    awayTeamId: matchs.away_team,
-                    homeScore: matchs.home_score,
-                    awayScore: matchs.away_score,
-                    homeSet1Score: matchs.home_set1_score,
-                    awaySet1Score: matchs.away_set1_score,
-                    homeSet2Score: matchs.home_set2_score,
-                    awaySet2Score: matchs.away_set2_score,
-                    homeSet3Score: matchs.home_set3_score,
-                    awaySet3Score: matchs.away_set3_score,
-                    winnerTeamId: matchs.winner
+                    id: matches.id,
+                    divisionId: matches.division,
+                    week: matches.week,
+                    date: matches.date,
+                    time: matches.time,
+                    court: matches.court,
+                    homeTeamId: matches.home_team,
+                    awayTeamId: matches.away_team,
+                    homeScore: matches.home_score,
+                    awayScore: matches.away_score,
+                    homeSet1Score: matches.home_set1_score,
+                    awaySet1Score: matches.away_set1_score,
+                    homeSet2Score: matches.home_set2_score,
+                    awaySet2Score: matches.away_set2_score,
+                    homeSet3Score: matches.home_set3_score,
+                    awaySet3Score: matches.away_set3_score,
+                    winnerTeamId: matches.winner
                 })
-                .from(matchs)
+                .from(matches)
                 .where(
-                    and(eq(matchs.season, seasonId), eq(matchs.playoff, true))
+                    and(eq(matches.season, seasonId), eq(matches.playoff, true))
                 ),
             db
                 .select({

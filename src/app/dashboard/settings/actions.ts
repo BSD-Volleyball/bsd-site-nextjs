@@ -10,7 +10,7 @@ import { logAuditEntry } from "@/lib/audit-log"
 export interface AccountProfileData {
     first_name: string | null
     last_name: string | null
-    preffered_name: string | null
+    preferred_name: string | null
     email: string | null
     phone: string | null
     emergency_contact: string | null
@@ -36,7 +36,7 @@ export async function getAccountProfile(): Promise<{
             .select({
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 email: users.email,
                 phone: users.phone,
                 emergency_contact: users.emergency_contact,
@@ -72,7 +72,7 @@ export async function updateAccountField(
     const allowedFields: (keyof AccountProfileData)[] = [
         "first_name",
         "last_name",
-        "preffered_name",
+        "preferred_name",
         "phone",
         "emergency_contact",
         "pronouns"
@@ -166,7 +166,7 @@ export async function updateAccountProfile(
             .set({
                 first_name: data.first_name || "",
                 last_name: data.last_name || "",
-                preffered_name: data.preffered_name,
+                preferred_name: data.preferred_name,
                 email: data.email || "",
                 phone: data.phone,
                 emergency_contact: data.emergency_contact,

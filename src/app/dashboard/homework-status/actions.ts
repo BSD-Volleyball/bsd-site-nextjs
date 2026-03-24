@@ -294,7 +294,7 @@ export async function getHomeworkStatusData(
                     id: users.id,
                     first_name: users.first_name,
                     last_name: users.last_name,
-                    preffered_name: users.preffered_name
+                    preferred_name: users.preferred_name
                 })
                 .from(users)
                 .where(inArray(users.id, captainIds))
@@ -303,7 +303,7 @@ export async function getHomeworkStatusData(
                 captainUserMap.set(row.id, {
                     firstName: row.first_name,
                     lastName: row.last_name,
-                    preferredName: row.preffered_name
+                    preferredName: row.preferred_name
                 })
             }
         }
@@ -497,7 +497,7 @@ export async function getRatePlayersDetail(
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(users)
             .where(inArray(users.id, playerIds))
@@ -507,7 +507,7 @@ export async function getRatePlayersDetail(
         const players = playerIds
             .map((id) => {
                 const u = userMap.get(id)
-                const displayFirst = u?.preffered_name || u?.first_name || ""
+                const displayFirst = u?.preferred_name || u?.first_name || ""
                 return {
                     playerId: id,
                     playerName: u ? `${displayFirst} ${u.last_name}`.trim() : id
@@ -573,7 +573,7 @@ export async function getMovingDayDetail(
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(users)
             .where(inArray(users.id, playerIds))
@@ -582,7 +582,7 @@ export async function getMovingDayDetail(
 
         const getPlayerName = (id: string) => {
             const u = userMap.get(id)
-            const displayFirst = u?.preffered_name || u?.first_name || ""
+            const displayFirst = u?.preferred_name || u?.first_name || ""
             return u ? `${displayFirst} ${u.last_name}`.trim() : id
         }
 

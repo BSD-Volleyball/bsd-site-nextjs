@@ -245,8 +245,8 @@ export function DraftWatchlist({
                             </div>
                         )}
                         <p className="mt-3 text-center font-medium">
-                            {enlargedUser.preffered_name
-                                ? `${enlargedUser.first_name} (${enlargedUser.preffered_name}) ${enlargedUser.last_name}`
+                            {enlargedUser.preferred_name
+                                ? `${enlargedUser.first_name} (${enlargedUser.preferred_name}) ${enlargedUser.last_name}`
                                 : `${enlargedUser.first_name} ${enlargedUser.last_name}`}
                         </p>
                         {enlargedUser.old_id && (

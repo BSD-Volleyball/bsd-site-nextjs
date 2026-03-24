@@ -8,6 +8,7 @@ import {
     RiCloseLine,
     RiDeleteBinLine
 } from "@remixicon/react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -335,10 +336,6 @@ export function Week2HomeworkForm({
         initial.recommendedMoveDown
     )
     const [submitting, setSubmitting] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
@@ -406,7 +403,6 @@ export function Week2HomeworkForm({
 
     const handleSubmit = async () => {
         setSubmitting(true)
-        setMessage(null)
 
         const result = await submitWeek2Homework({
             forcedMoveUpMale,
@@ -417,15 +413,13 @@ export function Week2HomeworkForm({
             recommendedMoveDown: recommendedMoveDown.filter(Boolean)
         })
 
-        setMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
-        setSubmitting(false)
-
         if (result.status) {
+            toast.success(result.message)
             router.refresh()
+        } else {
+            toast.error(result.message)
         }
+        setSubmitting(false)
     }
 
     const hasExisting = existingSubmissions.length > 0
@@ -768,17 +762,6 @@ export function Week2HomeworkForm({
 
             {/* Submit */}
             <div className="space-y-3">
-                {message && (
-                    <div
-                        className={`rounded-md p-3 text-sm ${
-                            message.type === "success"
-                                ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                        }`}
-                    >
-                        {message.text}
-                    </div>
-                )}
                 <Button
                     type="button"
                     onClick={handleSubmit}

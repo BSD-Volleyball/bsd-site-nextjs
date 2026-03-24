@@ -40,7 +40,7 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
             season_year: data.seasonConfig
                 ? String(data.seasonConfig.seasonYear)
                 : "",
-            user_preffered_name: data.currentUserPreferredName,
+            user_preferred_name: data.currentUserPreferredName,
             user_last_name: data.currentUserLastName,
             team_members: data.members
                 .map((m) => `\u2022 ${m.displayName} ${m.lastName}`)

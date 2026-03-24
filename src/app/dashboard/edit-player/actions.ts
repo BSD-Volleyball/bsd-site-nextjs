@@ -47,13 +47,13 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
             id: users.id,
             first_name: users.first_name,
             last_name: users.last_name,
-            preffered_name: users.preffered_name
+            preferred_name: users.preferred_name
         })
         .from(users)
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preffered_name ? ` (${u.preffered_name})` : ""
+        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
             name: `${u.first_name}${preferredPart} ${u.last_name}`
@@ -66,7 +66,7 @@ export interface UserDetails {
     name: string | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     email: string
     emailVerified: boolean
     image: string | null
@@ -265,7 +265,7 @@ export async function updateUser(
         name?: string | null
         first_name?: string
         last_name?: string
-        preffered_name?: string | null
+        preferred_name?: string | null
         email?: string
         emailVerified?: boolean
         image?: string | null

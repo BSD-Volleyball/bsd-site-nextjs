@@ -66,10 +66,10 @@ export const auth = betterAuth({
                 required: true,
                 fieldName: "last_name"
             },
-            preffered_name: {
+            preferred_name: {
                 type: "string",
                 required: false,
-                fieldName: "preffered_name"
+                fieldName: "preferred_name"
             },
             onboarding_completed: {
                 type: "boolean",
@@ -131,8 +131,8 @@ export const auth = betterAuth({
     },
     socialProviders: {
         google: {
-            clientId: process.env.GOOGLE_CLIENT_ID as string,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
             mapProfileToUser: (profile) => ({
                 email: profile.email.toLowerCase(),
                 first_name: profile.given_name || "",

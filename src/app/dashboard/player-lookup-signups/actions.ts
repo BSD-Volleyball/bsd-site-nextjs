@@ -27,7 +27,7 @@ export interface PlayerListItem {
     old_id: number | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
 }
 
 export interface SeasonInfo {
@@ -69,7 +69,7 @@ export async function getSignedUpPlayers(): Promise<{
                 old_id: users.old_id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name
+                preferred_name: users.preferred_name
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -110,7 +110,7 @@ export interface PlayerDetails {
     id: string
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     pronouns: string | null
     experience: string | null
     assessment: string | null
@@ -171,7 +171,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
                 id: users.id,
                 first_name: users.first_name,
                 last_name: users.last_name,
-                preffered_name: users.preffered_name,
+                preferred_name: users.preferred_name,
                 pronouns: users.pronouns,
                 experience: users.experience,
                 assessment: users.assessment,

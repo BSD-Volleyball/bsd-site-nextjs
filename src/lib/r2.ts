@@ -1,17 +1,10 @@
 import "server-only"
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { requireEnv } from "@/lib/utils"
 
 const R2_REGION = "auto"
 const UPLOAD_TTL_SECONDS = 60
-
-function requireEnv(name: string): string {
-    const value = process.env[name]
-    if (!value) {
-        throw new Error(`Missing required environment variable: ${name}`)
-    }
-    return value
-}
 
 function getR2AccountId(): string {
     return requireEnv("R2_ACCOUNT_ID")

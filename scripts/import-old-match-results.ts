@@ -7,7 +7,7 @@ import * as readline from "node:readline"
 import { db } from "../src/database/db"
 import {
     divisions,
-    matchs,
+    matches,
     seasons,
     teams,
     users
@@ -641,13 +641,13 @@ async function maybeReplaceExistingMatches(
     const uniqueWeeks = [...new Set(weeks)].sort((a, b) => a - b)
 
     const existing = await db
-        .select({ id: matchs.id, week: matchs.week })
-        .from(matchs)
+        .select({ id: matches.id, week: matches.week })
+        .from(matches)
         .where(
             and(
-                eq(matchs.season, seasonId),
-                eq(matchs.division, divisionId),
-                inArray(matchs.week, uniqueWeeks)
+                eq(matches.season, seasonId),
+                eq(matches.division, divisionId),
+                inArray(matches.week, uniqueWeeks)
             )
         )
 
@@ -679,12 +679,12 @@ async function maybeReplaceExistingMatches(
             )
         } else {
             await db
-                .delete(matchs)
+                .delete(matches)
                 .where(
                     and(
-                        eq(matchs.season, seasonId),
-                        eq(matchs.division, divisionId),
-                        inArray(matchs.week, uniqueWeeks)
+                        eq(matches.season, seasonId),
+                        eq(matches.division, divisionId),
+                        inArray(matches.week, uniqueWeeks)
                     )
                 )
             console.log(`Deleted ${existing.length} existing match row(s)`)
@@ -837,7 +837,7 @@ async function main() {
             continue
         }
 
-        await db.insert(matchs).values(rows)
+        await db.insert(matches).values(rows)
 
         importedFiles++
         importedRows += rows.length

@@ -55,7 +55,7 @@ export interface UserOption {
     old_id: number | null
     first_name: string
     last_name: string
-    preffered_name: string | null
+    preferred_name: string | null
     email: string
 }
 
@@ -198,7 +198,7 @@ export async function getCreateTeamsData(): Promise<{
                     old_id: users.old_id,
                     first_name: users.first_name,
                     last_name: users.last_name,
-                    preffered_name: users.preffered_name,
+                    preferred_name: users.preferred_name,
                     email: users.email
                 })
                 .from(signups)
@@ -211,7 +211,7 @@ export async function getCreateTeamsData(): Promise<{
                     old_id: users.old_id,
                     first_name: users.first_name,
                     last_name: users.last_name,
-                    preffered_name: users.preffered_name,
+                    preferred_name: users.preferred_name,
                     email: users.email
                 })
                 .from(users)
@@ -222,7 +222,7 @@ export async function getCreateTeamsData(): Promise<{
                     divisionId: commissioners.division,
                     userId: commissioners.commissioner,
                     firstName: users.first_name,
-                    preferredName: users.preffered_name
+                    preferredName: users.preferred_name
                 })
                 .from(commissioners)
                 .innerJoin(users, eq(commissioners.commissioner, users.id))

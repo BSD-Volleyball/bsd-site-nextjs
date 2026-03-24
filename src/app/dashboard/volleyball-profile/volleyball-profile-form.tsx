@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -32,10 +33,6 @@ export function VolleyballProfileForm({
 }: VolleyballProfileFormProps) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
-    const [message, setMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     const [formData, setFormData] = useState<VolleyballProfileData>({
         experience: initialData?.experience ?? null,
@@ -50,19 +47,16 @@ export function VolleyballProfileForm({
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
         setIsLoading(true)
-        setMessage(null)
 
         const result = await updateVolleyballProfile(formData)
 
-        setMessage({
-            type: result.status ? "success" : "error",
-            text: result.message
-        })
-        setIsLoading(false)
-
         if (result.status) {
+            toast.success(result.message)
             router.refresh()
+        } else {
+            toast.error(result.message)
         }
+        setIsLoading(false)
     }
 
     return (
@@ -220,18 +214,6 @@ export function VolleyballProfileForm({
                             </div>
                         </div>
                     </div>
-
-                    {message && (
-                        <div
-                            className={`rounded-md p-3 text-sm ${
-                                message.type === "success"
-                                    ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                    : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                            }`}
-                        >
-                            {message.text}
-                        </div>
-                    )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
                     <Button type="submit" disabled={isLoading}>

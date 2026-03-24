@@ -105,9 +105,9 @@ export function AdminPlayerDetailPopup({
                             <CardTitle className="pt-1">
                                 {playerDetails.first_name}{" "}
                                 {playerDetails.last_name}
-                                {playerDetails.preffered_name && (
+                                {playerDetails.preferred_name && (
                                     <span className="ml-2 font-normal text-base text-muted-foreground">
-                                        ({playerDetails.preffered_name})
+                                        ({playerDetails.preferred_name})
                                     </span>
                                 )}
                             </CardTitle>
