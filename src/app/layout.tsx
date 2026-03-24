@@ -1,7 +1,6 @@
 import { Providers } from "./providers"
 import type { ReactNode } from "react"
 import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
 import "@/styles/globals.css"
 
 export default function RootLayout({
@@ -17,7 +16,6 @@ export default function RootLayout({
             <body className="flex min-h-svh flex-col antialiased">
                 <Providers>{children}</Providers>
                 <Analytics />
-                <SpeedInsights />
             </body>
         </html>
     )
