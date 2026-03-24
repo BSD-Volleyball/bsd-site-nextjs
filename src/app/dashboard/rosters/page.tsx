@@ -88,7 +88,11 @@ export default async function CurrentRosterPage() {
                 </div>
             ) : (
                 result.divisions.map((division) => (
-                    <DivisionSection key={division.id} division={division} />
+                    <DivisionSection
+                        key={division.id}
+                        division={division}
+                        currentUserId={session.user.id}
+                    />
                 ))
             )}
         </div>
