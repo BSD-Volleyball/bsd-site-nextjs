@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
@@ -88,7 +88,10 @@ export async function getDraftHomeworkData(): Promise<{
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
+                or(
+                    eq(teams.captain, session.user.id),
+                    eq(teams.captain2, session.user.id)
+                )
             )
         )
         .limit(1)
@@ -328,7 +331,10 @@ export async function saveDraftHomework(
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
+                or(
+                    eq(teams.captain, session.user.id),
+                    eq(teams.captain2, session.user.id)
+                )
             )
         )
         .limit(1)
@@ -417,7 +423,10 @@ export async function getLastSeasonDraft(): Promise<{
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
+                or(
+                    eq(teams.captain, session.user.id),
+                    eq(teams.captain2, session.user.id)
+                )
             )
         )
         .limit(1)

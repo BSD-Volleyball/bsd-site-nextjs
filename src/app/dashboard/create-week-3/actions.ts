@@ -121,6 +121,7 @@ export async function getCreateWeek3Data(): Promise<{
             db
                 .select({
                     userId: teams.captain,
+                    captain2Id: teams.captain2,
                     divisionId: teams.division,
                     divisionName: divisions.name
                 })
@@ -526,6 +527,7 @@ export async function saveWeek3Rosters(
             db
                 .select({
                     userId: teams.captain,
+                    captain2Id: teams.captain2,
                     divisionId: teams.division
                 })
                 .from(teams)

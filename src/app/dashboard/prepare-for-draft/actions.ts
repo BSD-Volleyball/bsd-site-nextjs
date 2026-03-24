@@ -40,6 +40,15 @@ export interface CaptainInfo {
     displayName: string
     lastName: string
     email: string
+    teamId: number
+}
+
+export interface TeamInfo {
+    teamId: number
+    teamName: string
+    teamNumber: number | null
+    captain1: CaptainInfo
+    captain2: CaptainInfo | null
 }
 
 export interface PlayerRow {
@@ -48,10 +57,10 @@ export interface PlayerRow {
     lastName: string
     isMale: boolean
     isPairPick: boolean
-    captainRounds: {
-        captainId: string
+    teamRounds: {
+        teamId: number
         mappedRound: number
-        captainCompletedHomework: boolean
+        teamCompletedHomework: boolean
     }[]
     captainAverage: number
     draftHistoryAverage: number | null
@@ -91,6 +100,7 @@ export interface PrepareForDraftData {
     divisionId: number
     divisionName: string
     captains: CaptainInfo[]
+    teams: TeamInfo[]
     players: PlayerRow[]
     pairDifferentials: PairDifferential[]
     availableDivisions: DivisionOption[]
@@ -325,27 +335,90 @@ export async function getPrepareForDraftData(
             .filter((id): id is string => id !== null)
     )
 
-    // Query C: Captains for this division+season
-    const captainRows = await db
+    // Query C: Teams with captains for this division+season
+    const teamRows = await db
         .select({
+            teamId: teams.id,
+            teamName: teams.name,
+            teamNumber: teams.number,
             captainId: teams.captain,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preffered_name,
-            email: users.email
+            captain2Id: teams.captain2,
+            c1FirstName: users.first_name,
+            c1LastName: users.last_name,
+            c1PreferredName: users.preffered_name,
+            c1Email: users.email
         })
         .from(teams)
         .innerJoin(users, eq(teams.captain, users.id))
         .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
 
-    const captains: CaptainInfo[] = captainRows
-        .filter((r) => !isGhostCaptain(r.captainId))
-        .map((r) => ({
+    // Fetch captain2 user info separately for teams that have one
+    const captain2Ids = teamRows
+        .map((r) => r.captain2Id)
+        .filter((id): id is string => !!id && !isGhostCaptain(id))
+    const captain2UserMap = new Map<
+        string,
+        {
+            firstName: string
+            lastName: string
+            preferredName: string | null
+            email: string
+        }
+    >()
+    if (captain2Ids.length > 0) {
+        const c2Rows = await db
+            .select({
+                id: users.id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preffered_name,
+                email: users.email
+            })
+            .from(users)
+            .where(inArray(users.id, captain2Ids))
+        for (const row of c2Rows) {
+            captain2UserMap.set(row.id, row)
+        }
+    }
+
+    const teamInfos: TeamInfo[] = []
+    const captains: CaptainInfo[] = []
+
+    for (const r of teamRows) {
+        if (isGhostCaptain(r.captainId)) continue
+
+        const cap1: CaptainInfo = {
             userId: r.captainId,
-            displayName: r.preferredName ?? r.firstName,
-            lastName: r.lastName,
-            email: r.email
-        }))
+            displayName: r.c1PreferredName ?? r.c1FirstName,
+            lastName: r.c1LastName,
+            email: r.c1Email,
+            teamId: r.teamId
+        }
+        captains.push(cap1)
+
+        let cap2: CaptainInfo | null = null
+        if (r.captain2Id && !isGhostCaptain(r.captain2Id)) {
+            const c2User = captain2UserMap.get(r.captain2Id)
+            if (c2User) {
+                cap2 = {
+                    userId: r.captain2Id,
+                    displayName: c2User.preferredName ?? c2User.firstName,
+                    lastName: c2User.lastName,
+                    email: c2User.email,
+                    teamId: r.teamId
+                }
+                captains.push(cap2)
+            }
+        }
+
+        teamInfos.push({
+            teamId: r.teamId,
+            teamName: r.teamName,
+            teamNumber: r.teamNumber,
+            captain1: cap1,
+            captain2: cap2
+        })
+    }
 
     // Query D1: 3 most recent prior season IDs (weighted: index 0 = ×3, 1 = ×2, 2 = ×1)
     const priorSeasonRows = await db
@@ -389,41 +462,79 @@ export async function getPrepareForDraftData(
 
     const WEIGHTS = [3, 2, 1]
 
+    function getMappedRound(
+        captainUserId: string,
+        playerUserId: string,
+        isMale: boolean
+    ): number {
+        const key = `${captainUserId}:${playerUserId}`
+        const hw = homeworkMap.get(key)
+        if (!hw) return 9
+        if (isMale && hw.isMaleTab) return MALE_ROUND_MAP[hw.round] ?? 9
+        if (!isMale && !hw.isMaleTab) return NON_MALE_ROUND_MAP[hw.round] ?? 9
+        return 9
+    }
+
     function buildPlayerRow(player: (typeof signupRows)[0]): PlayerRow {
         const isMale = player.male === true
 
-        const captainRounds = captains.map((captain) => {
-            const key = `${captain.userId}:${player.userId}`
-            const hw = homeworkMap.get(key)
-            let mappedRound = 9
-            if (hw) {
-                if (isMale && hw.isMaleTab) {
-                    mappedRound = MALE_ROUND_MAP[hw.round] ?? 9
-                } else if (!isMale && !hw.isMaleTab) {
-                    mappedRound = NON_MALE_ROUND_MAP[hw.round] ?? 9
+        // Build per-team rounds (averaging captain1 + captain2 homework)
+        const teamRounds = teamInfos.map((team) => {
+            const cap1Round = getMappedRound(
+                team.captain1.userId,
+                player.userId,
+                isMale
+            )
+            const cap1Completed = captainsFullyCompleted.has(
+                team.captain1.userId
+            )
+
+            if (team.captain2) {
+                const cap2Round = getMappedRound(
+                    team.captain2.userId,
+                    player.userId,
+                    isMale
+                )
+                const cap2Completed = captainsFullyCompleted.has(
+                    team.captain2.userId
+                )
+                const bothCompleted = cap1Completed && cap2Completed
+                const eitherCompleted = cap1Completed || cap2Completed
+
+                let avgRound: number
+                if (cap1Completed && cap2Completed) {
+                    avgRound = (cap1Round + cap2Round) / 2
+                } else if (cap1Completed) {
+                    avgRound = cap1Round
+                } else if (cap2Completed) {
+                    avgRound = cap2Round
+                } else {
+                    // Neither completed — use raw average
+                    avgRound = (cap1Round + cap2Round) / 2
+                }
+
+                return {
+                    teamId: team.teamId,
+                    mappedRound: avgRound,
+                    teamCompletedHomework: bothCompleted || eitherCompleted
                 }
             }
+
             return {
-                captainId: captain.userId,
-                mappedRound,
-                captainCompletedHomework: captainsFullyCompleted.has(
-                    captain.userId
-                )
+                teamId: team.teamId,
+                mappedRound: cap1Round,
+                teamCompletedHomework: cap1Completed
             }
         })
 
-        // Only average over captains who have fully completed their homework.
-        // Fully completed captains who didn't rank this player contribute 9.
-        // Captains with partial or no homework are excluded from the average.
-        const activeCaptainRounds = captainRounds.filter((cr) =>
-            captainsFullyCompleted.has(cr.captainId)
+        // Only average over teams where at least one captain has fully completed their homework.
+        const activeTeamRounds = teamRounds.filter(
+            (tr) => tr.teamCompletedHomework
         )
         const captainAverage =
-            activeCaptainRounds.length > 0
-                ? activeCaptainRounds.reduce(
-                      (sum, r) => sum + r.mappedRound,
-                      0
-                  ) / activeCaptainRounds.length
+            activeTeamRounds.length > 0
+                ? activeTeamRounds.reduce((sum, r) => sum + r.mappedRound, 0) /
+                  activeTeamRounds.length
                 : 9
 
         // Weighted draft history average
@@ -453,7 +564,7 @@ export async function getPrepareForDraftData(
             lastName: player.lastName,
             isMale,
             isPairPick: pairPickSet.has(player.userId),
-            captainRounds,
+            teamRounds,
             captainAverage,
             draftHistoryAverage,
             recommendedRound
@@ -467,8 +578,8 @@ export async function getPrepareForDraftData(
 
     const players = signupRows
         .map(buildPlayerRow)
-        // Only include players that at least one captain placed in their homework
-        .filter((p) => p.captainRounds.some((r) => r.mappedRound !== 9))
+        // Only include players that at least one team placed in their homework
+        .filter((p) => p.teamRounds.some((r) => r.mappedRound !== 9))
         .sort(sortPlayerRows)
 
     // Build lookup maps for pair differentials
@@ -811,6 +922,7 @@ export async function getPrepareForDraftData(
             divisionId,
             divisionName,
             captains,
+            teams: teamInfos,
             players,
             pairDifferentials,
             availableDivisions,

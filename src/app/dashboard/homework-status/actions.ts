@@ -210,6 +210,7 @@ export async function getHomeworkStatusData(
             db
                 .select({
                     captainId: teams.captain,
+                    captain2Id: teams.captain2,
                     divisionId: teams.division,
                     divisionName: divisions.name,
                     divisionLevel: divisions.level,
@@ -268,7 +269,15 @@ export async function getHomeworkStatusData(
         ])
 
         // 4. Fetch captain names
-        const captainIds = [...new Set(teamsData.map((t) => t.captainId))]
+        const captainIds = [
+            ...new Set(
+                teamsData.flatMap((t) =>
+                    [t.captainId, t.captain2Id].filter(
+                        (id): id is string => !!id
+                    )
+                )
+            )
+        ]
 
         const captainUserMap = new Map<
             string,
@@ -348,16 +357,19 @@ export async function getHomeworkStatusData(
         for (const row of teamsData) {
             const existing = divisionMap.get(row.divisionId)
             if (!existing) {
+                const ids = new Set([row.captainId])
+                if (row.captain2Id) ids.add(row.captain2Id)
                 divisionMap.set(row.divisionId, {
                     divisionId: row.divisionId,
                     divisionName: row.divisionName,
                     divisionLevel: row.divisionLevel,
                     isCoachesMode: row.isCoachesMode,
                     numTeams: row.numTeams,
-                    captainIds: new Set([row.captainId])
+                    captainIds: ids
                 })
             } else {
                 existing.captainIds.add(row.captainId)
+                if (row.captain2Id) existing.captainIds.add(row.captain2Id)
             }
         }
 

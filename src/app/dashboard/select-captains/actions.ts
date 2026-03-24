@@ -40,6 +40,7 @@ export interface ExistingTeam {
     id: number
     number: number
     captainId: string
+    captain2Id: string | null
     teamName: string
 }
 
@@ -231,6 +232,7 @@ export async function getCreateTeamsData(): Promise<{
                     id: teams.id,
                     number: teams.number,
                     captain: teams.captain,
+                    captain2: teams.captain2,
                     name: teams.name,
                     division: teams.division
                 })
@@ -255,6 +257,7 @@ export async function getCreateTeamsData(): Promise<{
                 id: team.id,
                 number: team.number ?? 0,
                 captainId: team.captain,
+                captain2Id: team.captain2,
                 teamName: team.name
             })
         }
@@ -413,34 +416,41 @@ export async function createTeams(
         }
 
         // Only enforce uniqueness and signup checks for real (non-ghost) captains
-        const realCaptainIds = teamsToCreate
-            .map((team) => team.captainId || GHOST_CAPTAIN_ID)
-            .filter((id) => !isGhostCaptain(id))
-        const uniqueRealCaptainIds = new Set(realCaptainIds)
+        const allCaptainIds = teamsToCreate
+            .flatMap((t) => [t.captainId || GHOST_CAPTAIN_ID, t.coach2Id ?? ""])
+            .filter((id) => id && !isGhostCaptain(id))
+        const uniqueAllCaptainIds = new Set(allCaptainIds)
 
-        if (uniqueRealCaptainIds.size !== realCaptainIds.length) {
+        if (uniqueAllCaptainIds.size !== allCaptainIds.length) {
             return {
                 status: false,
-                message: "Each team must have a unique captain."
+                message: "Each captain must be unique across all teams."
             }
         }
 
-        if (uniqueRealCaptainIds.size > 0) {
+        const realPrimaryCaptainIds = teamsToCreate
+            .map((team) => team.captainId || GHOST_CAPTAIN_ID)
+            .filter((id) => !isGhostCaptain(id))
+        const uniqueRealPrimaryCaptainIds = new Set(realPrimaryCaptainIds)
+
+        if (uniqueRealPrimaryCaptainIds.size > 0) {
             const signedUpCaptains = await db
                 .select({ playerId: signups.player })
                 .from(signups)
                 .where(
                     and(
                         eq(signups.season, config.seasonId),
-                        inArray(signups.player, [...uniqueRealCaptainIds])
+                        inArray(signups.player, [
+                            ...uniqueRealPrimaryCaptainIds
+                        ])
                     )
                 )
 
-            if (signedUpCaptains.length !== uniqueRealCaptainIds.size) {
+            if (signedUpCaptains.length !== uniqueRealPrimaryCaptainIds.size) {
                 return {
                     status: false,
                     message:
-                        "All selected captains must be signed up for the current season."
+                        "All selected primary captains must be signed up for the current season."
                 }
             }
         }
@@ -478,7 +488,8 @@ export async function createTeams(
             .select({
                 id: teams.id,
                 number: teams.number,
-                captain: teams.captain
+                captain: teams.captain,
+                captain2: teams.captain2
             })
             .from(teams)
             .where(
@@ -491,7 +502,7 @@ export async function createTeams(
 
         const oldCaptainIds = new Set<string>(
             existingTeams
-                .map((t) => t.captain)
+                .flatMap((t) => [t.captain, t.captain2 ?? ""])
                 .filter((id): id is string => !!id && !isGhostCaptain(id))
         )
 
@@ -502,62 +513,39 @@ export async function createTeams(
             }
         }
 
-        if (isCoachesDiv) {
-            // Coach 1 occupies team numbers 1..numTeams
-            // Coach 2 occupies team numbers numTeams+1..2*numTeams
-            for (let i = 0; i < teamsToCreate.length; i++) {
-                const team = teamsToCreate[i]
-                const primaryNumber = i + 1
-                const secondaryNumber = i + 1 + numTeams
+        // Unified storage: all divisions use captain2 column instead of duplicate rows
+        for (let i = 0; i < teamsToCreate.length; i++) {
+            const team = teamsToCreate[i]
+            const number = i + 1
 
-                if (team.captainId) {
-                    const existingId = existingByNumber.get(primaryNumber)
-                    if (existingId !== undefined) {
-                        await db
-                            .update(teams)
-                            .set({
-                                captain: team.captainId,
-                                name: team.teamName.trim()
-                            })
-                            .where(eq(teams.id, existingId))
-                        existingByNumber.delete(primaryNumber)
-                    } else {
-                        await db.insert(teams).values({
-                            season: config.seasonId,
-                            captain: team.captainId,
-                            division: divisionId,
-                            name: team.teamName.trim(),
-                            number: primaryNumber
-                        })
-                    }
-                }
+            if (isCoachesDiv) {
+                // Coaches mode: both coaches optional, skip team if neither is set
+                const hasAnyCoach = team.captainId || team.coach2Id
+                if (!hasAnyCoach) continue
 
-                if (team.coach2Id) {
-                    const existingId = existingByNumber.get(secondaryNumber)
-                    if (existingId !== undefined) {
-                        await db
-                            .update(teams)
-                            .set({
-                                captain: team.coach2Id,
-                                name: team.teamName.trim()
-                            })
-                            .where(eq(teams.id, existingId))
-                        existingByNumber.delete(secondaryNumber)
-                    } else {
-                        await db.insert(teams).values({
-                            season: config.seasonId,
-                            captain: team.coach2Id,
-                            division: divisionId,
-                            name: team.teamName.trim(),
-                            number: secondaryNumber
+                const existingId = existingByNumber.get(number)
+                if (existingId !== undefined) {
+                    await db
+                        .update(teams)
+                        .set({
+                            captain: team.captainId || GHOST_CAPTAIN_ID,
+                            captain2: team.coach2Id || null,
+                            name: team.teamName.trim()
                         })
-                    }
+                        .where(eq(teams.id, existingId))
+                    existingByNumber.delete(number)
+                } else {
+                    await db.insert(teams).values({
+                        season: config.seasonId,
+                        captain: team.captainId || GHOST_CAPTAIN_ID,
+                        captain2: team.coach2Id || null,
+                        division: divisionId,
+                        name: team.teamName.trim(),
+                        number
+                    })
                 }
-            }
-        } else {
-            for (let i = 0; i < teamsToCreate.length; i++) {
-                const team = teamsToCreate[i]
-                const number = i + 1
+            } else {
+                // Standard captain mode
                 const existingId = existingByNumber.get(number)
                 const captainId = team.captainId || GHOST_CAPTAIN_ID
 
@@ -566,6 +554,7 @@ export async function createTeams(
                         .update(teams)
                         .set({
                             captain: captainId,
+                            captain2: team.coach2Id || null,
                             name: team.teamName.trim()
                         })
                         .where(eq(teams.id, existingId))
@@ -574,6 +563,7 @@ export async function createTeams(
                     await db.insert(teams).values({
                         season: config.seasonId,
                         captain: captainId,
+                        captain2: team.coach2Id || null,
                         division: divisionId,
                         name: team.teamName.trim(),
                         number

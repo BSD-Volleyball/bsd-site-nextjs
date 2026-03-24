@@ -84,17 +84,17 @@ function PlayerTableRow({
                     </span>
                 )}
             </td>
-            {player.captainRounds.map((cr) => (
+            {player.teamRounds.map((tr) => (
                 <td
-                    key={cr.captainId}
-                    className={`px-3 py-2 text-center ${getRoundClass(cr.mappedRound)}`}
+                    key={tr.teamId}
+                    className={`px-3 py-2 text-center ${getRoundClass(tr.mappedRound)}`}
                 >
-                    {cr.mappedRound === 9 ? (
+                    {tr.mappedRound >= 9 ? (
                         <span className="text-muted-foreground">
-                            {cr.captainCompletedHomework ? "— (9)" : "—"}
+                            {tr.teamCompletedHomework ? "— (9)" : "—"}
                         </span>
                     ) : (
-                        cr.mappedRound
+                        tr.mappedRound.toFixed(1)
                     )}
                 </td>
             ))}
@@ -429,7 +429,7 @@ export function PrepareForDraftTable({
                 </div>
             )}
 
-            {data.captains.length === 0 ? (
+            {data.teams.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No captains have been assigned to this division yet.
                 </div>
@@ -444,13 +444,17 @@ export function PrepareForDraftTable({
                                 <th className="sticky left-0 z-30 whitespace-nowrap border-r bg-muted px-3 py-2 text-left font-medium">
                                     Player
                                 </th>
-                                {data.captains.map((cap) => (
+                                {data.teams.map((team) => (
                                     <th
-                                        key={cap.userId}
+                                        key={team.teamId}
                                         className="whitespace-nowrap px-3 py-2 text-center font-medium"
-                                        title={`${cap.displayName} ${cap.lastName}`}
+                                        title={
+                                            team.captain2
+                                                ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName}`
+                                                : `${team.captain1.displayName} ${team.captain1.lastName}`
+                                        }
                                     >
-                                        {cap.displayName}
+                                        {team.captain1.displayName}
                                     </th>
                                 ))}
                                 <th className="whitespace-nowrap px-3 py-2 text-center font-medium">
@@ -504,8 +508,7 @@ export function PrepareForDraftTable({
                 </div>
             )}
 
-            {(data.captains.length > 0 ||
-                data.pairDifferentials.length > 0) && (
+            {(data.teams.length > 0 || data.pairDifferentials.length > 0) && (
                 <div className="flex items-center gap-4 pt-2">
                     <button
                         type="button"
@@ -594,8 +597,7 @@ export function PrepareForDraftTable({
                 </div>
             )}
 
-            {(data.captains.length > 0 ||
-                data.pairDifferentials.length > 0) && (
+            {(data.teams.length > 0 || data.pairDifferentials.length > 0) && (
                 <div className="flex items-center gap-4 pt-2">
                     <button
                         type="button"

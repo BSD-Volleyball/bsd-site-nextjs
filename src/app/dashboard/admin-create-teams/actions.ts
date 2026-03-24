@@ -102,6 +102,7 @@ export async function getCreateTeamsData(): Promise<{
 
 interface TeamToCreate {
     captainId: string
+    captain2Id?: string
     teamName: string
 }
 
@@ -155,6 +156,7 @@ export async function createTeams(
             teamsToCreate.map((team, index) => ({
                 season: seasonId,
                 captain: team.captainId,
+                captain2: team.captain2Id || null,
                 division: divisionId,
                 name: team.teamName.trim(),
                 number: index + 1
@@ -162,17 +164,26 @@ export async function createTeams(
         )
 
         // Sync captain roles to user_roles (new RBAC system)
-        await db
-            .insert(userRoles)
-            .values(
-                teamsToCreate.map((team) => ({
+        const roleInserts = teamsToCreate.flatMap((team) => {
+            const roles = [
+                {
                     user_id: team.captainId,
                     role: "captain",
                     season_id: seasonId,
                     division_id: divisionId
-                }))
-            )
-            .onConflictDoNothing()
+                }
+            ]
+            if (team.captain2Id) {
+                roles.push({
+                    user_id: team.captain2Id,
+                    role: "captain",
+                    season_id: seasonId,
+                    division_id: divisionId
+                })
+            }
+            return roles
+        })
+        await db.insert(userRoles).values(roleInserts).onConflictDoNothing()
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {

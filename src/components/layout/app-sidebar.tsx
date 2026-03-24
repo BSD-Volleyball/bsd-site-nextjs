@@ -221,6 +221,11 @@ const adminDangerNavItems = [
         title: "Edit Emails",
         url: "/dashboard/edit-emails",
         icon: RiMailLine
+    },
+    {
+        title: "Create Schedule",
+        url: "/dashboard/create-schedule",
+        icon: RiCalendarLine
     }
 ]
 
@@ -859,6 +864,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                         "select_commissioners" ||
                                                     phase === "select_captains"
                                                 )
+                                            if (
+                                                item.url ===
+                                                "/dashboard/create-schedule"
+                                            )
+                                                return phase === "draft"
                                             return true
                                         }
                                     )}

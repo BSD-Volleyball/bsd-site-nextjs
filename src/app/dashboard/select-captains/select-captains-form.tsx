@@ -266,11 +266,6 @@ export function SelectCaptainsForm({
                 ? (existingTeamsByDivision?.[parsedId] ?? [])
                 : []
 
-        const div =
-            divisions.find((d) => d.id.toString() === divisionId) || null
-        const isCoaches = div?.coaches ?? false
-        const nTeams = div?.name.trim().toUpperCase() === "BB" ? 4 : 6
-
         const byNumber = new Map(existing.map((t) => [t.number, t]))
 
         setSuccess(null)
@@ -282,28 +277,24 @@ export function SelectCaptainsForm({
                 .fill(null)
                 .map(() => ({ captainId: null, coach2Id: null, teamName: "" }))
             for (let i = 0; i < 6; i++) {
-                const primaryTeam = byNumber.get(i + 1)
-                const coach2Team = isCoaches
-                    ? byNumber.get(i + 1 + nTeams)
-                    : null
-                if (primaryTeam || coach2Team) {
-                    const primaryCaptainId = primaryTeam?.captainId ?? null
-                    const coach2CaptainId = coach2Team?.captainId ?? null
+                const team = byNumber.get(i + 1)
+                if (team) {
+                    const primaryCaptainId = team.captainId ?? null
+                    const captain2Id = team.captain2Id ?? null
                     next[i] = {
                         captainId: isGhostCaptain(primaryCaptainId)
                             ? null
                             : primaryCaptainId,
-                        coach2Id: isGhostCaptain(coach2CaptainId)
+                        coach2Id: isGhostCaptain(captain2Id)
                             ? null
-                            : coach2CaptainId,
-                        teamName:
-                            primaryTeam?.teamName ?? coach2Team?.teamName ?? ""
+                            : captain2Id,
+                        teamName: team.teamName ?? ""
                     }
                 }
             }
             return next
         })
-    }, [divisionId, existingTeamsByDivision, divisions])
+    }, [divisionId, existingTeamsByDivision])
 
     const selectedCaptainIds = useMemo(
         () =>
@@ -796,51 +787,83 @@ export function SelectCaptainsForm({
                                 ) : (
                                     <div
                                         key={index}
-                                        className="grid grid-cols-2 items-end gap-4"
+                                        className="space-y-3 rounded-md border p-3"
                                     >
+                                        <div className="grid grid-cols-2 items-end gap-4">
+                                            <div className="space-y-2">
+                                                <Label
+                                                    htmlFor={`captain-${index}`}
+                                                >
+                                                    Captain {index + 1}{" "}
+                                                    <span className="text-muted-foreground text-xs">
+                                                        (optional)
+                                                    </span>
+                                                </Label>
+                                                <UserCombobox
+                                                    users={users}
+                                                    value={
+                                                        captains[index]
+                                                            .captainId
+                                                    }
+                                                    onChange={(userId, user) =>
+                                                        handleCaptainChange(
+                                                            index,
+                                                            "captainId",
+                                                            userId,
+                                                            user
+                                                        )
+                                                    }
+                                                    placeholder="Select a captain..."
+                                                    excludeIds={
+                                                        selectedCaptainIds
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label
+                                                    htmlFor={`team-name-${index}`}
+                                                >
+                                                    Team Name{" "}
+                                                    <span className="text-destructive">
+                                                        *
+                                                    </span>
+                                                </Label>
+                                                <Input
+                                                    id={`team-name-${index}`}
+                                                    value={
+                                                        captains[index].teamName
+                                                    }
+                                                    onChange={(e) =>
+                                                        handleTeamNameChange(
+                                                            index,
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    placeholder="Team name"
+                                                />
+                                            </div>
+                                        </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor={`captain-${index}`}>
-                                                Captain {index + 1}{" "}
+                                            <Label>
+                                                Co-Captain{" "}
                                                 <span className="text-muted-foreground text-xs">
-                                                    (optional)
+                                                    (optional — assists with
+                                                    rating &amp; drafting)
                                                 </span>
                                             </Label>
                                             <UserCombobox
-                                                users={users}
-                                                value={
-                                                    captains[index].captainId
-                                                }
+                                                users={allUsers}
+                                                value={captains[index].coach2Id}
                                                 onChange={(userId, user) =>
                                                     handleCaptainChange(
                                                         index,
-                                                        "captainId",
+                                                        "coach2Id",
                                                         userId,
                                                         user
                                                     )
                                                 }
-                                                placeholder="Select a captain..."
+                                                placeholder="Select a co-captain..."
                                                 excludeIds={selectedCaptainIds}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label
-                                                htmlFor={`team-name-${index}`}
-                                            >
-                                                Team Name{" "}
-                                                <span className="text-destructive">
-                                                    *
-                                                </span>
-                                            </Label>
-                                            <Input
-                                                id={`team-name-${index}`}
-                                                value={captains[index].teamName}
-                                                onChange={(e) =>
-                                                    handleTeamNameChange(
-                                                        index,
-                                                        e.target.value
-                                                    )
-                                                }
-                                                placeholder="Team name"
                                             />
                                         </div>
                                     </div>

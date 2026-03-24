@@ -251,6 +251,7 @@ export async function updateWeek2Rosters(
             db
                 .select({
                     userId: teams.captain,
+                    captain2Id: teams.captain2,
                     divisionId: teams.division,
                     divisionName: divisions.name,
                     isCoachDiv: individual_divisions.coaches
