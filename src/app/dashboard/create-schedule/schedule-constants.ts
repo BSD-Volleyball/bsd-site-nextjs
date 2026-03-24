@@ -300,6 +300,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
         useSecondCourt: false
     },
     // Week 2 — times depend on division court (early courts: 7:00/7:50, late courts: 8:40/9:30)
+    // useSecondCourt: true → play on the paired court (e.g. BB on court 6 moves to court 5)
     {
         matchNum: 3,
         week: 2,
@@ -311,7 +312,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
         bracket: "winners",
         nextMatchNum: 6,
         nextLoserMatchNum: 5,
-        useSecondCourt: false
+        useSecondCourt: true
     },
     {
         matchNum: 4,
@@ -324,7 +325,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
         bracket: "losers",
         nextMatchNum: 5,
         nextLoserMatchNum: null,
-        useSecondCourt: false
+        useSecondCourt: true
     },
     // Week 3
     {
