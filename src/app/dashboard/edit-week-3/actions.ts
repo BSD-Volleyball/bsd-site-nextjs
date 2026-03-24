@@ -434,59 +434,66 @@ export async function sendWeek3RosterNotifications(
         textAlign: "right" as const
     }
 
-    let sent = 0
-    for (const userId of allUserIds) {
-        const user = userById.get(userId)
-        if (!user?.email) continue
-        const firstName =
-            user.preferredName || user.firstName || user.email.split("@")[0]
-        const isRemoved = removedSet.has(userId)
+    const emailResults = await Promise.allSettled(
+        allUserIds
+            .filter((userId) => !!userById.get(userId)?.email)
+            .map((userId) => {
+                const user = userById.get(userId)!
+                const firstName =
+                    user.preferredName ||
+                    user.firstName ||
+                    user.email!.split("@")[0]
+                const isRemoved = removedSet.has(userId)
 
-        try {
-            if (isRemoved) {
-                await resend.emails.send({
-                    from: site.mailFrom,
-                    to: user.email,
-                    subject: `BSD Volleyball: Week 3 Roster Update — ${seasonLabel}`,
-                    react: EmailTemplate({
-                        heading: "Roster Update",
-                        content: React.createElement(
-                            React.Fragment,
-                            null,
-                            React.createElement("p", null, `Hi ${firstName},`),
-                            React.createElement(
-                                "p",
+                if (isRemoved) {
+                    return resend.emails.send({
+                        from: site.mailFrom,
+                        to: user.email!,
+                        subject: `BSD Volleyball: Week 3 Roster Update — ${seasonLabel}`,
+                        react: EmailTemplate({
+                            heading: "Roster Update",
+                            content: React.createElement(
+                                React.Fragment,
                                 null,
-                                `We wanted to let you know that your Week 3 assignment for the ${seasonLabel} season has been removed. If you have questions, please reach out to us.`
-                            ),
-                            React.createElement(
-                                "p",
-                                null,
-                                "If you believe this is an error, contact us at ",
                                 React.createElement(
-                                    "a",
-                                    { href: `mailto:${site.mailSupport}` },
-                                    site.mailSupport
+                                    "p",
+                                    null,
+                                    `Hi ${firstName},`
                                 ),
-                                "."
-                            )
-                        ),
-                        action: "Go to Dashboard",
-                        url: `${site.url}/dashboard`,
-                        siteName: site.name,
-                        baseUrl: site.url,
-                        imageUrl: "cid:logo"
-                    }),
-                    attachments: [
-                        {
-                            filename: "logo.png",
-                            content: logoContent,
-                            contentType: "image/png",
-                            inlineContentId: "logo"
-                        }
-                    ]
-                })
-            } else {
+                                React.createElement(
+                                    "p",
+                                    null,
+                                    `We wanted to let you know that your Week 3 assignment for the ${seasonLabel} season has been removed. If you have questions, please reach out to us.`
+                                ),
+                                React.createElement(
+                                    "p",
+                                    null,
+                                    "If you believe this is an error, contact us at ",
+                                    React.createElement(
+                                        "a",
+                                        { href: `mailto:${site.mailSupport}` },
+                                        site.mailSupport
+                                    ),
+                                    "."
+                                )
+                            ),
+                            action: "Go to Dashboard",
+                            url: `${site.url}/dashboard`,
+                            siteName: site.name,
+                            baseUrl: site.url,
+                            imageUrl: "cid:logo"
+                        }),
+                        attachments: [
+                            {
+                                filename: "logo.png",
+                                content: logoContent,
+                                contentType: "image/png",
+                                inlineContentId: "logo"
+                            }
+                        ]
+                    })
+                }
+
                 const userAssignments = assignmentsByUser.get(userId) || []
 
                 const assignmentBlocks = userAssignments.map((a) => {
@@ -601,9 +608,9 @@ export async function sendWeek3RosterNotifications(
                     )
                 })
 
-                await resend.emails.send({
+                return resend.emails.send({
                     from: site.mailFrom,
-                    to: user.email,
+                    to: user.email!,
                     subject: `BSD Volleyball: Your Week 3 Assignment — ${seasonLabel}`,
                     react: EmailTemplate({
                         heading: "Week 3 Roster Assignment",
@@ -654,15 +661,17 @@ export async function sendWeek3RosterNotifications(
                         }
                     ]
                 })
-            }
-            sent++
-        } catch (error) {
+            })
+    )
+    const sent = emailResults.filter((r) => r.status === "fulfilled").length
+    emailResults
+        .filter((r) => r.status === "rejected")
+        .forEach((r, i) => {
             console.error(
-                `Failed to send week 3 notification to ${user.email}:`,
-                error
+                `Failed to send week 3 email (index ${i}):`,
+                (r as PromiseRejectedResult).reason
             )
-        }
-    }
+        })
 
     return { status: true, message: `${sent} notification(s) sent.` }
 }

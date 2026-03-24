@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -400,6 +401,7 @@ export async function writeRegularSeasonSchedule(
             })
         }
 
+        revalidatePath("/dashboard/create-schedule")
         return {
             status: true,
             message: `Successfully created ${allMatches.length} regular season matches across ${data.divisions.length} divisions!`
@@ -528,6 +530,7 @@ export async function writePlayoffSchedule(
             })
         }
 
+        revalidatePath("/dashboard/create-schedule")
         return {
             status: true,
             message: `Successfully created ${totalMatchesCreated} playoff matches across ${data.divisions.length} divisions!`

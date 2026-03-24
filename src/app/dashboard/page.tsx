@@ -599,10 +599,12 @@ function SignupCTA({
 
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
-    const hasTryoutSheetAccess = session?.user
-        ? await hasCaptainPagesAccessBySession()
-        : false
-    const isAdmin = session?.user ? await isAdminOrDirectorBySession() : false
+    const [hasTryoutSheetAccess, isAdmin] = session?.user
+        ? await Promise.all([
+              hasCaptainPagesAccessBySession(),
+              isAdminOrDirectorBySession()
+          ])
+        : [false, false]
     let isCurrentSeasonCommissioner = false
 
     let signupStatus = null
@@ -639,20 +641,29 @@ export default async function DashboardPage() {
     let assignedActiveConcernsCount = 0
 
     if (session?.user) {
-        signupStatus = await getSeasonSignup(session.user.id)
-        previousSeasons = await getPreviousSeasonsPlayed(session.user.id)
-        discount = await getActiveDiscountForUser(session.user.id)
+        const [
+            signupResult,
+            previousSeasonsResult,
+            discountResult,
+            userResult
+        ] = await Promise.all([
+            getSeasonSignup(session.user.id),
+            getPreviousSeasonsPlayed(session.user.id),
+            getActiveDiscountForUser(session.user.id),
+            db
+                .select({
+                    preferred_name: users.preferred_name,
+                    first_name: users.first_name
+                })
+                .from(users)
+                .where(eq(users.id, session.user.id))
+                .limit(1)
+        ])
 
-        // Get user's preferred name or first name for greeting
-        const [user] = await db
-            .select({
-                preferred_name: users.preferred_name,
-                first_name: users.first_name
-            })
-            .from(users)
-            .where(eq(users.id, session.user.id))
-            .limit(1)
-
+        signupStatus = signupResult
+        previousSeasons = previousSeasonsResult
+        discount = discountResult
+        const [user] = userResult
         userName = user?.preferred_name || user?.first_name || null
 
         const canViewConcerns =
@@ -682,17 +693,42 @@ export default async function DashboardPage() {
         }
 
         if (signupStatus?.config.seasonId) {
-            isCurrentSeasonCommissioner = await isCommissionerForSeason(
-                session.user.id,
-                signupStatus.config.seasonId
-            )
-
-            const [week1RosterRow] = await db
-                .select({ id: week1Rosters.id })
-                .from(week1Rosters)
-                .where(eq(week1Rosters.season, signupStatus.config.seasonId))
-                .limit(1)
-            hasWeek1RosterData = !!week1RosterRow
+            const [
+                week1RosterRow,
+                week2RosterRow,
+                week3RosterRow,
+                isCommissioner
+            ] = await Promise.all([
+                db
+                    .select({ id: week1Rosters.id })
+                    .from(week1Rosters)
+                    .where(
+                        eq(week1Rosters.season, signupStatus.config.seasonId)
+                    )
+                    .limit(1),
+                db
+                    .select({ id: week2Rosters.id })
+                    .from(week2Rosters)
+                    .where(
+                        eq(week2Rosters.season, signupStatus.config.seasonId)
+                    )
+                    .limit(1),
+                db
+                    .select({ id: week3Rosters.id })
+                    .from(week3Rosters)
+                    .where(
+                        eq(week3Rosters.season, signupStatus.config.seasonId)
+                    )
+                    .limit(1),
+                isCommissionerForSeason(
+                    session.user.id,
+                    signupStatus.config.seasonId
+                )
+            ])
+            hasWeek1RosterData = !!week1RosterRow[0]
+            hasWeek2RosterData = !!week2RosterRow[0]
+            hasWeek3RosterData = !!week3RosterRow[0]
+            isCurrentSeasonCommissioner = isCommissioner
 
             if (signupStatus.config.phase === "prep_tryout_week_1") {
                 const [myWeek1Slot] = await db
@@ -713,20 +749,6 @@ export default async function DashboardPage() {
                     .limit(1)
                 userWeek1Roster = myWeek1Slot ?? null
             }
-
-            const [week2RosterRow] = await db
-                .select({ id: week2Rosters.id })
-                .from(week2Rosters)
-                .where(eq(week2Rosters.season, signupStatus.config.seasonId))
-                .limit(1)
-            hasWeek2RosterData = !!week2RosterRow
-
-            const [week3RosterRow] = await db
-                .select({ id: week3Rosters.id })
-                .from(week3Rosters)
-                .where(eq(week3Rosters.season, signupStatus.config.seasonId))
-                .limit(1)
-            hasWeek3RosterData = !!week3RosterRow
 
             if (
                 signupStatus.config.phase === "prep_tryout_week_3" &&

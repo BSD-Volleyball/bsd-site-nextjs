@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { and, eq, isNull, or } from "drizzle-orm"
@@ -294,6 +295,7 @@ export async function finalizeMissingPictureUpload(
             })
         }
 
+        revalidatePath("/dashboard/add-pictures")
         return {
             status: true,
             message: "Player picture uploaded.",

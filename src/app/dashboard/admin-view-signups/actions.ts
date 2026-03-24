@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
     users,
@@ -444,6 +445,7 @@ export async function deleteSignupEntry(signupId: number): Promise<{
             summary: `Deleted signup entry. Full deleted signup record: ${JSON.stringify(signupRecord)}`
         })
 
+        revalidatePath("/dashboard/admin-view-signups")
         return {
             status: true,
             message: "Signup entry deleted."

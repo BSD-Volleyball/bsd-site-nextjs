@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { concerns, concernComments, users, userRoles } from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
@@ -209,6 +210,7 @@ export async function addConcernComment(
             author_id: userId,
             content: content.trim()
         })
+        revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Comment added." }
     } catch (error) {
         console.error("Error adding comment:", error)
@@ -230,6 +232,7 @@ export async function updateConcernStatus(
             .update(concerns)
             .set({ status, updated_at: new Date() })
             .where(eq(concerns.id, concernId))
+        revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Status updated." }
     } catch (error) {
         console.error("Error updating concern status:", error)
@@ -308,6 +311,7 @@ export async function assignConcern(
             content: assignmentComment
         })
 
+        revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern assigned." }
     } catch (error) {
         console.error("Error assigning concern:", error)
@@ -347,6 +351,7 @@ export async function closeConcern(
             content: `${actorName} closed this concern.`
         })
 
+        revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern closed." }
     } catch (error) {
         console.error("Error closing concern:", error)
@@ -386,6 +391,7 @@ export async function reopenConcern(
             content: `${actorName} reopened this concern and changed status to active.`
         })
 
+        revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern reopened." }
     } catch (error) {
         console.error("Error reopening concern:", error)

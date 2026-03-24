@@ -1,5 +1,6 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm"
@@ -228,6 +229,7 @@ export async function updateGoogleMembership(
             })
         }
 
+        revalidatePath("/dashboard/google-membership")
         return { status: true, message: "Membership fields updated." }
     } catch (error) {
         console.error("Error updating Google Membership fields:", error)

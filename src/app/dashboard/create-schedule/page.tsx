@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Create Schedule"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function CreateSchedulePage() {
     const session = await auth.api.getSession({ headers: await headers() })

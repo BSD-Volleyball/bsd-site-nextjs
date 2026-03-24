@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     title: "View Signups"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function ViewSignupsPage() {
     const session = await auth.api.getSession({ headers: await headers() })

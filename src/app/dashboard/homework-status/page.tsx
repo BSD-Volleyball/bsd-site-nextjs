@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     title: "Homework Status"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function HomeworkStatusPage({
     searchParams

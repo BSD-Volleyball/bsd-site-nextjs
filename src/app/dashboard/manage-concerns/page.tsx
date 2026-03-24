@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: "Manage Concerns"
 }
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export default async function ManageConcernsPage() {
     const session = await auth.api.getSession({ headers: await headers() })
