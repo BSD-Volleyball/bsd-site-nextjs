@@ -16,7 +16,11 @@ import { eq, and, inArray, asc, ne } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
-import { getCommissionerDivisionAccess } from "@/lib/rbac"
+import {
+    getCommissionerDivisionAccess,
+    grantRole,
+    revokeRole
+} from "@/lib/rbac"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,
@@ -471,7 +475,11 @@ export async function createTeams(
     try {
         // Fetch existing teams for this division+season to support upsert
         const existingTeams = await db
-            .select({ id: teams.id, number: teams.number })
+            .select({
+                id: teams.id,
+                number: teams.number,
+                captain: teams.captain
+            })
             .from(teams)
             .where(
                 and(
@@ -480,6 +488,12 @@ export async function createTeams(
                 )
             )
             .orderBy(asc(teams.number))
+
+        const oldCaptainIds = new Set<string>(
+            existingTeams
+                .map((t) => t.captain)
+                .filter((id): id is string => !!id && !isGhostCaptain(id))
+        )
 
         const existingByNumber = new Map<number, number>()
         for (const team of existingTeams) {
@@ -574,8 +588,35 @@ export async function createTeams(
             await db.delete(teams).where(inArray(teams.id, staleIds))
         }
 
-        const isUpdate = existingTeams.length > 0
+        // Sync RBAC captain roles: grant for new captains, revoke for removed captains
+        const newCaptainIds = new Set<string>(
+            teamsToCreate
+                .flatMap((t) => [t.captainId, t.coach2Id ?? ""])
+                .filter((id): id is string => !!id && !isGhostCaptain(id))
+        )
+
         const session = await auth.api.getSession({ headers: await headers() })
+
+        for (const captainId of newCaptainIds) {
+            if (!oldCaptainIds.has(captainId)) {
+                await grantRole(captainId, "captain", {
+                    seasonId: config.seasonId,
+                    divisionId,
+                    grantedBy: session?.user?.id
+                })
+            }
+        }
+
+        for (const captainId of oldCaptainIds) {
+            if (!newCaptainIds.has(captainId)) {
+                await revokeRole(captainId, "captain", {
+                    seasonId: config.seasonId,
+                    divisionId
+                })
+            }
+        }
+
+        const isUpdate = existingTeams.length > 0
         if (session) {
             await logAuditEntry({
                 userId: session.user.id,
