@@ -107,6 +107,7 @@ export async function getCreateWeek2Data(): Promise<{
                 db
                     .select({
                         userId: teams.captain,
+                        captain2Id: teams.captain2,
                         divisionId: teams.division,
                         divisionName: divisions.name,
                         isCoachDiv: individual_divisions.coaches
@@ -397,6 +398,7 @@ export async function saveWeek2Rosters(
         db
             .select({
                 userId: teams.captain,
+                captain2Id: teams.captain2,
                 divisionId: teams.division,
                 isCoachDiv: individual_divisions.coaches
             })

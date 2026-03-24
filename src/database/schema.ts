@@ -200,6 +200,7 @@ export const teams = pgTable("teams", {
     captain: text("captain")
         .notNull()
         .references(() => users.id),
+    captain2: text("captain2").references(() => users.id),
     division: integer("division")
         .notNull()
         .references(() => divisions.id),

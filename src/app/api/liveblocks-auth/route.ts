@@ -4,7 +4,7 @@ import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { db } from "@/database/db"
 import { users, teams } from "@/database/schema"
-import { and, eq } from "drizzle-orm"
+import { and, eq, or } from "drizzle-orm"
 import {
     isAdminOrDirector,
     isCommissionerForCurrentSeason,
@@ -54,7 +54,12 @@ export async function POST() {
         const captainTeams = await db
             .select({ id: teams.id })
             .from(teams)
-            .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    or(eq(teams.captain, userId), eq(teams.captain2, userId))
+                )
+            )
         captainTeamIds = captainTeams.map((t) => t.id)
     }
 

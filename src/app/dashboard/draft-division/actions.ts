@@ -15,7 +15,7 @@ import {
     signups,
     seasons
 } from "@/database/schema"
-import { eq, and, inArray, desc, lt } from "drizzle-orm"
+import { eq, and, inArray, desc, lt, or } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -135,7 +135,12 @@ export async function hasDraftPageAccess(): Promise<{
         db
             .select({ id: teams.id, division: teams.division })
             .from(teams)
-            .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    or(eq(teams.captain, userId), eq(teams.captain2, userId))
+                )
+            )
     ])
 
     const captainTeamIdsByDivision: Record<number, number[]> = {}
@@ -663,7 +668,10 @@ export async function getDraftWatchlistData(
                     and(
                         eq(teams.season, seasonId),
                         eq(teams.division, divisionId),
-                        eq(teams.captain, userId)
+                        or(
+                            eq(teams.captain, userId),
+                            eq(teams.captain2, userId)
+                        )
                     )
                 )
                 .limit(1),

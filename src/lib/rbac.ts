@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm"
+import { and, eq, isNull, or } from "drizzle-orm"
 import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -171,7 +171,12 @@ export async function isCaptainForSeason(
     const [captainRecord] = await db
         .select({ id: teams.id })
         .from(teams)
-        .where(and(eq(teams.season, seasonId), eq(teams.captain, userId)))
+        .where(
+            and(
+                eq(teams.season, seasonId),
+                or(eq(teams.captain, userId), eq(teams.captain2, userId))
+            )
+        )
         .limit(1)
 
     return !!captainRecord

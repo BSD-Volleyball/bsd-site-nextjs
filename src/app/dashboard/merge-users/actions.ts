@@ -186,6 +186,12 @@ export async function mergeUsers(
             .set({ captain: newUserId })
             .where(eq(teams.captain, oldUserId))
 
+        // Update teams:captain2
+        await db
+            .update(teams)
+            .set({ captain2: newUserId })
+            .where(eq(teams.captain2, oldUserId))
+
         // Update drafts:user
         await db
             .update(drafts)

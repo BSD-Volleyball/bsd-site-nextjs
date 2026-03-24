@@ -1,6 +1,6 @@
 "use server"
 
-import { and, asc, count, eq } from "drizzle-orm"
+import { and, asc, count, eq, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -147,7 +147,10 @@ export async function getWeek2HomeworkData(): Promise<{
             .where(
                 and(
                     eq(teams.season, config.seasonId),
-                    eq(teams.captain, session.user.id)
+                    or(
+                        eq(teams.captain, session.user.id),
+                        eq(teams.captain2, session.user.id)
+                    )
                 )
             )
             .limit(1)
@@ -741,7 +744,10 @@ export async function submitCoachWeek2Homework(
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
+                or(
+                    eq(teams.captain, session.user.id),
+                    eq(teams.captain2, session.user.id)
+                )
             )
         )
         .limit(1)
