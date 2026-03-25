@@ -163,6 +163,16 @@ function RoundGroup({
 
     // Each combobox is h-8 = 32px, gap-1 = 4px
     const totalHeightPx = slotCount * 32 + (slotCount - 1) * 4
+    // Reference height matches a full round (numTeams slots) — used for consistent photo sizing in the dynamic section
+    const referenceHeightPx = numTeams * 32 + (numTeams - 1) * 4
+
+    // Chunk selected players into rows of numTeams for the dynamic (Considering) section
+    const photoRows: DraftHomeworkPlayer[][] = []
+    if (isDynamic) {
+        for (let i = 0; i < selectedPlayers.length; i += numTeams) {
+            photoRows.push(selectedPlayers.slice(i, i + numTeams))
+        }
+    }
 
     return (
         <div className="mb-4">
@@ -222,20 +232,42 @@ function RoundGroup({
                     </div>
 
                     {/* Player pictures */}
-                    <div
-                        className="flex items-stretch gap-1"
-                        style={{ height: `${totalHeightPx}px` }}
-                    >
-                        {selectedPlayers.map((player) => (
-                            <PlayerPic
-                                key={player.userId}
-                                player={player}
-                                playerPicUrl={playerPicUrl}
-                                height="100%"
-                                onOpen={onOpenPlayer}
-                            />
-                        ))}
-                    </div>
+                    {isDynamic ? (
+                        <div className="flex flex-col gap-2">
+                            {photoRows.map((row, rowIdx) => (
+                                <div
+                                    key={rowIdx}
+                                    className="flex items-stretch gap-1"
+                                    style={{ height: `${referenceHeightPx}px` }}
+                                >
+                                    {row.map((player) => (
+                                        <PlayerPic
+                                            key={player.userId}
+                                            player={player}
+                                            playerPicUrl={playerPicUrl}
+                                            height="100%"
+                                            onOpen={onOpenPlayer}
+                                        />
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div
+                            className="flex items-stretch gap-1"
+                            style={{ height: `${totalHeightPx}px` }}
+                        >
+                            {selectedPlayers.map((player) => (
+                                <PlayerPic
+                                    key={player.userId}
+                                    player={player}
+                                    playerPicUrl={playerPicUrl}
+                                    height="100%"
+                                    onOpen={onOpenPlayer}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
