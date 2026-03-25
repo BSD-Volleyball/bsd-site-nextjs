@@ -3,7 +3,8 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { concerns } from "@/database/schema"
+import { concerns, userRoles, users } from "@/database/schema"
+import { eq } from "drizzle-orm"
 import { Resend } from "resend"
 import { site } from "@/config/site"
 
@@ -65,16 +66,27 @@ export async function submitConcern(
             status: "new"
         })
 
-        const notifyEmail = process.env.CONCERNS_NOTIFY_EMAIL
-        if (notifyEmail) {
+        const ombudsmenRows = await db
+            .select({ email: users.email })
+            .from(userRoles)
+            .innerJoin(users, eq(userRoles.user_id, users.id))
+            .where(eq(userRoles.role, "ombudsman"))
+
+        const ombudsmanEmails = [
+            ...new Set(ombudsmenRows.map((r) => r.email).filter(Boolean))
+        ]
+
+        if (ombudsmanEmails.length > 0) {
             const appUrl =
                 process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
-            await resend.emails.send({
-                from: site.mailFrom,
-                to: notifyEmail,
-                subject: "New Concern Submitted",
-                html: `<p>A new concern has been submitted.</p><p><a href="${appUrl}/dashboard/manage-concerns">View concerns</a></p>`
-            })
+            await resend.batch.send(
+                ombudsmanEmails.map((to) => ({
+                    from: site.mailFrom,
+                    to,
+                    subject: "New Concern Submitted",
+                    html: `<p>A new concern has been submitted.</p><p><a href="${appUrl}/dashboard/manage-concerns">View concerns</a></p>`
+                }))
+            )
         }
 
         return {
