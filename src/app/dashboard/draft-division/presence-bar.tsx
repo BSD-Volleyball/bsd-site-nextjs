@@ -3,7 +3,23 @@
 import { useOthers, useSelf, useRoom } from "@/lib/liveblocks.config"
 import { cn } from "@/lib/utils"
 
-export function PresenceBar() {
+interface PresenceBarProps {
+    teamIds: number[]
+    selfEffectiveRole: "commissioner" | "captain"
+}
+
+function getEffectiveRole(
+    baseRole: string | undefined,
+    captainTeamIds: number[] | undefined,
+    divisionTeamIds: number[]
+): "commissioner" | "captain" {
+    if (captainTeamIds?.some((id) => divisionTeamIds.includes(id))) {
+        return "captain"
+    }
+    return baseRole === "commissioner" ? "commissioner" : "captain"
+}
+
+export function PresenceBar({ teamIds, selfEffectiveRole }: PresenceBarProps) {
     const others = useOthers()
     const self = useSelf()
     const room = useRoom()
@@ -26,7 +42,7 @@ export function PresenceBar() {
                     <span
                         className={cn(
                             "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                            self.info?.role === "commissioner"
+                            selfEffectiveRole === "commissioner"
                                 ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
                                 : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"
                         )}
@@ -34,7 +50,7 @@ export function PresenceBar() {
                         <span
                             className={cn(
                                 "h-2 w-2 rounded-full",
-                                self.info?.role === "commissioner"
+                                selfEffectiveRole === "commissioner"
                                     ? "bg-purple-500"
                                     : "bg-blue-500"
                             )}
@@ -43,30 +59,37 @@ export function PresenceBar() {
                         <span className="opacity-70">(you)</span>
                     </span>
                 )}
-                {others.map((other) => (
-                    <span
-                        key={other.connectionId}
-                        className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                            other.info?.role === "commissioner"
-                                ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
-                                : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"
-                        )}
-                    >
+                {others.map((other) => {
+                    const effectiveRole = getEffectiveRole(
+                        other.info?.role,
+                        other.info?.captainTeamIds,
+                        teamIds
+                    )
+                    return (
                         <span
+                            key={other.connectionId}
                             className={cn(
-                                "h-2 w-2 rounded-full",
-                                other.info?.role === "commissioner"
-                                    ? "bg-purple-500"
-                                    : "bg-blue-500"
+                                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
+                                effectiveRole === "commissioner"
+                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
+                                    : "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200"
                             )}
-                        />
-                        {other.info?.name ?? "Unknown"}
-                        <span className="opacity-70">
-                            ({other.info?.role ?? "?"})
+                        >
+                            <span
+                                className={cn(
+                                    "h-2 w-2 rounded-full",
+                                    effectiveRole === "commissioner"
+                                        ? "bg-purple-500"
+                                        : "bg-blue-500"
+                                )}
+                            />
+                            {other.info?.name ?? "Unknown"}
+                            <span className="opacity-70">
+                                ({effectiveRole})
+                            </span>
                         </span>
-                    </span>
-                ))}
+                    )
+                })}
                 {!self && others.length === 0 && (
                     <span className="text-muted-foreground text-xs">
                         No one connected

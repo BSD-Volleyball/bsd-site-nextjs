@@ -118,19 +118,11 @@ export async function hasDraftPageAccess(): Promise<{
 
     const seasonId = config.seasonId
 
-    const isAdmin = await isAdminOrDirector(userId)
-    if (isAdmin) {
-        return {
-            hasAccess: true,
-            isLeagueWideCommissioner: true,
-            accessibleDivisionIds: [],
-            divisionRoleById: {},
-            captainTeamIdsByDivision: {},
-            defaultDivisionId: null
-        }
-    }
-
-    const [isCommissioner, captainTeams] = await Promise.all([
+    // Always check captain status and admin/commissioner status in parallel.
+    // Captain role takes priority over admin/commissioner in divisions
+    // where the user is a captain.
+    const [isAdmin, isCommissioner, captainTeams] = await Promise.all([
+        isAdminOrDirector(userId),
         isCommissionerForCurrentSeason(userId),
         db
             .select({ id: teams.id, division: teams.division })
@@ -159,6 +151,17 @@ export async function hasDraftPageAccess(): Promise<{
         divisionRoleById[divisionId] = "captain"
     }
 
+    if (isAdmin) {
+        return {
+            hasAccess: true,
+            isLeagueWideCommissioner: true,
+            accessibleDivisionIds: captainDivisionIds,
+            divisionRoleById,
+            captainTeamIdsByDivision,
+            defaultDivisionId: captainDivisionIds[0] ?? null
+        }
+    }
+
     if (isCommissioner) {
         const scope = await getCommissionerDivisionScope(userId, seasonId)
 
@@ -175,7 +178,11 @@ export async function hasDraftPageAccess(): Promise<{
 
         if (scope.type === "division_specific") {
             for (const divisionId of scope.divisionIds) {
-                divisionRoleById[divisionId] = "commissioner"
+                // Captain role takes priority — only set commissioner for
+                // divisions where the user is NOT a captain
+                if (!captainDivisionIds.includes(divisionId)) {
+                    divisionRoleById[divisionId] = "commissioner"
+                }
             }
 
             const accessibleDivisionIds = [
@@ -260,46 +267,57 @@ export async function getDraftDivisionData(
         const config = await getSeasonConfig()
         const seasonId = config.seasonId || 0
 
-        const [allDivisions, allUsers, splitRows] = await Promise.all([
-            db
-                .select({
-                    id: divisions.id,
-                    name: divisions.name,
-                    level: divisions.level
-                })
-                .from(divisions)
-                .orderBy(divisions.level),
-            seasonId > 0
-                ? db
-                      .select({
-                          id: users.id,
-                          old_id: users.old_id,
-                          first_name: users.first_name,
-                          last_name: users.last_name,
-                          preferred_name: users.preferred_name,
-                          male: users.male,
-                          picture: users.picture
-                      })
-                      .from(users)
-                      .innerJoin(
-                          signups,
-                          and(
-                              eq(signups.player, users.id),
-                              eq(signups.season, seasonId)
+        const [allDivisions, allUsers, splitRows, draftedRows] =
+            await Promise.all([
+                db
+                    .select({
+                        id: divisions.id,
+                        name: divisions.name,
+                        level: divisions.level
+                    })
+                    .from(divisions)
+                    .orderBy(divisions.level),
+                seasonId > 0
+                    ? db
+                          .select({
+                              id: users.id,
+                              old_id: users.old_id,
+                              first_name: users.first_name,
+                              last_name: users.last_name,
+                              preferred_name: users.preferred_name,
+                              male: users.male,
+                              picture: users.picture
+                          })
+                          .from(users)
+                          .innerJoin(
+                              signups,
+                              and(
+                                  eq(signups.player, users.id),
+                                  eq(signups.season, seasonId)
+                              )
                           )
-                      )
-                      .orderBy(users.last_name, users.first_name)
-                : Promise.resolve([]),
-            seasonId > 0
-                ? db
-                      .select({
-                          divisionId: individual_divisions.division,
-                          genderSplit: individual_divisions.gender_split
-                      })
-                      .from(individual_divisions)
-                      .where(eq(individual_divisions.season, seasonId))
-                : Promise.resolve([])
-        ])
+                          .orderBy(users.last_name, users.first_name)
+                    : Promise.resolve([]),
+                seasonId > 0
+                    ? db
+                          .select({
+                              divisionId: individual_divisions.division,
+                              genderSplit: individual_divisions.gender_split
+                          })
+                          .from(individual_divisions)
+                          .where(eq(individual_divisions.season, seasonId))
+                    : Promise.resolve([]),
+                seasonId > 0
+                    ? db
+                          .selectDistinct({ userId: drafts.user })
+                          .from(drafts)
+                          .innerJoin(teams, eq(drafts.team, teams.id))
+                          .where(eq(teams.season, seasonId))
+                    : Promise.resolve([])
+            ])
+
+        const draftedUserIds = new Set(draftedRows.map((r) => r.userId))
+        const undraftedUsers = allUsers.filter((u) => !draftedUserIds.has(u.id))
 
         const configuredDivisionIds = new Set(
             splitRows
@@ -324,7 +342,7 @@ export async function getDraftDivisionData(
                     genderSplit: r.genderSplit ?? "5-3"
                 })),
             divisions: filteredDivisions,
-            users: allUsers
+            users: undraftedUsers
         }
     } catch (error) {
         console.error("Error fetching draft division data:", error)
@@ -531,9 +549,11 @@ export async function getDraftInitData(
                 const key = `${team.captain}:${pairId}`
                 const pinnedRound = pairDiffLookup.get(key)?.round ?? 8
                 const pairRound =
-                    captainRound < pinnedRound
-                        ? pinnedRound
-                        : Math.min(captainRound + 1, DRAFT_ROUNDS)
+                    pinnedRound === captainRound
+                        ? captainRound < DRAFT_ROUNDS
+                            ? captainRound + 1
+                            : captainRound - 1
+                        : pinnedRound
                 if (!initialPicks[`${pairRound}-${team.id}`]) {
                     initialPicks[`${pairRound}-${team.id}`] = pairId
                 }

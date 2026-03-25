@@ -84,12 +84,16 @@ export function DraftDivisionForm({
         [divisions, divisionId]
     )
     const selectedDivisionId = divisionId ? parseInt(divisionId, 10) : null
-    const currentRole: "commissioner" | "captain" =
+    const isCaptainInDivision =
         selectedDivisionId !== null &&
-        (hasLeagueWideCommissionerAccess ||
-            divisionRoleById[selectedDivisionId] === "commissioner")
-            ? "commissioner"
-            : "captain"
+        divisionRoleById[selectedDivisionId] === "captain"
+    const currentRole: "commissioner" | "captain" = isCaptainInDivision
+        ? "captain"
+        : selectedDivisionId !== null &&
+            (hasLeagueWideCommissionerAccess ||
+                divisionRoleById[selectedDivisionId] === "commissioner")
+          ? "commissioner"
+          : "captain"
     const currentCaptainTeamIds =
         selectedDivisionId !== null
             ? (captainTeamIdsByDivision[selectedDivisionId] ?? [])
