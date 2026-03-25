@@ -48,20 +48,19 @@ export async function POST() {
     const role =
         isAdmin || isCommissioner ? "commissioner" : ("captain" as const)
 
-    // Look up captain's team IDs for the current season (empty for commissioners)
-    let captainTeamIds: number[] = []
-    if (role === "captain") {
-        const captainTeams = await db
-            .select({ id: teams.id })
-            .from(teams)
-            .where(
-                and(
-                    eq(teams.season, seasonId),
-                    or(eq(teams.captain, userId), eq(teams.captain2, userId))
-                )
+    // Always look up captain team IDs — even for admins/commissioners — so the
+    // client can enforce captain-level restrictions in divisions where the user
+    // is a captain (captain role takes priority over commissioner in those divisions).
+    const captainTeams = await db
+        .select({ id: teams.id })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, seasonId),
+                or(eq(teams.captain, userId), eq(teams.captain2, userId))
             )
-        captainTeamIds = captainTeams.map((t) => t.id)
-    }
+        )
+    const captainTeamIds = captainTeams.map((t) => t.id)
 
     // Get user display name
     const [user] = await db

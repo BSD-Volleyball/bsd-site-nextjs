@@ -317,9 +317,11 @@ export function DraftBoard({
                 // the partner immediately after. This way captains don't need
                 // to pick in a specific order to get the intended placement.
                 const targetRound =
-                    round < entry.pinnedRound
-                        ? entry.pinnedRound
-                        : Math.min(round + 1, ROUNDS)
+                    entry.pinnedRound === round
+                        ? round < ROUNDS
+                            ? round + 1
+                            : round - 1
+                        : entry.pinnedRound
                 const availableRound = findAvailablePairSlot(
                     targetRound,
                     teamId,
@@ -495,7 +497,10 @@ export function DraftBoard({
 
     return (
         <div>
-            <PresenceBar />
+            <PresenceBar
+                teamIds={teams.map((t) => t.id)}
+                selfEffectiveRole={role}
+            />
 
             {/* Turn indicator */}
             <div

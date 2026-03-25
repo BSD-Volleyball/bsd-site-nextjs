@@ -612,9 +612,11 @@ export async function getDraftSheetData(
                     const pinnedRound =
                         pairDiffMap.get(key)?.round ?? DRAFT_ROUNDS
                     const pairRound =
-                        captainRound < pinnedRound
-                            ? pinnedRound
-                            : Math.min(captainRound + 1, DRAFT_ROUNDS)
+                        pinnedRound === captainRound
+                            ? captainRound < DRAFT_ROUNDS
+                                ? captainRound + 1
+                                : captainRound - 1
+                            : pinnedRound
                     const pairInfo = pairInfoMap.get(pairId)
                     if (pairInfo?.name) {
                         picks.push({
