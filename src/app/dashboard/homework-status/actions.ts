@@ -11,7 +11,7 @@ import {
     movingDay,
     draftHomework
 } from "@/database/schema"
-import { eq, and, notInArray, desc, count, inArray } from "drizzle-orm"
+import { eq, and, notInArray, desc, count, inArray, or } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -622,6 +622,277 @@ export async function getMovingDayDetail(
             forcedDown: [],
             recommendedUp: [],
             recommendedDown: []
+        }
+    }
+}
+
+// ─── Draft Homework Detail ────────────────────────────────────────────────────
+
+const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
+const NON_MALE_ROUND_MAP: Record<number, number> = { 1: 3, 2: 5, 3: 8 }
+const CONSIDERING_ROUND = 9
+
+export interface DraftHomeworkDetailPlayer {
+    userId: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    oldId: number
+    picture: string | null
+}
+
+export interface DraftHomeworkDetailRound {
+    draftRound: number
+    label: string
+    isMale: boolean
+    players: DraftHomeworkDetailPlayer[]
+}
+
+export interface DraftHomeworkDetailResult {
+    status: boolean
+    message?: string
+    rounds: DraftHomeworkDetailRound[]
+    consideringMalePlayers: DraftHomeworkDetailPlayer[]
+    consideringNonMalePlayers: DraftHomeworkDetailPlayer[]
+    numTeams: number
+    captainName: string
+    divisionName: string
+}
+
+export async function getDraftHomeworkDetail(
+    captainId: string,
+    seasonId: number
+): Promise<DraftHomeworkDetailResult> {
+    const hasAccess = await getIsCommissioner()
+    if (!hasAccess) {
+        return {
+            status: false,
+            message: "Unauthorized",
+            rounds: [],
+            consideringMalePlayers: [],
+            consideringNonMalePlayers: [],
+            numTeams: 0,
+            captainName: "",
+            divisionName: ""
+        }
+    }
+
+    try {
+        // 1. Look up captain's team to find divisionId
+        const captainTeams = await db
+            .select({
+                divisionId: teams.division,
+                captain: teams.captain,
+                captain2: teams.captain2
+            })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    or(
+                        eq(teams.captain, captainId),
+                        eq(teams.captain2, captainId)
+                    )
+                )
+            )
+            .limit(1)
+
+        if (captainTeams.length === 0) {
+            return {
+                status: false,
+                message: "Captain not found in this season.",
+                rounds: [],
+                consideringMalePlayers: [],
+                consideringNonMalePlayers: [],
+                numTeams: 0,
+                captainName: "",
+                divisionName: ""
+            }
+        }
+
+        const divisionId = captainTeams[0].divisionId
+
+        // 2. Fetch division config (genderSplit, numTeams) and division name
+        const [divConfig] = await db
+            .select({
+                genderSplit: individual_divisions.gender_split,
+                numTeams: individual_divisions.teams,
+                divisionName: divisions.name
+            })
+            .from(individual_divisions)
+            .innerJoin(
+                divisions,
+                eq(individual_divisions.division, divisions.id)
+            )
+            .where(
+                and(
+                    eq(individual_divisions.season, seasonId),
+                    eq(individual_divisions.division, divisionId)
+                )
+            )
+            .limit(1)
+
+        if (!divConfig) {
+            return {
+                status: false,
+                message: "Division configuration not found.",
+                rounds: [],
+                consideringMalePlayers: [],
+                consideringNonMalePlayers: [],
+                numTeams: 0,
+                captainName: "",
+                divisionName: ""
+            }
+        }
+
+        // 3. Fetch captain user info
+        const [captainUser] = await db
+            .select({
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name
+            })
+            .from(users)
+            .where(eq(users.id, captainId))
+            .limit(1)
+
+        const captainDisplayFirst =
+            captainUser?.preferredName || captainUser?.firstName || ""
+        const captainName = captainUser
+            ? `${captainDisplayFirst} ${captainUser.lastName}`.trim()
+            : captainId
+
+        // 4. Fetch all homework rows for this captain+season
+        const homeworkRows = await db
+            .select({
+                round: draftHomework.round,
+                slot: draftHomework.slot,
+                player: draftHomework.player,
+                isMaleTab: draftHomework.is_male_tab
+            })
+            .from(draftHomework)
+            .where(
+                and(
+                    eq(draftHomework.season, seasonId),
+                    eq(draftHomework.captain, captainId)
+                )
+            )
+
+        // 5. Fetch player user data
+        const playerIds = [...new Set(homeworkRows.map((r) => r.player))]
+        const playerUserMap = new Map<string, DraftHomeworkDetailPlayer>()
+
+        if (playerIds.length > 0) {
+            const playerUsers = await db
+                .select({
+                    id: users.id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name,
+                    oldId: users.old_id,
+                    picture: users.picture
+                })
+                .from(users)
+                .where(inArray(users.id, playerIds))
+
+            for (const u of playerUsers) {
+                playerUserMap.set(u.id, {
+                    userId: u.id,
+                    firstName: u.firstName,
+                    lastName: u.lastName,
+                    preferredName: u.preferredName,
+                    oldId: u.oldId ?? 0,
+                    picture: u.picture
+                })
+            }
+        }
+
+        // 6. Parse genderSplit to determine how many rounds of each type exist
+        const splitParts = divConfig.genderSplit.split("-").map(Number)
+        const maleRounds = splitParts[0] ?? 0
+        const nonMaleRounds = splitParts[1] ?? 0
+
+        // 7. Build interleaved rounds and considering buckets
+        const roundMap = new Map<number, DraftHomeworkDetailRound>()
+
+        for (let mHw = 1; mHw <= maleRounds; mHw++) {
+            const draftRound = MALE_ROUND_MAP[mHw]
+            if (draftRound === undefined) continue
+            roundMap.set(draftRound, {
+                draftRound,
+                label: `Round ${draftRound} — Male (Pick ${mHw})`,
+                isMale: true,
+                players: []
+            })
+        }
+
+        for (let fHw = 1; fHw <= nonMaleRounds; fHw++) {
+            const draftRound = NON_MALE_ROUND_MAP[fHw]
+            if (draftRound === undefined) continue
+            roundMap.set(draftRound, {
+                draftRound,
+                label: `Round ${draftRound} — Non-Male (Pick ${fHw})`,
+                isMale: false,
+                players: []
+            })
+        }
+
+        const consideringMalePlayers: DraftHomeworkDetailPlayer[] = []
+        const consideringNonMalePlayers: DraftHomeworkDetailPlayer[] = []
+
+        // Sort by slot so players appear in pick order within each round
+        const sorted = [...homeworkRows].sort((a, b) => a.slot - b.slot)
+
+        for (const row of sorted) {
+            const player = playerUserMap.get(row.player)
+            if (!player) continue
+
+            if (row.round === CONSIDERING_ROUND) {
+                if (row.isMaleTab) {
+                    consideringMalePlayers.push(player)
+                } else {
+                    consideringNonMalePlayers.push(player)
+                }
+                continue
+            }
+
+            // Map homework round → draft round using the correct map
+            const draftRound = row.isMaleTab
+                ? MALE_ROUND_MAP[row.round]
+                : NON_MALE_ROUND_MAP[row.round]
+
+            if (draftRound === undefined) continue
+
+            const roundEntry = roundMap.get(draftRound)
+            if (roundEntry) {
+                roundEntry.players.push(player)
+            }
+        }
+
+        const rounds = [...roundMap.values()].sort(
+            (a, b) => a.draftRound - b.draftRound
+        )
+
+        return {
+            status: true,
+            rounds,
+            consideringMalePlayers,
+            consideringNonMalePlayers,
+            numTeams: divConfig.numTeams,
+            captainName,
+            divisionName: divConfig.divisionName
+        }
+    } catch (error) {
+        console.error("Error fetching draft homework detail:", error)
+        return {
+            status: false,
+            message: "Something went wrong.",
+            rounds: [],
+            consideringMalePlayers: [],
+            consideringNonMalePlayers: [],
+            numTeams: 0,
+            captainName: "",
+            divisionName: ""
         }
     }
 }
