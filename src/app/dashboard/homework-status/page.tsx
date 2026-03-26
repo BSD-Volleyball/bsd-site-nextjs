@@ -67,6 +67,7 @@ export default async function HomeworkStatusPage({
                 canSelectDivision={result.canSelectDivision}
                 divisions={result.divisions}
                 seasonId={result.seasonId}
+                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>
     )

@@ -1,6 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import {
+    useState,
+    useEffect,
+    useRef,
+    useMemo,
+    useCallback,
+    useTransition
+} from "react"
 import { useRouter } from "next/navigation"
 import type {
     PrepareForDraftData,
@@ -10,6 +17,9 @@ import type {
     ConsideredButUndraftedPlayer
 } from "./actions"
 import { setCaptainRound, setPairDiff } from "./actions"
+import type { DraftHomeworkDetailResult } from "@/app/dashboard/homework-status/actions"
+import { getDraftHomeworkDetail } from "@/app/dashboard/homework-status/actions"
+import { CaptainHomeworkPopup } from "@/components/captain-homework-popup"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -160,6 +170,22 @@ export function PrepareForDraftTable({
         "idle"
     )
     const [showEmailModal, setShowEmailModal] = useState(false)
+    const [homeworkPopupOpen, setHomeworkPopupOpen] = useState(false)
+    const [homeworkData, setHomeworkData] =
+        useState<DraftHomeworkDetailResult | null>(null)
+    const [, startHomeworkTransition] = useTransition()
+
+    const handleCaptainNameClick = (captainUserId: string) => {
+        setHomeworkPopupOpen(true)
+        setHomeworkData(null)
+        startHomeworkTransition(async () => {
+            const result = await getDraftHomeworkDetail(
+                captainUserId,
+                data.seasonId
+            )
+            setHomeworkData(result)
+        })
+    }
     const [copyEmailListSuccess, setCopyEmailListSuccess] = useState(false)
     const [copySubjectSuccess, setCopySubjectSuccess] = useState(false)
     const [copyPlainTextSuccess, setCopyPlainTextSuccess] = useState(false)
@@ -448,13 +474,23 @@ export function PrepareForDraftTable({
                                     <th
                                         key={team.teamId}
                                         className="whitespace-nowrap px-3 py-2 text-center font-medium"
-                                        title={
-                                            team.captain2
-                                                ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName}`
-                                                : `${team.captain1.displayName} ${team.captain1.lastName}`
-                                        }
                                     >
-                                        {team.captain1.displayName}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleCaptainNameClick(
+                                                    team.captain1.userId
+                                                )
+                                            }
+                                            className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
+                                            title={
+                                                team.captain2
+                                                    ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName} — view homework`
+                                                    : `${team.captain1.displayName} ${team.captain1.lastName} — view homework`
+                                            }
+                                        >
+                                            {team.captain1.displayName}
+                                        </button>
                                     </th>
                                 ))}
                                 <th className="whitespace-nowrap px-3 py-2 text-center font-medium">
@@ -805,6 +841,14 @@ export function PrepareForDraftTable({
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
                 viewerRating={modal.viewerRating}
+            />
+
+            <CaptainHomeworkPopup
+                open={homeworkPopupOpen}
+                onClose={() => setHomeworkPopupOpen(false)}
+                data={homeworkData}
+                isLoading={!homeworkData && homeworkPopupOpen}
+                playerPicUrl={playerPicUrl}
             />
         </div>
     )

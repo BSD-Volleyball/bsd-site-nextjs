@@ -14,9 +14,15 @@ import {
 import type {
     DivisionStatus,
     RatePlayersDetailResult,
-    MovingDayDetailResult
+    MovingDayDetailResult,
+    DraftHomeworkDetailResult
 } from "./actions"
-import { getRatePlayersDetail, getMovingDayDetail } from "./actions"
+import {
+    getRatePlayersDetail,
+    getMovingDayDetail,
+    getDraftHomeworkDetail
+} from "./actions"
+import { CaptainHomeworkPopup } from "@/components/captain-homework-popup"
 
 interface HomeworkStatusViewProps {
     divisions: DivisionStatus[]
@@ -24,11 +30,13 @@ interface HomeworkStatusViewProps {
     availableDivisions: { divisionId: number; divisionName: string }[]
     selectedDivisionId: number | null
     canSelectDivision: boolean
+    playerPicUrl: string
 }
 
 type DialogState =
     | { type: "rate"; captainId: string; captainName: string }
     | { type: "moving"; captainId: string; captainName: string }
+    | { type: "homework"; captainId: string; captainName: string }
     | null
 
 export function HomeworkStatusView({
@@ -36,7 +44,8 @@ export function HomeworkStatusView({
     seasonId,
     availableDivisions,
     selectedDivisionId,
-    canSelectDivision
+    canSelectDivision,
+    playerPicUrl
 }: HomeworkStatusViewProps) {
     const router = useRouter()
     const [dialogState, setDialogState] = useState<DialogState>(null)
@@ -46,6 +55,8 @@ export function HomeworkStatusView({
     const [movingData, setMovingData] = useState<MovingDayDetailResult | null>(
         null
     )
+    const [homeworkData, setHomeworkData] =
+        useState<DraftHomeworkDetailResult | null>(null)
     const [isPending, startTransition] = useTransition()
 
     const handleRateClick = (captainId: string, captainName: string) => {
@@ -63,6 +74,15 @@ export function HomeworkStatusView({
         startTransition(async () => {
             const data = await getMovingDayDetail(captainId, seasonId)
             setMovingData(data)
+        })
+    }
+
+    const handleHomeworkClick = (captainId: string, captainName: string) => {
+        setDialogState({ type: "homework", captainId, captainName })
+        setHomeworkData(null)
+        startTransition(async () => {
+            const data = await getDraftHomeworkDetail(captainId, seasonId)
+            setHomeworkData(data)
         })
     }
 
@@ -194,10 +214,21 @@ export function HomeworkStatusView({
                                                 </td>
                                                 <td className="px-4 py-2 text-center">
                                                     {captain.draftHomeworkComplete && (
-                                                        <RiCheckLine
-                                                            className="mx-auto text-green-600"
-                                                            size={18}
-                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                handleHomeworkClick(
+                                                                    captain.captainId,
+                                                                    captain.captainName
+                                                                )
+                                                            }
+                                                            className="mx-auto flex items-center justify-center rounded p-0.5 text-green-600 transition-colors hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30"
+                                                            title="View draft homework"
+                                                        >
+                                                            <RiCheckLine
+                                                                size={18}
+                                                            />
+                                                        </button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -252,6 +283,15 @@ export function HomeworkStatusView({
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Draft Homework Popup */}
+            <CaptainHomeworkPopup
+                open={dialogState?.type === "homework"}
+                onClose={handleDialogClose}
+                data={homeworkData}
+                isLoading={isPending && !homeworkData}
+                playerPicUrl={playerPicUrl}
+            />
 
             {/* Moving Day Dialog */}
             <Dialog
