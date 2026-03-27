@@ -253,6 +253,7 @@ export interface CaptainWelcomeMember {
     displayName: string
     lastName: string
     email: string
+    phone: string | null
 }
 
 export interface CaptainWelcomeData {
@@ -329,7 +330,8 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preferred_name,
-                email: users.email
+                email: users.email,
+                phone: users.phone
             })
             .from(drafts)
             .innerJoin(users, eq(drafts.user, users.id))
@@ -339,7 +341,8 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
         const members: CaptainWelcomeMember[] = draftRows.map((row) => ({
             displayName: row.preferredName || row.firstName,
             lastName: row.lastName,
-            email: row.email
+            email: row.email,
+            phone: row.phone ?? null
         }))
 
         let emailTemplate = ""
@@ -392,6 +395,33 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
         console.error("Error fetching captain welcome data:", error)
         return null
     }
+}
+
+export async function logContactDetailsViewed(): Promise<void> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return
+
+    const [teamRow] = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(
+            and(
+                eq(teams.season, config.seasonId),
+                eq(teams.captain, session.user.id)
+            )
+        )
+        .limit(1)
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "view",
+        entityType: "teams",
+        entityId: teamRow?.id,
+        summary: `Captain viewed team contact details for team "${teamRow?.name ?? "unknown"}" (season ${config.seasonId})`
+    })
 }
 
 export interface PlayerTeamAssignment {
