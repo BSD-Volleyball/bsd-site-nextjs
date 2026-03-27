@@ -86,6 +86,7 @@ export async function getCreateScheduleData(): Promise<{
     message?: string
     seasonId: number
     seasonLabel: string
+    seasonName: string
     phase: string
     divisions: DivisionWithTeams[]
     seasonDates: string[]
@@ -99,6 +100,7 @@ export async function getCreateScheduleData(): Promise<{
             message: "You don't have permission to access this page.",
             seasonId: 0,
             seasonLabel: "",
+            seasonName: "",
             phase: "",
             divisions: [],
             seasonDates: [],
@@ -115,6 +117,7 @@ export async function getCreateScheduleData(): Promise<{
                 message: "No active season found.",
                 seasonId: 0,
                 seasonLabel: "",
+                seasonName: "",
                 phase: "",
                 divisions: [],
                 seasonDates: [],
@@ -201,6 +204,7 @@ export async function getCreateScheduleData(): Promise<{
             status: true,
             seasonId: config.seasonId,
             seasonLabel,
+            seasonName: config.seasonName,
             phase: config.phase,
             divisions: divisionsData,
             seasonDates,
@@ -214,6 +218,7 @@ export async function getCreateScheduleData(): Promise<{
             message: "Something went wrong loading schedule data.",
             seasonId: 0,
             seasonLabel: "",
+            seasonName: "",
             phase: "",
             divisions: [],
             seasonDates: [],
@@ -451,6 +456,7 @@ export async function writePlayoffSchedule(
             }
         }
 
+        const isSpring = data.seasonName.toLowerCase() === "spring"
         let totalMatchesCreated = 0
 
         for (const div of data.divisions) {
@@ -472,7 +478,7 @@ export async function writePlayoffSchedule(
                 const matchCourt = pm.useSecondCourt
                     ? getPairedCourt(court)
                     : court
-                const matchTime = getPlayoffMatchTime(pm, court)
+                const matchTime = getPlayoffMatchTime(pm, court, isSpring)
 
                 const [inserted] = await db
                     .insert(matches)

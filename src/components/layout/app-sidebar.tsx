@@ -153,6 +153,11 @@ const adminNavItems = [
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
+    },
+    {
+        title: "Draft History",
+        url: "/dashboard/draft-history",
+        icon: RiFileList3Line
     }
 ]
 
@@ -263,6 +268,12 @@ const currentRostersNavItem = {
     title: "Rosters",
     url: "/dashboard/rosters",
     icon: RiTeamLine
+}
+
+const scheduleNavItem = {
+    title: "Schedule",
+    url: "/dashboard/season-schedule",
+    icon: RiCalendarLine
 }
 
 const addPicturesNavItem = {
@@ -496,6 +507,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showWeek2 = inRange("select_captains", "draft")
     const showWeek3 = inRange("select_captains", "draft")
     const showCurrentRosters = inRange("draft", "complete")
+    const showSchedule = inRange("draft", "complete")
     const showWeek2Homework = phase === "prep_tryout_week_3"
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
     const showPictures =
@@ -566,7 +578,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             ...(!showWeek1 ? [week1NavItem] : []),
             ...(!showWeek2 ? [week2NavItem] : []),
             ...(!showWeek3 ? [week3NavItem] : []),
-            ...(!showCurrentRosters ? [currentRostersNavItem] : [])
+            ...(!showCurrentRosters ? [currentRostersNavItem] : []),
+            ...(!showSchedule ? [scheduleNavItem] : [])
         ]
         if (hiddenSeasonItems.length > 0)
             hiddenGroups.push({
@@ -669,7 +682,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 {(showWeek1 ||
                     showWeek2 ||
                     showWeek3 ||
-                    showCurrentRosters) && (
+                    showCurrentRosters ||
+                    showSchedule) && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
                             Season
@@ -697,6 +711,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 {showCurrentRosters && (
                                     <NavItems
                                         items={[currentRostersNavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                                {showSchedule && (
+                                    <NavItems
+                                        items={[scheduleNavItem]}
                                         pathname={pathname}
                                     />
                                 )}
