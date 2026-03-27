@@ -37,7 +37,7 @@ import {
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
-import { WelcomeTeamCard } from "./welcome-team-card"
+import { WelcomeTeamCard } from "./captain-info-card"
 import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession,
@@ -1170,7 +1170,13 @@ export default async function DashboardPage() {
     )
     const shouldShowWelcomeTeamCard = !!(
         signupStatus &&
-        ["prep_tryout_week_3", "draft"].includes(signupStatus.config.phase) &&
+        [
+            "prep_tryout_week_3",
+            "draft",
+            "regular_season",
+            "playoffs",
+            "complete"
+        ].includes(signupStatus.config.phase) &&
         isSeasonCaptain &&
         isDivisionDrafted &&
         captainWelcomeData
