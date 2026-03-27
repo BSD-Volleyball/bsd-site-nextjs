@@ -22,6 +22,7 @@ import type { PlayoffMatchTemplate } from "./schedule-constants"
 interface Props {
     seasonId: number
     seasonLabel: string
+    seasonName: string
     divisions: DivisionWithTeams[]
     seasonDates: string[]
     playoffDates: string[]
@@ -103,7 +104,8 @@ function buildRegularSeasonPreview(
 
 function buildPlayoffPreview(
     division: DivisionWithTeams,
-    playoffDates: string[]
+    playoffDates: string[],
+    isSpring: boolean
 ): PlayoffPreview[] {
     const court = division.level
     const template: PlayoffMatchTemplate[] =
@@ -114,7 +116,7 @@ function buildPlayoffPreview(
         week: pm.week,
         date:
             pm.week <= playoffDates.length ? playoffDates[pm.week - 1] : "TBD",
-        time: getPlayoffMatchTime(pm, court),
+        time: getPlayoffMatchTime(pm, court, isSpring),
         court: pm.useSecondCourt ? getPairedCourt(court) : court,
         homeLabel: pm.homeSeed,
         awayLabel: pm.awaySeed,
@@ -139,6 +141,7 @@ function bracketLabel(bracket: string): string {
 export function CreateScheduleClient({
     seasonId,
     seasonLabel,
+    seasonName,
     divisions,
     seasonDates,
     playoffDates
@@ -161,10 +164,12 @@ export function CreateScheduleClient({
     )
     const allTeamsReady = incompleteDivisions.length === 0
 
+    const isSpring = seasonName.toLowerCase() === "spring"
+
     // Build all playoff previews and check for court/time conflicts
     const allPlayoffPreviews = divisions.map((div) => ({
         division: div,
-        matches: buildPlayoffPreview(div, playoffDates)
+        matches: buildPlayoffPreview(div, playoffDates, isSpring)
     }))
 
     interface ConflictEntry {

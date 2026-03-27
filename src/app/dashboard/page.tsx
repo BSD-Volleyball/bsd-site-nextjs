@@ -47,8 +47,10 @@ import {
 import {
     getCaptainWelcomeData,
     getPlayerTeamAssignment,
+    getNextMatch,
     type CaptainWelcomeData,
-    type PlayerTeamAssignment
+    type PlayerTeamAssignment,
+    type NextMatch
 } from "./actions"
 import { cn } from "@/lib/utils"
 
@@ -622,6 +624,7 @@ export default async function DashboardPage() {
     let isDivisionDrafted = false
     let captainWelcomeData: CaptainWelcomeData | null = null
     let playerTeamAssignment: PlayerTeamAssignment | null = null
+    let nextMatch: NextMatch | null = null
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -814,6 +817,17 @@ export default async function DashboardPage() {
                 )
             ) {
                 playerTeamAssignment = await getPlayerTeamAssignment(
+                    session.user.id,
+                    signupStatus.config.seasonId
+                )
+            }
+
+            if (
+                ["draft", "regular_season", "playoffs"].includes(
+                    signupStatus.config.phase
+                )
+            ) {
+                nextMatch = await getNextMatch(
                     session.user.id,
                     signupStatus.config.seasonId
                 )
@@ -1175,6 +1189,72 @@ export default async function DashboardPage() {
             />
 
             <div className="flex flex-wrap gap-6">
+                {nextMatch && (
+                    <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                                    Your Next Match
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="space-y-1.5 rounded-md bg-blue-100 p-3 text-sm dark:bg-blue-900">
+                                <div className="flex justify-between">
+                                    <span className="text-blue-700 dark:text-blue-300">
+                                        Date:
+                                    </span>
+                                    <span className="font-semibold text-blue-800 dark:text-blue-200">
+                                        {nextMatch.date}
+                                    </span>
+                                </div>
+                                {nextMatch.time && (
+                                    <div className="flex justify-between">
+                                        <span className="text-blue-700 dark:text-blue-300">
+                                            Time:
+                                        </span>
+                                        <span className="font-semibold text-blue-800 dark:text-blue-200">
+                                            {nextMatch.time}
+                                        </span>
+                                    </div>
+                                )}
+                                {nextMatch.court !== null && (
+                                    <div className="flex justify-between">
+                                        <span className="text-blue-700 dark:text-blue-300">
+                                            Court:
+                                        </span>
+                                        <span className="font-semibold text-blue-800 dark:text-blue-200">
+                                            Court {nextMatch.court}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between">
+                                    <span className="text-blue-700 dark:text-blue-300">
+                                        Opponent:
+                                    </span>
+                                    <span className="font-semibold text-blue-800 dark:text-blue-200">
+                                        {nextMatch.opponentName}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-blue-700 dark:text-blue-300">
+                                        Division:
+                                    </span>
+                                    <span className="font-semibold text-blue-800 dark:text-blue-200">
+                                        {nextMatch.divisionName}
+                                    </span>
+                                </div>
+                            </div>
+                            <Link
+                                href="/dashboard/season-schedule"
+                                className="block text-center text-blue-700 text-sm underline underline-offset-4 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"
+                            >
+                                View Full Schedule →
+                            </Link>
+                        </CardContent>
+                    </Card>
+                )}
                 {userWeek3Roster && signupStatus && (
                     <Card className="min-w-[280px] flex-1 border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
                         <CardHeader className="pb-2">

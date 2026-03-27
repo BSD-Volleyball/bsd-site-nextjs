@@ -51,6 +51,7 @@ export default async function CreateSchedulePage() {
             <CreateScheduleClient
                 seasonId={data.seasonId}
                 seasonLabel={data.seasonLabel}
+                seasonName={data.seasonName}
                 divisions={data.divisions}
                 seasonDates={data.seasonDates}
                 playoffDates={data.playoffDates}

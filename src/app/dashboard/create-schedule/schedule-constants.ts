@@ -79,8 +79,12 @@ export const FOUR_TEAM_WEEKS: [number, number][][] = [
 export const FOUR_TEAM_TIMES = ["8:10", "9:20"]
 
 // Courts that get the EARLY time slots in playoff week 2 (7:00 and 7:50).
-// Courts 1 (AA), 3 (ABA), 6 (BB) are early; courts 2 (A), 4 (ABB), 5 (BBB) are late.
-export const EARLY_PLAYOFF_COURTS = new Set([1, 3, 6])
+// Alternates by season type so each division gets early slots every other season:
+//   Fall  → courts 1 (AA), 3 (ABA), 6 (BB) are early
+//   Spring → courts 2 (A), 4 (ABB), 5 (BBB) are early
+export function getEarlyCourts(isSpring: boolean): Set<number> {
+    return isSpring ? new Set([2, 4, 5]) : new Set([1, 3, 6])
+}
 
 // Each court shares simultaneous playoff week-2 matches with its paired court.
 export const COURT_PAIR: Record<number, number> = {
@@ -111,13 +115,14 @@ export interface PlayoffMatchTemplate {
     useSecondCourt: boolean
 }
 
-/** Returns the correct time for a playoff match given the division's court. */
+/** Returns the correct time for a playoff match given the division's court and season type. */
 export function getPlayoffMatchTime(
     pm: PlayoffMatchTemplate,
-    primaryCourt: number
+    primaryCourt: number,
+    isSpring: boolean
 ): string {
     if (pm.week === 2 && pm.week2SlotIndex !== undefined) {
-        const times = EARLY_PLAYOFF_COURTS.has(primaryCourt)
+        const times = getEarlyCourts(isSpring).has(primaryCourt)
             ? PLAYOFF_WEEK2_EARLY_TIMES
             : PLAYOFF_WEEK2_LATE_TIMES
         return times[pm.week2SlotIndex]
