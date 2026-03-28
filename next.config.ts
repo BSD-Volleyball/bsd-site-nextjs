@@ -24,10 +24,32 @@ const securityHeaders = [
     }
 ] as const
 
+// Parse PLAYER_PIC_URL to extract hostname for next/image remotePatterns
+const playerPicRemotePattern = (() => {
+    const url = process.env.PLAYER_PIC_URL
+    if (!url) return null
+    try {
+        const { hostname, protocol } = new URL(url)
+        return {
+            protocol: protocol.replace(":", "") as "https" | "http",
+            hostname
+        }
+    } catch {
+        return null
+    }
+})()
+
 const nextConfig: NextConfig = {
     /* config options here */
     images: {
-        minimumCacheTTL: 31536000
+        minimumCacheTTL: 31536000,
+        remotePatterns: [
+            // Cloudflare R2 default public bucket domains
+            { protocol: "https", hostname: "*.r2.dev" },
+            { protocol: "https", hostname: "*.r2.cloudflarestorage.com" },
+            // Dynamic pattern from PLAYER_PIC_URL env var if set
+            ...(playerPicRemotePattern ? [playerPicRemotePattern] : [])
+        ]
     },
     async headers() {
         return [
