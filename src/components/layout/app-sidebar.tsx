@@ -55,17 +55,7 @@ import {
     CollapsibleContent
 } from "@/components/ui/collapsible"
 import { site } from "@/config/site"
-import {
-    getSignupEligibility,
-    getIsAdminOrDirector,
-    getIsCommissioner,
-    getHasCaptainPagesAccess,
-    getHasPicturesAccess,
-    getHasConcernsAccess,
-    getRecentSeasonsNav,
-    getSeasonPhase,
-    type SeasonNavItem
-} from "@/app/dashboard/actions"
+import { getSidebarData, type SeasonNavItem } from "@/app/dashboard/actions"
 import {
     PHASE_CONFIG,
     SEASON_PHASES,
@@ -480,14 +470,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
 
     useEffect(() => {
-        getSignupEligibility().then(setShowSignupLink)
-        getIsAdminOrDirector().then(setIsAdmin)
-        getIsCommissioner().then(setIsCommissioner)
-        getHasCaptainPagesAccess().then(setHasCaptainPagesAccess)
-        getHasPicturesAccess().then(setHasPicturesAccess)
-        getHasConcernsAccess().then(setHasConcernsAccess)
-        getRecentSeasonsNav().then(setSeasonNav)
-        getSeasonPhase().then(setPhase)
+        getSidebarData().then((data) => {
+            setShowSignupLink(data.showSignupLink)
+            setIsAdmin(data.isAdmin)
+            setIsCommissioner(data.isCommissioner)
+            setHasCaptainPagesAccess(data.hasCaptainPagesAccess)
+            setHasPicturesAccess(data.hasPicturesAccess)
+            setHasConcernsAccess(data.hasConcernsAccess)
+            setSeasonNav(data.seasonNav)
+            setPhase(data.phase)
+        })
     }, [])
 
     const phaseConfig = phase ? PHASE_CONFIG[phase] : null

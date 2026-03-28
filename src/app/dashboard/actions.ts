@@ -160,6 +160,70 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     }
 }
 
+export interface SidebarData {
+    showSignupLink: boolean
+    isAdmin: boolean
+    isCommissioner: boolean
+    hasCaptainPagesAccess: boolean
+    hasPicturesAccess: boolean
+    hasConcernsAccess: boolean
+    seasonNav: SeasonNavItem[]
+    phase: SeasonPhase | null
+}
+
+export async function getSidebarData(): Promise<SidebarData> {
+    const session = await auth.api.getSession({ headers: await headers() })
+
+    if (!session?.user) {
+        return {
+            showSignupLink: false,
+            isAdmin: false,
+            isCommissioner: false,
+            hasCaptainPagesAccess: false,
+            hasPicturesAccess: false,
+            hasConcernsAccess: false,
+            seasonNav: [],
+            phase: null
+        }
+    }
+
+    const config = await getSeasonConfig()
+    const seasonId = config.seasonId
+
+    const [
+        showSignupLink,
+        isAdmin,
+        isCommissioner,
+        hasCaptainPagesAccess,
+        hasPicturesAccess,
+        hasConcernsAccess,
+        seasonNav
+    ] = await Promise.all([
+        checkSignupEligibility(session.user.id),
+        isAdminOrDirectorBySession(),
+        isCommissionerBySession(),
+        hasCaptainPagesAccessBySession(),
+        seasonId
+            ? hasPermissionBySession("pictures:manage", { seasonId })
+            : Promise.resolve(false),
+        seasonId
+            ? hasPermissionBySession("concerns:view", { seasonId })
+            : Promise.resolve(false),
+        getRecentSeasonsNav()
+    ])
+
+    return {
+        showSignupLink,
+        isAdmin,
+        isCommissioner,
+        hasCaptainPagesAccess,
+        hasPicturesAccess,
+        hasConcernsAccess,
+        seasonNav,
+        phase: seasonId ? config.phase : null
+    }
+}
+
 export interface TeamRosterPlayer {
     id: string
     displayName: string

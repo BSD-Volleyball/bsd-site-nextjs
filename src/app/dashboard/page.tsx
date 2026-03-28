@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { PageHeader } from "@/components/layout/page-header"
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
@@ -189,6 +190,12 @@ async function getPreviousSeasonsPlayed(
         champion: !!r.championId,
         championPicture: r.championPicture
     }))
+}
+
+async function PreviousSeasonsSection({ userId }: { userId: string }) {
+    const previousSeasons = await getPreviousSeasonsPlayed(userId)
+    if (previousSeasons.length === 0) return null
+    return <PreviousSeasonsCard previousSeasons={previousSeasons} />
 }
 
 async function getNewPlayerEvalStats(
@@ -611,7 +618,6 @@ export default async function DashboardPage() {
 
     let signupStatus = null
     let userName: string | null = null
-    let previousSeasons: PreviousSeason[] = []
     let evalStats: { totalNew: number; ratedByUser: number } | null = null
     let discount: Awaited<ReturnType<typeof getActiveDiscountForUser>> = null
     let commissionerCaptainStatuses: CaptainSelectionDivisionStatus[] = []
@@ -644,14 +650,8 @@ export default async function DashboardPage() {
     let assignedActiveConcernsCount = 0
 
     if (session?.user) {
-        const [
-            signupResult,
-            previousSeasonsResult,
-            discountResult,
-            userResult
-        ] = await Promise.all([
+        const [signupResult, discountResult, userResult] = await Promise.all([
             getSeasonSignup(session.user.id),
-            getPreviousSeasonsPlayed(session.user.id),
             getActiveDiscountForUser(session.user.id),
             db
                 .select({
@@ -664,16 +664,24 @@ export default async function DashboardPage() {
         ])
 
         signupStatus = signupResult
-        previousSeasons = previousSeasonsResult
         discount = discountResult
         const [user] = userResult
         userName = user?.preferred_name || user?.first_name || null
 
-        const canViewConcerns =
-            !!signupStatus?.config.seasonId &&
-            (await hasPermissionBySession("concerns:view", {
-                seasonId: signupStatus.config.seasonId
-            }))
+        const seasonId = signupStatus?.config.seasonId
+
+        // Run permission check and admin eval stats in parallel — both are independent
+        const [canViewConcerns, evalStatsResult] = await Promise.all([
+            seasonId
+                ? hasPermissionBySession("concerns:view", { seasonId })
+                : Promise.resolve(false),
+            isAdmin && seasonId
+                ? getNewPlayerEvalStats(session.user.id, seasonId)
+                : Promise.resolve(null)
+        ])
+
+        evalStats = evalStatsResult
+
         if (canViewConcerns) {
             const [assignedConcernCount] = await db
                 .select({ total: count() })
@@ -686,13 +694,6 @@ export default async function DashboardPage() {
                 )
 
             assignedActiveConcernsCount = assignedConcernCount?.total ?? 0
-        }
-
-        if (isAdmin && signupStatus?.config.seasonId) {
-            evalStats = await getNewPlayerEvalStats(
-                session.user.id,
-                signupStatus.config.seasonId
-            )
         }
 
         if (signupStatus?.config.seasonId) {
@@ -2186,8 +2187,10 @@ export default async function DashboardPage() {
                 )}
             </div>
 
-            {previousSeasons.length > 0 && (
-                <PreviousSeasonsCard previousSeasons={previousSeasons} />
+            {session?.user && (
+                <Suspense>
+                    <PreviousSeasonsSection userId={session.user.id} />
+                </Suspense>
             )}
         </div>
     )
