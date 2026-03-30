@@ -43,13 +43,13 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
 
     const isDraftPhase = data.seasonConfig?.phase === "draft"
 
-    // Show welcome section if within 7 days of this division's specific draft date
-    const draftWithinWeek = data.divisionDraftDate
+    // Show welcome section only if within 7 days of this division's draft date.
+    // Fall back to isDraftPhase only when no draft date is available.
+    const showWelcomeSection = data.divisionDraftDate
         ? Date.now() -
               new Date(`${data.divisionDraftDate}T00:00:00`).getTime() <
           7 * 24 * 60 * 60 * 1000
         : isDraftPhase
-    const showWelcomeSection = isDraftPhase || draftWithinWeek
     const showAvailabilitySection =
         !showWelcomeSection && !!data.nextMatchAvailability
 
