@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import {
     getSeasonConfig,
     getEventsByType,
+    formatEventDate,
     formatEventTime
 } from "@/lib/site-config"
 import { db } from "@/database/db"
@@ -54,6 +55,9 @@ export default async function DraftPreseasonWeek1Page() {
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
     const tryouts = getEventsByType(config, "tryout")
     const tryout1 = tryouts[0]
+    const tryout1DateDisplay = tryout1
+        ? formatEventDate(tryout1.eventDate)
+        : "Date TBD"
     const sessionTimes: Record<1 | 2, string> = {
         1: tryout1?.timeSlots[0]
             ? formatEventTime(tryout1.timeSlots[0].startTime)
@@ -166,7 +170,7 @@ export default async function DraftPreseasonWeek1Page() {
             <div className="flex items-start justify-between print:hidden">
                 <PageHeader
                     title={`${seasonLabel} Pre-Season Week 1`}
-                    description="Preseason week 1 roster assignments by session and court."
+                    description={`Preseason week 1 roster assignments by session and court. ${tryout1DateDisplay}`}
                 />
                 <PrintButton />
             </div>
@@ -214,7 +218,7 @@ export default async function DraftPreseasonWeek1Page() {
                         .pw1-player-empty { font-size: 10.5pt; color: #999; font-style: italic; }
                     }
                 `}</style>
-                <p className="pw1-title">{seasonLabel} Pre-Season Week 1</p>
+                <p className="pw1-title">{seasonLabel} Pre-Season Week 1 — {tryout1DateDisplay}</p>
                 {[1, 2].map((sessionNumber) => (
                     <div key={`print-session-${sessionNumber}`}>
                         <p className="pw1-session-header">
