@@ -24,11 +24,22 @@ CREATE TABLE "season_events" (
 	"label" text
 );
 --> statement-breakpoint
-ALTER TABLE "matches" ALTER COLUMN "date" SET DATA TYPE date;--> statement-breakpoint
-ALTER TABLE "matches" ALTER COLUMN "time" SET DATA TYPE time;--> statement-breakpoint
-ALTER TABLE "seasons" ALTER COLUMN "season_amount" SET DATA TYPE numeric;--> statement-breakpoint
-ALTER TABLE "seasons" ALTER COLUMN "late_amount" SET DATA TYPE numeric;--> statement-breakpoint
-ALTER TABLE "seasons" ALTER COLUMN "max_players" SET DATA TYPE integer;--> statement-breakpoint
+ALTER TABLE "matches" ALTER COLUMN "date" SET DATA TYPE date USING 
+  CASE 
+    WHEN "date" ~ '^\d{4}-\d{2}-\d{2}$' THEN "date"::date
+    WHEN "date" ~ '^\d{2}/\d{2}/\d{4}$' THEN to_date("date", 'MM/DD/YYYY')
+    WHEN "date" ~ '^\d{1,2}/\d{1,2}$' THEN NULL
+    ELSE NULL
+  END;--> statement-breakpoint
+ALTER TABLE "matches" ALTER COLUMN "time" SET DATA TYPE time USING 
+  CASE 
+    WHEN "time" ~ '^\d{2}:\d{2}:\d{2}$' THEN "time"::time
+    WHEN "time" ~ '^\d{1,2}:\d{2}$' THEN ("time" || ':00')::time
+    ELSE NULL
+  END;--> statement-breakpoint
+ALTER TABLE "seasons" ALTER COLUMN "season_amount" SET DATA TYPE numeric USING "season_amount"::numeric;--> statement-breakpoint
+ALTER TABLE "seasons" ALTER COLUMN "late_amount" SET DATA TYPE numeric USING "late_amount"::numeric;--> statement-breakpoint
+ALTER TABLE "seasons" ALTER COLUMN "max_players" SET DATA TYPE integer USING "max_players"::integer;--> statement-breakpoint
 ALTER TABLE "event_time_slots" ADD CONSTRAINT "event_time_slots_event_id_season_events_id_fk" FOREIGN KEY ("event_id") REFERENCES "public"."season_events"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "player_unavailability" ADD CONSTRAINT "player_unavailability_signup_id_signups_id_fk" FOREIGN KEY ("signup_id") REFERENCES "public"."signups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "player_unavailability" ADD CONSTRAINT "player_unavailability_event_id_season_events_id_fk" FOREIGN KEY ("event_id") REFERENCES "public"."season_events"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
