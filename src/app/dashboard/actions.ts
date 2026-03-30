@@ -12,7 +12,8 @@ import {
     drafts,
     divisions,
     matches,
-    emailTemplates
+    emailTemplates,
+    seasonEvents
 } from "@/database/schema"
 import { eq, and, lt, desc, inArray, asc, or, isNull } from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -24,6 +25,7 @@ import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
 } from "@/lib/rbac"
+import { formatMatchTime } from "@/lib/season-utils"
 import type { SeasonPhase } from "@/lib/season-phases"
 import {
     type LexicalEmailTemplateContent,
@@ -675,7 +677,26 @@ export async function getNextMatch(
             .orderBy(matches.week, matches.time)
             .limit(1)
 
-        if (!nextMatchRow || !nextMatchRow.date) return null
+        if (!nextMatchRow) return null
+
+        // If match.date is null, resolve it from season_events using the week number
+        let matchDate: string | null = nextMatchRow.date
+        if (!matchDate) {
+            const rsEvents = await db
+                .select({ eventDate: seasonEvents.event_date })
+                .from(seasonEvents)
+                .where(
+                    and(
+                        eq(seasonEvents.season_id, seasonId),
+                        eq(seasonEvents.event_type, "regular_season")
+                    )
+                )
+                .orderBy(asc(seasonEvents.event_date))
+            const weekEvent = rsEvents[nextMatchRow.week - 1]
+            if (weekEvent) matchDate = weekEvent.eventDate
+        }
+
+        if (!matchDate) return null
 
         const opponentTeamId =
             nextMatchRow.homeTeamId === draftRecord.teamId
@@ -721,8 +742,8 @@ export async function getNextMatch(
               : opponent.name
 
         return {
-            date: nextMatchRow.date,
-            time: nextMatchRow.time,
+            date: matchDate,
+            time: formatMatchTime(nextMatchRow.time),
             court: nextMatchRow.court,
             opponentName,
             divisionName: divisionRow[0]?.name ?? "",

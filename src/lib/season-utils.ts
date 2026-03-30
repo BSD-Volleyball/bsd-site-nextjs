@@ -26,11 +26,20 @@ export function formatEventDate(dateStr: string): string {
     })
 }
 
-/** Format a time string (HH:MM:SS) to a human-readable label */
+/** Format a time string (HH:MM:SS) to a human-readable label with AM/PM */
 export function formatEventTime(timeStr: string): string {
     const [hours, minutes] = timeStr.split(":")
     const hour12 = Number.parseInt(hours, 10)
     const ampm = hour12 >= 12 ? "PM" : "AM"
     const displayHour = hour12 % 12 || 12
     return `${displayHour}:${minutes} ${ampm}`
+}
+
+/** Format a match time (HH:MM:SS or H:MM) to compact display without leading zeros or seconds (e.g., "7:00") */
+export function formatMatchTime(timeStr: string | null | undefined): string {
+    if (!timeStr) return ""
+    const parts = timeStr.split(":")
+    const hour = Number.parseInt(parts[0], 10)
+    const minutes = parts[1] ?? "00"
+    return `${hour}:${minutes}`
 }

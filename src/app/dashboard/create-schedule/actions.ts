@@ -258,7 +258,7 @@ function buildRegularSeasonMatches(
                     matches.push({
                         week: week + 1,
                         date: seasonDates[week] || "",
-                        time: FOUR_TEAM_TIMES[m] || seasonTimes[m + 1] || "",
+                        time: seasonTimes[m + 1] || FOUR_TEAM_TIMES[m] || "",
                         court,
                         homeTeamId: homeId,
                         awayTeamId: awayId
@@ -281,7 +281,7 @@ function buildRegularSeasonMatches(
                     matches.push({
                         week: week + 1,
                         date: seasonDates[week] || "",
-                        time: SIX_TEAM_TIMES[m] || seasonTimes[m] || "",
+                        time: seasonTimes[m] || SIX_TEAM_TIMES[m] || "",
                         court,
                         homeTeamId: homeId,
                         awayTeamId: awayId

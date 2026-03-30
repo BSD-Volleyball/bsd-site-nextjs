@@ -7,6 +7,7 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { formatMatchTime } from "@/lib/season-utils"
 import type { CurrentSeasonScheduleDivision } from "./actions"
 
 interface Props {
@@ -138,7 +139,7 @@ export function SeasonDivisionSection({
                                                                                 "font-semibold text-primary"
                                                                         )}
                                                                     >
-                                                                        {m.time ||
+                                                                        {formatMatchTime(m.time) ||
                                                                             "—"}
                                                                     </div>
                                                                 )

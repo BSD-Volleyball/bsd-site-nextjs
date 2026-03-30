@@ -61,7 +61,7 @@ interface HeadToHeadStats {
 
 function parseTimeForSort(time: string | null): number {
     if (!time) return Number.MAX_SAFE_INTEGER
-    const match = time.match(/^(\d{1,2}):(\d{2})$/)
+    const match = time.match(/^(\d{1,2}):(\d{2})/)
     if (!match) return Number.MAX_SAFE_INTEGER
     const hour = Number.parseInt(match[1], 10)
     const minute = Number.parseInt(match[2], 10)
