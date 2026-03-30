@@ -1,3 +1,5 @@
+import "server-only"
+
 import { db } from "@/database/db"
 import {
     seasons,
@@ -8,74 +10,34 @@ import {
 } from "@/database/schema"
 import { eq, desc, count, and, asc, inArray } from "drizzle-orm"
 import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
+import type {
+    EventType,
+    TimeSlot,
+    SeasonEvent,
+    SeasonConfig,
+    PlayerUnavailability
+} from "@/lib/season-types"
+import {
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/season-utils"
 
-export type EventType =
-    | "tryout"
-    | "regular_season"
-    | "playoff"
-    | "draft"
-    | "captain_select"
-    | "late_date"
+// Re-export types from season-types.ts (client-safe)
+export type {
+    EventType,
+    TimeSlot,
+    SeasonEvent,
+    SeasonConfig,
+    PlayerUnavailability
+} from "@/lib/season-types"
 
-export interface TimeSlot {
-    id: number
-    startTime: string
-    slotLabel: string | null
-    sortOrder: number
-}
-
-export interface SeasonEvent {
-    id: number
-    eventType: EventType
-    eventDate: string
-    sortOrder: number
-    label: string | null
-    timeSlots: TimeSlot[]
-}
-
-export interface SeasonConfig {
-    seasonId: number
-    seasonAmount: string
-    lateAmount: string
-    maxPlayers: number
-    seasonYear: number
-    seasonName: string
-    phase: SeasonPhase
-    events: SeasonEvent[]
-}
-
-/** Get events filtered by type, sorted by sort_order */
-export function getEventsByType(
-    config: SeasonConfig,
-    type: EventType
-): SeasonEvent[] {
-    return config.events
-        .filter((e) => e.eventType === type)
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-}
-
-/** Format a date string (YYYY-MM-DD) to a human-readable label */
-export function formatEventDate(dateStr: string): string {
-    const d = new Date(`${dateStr}T12:00:00`)
-    return d.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-    })
-}
-
-/** Format a time string (HH:MM:SS or HH:MM) for display */
-export function formatEventTime(timeStr: string): string {
-    const [h, m] = timeStr.split(":")
-    const hour = Number.parseInt(h, 10)
-    const minute = m || "00"
-    const ampm = hour >= 12 ? "PM" : "AM"
-    const displayHour = hour % 12 || 12
-    return minute === "00"
-        ? `${displayHour} ${ampm}`
-        : `${displayHour}:${minute} ${ampm}`
-}
+// Re-export utility functions from season-utils.ts (client-safe)
+export {
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/season-utils"
 
 const EMPTY_CONFIG: SeasonConfig = {
     seasonId: 0,

@@ -45,7 +45,7 @@ import {
     resolveSubjectVariables,
     buildEventVariableValues
 } from "@/lib/email-template-variables"
-import type { SeasonConfig } from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/season-types"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import { isGhostCaptain } from "@/lib/ghost-captain"
 

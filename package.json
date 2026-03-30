@@ -68,6 +68,7 @@
         "react-use-measure": "^2.1.7",
         "recharts": "^3.8.0",
         "resend": "^4.7.0",
+        "server-only": "^0.0.1",
         "sonner": "^2.0.5",
         "square": "^44.0.1",
         "tailwind-merge": "^3.5.0",

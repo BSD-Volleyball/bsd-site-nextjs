@@ -38,8 +38,8 @@ import {
     RiErrorWarningLine,
     RiArrowRightLine
 } from "@remixicon/react"
-import type { SeasonConfig } from "@/lib/site-config"
-import { getEventsByType, formatEventDate } from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/season-types"
+import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 import Link from "next/link"
 
 interface User {

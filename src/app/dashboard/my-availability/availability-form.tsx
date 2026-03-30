@@ -14,8 +14,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import type { SeasonConfig } from "@/lib/site-config"
-import { getEventsByType, formatEventDate } from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/season-types"
+import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 
 interface AvailabilityFormProps {
     signupId: number

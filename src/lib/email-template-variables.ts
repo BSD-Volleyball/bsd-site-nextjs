@@ -5,12 +5,12 @@ import type {
     LexicalListNode,
     LexicalListItemNode
 } from "@/lib/email-template-content"
-import type { SeasonConfig } from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/season-types"
 import {
     getEventsByType,
     formatEventDate,
     formatEventTime
-} from "@/lib/site-config"
+} from "@/lib/season-utils"
 
 export interface TemplateVariable {
     key: string

@@ -28,7 +28,7 @@ import {
     buildEventVariableValues,
     type TemplateVariableValues
 } from "@/lib/email-template-variables"
-import type { SeasonConfig } from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/season-types"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import type { DivisionCommissioner } from "./actions"
 
