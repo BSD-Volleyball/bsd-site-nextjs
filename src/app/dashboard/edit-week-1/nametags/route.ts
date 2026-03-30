@@ -11,7 +11,11 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, week1Rosters } from "@/database/schema"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 
@@ -497,9 +501,11 @@ export async function GET() {
             )
         })
 
+        const tryoutEvents = getEventsByType(config, "tryout")
+        const tryout1Slots = tryoutEvents[0]?.timeSlots ?? []
         const sessionTimes: Record<number, string> = {
-            1: config.tryout1Session1Time.trim(),
-            2: config.tryout1Session2Time.trim()
+            1: formatEventTime(tryout1Slots[0]?.startTime ?? ""),
+            2: formatEventTime(tryout1Slots[1]?.startTime ?? "")
         }
 
         if (rosterRows.length === 0) {

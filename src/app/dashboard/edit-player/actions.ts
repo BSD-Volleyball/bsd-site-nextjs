@@ -465,8 +465,6 @@ export interface SignupDetails {
     pair: boolean | null
     pair_pick: string | null
     pair_reason: string | null
-    dates_missing: string | null
-    play_1st_week: boolean | null
     order_id: string | null
     amount_paid: string | null
     created_at: Date
@@ -515,8 +513,6 @@ export async function getSignupForCurrentSeason(
                 pair: signup.pair,
                 pair_pick: signup.pair_pick,
                 pair_reason: signup.pair_reason,
-                dates_missing: signup.dates_missing,
-                play_1st_week: signup.play_1st_week,
                 order_id: signup.order_id,
                 amount_paid: signup.amount_paid,
                 created_at: signup.created_at
@@ -536,8 +532,6 @@ export async function updateSignup(
         pair?: boolean | null
         pair_pick?: string | null
         pair_reason?: string | null
-        dates_missing?: string | null
-        play_1st_week?: boolean | null
         amount_paid?: string | null
     }
 ): Promise<{ status: boolean; message: string }> {

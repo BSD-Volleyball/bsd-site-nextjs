@@ -50,7 +50,7 @@ function generateCsvContent(
         "Skill: Setter",
         "Skill: Hitter",
         "Skill: Other",
-        "Dates Missing",
+        "Unavailable Dates",
         "Last Season",
         "Last Division",
         "Last Captain",
@@ -81,7 +81,7 @@ function generateCsvContent(
         entry.skillSetter ? "Yes" : "No",
         entry.skillHitter ? "Yes" : "No",
         entry.skillOther ? "Yes" : "No",
-        entry.datesMissing || "",
+        entry.unavailableDates || "",
         entry.lastDraftSeason || "",
         entry.lastDraftDivision || "",
         entry.lastDraftCaptain || "",
@@ -269,7 +269,7 @@ export function SignupsList({
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
                 pairReason={modal.pairReason}
-                datesMissing={modal.datesMissing}
+                datesMissing={modal.unavailableDates}
                 playoffDates={modal.playoffDates}
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}

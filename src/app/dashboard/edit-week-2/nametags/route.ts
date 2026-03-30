@@ -11,7 +11,11 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { divisions, users, week2Rosters } from "@/database/schema"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 
@@ -515,10 +519,12 @@ export async function GET() {
             )
         })
 
+        const tryoutEvents = getEventsByType(config, "tryout")
+        const tryout2Slots = tryoutEvents[1]?.timeSlots ?? []
         const sessionTimes: Record<number, string> = {
-            1: config.tryout2Session1Time.trim(),
-            2: config.tryout2Session2Time.trim(),
-            3: config.tryout2Session3Time.trim()
+            1: formatEventTime(tryout2Slots[0]?.startTime ?? ""),
+            2: formatEventTime(tryout2Slots[1]?.startTime ?? ""),
+            3: formatEventTime(tryout2Slots[2]?.startTime ?? "")
         }
 
         if (normalizedRows.length === 0) {

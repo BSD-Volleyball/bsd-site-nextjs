@@ -7,12 +7,18 @@ import {
     drafts,
     teams,
     seasons,
-    divisions
+    divisions,
+    playerUnavailability,
+    seasonEvents
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 import { checkCaptainPagesAccess } from "@/app/dashboard/view-signups/actions"
 import { getSessionUserId } from "@/lib/rbac"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate
+} from "@/lib/site-config"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -139,7 +145,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
     player: PlayerDetails | null
     pairPickName: string | null
     pairReason: string | null
-    datesMissing: string | null
+    unavailableDates: string | null
     playoffDates: string[]
     draftHistory: PlayerDraftHistory[]
     ratingAverages: PlayerRatingAverages
@@ -155,7 +161,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
-            datesMissing: null,
+            unavailableDates: null,
             playoffDates: [],
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),
@@ -194,7 +200,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
                 player: null,
                 pairPickName: null,
                 pairReason: null,
-                datesMissing: null,
+                unavailableDates: null,
                 playoffDates: [],
                 draftHistory: [],
                 ratingAverages: getEmptyPlayerRatingAverages(),
@@ -215,13 +221,13 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
         // Get pair info from most recent signup
         let pairPickName: string | null = null
         let pairReason: string | null = null
-        let datesMissing: string | null = null
+        let unavailableDates: string | null = null
 
         const [mostRecentSignup] = await db
             .select({
+                id: signups.id,
                 pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason,
-                datesMissing: signups.dates_missing
+                pairReason: signups.pair_reason
             })
             .from(signups)
             .innerJoin(seasons, eq(signups.season, seasons.id))
@@ -248,8 +254,23 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             pairReason = mostRecentSignup.pairReason
         }
 
-        if (mostRecentSignup?.datesMissing) {
-            datesMissing = mostRecentSignup.datesMissing
+        if (mostRecentSignup) {
+            const unavailRows = await db
+                .select({
+                    eventDate: seasonEvents.event_date
+                })
+                .from(playerUnavailability)
+                .innerJoin(
+                    seasonEvents,
+                    eq(seasonEvents.id, playerUnavailability.event_id)
+                )
+                .where(eq(playerUnavailability.signup_id, mostRecentSignup.id))
+
+            if (unavailRows.length > 0) {
+                unavailableDates = unavailRows
+                    .map((u) => formatEventDate(u.eventDate))
+                    .join(", ")
+            }
         }
 
         // Fetch draft history
@@ -270,18 +291,16 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
-        const playoffDates = [
-            config.playoff1Date,
-            config.playoff2Date,
-            config.playoff3Date
-        ].filter(Boolean)
+        const playoffDates = getEventsByType(config, "playoff").map((e) =>
+            formatEventDate(e.eventDate)
+        )
 
         return {
             status: true,
             player,
             pairPickName,
             pairReason,
-            datesMissing,
+            unavailableDates,
             playoffDates,
             draftHistory: draftData,
             ratingAverages: ratingsSection.averages,
@@ -297,7 +316,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             player: null,
             pairPickName: null,
             pairReason: null,
-            datesMissing: null,
+            unavailableDates: null,
             playoffDates: [],
             draftHistory: [],
             ratingAverages: getEmptyPlayerRatingAverages(),

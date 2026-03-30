@@ -802,7 +802,7 @@ export function DraftBoard({
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
                 pairReason={modal.pairReason}
-                datesMissing={modal.datesMissing}
+                datesMissing={modal.unavailableDates}
                 playoffDates={modal.playoffDates}
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}

@@ -7,7 +7,9 @@ import {
     seasons,
     drafts,
     teams,
-    divisions
+    divisions,
+    playerUnavailability,
+    seasonEvents
 } from "@/database/schema"
 import { eq, desc, ne } from "drizzle-orm"
 import {
@@ -15,7 +17,11 @@ import {
     isCommissionerBySession,
     isAdminOrDirectorBySession
 } from "@/lib/rbac"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate
+} from "@/lib/site-config"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import {
     getEmptyPlayerRatingAverages,
@@ -76,8 +82,7 @@ export interface PlayerSignup {
     pairPickId: string | null
     pairPickName: string | null
     pairReason: string | null
-    datesMissing: string | null
-    play1stWeek: boolean | null
+    unavailableDates: string | null
     orderId: string | null
     amountPaid: string | null
     createdAt: Date
@@ -237,8 +242,6 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 pair: signups.pair,
                 pairPickId: signups.pair_pick,
                 pairReason: signups.pair_reason,
-                datesMissing: signups.dates_missing,
-                play1stWeek: signups.play_1st_week,
                 orderId: signups.order_id,
                 amountPaid: signups.amount_paid,
                 createdAt: signups.created_at
@@ -248,7 +251,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
             .where(eq(signups.player, playerId))
             .orderBy(desc(seasons.id))
 
-        // Fetch pair pick names for each signup that has one
+        // Fetch pair pick names and unavailability for each signup
         const signupHistory: PlayerSignup[] = await Promise.all(
             signupData.map(async (signup) => {
                 let pairPickName: string | null = null
@@ -267,9 +270,28 @@ export async function getPlayerDetails(playerId: string): Promise<{
                     }
                 }
 
+                const unavailRows = await db
+                    .select({
+                        eventDate: seasonEvents.event_date
+                    })
+                    .from(playerUnavailability)
+                    .innerJoin(
+                        seasonEvents,
+                        eq(seasonEvents.id, playerUnavailability.event_id)
+                    )
+                    .where(eq(playerUnavailability.signup_id, signup.id))
+
+                const unavailableDates =
+                    unavailRows.length > 0
+                        ? unavailRows
+                              .map((u) => formatEventDate(u.eventDate))
+                              .join(", ")
+                        : null
+
                 return {
                     ...signup,
-                    pairPickName
+                    pairPickName,
+                    unavailableDates
                 }
             })
         )
@@ -292,11 +314,9 @@ export async function getPlayerDetails(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
-        const playoffDates = [
-            config.playoff1Date,
-            config.playoff2Date,
-            config.playoff3Date
-        ].filter(Boolean)
+        const playoffDates = getEventsByType(config, "playoff").map((e) =>
+            formatEventDate(e.eventDate)
+        )
 
         const isAdmin = await isAdminOrDirectorBySession()
         const sanitizedPlayer = isAdmin

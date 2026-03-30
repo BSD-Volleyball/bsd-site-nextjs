@@ -14,7 +14,7 @@ import {
 import { eq, asc } from "drizzle-orm"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import {
     SIX_TEAM_ROUNDS,
     SIX_TEAM_ROTATIONS,
@@ -179,26 +179,15 @@ export async function getCreateScheduleData(): Promise<{
             teams: teamsByDivision.get(d.divisionId) || []
         }))
 
-        const seasonDates = [
-            config.season1Date,
-            config.season2Date,
-            config.season3Date,
-            config.season4Date,
-            config.season5Date,
-            config.season6Date
-        ]
+        const regularSeason = getEventsByType(config, "regular_season")
+        const seasonDates = regularSeason.map((e) => e.eventDate)
 
-        const seasonTimes = [
-            config.seasonSession1Time,
-            config.seasonSession2Time,
-            config.seasonSession3Time
-        ]
+        const seasonTimes =
+            regularSeason[0]?.timeSlots.map((ts) => ts.startTime) ?? []
 
-        const playoffDates = [
-            config.playoff1Date,
-            config.playoff2Date,
-            config.playoff3Date
-        ]
+        const playoffDates = getEventsByType(config, "playoff").map(
+            (e) => e.eventDate
+        )
 
         return {
             status: true,

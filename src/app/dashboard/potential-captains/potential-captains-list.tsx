@@ -27,7 +27,12 @@ import {
     resolveSubjectVariables,
     type TemplateVariableValues
 } from "@/lib/email-template-variables"
-import type { SeasonConfig } from "@/lib/site-config"
+import {
+    type SeasonConfig,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import type { DivisionCommissioner } from "./actions"
 
@@ -140,47 +145,60 @@ export function PotentialCaptainsList({
             }
 
             if (seasonConfig) {
-                const divisionDraftDateByLevel: Record<number, string> = {
-                    1: seasonConfig.draft1Date,
-                    2: seasonConfig.draft2Date,
-                    3: seasonConfig.draft3Date,
-                    4: seasonConfig.draft4Date,
-                    5: seasonConfig.draft5Date,
-                    6: seasonConfig.draft6Date
+                const tryouts = getEventsByType(seasonConfig, "tryout")
+                const regularSeason = getEventsByType(
+                    seasonConfig,
+                    "regular_season"
+                )
+                const playoffs = getEventsByType(seasonConfig, "playoff")
+                const drafts = getEventsByType(seasonConfig, "draft")
+                const captainSelect = getEventsByType(
+                    seasonConfig,
+                    "captain_select"
+                )
+
+                tryouts.forEach((e, i) => {
+                    values[`tryout_${i + 1}_date`] = formatEventDate(
+                        e.eventDate
+                    )
+                    e.timeSlots.forEach((ts, j) => {
+                        values[`tryout_${i + 1}_s${j + 1}_time`] =
+                            formatEventTime(ts.startTime)
+                    })
+                })
+
+                regularSeason.forEach((e, i) => {
+                    values[`season_${i + 1}_date`] = formatEventDate(
+                        e.eventDate
+                    )
+                })
+                if (regularSeason[0]) {
+                    regularSeason[0].timeSlots.forEach((ts, j) => {
+                        values[`season_s${j + 1}_time`] = formatEventTime(
+                            ts.startTime
+                        )
+                    })
                 }
 
-                values.tryout_1_date = seasonConfig.tryout1Date
-                values.tryout_2_date = seasonConfig.tryout2Date
-                values.tryout_3_date = seasonConfig.tryout3Date
-                values.season_1_date = seasonConfig.season1Date
-                values.season_2_date = seasonConfig.season2Date
-                values.season_3_date = seasonConfig.season3Date
-                values.season_4_date = seasonConfig.season4Date
-                values.season_5_date = seasonConfig.season5Date
-                values.season_6_date = seasonConfig.season6Date
-                values.playoff_1_date = seasonConfig.playoff1Date
-                values.playoff_2_date = seasonConfig.playoff2Date
-                values.playoff_3_date = seasonConfig.playoff3Date
-                values.captain_select_date = seasonConfig.captainSelectDate
-                values.draft_1_date = seasonConfig.draft1Date
-                values.draft_2_date = seasonConfig.draft2Date
-                values.draft_3_date = seasonConfig.draft3Date
-                values.draft_4_date = seasonConfig.draft4Date
-                values.draft_5_date = seasonConfig.draft5Date
-                values.draft_6_date = seasonConfig.draft6Date
-                values.tryout_1_s1_time = seasonConfig.tryout1Session1Time
-                values.tryout_1_s2_time = seasonConfig.tryout1Session2Time
-                values.tryout_2_s1_time = seasonConfig.tryout2Session1Time
-                values.tryout_2_s2_time = seasonConfig.tryout2Session2Time
-                values.tryout_2_s3_time = seasonConfig.tryout2Session3Time
-                values.tryout_3_s1_time = seasonConfig.tryout3Session1Time
-                values.tryout_3_s2_time = seasonConfig.tryout3Session2Time
-                values.tryout_3_s3_time = seasonConfig.tryout3Session3Time
-                values.season_s1_time = seasonConfig.seasonSession1Time
-                values.season_s2_time = seasonConfig.seasonSession2Time
-                values.season_s3_time = seasonConfig.seasonSession3Time
-                values.division_draft_date =
-                    divisionDraftDateByLevel[divisionLevel] ?? ""
+                playoffs.forEach((e, i) => {
+                    values[`playoff_${i + 1}_date`] = formatEventDate(
+                        e.eventDate
+                    )
+                })
+
+                drafts.forEach((e, i) => {
+                    values[`draft_${i + 1}_date`] = formatEventDate(e.eventDate)
+                })
+
+                if (captainSelect[0]) {
+                    values.captain_select_date = formatEventDate(
+                        captainSelect[0].eventDate
+                    )
+                }
+
+                values.division_draft_date = drafts[divisionLevel - 1]
+                    ? formatEventDate(drafts[divisionLevel - 1].eventDate)
+                    : ""
             }
 
             return values
@@ -454,7 +472,7 @@ export function PotentialCaptainsList({
                 isLoading={modal.isLoading}
                 pairPickName={modal.pairPickName}
                 pairReason={modal.pairReason}
-                datesMissing={modal.datesMissing}
+                datesMissing={modal.unavailableDates}
                 playoffDates={modal.playoffDates}
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}

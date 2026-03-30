@@ -92,8 +92,6 @@ interface SignupFormData {
     pair: boolean
     pair_pick: string
     pair_reason: string
-    dates_missing: string
-    play_1st_week: boolean
     order_id: string
     amount_paid: string
     created_at: string
@@ -108,8 +106,6 @@ function signupToFormData(signup: SignupDetails): SignupFormData {
         pair: signup.pair ?? false,
         pair_pick: signup.pair_pick ?? "",
         pair_reason: signup.pair_reason ?? "",
-        dates_missing: signup.dates_missing ?? "",
-        play_1st_week: signup.play_1st_week ?? false,
         order_id: signup.order_id ?? "",
         amount_paid: signup.amount_paid ?? "",
         created_at: signup.created_at
@@ -388,8 +384,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 pair: signupData.pair,
                 pair_pick: signupData.pair_pick || null,
                 pair_reason: signupData.pair_reason || null,
-                dates_missing: signupData.dates_missing || null,
-                play_1st_week: signupData.play_1st_week,
                 amount_paid: signupData.amount_paid || null
             })
 
@@ -731,24 +725,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                         </div>
                         <div>
                             <Label
-                                htmlFor="signup_dates_missing"
-                                className="mb-1 block"
-                            >
-                                Dates Missing
-                            </Label>
-                            <Input
-                                id="signup_dates_missing"
-                                value={signupData.dates_missing}
-                                onChange={(e) =>
-                                    handleSignupTextChange(
-                                        "dates_missing",
-                                        e.target.value
-                                    )
-                                }
-                            />
-                        </div>
-                        <div>
-                            <Label
                                 htmlFor="signup_amount_paid"
                                 className="mb-1 block"
                             >
@@ -777,21 +753,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                 }
                             />
                             <Label htmlFor="signup_pair">Wants Pair</Label>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Switch
-                                id="signup_play_1st_week"
-                                checked={signupData.play_1st_week}
-                                onCheckedChange={(checked) =>
-                                    handleSignupBooleanChange(
-                                        "play_1st_week",
-                                        checked
-                                    )
-                                }
-                            />
-                            <Label htmlFor="signup_play_1st_week">
-                                Play 1st Week
-                            </Label>
                         </div>
                     </div>
 

@@ -13,7 +13,11 @@ import {
     users,
     week1Rosters
 } from "@/database/schema"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatHeight } from "@/components/player-detail/format-height"
@@ -506,9 +510,11 @@ export async function GET() {
         const sessions = [
             ...new Set(rosterRows.map((row) => row.sessionNumber))
         ].sort((a, b) => a - b)
+        const tryoutEvents = getEventsByType(config, "tryout")
+        const tryout1Slots = tryoutEvents[0]?.timeSlots ?? []
         const sessionTimes: Record<number, string> = {
-            1: config.tryout1Session1Time.trim(),
-            2: config.tryout1Session2Time.trim()
+            1: formatEventTime(tryout1Slots[0]?.startTime ?? ""),
+            2: formatEventTime(tryout1Slots[1]?.startTime ?? "")
         }
 
         const generatedTimestamp = new Intl.DateTimeFormat("en-US", {

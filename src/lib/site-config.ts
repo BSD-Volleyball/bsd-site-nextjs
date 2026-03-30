@@ -1,47 +1,91 @@
 import { db } from "@/database/db"
-import { seasons, signups, waitlist } from "@/database/schema"
-import { eq, desc, count, and } from "drizzle-orm"
+import {
+    seasons,
+    seasonEvents,
+    eventTimeSlots,
+    signups,
+    waitlist
+} from "@/database/schema"
+import { eq, desc, count, and, asc, inArray } from "drizzle-orm"
 import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
+
+export type EventType =
+    | "tryout"
+    | "regular_season"
+    | "playoff"
+    | "draft"
+    | "captain_select"
+    | "late_date"
+
+export interface TimeSlot {
+    id: number
+    startTime: string
+    slotLabel: string | null
+    sortOrder: number
+}
+
+export interface SeasonEvent {
+    id: number
+    eventType: EventType
+    eventDate: string
+    sortOrder: number
+    label: string | null
+    timeSlots: TimeSlot[]
+}
 
 export interface SeasonConfig {
     seasonId: number
     seasonAmount: string
     lateAmount: string
-    lateDate: string
-    maxPlayers: string
+    maxPlayers: number
     seasonYear: number
     seasonName: string
     phase: SeasonPhase
-    tryout1Date: string
-    tryout1Session1Time: string
-    tryout1Session2Time: string
-    tryout2Date: string
-    tryout2Session1Time: string
-    tryout2Session2Time: string
-    tryout2Session3Time: string
-    tryout3Date: string
-    tryout3Session1Time: string
-    tryout3Session2Time: string
-    tryout3Session3Time: string
-    seasonSession1Time: string
-    seasonSession2Time: string
-    seasonSession3Time: string
-    season1Date: string
-    season2Date: string
-    season3Date: string
-    season4Date: string
-    season5Date: string
-    season6Date: string
-    playoff1Date: string
-    playoff2Date: string
-    playoff3Date: string
-    captainSelectDate: string
-    draft1Date: string
-    draft2Date: string
-    draft3Date: string
-    draft4Date: string
-    draft5Date: string
-    draft6Date: string
+    events: SeasonEvent[]
+}
+
+/** Get events filtered by type, sorted by sort_order */
+export function getEventsByType(
+    config: SeasonConfig,
+    type: EventType
+): SeasonEvent[] {
+    return config.events
+        .filter((e) => e.eventType === type)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+}
+
+/** Format a date string (YYYY-MM-DD) to a human-readable label */
+export function formatEventDate(dateStr: string): string {
+    const d = new Date(`${dateStr}T12:00:00`)
+    return d.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+    })
+}
+
+/** Format a time string (HH:MM:SS or HH:MM) for display */
+export function formatEventTime(timeStr: string): string {
+    const [h, m] = timeStr.split(":")
+    const hour = Number.parseInt(h, 10)
+    const minute = m || "00"
+    const ampm = hour >= 12 ? "PM" : "AM"
+    const displayHour = hour % 12 || 12
+    return minute === "00"
+        ? `${displayHour} ${ampm}`
+        : `${displayHour}:${minute} ${ampm}`
+}
+
+const EMPTY_CONFIG: SeasonConfig = {
+    seasonId: 0,
+    seasonAmount: "",
+    lateAmount: "",
+    maxPlayers: 0,
+    seasonYear: 0,
+    seasonName: "",
+    phase: "off_season",
+    events: []
 }
 
 export async function getSeasonConfig(): Promise<SeasonConfig> {
@@ -52,89 +96,58 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         .limit(1)
 
     if (!season) {
-        return {
-            seasonId: 0,
-            seasonAmount: "",
-            lateAmount: "",
-            lateDate: "",
-            maxPlayers: "",
-            seasonYear: 0,
-            seasonName: "",
-            phase: "off_season",
-            tryout1Date: "",
-            tryout1Session1Time: "",
-            tryout1Session2Time: "",
-            tryout2Date: "",
-            tryout2Session1Time: "",
-            tryout2Session2Time: "",
-            tryout2Session3Time: "",
-            tryout3Date: "",
-            tryout3Session1Time: "",
-            tryout3Session2Time: "",
-            tryout3Session3Time: "",
-            seasonSession1Time: "",
-            seasonSession2Time: "",
-            seasonSession3Time: "",
-            season1Date: "",
-            season2Date: "",
-            season3Date: "",
-            season4Date: "",
-            season5Date: "",
-            season6Date: "",
-            playoff1Date: "",
-            playoff2Date: "",
-            playoff3Date: "",
-            captainSelectDate: "",
-            draft1Date: "",
-            draft2Date: "",
-            draft3Date: "",
-            draft4Date: "",
-            draft5Date: "",
-            draft6Date: ""
-        }
+        return EMPTY_CONFIG
     }
+
+    const eventRows = await db
+        .select()
+        .from(seasonEvents)
+        .where(eq(seasonEvents.season_id, season.id))
+        .orderBy(asc(seasonEvents.event_type), asc(seasonEvents.sort_order))
+
+    const eventIds = eventRows.map((e) => e.id)
+
+    let timeSlotRows: (typeof eventTimeSlots.$inferSelect)[] = []
+    if (eventIds.length > 0) {
+        timeSlotRows = await db
+            .select()
+            .from(eventTimeSlots)
+            .where(inArray(eventTimeSlots.event_id, eventIds))
+            .orderBy(asc(eventTimeSlots.sort_order))
+    }
+
+    const slotsByEvent = new Map<number, TimeSlot[]>()
+    for (const ts of timeSlotRows) {
+        const slots = slotsByEvent.get(ts.event_id) || []
+        slots.push({
+            id: ts.id,
+            startTime: ts.start_time,
+            slotLabel: ts.slot_label,
+            sortOrder: ts.sort_order
+        })
+        slotsByEvent.set(ts.event_id, slots)
+    }
+
+    const events: SeasonEvent[] = eventRows.map((e) => ({
+        id: e.id,
+        eventType: e.event_type as EventType,
+        eventDate: e.event_date,
+        sortOrder: e.sort_order,
+        label: e.label,
+        timeSlots: slotsByEvent.get(e.id) || []
+    }))
 
     return {
         seasonId: season.id,
         seasonAmount: season.season_amount || "",
         lateAmount: season.late_amount || "",
-        lateDate: season.late_date || "",
-        maxPlayers: season.max_players || "",
+        maxPlayers: season.max_players || 0,
         seasonYear: season.year,
         seasonName: season.season,
         phase: SEASON_PHASES.includes(season.phase as SeasonPhase)
             ? (season.phase as SeasonPhase)
             : "off_season",
-        tryout1Date: season.tryout_1_date || "",
-        tryout1Session1Time: season.tryout_1_s1_time || "",
-        tryout1Session2Time: season.tryout_1_s2_time || "",
-        tryout2Date: season.tryout_2_date || "",
-        tryout2Session1Time: season.tryout_2_s1_time || "",
-        tryout2Session2Time: season.tryout_2_s2_time || "",
-        tryout2Session3Time: season.tryout_2_s3_time || "",
-        tryout3Date: season.tryout_3_date || "",
-        tryout3Session1Time: season.tryout_3_s1_time || "",
-        tryout3Session2Time: season.tryout_3_s2_time || "",
-        tryout3Session3Time: season.tryout_3_s3_time || "",
-        seasonSession1Time: season.season_s1_time || "",
-        seasonSession2Time: season.season_s2_time || "",
-        seasonSession3Time: season.season_s3_time || "",
-        season1Date: season.season_1_date || "",
-        season2Date: season.season_2_date || "",
-        season3Date: season.season_3_date || "",
-        season4Date: season.season_4_date || "",
-        season5Date: season.season_5_date || "",
-        season6Date: season.season_6_date || "",
-        playoff1Date: season.playoff_1_date || "",
-        playoff2Date: season.playoff_2_date || "",
-        playoff3Date: season.playoff_3_date || "",
-        captainSelectDate: season.captain_select_date || "",
-        draft1Date: season.draft_1_date || "",
-        draft2Date: season.draft_2_date || "",
-        draft3Date: season.draft_3_date || "",
-        draft4Date: season.draft_4_date || "",
-        draft5Date: season.draft_5_date || "",
-        draft6Date: season.draft_6_date || ""
+        events
     }
 }
 
@@ -142,13 +155,14 @@ function isPastLateDateET(lateDate: string): boolean {
     const nowET = new Date(
         new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
     )
-    const target = new Date(lateDate)
+    const target = new Date(`${lateDate}T23:59:59`)
     return nowET >= target
 }
 
 export function getCurrentSeasonAmount(config: SeasonConfig): string {
-    if (config.lateDate && config.lateAmount) {
-        if (isPastLateDateET(config.lateDate)) {
+    const lateDateEvent = getEventsByType(config, "late_date")[0]
+    if (lateDateEvent && config.lateAmount) {
+        if (isPastLateDateET(lateDateEvent.eventDate)) {
             return config.lateAmount
         }
     }
@@ -156,8 +170,9 @@ export function getCurrentSeasonAmount(config: SeasonConfig): string {
 }
 
 export function isLatePricing(config: SeasonConfig): boolean {
-    if (config.lateDate && config.lateAmount) {
-        return isPastLateDateET(config.lateDate)
+    const lateDateEvent = getEventsByType(config, "late_date")[0]
+    if (lateDateEvent && config.lateAmount) {
+        return isPastLateDateET(lateDateEvent.eventDate)
     }
     return false
 }
@@ -169,7 +184,6 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
         return false
     }
 
-    // Check if user already has a signup for this season
     const [existingSignup] = await db
         .select({ id: signups.id })
         .from(signups)
@@ -182,8 +196,7 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
         return false
     }
 
-    // Check if season is full
-    const maxPlayers = parseInt(config.maxPlayers, 10)
+    const maxPlayers = config.maxPlayers
     if (maxPlayers > 0) {
         const [result] = await db
             .select({ total: count() })

@@ -9,10 +9,12 @@ import {
     teams,
     divisions,
     seasons,
-    discounts
+    discounts,
+    playerUnavailability,
+    seasonEvents
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
@@ -43,8 +45,7 @@ export interface SignupEntry {
     skillSetter: boolean | null
     skillHitter: boolean | null
     skillOther: boolean | null
-    datesMissing: string | null
-    playFirstWeek: boolean | null
+    unavailableDates: string | null
     lastDraftSeason: string | null
     lastDraftDivision: string | null
     lastDraftCaptain: string | null
@@ -119,9 +120,7 @@ export async function getSeasonSignups(): Promise<{
                 skillHitter: users.skill_hitter,
                 skillOther: users.skill_other,
                 seasonsList: users.seasons_list,
-                notificationList: users.notification_list,
-                datesMissing: signups.dates_missing,
-                playFirstWeek: signups.play_1st_week
+                notificationList: users.notification_list
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -139,6 +138,34 @@ export async function getSeasonSignups(): Promise<{
                 .where(inArray(drafts.user, userIds))
 
             draftedUserIds = new Set(draftedUsers.map((d) => d.user))
+        }
+
+        // Fetch player unavailability per signup
+        const signupIds = signupRows.map((r) => r.signupId)
+        const unavailabilityMap = new Map<number, string>()
+
+        if (signupIds.length > 0) {
+            const unavailRows = await db
+                .select({
+                    signupId: playerUnavailability.signup_id,
+                    eventDate: seasonEvents.event_date
+                })
+                .from(playerUnavailability)
+                .innerJoin(
+                    seasonEvents,
+                    eq(seasonEvents.id, playerUnavailability.event_id)
+                )
+                .where(inArray(playerUnavailability.signup_id, signupIds))
+
+            const bySignup = new Map<number, string[]>()
+            for (const row of unavailRows) {
+                const dates = bySignup.get(row.signupId) || []
+                dates.push(formatEventDate(row.eventDate))
+                bySignup.set(row.signupId, dates)
+            }
+            for (const [sid, dates] of bySignup) {
+                unavailabilityMap.set(sid, dates.join(", "))
+            }
         }
 
         // Fetch used discount codes for signup users and keep the most recent per user
@@ -327,8 +354,7 @@ export async function getSeasonSignups(): Promise<{
                 skillSetter: row.skillSetter,
                 skillHitter: row.skillHitter,
                 skillOther: row.skillOther,
-                datesMissing: row.datesMissing,
-                playFirstWeek: row.playFirstWeek,
+                unavailableDates: unavailabilityMap.get(row.signupId) ?? null,
                 lastDraftSeason: lastDraft?.season ?? null,
                 lastDraftDivision: lastDraft?.division ?? null,
                 lastDraftCaptain: lastDraft?.captain ?? null,
@@ -406,8 +432,6 @@ export async function deleteSignupEntry(signupId: number): Promise<{
                 pair: signups.pair,
                 pairPick: signups.pair_pick,
                 pairReason: signups.pair_reason,
-                datesMissing: signups.dates_missing,
-                playFirstWeek: signups.play_1st_week,
                 orderId: signups.order_id,
                 amountPaid: signups.amount_paid,
                 createdAt: signups.created_at

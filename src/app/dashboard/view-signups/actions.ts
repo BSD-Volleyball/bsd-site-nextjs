@@ -8,10 +8,16 @@ import {
     teams,
     seasons,
     divisions,
-    playerRatings
+    playerRatings,
+    playerUnavailability,
+    seasonEvents
 } from "@/database/schema"
 import { and, eq, inArray, desc } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate
+} from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
@@ -46,7 +52,7 @@ export interface SignupCsvEntry {
     skillSetter: boolean | null
     skillHitter: boolean | null
     skillOther: boolean | null
-    datesMissing: string | null
+    unavailableDates: string | null
     lastDraftSeason: string | null
     lastDraftDivision: string | null
     lastDraftCaptain: string | null
@@ -113,6 +119,7 @@ export async function getSignupsCsvData(): Promise<{
 
         const signupRows = await db
             .select({
+                signupId: signups.id,
                 userId: signups.player,
                 oldId: users.old_id,
                 firstName: users.first_name,
@@ -128,8 +135,7 @@ export async function getSignupsCsvData(): Promise<{
                 skillPasser: users.skill_passer,
                 skillSetter: users.skill_setter,
                 skillHitter: users.skill_hitter,
-                skillOther: users.skill_other,
-                datesMissing: signups.dates_missing
+                skillOther: users.skill_other
             })
             .from(signups)
             .innerJoin(users, eq(signups.player, users.id))
@@ -137,7 +143,35 @@ export async function getSignupsCsvData(): Promise<{
             .orderBy(users.last_name, users.first_name)
 
         const userIds = signupRows.map((r) => r.userId)
+        const signupIds = signupRows.map((r) => r.signupId)
         const sessionUserId = await getSessionUserId()
+
+        // Fetch player unavailability per signup
+        const unavailabilityMap = new Map<number, string>()
+
+        if (signupIds.length > 0) {
+            const unavailRows = await db
+                .select({
+                    signupId: playerUnavailability.signup_id,
+                    eventDate: seasonEvents.event_date
+                })
+                .from(playerUnavailability)
+                .innerJoin(
+                    seasonEvents,
+                    eq(seasonEvents.id, playerUnavailability.event_id)
+                )
+                .where(inArray(playerUnavailability.signup_id, signupIds))
+
+            const bySignup = new Map<number, string[]>()
+            for (const row of unavailRows) {
+                const dates = bySignup.get(row.signupId) || []
+                dates.push(formatEventDate(row.eventDate))
+                bySignup.set(row.signupId, dates)
+            }
+            for (const [sid, dates] of bySignup) {
+                unavailabilityMap.set(sid, dates.join(", "))
+            }
+        }
 
         // Fetch pair pick user names
         const pairPickIds = signupRows
@@ -323,7 +357,7 @@ export async function getSignupsCsvData(): Promise<{
                 skillSetter: row.skillSetter,
                 skillHitter: row.skillHitter,
                 skillOther: row.skillOther,
-                datesMissing: row.datesMissing,
+                unavailableDates: unavailabilityMap.get(row.signupId) ?? null,
                 lastDraftSeason: lastDraft?.season ?? null,
                 lastDraftDivision: lastDraft?.division ?? null,
                 lastDraftCaptain: lastDraft?.captain ?? null,
@@ -610,7 +644,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
     viewerRating: PlayerViewerRating | null
     pairPickName: string | null
     pairReason: string | null
-    datesMissing: string | null
+    unavailableDates: string | null
     playoffDates: string[]
 }> {
     const hasAccess = await checkCaptainPagesAccess()
@@ -627,7 +661,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             viewerRating: null,
             pairPickName: null,
             pairReason: null,
-            datesMissing: null,
+            unavailableDates: null,
             playoffDates: []
         }
     }
@@ -667,7 +701,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
                 viewerRating: null,
                 pairPickName: null,
                 pairReason: null,
-                datesMissing: null,
+                unavailableDates: null,
                 playoffDates: []
             }
         }
@@ -699,13 +733,13 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
 
         let pairPickName: string | null = null
         let pairReason: string | null = null
-        let datesMissing: string | null = null
+        let unavailableDates: string | null = null
 
         const [mostRecentSignup] = await db
             .select({
+                id: signups.id,
                 pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason,
-                datesMissing: signups.dates_missing
+                pairReason: signups.pair_reason
             })
             .from(signups)
             .innerJoin(seasons, eq(signups.season, seasons.id))
@@ -732,8 +766,23 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             pairReason = mostRecentSignup.pairReason
         }
 
-        if (mostRecentSignup?.datesMissing) {
-            datesMissing = mostRecentSignup.datesMissing
+        if (mostRecentSignup) {
+            const unavailRows = await db
+                .select({
+                    eventDate: seasonEvents.event_date
+                })
+                .from(playerUnavailability)
+                .innerJoin(
+                    seasonEvents,
+                    eq(seasonEvents.id, playerUnavailability.event_id)
+                )
+                .where(eq(playerUnavailability.signup_id, mostRecentSignup.id))
+
+            if (unavailRows.length > 0) {
+                unavailableDates = unavailRows
+                    .map((u) => formatEventDate(u.eventDate))
+                    .join(", ")
+            }
         }
 
         const draftData = await db
@@ -753,11 +802,9 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             .where(eq(drafts.user, playerId))
             .orderBy(seasons.year, seasons.id)
 
-        const playoffDates = [
-            config.playoff1Date,
-            config.playoff2Date,
-            config.playoff3Date
-        ].filter(Boolean)
+        const playoffDates = getEventsByType(config, "playoff").map((e) =>
+            formatEventDate(e.eventDate)
+        )
 
         return {
             status: true,
@@ -770,7 +817,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             viewerRating: ratingsSection.viewerRating,
             pairPickName,
             pairReason,
-            datesMissing,
+            unavailableDates,
             playoffDates
         }
     } catch (error) {
@@ -787,7 +834,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             viewerRating: null,
             pairPickName: null,
             pairReason: null,
-            datesMissing: null,
+            unavailableDates: null,
             playoffDates: []
         }
     }

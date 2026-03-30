@@ -19,7 +19,9 @@ import {
     concerns,
     week1Rosters,
     week2Rosters,
-    week3Rosters
+    week3Rosters,
+    playerUnavailability,
+    seasonEvents
 } from "@/database/schema"
 import { eq, and, desc, count, inArray, isNotNull } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,7 +35,10 @@ import Link from "next/link"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
-    isLatePricing
+    isLatePricing,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { WaitlistButton } from "./waitlist-button"
@@ -105,7 +110,7 @@ async function getSeasonSignup(userId: string) {
 
     // Check if season is full
     let seasonFull = false
-    const maxPlayers = parseInt(config.maxPlayers, 10)
+    const maxPlayers = config.maxPlayers
     if (maxPlayers > 0 && !signup) {
         const [result] = await db
             .select({ total: count() })
@@ -133,10 +138,30 @@ async function getSeasonSignup(userId: string) {
         waitlistApproved = waitlistEntry?.approved ?? false
     }
 
+    // Fetch player unavailability for this signup
+    let unavailableDates: string | null = null
+    if (signup) {
+        const unavailRows = await db
+            .select({ eventDate: seasonEvents.event_date })
+            .from(playerUnavailability)
+            .innerJoin(
+                seasonEvents,
+                eq(seasonEvents.id, playerUnavailability.event_id)
+            )
+            .where(eq(playerUnavailability.signup_id, signup.id))
+
+        if (unavailRows.length > 0) {
+            unavailableDates = unavailRows
+                .map((u) => formatEventDate(u.eventDate))
+                .join(", ")
+        }
+    }
+
     return {
         season,
         signup,
         pairPickName,
+        unavailableDates,
         config,
         seasonFull,
         onWaitlist,
@@ -457,17 +482,6 @@ function RegistrationConfirmation({
                     </span>
                 </div>
 
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                        Week 1 Tryouts:
-                    </span>
-                    <span className="font-medium">
-                        {signupStatus.signup!.play_1st_week
-                            ? "Requested"
-                            : "Not requested"}
-                    </span>
-                </div>
-
                 {signupStatus.pairPickName && (
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">
@@ -479,13 +493,13 @@ function RegistrationConfirmation({
                     </div>
                 )}
 
-                {signupStatus.signup!.dates_missing && (
+                {signupStatus.unavailableDates && (
                     <div className="flex flex-col gap-1">
                         <span className="text-muted-foreground">
-                            Dates Missing:
+                            Dates Unavailable:
                         </span>
                         <span className="font-medium text-xs">
-                            {signupStatus.signup!.dates_missing}
+                            {signupStatus.unavailableDates}
                         </span>
                     </div>
                 )}
@@ -572,21 +586,27 @@ function SignupCTA({
                         ${getCurrentSeasonAmount(signupStatus.config)}
                     </span>
                 </div>
-                {signupStatus.config.lateDate &&
-                    signupStatus.config.lateAmount &&
-                    (isLatePricing(signupStatus.config) ? (
-                        <p className="text-amber-600 text-xs dark:text-amber-400">
-                            Late registration pricing in effect
-                        </p>
-                    ) : (
-                        <p className="text-muted-foreground text-xs">
-                            Price increases to ${signupStatus.config.lateAmount}{" "}
-                            after{" "}
-                            {new Date(
-                                signupStatus.config.lateDate
-                            ).toLocaleDateString()}
-                        </p>
-                    ))}
+                {(() => {
+                    const lateDateEvent = getEventsByType(
+                        signupStatus.config,
+                        "late_date"
+                    )[0]
+                    return (
+                        lateDateEvent &&
+                        signupStatus.config.lateAmount &&
+                        (isLatePricing(signupStatus.config) ? (
+                            <p className="text-amber-600 text-xs dark:text-amber-400">
+                                Late registration pricing in effect
+                            </p>
+                        ) : (
+                            <p className="text-muted-foreground text-xs">
+                                Price increases to $
+                                {signupStatus.config.lateAmount} after{" "}
+                                {formatEventDate(lateDateEvent.eventDate)}
+                            </p>
+                        ))
+                    )
+                })()}
             </div>
             <div className="flex gap-2">
                 <Link
@@ -923,11 +943,14 @@ export default async function DashboardPage() {
                         legacyCourtByDivision[myWeek2Slot.divisionName] ??
                         (divisionIndex >= 0 ? divisionIndex + 1 : 1)
 
-                    const sessionTimes = [
-                        signupStatus.config.tryout2Session1Time,
-                        signupStatus.config.tryout2Session2Time,
-                        signupStatus.config.tryout2Session3Time
-                    ]
+                    const tryout2Events = getEventsByType(
+                        signupStatus.config,
+                        "tryout"
+                    )
+                    const tryout2TimeSlots = tryout2Events[1]?.timeSlots ?? []
+                    const sessionTimes = tryout2TimeSlots.map(
+                        (ts) => ts.startTime
+                    )
                     const matchupIndex = Math.floor(
                         (myWeek2Slot.teamNumber - 1) / 2
                     )
@@ -1038,11 +1061,14 @@ export default async function DashboardPage() {
                         legacyCourtByDivision[myWeek3Slot.divisionName] ??
                         (divisionIndex >= 0 ? divisionIndex + 1 : 1)
 
-                    const sessionTimes = [
-                        signupStatus.config.tryout3Session1Time,
-                        signupStatus.config.tryout3Session2Time,
-                        signupStatus.config.tryout3Session3Time
-                    ]
+                    const tryout3Events = getEventsByType(
+                        signupStatus.config,
+                        "tryout"
+                    )
+                    const tryout3TimeSlots = tryout3Events[2]?.timeSlots ?? []
+                    const sessionTimes = tryout3TimeSlots.map(
+                        (ts) => ts.startTime
+                    )
                     const matchupIndex = Math.floor(
                         (myWeek3Slot.teamNumber - 1) / 2
                     )
@@ -1278,13 +1304,21 @@ export default async function DashboardPage() {
                                 Week 3 tryout.
                             </p>
                             <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
-                                {signupStatus.config.tryout3Date && (
+                                {getEventsByType(
+                                    signupStatus.config,
+                                    "tryout"
+                                )[2]?.eventDate && (
                                     <div className="flex justify-between">
                                         <span className="text-orange-700 dark:text-orange-300">
                                             Date:
                                         </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                            {signupStatus.config.tryout3Date}
+                                            {formatEventDate(
+                                                getEventsByType(
+                                                    signupStatus.config,
+                                                    "tryout"
+                                                )[2]!.eventDate
+                                            )}
                                         </span>
                                     </div>
                                 )}
@@ -1641,13 +1675,21 @@ export default async function DashboardPage() {
                                 Week 2 tryout.
                             </p>
                             <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
-                                {signupStatus.config.tryout2Date && (
+                                {getEventsByType(
+                                    signupStatus.config,
+                                    "tryout"
+                                )[1]?.eventDate && (
                                     <div className="flex justify-between">
                                         <span className="text-orange-700 dark:text-orange-300">
                                             Date:
                                         </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                            {signupStatus.config.tryout2Date}
+                                            {formatEventDate(
+                                                getEventsByType(
+                                                    signupStatus.config,
+                                                    "tryout"
+                                                )[1]!.eventDate
+                                            )}
                                         </span>
                                     </div>
                                 )}
@@ -1723,13 +1765,21 @@ export default async function DashboardPage() {
                                 Week 1 tryout.
                             </p>
                             <div className="space-y-1.5 rounded-md bg-orange-100 p-3 text-sm dark:bg-orange-900">
-                                {signupStatus.config.tryout1Date && (
+                                {getEventsByType(
+                                    signupStatus.config,
+                                    "tryout"
+                                )[0]?.eventDate && (
                                     <div className="flex justify-between">
                                         <span className="text-orange-700 dark:text-orange-300">
                                             Date:
                                         </span>
                                         <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                            {signupStatus.config.tryout1Date}
+                                            {formatEventDate(
+                                                getEventsByType(
+                                                    signupStatus.config,
+                                                    "tryout"
+                                                )[0]!.eventDate
+                                            )}
                                         </span>
                                     </div>
                                 )}
@@ -1758,11 +1808,24 @@ export default async function DashboardPage() {
                                         Time:
                                     </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        {userWeek1Roster.sessionNumber === 1
-                                            ? signupStatus.config
-                                                  .tryout1Session1Time || "TBD"
-                                            : signupStatus.config
-                                                  .tryout1Session2Time || "TBD"}
+                                        {(() => {
+                                            const t1Events = getEventsByType(
+                                                signupStatus.config,
+                                                "tryout"
+                                            )
+                                            const t1Slots =
+                                                t1Events[0]?.timeSlots ?? []
+                                            return userWeek1Roster.sessionNumber ===
+                                                1
+                                                ? formatEventTime(
+                                                      t1Slots[0]?.startTime ??
+                                                          ""
+                                                  ) || "TBD"
+                                                : formatEventTime(
+                                                      t1Slots[1]?.startTime ??
+                                                          ""
+                                                  ) || "TBD"
+                                        })()}
                                     </span>
                                 </div>
                             </div>

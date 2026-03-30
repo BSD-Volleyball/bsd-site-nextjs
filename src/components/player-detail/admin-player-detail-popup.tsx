@@ -434,16 +434,6 @@ export function AdminPlayerDetailPopup({
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground">
-                                            Week 1 Tryouts:
-                                        </span>
-                                        <span className="ml-2 font-medium">
-                                            {signup.play1stWeek
-                                                ? "Requested"
-                                                : "Not requested"}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-muted-foreground">
                                             Pair Request:
                                         </span>
                                         <span className="ml-2 font-medium">
@@ -470,13 +460,13 @@ export function AdminPlayerDetailPopup({
                                             </span>
                                         </div>
                                     )}
-                                    {signup.datesMissing && (
+                                    {signup.unavailableDates && (
                                         <div className="col-span-2">
                                             <span className="text-muted-foreground">
-                                                Dates Missing:
+                                                Dates Unavailable:
                                             </span>
                                             <span className="ml-2 font-medium">
-                                                {signup.datesMissing}
+                                                {signup.unavailableDates}
                                             </span>
                                         </div>
                                     )}

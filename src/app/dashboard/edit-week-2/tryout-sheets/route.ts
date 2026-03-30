@@ -13,7 +13,11 @@ import {
     users,
     week2Rosters
 } from "@/database/schema"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatHeight } from "@/components/player-detail/format-height"
@@ -626,10 +630,12 @@ export async function GET() {
             hour12: true
         }).format(new Date())
 
+        const tryoutEvents = getEventsByType(config, "tryout")
+        const tryout2Slots = tryoutEvents[1]?.timeSlots ?? []
         const sessionTimeMap: Record<1 | 2 | 3, string> = {
-            1: config.tryout2Session1Time.trim(),
-            2: config.tryout2Session2Time.trim(),
-            3: config.tryout2Session3Time.trim()
+            1: formatEventTime(tryout2Slots[0]?.startTime ?? ""),
+            2: formatEventTime(tryout2Slots[1]?.startTime ?? ""),
+            3: formatEventTime(tryout2Slots[2]?.startTime ?? "")
         }
 
         const highlightYellow = rgb(1, 0.98, 0.8)

@@ -83,7 +83,7 @@ export function PlayerSlotColumn({
                 viewerRating: result.viewerRating,
                 pairPickName: result.pairPickName,
                 pairReason: result.pairReason,
-                datesMissing: result.datesMissing,
+                datesMissing: result.unavailableDates,
                 playoffDates: result.playoffDates
             })
         } else {
