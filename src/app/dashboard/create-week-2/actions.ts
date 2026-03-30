@@ -11,10 +11,11 @@ import {
     seasons,
     divisions,
     individual_divisions,
-    week2Rosters
+    week2Rosters,
+    playerUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -76,7 +77,8 @@ export async function getCreateWeek2Data(): Promise<{
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryout2 = config.tryout2Date.trim().toLowerCase()
+        const tryouts = getEventsByType(config, "tryout")
+        const tryout2Event = tryouts[1] ?? null
 
         const [activeDivisions, signupRowsRaw, captainRows, indivDivRows] =
             await Promise.all([
@@ -91,13 +93,13 @@ export async function getCreateWeek2Data(): Promise<{
                     .orderBy(divisions.level),
                 db
                     .select({
+                        signupId: signups.id,
                         userId: signups.player,
                         oldId: users.old_id,
                         firstName: users.first_name,
                         lastName: users.last_name,
                         preferredName: users.preferred_name,
                         male: users.male,
-                        datesMissing: signups.dates_missing,
                         pairPickId: signups.pair_pick
                     })
                     .from(signups)
@@ -158,17 +160,36 @@ export async function getCreateWeek2Data(): Promise<{
 
         const excludedPlayers: Week2ExcludedPlayer[] = []
 
+        const unavailableSignupIds = new Set<number>()
+        if (tryout2Event) {
+            const allSignupIds = signupRowsRaw.map((row) => row.signupId)
+            if (allSignupIds.length > 0) {
+                const unavailRows = await db
+                    .select({
+                        signupId: playerUnavailability.signup_id
+                    })
+                    .from(playerUnavailability)
+                    .where(
+                        and(
+                            inArray(
+                                playerUnavailability.signup_id,
+                                allSignupIds
+                            ),
+                            eq(playerUnavailability.event_id, tryout2Event.id)
+                        )
+                    )
+                for (const row of unavailRows) {
+                    unavailableSignupIds.add(row.signupId)
+                }
+            }
+        }
+
         const signupRows = signupRowsRaw.filter((row) => {
-            if (!tryout2) {
+            if (!tryout2Event) {
                 return true
             }
 
-            const missingDates = (row.datesMissing || "")
-                .split(",")
-                .map((value) => value.trim().toLowerCase())
-                .filter(Boolean)
-
-            const isExcluded = missingDates.includes(tryout2)
+            const isExcluded = unavailableSignupIds.has(row.signupId)
             if (isExcluded) {
                 excludedPlayers.push({
                     userId: row.userId,

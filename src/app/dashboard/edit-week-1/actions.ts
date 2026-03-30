@@ -14,10 +14,16 @@ import {
     week1Rosters,
     drafts,
     teams,
-    seasons
+    seasons,
+    playerUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -94,7 +100,7 @@ export async function getEditWeek1Data(): Promise<{
                     lastName: users.last_name,
                     preferredName: users.preferred_name,
                     male: users.male,
-                    playFirstWeek: signups.play_1st_week,
+                    signupId: signups.id,
                     pairPick: signups.pair_pick
                 })
                 .from(signups)
@@ -144,6 +150,28 @@ export async function getEditWeek1Data(): Promise<{
 
         const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
+        const tryouts = getEventsByType(config, "tryout")
+        const tryout1Event = tryouts[0] ?? null
+
+        const signupIds = signupPlayersRaw.map((p) => p.signupId)
+        const unavailableForTryout1 = new Set<number>()
+        if (tryout1Event && signupIds.length > 0) {
+            const unavailRows = await db
+                .select({
+                    signupId: playerUnavailability.signup_id
+                })
+                .from(playerUnavailability)
+                .where(
+                    and(
+                        inArray(playerUnavailability.signup_id, signupIds),
+                        eq(playerUnavailability.event_id, tryout1Event.id)
+                    )
+                )
+            for (const row of unavailRows) {
+                unavailableForTryout1.add(row.signupId)
+            }
+        }
+
         const signupPlayers: Week1EditablePlayer[] = signupPlayersRaw.map(
             (p) => ({
                 id: p.id,
@@ -151,7 +179,8 @@ export async function getEditWeek1Data(): Promise<{
                 lastName: p.lastName,
                 preferredName: p.preferredName,
                 male: p.male,
-                playFirstWeek: p.playFirstWeek ?? false,
+                playFirstWeek:
+                    !tryout1Event || !unavailableForTryout1.has(p.signupId),
                 seasonsPlayed: seasonsPlayedByUser.get(p.id)?.size ?? 0,
                 placementScore: scoreByUser.get(p.id) ?? 200,
                 hasPairPick: !!p.pairPick
@@ -304,10 +333,18 @@ export async function sendWeek1RosterNotifications(
             .where(inArray(users.id, allUserIds))
     ])
 
-    const tryoutDate = config.tryout1Date || null
+    const tryouts = getEventsByType(config, "tryout")
+    const tryout1Event = tryouts[0] ?? null
+    const tryoutDate = tryout1Event
+        ? formatEventDate(tryout1Event.eventDate)
+        : null
     const sessionTimes = [
-        config.tryout1Session1Time || "TBD",
-        config.tryout1Session2Time || "TBD"
+        tryout1Event?.timeSlots[0]?.startTime
+            ? formatEventTime(tryout1Event.timeSlots[0].startTime)
+            : "TBD",
+        tryout1Event?.timeSlots[1]?.startTime
+            ? formatEventTime(tryout1Event.timeSlots[1].startTime)
+            : "TBD"
     ]
 
     const userById = new Map(userRows.map((u) => [u.id, u]))

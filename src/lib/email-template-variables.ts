@@ -147,10 +147,7 @@ function buildDateVariables(config: SeasonConfig): TemplateVariable[] {
         })
     }
 
-    for (const [i] of getEventsByType(
-        config,
-        "regular_season"
-    ).entries()) {
+    for (const [i] of getEventsByType(config, "regular_season").entries()) {
         vars.push({
             key: `season_${i + 1}_date`,
             label: `Season Week ${i + 1} Date`,
@@ -314,9 +311,7 @@ export function buildEventVariableValues(
 
     const captainSelect = getEventsByType(config, "captain_select")
     if (captainSelect[0]) {
-        values.captain_select_date = formatEventDate(
-            captainSelect[0].eventDate
-        )
+        values.captain_select_date = formatEventDate(captainSelect[0].eventDate)
     }
 
     if (divisionLevel != null && drafts[divisionLevel - 1]) {

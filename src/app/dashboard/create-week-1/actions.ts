@@ -11,10 +11,11 @@ import {
     teams,
     seasons,
     divisions,
-    week1Rosters
+    week1Rosters,
+    playerUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -125,20 +126,22 @@ export async function getCreateWeek1Data(): Promise<{
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryout1 = config.tryout1Date.trim().toLowerCase()
+        const tryouts = getEventsByType(config, "tryout")
+        const tryout1Event = tryouts[0] ?? null
+        const tryout2Event = tryouts[1] ?? null
+        const tryout3Event = tryouts[2] ?? null
 
         const [signupRowsRaw, commissionerRows, captainRows] =
             await Promise.all([
                 db
                     .select({
+                        signupId: signups.id,
                         userId: signups.player,
                         oldId: users.old_id,
                         firstName: users.first_name,
                         lastName: users.last_name,
                         preferredName: users.preferred_name,
                         male: users.male,
-                        playFirstWeek: signups.play_1st_week,
-                        datesMissing: signups.dates_missing,
                         pairPickId: signups.pair_pick
                     })
                     .from(signups)
@@ -160,21 +163,50 @@ export async function getCreateWeek1Data(): Promise<{
             ...captainRows.map((row) => row.userId)
         ])
 
+        const allSignupIds = signupRowsRaw.map((row) => row.signupId)
+        const tryoutEventIds = [
+            tryout1Event?.id,
+            tryout2Event?.id,
+            tryout3Event?.id
+        ].filter((id): id is number => id != null)
+
+        let unavailabilityRows: {
+            signupId: number
+            eventId: number
+        }[] = []
+        if (allSignupIds.length > 0 && tryoutEventIds.length > 0) {
+            unavailabilityRows = await db
+                .select({
+                    signupId: playerUnavailability.signup_id,
+                    eventId: playerUnavailability.event_id
+                })
+                .from(playerUnavailability)
+                .where(
+                    and(
+                        inArray(playerUnavailability.signup_id, allSignupIds),
+                        inArray(playerUnavailability.event_id, tryoutEventIds)
+                    )
+                )
+        }
+
+        const unavailBySignup = new Map<number, Set<number>>()
+        for (const row of unavailabilityRows) {
+            const set = unavailBySignup.get(row.signupId) ?? new Set<number>()
+            set.add(row.eventId)
+            unavailBySignup.set(row.signupId, set)
+        }
+
         const signupRows = signupRowsRaw.filter((row) => {
             if (excludedUserIds.has(row.userId)) {
                 return false
             }
 
-            if (!tryout1) {
+            if (!tryout1Event) {
                 return true
             }
 
-            const missingDates = (row.datesMissing || "")
-                .split(",")
-                .map((value) => value.trim().toLowerCase())
-                .filter(Boolean)
-
-            return !missingDates.includes(tryout1)
+            const unavailEvents = unavailBySignup.get(row.signupId) ?? new Set()
+            return !unavailEvents.has(tryout1Event.id)
         })
 
         if (signupRows.length === 0) {
@@ -239,8 +271,6 @@ export async function getCreateWeek1Data(): Promise<{
             }
         }
 
-        const tryout2 = config.tryout2Date.trim().toLowerCase()
-        const tryout3 = config.tryout3Date.trim().toLowerCase()
         const pairIds = signupRows
             .map((row) => row.pairPickId)
             .filter((pairId): pairId is string => !!pairId)
@@ -274,18 +304,15 @@ export async function getCreateWeek1Data(): Promise<{
             const mostRecentDraft = history[0] || null
             const secondMostRecentDraft = history[1] || null
             const hasAnyDraft = history.length > 0
-            const playFirstWeek = row.playFirstWeek === true
+            const unavailEvents = unavailBySignup.get(row.signupId) ?? new Set()
+            const playFirstWeek =
+                !tryout1Event || !unavailEvents.has(tryout1Event.id)
             const seasonsPlayedCount = history.length
             const placementScore = scoreByUser.get(row.userId) ?? 200
 
-            const missingDates = (row.datesMissing || "")
-                .split(",")
-                .map((value) => value.trim().toLowerCase())
-                .filter(Boolean)
-
             const missesTryout2Or3 =
-                (tryout2.length > 0 && missingDates.includes(tryout2)) ||
-                (tryout3.length > 0 && missingDates.includes(tryout3))
+                (tryout2Event ? unavailEvents.has(tryout2Event.id) : false) ||
+                (tryout3Event ? unavailEvents.has(tryout3Event.id) : false)
 
             const group = getGroupForUser({
                 hasAnyDraft,

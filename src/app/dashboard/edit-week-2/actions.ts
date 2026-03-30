@@ -16,10 +16,16 @@ import {
     divisions,
     individual_divisions,
     drafts,
-    seasons
+    seasons,
+    playerUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
@@ -91,17 +97,18 @@ export async function getEditWeek2Data(): Promise<{
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryout2 = config.tryout2Date.trim().toLowerCase()
+        const tryouts = getEventsByType(config, "tryout")
+        const tryout2Event = tryouts[1] ?? null
 
         const [signupPlayersRaw, rosterSlots] = await Promise.all([
             db
                 .select({
+                    signupId: signups.id,
                     id: users.id,
                     firstName: users.first_name,
                     lastName: users.last_name,
                     preferredName: users.preferred_name,
                     male: users.male,
-                    datesMissing: signups.dates_missing,
                     pairPick: signups.pair_pick
                 })
                 .from(signups)
@@ -127,17 +134,36 @@ export async function getEditWeek2Data(): Promise<{
                 )
         ])
 
+        const unavailableSignupIds = new Set<number>()
+        if (tryout2Event) {
+            const allSignupIds = signupPlayersRaw.map((p) => p.signupId)
+            if (allSignupIds.length > 0) {
+                const unavailRows = await db
+                    .select({
+                        signupId: playerUnavailability.signup_id
+                    })
+                    .from(playerUnavailability)
+                    .where(
+                        and(
+                            inArray(
+                                playerUnavailability.signup_id,
+                                allSignupIds
+                            ),
+                            eq(playerUnavailability.event_id, tryout2Event.id)
+                        )
+                    )
+                for (const row of unavailRows) {
+                    unavailableSignupIds.add(row.signupId)
+                }
+            }
+        }
+
         const signupPlayers = signupPlayersRaw.filter((player) => {
-            if (!tryout2) {
+            if (!tryout2Event) {
                 return true
             }
 
-            const missingDates = (player.datesMissing || "")
-                .split(",")
-                .map((value) => value.trim().toLowerCase())
-                .filter(Boolean)
-
-            return !missingDates.includes(tryout2)
+            return !unavailableSignupIds.has(player.signupId)
         })
 
         const userIds = signupPlayers.map((p) => p.id)
@@ -412,11 +438,21 @@ export async function sendWeek2RosterNotifications(
             .orderBy(divisions.level)
     ])
 
-    const tryoutDate = config.tryout2Date || null
+    const tryouts = getEventsByType(config, "tryout")
+    const tryout2Event = tryouts[1] ?? null
+    const tryoutDate = tryout2Event
+        ? formatEventDate(tryout2Event.eventDate)
+        : null
     const sessionTimes = [
-        config.tryout2Session1Time || "TBD",
-        config.tryout2Session2Time || "TBD",
-        config.tryout2Session3Time || "TBD"
+        tryout2Event?.timeSlots[0]?.startTime
+            ? formatEventTime(tryout2Event.timeSlots[0].startTime)
+            : "TBD",
+        tryout2Event?.timeSlots[1]?.startTime
+            ? formatEventTime(tryout2Event.timeSlots[1].startTime)
+            : "TBD",
+        tryout2Event?.timeSlots[2]?.startTime
+            ? formatEventTime(tryout2Event.timeSlots[2].startTime)
+            : "TBD"
     ]
 
     const legacyCourtByDivision: Record<string, number> = {

@@ -2,7 +2,12 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 import { db } from "@/database/db"
 import { week3Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
@@ -99,10 +104,25 @@ export default async function PreseasonWeek3Page() {
     }
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const tryouts = getEventsByType(config, "tryout")
+    const tryout3 = tryouts[2]
+    const tryout3DateDisplay = tryout3
+        ? formatEventDate(tryout3.eventDate)
+        : "Date TBD"
+    const regularSeason = getEventsByType(config, "regular_season")
+    const season1DateDisplay = regularSeason[0]
+        ? formatEventDate(regularSeason[0].eventDate)
+        : "TBD"
     const sessionTimes = [
-        config.tryout3Session1Time,
-        config.tryout3Session2Time,
-        config.tryout3Session3Time
+        tryout3?.timeSlots[0]
+            ? formatEventTime(tryout3.timeSlots[0].startTime)
+            : "Time TBD",
+        tryout3?.timeSlots[1]
+            ? formatEventTime(tryout3.timeSlots[1].startTime)
+            : "Time TBD",
+        tryout3?.timeSlots[2]
+            ? formatEventTime(tryout3.timeSlots[2].startTime)
+            : "Time TBD"
     ]
 
     const rosterRows = await db
@@ -247,7 +267,7 @@ export default async function PreseasonWeek3Page() {
                         playing. This is the final week of preseason play. Over
                         the next two weeks, the Captain will draft their teams
                         for the regular season. Regular season play begins on{" "}
-                        {config.season1Date || "TBD"}.
+                        {season1DateDisplay}.
                     </p>
                     <p className="text-sm">
                         Please note that these &quot;Moving Day&quot;
@@ -292,7 +312,7 @@ export default async function PreseasonWeek3Page() {
                 </div>
 
                 <h2 className="font-semibold text-xl">
-                    Preseason Week 3 - {config.tryout3Date || "Date TBD"}
+                    Preseason Week 3 - {tryout3DateDisplay}
                 </h2>
 
                 {divisionGroups.length === 0 ? (
@@ -461,7 +481,7 @@ export default async function PreseasonWeek3Page() {
                                     {seasonLabel} Pre-Season Week 3
                                 </div>
                                 <div className="pw3-date">
-                                    {config.tryout3Date || "Date TBD"}
+                                    {tryout3DateDisplay}
                                 </div>
                             </div>
 

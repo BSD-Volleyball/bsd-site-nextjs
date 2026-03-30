@@ -10,7 +10,12 @@ import React from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { signups, users, waitlist } from "@/database/schema"
+import {
+    signups,
+    users,
+    waitlist,
+    playerUnavailability
+} from "@/database/schema"
 import { eq, and, count } from "drizzle-orm"
 import {
     getSeasonConfig,
@@ -34,8 +39,7 @@ export interface SignupFormData {
     pair: boolean
     pairPick: string | null
     pairReason: string
-    datesMissing: string
-    play1stWeek: boolean
+    unavailableEventIds: number[]
 }
 
 const getSquareClient = () => {
@@ -164,7 +168,7 @@ export interface PaymentResult {
 async function validateFinalSignupAvailability(
     userId: string,
     seasonId: number,
-    maxPlayersValue: string
+    maxPlayers: number
 ): Promise<{
     ok: boolean
     message?: string
@@ -184,7 +188,6 @@ async function validateFinalSignupAvailability(
         }
     }
 
-    const maxPlayers = parseInt(maxPlayersValue, 10)
     if (!Number.isFinite(maxPlayers) || maxPlayers <= 0) {
         return { ok: true }
     }
@@ -320,20 +323,31 @@ export async function submitSeasonPayment(
         if (response.payment) {
             if (config.seasonId) {
                 // Create signup record
-                await db.insert(signups).values({
-                    season: config.seasonId,
-                    player: session.user.id,
-                    order_id: response.payment.id,
-                    amount_paid: finalAmount,
-                    age: formData.age,
-                    captain: formData.captain,
-                    pair: formData.pair,
-                    pair_pick: formData.pairPick,
-                    pair_reason: formData.pairReason,
-                    dates_missing: formData.datesMissing,
-                    play_1st_week: formData.play1stWeek,
-                    created_at: new Date()
-                })
+                const [newSignup] = await db
+                    .insert(signups)
+                    .values({
+                        season: config.seasonId,
+                        player: session.user.id,
+                        order_id: response.payment.id,
+                        amount_paid: finalAmount,
+                        age: formData.age,
+                        captain: formData.captain,
+                        pair: formData.pair,
+                        pair_pick: formData.pairPick,
+                        pair_reason: formData.pairReason,
+                        created_at: new Date()
+                    })
+                    .returning({ id: signups.id })
+
+                // Insert player unavailability rows
+                if (formData.unavailableEventIds.length > 0 && newSignup) {
+                    await db.insert(playerUnavailability).values(
+                        formData.unavailableEventIds.map((eventId) => ({
+                            signup_id: newSignup.id,
+                            event_id: eventId
+                        }))
+                    )
+                }
 
                 await db
                     .delete(waitlist)
@@ -464,20 +478,31 @@ export async function submitFreeSignup(
         }
 
         // Create signup record with $0 amount
-        await db.insert(signups).values({
-            season: config.seasonId,
-            player: session.user.id,
-            order_id: `FREE-${discountId}`,
-            amount_paid: "0",
-            age: formData.age,
-            captain: formData.captain,
-            pair: formData.pair,
-            pair_pick: formData.pairPick,
-            pair_reason: formData.pairReason,
-            dates_missing: formData.datesMissing,
-            play_1st_week: formData.play1stWeek,
-            created_at: new Date()
-        })
+        const [newSignup] = await db
+            .insert(signups)
+            .values({
+                season: config.seasonId,
+                player: session.user.id,
+                order_id: `FREE-${discountId}`,
+                amount_paid: "0",
+                age: formData.age,
+                captain: formData.captain,
+                pair: formData.pair,
+                pair_pick: formData.pairPick,
+                pair_reason: formData.pairReason,
+                created_at: new Date()
+            })
+            .returning({ id: signups.id })
+
+        // Insert player unavailability rows
+        if (formData.unavailableEventIds.length > 0 && newSignup) {
+            await db.insert(playerUnavailability).values(
+                formData.unavailableEventIds.map((eventId) => ({
+                    signup_id: newSignup.id,
+                    event_id: eventId
+                }))
+            )
+        }
 
         await db
             .delete(waitlist)

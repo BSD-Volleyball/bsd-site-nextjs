@@ -39,6 +39,7 @@ import {
     RiArrowRightLine
 } from "@remixicon/react"
 import type { SeasonConfig } from "@/lib/site-config"
+import { getEventsByType, formatEventDate } from "@/lib/site-config"
 import Link from "next/link"
 
 interface User {
@@ -72,49 +73,31 @@ export function WizardForm({
         pair: false,
         pairPick: null,
         pairReason: "",
-        datesMissing: "",
-        play1stWeek: false
+        unavailableEventIds: []
     })
-    const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set())
+    const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set())
     const [waiverAgreed, setWaiverAgreed] = useState(false)
 
-    const toggleDate = (date: string) => {
-        setSelectedDates((prev) => {
+    const toggleEvent = (eventId: number) => {
+        setSelectedEvents((prev) => {
             const newSet = new Set(prev)
-            if (newSet.has(date)) {
-                newSet.delete(date)
+            if (newSet.has(eventId)) {
+                newSet.delete(eventId)
             } else {
-                newSet.add(date)
+                newSet.add(eventId)
             }
-            // Update formData with comma-separated list
+            // Update formData with array of event IDs
             setFormData((f) => ({
                 ...f,
-                datesMissing: Array.from(newSet).join(", ")
+                unavailableEventIds: Array.from(newSet)
             }))
             return newSet
         })
     }
 
-    const tryoutDates = [
-        { key: "tryout1", label: config.tryout1Date },
-        { key: "tryout2", label: config.tryout2Date },
-        { key: "tryout3", label: config.tryout3Date }
-    ].filter((d) => d.label)
-
-    const seasonDates = [
-        { key: "season1", label: config.season1Date },
-        { key: "season2", label: config.season2Date },
-        { key: "season3", label: config.season3Date },
-        { key: "season4", label: config.season4Date },
-        { key: "season5", label: config.season5Date },
-        { key: "season6", label: config.season6Date }
-    ].filter((d) => d.label)
-
-    const playoffDates = [
-        { key: "playoff1", label: config.playoff1Date },
-        { key: "playoff2", label: config.playoff2Date },
-        { key: "playoff3", label: config.playoff3Date }
-    ].filter((d) => d.label)
+    const tryoutEvents = getEventsByType(config, "tryout")
+    const seasonEvents = getEventsByType(config, "regular_season")
+    const playoffEvents = getEventsByType(config, "playoff")
     const [isProcessing, setIsProcessing] = useState(false)
     const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(
         null
@@ -424,118 +407,118 @@ export function WizardForm({
                             </h3>
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                                {tryoutDates.length > 0 && (
+                                {tryoutEvents.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="font-medium text-muted-foreground text-sm">
                                             Tryouts
                                         </h4>
                                         <div className="space-y-2">
-                                            {tryoutDates.map(
-                                                ({ key, label }) => (
-                                                    <div
-                                                        key={key}
-                                                        className="flex items-center gap-2"
+                                            {tryoutEvents.map((event) => (
+                                                <div
+                                                    key={event.id}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Checkbox
+                                                        id={`event-${event.id}`}
+                                                        checked={selectedEvents.has(
+                                                            event.id
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleEvent(
+                                                                event.id
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor={`event-${event.id}`}
+                                                        className="cursor-pointer font-normal"
                                                     >
-                                                        <Checkbox
-                                                            id={key}
-                                                            checked={selectedDates.has(
-                                                                label
-                                                            )}
-                                                            onCheckedChange={() =>
-                                                                toggleDate(
-                                                                    label
-                                                                )
-                                                            }
-                                                        />
-                                                        <Label
-                                                            htmlFor={key}
-                                                            className="cursor-pointer font-normal"
-                                                        >
-                                                            {label}
-                                                        </Label>
-                                                    </div>
-                                                )
-                                            )}
+                                                        {formatEventDate(
+                                                            event.eventDate
+                                                        )}
+                                                    </Label>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {seasonDates.length > 0 && (
+                                {seasonEvents.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="font-medium text-muted-foreground text-sm">
                                             Regular Season
                                         </h4>
                                         <div className="space-y-2">
-                                            {seasonDates.map(
-                                                ({ key, label }) => (
-                                                    <div
-                                                        key={key}
-                                                        className="flex items-center gap-2"
+                                            {seasonEvents.map((event) => (
+                                                <div
+                                                    key={event.id}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Checkbox
+                                                        id={`event-${event.id}`}
+                                                        checked={selectedEvents.has(
+                                                            event.id
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleEvent(
+                                                                event.id
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor={`event-${event.id}`}
+                                                        className="cursor-pointer font-normal"
                                                     >
-                                                        <Checkbox
-                                                            id={key}
-                                                            checked={selectedDates.has(
-                                                                label
-                                                            )}
-                                                            onCheckedChange={() =>
-                                                                toggleDate(
-                                                                    label
-                                                                )
-                                                            }
-                                                        />
-                                                        <Label
-                                                            htmlFor={key}
-                                                            className="cursor-pointer font-normal"
-                                                        >
-                                                            {label}
-                                                        </Label>
-                                                    </div>
-                                                )
-                                            )}
+                                                        {formatEventDate(
+                                                            event.eventDate
+                                                        )}
+                                                    </Label>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {playoffDates.length > 0 && (
+                                {playoffEvents.length > 0 && (
                                     <div className="space-y-2">
                                         <h4 className="font-medium text-muted-foreground text-sm">
                                             Playoffs
                                         </h4>
                                         <div className="space-y-2">
-                                            {playoffDates.map(
-                                                ({ key, label }) => (
-                                                    <div
-                                                        key={key}
-                                                        className="flex items-center gap-2"
+                                            {playoffEvents.map((event) => (
+                                                <div
+                                                    key={event.id}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <Checkbox
+                                                        id={`event-${event.id}`}
+                                                        checked={selectedEvents.has(
+                                                            event.id
+                                                        )}
+                                                        onCheckedChange={() =>
+                                                            toggleEvent(
+                                                                event.id
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor={`event-${event.id}`}
+                                                        className="cursor-pointer font-normal"
                                                     >
-                                                        <Checkbox
-                                                            id={key}
-                                                            checked={selectedDates.has(
-                                                                label
-                                                            )}
-                                                            onCheckedChange={() =>
-                                                                toggleDate(
-                                                                    label
-                                                                )
-                                                            }
-                                                        />
-                                                        <Label
-                                                            htmlFor={key}
-                                                            className="cursor-pointer font-normal"
-                                                        >
-                                                            {label}
-                                                        </Label>
-                                                    </div>
-                                                )
-                                            )}
+                                                        {formatEventDate(
+                                                            event.eventDate
+                                                        )}
+                                                    </Label>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            {tryoutDates.length > 0 &&
-                                tryoutDates.every(({ label }) =>
-                                    selectedDates.has(label)
+                            {tryoutEvents.length > 0 &&
+                                tryoutEvents.every((event) =>
+                                    selectedEvents.has(event.id)
                                 ) && (
                                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
                                         Are you sure you want to play this
@@ -547,7 +530,7 @@ export function WizardForm({
                                     </div>
                                 )}
 
-                            {selectedDates.size >= 4 && (
+                            {selectedEvents.size >= 4 && (
                                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
                                     Are you sure you want to play this season?
                                     You&apos;ve listed quite a few dates that
@@ -555,9 +538,9 @@ export function WizardForm({
                                 </div>
                             )}
 
-                            {playoffDates.length > 0 &&
-                                playoffDates.every(({ label }) =>
-                                    selectedDates.has(label)
+                            {playoffEvents.length > 0 &&
+                                playoffEvents.every((event) =>
+                                    selectedEvents.has(event.id)
                                 ) && (
                                     <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800 text-sm dark:border-red-900 dark:bg-red-950 dark:text-red-200">
                                         Are you really going to miss all of the
@@ -566,49 +549,6 @@ export function WizardForm({
                                         at least 1 match of the playoffs.
                                     </div>
                                 )}
-                        </div>
-
-                        {/* Section 2: Week 1 Participation */}
-                        <div className="space-y-3">
-                            <h3 className="font-medium text-base">
-                                Want to Play Tryouts Week 1?
-                            </h3>
-                            <p className="text-muted-foreground text-sm">
-                                Week 1 of the tryouts is limited to 96 players
-                                and will be mostly focused on skills drills for{" "}
-                                <strong>NEW</strong> players.
-                            </p>
-                            <p className="text-muted-foreground text-sm">
-                                Returning players who check here will be
-                                considered for any available slots that week but
-                                should NOT assume they will get to play. We will
-                                contact all players directly who are requested
-                                to attend the first week. You should consider
-                                selecting this option if your skills have
-                                changed significantly since last season you
-                                played or have not played in more than 2
-                                seasons.
-                            </p>
-                            <div className="flex items-center gap-2 pt-2">
-                                <Checkbox
-                                    id="play-1st-week"
-                                    checked={formData.play1stWeek}
-                                    onCheckedChange={(
-                                        checked: boolean | "indeterminate"
-                                    ) =>
-                                        setFormData((prev) => ({
-                                            ...prev,
-                                            play1stWeek: checked === true
-                                        }))
-                                    }
-                                />
-                                <Label
-                                    htmlFor="play-1st-week"
-                                    className="cursor-pointer font-normal"
-                                >
-                                    Request to participate in week 1
-                                </Label>
-                            </div>
                         </div>
 
                         <div className="pt-4">
@@ -739,31 +679,34 @@ export function WizardForm({
                                 </>
                             )}
                             {!discount &&
-                                config.lateDate &&
-                                config.lateAmount &&
-                                (new Date(
-                                    new Date().toLocaleString("en-US", {
-                                        timeZone: "America/New_York"
-                                    })
-                                ) >= new Date(config.lateDate) ? (
-                                    <p className="text-amber-600 text-xs dark:text-amber-400">
-                                        Late registration pricing is in effect
-                                        (after{" "}
-                                        {new Date(
-                                            config.lateDate
-                                        ).toLocaleDateString()}
-                                        )
-                                    </p>
-                                ) : (
-                                    <p className="text-muted-foreground text-xs">
-                                        Register before{" "}
-                                        {new Date(
-                                            config.lateDate
-                                        ).toLocaleDateString()}{" "}
-                                        to avoid the late fee of $
-                                        {config.lateAmount}
-                                    </p>
-                                ))}
+                                (() => {
+                                    const lateDateStr = getEventsByType(
+                                        config,
+                                        "late_date"
+                                    )[0]?.eventDate
+                                    if (!lateDateStr || !config.lateAmount)
+                                        return null
+                                    const isLate =
+                                        new Date(
+                                            new Date().toLocaleString("en-US", {
+                                                timeZone: "America/New_York"
+                                            })
+                                        ) >= new Date(`${lateDateStr}T00:00:00`)
+                                    return isLate ? (
+                                        <p className="text-amber-600 text-xs dark:text-amber-400">
+                                            Late registration pricing is in
+                                            effect (after{" "}
+                                            {formatEventDate(lateDateStr)})
+                                        </p>
+                                    ) : (
+                                        <p className="text-muted-foreground text-xs">
+                                            Register before{" "}
+                                            {formatEventDate(lateDateStr)} to
+                                            avoid the late fee of $
+                                            {config.lateAmount}
+                                        </p>
+                                    )
+                                })()}
                         </div>
 
                         {paymentResult && !paymentResult.status && (

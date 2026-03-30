@@ -2,7 +2,11 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
@@ -48,9 +52,15 @@ export default async function DraftPreseasonWeek1Page() {
     }
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const tryouts = getEventsByType(config, "tryout")
+    const tryout1 = tryouts[0]
     const sessionTimes: Record<1 | 2, string> = {
-        1: config.tryout1Session1Time,
-        2: config.tryout1Session2Time
+        1: tryout1?.timeSlots[0]
+            ? formatEventTime(tryout1.timeSlots[0].startTime)
+            : "Time TBD",
+        2: tryout1?.timeSlots[1]
+            ? formatEventTime(tryout1.timeSlots[1].startTime)
+            : "Time TBD"
     }
 
     const rosterRows = await db

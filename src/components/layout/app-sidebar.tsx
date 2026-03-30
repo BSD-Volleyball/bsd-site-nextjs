@@ -86,6 +86,11 @@ const baseNavItems = [
         title: "Report a Concern",
         url: "/dashboard/report-concern",
         icon: RiAlertLine
+    },
+    {
+        title: "My Availability",
+        url: "/dashboard/my-availability",
+        icon: RiCheckboxLine
     }
 ]
 
@@ -156,6 +161,11 @@ const adminDangerNavItems = [
         title: "Season Control",
         url: "/dashboard/season-control",
         icon: RiSettings3Line
+    },
+    {
+        title: "Season Configuration",
+        url: "/dashboard/season-config",
+        icon: RiCalendarLine
     },
     {
         title: "Manage Roles",
@@ -330,6 +340,11 @@ const captainPagesNavItems = [
         title: "Live Draft",
         url: "/dashboard/draft-division",
         icon: RiFileList3Line
+    },
+    {
+        title: "Team Availability",
+        url: "/dashboard/team-availability",
+        icon: RiCalendarLine
     }
 ]
 

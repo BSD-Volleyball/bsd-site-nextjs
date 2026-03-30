@@ -25,14 +25,10 @@ import {
 import {
     resolveTemplateVariablesInContent,
     resolveSubjectVariables,
+    buildEventVariableValues,
     type TemplateVariableValues
 } from "@/lib/email-template-variables"
-import {
-    type SeasonConfig,
-    getEventsByType,
-    formatEventDate,
-    formatEventTime
-} from "@/lib/site-config"
+import type { SeasonConfig } from "@/lib/site-config"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import type { DivisionCommissioner } from "./actions"
 
@@ -145,60 +141,10 @@ export function PotentialCaptainsList({
             }
 
             if (seasonConfig) {
-                const tryouts = getEventsByType(seasonConfig, "tryout")
-                const regularSeason = getEventsByType(
-                    seasonConfig,
-                    "regular_season"
+                Object.assign(
+                    values,
+                    buildEventVariableValues(seasonConfig, divisionLevel)
                 )
-                const playoffs = getEventsByType(seasonConfig, "playoff")
-                const drafts = getEventsByType(seasonConfig, "draft")
-                const captainSelect = getEventsByType(
-                    seasonConfig,
-                    "captain_select"
-                )
-
-                tryouts.forEach((e, i) => {
-                    values[`tryout_${i + 1}_date`] = formatEventDate(
-                        e.eventDate
-                    )
-                    e.timeSlots.forEach((ts, j) => {
-                        values[`tryout_${i + 1}_s${j + 1}_time`] =
-                            formatEventTime(ts.startTime)
-                    })
-                })
-
-                regularSeason.forEach((e, i) => {
-                    values[`season_${i + 1}_date`] = formatEventDate(
-                        e.eventDate
-                    )
-                })
-                if (regularSeason[0]) {
-                    regularSeason[0].timeSlots.forEach((ts, j) => {
-                        values[`season_s${j + 1}_time`] = formatEventTime(
-                            ts.startTime
-                        )
-                    })
-                }
-
-                playoffs.forEach((e, i) => {
-                    values[`playoff_${i + 1}_date`] = formatEventDate(
-                        e.eventDate
-                    )
-                })
-
-                drafts.forEach((e, i) => {
-                    values[`draft_${i + 1}_date`] = formatEventDate(e.eventDate)
-                })
-
-                if (captainSelect[0]) {
-                    values.captain_select_date = formatEventDate(
-                        captainSelect[0].eventDate
-                    )
-                }
-
-                values.division_draft_date = drafts[divisionLevel - 1]
-                    ? formatEventDate(drafts[divisionLevel - 1].eventDate)
-                    : ""
             }
 
             return values

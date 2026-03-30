@@ -1,5 +1,6 @@
 import {
     pgTable,
+    pgEnum,
     text,
     timestamp,
     boolean,
@@ -7,6 +8,8 @@ import {
     serial,
     numeric,
     real,
+    date,
+    time,
     uniqueIndex,
     jsonb,
     index
@@ -112,41 +115,60 @@ export const seasons = pgTable("seasons", {
     phase: text("phase")
         .$defaultFn(() => "off_season")
         .notNull(),
-    late_date: text("late_date"),
-    tryout_1_date: text("tryout_1_date"),
-    tryout_1_s1_time: text("tryout_1_s1_time"),
-    tryout_1_s2_time: text("tryout_1_s2_time"),
-    tryout_2_date: text("tryout_2_date"),
-    tryout_2_s1_time: text("tryout_2_s1_time"),
-    tryout_2_s2_time: text("tryout_2_s2_time"),
-    tryout_2_s3_time: text("tryout_2_s3_time"),
-    tryout_3_date: text("tryout_3_date"),
-    tryout_3_s1_time: text("tryout_3_s1_time"),
-    tryout_3_s2_time: text("tryout_3_s2_time"),
-    tryout_3_s3_time: text("tryout_3_s3_time"),
-    season_s1_time: text("season_s1_time"),
-    season_s2_time: text("season_s2_time"),
-    season_s3_time: text("season_s3_time"),
-    season_1_date: text("season_1_date"),
-    season_2_date: text("season_2_date"),
-    season_3_date: text("season_3_date"),
-    season_4_date: text("season_4_date"),
-    season_5_date: text("season_5_date"),
-    season_6_date: text("season_6_date"),
-    captain_select_date: text("captain_select_date"),
-    draft_1_date: text("draft_1_date"),
-    draft_2_date: text("draft_2_date"),
-    draft_3_date: text("draft_3_date"),
-    draft_4_date: text("draft_4_date"),
-    draft_5_date: text("draft_5_date"),
-    draft_6_date: text("draft_6_date"),
-    playoff_1_date: text("playoff_1_date"),
-    playoff_2_date: text("playoff_2_date"),
-    playoff_3_date: text("playoff_3_date"),
-    season_amount: text("season_amount"),
-    late_amount: text("late_amount"),
-    max_players: text("max_players")
+    season_amount: numeric("season_amount"),
+    late_amount: numeric("late_amount"),
+    max_players: integer("max_players")
 })
+
+export const eventTypeEnum = pgEnum("event_type", [
+    "tryout",
+    "regular_season",
+    "playoff",
+    "draft",
+    "captain_select",
+    "late_date"
+])
+
+export const seasonEvents = pgTable(
+    "season_events",
+    {
+        id: serial("id").primaryKey(),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        event_type: eventTypeEnum("event_type").notNull(),
+        event_date: date("event_date", { mode: "string" }).notNull(),
+        sort_order: integer("sort_order").notNull(),
+        label: text("label")
+    },
+    (table) => ({
+        seasonEventsSeasonIdx: index("season_events_season_idx").on(
+            table.season_id
+        ),
+        seasonEventsTypeIdx: index("season_events_type_idx").on(
+            table.season_id,
+            table.event_type
+        )
+    })
+)
+
+export const eventTimeSlots = pgTable(
+    "event_time_slots",
+    {
+        id: serial("id").primaryKey(),
+        event_id: integer("event_id")
+            .notNull()
+            .references(() => seasonEvents.id, { onDelete: "cascade" }),
+        start_time: time("start_time").notNull(),
+        slot_label: text("slot_label"),
+        sort_order: integer("sort_order").notNull()
+    },
+    (table) => ({
+        eventTimeSlotsEventIdx: index("event_time_slots_event_idx").on(
+            table.event_id
+        )
+    })
+)
 
 export const divisions = pgTable("divisions", {
     id: serial("id").primaryKey(),
@@ -187,8 +209,6 @@ export const signups = pgTable(
         pair: boolean("pair"),
         pair_pick: text("pair_pick").references(() => users.id),
         pair_reason: text("pair_reason"),
-        dates_missing: text("dates_missing"),
-        play_1st_week: boolean("play_1st_week"),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
         created_at: timestamp("created_at").notNull()
@@ -196,6 +216,36 @@ export const signups = pgTable(
     (table) => ({
         signupsSeasonIdx: index("signups_season_idx").on(table.season),
         signupsPlayerIdx: index("signups_player_idx").on(table.player)
+    })
+)
+
+export const playerUnavailability = pgTable(
+    "player_unavailability",
+    {
+        id: serial("id").primaryKey(),
+        signup_id: integer("signup_id")
+            .notNull()
+            .references(() => signups.id, { onDelete: "cascade" }),
+        event_id: integer("event_id")
+            .notNull()
+            .references(() => seasonEvents.id, { onDelete: "cascade" }),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull(),
+        updated_at: timestamp("updated_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        playerUnavailabilitySignupIdx: index(
+            "player_unavailability_signup_idx"
+        ).on(table.signup_id),
+        playerUnavailabilityEventIdx: index(
+            "player_unavailability_event_idx"
+        ).on(table.event_id),
+        playerUnavailabilityUnique: uniqueIndex(
+            "player_unavailability_signup_event_unique"
+        ).on(table.signup_id, table.event_id)
     })
 )
 
@@ -234,8 +284,8 @@ export const matches = pgTable(
             .notNull()
             .references(() => divisions.id),
         week: integer("week").notNull(),
-        date: text("date"),
-        time: text("time"),
+        date: date("date", { mode: "string" }),
+        time: time("time"),
         court: integer("court"),
         home_team: integer("home_team").references(() => teams.id),
         away_team: integer("away_team").references(() => teams.id),

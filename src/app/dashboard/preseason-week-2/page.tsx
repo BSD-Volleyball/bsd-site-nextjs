@@ -2,7 +2,12 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { PageHeader } from "@/components/layout/page-header"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 import { db } from "@/database/db"
 import { week2Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
@@ -99,10 +104,21 @@ export default async function PreseasonWeek2Page() {
     }
 
     const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const tryouts = getEventsByType(config, "tryout")
+    const tryout2 = tryouts[1]
+    const tryout2DateDisplay = tryout2
+        ? formatEventDate(tryout2.eventDate)
+        : "Date TBD"
     const sessionTimes = [
-        config.tryout2Session1Time,
-        config.tryout2Session2Time,
-        config.tryout2Session3Time
+        tryout2?.timeSlots[0]
+            ? formatEventTime(tryout2.timeSlots[0].startTime)
+            : "Time TBD",
+        tryout2?.timeSlots[1]
+            ? formatEventTime(tryout2.timeSlots[1].startTime)
+            : "Time TBD",
+        tryout2?.timeSlots[2]
+            ? formatEventTime(tryout2.timeSlots[2].startTime)
+            : "Time TBD"
     ]
 
     const rosterRows = await db
@@ -251,7 +267,7 @@ export default async function PreseasonWeek2Page() {
                 </div>
 
                 <h2 className="font-semibold text-xl">
-                    Preseason Week 2 - {config.tryout2Date || "Date TBD"}
+                    Preseason Week 2 - {tryout2DateDisplay}
                 </h2>
 
                 {divisionGroups.length === 0 ? (
@@ -420,7 +436,7 @@ export default async function PreseasonWeek2Page() {
                                     {seasonLabel} Pre-Season Week 2
                                 </div>
                                 <div className="pw2-date">
-                                    {config.tryout2Date || "Date TBD"}
+                                    {tryout2DateDisplay}
                                 </div>
                             </div>
 

@@ -15,6 +15,13 @@
       "when": 1774387399390,
       "tag": "0001_handy_lilith",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774878042335,
+      "tag": "0002_tranquil_umar",
+      "breakpoints": true
     }
   ]
 }
