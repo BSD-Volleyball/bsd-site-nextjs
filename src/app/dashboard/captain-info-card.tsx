@@ -27,6 +27,7 @@ import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import type { CaptainWelcomeData } from "./actions"
 import { logContactDetailsViewed } from "./actions"
 import { buildEventVariableValues } from "@/lib/email-template-variables"
+import Link from "next/link"
 
 export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
     const [showEmailModal, setShowEmailModal] = useState(false)
@@ -337,6 +338,12 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                     )
                                 })}
                             </ul>
+                            <Link
+                                href="/dashboard/team-availability"
+                                className="inline-flex items-center gap-1 text-teal-700 text-xs underline underline-offset-2 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+                            >
+                                View full season availability →
+                            </Link>
                         </div>
                     )}
                     {(showWelcomeSection || showAvailabilitySection) && (
