@@ -133,25 +133,38 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                                     <th className="sticky left-0 z-10 border-b bg-background px-3 py-2 text-left font-medium">
                                         Player
                                     </th>
-                                    {events.map((event) => (
-                                        <th
-                                            key={event.id}
-                                            className={`whitespace-nowrap border-b px-3 py-2 text-center font-medium ${
-                                                event.eventType === "playoff"
-                                                    ? "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                                                    : ""
-                                            }`}
-                                        >
-                                            <div>
-                                                {formatDate(event.eventDate)}
-                                            </div>
-                                            {event.eventType === "playoff" && (
-                                                <div className="font-normal text-amber-600 text-xs dark:text-amber-400">
-                                                    Playoff
+                                    {events.map((event) => {
+                                        const count =
+                                            availableCountByEvent.get(
+                                                event.id
+                                            ) ?? 0
+                                        const isLow = count < 6
+                                        return (
+                                            <th
+                                                key={event.id}
+                                                className={`whitespace-nowrap border-b px-3 py-2 text-center font-medium ${
+                                                    isLow
+                                                        ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+                                                        : event.eventType ===
+                                                            "playoff"
+                                                          ? "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                                                          : ""
+                                                }`}
+                                            >
+                                                <div>
+                                                    {formatDate(
+                                                        event.eventDate
+                                                    )}
                                                 </div>
-                                            )}
-                                        </th>
-                                    ))}
+                                                {event.eventType ===
+                                                    "playoff" && (
+                                                    <div className="font-normal text-xs">
+                                                        Playoff
+                                                    </div>
+                                                )}
+                                            </th>
+                                        )
+                                    })}
                                 </tr>
                             </thead>
                             <tbody>
@@ -207,8 +220,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                                                 event.id
                                             ) ?? 0
                                         const total = roster.length
-                                        const isLow =
-                                            count < Math.ceil(total * 0.5)
+                                        const isLow = count < 6
                                         return (
                                             <td
                                                 key={event.id}
