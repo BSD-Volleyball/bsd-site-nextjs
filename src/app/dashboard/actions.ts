@@ -13,7 +13,9 @@ import {
     divisions,
     matches,
     emailTemplates,
-    seasonEvents
+    seasonEvents,
+    signups,
+    playerUnavailability
 } from "@/database/schema"
 import { eq, and, lt, desc, inArray, asc, or, isNull } from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -634,6 +636,7 @@ export interface NextMatch {
     opponentName: string
     divisionName: string
     week: number
+    isUnavailable: boolean
 }
 
 export async function getNextMatch(
@@ -681,9 +684,10 @@ export async function getNextMatch(
 
         // If match.date is null, resolve it from season_events using the week number
         let matchDate: string | null = nextMatchRow.date
+        let matchEventId: number | null = null
         if (!matchDate) {
             const rsEvents = await db
-                .select({ eventDate: seasonEvents.event_date })
+                .select({ eventDate: seasonEvents.event_date, id: seasonEvents.id })
                 .from(seasonEvents)
                 .where(
                     and(
@@ -693,7 +697,10 @@ export async function getNextMatch(
                 )
                 .orderBy(asc(seasonEvents.event_date))
             const weekEvent = rsEvents[nextMatchRow.week - 1]
-            if (weekEvent) matchDate = weekEvent.eventDate
+            if (weekEvent) {
+                matchDate = weekEvent.eventDate
+                matchEventId = weekEvent.id
+            }
         }
 
         if (!matchDate) return null
@@ -741,13 +748,43 @@ export async function getNextMatch(
               ? `Team ${opponent.number}`
               : opponent.name
 
+        // Check if player has marked themselves unavailable for this match's event
+        let isUnavailable = false
+        if (matchEventId !== null) {
+            const [signup] = await db
+                .select({ id: signups.id })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.player, userId),
+                        eq(signups.season, seasonId)
+                    )
+                )
+                .limit(1)
+
+            if (signup) {
+                const [unavailRecord] = await db
+                    .select({ id: playerUnavailability.id })
+                    .from(playerUnavailability)
+                    .where(
+                        and(
+                            eq(playerUnavailability.signup_id, signup.id),
+                            eq(playerUnavailability.event_id, matchEventId)
+                        )
+                    )
+                    .limit(1)
+                isUnavailable = !!unavailRecord
+            }
+        }
+
         return {
             date: matchDate,
             time: formatMatchTime(nextMatchRow.time),
             court: nextMatchRow.court,
             opponentName,
             divisionName: divisionRow[0]?.name ?? "",
-            week: nextMatchRow.week
+            week: nextMatchRow.week,
+            isUnavailable
         }
     } catch (error) {
         console.error("Error fetching next match:", error)

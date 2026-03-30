@@ -1278,7 +1278,35 @@ export default async function DashboardPage() {
                                         {nextMatch.divisionName}
                                     </span>
                                 </div>
+                                <div className="flex justify-between">
+                                    <span className="text-blue-700 dark:text-blue-300">
+                                        Availability:
+                                    </span>
+                                    <span
+                                        className={
+                                            nextMatch.isUnavailable
+                                                ? "font-semibold text-red-600 dark:text-red-400"
+                                                : "font-semibold text-green-700 dark:text-green-400"
+                                        }
+                                    >
+                                        {nextMatch.isUnavailable
+                                            ? "Not Available"
+                                            : "Available"}
+                                    </span>
+                                </div>
                             </div>
+                            <p className="text-blue-600 text-xs dark:text-blue-400">
+                                {nextMatch.isUnavailable
+                                    ? "You've marked this date as unavailable. If you can now make it, "
+                                    : "Can't make this match? "}
+                                <Link
+                                    href="/dashboard/my-availability"
+                                    className="underline underline-offset-2 hover:text-blue-800 dark:hover:text-blue-200"
+                                >
+                                    update your availability
+                                </Link>
+                                {nextMatch.isUnavailable ? "." : " so your captain knows."}
+                            </p>
                             <Link
                                 href="/dashboard/season-schedule"
                                 className="block text-center text-blue-700 text-sm underline underline-offset-4 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200"

@@ -12,8 +12,11 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import {
+    RiCheckboxCircleLine,
+    RiCloseCircleFill
+} from "@remixicon/react"
+import { cn } from "@/lib/utils"
 import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 
@@ -87,29 +90,27 @@ export function AvailabilityForm({
                             <h4 className="font-medium text-muted-foreground text-sm">
                                 Tryouts
                             </h4>
-                            <div className="space-y-2">
-                                {tryoutEvents.map((event) => (
-                                    <div
-                                        key={event.id}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <Checkbox
-                                            id={`event-${event.id}`}
-                                            checked={selectedEvents.has(
-                                                event.id
-                                            )}
-                                            onCheckedChange={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor={`event-${event.id}`}
-                                            className="cursor-pointer font-normal"
+                            <div className="space-y-1">
+                                {tryoutEvents.map((event) => {
+                                    const unavailable = selectedEvents.has(event.id)
+                                    return (
+                                        <button
+                                            key={event.id}
+                                            type="button"
+                                            onClick={() => toggleEvent(event.id)}
+                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                                         >
-                                            {formatEventDate(event.eventDate)}
-                                        </Label>
-                                    </div>
-                                ))}
+                                            {unavailable ? (
+                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+                                            ) : (
+                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            )}
+                                            <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
+                                                {formatEventDate(event.eventDate)}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -119,29 +120,27 @@ export function AvailabilityForm({
                             <h4 className="font-medium text-muted-foreground text-sm">
                                 Regular Season
                             </h4>
-                            <div className="space-y-2">
-                                {seasonEvents.map((event) => (
-                                    <div
-                                        key={event.id}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <Checkbox
-                                            id={`event-${event.id}`}
-                                            checked={selectedEvents.has(
-                                                event.id
-                                            )}
-                                            onCheckedChange={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor={`event-${event.id}`}
-                                            className="cursor-pointer font-normal"
+                            <div className="space-y-1">
+                                {seasonEvents.map((event) => {
+                                    const unavailable = selectedEvents.has(event.id)
+                                    return (
+                                        <button
+                                            key={event.id}
+                                            type="button"
+                                            onClick={() => toggleEvent(event.id)}
+                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                                         >
-                                            {formatEventDate(event.eventDate)}
-                                        </Label>
-                                    </div>
-                                ))}
+                                            {unavailable ? (
+                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+                                            ) : (
+                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            )}
+                                            <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
+                                                {formatEventDate(event.eventDate)}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -151,29 +150,27 @@ export function AvailabilityForm({
                             <h4 className="font-medium text-muted-foreground text-sm">
                                 Playoffs
                             </h4>
-                            <div className="space-y-2">
-                                {playoffEvents.map((event) => (
-                                    <div
-                                        key={event.id}
-                                        className="flex items-center gap-2"
-                                    >
-                                        <Checkbox
-                                            id={`event-${event.id}`}
-                                            checked={selectedEvents.has(
-                                                event.id
-                                            )}
-                                            onCheckedChange={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor={`event-${event.id}`}
-                                            className="cursor-pointer font-normal"
+                            <div className="space-y-1">
+                                {playoffEvents.map((event) => {
+                                    const unavailable = selectedEvents.has(event.id)
+                                    return (
+                                        <button
+                                            key={event.id}
+                                            type="button"
+                                            onClick={() => toggleEvent(event.id)}
+                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
                                         >
-                                            {formatEventDate(event.eventDate)}
-                                        </Label>
-                                    </div>
-                                ))}
+                                            {unavailable ? (
+                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+                                            ) : (
+                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            )}
+                                            <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
+                                                {formatEventDate(event.eventDate)}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
