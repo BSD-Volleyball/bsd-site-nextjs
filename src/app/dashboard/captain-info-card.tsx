@@ -43,17 +43,12 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
 
     const isDraftPhase = data.seasonConfig?.phase === "draft"
 
-    // Show welcome section if currently in draft phase OR within 7 days of last draft event
-    const lastDraftDate = data.seasonConfig?.events
-        .filter((e) => e.eventType === "draft")
-        .map((e) => e.eventDate)
-        .sort()
-        .at(-1)
-    const draftWithinWeek = lastDraftDate
+    // Show welcome section if within 7 days of this division's specific draft date
+    const draftWithinWeek = data.divisionDraftDate
         ? Date.now() -
-              new Date(`${lastDraftDate}T00:00:00`).getTime() <
+              new Date(`${data.divisionDraftDate}T00:00:00`).getTime() <
           7 * 24 * 60 * 60 * 1000
-        : false
+        : isDraftPhase
     const showWelcomeSection = isDraftPhase || draftWithinWeek
     const showAvailabilitySection =
         !showWelcomeSection && !!data.nextMatchAvailability

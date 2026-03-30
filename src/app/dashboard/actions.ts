@@ -337,6 +337,7 @@ export interface CaptainWelcomeData {
     seasonConfig: SeasonConfig | null
     currentUserPreferredName: string
     currentUserLastName: string
+    divisionDraftDate: string | null
     nextMatchAvailability: {
         eventDate: string
         unavailableUserIds: string[]
@@ -449,6 +450,52 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             )
         }
 
+        // Find this division's specific draft date
+        // Divisions are drafted in ascending level order (lowest level = drafted first)
+        // so the division's rank among season divisions maps to the Nth draft event
+        let divisionDraftDate: string | null = null
+        try {
+            const seasonDivisionRows = await db
+                .selectDistinct({ divisionId: teams.division })
+                .from(teams)
+                .where(eq(teams.season, config.seasonId))
+
+            const divisionIds = seasonDivisionRows.map((r) => r.divisionId)
+
+            if (divisionIds.length > 0) {
+                const divisionLevelRows = await db
+                    .select({ id: divisions.id, level: divisions.level })
+                    .from(divisions)
+                    .where(inArray(divisions.id, divisionIds))
+                    .orderBy(asc(divisions.level))
+
+                const divisionIndex = divisionLevelRows.findIndex(
+                    (d) => d.id === teamRow.divisionId
+                )
+
+                const draftEventRows = await db
+                    .select({ event_date: seasonEvents.event_date })
+                    .from(seasonEvents)
+                    .where(
+                        and(
+                            eq(seasonEvents.season_id, config.seasonId),
+                            eq(seasonEvents.event_type, "draft")
+                        )
+                    )
+                    .orderBy(asc(seasonEvents.sort_order))
+
+                if (divisionIndex >= 0 && draftEventRows[divisionIndex]) {
+                    divisionDraftDate =
+                        draftEventRows[divisionIndex].event_date
+                }
+            }
+        } catch (draftDateError) {
+            console.error(
+                "Error fetching division draft date:",
+                draftDateError
+            )
+        }
+
         // Find next match availability for the team's roster
         let nextMatchAvailability: CaptainWelcomeData["nextMatchAvailability"] =
             null
@@ -538,6 +585,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 currentUserRow?.firstName ||
                 "",
             currentUserLastName: currentUserRow?.lastName || "",
+            divisionDraftDate,
             nextMatchAvailability
         }
     } catch (error) {
