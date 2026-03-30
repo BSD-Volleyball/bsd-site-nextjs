@@ -65,6 +65,11 @@ import {
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
     {
+        title: "My Availability",
+        url: "/dashboard/my-availability",
+        icon: RiCheckboxLine
+    },
+    {
         title: "Volleyball Profile",
         url: "/dashboard/volleyball-profile",
         icon: RiBasketballLine
@@ -86,11 +91,6 @@ const baseNavItems = [
         title: "Report a Concern",
         url: "/dashboard/report-concern",
         icon: RiAlertLine
-    },
-    {
-        title: "My Availability",
-        url: "/dashboard/my-availability",
-        icon: RiCheckboxLine
     }
 ]
 
