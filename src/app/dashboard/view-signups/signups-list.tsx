@@ -24,7 +24,8 @@ interface SeasonInfo {
 }
 
 interface SignupsListProps {
-    groups: SignupGroup[]
+    undraftedGroups: SignupGroup[]
+    draftedGroups: SignupGroup[]
     allSeasons: SeasonInfo[]
     playerPicUrl: string
     seasonLabel: string
@@ -102,7 +103,8 @@ function generateCsvContent(
 }
 
 export function SignupsList({
-    groups,
+    undraftedGroups,
+    draftedGroups,
     allSeasons,
     playerPicUrl,
     seasonLabel
@@ -153,7 +155,42 @@ export function SignupsList({
                 </Button>
             </div>
 
-            {groups.map((group) => (
+            {undraftedGroups.length > 0 && (
+                <div className="flex items-center gap-3">
+                    <h2 className="font-semibold text-lg">
+                        Not Yet Drafted
+                    </h2>
+                    <span className="rounded-md bg-muted px-3 py-1 font-medium text-sm">
+                        {undraftedGroups.reduce(
+                            (sum, g) => sum + g.players.length,
+                            0
+                        )}{" "}
+                        players
+                    </span>
+                    <span className="rounded-md bg-blue-100 px-3 py-1 font-medium text-blue-700 text-sm dark:bg-blue-900 dark:text-blue-300">
+                        {undraftedGroups.reduce(
+                            (sum, g) =>
+                                sum +
+                                g.players.filter((p) => p.gender === "Male")
+                                    .length,
+                            0
+                        )}{" "}
+                        male
+                    </span>
+                    <span className="rounded-md bg-purple-100 px-3 py-1 font-medium text-purple-700 text-sm dark:bg-purple-900 dark:text-purple-300">
+                        {undraftedGroups.reduce(
+                            (sum, g) =>
+                                sum +
+                                g.players.filter((p) => p.gender !== "Male")
+                                    .length,
+                            0
+                        )}{" "}
+                        non-male
+                    </span>
+                </div>
+            )}
+
+            {undraftedGroups.map((group) => (
                 <Card key={group.groupLabel}>
                     <CardHeader>
                         <CardTitle>{group.groupLabel}</CardTitle>
@@ -258,6 +295,158 @@ export function SignupsList({
                     </CardContent>
                 </Card>
             ))}
+
+            {draftedGroups.length > 0 && (
+                <>
+                    <div className="flex items-center gap-3 border-t pt-4">
+                        <h2 className="font-semibold text-lg">
+                            Drafted Players
+                        </h2>
+                        <span className="rounded-md bg-amber-100 px-3 py-1 font-medium text-amber-700 text-sm dark:bg-amber-900 dark:text-amber-300">
+                            {draftedGroups.reduce(
+                                (sum, g) => sum + g.players.length,
+                                0
+                            )}{" "}
+                            players
+                        </span>
+                        <span className="rounded-md bg-blue-100 px-3 py-1 font-medium text-blue-700 text-sm dark:bg-blue-900 dark:text-blue-300">
+                            {draftedGroups.reduce(
+                                (sum, g) =>
+                                    sum +
+                                    g.players.filter(
+                                        (p) => p.gender === "Male"
+                                    ).length,
+                                0
+                            )}{" "}
+                            male
+                        </span>
+                        <span className="rounded-md bg-purple-100 px-3 py-1 font-medium text-purple-700 text-sm dark:bg-purple-900 dark:text-purple-300">
+                            {draftedGroups.reduce(
+                                (sum, g) =>
+                                    sum +
+                                    g.players.filter(
+                                        (p) => p.gender !== "Male"
+                                    ).length,
+                                0
+                            )}{" "}
+                            non-male
+                        </span>
+                    </div>
+
+                    {draftedGroups.map((group) => (
+                        <Card key={`drafted-${group.groupLabel}`}>
+                            <CardHeader>
+                                <CardTitle>{group.groupLabel}</CardTitle>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
+                                        {group.players.length} total
+                                    </span>
+                                    <span className="rounded-md bg-blue-100 px-3 py-1.5 font-medium text-blue-700 text-sm dark:bg-blue-900 dark:text-blue-300">
+                                        {
+                                            group.players.filter(
+                                                (player) =>
+                                                    player.gender === "Male"
+                                            ).length
+                                        }{" "}
+                                        male
+                                    </span>
+                                    <span className="rounded-md bg-purple-100 px-3 py-1.5 font-medium text-purple-700 text-sm dark:bg-purple-900 dark:text-purple-300">
+                                        {
+                                            group.players.filter(
+                                                (player) =>
+                                                    player.gender !== "Male"
+                                            ).length
+                                        }{" "}
+                                        non-male
+                                    </span>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="overflow-x-auto rounded-lg border">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b bg-muted/50">
+                                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                                    Name
+                                                </th>
+                                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                                    Paired With
+                                                </th>
+                                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                                    Gender
+                                                </th>
+                                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                                    Age
+                                                </th>
+                                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                                    Height
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {group.players.map((player) => (
+                                                <tr
+                                                    key={player.userId}
+                                                    className="border-b transition-colors last:border-0 hover:bg-accent/50"
+                                                >
+                                                    <td className="px-4 py-2 font-medium">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                modal.openPlayerDetail(
+                                                                    player.userId
+                                                                )
+                                                            }
+                                                            className="text-left underline decoration-dotted transition-colors hover:text-primary focus:outline-none"
+                                                        >
+                                                            {player.displayName}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {player.pairedWith ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    player.pairedWithId &&
+                                                                    modal.openPlayerDetail(
+                                                                        player.pairedWithId
+                                                                    )
+                                                                }
+                                                                className="text-left underline decoration-dotted transition-colors hover:text-primary focus:outline-none"
+                                                                disabled={
+                                                                    !player.pairedWithId
+                                                                }
+                                                            >
+                                                                {
+                                                                    player.pairedWith
+                                                                }
+                                                            </button>
+                                                        ) : (
+                                                            "\u2014"
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {player.gender}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {player.age ||
+                                                            "\u2014"}
+                                                    </td>
+                                                    <td className="px-4 py-2">
+                                                        {formatHeight(
+                                                            player.height
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </>
+            )}
 
             <PlayerDetailPopup
                 open={!!modal.selectedUserId}

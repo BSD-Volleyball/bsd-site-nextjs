@@ -404,7 +404,8 @@ export interface SeasonInfo {
 export async function getSignupsData(): Promise<{
     status: boolean
     message?: string
-    groups: SignupGroup[]
+    undraftedGroups: SignupGroup[]
+    draftedGroups: SignupGroup[]
     allSeasons: SeasonInfo[]
     seasonLabel: string
 }> {
@@ -413,7 +414,8 @@ export async function getSignupsData(): Promise<{
         return {
             status: false,
             message: "Unauthorized",
-            groups: [],
+            undraftedGroups: [],
+            draftedGroups: [],
             allSeasons: [],
             seasonLabel: ""
         }
@@ -426,7 +428,8 @@ export async function getSignupsData(): Promise<{
             return {
                 status: false,
                 message: "No current season found.",
-                groups: [],
+                undraftedGroups: [],
+                draftedGroups: [],
                 allSeasons: [],
                 seasonLabel: ""
             }
@@ -454,7 +457,8 @@ export async function getSignupsData(): Promise<{
         if (signupRows.length === 0) {
             return {
                 status: true,
-                groups: [],
+                undraftedGroups: [],
+                draftedGroups: [],
                 allSeasons: [],
                 seasonLabel
             }
@@ -523,23 +527,58 @@ export async function getSignupsData(): Promise<{
             }
         }
 
-        // Group players by their last drafted division
-        const groupMap = new Map<string, SignupPlayer[]>()
-        const groupOrderMap = new Map<string, number>()
+        // Fetch current-season draft assignments with division level for ordering
+        const draftedInMap = new Map<
+            string,
+            { divisionName: string; divisionLevel: number }
+        >()
+
+        if (userIds.length > 0) {
+            const currentDraftRows = await db
+                .select({
+                    userId: drafts.user,
+                    divisionName: divisions.name,
+                    divisionLevel: divisions.level
+                })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        inArray(drafts.user, userIds)
+                    )
+                )
+
+            for (const draft of currentDraftRows) {
+                draftedInMap.set(draft.userId, {
+                    divisionName: draft.divisionName,
+                    divisionLevel: draft.divisionLevel
+                })
+            }
+        }
+
+        // Group undrafted players by their last drafted division,
+        // and drafted players by their current-season division
+        const undraftedGroupMap = new Map<string, SignupPlayer[]>()
+        const undraftedGroupOrderMap = new Map<string, number>()
+        const draftedGroupMap = new Map<string, SignupPlayer[]>()
+        const draftedGroupOrderMap = new Map<string, number>()
+
+        function sortGroupPlayers(players: SignupPlayer[]) {
+            players.sort((a, b) => {
+                const genderOrder = { Male: 0, "Non-Male": 1, Unknown: 2 }
+                const genderCompare =
+                    genderOrder[a.gender as keyof typeof genderOrder] -
+                    genderOrder[b.gender as keyof typeof genderOrder]
+                if (genderCompare !== 0) return genderCompare
+                const aLastName = a.displayName.split(" ").pop() || ""
+                const bLastName = b.displayName.split(" ").pop() || ""
+                return aLastName.localeCompare(bLastName)
+            })
+        }
 
         for (const row of signupRows) {
-            const lastDraft = lastDraftMap.get(row.userId)
-            let groupLabel: string
-            let divisionOrder: number
-
-            if (lastDraft) {
-                groupLabel = lastDraft.divisionName
-                divisionOrder = lastDraft.divisionLevel
-            } else {
-                groupLabel = "New Players"
-                divisionOrder = 999
-            }
-
             const displayName = row.preferredName
                 ? `${row.preferredName} ${row.lastName}`
                 : `${row.firstName} ${row.lastName}`
@@ -559,45 +598,54 @@ export async function getSignupsData(): Promise<{
                 height: row.height
             }
 
-            if (!groupMap.has(groupLabel)) {
-                groupMap.set(groupLabel, [])
-                groupOrderMap.set(groupLabel, divisionOrder)
+            const currentDraft = draftedInMap.get(row.userId)
+
+            if (currentDraft) {
+                const { divisionName, divisionLevel } = currentDraft
+                if (!draftedGroupMap.has(divisionName)) {
+                    draftedGroupMap.set(divisionName, [])
+                    draftedGroupOrderMap.set(divisionName, divisionLevel)
+                }
+                draftedGroupMap.get(divisionName)!.push(player)
+            } else {
+                const lastDraft = lastDraftMap.get(row.userId)
+                const groupLabel = lastDraft
+                    ? lastDraft.divisionName
+                    : "New Players"
+                const divisionOrder = lastDraft ? lastDraft.divisionLevel : 999
+
+                if (!undraftedGroupMap.has(groupLabel)) {
+                    undraftedGroupMap.set(groupLabel, [])
+                    undraftedGroupOrderMap.set(groupLabel, divisionOrder)
+                }
+                undraftedGroupMap.get(groupLabel)!.push(player)
             }
-
-            groupMap.get(groupLabel)!.push(player)
         }
 
-        // Sort players within each group by gender, then last name
-        for (const group of groupMap.values()) {
-            group.sort((a, b) => {
-                // Sort by gender first (Male, Non-Male, Unknown)
-                const genderOrder = { Male: 0, "Non-Male": 1, Unknown: 2 }
-                const genderCompare =
-                    genderOrder[a.gender as keyof typeof genderOrder] -
-                    genderOrder[b.gender as keyof typeof genderOrder]
-                if (genderCompare !== 0) return genderCompare
+        for (const group of undraftedGroupMap.values()) sortGroupPlayers(group)
+        for (const group of draftedGroupMap.values()) sortGroupPlayers(group)
 
-                // Then sort by last name (extracted from displayName)
-                const aLastName = a.displayName.split(" ").pop() || ""
-                const bLastName = b.displayName.split(" ").pop() || ""
-                return aLastName.localeCompare(bLastName)
-            })
-        }
-
-        // Convert map to array and sort groups (by division level, "New Players" always first)
-        const groups: SignupGroup[] = Array.from(groupMap.entries()).map(
-            ([label, players]) => ({
-                groupLabel: label,
-                seasonOrder: groupOrderMap.get(label)!,
-                players
-            })
-        )
-
-        groups.sort((a, b) => {
+        const undraftedGroups: SignupGroup[] = Array.from(
+            undraftedGroupMap.entries()
+        ).map(([label, players]) => ({
+            groupLabel: label,
+            seasonOrder: undraftedGroupOrderMap.get(label)!,
+            players
+        }))
+        undraftedGroups.sort((a, b) => {
             if (a.groupLabel === "New Players") return -1
             if (b.groupLabel === "New Players") return 1
             return a.seasonOrder - b.seasonOrder
         })
+
+        const draftedGroups: SignupGroup[] = Array.from(
+            draftedGroupMap.entries()
+        ).map(([label, players]) => ({
+            groupLabel: label,
+            seasonOrder: draftedGroupOrderMap.get(label)!,
+            players
+        }))
+        draftedGroups.sort((a, b) => a.seasonOrder - b.seasonOrder)
 
         // Fetch all seasons for chart gap detection
         const allSeasonRows = await db
@@ -612,7 +660,8 @@ export async function getSignupsData(): Promise<{
 
         return {
             status: true,
-            groups,
+            undraftedGroups,
+            draftedGroups,
             allSeasons: allSeasonRows.map((s) => ({
                 id: s.id,
                 year: s.year,
@@ -625,7 +674,8 @@ export async function getSignupsData(): Promise<{
         return {
             status: false,
             message: "Something went wrong.",
-            groups: [],
+            undraftedGroups: [],
+            draftedGroups: [],
             allSeasons: [],
             seasonLabel: ""
         }
