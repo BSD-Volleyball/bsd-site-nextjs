@@ -5,6 +5,8 @@ import { db } from "@/database/db"
 import { champions, divisions, seasons, teams, users } from "@/database/schema"
 import { ChampionsList, type ChampionListRow } from "./champions-list"
 
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
     title: "Andrea's Hall of Champions"
 }
