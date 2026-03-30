@@ -5,6 +5,12 @@ import type {
     LexicalListNode,
     LexicalListItemNode
 } from "@/lib/email-template-content"
+import type { SeasonConfig } from "@/lib/site-config"
+import {
+    getEventsByType,
+    formatEventDate,
+    formatEventTime
+} from "@/lib/site-config"
 
 export interface TemplateVariable {
     key: string
@@ -15,7 +21,25 @@ export interface TemplateVariable {
 
 export type TemplateVariableValues = Record<string, string>
 
-export const TEMPLATE_VARIABLES: TemplateVariable[] = [
+const ORDINALS = [
+    "First",
+    "Second",
+    "Third",
+    "Fourth",
+    "Fifth",
+    "Sixth",
+    "Seventh",
+    "Eighth",
+    "Ninth",
+    "Tenth"
+]
+
+function ordinal(i: number): string {
+    return ORDINALS[i] ?? `#${i + 1}`
+}
+
+/** Variables that do not depend on season event data. */
+const STATIC_VARIABLES: TemplateVariable[] = [
     // General
     {
         key: "division_name",
@@ -83,129 +107,6 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         description: "Logged-in user's last name"
     },
 
-    // Dates
-    {
-        key: "tryout_1_date",
-        label: "Tryout 1 Date",
-        category: "Dates",
-        description: "First tryout date"
-    },
-    {
-        key: "tryout_2_date",
-        label: "Tryout 2 Date",
-        category: "Dates",
-        description: "Second tryout date"
-    },
-    {
-        key: "tryout_3_date",
-        label: "Tryout 3 Date",
-        category: "Dates",
-        description: "Third tryout date"
-    },
-    {
-        key: "season_1_date",
-        label: "Season Week 1 Date",
-        category: "Dates",
-        description: "First week of season date"
-    },
-    {
-        key: "season_2_date",
-        label: "Season Week 2 Date",
-        category: "Dates",
-        description: "Second week of season date"
-    },
-    {
-        key: "season_3_date",
-        label: "Season Week 3 Date",
-        category: "Dates",
-        description: "Third week of season date"
-    },
-    {
-        key: "season_4_date",
-        label: "Season Week 4 Date",
-        category: "Dates",
-        description: "Fourth week of season date"
-    },
-    {
-        key: "season_5_date",
-        label: "Season Week 5 Date",
-        category: "Dates",
-        description: "Fifth week of season date"
-    },
-    {
-        key: "season_6_date",
-        label: "Season Week 6 Date",
-        category: "Dates",
-        description: "Sixth week of season date"
-    },
-    {
-        key: "captain_select_date",
-        label: "Captain Select Date",
-        category: "Dates",
-        description: "Date captains are selected"
-    },
-    {
-        key: "draft_1_date",
-        label: "Draft 1 Date",
-        category: "Dates",
-        description: "First draft date"
-    },
-    {
-        key: "draft_2_date",
-        label: "Draft 2 Date",
-        category: "Dates",
-        description: "Second draft date"
-    },
-    {
-        key: "draft_3_date",
-        label: "Draft 3 Date",
-        category: "Dates",
-        description: "Third draft date"
-    },
-    {
-        key: "draft_4_date",
-        label: "Draft 4 Date",
-        category: "Dates",
-        description: "Fourth draft date"
-    },
-    {
-        key: "draft_5_date",
-        label: "Draft 5 Date",
-        category: "Dates",
-        description: "Fifth draft date"
-    },
-    {
-        key: "draft_6_date",
-        label: "Draft 6 Date",
-        category: "Dates",
-        description: "Sixth draft date"
-    },
-    {
-        key: "division_draft_date",
-        label: "Division Draft Date",
-        category: "Dates",
-        description:
-            "Draft date for the selected division based on division level"
-    },
-    {
-        key: "playoff_1_date",
-        label: "Playoff Week 1 Date",
-        category: "Dates",
-        description: "First playoff date"
-    },
-    {
-        key: "playoff_2_date",
-        label: "Playoff Week 2 Date",
-        category: "Dates",
-        description: "Second playoff date"
-    },
-    {
-        key: "playoff_3_date",
-        label: "Playoff Week 3 Date",
-        category: "Dates",
-        description: "Third playoff date"
-    },
-
     // Draft
     {
         key: "captain_rounds",
@@ -231,92 +132,200 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
         label: "Team Name",
         category: "Draft",
         description: "Name of the captain's team"
-    },
-
-    // Session Times
-    {
-        key: "tryout_1_s1_time",
-        label: "Tryout 1 Session 1 Time",
-        category: "Session Times",
-        description: "First tryout, first session time"
-    },
-    {
-        key: "tryout_1_s2_time",
-        label: "Tryout 1 Session 2 Time",
-        category: "Session Times",
-        description: "First tryout, second session time"
-    },
-    {
-        key: "tryout_2_s1_time",
-        label: "Tryout 2 Session 1 Time",
-        category: "Session Times",
-        description: "Second tryout, first session time"
-    },
-    {
-        key: "tryout_2_s2_time",
-        label: "Tryout 2 Session 2 Time",
-        category: "Session Times",
-        description: "Second tryout, second session time"
-    },
-    {
-        key: "tryout_2_s3_time",
-        label: "Tryout 2 Session 3 Time",
-        category: "Session Times",
-        description: "Second tryout, third session time"
-    },
-    {
-        key: "tryout_3_s1_time",
-        label: "Tryout 3 Session 1 Time",
-        category: "Session Times",
-        description: "Third tryout, first session time"
-    },
-    {
-        key: "tryout_3_s2_time",
-        label: "Tryout 3 Session 2 Time",
-        category: "Session Times",
-        description: "Third tryout, second session time"
-    },
-    {
-        key: "tryout_3_s3_time",
-        label: "Tryout 3 Session 3 Time",
-        category: "Session Times",
-        description: "Third tryout, third session time"
-    },
-    {
-        key: "season_s1_time",
-        label: "Season Session 1 Time",
-        category: "Session Times",
-        description: "Regular season, first session time"
-    },
-    {
-        key: "season_s2_time",
-        label: "Season Session 2 Time",
-        category: "Session Times",
-        description: "Regular season, second session time"
-    },
-    {
-        key: "season_s3_time",
-        label: "Season Session 3 Time",
-        category: "Session Times",
-        description: "Regular season, third session time"
     }
 ]
 
-export function getTemplateVariable(key: string): TemplateVariable | undefined {
-    return TEMPLATE_VARIABLES.find((v) => v.key === key)
+function buildDateVariables(config: SeasonConfig): TemplateVariable[] {
+    const vars: TemplateVariable[] = []
+
+    for (const [i] of getEventsByType(config, "tryout").entries()) {
+        vars.push({
+            key: `tryout_${i + 1}_date`,
+            label: `Tryout ${i + 1} Date`,
+            category: "Dates",
+            description: `${ordinal(i)} tryout date`
+        })
+    }
+
+    for (const [i] of getEventsByType(
+        config,
+        "regular_season"
+    ).entries()) {
+        vars.push({
+            key: `season_${i + 1}_date`,
+            label: `Season Week ${i + 1} Date`,
+            category: "Dates",
+            description: `${ordinal(i)} week of season date`
+        })
+    }
+
+    if (getEventsByType(config, "captain_select").length > 0) {
+        vars.push({
+            key: "captain_select_date",
+            label: "Captain Select Date",
+            category: "Dates",
+            description: "Date captains are selected"
+        })
+    }
+
+    const drafts = getEventsByType(config, "draft")
+    for (const [i] of drafts.entries()) {
+        vars.push({
+            key: `draft_${i + 1}_date`,
+            label: `Draft ${i + 1} Date`,
+            category: "Dates",
+            description: `${ordinal(i)} draft date`
+        })
+    }
+
+    if (drafts.length > 0) {
+        vars.push({
+            key: "division_draft_date",
+            label: "Division Draft Date",
+            category: "Dates",
+            description:
+                "Draft date for the selected division based on division level"
+        })
+    }
+
+    for (const [i] of getEventsByType(config, "playoff").entries()) {
+        vars.push({
+            key: `playoff_${i + 1}_date`,
+            label: `Playoff Week ${i + 1} Date`,
+            category: "Dates",
+            description: `${ordinal(i)} playoff date`
+        })
+    }
+
+    return vars
 }
 
-export function getTemplateVariablesByCategory(): Map<
-    string,
-    TemplateVariable[]
-> {
+function buildTimeSlotVariables(config: SeasonConfig): TemplateVariable[] {
+    const vars: TemplateVariable[] = []
+
+    for (const [i, event] of getEventsByType(config, "tryout").entries()) {
+        for (const [j] of event.timeSlots.entries()) {
+            vars.push({
+                key: `tryout_${i + 1}_s${j + 1}_time`,
+                label: `Tryout ${i + 1} Session ${j + 1} Time`,
+                category: "Session Times",
+                description: `${ordinal(i)} tryout, ${ordinal(j).toLowerCase()} session time`
+            })
+        }
+    }
+
+    const regularSeason = getEventsByType(config, "regular_season")
+    if (regularSeason[0]) {
+        for (const [j] of regularSeason[0].timeSlots.entries()) {
+            vars.push({
+                key: `season_s${j + 1}_time`,
+                label: `Season Session ${j + 1} Time`,
+                category: "Session Times",
+                description: `Regular season, ${ordinal(j).toLowerCase()} session time`
+            })
+        }
+    }
+
+    return vars
+}
+
+/**
+ * Build the full list of template variables including season-specific
+ * date and time slot entries derived from the given SeasonConfig.
+ */
+export function buildTemplateVariables(
+    config: SeasonConfig
+): TemplateVariable[] {
+    return [
+        ...STATIC_VARIABLES,
+        ...buildDateVariables(config),
+        ...buildTimeSlotVariables(config)
+    ]
+}
+
+/**
+ * Static-only variable list (General, People, Draft).
+ * @deprecated Pass a SeasonConfig to {@link buildTemplateVariables} for the
+ * complete list including dynamic date/time variables.
+ */
+export const TEMPLATE_VARIABLES = STATIC_VARIABLES
+
+export function getTemplateVariable(
+    key: string,
+    config?: SeasonConfig
+): TemplateVariable | undefined {
+    const vars = config ? buildTemplateVariables(config) : STATIC_VARIABLES
+    return vars.find((v) => v.key === key)
+}
+
+export function getTemplateVariablesByCategory(
+    config?: SeasonConfig
+): Map<string, TemplateVariable[]> {
+    const vars = config ? buildTemplateVariables(config) : STATIC_VARIABLES
     const map = new Map<string, TemplateVariable[]>()
-    for (const variable of TEMPLATE_VARIABLES) {
+    for (const variable of vars) {
         const existing = map.get(variable.category) ?? []
         existing.push(variable)
         map.set(variable.category, existing)
     }
     return map
+}
+
+/**
+ * Build template variable values for all season event dates and time slots.
+ * Centralizes the mapping from SeasonConfig events to the backward-compatible
+ * variable keys so individual components do not need to duplicate this logic.
+ */
+export function buildEventVariableValues(
+    config: SeasonConfig,
+    divisionLevel?: number | null
+): TemplateVariableValues {
+    const values: TemplateVariableValues = {}
+
+    const tryouts = getEventsByType(config, "tryout")
+    for (const [i, event] of tryouts.entries()) {
+        values[`tryout_${i + 1}_date`] = formatEventDate(event.eventDate)
+        for (const [j, ts] of event.timeSlots.entries()) {
+            values[`tryout_${i + 1}_s${j + 1}_time`] = formatEventTime(
+                ts.startTime
+            )
+        }
+    }
+
+    const regularSeason = getEventsByType(config, "regular_season")
+    for (const [i, event] of regularSeason.entries()) {
+        values[`season_${i + 1}_date`] = formatEventDate(event.eventDate)
+    }
+    if (regularSeason[0]) {
+        for (const [j, ts] of regularSeason[0].timeSlots.entries()) {
+            values[`season_s${j + 1}_time`] = formatEventTime(ts.startTime)
+        }
+    }
+
+    const playoffs = getEventsByType(config, "playoff")
+    for (const [i, event] of playoffs.entries()) {
+        values[`playoff_${i + 1}_date`] = formatEventDate(event.eventDate)
+    }
+
+    const drafts = getEventsByType(config, "draft")
+    for (const [i, event] of drafts.entries()) {
+        values[`draft_${i + 1}_date`] = formatEventDate(event.eventDate)
+    }
+
+    const captainSelect = getEventsByType(config, "captain_select")
+    if (captainSelect[0]) {
+        values.captain_select_date = formatEventDate(
+            captainSelect[0].eventDate
+        )
+    }
+
+    if (divisionLevel != null && drafts[divisionLevel - 1]) {
+        values.division_draft_date = formatEventDate(
+            drafts[divisionLevel - 1].eventDate
+        )
+    }
+
+    return values
 }
 
 function resolveInlineNode(
