@@ -189,10 +189,11 @@ async function migrateAvailabilityData(signupsData: any[]) {
                         `, [signup.signupId, matchingEvent.id])
                         
                         migratedCount++
-                    } catch (err) {
+                    } catch (err: unknown) {
                         // Ignore foreign key errors (signup may not exist in current DB)
-                        if (!err.message.includes('foreign key')) {
-                            console.log(`⚠️  Error inserting availability for signup ${signup.signupId}: ${err.message}`)
+                        const message = err instanceof Error ? err.message : String(err)
+                        if (!message.includes('foreign key')) {
+                            console.log(`⚠️  Error inserting availability for signup ${signup.signupId}: ${message}`)
                         }
                     }
                 }
