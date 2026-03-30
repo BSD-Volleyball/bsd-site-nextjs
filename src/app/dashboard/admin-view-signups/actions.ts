@@ -5,6 +5,8 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
+    deletedSignups,
+    draftHomework,
     drafts,
     teams,
     divisions,
@@ -14,6 +16,7 @@ import {
     seasonEvents
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
+import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -385,7 +388,10 @@ export async function getSeasonSignups(): Promise<{
     }
 }
 
-export async function deleteSignupEntry(signupId: number): Promise<{
+export async function deleteSignupEntry(
+    signupId: number,
+    reason: string
+): Promise<{
     status: boolean
     message: string
 }> {
@@ -401,6 +407,14 @@ export async function deleteSignupEntry(signupId: number): Promise<{
         return {
             status: false,
             message: "Invalid signup id."
+        }
+    }
+
+    const trimmedReason = reason?.trim() ?? ""
+    if (!trimmedReason) {
+        return {
+            status: false,
+            message: "A reason for deletion is required."
         }
     }
 
@@ -452,6 +466,25 @@ export async function deleteSignupEntry(signupId: number): Promise<{
             }
         }
 
+        // Archive the signup record before deletion
+        await db.insert(deletedSignups).values({
+            id: signupRecord.id,
+            season: signupRecord.season,
+            player: signupRecord.player,
+            age: signupRecord.age,
+            captain: signupRecord.captain,
+            pair: signupRecord.pair,
+            pair_pick: signupRecord.pairPick,
+            pair_reason: signupRecord.pairReason,
+            order_id: signupRecord.orderId,
+            amount_paid: signupRecord.amountPaid,
+            created_at: signupRecord.createdAt,
+            deleted_at: new Date(),
+            deleted_by: session.user.id,
+            reason: trimmedReason
+        })
+
+        // Delete the signup (cascades to playerUnavailability)
         await db
             .delete(signups)
             .where(
@@ -461,12 +494,22 @@ export async function deleteSignupEntry(signupId: number): Promise<{
                 )
             )
 
+        // Remove this player from any captain's draft homework for the season
+        await db
+            .delete(draftHomework)
+            .where(
+                and(
+                    eq(draftHomework.season, config.seasonId),
+                    eq(draftHomework.player, signupRecord.player)
+                )
+            )
+
         await logAuditEntry({
             userId: session.user.id,
             action: "delete",
             entityType: "signups",
             entityId: signupId,
-            summary: `Deleted signup entry. Full deleted signup record: ${JSON.stringify(signupRecord)}`
+            summary: `Deleted signup entry. Reason: ${trimmedReason}. Full deleted signup record: ${JSON.stringify(signupRecord)}`
         })
 
         revalidatePath("/dashboard/admin-view-signups")
@@ -495,4 +538,95 @@ export async function logAdminCsvDownload(): Promise<void> {
         entityType: "signups",
         summary: `Downloaded admin signups CSV for season ${config.seasonId ?? "unknown"}`
     })
+}
+
+export interface DeletedSignupEntry {
+    signupId: number
+    userId: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    email: string
+    age: string | null
+    captain: string | null
+    amountPaid: string | null
+    signupDate: Date
+    deletedAt: Date
+    deletedByName: string
+    reason: string | null
+}
+
+export async function getDeletedSignups(): Promise<{
+    status: boolean
+    message: string
+    entries: DeletedSignupEntry[]
+}> {
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) {
+        return { status: false, message: "Unauthorized", entries: [] }
+    }
+
+    try {
+        const config = await getSeasonConfig()
+        if (!config.seasonId) {
+            return {
+                status: false,
+                message: "No current season found.",
+                entries: []
+            }
+        }
+
+        const playerUser = alias(users, "player_user")
+        const deletedByUser = alias(users, "deleted_by_user")
+
+        const rows = await db
+            .select({
+                signupId: deletedSignups.id,
+                userId: deletedSignups.player,
+                age: deletedSignups.age,
+                captain: deletedSignups.captain,
+                amountPaid: deletedSignups.amount_paid,
+                signupDate: deletedSignups.created_at,
+                deletedAt: deletedSignups.deleted_at,
+                reason: deletedSignups.reason,
+                playerFirstName: playerUser.first_name,
+                playerLastName: playerUser.last_name,
+                playerPreferredName: playerUser.preferred_name,
+                playerEmail: playerUser.email,
+                deletedByName: deletedByUser.name
+            })
+            .from(deletedSignups)
+            .innerJoin(playerUser, eq(deletedSignups.player, playerUser.id))
+            .innerJoin(
+                deletedByUser,
+                eq(deletedSignups.deleted_by, deletedByUser.id)
+            )
+            .where(eq(deletedSignups.season, config.seasonId))
+            .orderBy(desc(deletedSignups.deleted_at))
+
+        const entries: DeletedSignupEntry[] = rows.map((row) => ({
+            signupId: row.signupId,
+            userId: row.userId,
+            firstName: row.playerFirstName,
+            lastName: row.playerLastName,
+            preferredName: row.playerPreferredName,
+            email: row.playerEmail,
+            age: row.age,
+            captain: row.captain,
+            amountPaid: row.amountPaid,
+            signupDate: row.signupDate,
+            deletedAt: row.deletedAt,
+            deletedByName: row.deletedByName ?? "Unknown",
+            reason: row.reason
+        }))
+
+        return { status: true, message: "", entries }
+    } catch (error) {
+        console.error("Error fetching deleted signups:", error)
+        return {
+            status: false,
+            message: "Failed to load deleted signups.",
+            entries: []
+        }
+    }
 }

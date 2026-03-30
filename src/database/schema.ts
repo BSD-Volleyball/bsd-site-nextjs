@@ -219,6 +219,42 @@ export const signups = pgTable(
     })
 )
 
+export const deletedSignups = pgTable(
+    "deleted_signups",
+    {
+        id: integer("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        player: text("player")
+            .notNull()
+            .references(() => users.id),
+        age: text("age"),
+        captain: text("captain"),
+        pair: boolean("pair"),
+        pair_pick: text("pair_pick"),
+        pair_reason: text("pair_reason"),
+        order_id: text("order_id"),
+        amount_paid: numeric("amount_paid"),
+        created_at: timestamp("created_at").notNull(),
+        deleted_at: timestamp("deleted_at")
+            .$defaultFn(() => new Date())
+            .notNull(),
+        deleted_by: text("deleted_by")
+            .notNull()
+            .references(() => users.id),
+        reason: text("reason")
+    },
+    (table) => ({
+        deletedSignupsSeasonIdx: index("deleted_signups_season_idx").on(
+            table.season
+        ),
+        deletedSignupsPlayerIdx: index("deleted_signups_player_idx").on(
+            table.player
+        )
+    })
+)
+
 export const playerUnavailability = pgTable(
     "player_unavailability",
     {

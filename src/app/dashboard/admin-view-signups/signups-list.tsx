@@ -23,13 +23,16 @@ import {
 import {
     deleteSignupEntry,
     logAdminCsvDownload,
-    type SignupEntry
+    type SignupEntry,
+    type DeletedSignupEntry
 } from "./actions"
 import { createDiscount } from "../manage-discounts/actions"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 interface SignupsListProps {
     signups: SignupEntry[]
+    deletedSignups: DeletedSignupEntry[]
     playerPicUrl: string
     seasonLabel: string
     lateAmount: string
@@ -123,6 +126,7 @@ function generateCsvContent(
 
 export function SignupsList({
     signups,
+    deletedSignups,
     playerPicUrl,
     seasonLabel,
     lateAmount
@@ -134,6 +138,7 @@ export function SignupsList({
         null
     )
     const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteReason, setDeleteReason] = useState("")
     const [deleteResult, setDeleteResult] = useState<{
         status: boolean
         message: string
@@ -330,7 +335,10 @@ export function SignupsList({
 
         setIsDeleting(true)
 
-        const result = await deleteSignupEntry(signupToDelete.signupId)
+        const result = await deleteSignupEntry(
+            signupToDelete.signupId,
+            deleteReason
+        )
         setDeleteResult(result)
         setIsDeleting(false)
 
@@ -351,6 +359,7 @@ export function SignupsList({
                 userId: signupToDelete.userId,
                 name: getDisplayName(signupToDelete)
             })
+            setDeleteReason("")
             setSignupToDelete(null)
             router.refresh()
         }
@@ -485,9 +494,7 @@ export function SignupsList({
                                             entry.isNew &&
                                                 "bg-blue-50 dark:bg-blue-950/40"
                                         )}
-                                        onClick={() =>
-                                            handlePlayerClick(entry)
-                                        }
+                                        onClick={() => handlePlayerClick(entry)}
                                     >
                                         <td className="px-4 py-2 text-muted-foreground">
                                             {signupNumberById.get(
@@ -622,9 +629,7 @@ export function SignupsList({
                                             entry.isNew &&
                                                 "bg-blue-50 dark:bg-blue-950/40"
                                         )}
-                                        onClick={() =>
-                                            handlePlayerClick(entry)
-                                        }
+                                        onClick={() => handlePlayerClick(entry)}
                                     >
                                         <td className="px-4 py-2 text-muted-foreground">
                                             {signupNumberById.get(
@@ -868,6 +873,7 @@ export function SignupsList({
                     if (!open && !isDeleting && !isCreatingDiscount) {
                         setSignupToDelete(null)
                         setPostDeleteUser(null)
+                        setDeleteReason("")
                     }
                 }}
             >
@@ -922,12 +928,39 @@ export function SignupsList({
                                         {signupToDelete.signupId}
                                     </p>
                                 </div>
+
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="delete-reason">
+                                        Reason for deletion{" "}
+                                        <span className="text-red-600">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="delete-reason"
+                                        value={deleteReason}
+                                        onChange={(e) =>
+                                            setDeleteReason(e.target.value)
+                                        }
+                                        placeholder="e.g. Player withdrew from the season"
+                                        rows={2}
+                                        disabled={isDeleting}
+                                    />
+                                </div>
+
+                                {deleteResult && !deleteResult.status && (
+                                    <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
+                                        {deleteResult.message}
+                                    </div>
+                                )}
                             </div>
 
                             <DialogFooter>
                                 <Button
                                     variant="outline"
-                                    onClick={() => setSignupToDelete(null)}
+                                    onClick={() => {
+                                        setSignupToDelete(null)
+                                        setDeleteReason("")
+                                        setDeleteResult(null)
+                                    }}
                                     disabled={isDeleting}
                                 >
                                     Cancel
@@ -935,7 +968,9 @@ export function SignupsList({
                                 <Button
                                     variant="destructive"
                                     onClick={handleDeleteSignup}
-                                    disabled={isDeleting}
+                                    disabled={
+                                        isDeleting || !deleteReason.trim()
+                                    }
                                 >
                                     {isDeleting
                                         ? "Deleting..."
@@ -1028,6 +1063,79 @@ export function SignupsList({
                     )}
                 </DialogContent>
             </Dialog>
+
+            {deletedSignups.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base text-muted-foreground">
+                            Deleted Players ({deletedSignups.length})
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/50 text-left text-muted-foreground text-xs">
+                                        <th className="px-4 py-2 font-medium">
+                                            Player
+                                        </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Email
+                                        </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Signup ID
+                                        </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Deleted At
+                                        </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Deleted By
+                                        </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Reason
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {deletedSignups.map((entry) => {
+                                        const preferred = entry.preferredName
+                                            ? ` (${entry.preferredName})`
+                                            : ""
+                                        const displayName = `${entry.firstName}${preferred} ${entry.lastName}`
+                                        return (
+                                            <tr
+                                                key={entry.signupId}
+                                                className="border-b last:border-0"
+                                            >
+                                                <td className="px-4 py-2 font-medium">
+                                                    {displayName}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground">
+                                                    {entry.email}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground">
+                                                    {entry.signupId}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground">
+                                                    {new Date(
+                                                        entry.deletedAt
+                                                    ).toLocaleString()}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground">
+                                                    {entry.deletedByName}
+                                                </td>
+                                                <td className="px-4 py-2 text-muted-foreground">
+                                                    {entry.reason ?? "—"}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

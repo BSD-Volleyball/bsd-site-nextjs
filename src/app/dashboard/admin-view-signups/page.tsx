@@ -3,7 +3,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SignupsList } from "./signups-list"
-import { getSeasonSignups } from "./actions"
+import { getSeasonSignups, getDeletedSignups } from "./actions"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import type { Metadata } from "next"
 
@@ -26,7 +26,10 @@ export default async function ViewSignupsPage() {
         redirect("/dashboard")
     }
 
-    const result = await getSeasonSignups()
+    const [result, deletedResult] = await Promise.all([
+        getSeasonSignups(),
+        getDeletedSignups()
+    ])
 
     if (!result.status) {
         return (
@@ -50,6 +53,7 @@ export default async function ViewSignupsPage() {
             />
             <SignupsList
                 signups={result.signups}
+                deletedSignups={deletedResult.entries}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
                 seasonLabel={result.seasonLabel}
                 lateAmount={result.lateAmount}

@@ -30,6 +30,24 @@ npx drizzle-kit migrate
 npx @better-auth/cli generate
 ```
 
+> **Environment note:** Database credentials and all other secrets live in **`.env.local`** (not `.env`). `drizzle.config.ts` uses `import "dotenv/config"` which reads `.env` by default. Prefix Drizzle commands with `DOTENV_CONFIG_PATH=.env.local` so they pick up the correct credentials:
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.local npx drizzle-kit generate
+> ```
+>
+> The database uses **Prisma Accelerate** (`db.prisma.io`), which is incompatible with `drizzle-kit migrate`. Always apply migrations via the custom script instead:
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.local npx tsx scripts/run-migration.ts
+> ```
+>
+> One-off scripts under `scripts/` also use `import "dotenv/config"`. Run them with the same prefix:
+>
+> ```bash
+> DOTENV_CONFIG_PATH=.env.local npx tsx scripts/my-script.ts
+> ```
+
 ## Repository Map
 
 - `src/app/`: Next.js routes (App Router).
