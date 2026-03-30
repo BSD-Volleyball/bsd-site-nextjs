@@ -24,12 +24,14 @@ interface AvailabilityFormProps {
     signupId: number
     config: SeasonConfig
     initialUnavailableIds: number[]
+    scheduledTimesByEventId: Record<number, string>
 }
 
 export function AvailabilityForm({
     signupId,
     config,
-    initialUnavailableIds
+    initialUnavailableIds,
+    scheduledTimesByEventId
 }: AvailabilityFormProps) {
     const router = useRouter()
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(
@@ -93,6 +95,7 @@ export function AvailabilityForm({
                             <div className="space-y-1">
                                 {tryoutEvents.map((event) => {
                                     const unavailable = selectedEvents.has(event.id)
+                                    const scheduledTime = scheduledTimesByEventId[event.id]
                                     return (
                                         <button
                                             key={event.id}
@@ -107,6 +110,11 @@ export function AvailabilityForm({
                                             )}
                                             <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
                                                 {formatEventDate(event.eventDate)}
+                                                {scheduledTime && (
+                                                    <span className="ml-1.5 text-muted-foreground text-xs">
+                                                        {scheduledTime}
+                                                    </span>
+                                                )}
                                             </span>
                                         </button>
                                     )
@@ -123,6 +131,7 @@ export function AvailabilityForm({
                             <div className="space-y-1">
                                 {seasonEvents.map((event) => {
                                     const unavailable = selectedEvents.has(event.id)
+                                    const scheduledTime = scheduledTimesByEventId[event.id]
                                     return (
                                         <button
                                             key={event.id}
@@ -137,6 +146,11 @@ export function AvailabilityForm({
                                             )}
                                             <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
                                                 {formatEventDate(event.eventDate)}
+                                                {scheduledTime && (
+                                                    <span className="ml-1.5 text-muted-foreground text-xs">
+                                                        {scheduledTime}
+                                                    </span>
+                                                )}
                                             </span>
                                         </button>
                                     )
@@ -153,6 +167,7 @@ export function AvailabilityForm({
                             <div className="space-y-1">
                                 {playoffEvents.map((event) => {
                                     const unavailable = selectedEvents.has(event.id)
+                                    const scheduledTime = scheduledTimesByEventId[event.id]
                                     return (
                                         <button
                                             key={event.id}
@@ -167,6 +182,11 @@ export function AvailabilityForm({
                                             )}
                                             <span className={cn(unavailable && "text-red-600 dark:text-red-400")}>
                                                 {formatEventDate(event.eventDate)}
+                                                {scheduledTime && (
+                                                    <span className="ml-1.5 text-muted-foreground text-xs">
+                                                        {scheduledTime}
+                                                    </span>
+                                                )}
                                             </span>
                                         </button>
                                     )
