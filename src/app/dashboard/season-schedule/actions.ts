@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/database/db"
-import { divisions, matches, seasons, teams, drafts } from "@/database/schema"
-import { and, eq, inArray } from "drizzle-orm"
+import { divisions, matches, seasons, teams, drafts, seasonEvents } from "@/database/schema"
+import { and, asc, eq, inArray } from "drizzle-orm"
 
 interface StandingTeam {
     id: number
@@ -225,7 +225,7 @@ export async function getCurrentSeasonScheduleData(
                 .map((t) => t.divisionId)
         )
 
-        const [divisionRows, matchRows] = await Promise.all([
+        const [divisionRows, matchRows, rsEventRows] = await Promise.all([
             db
                 .select({
                     id: divisions.id,
@@ -263,8 +263,22 @@ export async function getCurrentSeasonScheduleData(
                         inArray(matches.home_team, teamIds),
                         inArray(matches.away_team, teamIds)
                     )
+                ),
+            db
+                .select({ eventDate: seasonEvents.event_date })
+                .from(seasonEvents)
+                .where(
+                    and(
+                        eq(seasonEvents.season_id, seasonId),
+                        eq(seasonEvents.event_type, "regular_season")
+                    )
                 )
+                .orderBy(asc(seasonEvents.event_date))
         ])
+
+        // Build week number → date fallback from season_events (week 1 = first event, etc.)
+        const weekToDate = new Map<number, string>()
+        rsEventRows.forEach((e, idx) => weekToDate.set(idx + 1, e.eventDate))
 
         const teamById = new Map(teamRows.map((t) => [t.id, t]))
         const teamsByDivision = new Map<number, typeof teamRows>()
@@ -382,7 +396,7 @@ export async function getCurrentSeasonScheduleData(
                     const week = match.week
                     const existing = weeksMap.get(week) ?? {
                         week,
-                        date: match.date,
+                        date: match.date ?? weekToDate.get(week) ?? null,
                         matches: []
                     }
 

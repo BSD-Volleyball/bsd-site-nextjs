@@ -26,6 +26,16 @@ export function formatEventDate(dateStr: string): string {
     })
 }
 
+/** Format a date string (YYYY-MM-DD) to a short label, e.g. "Thu, Apr 2" */
+export function formatShortDate(dateStr: string): string {
+    const d = new Date(`${dateStr}T12:00:00`)
+    return d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+    })
+}
+
 /** Format a time string (HH:MM:SS) to a human-readable label with AM/PM */
 export function formatEventTime(timeStr: string): string {
     const [hours, minutes] = timeStr.split(":")

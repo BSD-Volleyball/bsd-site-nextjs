@@ -7,7 +7,7 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
-import { formatMatchTime } from "@/lib/season-utils"
+import { formatMatchTime, formatShortDate } from "@/lib/season-utils"
 import type { CurrentSeasonScheduleDivision } from "./actions"
 
 interface Props {
@@ -120,7 +120,7 @@ export function SeasonDivisionSection({
                                                     className="border-b align-top last:border-0"
                                                 >
                                                     <td className="whitespace-nowrap px-3 py-2">
-                                                        {week.date || "—"}
+                                                        {week.date ? formatShortDate(week.date) : "—"}
                                                     </td>
                                                     <td className="px-3 py-2">
                                                         <div className="space-y-1">

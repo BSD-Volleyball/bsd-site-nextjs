@@ -38,6 +38,7 @@ import {
     isLatePricing,
     getEventsByType,
     formatEventDate,
+    formatShortDate,
     formatEventTime
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
@@ -1239,7 +1240,7 @@ export default async function DashboardPage() {
                                         Date:
                                     </span>
                                     <span className="font-semibold text-blue-800 dark:text-blue-200">
-                                        {nextMatch.date}
+                                        {formatShortDate(nextMatch.date)}
                                     </span>
                                 </div>
                                 {nextMatch.time && (

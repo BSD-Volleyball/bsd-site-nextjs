@@ -36,7 +36,9 @@ export type {
 export {
     getEventsByType,
     formatEventDate,
-    formatEventTime
+    formatShortDate,
+    formatEventTime,
+    formatMatchTime
 } from "@/lib/season-utils"
 
 const EMPTY_CONFIG: SeasonConfig = {
