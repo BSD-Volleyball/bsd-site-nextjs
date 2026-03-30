@@ -39,27 +39,6 @@ export default async function AuthPage({
             </AuthLoading>
 
             <AuthView pathname={pathname} />
-
-            {["sign-up"].includes(pathname) && (
-                <div className="text-center text-muted-foreground text-sm">
-                    <p>
-                        By continuing, you agree to our{" "}
-                        <Link
-                            href="/terms"
-                            className="underline hover:text-foreground"
-                        >
-                            Terms of Service
-                        </Link>{" "}
-                        and{" "}
-                        <Link
-                            href="/privacy"
-                            className="underline hover:text-foreground"
-                        >
-                            Privacy Policy
-                        </Link>
-                    </p>
-                </div>
-            )}
         </main>
     )
 }

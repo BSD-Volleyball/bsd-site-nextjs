@@ -50,7 +50,6 @@ export default function RootLayout({
                     href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Lora:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500;700&display=swap"
                     rel="stylesheet"
                 />
-                <script async src="/seline.js" data-token="24cc7b65ecf3469" />
             </head>
             <body className="flex min-h-svh flex-col antialiased">
                 <Providers>{children}</Providers>
