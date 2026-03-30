@@ -140,9 +140,23 @@ export async function getTeamAvailabilityData(
     }
 
     // Determine which team to show
-    const selectedTeam = teamId
-        ? availableTeams.find((t) => t.id === teamId)
-        : availableTeams[0]
+    let selectedTeam: TeamOption | undefined
+    if (teamId) {
+        selectedTeam = availableTeams.find((t) => t.id === teamId)
+    } else if (isAdmin) {
+        // If the admin is also a captain, default to their own team
+        const captainRow = allTeamRows.find(
+            (t) =>
+                t.captain === session.user.id ||
+                t.captain2 === session.user.id
+        )
+        selectedTeam = captainRow
+            ? (availableTeams.find((t) => t.id === captainRow.id) ??
+              availableTeams[0])
+            : availableTeams[0]
+    } else {
+        selectedTeam = availableTeams[0]
+    }
 
     if (!selectedTeam) {
         return {
