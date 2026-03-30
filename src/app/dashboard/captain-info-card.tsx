@@ -8,7 +8,10 @@ import {
     RiMailSendLine,
     RiUserStarLine,
     RiPhoneLine,
-    RiAlertLine
+    RiAlertLine,
+    RiCalendarCheckLine,
+    RiCheckboxCircleLine,
+    RiCloseCircleFill
 } from "@remixicon/react"
 import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
 import {
@@ -39,6 +42,21 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
         useState(false)
 
     const isDraftPhase = data.seasonConfig?.phase === "draft"
+
+    // Show welcome section if currently in draft phase OR within 7 days of last draft event
+    const lastDraftDate = data.seasonConfig?.events
+        .filter((e) => e.eventType === "draft")
+        .map((e) => e.eventDate)
+        .sort()
+        .at(-1)
+    const draftWithinWeek = lastDraftDate
+        ? Date.now() -
+              new Date(`${lastDraftDate}T00:00:00`).getTime() <
+          7 * 24 * 60 * 60 * 1000
+        : false
+    const showWelcomeSection = isDraftPhase || draftWithinWeek
+    const showAvailabilitySection =
+        !showWelcomeSection && !!data.nextMatchAvailability
 
     const baseEmailTemplateContent = useMemo(
         () =>
@@ -251,7 +269,7 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {isDraftPhase && (
+                    {showWelcomeSection && (
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
                                 <RiMailSendLine className="h-4 w-4 text-teal-600 dark:text-teal-400" />
@@ -277,7 +295,56 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                             </Button>
                         </div>
                     )}
-                    {isDraftPhase && (
+                    {showAvailabilitySection && data.nextMatchAvailability && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <RiCalendarCheckLine className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                                <h3 className="font-medium text-sm text-teal-700 dark:text-teal-300">
+                                    Team Availability for Next Match
+                                </h3>
+                            </div>
+                            <p className="text-xs text-teal-600 dark:text-teal-400">
+                                {new Date(
+                                    `${data.nextMatchAvailability.eventDate}T00:00:00`
+                                ).toLocaleDateString("en-US", {
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric"
+                                })}
+                            </p>
+                            <ul className="space-y-1">
+                                {data.members.map((m) => {
+                                    const isUnavailable =
+                                        data.nextMatchAvailability!.unavailableUserIds.includes(
+                                            m.userId
+                                        )
+                                    const name = m.displayName
+                                    return (
+                                        <li
+                                            key={m.email}
+                                            className="flex items-center gap-2 text-sm"
+                                        >
+                                            {isUnavailable ? (
+                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-destructive" />
+                                            ) : (
+                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                            )}
+                                            <span
+                                                className={
+                                                    isUnavailable
+                                                        ? "text-destructive"
+                                                        : "text-teal-700 dark:text-teal-300"
+                                                }
+                                            >
+                                                {name} {m.lastName}
+                                            </span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+                        </div>
+                    )}
+                    {(showWelcomeSection || showAvailabilitySection) && (
                         <hr className="border-teal-200 dark:border-teal-800" />
                     )}
                     <div className="space-y-3">

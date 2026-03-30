@@ -17,7 +17,7 @@ import {
     signups,
     playerUnavailability
 } from "@/database/schema"
-import { eq, and, lt, desc, inArray, asc, or, isNull } from "drizzle-orm"
+import { eq, and, lt, desc, inArray, asc, or, isNull, gte } from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -318,6 +318,7 @@ export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
 }
 
 export interface CaptainWelcomeMember {
+    userId: string
     displayName: string
     lastName: string
     email: string
@@ -336,6 +337,10 @@ export interface CaptainWelcomeData {
     seasonConfig: SeasonConfig | null
     currentUserPreferredName: string
     currentUserLastName: string
+    nextMatchAvailability: {
+        eventDate: string
+        unavailableUserIds: string[]
+    } | null
 }
 
 export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null> {
@@ -407,6 +412,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             .orderBy(asc(users.last_name), asc(users.first_name))
 
         const members: CaptainWelcomeMember[] = draftRows.map((row) => ({
+            userId: row.userId,
             displayName: row.preferredName || row.firstName,
             lastName: row.lastName,
             email: row.email,
@@ -443,6 +449,80 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             )
         }
 
+        // Find next match availability for the team's roster
+        let nextMatchAvailability: CaptainWelcomeData["nextMatchAvailability"] =
+            null
+        try {
+            const today = new Date().toISOString().split("T")[0]
+            const [nextEvent] = await db
+                .select({
+                    id: seasonEvents.id,
+                    event_date: seasonEvents.event_date
+                })
+                .from(seasonEvents)
+                .where(
+                    and(
+                        eq(seasonEvents.season_id, config.seasonId),
+                        inArray(seasonEvents.event_type, [
+                            "regular_season",
+                            "playoff"
+                        ]),
+                        gte(seasonEvents.event_date, today)
+                    )
+                )
+                .orderBy(asc(seasonEvents.sort_order))
+                .limit(1)
+
+            if (nextEvent && draftRows.length > 0) {
+                const memberIds = draftRows.map((r) => r.userId)
+                const signupRows = await db
+                    .select({ id: signups.id, player: signups.player })
+                    .from(signups)
+                    .where(
+                        and(
+                            eq(signups.season, config.seasonId),
+                            inArray(signups.player, memberIds)
+                        )
+                    )
+                const signupToUser = new Map(
+                    signupRows.map((s) => [s.id, s.player])
+                )
+                const signupIds = signupRows.map((s) => s.id)
+                let unavailableUserIds: string[] = []
+                if (signupIds.length > 0) {
+                    const unavailRows = await db
+                        .select({
+                            signup_id: playerUnavailability.signup_id
+                        })
+                        .from(playerUnavailability)
+                        .where(
+                            and(
+                                inArray(
+                                    playerUnavailability.signup_id,
+                                    signupIds
+                                ),
+                                eq(
+                                    playerUnavailability.event_id,
+                                    nextEvent.id
+                                )
+                            )
+                        )
+                    unavailableUserIds = unavailRows
+                        .map((r) => signupToUser.get(r.signup_id)!)
+                        .filter(Boolean)
+                }
+                nextMatchAvailability = {
+                    eventDate: nextEvent.event_date,
+                    unavailableUserIds
+                }
+            }
+        } catch (availError) {
+            console.error(
+                "Error fetching next match availability:",
+                availError
+            )
+        }
+
         return {
             teamName: teamRow.name,
             divisionName: divisionRow?.name ?? "",
@@ -457,7 +537,8 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 currentUserRow?.preferredName ||
                 currentUserRow?.firstName ||
                 "",
-            currentUserLastName: currentUserRow?.lastName || ""
+            currentUserLastName: currentUserRow?.lastName || "",
+            nextMatchAvailability
         }
     } catch (error) {
         console.error("Error fetching captain welcome data:", error)
