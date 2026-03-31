@@ -10,6 +10,7 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatMatchTime } from "@/lib/season-utils"
 import type {
     PlayoffDivision,
     PlayoffMatchLine,
@@ -40,7 +41,7 @@ function MatchCard({ match }: { match: PlayoffMatchLine }) {
                 </span>
                 <span className="whitespace-nowrap">
                     {match.date || "TBD"}
-                    {match.time ? ` @ ${match.time}` : ""}
+                    {match.time ? ` @ ${formatMatchTime(match.time)}` : ""}
                     {match.court !== null ? ` • Ct ${match.court}` : ""}
                 </span>
             </div>
@@ -181,7 +182,7 @@ function ScheduleTable({ matches }: { matches: PlayoffMatchLine[] }) {
                                     ? `#${match.matchNum}`
                                     : "—"}
                             </td>
-                            <td className="px-3 py-2">{match.time || "—"}</td>
+                            <td className="px-3 py-2">{formatMatchTime(match.time) || "—"}</td>
                             <td className="px-3 py-2">
                                 {match.court !== null ? match.court : "—"}
                             </td>

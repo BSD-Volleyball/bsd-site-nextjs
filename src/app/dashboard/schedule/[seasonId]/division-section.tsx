@@ -6,6 +6,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
+import { formatMatchTime } from "@/lib/season-utils"
 import type { ScheduleDivision } from "./actions"
 
 export function DivisionSection({ division }: { division: ScheduleDivision }) {
@@ -105,7 +106,7 @@ export function DivisionSection({ division }: { division: ScheduleDivision }) {
                                                                         key={`time-${m.id}`}
                                                                         className="whitespace-nowrap"
                                                                     >
-                                                                        {m.time ||
+                                                                        {formatMatchTime(m.time) ||
                                                                             "—"}
                                                                     </div>
                                                                 )

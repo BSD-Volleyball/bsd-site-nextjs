@@ -45,11 +45,13 @@ export function formatEventTime(timeStr: string): string {
     return `${displayHour}:${minutes} ${ampm}`
 }
 
-/** Format a match time (HH:MM:SS or H:MM) to compact display without leading zeros or seconds (e.g., "7:00") */
+/** Format a match time (HH:MM:SS or H:MM) to human-readable 12-hour format (e.g., "7:00 PM") */
 export function formatMatchTime(timeStr: string | null | undefined): string {
     if (!timeStr) return ""
     const parts = timeStr.split(":")
-    const hour = Number.parseInt(parts[0], 10)
+    const hour24 = Number.parseInt(parts[0], 10)
     const minutes = parts[1] ?? "00"
-    return `${hour}:${minutes}`
+    const ampm = hour24 >= 12 ? "PM" : "AM"
+    const hour12 = hour24 % 12 || 12
+    return `${hour12}:${minutes} ${ampm}`
 }

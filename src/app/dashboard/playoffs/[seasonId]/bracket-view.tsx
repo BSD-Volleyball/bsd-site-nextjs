@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, type MouseEvent as ReactMouseEvent } from "react"
 import dynamic from "next/dynamic"
+import { formatMatchTime } from "@/lib/season-utils"
 import type {
     MatchComponentProps,
     SvgWrapperProps
@@ -119,7 +120,7 @@ function CustomMatch(props: MatchComponentProps) {
                         </span>
                         <span>
                             {bm.date || "TBD"}
-                            {bm.time ? ` ${bm.time}` : ""}
+                            {bm.time ? ` ${formatMatchTime(bm.time)}` : ""}
                             {bm.court !== null ? ` Ct${bm.court}` : ""}
                         </span>
                     </div>
