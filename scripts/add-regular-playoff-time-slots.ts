@@ -1,8 +1,8 @@
 /**
  * Add time slots to regular_season and playoff season_events that have none.
  *
- * Regular season: 3 time slots per night — 07:00, 08:10, 09:20
- * Playoff: 4 time slots per night — 07:00, 07:50, 08:40, 09:30
+ * Regular season: 3 time slots per night — 19:00, 20:10, 21:20
+ * Playoff: 4 time slots per night — 19:00, 19:50, 20:40, 21:30
  *
  * Run with: npx tsx scripts/add-regular-playoff-time-slots.ts
  */
@@ -13,16 +13,16 @@ import { Client } from "pg"
 config({ path: ".env.local" })
 
 const REGULAR_SEASON_SLOTS = [
-    { time: "07:00:00", label: "7:00" },
-    { time: "08:10:00", label: "8:10" },
-    { time: "09:20:00", label: "9:20" }
+    { time: "19:00:00", label: "7:00" },
+    { time: "20:10:00", label: "8:10" },
+    { time: "21:20:00", label: "9:20" }
 ]
 
 const PLAYOFF_SLOTS = [
-    { time: "07:00:00", label: "7:00" },
-    { time: "07:50:00", label: "7:50" },
-    { time: "08:40:00", label: "8:40" },
-    { time: "09:30:00", label: "9:30" }
+    { time: "19:00:00", label: "7:00" },
+    { time: "19:50:00", label: "7:50" },
+    { time: "20:40:00", label: "8:40" },
+    { time: "21:30:00", label: "9:30" }
 ]
 
 async function main() {

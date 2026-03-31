@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getCurrentSeasonScheduleData } from "./actions"
 import { SeasonDivisionSection } from "./division-section"
+import { AddToCalendarButton } from "./add-to-calendar-button"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import type { Metadata } from "next"
 
@@ -59,10 +60,13 @@ export default async function SeasonSchedulePage() {
 
     return (
         <div className="space-y-6">
-            <PageHeader
-                title={`${result.seasonLabel} Season`}
-                description="Standings, schedule, and results by division."
-            />
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <PageHeader
+                    title={`${result.seasonLabel} Season`}
+                    description="Standings, schedule, and results by division."
+                />
+                {result.userTeamId !== null && <AddToCalendarButton />}
+            </div>
             {result.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No season schedule data found for this season.
