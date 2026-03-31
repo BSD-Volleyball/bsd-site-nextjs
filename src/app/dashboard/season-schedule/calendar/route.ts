@@ -8,6 +8,7 @@ import {
     drafts,
     eventTimeSlots,
     matches,
+    playoffMatchesMeta,
     seasonEvents,
     seasons,
     teams,
@@ -195,7 +196,7 @@ export async function GET() {
         const homeName = homeTeam?.name ?? "TBD"
         const awayName = awayTeam?.name ?? "TBD"
 
-        const summary = `BSD: Wk ${match.week} - ${homeName} vs ${awayName} (${playerName})`
+        const summary = `BSD: ${homeName} vs ${awayName} (${playerName})`
 
         const dateStr = match.date.replace(/-/g, "")
 
@@ -230,11 +231,33 @@ export async function GET() {
         })
     }
 
+    // Determine which playoff weeks apply to the user's division.
+    // playoff_matches_meta stores per-division bracket weeks; if it has
+    // no rows yet (bracket not set up), fall back to all playoff events.
+    const divisionPlayoffMetaRows = await db
+        .select({ week: playoffMatchesMeta.week })
+        .from(playoffMatchesMeta)
+        .where(
+            and(
+                eq(playoffMatchesMeta.season, seasonId),
+                eq(playoffMatchesMeta.division, divisionId)
+            )
+        )
+
+    const divisionPlayoffWeeks = new Set(
+        divisionPlayoffMetaRows.map((r) => r.week)
+    )
+
+    // playoff season_events are ordered by sort_order; sort_order == bracket week number
+    const applicablePlayoffEvents =
+        divisionPlayoffWeeks.size > 0
+            ? playoffEvents.filter((e) => divisionPlayoffWeeks.has(e.sortOrder))
+            : playoffEvents
+
     // Playoff placeholder events
-    for (let i = 0; i < playoffEvents.length; i++) {
-        const event = playoffEvents[i]
+    for (const event of applicablePlayoffEvents) {
         const dateStr = event.eventDate.replace(/-/g, "")
-        const weekNum = i + 1
+        const weekNum = event.sortOrder
 
         const slots = playoffTimeSlotsByEvent.get(event.id) ?? []
 
@@ -244,7 +267,7 @@ export async function GET() {
         let endMinute: number
 
         if (slots.length > 0) {
-            // Earliest slot → start; latest slot + match duration → end
+            // Earliest slot → start; latest slot start + match duration → end
             const first = parseTime(slots[0].startTime)
             startHour = first.hour
             startMinute = first.minute
@@ -267,11 +290,9 @@ export async function GET() {
             endMinute = end.minute
         }
 
-        const summary = `BSD: Playoff Wk ${weekNum} (${playerName})`
-
         calendarEvents.push({
             uid: `bsd-playoff-wk${weekNum}-s${seasonId}@bsd-volleyball.com`,
-            summary,
+            summary: `BSD: Playoff Week ${weekNum} (${playerName})`,
             description: [
                 `${seasonLabel} Playoffs – ${divisionRow?.name ?? ""}`,
                 `Playoff Week ${weekNum}`,
