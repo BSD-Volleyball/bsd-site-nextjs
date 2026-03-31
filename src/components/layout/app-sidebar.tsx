@@ -70,19 +70,6 @@ const baseNavItems = [
         icon: RiCheckboxLine
     },
     {
-        title: "Volleyball Profile",
-        url: "/dashboard/volleyball-profile",
-        icon: RiBasketballLine
-    },
-    { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
-    { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
-    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine },
-    {
-        title: "Hall of Champions",
-        url: "/dashboard/hall-of-champions",
-        icon: RiTrophyLine
-    },
-    {
         title: "League Rules",
         url: "/dashboard/rules",
         icon: RiFileList3Line
@@ -92,6 +79,23 @@ const baseNavItems = [
         url: "/dashboard/report-concern",
         icon: RiAlertLine
     }
+]
+
+const hallOfChampionsNavItem = {
+    title: "Hall of Champions",
+    url: "/dashboard/hall-of-champions",
+    icon: RiTrophyLine
+}
+
+const accountNavItems = [
+    { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
+    {
+        title: "Volleyball Profile",
+        url: "/dashboard/volleyball-profile",
+        icon: RiBasketballLine
+    },
+    { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
+    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine }
 ]
 
 const concernsNavItems = [
@@ -120,6 +124,11 @@ const adminNavItems = [
         icon: RiGroupLine
     },
     {
+        title: "View Waitlist",
+        url: "/dashboard/view-waitlist",
+        icon: RiTimeLine
+    },
+    {
         title: "Google Membership",
         url: "/dashboard/google-membership",
         icon: RiMailLine
@@ -128,11 +137,6 @@ const adminNavItems = [
         title: "Review Pairs",
         url: "/dashboard/review-pairs",
         icon: RiLinksLine
-    },
-    {
-        title: "View Waitlist",
-        url: "/dashboard/view-waitlist",
-        icon: RiTimeLine
     },
     {
         title: "Manage Discounts",
@@ -145,14 +149,14 @@ const adminNavItems = [
         icon: RiStarLine
     },
     {
-        title: "Audit Log",
-        url: "/dashboard/audit-log",
-        icon: RiHistoryLine
-    },
-    {
         title: "Draft History",
         url: "/dashboard/draft-history",
         icon: RiFileList3Line
+    },
+    {
+        title: "Audit Log",
+        url: "/dashboard/audit-log",
+        icon: RiHistoryLine
     }
 ]
 
@@ -284,6 +288,11 @@ const addPicturesNavItem = {
 
 const commissionerNavItems = [
     {
+        title: "Homework Status",
+        url: "/dashboard/homework-status",
+        icon: RiCheckboxLine
+    },
+    {
         title: "Potential Captains",
         url: "/dashboard/potential-captains",
         icon: RiUserSettingsLine
@@ -299,11 +308,6 @@ const commissionerNavItems = [
         icon: RiFileList3Line
     },
     {
-        title: "Homework Status",
-        url: "/dashboard/homework-status",
-        icon: RiCheckboxLine
-    },
-    {
         title: "Draft Day",
         url: "/dashboard/draft-day",
         icon: RiFileList3Line
@@ -311,6 +315,11 @@ const commissionerNavItems = [
 ]
 
 const captainPagesNavItems = [
+    {
+        title: "Team Availability",
+        url: "/dashboard/team-availability",
+        icon: RiCalendarLine
+    },
     {
         title: "View Signups",
         url: "/dashboard/view-signups",
@@ -340,11 +349,6 @@ const captainPagesNavItems = [
         title: "Live Draft",
         url: "/dashboard/draft-division",
         icon: RiFileList3Line
-    },
-    {
-        title: "Team Availability",
-        url: "/dashboard/team-availability",
-        icon: RiCalendarLine
     }
 ]
 
@@ -531,12 +535,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
     const visibleCaptainItems = [
-        ...(captainBaseVisible ? captainPagesNavItems.slice(0, 3) : []),
+        ...(hasCaptainPagesAccess && showDraftItems ? [captainPagesNavItems[0]] : []),
+        ...(captainBaseVisible ? captainPagesNavItems.slice(1, 4) : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
-            ? [captainPagesNavItems[3]]
+            ? [captainPagesNavItems[4]]
             : []),
         ...(hasCaptainPagesAccess && showDraftItems
-            ? captainPagesNavItems.slice(4)
+            ? captainPagesNavItems.slice(5)
             : [])
     ]
 
@@ -621,6 +626,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         // Captain page items currently suppressed
         const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
+            if (item.url === "/dashboard/team-availability")
+                return !showDraftItems
             if (item.url === "/dashboard/week-2-homework")
                 return !showWeek2Homework
             if (
@@ -697,6 +704,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
+                                {showSchedule && (
+                                    <NavItems
+                                        items={[scheduleNavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
+                                {showCurrentRosters && (
+                                    <NavItems
+                                        items={[currentRostersNavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
                                 {showWeek1 && (
                                     <NavItems
                                         items={[week1NavItem]}
@@ -715,41 +734,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                         pathname={pathname}
                                     />
                                 )}
-                                {showCurrentRosters && (
-                                    <NavItems
-                                        items={[currentRostersNavItem]}
-                                        pathname={pathname}
-                                    />
-                                )}
-                                {showSchedule && (
-                                    <NavItems
-                                        items={[scheduleNavItem]}
-                                        pathname={pathname}
-                                    />
-                                )}
                             </SidebarMenu>
                         </SidebarGroupContent>
                     </SidebarGroup>
                 )}
 
-                {seasonNav.length > 0 && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Recent Seasons
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                {seasonNav.map((season) => (
-                                    <SeasonNavMenuItem
-                                        key={season.id}
-                                        season={season}
-                                        pathname={pathname}
-                                    />
-                                ))}
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                        Historical
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <NavItems
+                                items={[hallOfChampionsNavItem]}
+                                pathname={pathname}
+                            />
+                            {seasonNav.map((season) => (
+                                <SeasonNavMenuItem
+                                    key={season.id}
+                                    season={season}
+                                    pathname={pathname}
+                                />
+                            ))}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
 
                 {visibleCaptainItems.length > 0 && (
                     <SidebarGroup>
@@ -814,6 +823,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarGroupContent>
                     </SidebarGroup>
                 )}
+
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                        Account
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <NavItems
+                                items={accountNavItems}
+                                pathname={pathname}
+                            />
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
 
                 {isAdmin && (
                     <SidebarGroup>
