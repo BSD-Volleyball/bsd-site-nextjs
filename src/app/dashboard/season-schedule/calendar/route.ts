@@ -231,6 +231,35 @@ export async function GET() {
         })
     }
 
+    // Determine the earliest and latest times this division plays during
+    // regular season — these bound the playoff placeholder window.
+    // We look at all division matches (not just the user's team) so we
+    // capture every possible slot, then intersect with the playoff
+    // event_time_slots to stay within the actual playoff night schedule.
+    const divisionMatchTimeRows = await db
+        .select({ time: matches.time })
+        .from(matches)
+        .where(
+            and(
+                eq(matches.season, seasonId),
+                eq(matches.division, divisionId),
+                eq(matches.playoff, false)
+            )
+        )
+
+    const divisionMinutes = divisionMatchTimeRows
+        .filter((r) => r.time !== null)
+        .map((r) => {
+            const { hour, minute } = parseTime(r.time!)
+            return hour * 60 + minute
+        })
+        .filter((m) => m > 0)
+
+    const divisionEarliestMin =
+        divisionMinutes.length > 0 ? Math.min(...divisionMinutes) : null
+    const divisionLatestMin =
+        divisionMinutes.length > 0 ? Math.max(...divisionMinutes) : null
+
     // Determine which playoff weeks apply to the user's division.
     // playoff_matches_meta stores per-division bracket weeks; if it has
     // no rows yet (bracket not set up), fall back to all playoff events.
@@ -259,20 +288,33 @@ export async function GET() {
         const dateStr = event.eventDate.replace(/-/g, "")
         const weekNum = event.sortOrder
 
-        const slots = playoffTimeSlotsByEvent.get(event.id) ?? []
+        // Narrow to slots that fall within this division's time range.
+        // If we have no regular season data to compare against, use all slots.
+        const allSlots = playoffTimeSlotsByEvent.get(event.id) ?? []
+        const slots =
+            divisionEarliestMin !== null && divisionLatestMin !== null
+                ? allSlots.filter((s) => {
+                      const { hour, minute } = parseTime(s.startTime)
+                      const m = hour * 60 + minute
+                      return m >= divisionEarliestMin && m <= divisionLatestMin
+                  })
+                : allSlots
+
+        const effectiveSlots = slots.length > 0 ? slots : allSlots
 
         let startHour = 19
         let startMinute = 0
         let endHour: number
         let endMinute: number
 
-        if (slots.length > 0) {
-            // Earliest slot → start; latest slot start + match duration → end
-            const first = parseTime(slots[0].startTime)
+        if (effectiveSlots.length > 0) {
+            const first = parseTime(effectiveSlots[0].startTime)
             startHour = first.hour
             startMinute = first.minute
 
-            const last = parseTime(slots[slots.length - 1].startTime)
+            const last = parseTime(
+                effectiveSlots[effectiveSlots.length - 1].startTime
+            )
             const lastEnd = addMinutes(
                 last.hour,
                 last.minute,
