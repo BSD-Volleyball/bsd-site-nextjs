@@ -3,7 +3,6 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
     Select,
     SelectContent,
@@ -726,7 +725,7 @@ function MatchScoreEntry({
         <div
             className={`rounded-md border p-3 ${hasWarnings ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : ""}`}
         >
-            {/* Match Header with court number */}
+            {/* Match Header */}
             <div className="mb-3 flex items-center gap-2 text-muted-foreground text-xs">
                 {match.court && <span>Court {match.court}</span>}
                 {isPlayoff && (
@@ -736,71 +735,117 @@ function MatchScoreEntry({
                 )}
             </div>
 
-            {/* Team names with winner selection */}
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    className={`rounded-md px-3 py-1.5 font-medium text-sm transition-colors ${
-                        form.winner === match.homeTeamId
-                            ? "bg-green-600 text-white"
-                            : "bg-muted hover:bg-muted/80"
-                    }`}
-                    onClick={() => onSelectWinner(match.homeTeamId)}
-                    title="Click to select as winner"
-                >
-                    {match.homeTeamName}
-                </button>
-                <span className="text-muted-foreground text-sm">vs</span>
-                <button
-                    type="button"
-                    className={`rounded-md px-3 py-1.5 font-medium text-sm transition-colors ${
-                        form.winner === match.awayTeamId
-                            ? "bg-green-600 text-white"
-                            : "bg-muted hover:bg-muted/80"
-                    }`}
-                    onClick={() => onSelectWinner(match.awayTeamId)}
-                    title="Click to select as winner"
-                >
-                    {match.awayTeamName}
-                </button>
-            </div>
+            {/* Score table */}
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr>
+                            {/* Row label column */}
+                            <th className="w-36 pb-2 text-left font-normal text-muted-foreground" />
+                            <th className="w-24 pb-2 text-center font-semibold">
+                                {match.homeTeamName}
+                            </th>
+                            <th className="w-4 pb-2" />
+                            <th className="w-24 pb-2 text-center font-semibold">
+                                {match.awayTeamName}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {/* Winner row */}
+                        <tr>
+                            <td className="py-1.5 pr-3 text-muted-foreground">
+                                Winner
+                            </td>
+                            <td className="py-1.5 text-center">
+                                <button
+                                    type="button"
+                                    className={`w-full rounded-md px-2 py-1 font-medium text-xs transition-colors ${
+                                        form.winner === match.homeTeamId
+                                            ? "bg-green-600 text-white"
+                                            : "bg-muted hover:bg-muted/80"
+                                    }`}
+                                    onClick={() =>
+                                        onSelectWinner(match.homeTeamId)
+                                    }
+                                    title="Click to select as winner"
+                                >
+                                    {form.winner === match.homeTeamId
+                                        ? "✓ Winner"
+                                        : "Select"}
+                                </button>
+                            </td>
+                            <td className="py-1.5 text-center text-muted-foreground text-xs">
+                                vs
+                            </td>
+                            <td className="py-1.5 text-center">
+                                <button
+                                    type="button"
+                                    className={`w-full rounded-md px-2 py-1 font-medium text-xs transition-colors ${
+                                        form.winner === match.awayTeamId
+                                            ? "bg-green-600 text-white"
+                                            : "bg-muted hover:bg-muted/80"
+                                    }`}
+                                    onClick={() =>
+                                        onSelectWinner(match.awayTeamId)
+                                    }
+                                    title="Click to select as winner"
+                                >
+                                    {form.winner === match.awayTeamId
+                                        ? "✓ Winner"
+                                        : "Select"}
+                                </button>
+                            </td>
+                        </tr>
 
-            {/* Game Scores */}
-            <div className="space-y-2">
-                <GameScoreRow
-                    label="Game 1"
-                    homeValue={form.homeSet1Score}
-                    awayValue={form.awaySet1Score}
-                    onHomeChange={(v) => onFieldChange("homeSet1Score", v)}
-                    onAwayChange={(v) => onFieldChange("awaySet1Score", v)}
-                />
-                <GameScoreRow
-                    label="Game 2"
-                    homeValue={form.homeSet2Score}
-                    awayValue={form.awaySet2Score}
-                    onHomeChange={(v) => onFieldChange("homeSet2Score", v)}
-                    onAwayChange={(v) => onFieldChange("awaySet2Score", v)}
-                />
-                <GameScoreRow
-                    label={isPlayoff ? "Game 3 (if needed)" : "Game 3"}
-                    homeValue={form.homeSet3Score}
-                    awayValue={form.awaySet3Score}
-                    onHomeChange={(v) => onFieldChange("homeSet3Score", v)}
-                    onAwayChange={(v) => onFieldChange("awaySet3Score", v)}
-                    optional={isPlayoff}
-                />
+                        {/* Game score rows */}
+                        <ScoreInputRow
+                            label="Game 1"
+                            homeValue={form.homeSet1Score}
+                            awayValue={form.awaySet1Score}
+                            onHomeChange={(v) =>
+                                onFieldChange("homeSet1Score", v)
+                            }
+                            onAwayChange={(v) =>
+                                onFieldChange("awaySet1Score", v)
+                            }
+                        />
+                        <ScoreInputRow
+                            label="Game 2"
+                            homeValue={form.homeSet2Score}
+                            awayValue={form.awaySet2Score}
+                            onHomeChange={(v) =>
+                                onFieldChange("homeSet2Score", v)
+                            }
+                            onAwayChange={(v) =>
+                                onFieldChange("awaySet2Score", v)
+                            }
+                        />
+                        <ScoreInputRow
+                            label={isPlayoff ? "Game 3 (if needed)" : "Game 3"}
+                            homeValue={form.homeSet3Score}
+                            awayValue={form.awaySet3Score}
+                            onHomeChange={(v) =>
+                                onFieldChange("homeSet3Score", v)
+                            }
+                            onAwayChange={(v) =>
+                                onFieldChange("awaySet3Score", v)
+                            }
+                            optional={isPlayoff}
+                        />
 
-                {/* Divider */}
-                <div className="border-t pt-2">
-                    <GameScoreRow
-                        label="Games Won"
-                        homeValue={form.homeScore}
-                        awayValue={form.awayScore}
-                        onHomeChange={(v) => onFieldChange("homeScore", v)}
-                        onAwayChange={(v) => onFieldChange("awayScore", v)}
-                        bold
-                    />
-                </div>
+                        {/* Games won — separated */}
+                        <ScoreInputRow
+                            label="Games Won"
+                            homeValue={form.homeScore}
+                            awayValue={form.awayScore}
+                            onHomeChange={(v) => onFieldChange("homeScore", v)}
+                            onAwayChange={(v) => onFieldChange("awayScore", v)}
+                            bold
+                            topBorder
+                        />
+                    </tbody>
+                </table>
             </div>
 
             {/* Validation Warnings */}
@@ -820,14 +865,15 @@ function MatchScoreEntry({
     )
 }
 
-function GameScoreRow({
+function ScoreInputRow({
     label,
     homeValue,
     awayValue,
     onHomeChange,
     onAwayChange,
     optional = false,
-    bold = false
+    bold = false,
+    topBorder = false
 }: {
     label: string
     homeValue: string
@@ -836,31 +882,38 @@ function GameScoreRow({
     onAwayChange: (value: string) => void
     optional?: boolean
     bold?: boolean
+    topBorder?: boolean
 }) {
     return (
-        <div className="flex items-center gap-2">
-            <span
-                className={`w-32 text-sm ${bold ? "font-semibold" : "text-muted-foreground"} ${optional ? "italic" : ""}`}
+        <tr className={topBorder ? "border-t-2" : ""}>
+            <td
+                className={`py-1.5 pr-3 ${bold ? "font-semibold" : "text-muted-foreground"} ${optional ? "italic" : ""}`}
             >
                 {label}
-            </span>
-            <Input
-                type="number"
-                min={0}
-                className="h-8 w-16 text-center"
-                value={homeValue}
-                onChange={(e) => onHomeChange(e.target.value)}
-                placeholder={optional ? "—" : ""}
-            />
-            <span className="text-muted-foreground text-sm">-</span>
-            <Input
-                type="number"
-                min={0}
-                className="h-8 w-16 text-center"
-                value={awayValue}
-                onChange={(e) => onAwayChange(e.target.value)}
-                placeholder={optional ? "—" : ""}
-            />
-        </div>
+            </td>
+            <td className="py-1.5 text-center">
+                <input
+                    type="number"
+                    min={0}
+                    className="h-8 w-20 rounded-md border bg-background px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    value={homeValue}
+                    onChange={(e) => onHomeChange(e.target.value)}
+                    placeholder={optional ? "—" : ""}
+                />
+            </td>
+            <td className="py-1.5 text-center text-muted-foreground text-xs">
+                -
+            </td>
+            <td className="py-1.5 text-center">
+                <input
+                    type="number"
+                    min={0}
+                    className="h-8 w-20 rounded-md border bg-background px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    value={awayValue}
+                    onChange={(e) => onAwayChange(e.target.value)}
+                    placeholder={optional ? "—" : ""}
+                />
+            </td>
+        </tr>
     )
 }
