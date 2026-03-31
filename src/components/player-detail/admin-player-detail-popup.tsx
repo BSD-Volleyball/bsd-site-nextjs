@@ -184,14 +184,6 @@ export function AdminPlayerDetailPopup({
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground">
-                                        Role:
-                                    </span>
-                                    <span className="ml-2 font-medium">
-                                        {playerDetails.role || "\u2014"}
-                                    </span>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground">
                                         Captain Eligible:
                                     </span>
                                     <span className="ml-2 font-medium">

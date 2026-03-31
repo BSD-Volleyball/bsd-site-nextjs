@@ -36,6 +36,13 @@
       "when": 1774971841674,
       "tag": "0004_chemical_ravenous",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774994815729,
+      "tag": "0005_fearless_vermin",
+      "breakpoints": true
     }
   ]
 }

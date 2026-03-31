@@ -1,9 +1,7 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { db } from "@/database/db"
-import { users } from "@/database/schema"
-import { eq } from "drizzle-orm"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { PageHeader } from "@/components/layout/page-header"
 import { WaitlistList } from "./waitlist-list"
 import { getSeasonWaitlist } from "./actions"
@@ -15,16 +13,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-async function checkAdminAccess(userId: string): Promise<boolean> {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-
-    return user?.role === "admin" || user?.role === "director"
-}
-
 export default async function ViewWaitlistPage() {
     const session = await auth.api.getSession({ headers: await headers() })
 
@@ -32,7 +20,7 @@ export default async function ViewWaitlistPage() {
         redirect("/auth/sign-in")
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await isAdminOrDirectorBySession()
 
     if (!hasAccess) {
         redirect("/dashboard")

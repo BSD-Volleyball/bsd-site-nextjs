@@ -55,7 +55,6 @@ interface FormData {
     emergency_contact: string
     referred_by: string
     pronouns: string
-    role: string
     male: boolean
     onboarding_completed: boolean
     seasons_list: string
@@ -78,7 +77,6 @@ function normalizeMembershipValue(value: string | null | undefined): string {
 const readOnlyFields = new Set([
     "id",
     "name",
-    "role",
     "image",
     "avatar",
     "avatarUrl"
@@ -148,7 +146,6 @@ function userToFormData(user: UserDetails): FormData {
         emergency_contact: user.emergency_contact ?? "",
         referred_by: user.referred_by ?? "",
         pronouns: user.pronouns ?? "",
-        role: user.role ?? "",
         male: user.male ?? false,
         onboarding_completed: user.onboarding_completed ?? false,
         seasons_list: normalizeMembershipValue(user.seasons_list),
@@ -404,7 +401,6 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         { key: "email", label: "Email" },
         { key: "phone", label: "Phone" },
         { key: "pronouns", label: "Pronouns" },
-        { key: "role", label: "Role" },
         { key: "experience", label: "Experience" },
         { key: "assessment", label: "Assessment" },
         { key: "emergency_contact", label: "Emergency Contact" },

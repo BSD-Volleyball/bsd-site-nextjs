@@ -1,14 +1,11 @@
-import { and, eq, isNull, or } from "drizzle-orm"
+import { and, eq, isNull } from "drizzle-orm"
 import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import {
-    commissioners,
     sessions,
-    teams,
-    userRoles,
-    users
+    userRoles
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -85,11 +82,6 @@ export async function hasPermission(
         if (perms?.includes(permission)) return true
     }
 
-    // Fall back to legacy users.role column during transition (admin/director).
-    // This ensures the system works even before user_roles is fully populated.
-    const legacyRole = await getLegacyRole(userId)
-    if (legacyRole === "admin" || legacyRole === "director") return true
-
     return false
 }
 
@@ -101,19 +93,6 @@ export async function hasPermissionBySession(
     if (!userId) return false
     return hasPermission(userId, permission, context)
 }
-
-// ---------------------------------------------------------------------------
-// Legacy fallback: read users.role column during transition
-// ---------------------------------------------------------------------------
-
-const getLegacyRole = cache(async (userId: string): Promise<string | null> => {
-    const [user] = await db
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-    return user?.role ?? null
-})
 
 // ---------------------------------------------------------------------------
 // Backward-compatible helpers (signatures unchanged — zero action changes needed)
@@ -139,19 +118,7 @@ export async function isCommissionerForSeason(
         return true
     }
 
-    // Fall back to legacy commissioners table during transition
-    const [record] = await db
-        .select({ id: commissioners.id })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
-            )
-        )
-        .limit(1)
-
-    return !!record
+    return false
 }
 
 export async function isCommissionerForCurrentSeason(
@@ -166,26 +133,10 @@ export async function isCaptainForSeason(
     userId: string,
     seasonId: number
 ): Promise<boolean> {
-    // Check user_roles first (new system)
     const rows = await getUserRoleRows(userId)
-    const hasCaptainRole = rows.some(
+    return rows.some(
         (r) => r.role === "captain" && r.season_id === seasonId
     )
-    if (hasCaptainRole) return true
-
-    // Fall back to legacy teams table lookup during transition
-    const [captainRecord] = await db
-        .select({ id: teams.id })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, seasonId),
-                or(eq(teams.captain, userId), eq(teams.captain2, userId))
-            )
-        )
-        .limit(1)
-
-    return !!captainRecord
 }
 
 export async function isCommissionerBySession(): Promise<boolean> {
@@ -253,40 +204,17 @@ export async function getCommissionerDivisionScope(
             )
         )
 
-    if (roleRows.length > 0) {
-        const hasLeagueWide = roleRows.some((r) => r.divisionId === null)
-        if (hasLeagueWide) return { type: "league_wide" }
-        const divisionIds = [...new Set(roleRows.map((r) => r.divisionId))]
-            .filter((divisionId): divisionId is number => divisionId !== null)
-            .sort((a, b) => a - b)
-        return {
-            type: "division_specific",
-            divisionIds
-        }
+    if (roleRows.length === 0) return { type: "denied" }
+
+    const hasLeagueWide = roleRows.some((r) => r.divisionId === null)
+    if (hasLeagueWide) return { type: "league_wide" }
+    const divisionIds = [...new Set(roleRows.map((r) => r.divisionId))]
+        .filter((divisionId): divisionId is number => divisionId !== null)
+        .sort((a, b) => a - b)
+    return {
+        type: "division_specific",
+        divisionIds
     }
-
-    const legacyRows = await db
-        .select({ divisionId: commissioners.division })
-        .from(commissioners)
-        .where(
-            and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
-            )
-        )
-
-    if (legacyRows.length > 0) {
-        return {
-            type: "division_specific",
-            divisionIds: [...new Set(legacyRows.map((row) => row.divisionId))]
-                .filter(
-                    (divisionId): divisionId is number => divisionId !== null
-                )
-                .sort((a, b) => a - b)
-        }
-    }
-
-    return { type: "denied" }
 }
 
 export async function getCommissionerDivisionAccess(

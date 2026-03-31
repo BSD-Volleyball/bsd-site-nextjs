@@ -87,7 +87,7 @@ npx @better-auth/cli generate
 - For season-bound actions, validate incoming `seasonId` (positive integer) before querying.
 - Commissioner division-scoping is configurable: a commissioner row with `division_id = NULL` in `user_roles` has league-wide access; a row with a specific `division_id` is restricted to that division. Pass `{ seasonId, divisionId }` context to `hasPermission()` to enforce division-level checks.
 - Role updates that change privilege should invalidate active sessions for the affected user (call `invalidateAllSessionsForUser`).
-- Roles are stored in the `user_roles` table. The legacy `users.role` column and `commissioners` table are read as fallbacks during transition; the `user_roles` table is authoritative for new role checks.
+- Roles are stored in the `user_roles` table, which is the sole authority for all role checks. The legacy `users.role` column has been removed from the schema.
 - Baseline HTTP security headers are configured in `next.config.ts` (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
 
 ## Database Conventions

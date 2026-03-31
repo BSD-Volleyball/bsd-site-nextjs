@@ -22,9 +22,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     invalidateAllSessionsForUser,
-    isAdminOrDirectorBySession,
-    grantRole,
-    revokeRole
+    isAdminOrDirectorBySession
 } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
@@ -88,7 +86,6 @@ export interface UserDetails {
     emergency_contact: string | null
     referred_by: string | null
     pronouns: string | null
-    role: string | null
     male: boolean | null
     onboarding_completed: boolean | null
     seasons_list: string
@@ -286,7 +283,6 @@ export async function updateUser(
         emergency_contact?: string | null
         referred_by?: string | null
         pronouns?: string | null
-        role?: string | null
         male?: boolean | null
         onboarding_completed?: boolean | null
         seasons_list?: string
@@ -303,7 +299,7 @@ export async function updateUser(
 
     try {
         const [existingUser] = await db
-            .select({ id: users.id, role: users.role })
+            .select({ id: users.id })
             .from(users)
             .where(eq(users.id, originalId))
             .limit(1)
@@ -311,9 +307,6 @@ export async function updateUser(
         if (!existingUser) {
             return { status: false, message: "User not found." }
         }
-
-        const roleWillChange =
-            data.role !== undefined && data.role !== existingUser.role
 
         if (isIdChanging) {
             const newId = data.id as string
@@ -431,24 +424,10 @@ export async function updateUser(
             })
         }
 
-        if (roleWillChange) {
-            // Sync admin role to user_roles (new RBAC system).
-            // Remove any existing admin role, then re-grant if the new role is admin/director.
-            await revokeRole(effectiveId, "admin")
-            if (data.role === "admin" || data.role === "director") {
-                await grantRole(effectiveId, "admin", {
-                    grantedBy: session?.user?.id
-                })
-            }
-            await invalidateAllSessionsForUser(effectiveId)
-        }
-
         revalidatePath("/dashboard/edit-player")
         return {
             status: true,
-            message: roleWillChange
-                ? "User updated successfully. Active sessions were invalidated due to role change."
-                : "User updated successfully."
+            message: "User updated successfully."
         }
     } catch (error) {
         console.error("Error updating user:", error)

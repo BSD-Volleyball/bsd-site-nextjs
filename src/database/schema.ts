@@ -47,7 +47,6 @@ export const users = pgTable("users", {
     emergency_contact: text("emergency_contact"),
     referred_by: text("referred_by"),
     pronouns: text("pronouns"),
-    role: text("role"),
     male: boolean("male"),
     onboarding_completed: boolean("onboarding_completed").$defaultFn(
         () => false

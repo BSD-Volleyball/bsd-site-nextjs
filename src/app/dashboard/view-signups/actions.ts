@@ -764,7 +764,6 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             emailVerified: false,
             phone: null,
             emergency_contact: null,
-            role: null,
             onboarding_completed: null,
             seasons_list: "",
             notification_list: "",

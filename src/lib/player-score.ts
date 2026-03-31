@@ -7,10 +7,24 @@ import {
     playerRatings,
     seasons,
     teams,
-    users
+    userRoles
 } from "@/database/schema"
 
 const DEFAULT_SCORE = 200
+
+async function getAdminEvaluatorIds(evaluatorIds: string[]): Promise<Set<string>> {
+    if (evaluatorIds.length === 0) return new Set()
+    const rows = await db
+        .select({ user_id: userRoles.user_id })
+        .from(userRoles)
+        .where(
+            and(
+                eq(userRoles.role, "admin"),
+                inArray(userRoles.user_id, evaluatorIds)
+            )
+        )
+    return new Set(rows.map((r) => r.user_id))
+}
 
 /**
  * Returns a rating-based placement score for each userId using current-season
@@ -27,10 +41,9 @@ export async function fetchRatingBasedScores(
         .select({
             playerId: playerRatings.player,
             overall: playerRatings.overall,
-            evaluatorRole: users.role
+            evaluatorId: playerRatings.evaluator
         })
         .from(playerRatings)
-        .innerJoin(users, eq(playerRatings.evaluator, users.id))
         .where(
             and(
                 eq(playerRatings.season, seasonId),
@@ -39,13 +52,16 @@ export async function fetchRatingBasedScores(
             )
         )
 
+    const evaluatorIds = [...new Set(ratingRows.map((r) => r.evaluatorId))]
+    const adminEvaluators = await getAdminEvaluatorIds(evaluatorIds)
+
     const aggregates = new Map<
         string,
         { weightedSum: number; totalWeight: number }
     >()
     for (const row of ratingRows) {
         if (row.overall === null) continue
-        const weight = row.evaluatorRole === "director" ? 2 : 1
+        const weight = adminEvaluators.has(row.evaluatorId) ? 2 : 1
         const current = aggregates.get(row.playerId) || {
             weightedSum: 0,
             totalWeight: 0
@@ -106,10 +122,9 @@ export async function fetchPlayerScores(
             .select({
                 playerId: playerRatings.player,
                 overall: playerRatings.overall,
-                evaluatorRole: users.role
+                evaluatorId: playerRatings.evaluator
             })
             .from(playerRatings)
-            .innerJoin(users, eq(playerRatings.evaluator, users.id))
             .where(
                 and(
                     eq(playerRatings.season, seasonId),
@@ -118,13 +133,16 @@ export async function fetchPlayerScores(
                 )
             )
 
+        const evaluatorIds = [...new Set(ratingRows.map((r) => r.evaluatorId))]
+        const adminEvaluators = await getAdminEvaluatorIds(evaluatorIds)
+
         const ratingAggregates = new Map<
             string,
             { weightedSum: number; totalWeight: number }
         >()
         for (const row of ratingRows) {
             if (row.overall === null) continue
-            const weight = row.evaluatorRole === "director" ? 2 : 1
+            const weight = adminEvaluators.has(row.evaluatorId) ? 2 : 1
             const current = ratingAggregates.get(row.playerId) || {
                 weightedSum: 0,
                 totalWeight: 0

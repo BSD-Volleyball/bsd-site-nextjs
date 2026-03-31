@@ -59,7 +59,6 @@ export interface PlayerDetails {
     skill_hitter: boolean | null
     skill_passer: boolean | null
     skill_other: boolean | null
-    role: string | null
     male: boolean | null
     onboarding_completed: boolean | null
     seasons_list: string
@@ -192,7 +191,6 @@ export async function getPlayerDetails(playerId: string): Promise<{
                 skill_hitter: users.skill_hitter,
                 skill_passer: users.skill_passer,
                 skill_other: users.skill_other,
-                role: users.role,
                 male: users.male,
                 onboarding_completed: users.onboarding_completed,
                 seasons_list: users.seasons_list,
@@ -327,7 +325,6 @@ export async function getPlayerDetails(playerId: string): Promise<{
                   emailVerified: false,
                   phone: null,
                   emergency_contact: null,
-                  role: null,
                   onboarding_completed: null,
                   createdAt: new Date(0),
                   updatedAt: new Date(0)
