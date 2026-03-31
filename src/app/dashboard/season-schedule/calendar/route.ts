@@ -8,7 +8,6 @@ import {
     drafts,
     eventTimeSlots,
     matches,
-    playoffMatchesMeta,
     seasonEvents,
     seasons,
     teams,
@@ -260,33 +259,13 @@ export async function GET() {
     const divisionLatestMin =
         divisionMinutes.length > 0 ? Math.max(...divisionMinutes) : null
 
-    // Determine which playoff weeks apply to the user's division.
-    // playoff_matches_meta stores per-division bracket weeks; if it has
-    // no rows yet (bracket not set up), fall back to all playoff events.
-    const divisionPlayoffMetaRows = await db
-        .select({ week: playoffMatchesMeta.week })
-        .from(playoffMatchesMeta)
-        .where(
-            and(
-                eq(playoffMatchesMeta.season, seasonId),
-                eq(playoffMatchesMeta.division, divisionId)
-            )
-        )
-
-    const divisionPlayoffWeeks = new Set(
-        divisionPlayoffMetaRows.map((r) => r.week)
-    )
-
-    // playoff season_events are ordered by sort_order; sort_order == bracket week number
-    const applicablePlayoffEvents =
-        divisionPlayoffWeeks.size > 0
-            ? playoffEvents.filter((e) => divisionPlayoffWeeks.has(e.sortOrder))
-            : playoffEvents
+    // All playoff events are placeholders for every player (bracket is TBD until playoffs start)
+    const applicablePlayoffEvents = playoffEvents
 
     // Playoff placeholder events
-    for (const event of applicablePlayoffEvents) {
+    for (const [idx, event] of applicablePlayoffEvents.entries()) {
         const dateStr = event.eventDate.replace(/-/g, "")
-        const weekNum = event.sortOrder
+        const weekNum = idx + 1
 
         // Narrow to slots that fall within this division's time range.
         // If we have no regular season data to compare against, use all slots.

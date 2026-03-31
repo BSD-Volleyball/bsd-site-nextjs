@@ -45,7 +45,7 @@ export const SIX_TEAM_ROTATIONS: number[][] = [
     [1, 0, 3, 4, 2, 0] // Division position 5 (Court 6)
 ]
 
-export const SIX_TEAM_TIMES = ["7:00", "8:10", "9:20"]
+export const SIX_TEAM_TIMES = ["19:00", "20:10", "21:20"]
 
 // 4-team schedule: 6 weeks, 2 matches per week at 8:10, 9:20
 // Each pair of teams plays twice across the 6 weeks.
@@ -76,7 +76,7 @@ export const FOUR_TEAM_WEEKS: [number, number][][] = [
     ] // Week 6
 ]
 
-export const FOUR_TEAM_TIMES = ["8:10", "9:20"]
+export const FOUR_TEAM_TIMES = ["20:10", "21:20"]
 
 // Courts that get the EARLY time slots in playoff week 2 (7:00 and 7:50).
 // Alternates by season type so each division gets early slots every other season:
@@ -97,8 +97,8 @@ export const COURT_PAIR: Record<number, number> = {
 }
 
 // Playoff week-2 time slots [slotIndex 0, slotIndex 1] for early and late divisions.
-export const PLAYOFF_WEEK2_EARLY_TIMES = ["7:00", "7:50"]
-export const PLAYOFF_WEEK2_LATE_TIMES = ["8:40", "9:30"]
+export const PLAYOFF_WEEK2_EARLY_TIMES = ["19:00", "19:50"]
+export const PLAYOFF_WEEK2_LATE_TIMES = ["20:40", "21:30"]
 
 // 6-team playoff bracket: double-elimination, 10 scheduled matches + optional 11th
 export interface PlayoffMatchTemplate {
@@ -140,7 +140,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 1,
         week: 1,
-        time: "7:00",
+        time: "19:00",
         homeSeed: "S4",
         awaySeed: "S5",
         workTeam: "S1",
@@ -152,7 +152,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 2,
         week: 1,
-        time: "7:50",
+        time: "19:50",
         homeSeed: "S1",
         awaySeed: "W1",
         workTeam: "L1",
@@ -164,7 +164,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 3,
         week: 1,
-        time: "8:40",
+        time: "20:40",
         homeSeed: "S3",
         awaySeed: "S6",
         workTeam: "S2",
@@ -176,7 +176,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 4,
         week: 1,
-        time: "9:30",
+        time: "21:30",
         homeSeed: "S2",
         awaySeed: "W3",
         workTeam: "L3",
@@ -242,7 +242,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 9,
         week: 3,
-        time: "7:00",
+        time: "19:00",
         homeSeed: "L7",
         awaySeed: "W8",
         workTeam: "W7",
@@ -254,7 +254,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 10,
         week: 3,
-        time: "7:50",
+        time: "19:50",
         homeSeed: "W7",
         awaySeed: "W9",
         workTeam: "L9",
@@ -266,7 +266,7 @@ export const SIX_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 11,
         week: 3,
-        time: "8:40",
+        time: "20:40",
         homeSeed: "W10",
         awaySeed: "L10",
         workTeam: "L9",
@@ -283,7 +283,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 1,
         week: 1,
-        time: "7:00",
+        time: "19:00",
         homeSeed: "S1",
         awaySeed: "S4",
         workTeam: "S3",
@@ -295,7 +295,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 2,
         week: 1,
-        time: "7:50",
+        time: "19:50",
         homeSeed: "S2",
         awaySeed: "S3",
         workTeam: "S4",
@@ -336,7 +336,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 5,
         week: 3,
-        time: "7:00",
+        time: "19:00",
         homeSeed: "L3",
         awaySeed: "W4",
         workTeam: "W3",
@@ -348,7 +348,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 6,
         week: 3,
-        time: "7:50",
+        time: "19:50",
         homeSeed: "W3",
         awaySeed: "W5",
         workTeam: "L5",
@@ -360,7 +360,7 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
     {
         matchNum: 7,
         week: 3,
-        time: "8:40",
+        time: "20:40",
         homeSeed: "W6",
         awaySeed: "L6",
         workTeam: "L5",
