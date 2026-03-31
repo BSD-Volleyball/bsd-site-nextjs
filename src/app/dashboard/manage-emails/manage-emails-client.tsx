@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react"
 import {
-    addConcernComment,
-    assignConcern,
-    closeConcern,
-    getConcernComments,
-    reopenConcern,
-    type AssignableUser,
-    type ConcernComment,
-    type ConcernRow
+    addInboundEmailComment,
+    assignInboundEmail,
+    closeInboundEmail,
+    getInboundEmailComments,
+    reopenInboundEmail,
+    type AssignableAdmin,
+    type InboundEmailComment,
+    type InboundEmailRow
 } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,10 +28,6 @@ import {
 } from "@/components/ui/collapsible"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import {
-    AdminPlayerDetailPopup,
-    usePlayerDetailModal
-} from "@/components/player-detail"
 
 function formatDate(date: Date | string) {
     return new Date(date).toLocaleDateString("en-US", {
@@ -61,20 +57,18 @@ function StatusBadge({ status }: { status: string }) {
     )
 }
 
-function ConcernCard({
-    concern,
-    assignableUsers,
-    onUpdate,
-    onOpenPlayer
+function EmailCard({
+    email,
+    assignableAdmins,
+    onUpdate
 }: {
-    concern: ConcernRow
-    assignableUsers: AssignableUser[]
+    email: InboundEmailRow
+    assignableAdmins: AssignableAdmin[]
     onUpdate: () => void
-    onOpenPlayer: (userId: string) => void
 }) {
     const [isPending, startTransition] = useTransition()
     const [expanded, setExpanded] = useState(false)
-    const [comments, setComments] = useState<ConcernComment[]>([])
+    const [comments, setComments] = useState<InboundEmailComment[]>([])
     const [commentsLoaded, setCommentsLoaded] = useState(false)
     const [newComment, setNewComment] = useState("")
     const [commentMsg, setCommentMsg] = useState<string | null>(null)
@@ -82,7 +76,7 @@ function ConcernCard({
     function loadComments() {
         if (commentsLoaded) return
         startTransition(async () => {
-            const result = await getConcernComments(concern.id)
+            const result = await getInboundEmailComments(email.id)
             if (result.status) {
                 setComments(result.comments)
                 setCommentsLoaded(true)
@@ -97,24 +91,24 @@ function ConcernCard({
 
     function handleAssignChange(assigneeId: string) {
         startTransition(async () => {
-            await assignConcern(
-                concern.id,
+            await assignInboundEmail(
+                email.id,
                 assigneeId === "unassigned" ? null : assigneeId
             )
             onUpdate()
         })
     }
 
-    function handleCloseConcern() {
+    function handleClose() {
         startTransition(async () => {
-            await closeConcern(concern.id)
+            await closeInboundEmail(email.id)
             onUpdate()
         })
     }
 
-    function handleReopenConcern() {
+    function handleReopen() {
         startTransition(async () => {
-            await reopenConcern(concern.id)
+            await reopenInboundEmail(email.id)
             onUpdate()
         })
     }
@@ -123,11 +117,13 @@ function ConcernCard({
         if (!newComment.trim()) return
         setCommentMsg(null)
         startTransition(async () => {
-            const result = await addConcernComment(concern.id, newComment)
+            const result = await addInboundEmailComment(
+                email.id,
+                newComment
+            )
             if (result.status) {
                 setNewComment("")
-                // Reload comments
-                const updated = await getConcernComments(concern.id)
+                const updated = await getInboundEmailComments(email.id)
                 if (updated.status) setComments(updated.comments)
                 setCommentMsg(null)
             } else {
@@ -139,7 +135,6 @@ function ConcernCard({
     return (
         <Collapsible open={expanded} onOpenChange={handleToggle}>
             <div className="rounded-lg border bg-card">
-                {/* Card header — always visible */}
                 <CollapsibleTrigger asChild>
                     <button
                         type="button"
@@ -155,175 +150,84 @@ function ConcernCard({
                         <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="font-medium text-sm">
-                                    #{concern.id}
+                                    #{email.id}
                                 </span>
-                                <StatusBadge status={concern.status} />
-                                {concern.anonymous && (
-                                    <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                    >
-                                        Anonymous
-                                    </Badge>
-                                )}
-                                {concern.want_followup && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-blue-300 text-blue-700 text-xs dark:text-blue-300"
-                                    >
-                                        Follow-up Requested
-                                    </Badge>
-                                )}
-                                {concern.source === "email" && (
-                                    <Badge
-                                        variant="outline"
-                                        className="border-purple-300 text-purple-700 text-xs dark:text-purple-300"
-                                    >
-                                        Via Email
-                                    </Badge>
-                                )}
+                                <StatusBadge status={email.status} />
+                                <Badge
+                                    variant="outline"
+                                    className="text-xs"
+                                >
+                                    Email
+                                </Badge>
                             </div>
-                            <p className="mt-1 truncate text-muted-foreground text-sm">
-                                <span className="font-medium text-foreground">
-                                    Incident:{" "}
-                                </span>
-                                {concern.incident_date} · {concern.location}
+                            <p className="mt-1 truncate text-sm font-medium">
+                                {email.subject}
                             </p>
                             <p className="truncate text-muted-foreground text-sm">
                                 <span className="font-medium text-foreground">
-                                    Person involved:{" "}
+                                    From:{" "}
                                 </span>
-                                {concern.person_involved}
+                                {email.from_name
+                                    ? `${email.from_name} <${email.from_address}>`
+                                    : email.from_address}
                             </p>
                         </div>
                         <div className="shrink-0 text-right text-muted-foreground text-xs">
-                            <div>{formatDate(concern.created_at)}</div>
-                            {concern.assigned_to_name && (
+                            <div>{formatDate(email.created_at)}</div>
+                            {email.assigned_to_name && (
                                 <div className="mt-0.5">
-                                    Assigned: {concern.assigned_to_name}
+                                    Assigned: {email.assigned_to_name}
                                 </div>
                             )}
                         </div>
                     </button>
                 </CollapsibleTrigger>
 
-                {/* Expanded content */}
                 <CollapsibleContent>
                     <div className="space-y-4 border-t px-4 pt-4 pb-4">
-                        {/* Submitter info */}
-                        {!concern.anonymous &&
-                            (concern.submitter_name ||
-                                concern.contact_name) && (
-                                <div className="space-y-1 rounded-md bg-muted/50 p-3 text-sm">
-                                    <p className="font-medium">Submitted by</p>
-                                    {concern.user_id ? (
-                                        <button
-                                            type="button"
-                                            className="text-left font-medium text-primary underline underline-offset-2"
-                                            onClick={() => {
-                                                if (concern.user_id) {
-                                                    onOpenPlayer(
-                                                        concern.user_id
-                                                    )
-                                                }
-                                            }}
-                                        >
-                                            {concern.submitter_name ??
-                                                concern.contact_name}
-                                        </button>
-                                    ) : (
-                                        <p>
-                                            {concern.submitter_name ??
-                                                concern.contact_name}
-                                        </p>
-                                    )}
-                                    {(concern.submitter_email ??
-                                    concern.contact_email) ? (
-                                        <p className="text-muted-foreground">
-                                            {concern.submitter_email ??
-                                                concern.contact_email}
-                                        </p>
-                                    ) : null}
-                                    {concern.contact_phone && (
-                                        <p className="text-muted-foreground">
-                                            {concern.contact_phone}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-
+                        {/* Email metadata */}
                         <div className="grid gap-3 rounded-md bg-muted/50 p-3 text-sm sm:grid-cols-2">
                             <div>
                                 <p className="font-medium text-muted-foreground">
-                                    Contact Name
+                                    From
                                 </p>
-                                <p>{concern.contact_name || "Not provided"}</p>
+                                <p>
+                                    {email.from_name
+                                        ? `${email.from_name} <${email.from_address}>`
+                                        : email.from_address}
+                                </p>
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">
-                                    Contact Email
+                                    To
                                 </p>
-                                <p>{concern.contact_email || "Not provided"}</p>
+                                <p>{email.to_address}</p>
                             </div>
-                            <div>
+                            <div className="sm:col-span-2">
                                 <p className="font-medium text-muted-foreground">
-                                    Contact Phone
+                                    Subject
                                 </p>
-                                <p>{concern.contact_phone || "Not provided"}</p>
-                            </div>
-                            <div>
-                                <p className="font-medium text-muted-foreground">
-                                    Wants Follow-up
-                                </p>
-                                <p>{concern.want_followup ? "Yes" : "No"}</p>
+                                <p>{email.subject}</p>
                             </div>
                         </div>
 
-                        {/* Incident fields */}
-                        <div className="grid gap-3 text-sm sm:grid-cols-2">
-                            <div>
-                                <p className="font-medium text-muted-foreground">
-                                    Date of Incident
-                                </p>
-                                <p>{concern.incident_date}</p>
-                            </div>
-                            <div>
-                                <p className="font-medium text-muted-foreground">
-                                    Location
-                                </p>
-                                <p>{concern.location}</p>
-                            </div>
-                            <div>
-                                <p className="font-medium text-muted-foreground">
-                                    Person(s) Involved
-                                </p>
-                                <p>{concern.person_involved}</p>
-                            </div>
-                            {concern.witnesses && (
-                                <div>
-                                    <p className="font-medium text-muted-foreground">
-                                        Witnesses
-                                    </p>
-                                    <p>{concern.witnesses}</p>
-                                </div>
-                            )}
-                            {concern.team_match && (
-                                <div>
-                                    <p className="font-medium text-muted-foreground">
-                                        Team / Match
-                                    </p>
-                                    <p>{concern.team_match}</p>
-                                </div>
-                            )}
-                        </div>
-
+                        {/* Email body */}
                         <div className="text-sm">
                             <p className="font-medium text-muted-foreground">
-                                Description
+                                Body
                             </p>
-                            <p className="mt-1 whitespace-pre-wrap">
-                                {concern.description}
-                            </p>
+                            {email.body_html ? (
+                                <div
+                                    className="prose prose-sm dark:prose-invert mt-1 max-w-none rounded-md border bg-background p-3"
+                                    dangerouslySetInnerHTML={{
+                                        __html: email.body_html
+                                    }}
+                                />
+                            ) : (
+                                <p className="mt-1 whitespace-pre-wrap">
+                                    {email.body_text || "(No body)"}
+                                </p>
+                            )}
                         </div>
 
                         {/* Management controls */}
@@ -333,7 +237,9 @@ function ConcernCard({
                                     Assign To
                                 </p>
                                 <Select
-                                    value={concern.assigned_to ?? "unassigned"}
+                                    value={
+                                        email.assigned_to ?? "unassigned"
+                                    }
                                     onValueChange={handleAssignChange}
                                     disabled={isPending}
                                 >
@@ -344,41 +250,41 @@ function ConcernCard({
                                         <SelectItem value="unassigned">
                                             Unassigned
                                         </SelectItem>
-                                        {assignableUsers.map((u) => (
-                                            <SelectItem key={u.id} value={u.id}>
-                                                {u.name}{" "}
-                                                <span className="text-muted-foreground capitalize">
-                                                    ({u.role})
-                                                </span>
+                                        {assignableAdmins.map((u) => (
+                                            <SelectItem
+                                                key={u.id}
+                                                value={u.id}
+                                            >
+                                                {u.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            {concern.status === "active" && (
+                            {email.status === "active" && (
                                 <div className="space-y-1">
                                     <p className="font-medium text-muted-foreground text-xs">
                                         Action
                                     </p>
                                     <Button
                                         size="sm"
-                                        onClick={handleCloseConcern}
+                                        onClick={handleClose}
                                         disabled={isPending}
                                     >
-                                        Close Concern
+                                        Close Email
                                     </Button>
                                 </div>
                             )}
 
-                            {concern.status === "closed" && (
+                            {email.status === "closed" && (
                                 <div className="space-y-1">
                                     <p className="font-medium text-muted-foreground text-xs">
                                         Action
                                     </p>
                                     <Button
                                         size="sm"
-                                        onClick={handleReopenConcern}
+                                        onClick={handleReopen}
                                         disabled={isPending}
                                     >
                                         Reopen
@@ -435,7 +341,9 @@ function ConcernCard({
                                 <Button
                                     size="sm"
                                     onClick={handleAddComment}
-                                    disabled={isPending || !newComment.trim()}
+                                    disabled={
+                                        isPending || !newComment.trim()
+                                    }
                                 >
                                     {isPending ? "Saving..." : "Add Comment"}
                                 </Button>
@@ -448,20 +356,18 @@ function ConcernCard({
     )
 }
 
-function ConcernSection({
+function EmailSection({
     title,
-    concerns,
-    assignableUsers,
+    emails,
+    assignableAdmins,
     defaultOpen,
-    onUpdate,
-    onOpenPlayer
+    onUpdate
 }: {
     title: string
-    concerns: ConcernRow[]
-    assignableUsers: AssignableUser[]
+    emails: InboundEmailRow[]
+    assignableAdmins: AssignableAdmin[]
     defaultOpen: boolean
     onUpdate: () => void
-    onOpenPlayer: (userId: string) => void
 }) {
     const [open, setOpen] = useState(defaultOpen)
 
@@ -479,24 +385,23 @@ function ConcernSection({
                     )}
                     <span>{title}</span>
                     <Badge variant="secondary" className="ml-auto">
-                        {concerns.length}
+                        {emails.length}
                     </Badge>
                 </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
                 <div className="mt-2 space-y-2">
-                    {concerns.length === 0 ? (
+                    {emails.length === 0 ? (
                         <p className="px-2 py-4 text-center text-muted-foreground text-sm">
-                            No concerns in this category.
+                            No emails in this category.
                         </p>
                     ) : (
-                        concerns.map((c) => (
-                            <ConcernCard
-                                key={c.id}
-                                concern={c}
-                                assignableUsers={assignableUsers}
+                        emails.map((e) => (
+                            <EmailCard
+                                key={e.id}
+                                email={e}
+                                assignableAdmins={assignableAdmins}
                                 onUpdate={onUpdate}
-                                onOpenPlayer={onOpenPlayer}
                             />
                         ))
                     )}
@@ -506,77 +411,52 @@ function ConcernSection({
     )
 }
 
-export function ManageConcernsClient({
-    initialConcerns,
-    assignableUsers,
-    playerPicUrl
+export function ManageEmailsClient({
+    initialEmails,
+    assignableAdmins
 }: {
-    initialConcerns: ConcernRow[]
-    assignableUsers: AssignableUser[]
-    playerPicUrl: string
+    initialEmails: InboundEmailRow[]
+    assignableAdmins: AssignableAdmin[]
 }) {
-    const [concerns, setConcerns] = useState(initialConcerns)
+    const [emails, setEmails] = useState(initialEmails)
     const [_isRefreshing, startRefresh] = useTransition()
-    const modal = usePlayerDetailModal()
 
     function refresh() {
-        // Re-fetch by triggering a server-side reload via router or re-fetching
-        // We use a key-based trick: just force re-sort from existing state
-        // For live updates, re-call the server action
         startRefresh(async () => {
-            const { getConcerns } = await import("./actions")
-            const result = await getConcerns()
+            const { getInboundEmails } = await import("./actions")
+            const result = await getInboundEmails()
             if (result.status) {
-                setConcerns(result.concerns)
+                setEmails(result.emails)
             }
         })
     }
 
-    const newConcerns = concerns.filter((c) => c.status === "new")
-    const activeConcerns = concerns.filter((c) => c.status === "active")
-    const closedConcerns = concerns.filter((c) => c.status === "closed")
+    const newEmails = emails.filter((e) => e.status === "new")
+    const activeEmails = emails.filter((e) => e.status === "active")
+    const closedEmails = emails.filter((e) => e.status === "closed")
 
     return (
         <div className="space-y-4">
-            <ConcernSection
-                title="New Concerns"
-                concerns={newConcerns}
-                assignableUsers={assignableUsers}
+            <EmailSection
+                title="New Emails"
+                emails={newEmails}
+                assignableAdmins={assignableAdmins}
                 defaultOpen={true}
                 onUpdate={refresh}
-                onOpenPlayer={modal.openPlayerDetail}
             />
-            <ConcernSection
-                title="Active Concerns"
-                concerns={activeConcerns}
-                assignableUsers={assignableUsers}
+            <EmailSection
+                title="Active Emails"
+                emails={activeEmails}
+                assignableAdmins={assignableAdmins}
                 defaultOpen={true}
                 onUpdate={refresh}
-                onOpenPlayer={modal.openPlayerDetail}
             />
-            <ConcernSection
-                title="Closed Concerns"
-                concerns={closedConcerns}
-                assignableUsers={assignableUsers}
+            <EmailSection
+                title="Closed Emails"
+                emails={closedEmails}
+                assignableAdmins={assignableAdmins}
                 defaultOpen={false}
                 onUpdate={refresh}
-                onOpenPlayer={modal.openPlayerDetail}
-            />
-
-            <AdminPlayerDetailPopup
-                open={!!modal.selectedUserId}
-                onClose={modal.closePlayerDetail}
-                playerDetails={modal.playerDetails}
-                draftHistory={modal.draftHistory}
-                signupHistory={modal.signupHistory}
-                playerPicUrl={playerPicUrl}
-                isLoading={modal.isLoading}
-                pairPickName={modal.pairPickName}
-                pairReason={modal.pairReason}
-                ratingAverages={modal.ratingAverages}
-                sharedRatingNotes={modal.sharedRatingNotes}
-                privateRatingNotes={modal.privateRatingNotes}
-                viewerRating={modal.viewerRating}
             />
         </div>
     )

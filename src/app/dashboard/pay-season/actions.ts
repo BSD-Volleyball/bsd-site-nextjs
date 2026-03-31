@@ -148,7 +148,7 @@ async function sendSignupConfirmationEmail(
                     filename: "logo.png",
                     content: logoContent,
                     contentType: "image/png",
-                    inlineContentId: "logo"
+                    contentId: "logo"
                 }
             ]
         })

@@ -659,6 +659,12 @@ export const concerns = pgTable("concerns", {
         .$defaultFn(() => "new")
         .notNull(), // 'new' | 'active' | 'closed'
     assigned_to: text("assigned_to").references(() => users.id),
+    // How the concern was submitted: 'web' (default) or 'email'
+    source: text("source")
+        .$defaultFn(() => "web")
+        .notNull(),
+    // Resend email_id when source = 'email'
+    source_email_id: text("source_email_id"),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull(),
@@ -672,6 +678,43 @@ export const concernComments = pgTable("concern_comments", {
     concern_id: integer("concern_id")
         .notNull()
         .references(() => concerns.id, { onDelete: "cascade" }),
+    author_id: text("author_id")
+        .notNull()
+        .references(() => users.id),
+    content: text("content").notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+// --- Inbound Emails (admin inbox) ---
+
+export const inboundEmails = pgTable("inbound_emails", {
+    id: serial("id").primaryKey(),
+    email_id: text("email_id").notNull(), // Resend email_id
+    from_address: text("from_address").notNull(),
+    from_name: text("from_name"),
+    to_address: text("to_address").notNull(),
+    subject: text("subject").notNull(),
+    body_text: text("body_text"),
+    body_html: text("body_html"),
+    status: text("status")
+        .$defaultFn(() => "new")
+        .notNull(), // 'new' | 'active' | 'closed'
+    assigned_to: text("assigned_to").references(() => users.id),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull(),
+    updated_at: timestamp("updated_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+export const inboundEmailComments = pgTable("inbound_email_comments", {
+    id: serial("id").primaryKey(),
+    email_id: integer("email_id")
+        .notNull()
+        .references(() => inboundEmails.id, { onDelete: "cascade" }),
     author_id: text("author_id")
         .notNull()
         .references(() => users.id),

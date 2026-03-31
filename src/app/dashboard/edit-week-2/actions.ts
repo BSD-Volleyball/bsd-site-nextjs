@@ -569,7 +569,7 @@ export async function sendWeek2RosterNotifications(
                                 filename: "logo.png",
                                 content: logoContent,
                                 contentType: "image/png",
-                                inlineContentId: "logo"
+                                contentId: "logo"
                             }
                         ]
                     })
@@ -738,7 +738,7 @@ export async function sendWeek2RosterNotifications(
                             filename: "logo.png",
                             content: logoContent,
                             contentType: "image/png",
-                            inlineContentId: "logo"
+                            contentId: "logo"
                         }
                     ]
                 })

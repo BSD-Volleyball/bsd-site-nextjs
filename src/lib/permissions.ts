@@ -47,6 +47,9 @@ export type Permission =
     // Player concerns
     | "concerns:view"
     | "concerns:manage"
+    // Admin inbound emails
+    | "admin_emails:view"
+    | "admin_emails:manage"
 
 // All permissions — used for admin wildcard.
 // Keep in sync with the Permission type above.
@@ -72,7 +75,9 @@ const ALL_PERMISSIONS: Permission[] = [
     "emails:edit",
     "audit:view",
     "google:manage",
-    "attrition:view"
+    "attrition:view",
+    "admin_emails:view",
+    "admin_emails:manage"
     // concerns:view and concerns:manage are intentionally omitted — only ombudsman role has access
 ]
 

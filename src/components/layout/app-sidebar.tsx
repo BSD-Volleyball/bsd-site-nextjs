@@ -28,7 +28,8 @@ import {
     RiAlertLine,
     RiFileWarningLine,
     RiCheckboxLine,
-    RiClipboardLine
+    RiClipboardLine,
+    RiInboxLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -158,6 +159,11 @@ const adminNavItems = [
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
+    },
+    {
+        title: "Manage Emails",
+        url: "/dashboard/manage-emails",
+        icon: RiInboxLine
     }
 ]
 

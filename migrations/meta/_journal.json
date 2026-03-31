@@ -43,6 +43,13 @@
       "when": 1774994815729,
       "tag": "0005_fearless_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774998780585,
+      "tag": "0006_fresh_hitman",
+      "breakpoints": true
     }
   ]
 }

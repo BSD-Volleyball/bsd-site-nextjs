@@ -34,6 +34,7 @@ export interface ConcernRow {
     assigned_to_name: string | null
     submitter_name: string | null
     submitter_email: string | null
+    source: string
     created_at: Date
     updated_at: Date
 }
@@ -80,6 +81,7 @@ export async function getConcerns(): Promise<{
                 description: concerns.description,
                 status: concerns.status,
                 assigned_to: concerns.assigned_to,
+                source: concerns.source,
                 created_at: concerns.created_at,
                 updated_at: concerns.updated_at,
                 user_id: concerns.user_id,
@@ -130,6 +132,7 @@ export async function getConcerns(): Promise<{
                 : null,
             submitter_name: r.anonymous ? null : (r.submitter_name ?? null),
             submitter_email: r.anonymous ? null : (r.submitter_email ?? null),
+            source: r.source,
             created_at: r.created_at,
             updated_at: r.updated_at
         }))
