@@ -756,43 +756,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                <SidebarGroup>
-                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                        Historical
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <NavItems
-                                items={[hallOfChampionsNavItem]}
-                                pathname={pathname}
-                            />
-                            {seasonNav.map((season) => (
-                                <SeasonNavMenuItem
-                                    key={season.id}
-                                    season={season}
-                                    pathname={pathname}
-                                />
-                            ))}
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
-
-                {visibleCaptainItems.length > 0 && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Captain Pages
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <NavItems
-                                    items={visibleCaptainItems}
-                                    pathname={pathname}
-                                />
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
-
                 {showCourtMgmt && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
@@ -809,6 +772,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             ? [addPicturesNavItem]
                                             : [])
                                     ]}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {visibleCaptainItems.length > 0 && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Captain Pages
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={visibleCaptainItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>
@@ -858,6 +837,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 items={accountNavItems}
                                 pathname={pathname}
                             />
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+
+                <SidebarGroup>
+                    <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                        Historical
+                    </SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <NavItems
+                                items={[hallOfChampionsNavItem]}
+                                pathname={pathname}
+                            />
+                            {seasonNav.map((season) => (
+                                <SeasonNavMenuItem
+                                    key={season.id}
+                                    season={season}
+                                    pathname={pathname}
+                                />
+                            ))}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
