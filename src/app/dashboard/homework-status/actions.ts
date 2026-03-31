@@ -261,11 +261,23 @@ export async function getHomeworkStatusData(
                 )
                 .groupBy(movingDay.submitted_by, movingDay.direction),
 
-            // E. Distinct captains who have saved draft homework
+            // E. Draft homework row counts per captain per division
             db
-                .selectDistinct({ captain: draftHomework.captain })
+                .select({
+                    captain: draftHomework.captain,
+                    division: draftHomework.division,
+                    cnt: count()
+                })
                 .from(draftHomework)
-                .where(eq(draftHomework.season, seasonId))
+                .where(
+                    and(
+                        eq(draftHomework.season, seasonId),
+                        selectedDivisionId !== null
+                            ? eq(draftHomework.division, selectedDivisionId)
+                            : undefined
+                    )
+                )
+                .groupBy(draftHomework.captain, draftHomework.division)
         ])
 
         // 4. Fetch captain names
@@ -328,9 +340,14 @@ export async function getHomeworkStatusData(
             movingDayMap.set(row.submittedBy, existing)
         }
 
-        const draftHomeworkSet = new Set(
-            draftHomeworkCaptains.map((r) => r.captain)
-        )
+        // captainId → divisionId → row count
+        const draftHomeworkCountMap = new Map<string, Map<number, number>>()
+        for (const row of draftHomeworkCaptains) {
+            if (!draftHomeworkCountMap.has(row.captain)) {
+                draftHomeworkCountMap.set(row.captain, new Map())
+            }
+            draftHomeworkCountMap.get(row.captain)!.set(row.division, row.cnt)
+        }
 
         // 6. Determine division min/max levels (top/bottom division logic)
         const divisionLevels = [
@@ -419,7 +436,14 @@ export async function getHomeworkStatusData(
                         mdCounts.up + mdCounts.down >= 3
                 }
 
-                const draftHomeworkComplete = draftHomeworkSet.has(captainId)
+                const homeworkRowCount =
+                    draftHomeworkCountMap
+                        .get(captainId)
+                        ?.get(div.divisionId) ?? 0
+                const completionThreshold = div.numTeams * 8
+                const draftHomeworkComplete =
+                    completionThreshold > 0 &&
+                    homeworkRowCount >= completionThreshold
 
                 captains.push({
                     captainId,
