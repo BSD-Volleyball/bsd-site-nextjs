@@ -72,9 +72,8 @@ const ALL_PERMISSIONS: Permission[] = [
     "emails:edit",
     "audit:view",
     "google:manage",
-    "attrition:view",
-    "concerns:view",
-    "concerns:manage"
+    "attrition:view"
+    // concerns:view and concerns:manage are intentionally omitted — only ombudsman role has access
 ]
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -94,7 +93,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
         "player:lookup",
         "teams:create",
         "schedule:view",
-        "concerns:view"
+        "scores:enter"
     ],
 
     // Season-scoped: view signups, participate in draft, rate players
@@ -106,7 +105,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
         "players:evaluate",
         "player:lookup",
         "signups:view",
-        "pictures:manage"
+        "pictures:manage",
+        "scores:enter"
     ],
 
     // Season-scoped: handle player concerns and disputes

@@ -1,5 +1,9 @@
 import "server-only"
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import {
+    DeleteObjectCommand,
+    PutObjectCommand,
+    S3Client
+} from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { requireEnv } from "@/lib/utils"
 
@@ -61,4 +65,15 @@ export async function createPlayerPictureUploadPresignedUrl(params: {
     return getSignedUrl(getR2Client(), command, {
         expiresIn: UPLOAD_TTL_SECONDS
     })
+}
+
+export async function deleteR2Object(key: string): Promise<void> {
+    const bucket = getR2Bucket()
+
+    const command = new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key
+    })
+
+    await getR2Client().send(command)
 }

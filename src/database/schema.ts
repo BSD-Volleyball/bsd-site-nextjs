@@ -746,6 +746,32 @@ export const draftPairDiffs = pgTable(
     })
 )
 
+export const scoreSheets = pgTable(
+    "score_sheets",
+    {
+        id: serial("id").primaryKey(),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id),
+        division_id: integer("division_id")
+            .notNull()
+            .references(() => divisions.id),
+        match_date: date("match_date", { mode: "string" }).notNull(),
+        image_path: text("image_path").notNull(),
+        uploaded_by: text("uploaded_by")
+            .notNull()
+            .references(() => users.id),
+        uploaded_at: timestamp("uploaded_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        scoreSheetsSeasonDivDateIdx: index(
+            "score_sheets_season_div_date_idx"
+        ).on(table.season_id, table.division_id, table.match_date)
+    })
+)
+
 // user_roles: multi-role assignment table supporting season/division scoping.
 // Replaces users.role column and commissioners table as the source of truth
 // for authorization. Permissions are defined in src/lib/permissions.ts.

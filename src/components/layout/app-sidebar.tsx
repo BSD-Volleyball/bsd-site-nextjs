@@ -27,7 +27,8 @@ import {
     RiSettings3Line,
     RiAlertLine,
     RiFileWarningLine,
-    RiCheckboxLine
+    RiCheckboxLine,
+    RiClipboardLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -280,6 +281,12 @@ const scheduleNavItem = {
     icon: RiCalendarLine
 }
 
+const enterScoresNavItem = {
+    title: "Enter Scores",
+    url: "/dashboard/enter-scores",
+    icon: RiClipboardLine
+}
+
 const addPicturesNavItem = {
     title: "Add Pictures",
     url: "/dashboard/add-pictures",
@@ -484,6 +491,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
     const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
+    const [hasScoresAccess, setHasScoresAccess] = useState(false)
     const [hasConcernsAccess, setHasConcernsAccess] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
@@ -495,6 +503,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setIsCommissioner(data.isCommissioner)
             setHasCaptainPagesAccess(data.hasCaptainPagesAccess)
             setHasPicturesAccess(data.hasPicturesAccess)
+            setHasScoresAccess(data.hasScoresAccess)
             setHasConcernsAccess(data.hasConcernsAccess)
             setSeasonNav(data.seasonNav)
             setPhase(data.phase)
@@ -523,6 +532,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
     const showPictures =
         hasPicturesAccess && inRange("prep_tryout_week_1", "draft")
+    const showEnterScores = hasScoresAccess && inRange("draft", "playoffs")
+    const showCourtMgmt = showPictures || showEnterScores
     const showReviewPairs = isAdmin && inRange("select_commissioners", "draft")
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
@@ -535,7 +546,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
     const visibleCaptainItems = [
-        ...(hasCaptainPagesAccess && showDraftItems ? [captainPagesNavItems[0]] : []),
+        ...(hasCaptainPagesAccess && showDraftItems
+            ? [captainPagesNavItems[0]]
+            : []),
         ...(captainBaseVisible ? captainPagesNavItems.slice(1, 4) : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
             ? [captainPagesNavItems[4]]
@@ -644,11 +657,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 items: hiddenCaptainItems
             })
 
-        // Pictures
-        if (!showPictures)
+        // Court Mgmt
+        const hiddenCourtMgmtItems = [
+            ...(!showEnterScores ? [enterScoresNavItem] : []),
+            ...(!showPictures ? [addPicturesNavItem] : [])
+        ]
+        if (hiddenCourtMgmtItems.length > 0)
             hiddenGroups.push({
-                label: "Pictures",
-                items: [addPicturesNavItem]
+                label: "Court Mgmt",
+                items: hiddenCourtMgmtItems
             })
 
         // Commissioner items currently suppressed
@@ -776,15 +793,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
-                {showPictures && (
+                {showCourtMgmt && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Pictures
+                            Court Mgmt
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <NavItems
-                                    items={[addPicturesNavItem]}
+                                    items={[
+                                        ...(showEnterScores
+                                            ? [enterScoresNavItem]
+                                            : []),
+                                        ...(showPictures
+                                            ? [addPicturesNavItem]
+                                            : [])
+                                    ]}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

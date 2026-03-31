@@ -23,7 +23,8 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
     const [players, setPlayers] = useState(initialPlayers)
     const [search, setSearch] = useState("")
     const [uploadingUserId, setUploadingUserId] = useState<string | null>(null)
-    const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+    const cameraInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+    const uploadInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
     const maxSourcePictureUploadBytes = 25 * 1024 * 1024
 
@@ -53,17 +54,21 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
     }
 
     const clearFileInput = (userId: string) => {
-        const input = fileInputRefs.current[userId]
-        if (input) {
-            input.value = ""
-        }
+        const camera = cameraInputRefs.current[userId]
+        const upload = uploadInputRefs.current[userId]
+        if (camera) camera.value = ""
+        if (upload) upload.value = ""
     }
 
     const handleOpenCamera = (userId: string) => {
-        const input = fileInputRefs.current[userId]
-        if (!input) {
-            return
-        }
+        const input = cameraInputRefs.current[userId]
+        if (!input) return
+        input.click()
+    }
+
+    const handleOpenFilePicker = (userId: string) => {
+        const input = uploadInputRefs.current[userId]
+        if (!input) return
         input.click()
     }
 
@@ -201,7 +206,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                                 <div className="flex items-center gap-2">
                                     <input
                                         ref={(node) => {
-                                            fileInputRefs.current[
+                                            cameraInputRefs.current[
                                                 player.userId
                                             ] = node
                                         }}
@@ -215,10 +220,30 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                                         onChange={(event) => {
                                             const selectedFile =
                                                 event.target.files?.[0] ?? null
-                                            if (!selectedFile) {
-                                                return
-                                            }
+                                            if (!selectedFile) return
+                                            void handleFileSelected(
+                                                player,
+                                                selectedFile
+                                            )
+                                        }}
+                                    />
 
+                                    <input
+                                        ref={(node) => {
+                                            uploadInputRefs.current[
+                                                player.userId
+                                            ] = node
+                                        }}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={
+                                            !canUpload || !!uploadingUserId
+                                        }
+                                        onChange={(event) => {
+                                            const selectedFile =
+                                                event.target.files?.[0] ?? null
+                                            if (!selectedFile) return
                                             void handleFileSelected(
                                                 player,
                                                 selectedFile
@@ -239,7 +264,24 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                                     >
                                         {isRowUploading
                                             ? "Uploading..."
-                                            : "Add Picture"}
+                                            : "Take Pic"}
+                                    </Button>
+
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() =>
+                                            handleOpenFilePicker(player.userId)
+                                        }
+                                        disabled={
+                                            !canUpload ||
+                                            !!uploadingUserId ||
+                                            isRowUploading
+                                        }
+                                    >
+                                        {isRowUploading
+                                            ? "Uploading..."
+                                            : "Upload Pic"}
                                     </Button>
 
                                     {!canUpload && (

@@ -170,6 +170,7 @@ export interface SidebarData {
     isCommissioner: boolean
     hasCaptainPagesAccess: boolean
     hasPicturesAccess: boolean
+    hasScoresAccess: boolean
     hasConcernsAccess: boolean
     seasonNav: SeasonNavItem[]
     phase: SeasonPhase | null
@@ -185,6 +186,7 @@ export async function getSidebarData(): Promise<SidebarData> {
             isCommissioner: false,
             hasCaptainPagesAccess: false,
             hasPicturesAccess: false,
+            hasScoresAccess: false,
             hasConcernsAccess: false,
             seasonNav: [],
             phase: null
@@ -200,6 +202,7 @@ export async function getSidebarData(): Promise<SidebarData> {
         isCommissioner,
         hasCaptainPagesAccess,
         hasPicturesAccess,
+        hasScoresAccess,
         hasConcernsAccess,
         seasonNav
     ] = await Promise.all([
@@ -209,6 +212,9 @@ export async function getSidebarData(): Promise<SidebarData> {
         hasCaptainPagesAccessBySession(),
         seasonId
             ? hasPermissionBySession("pictures:manage", { seasonId })
+            : Promise.resolve(false),
+        seasonId
+            ? hasPermissionBySession("scores:enter", { seasonId })
             : Promise.resolve(false),
         seasonId
             ? hasPermissionBySession("concerns:view", { seasonId })
@@ -222,6 +228,7 @@ export async function getSidebarData(): Promise<SidebarData> {
         isCommissioner,
         hasCaptainPagesAccess,
         hasPicturesAccess,
+        hasScoresAccess,
         hasConcernsAccess,
         seasonNav,
         phase: seasonId ? config.phase : null
@@ -485,15 +492,11 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                     .orderBy(asc(seasonEvents.sort_order))
 
                 if (divisionIndex >= 0 && draftEventRows[divisionIndex]) {
-                    divisionDraftDate =
-                        draftEventRows[divisionIndex].event_date
+                    divisionDraftDate = draftEventRows[divisionIndex].event_date
                 }
             }
         } catch (draftDateError) {
-            console.error(
-                "Error fetching division draft date:",
-                draftDateError
-            )
+            console.error("Error fetching division draft date:", draftDateError)
         }
 
         // Find next match availability for the team's roster
@@ -548,10 +551,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                                     playerUnavailability.signup_id,
                                     signupIds
                                 ),
-                                eq(
-                                    playerUnavailability.event_id,
-                                    nextEvent.id
-                                )
+                                eq(playerUnavailability.event_id, nextEvent.id)
                             )
                         )
                     unavailableUserIds = unavailRows
@@ -564,10 +564,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 }
             }
         } catch (availError) {
-            console.error(
-                "Error fetching next match availability:",
-                availError
-            )
+            console.error("Error fetching next match availability:", availError)
         }
 
         return {
@@ -816,7 +813,10 @@ export async function getNextMatch(
         let matchEventId: number | null = null
         if (!matchDate) {
             const rsEvents = await db
-                .select({ eventDate: seasonEvents.event_date, id: seasonEvents.id })
+                .select({
+                    eventDate: seasonEvents.event_date,
+                    id: seasonEvents.id
+                })
                 .from(seasonEvents)
                 .where(
                     and(
