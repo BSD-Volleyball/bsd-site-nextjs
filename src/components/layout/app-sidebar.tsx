@@ -126,6 +126,11 @@ const adminNavItems = [
         icon: RiGroupLine
     },
     {
+        title: "Manage Emails",
+        url: "/dashboard/manage-emails",
+        icon: RiInboxLine
+    },
+    {
         title: "View Waitlist",
         url: "/dashboard/view-waitlist",
         icon: RiTimeLine
@@ -159,11 +164,6 @@ const adminNavItems = [
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
-    },
-    {
-        title: "Manage Emails",
-        url: "/dashboard/manage-emails",
-        icon: RiInboxLine
     }
 ]
 
