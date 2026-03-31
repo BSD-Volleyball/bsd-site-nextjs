@@ -741,26 +741,13 @@ function MatchScoreEntry({
                     <thead>
                         <tr>
                             {/* Row label column */}
-                            <th className="w-36 pb-2 text-left font-normal text-muted-foreground" />
-                            <th className="w-24 pb-2 text-center font-semibold">
-                                {match.homeTeamName}
-                            </th>
-                            <th className="w-4 pb-2" />
-                            <th className="w-24 pb-2 text-center font-semibold">
-                                {match.awayTeamName}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {/* Winner row */}
-                        <tr>
-                            <td className="py-1.5 pr-3 text-muted-foreground">
+                            <th className="w-36 pb-2 text-left font-normal text-muted-foreground">
                                 Winner
-                            </td>
-                            <td className="py-1.5 text-center">
+                            </th>
+                            <th className="w-24 pb-2 text-center">
                                 <button
                                     type="button"
-                                    className={`w-full rounded-md px-2 py-1 font-medium text-xs transition-colors ${
+                                    className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
                                         form.winner === match.homeTeamId
                                             ? "bg-green-600 text-white"
                                             : "bg-muted hover:bg-muted/80"
@@ -770,18 +757,16 @@ function MatchScoreEntry({
                                     }
                                     title="Click to select as winner"
                                 >
-                                    {form.winner === match.homeTeamId
-                                        ? "✓ Winner"
-                                        : "Select"}
+                                    {match.homeTeamName}
                                 </button>
-                            </td>
-                            <td className="py-1.5 text-center text-muted-foreground text-xs">
+                            </th>
+                            <th className="w-4 pb-2 text-center font-normal text-muted-foreground text-xs">
                                 vs
-                            </td>
-                            <td className="py-1.5 text-center">
+                            </th>
+                            <th className="w-24 pb-2 text-center">
                                 <button
                                     type="button"
-                                    className={`w-full rounded-md px-2 py-1 font-medium text-xs transition-colors ${
+                                    className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
                                         form.winner === match.awayTeamId
                                             ? "bg-green-600 text-white"
                                             : "bg-muted hover:bg-muted/80"
@@ -791,13 +776,12 @@ function MatchScoreEntry({
                                     }
                                     title="Click to select as winner"
                                 >
-                                    {form.winner === match.awayTeamId
-                                        ? "✓ Winner"
-                                        : "Select"}
+                                    {match.awayTeamName}
                                 </button>
-                            </td>
+                            </th>
                         </tr>
-
+                    </thead>
+                    <tbody className="divide-y">
                         {/* Game score rows */}
                         <ScoreInputRow
                             label="Game 1"
