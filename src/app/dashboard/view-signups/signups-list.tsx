@@ -157,9 +157,7 @@ export function SignupsList({
 
             {undraftedGroups.length > 0 && (
                 <div className="flex items-center gap-3">
-                    <h2 className="font-semibold text-lg">
-                        Not Yet Drafted
-                    </h2>
+                    <h2 className="font-semibold text-lg">Not Yet Drafted</h2>
                     <span className="rounded-md bg-muted px-3 py-1 font-medium text-sm">
                         {undraftedGroups.reduce(
                             (sum, g) => sum + g.players.length,
@@ -193,7 +191,11 @@ export function SignupsList({
             {undraftedGroups.map((group) => (
                 <Card key={group.groupLabel}>
                     <CardHeader>
-                        <CardTitle>{group.groupLabel}</CardTitle>
+                        <CardTitle>
+                            {group.groupLabel === "New Players"
+                                ? "New Players"
+                                : `Last played in ${group.groupLabel}`}
+                        </CardTitle>
                         <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
                                 {group.players.length} total
@@ -313,9 +315,8 @@ export function SignupsList({
                             {draftedGroups.reduce(
                                 (sum, g) =>
                                     sum +
-                                    g.players.filter(
-                                        (p) => p.gender === "Male"
-                                    ).length,
+                                    g.players.filter((p) => p.gender === "Male")
+                                        .length,
                                 0
                             )}{" "}
                             male
@@ -324,9 +325,8 @@ export function SignupsList({
                             {draftedGroups.reduce(
                                 (sum, g) =>
                                     sum +
-                                    g.players.filter(
-                                        (p) => p.gender !== "Male"
-                                    ).length,
+                                    g.players.filter((p) => p.gender !== "Male")
+                                        .length,
                                 0
                             )}{" "}
                             non-male
@@ -336,7 +336,7 @@ export function SignupsList({
                     {draftedGroups.map((group) => (
                         <Card key={`drafted-${group.groupLabel}`}>
                             <CardHeader>
-                                <CardTitle>{group.groupLabel}</CardTitle>
+                                <CardTitle>{`Drafted in ${group.groupLabel}`}</CardTitle>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="rounded-md bg-muted px-3 py-1.5 font-medium text-sm">
                                         {group.players.length} total
@@ -429,8 +429,7 @@ export function SignupsList({
                                                         {player.gender}
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        {player.age ||
-                                                            "\u2014"}
+                                                        {player.age || "\u2014"}
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         {formatHeight(
