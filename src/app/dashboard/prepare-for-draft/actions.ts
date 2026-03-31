@@ -48,7 +48,11 @@ export interface TeamInfo {
     teamName: string
     teamNumber: number | null
     captain1: CaptainInfo
+    captain1Completed: boolean
     captain2: CaptainInfo | null
+    captain2Completed: boolean
+    coachesTotal: number
+    coachesCompleted: number
 }
 
 export interface PlayerRow {
@@ -99,6 +103,7 @@ export interface PrepareForDraftData {
     seasonLabel: string
     divisionId: number
     divisionName: string
+    usesCoaches: boolean
     captains: CaptainInfo[]
     teams: TeamInfo[]
     players: PlayerRow[]
@@ -260,7 +265,10 @@ export async function getPrepareForDraftData(
 
     // numTeams determines completion threshold: 5 male rounds + 3 non-male rounds = 8 slots per team
     const [indivDiv] = await db
-        .select({ numTeams: individual_divisions.teams })
+        .select({
+            numTeams: individual_divisions.teams,
+            coaches: individual_divisions.coaches
+        })
         .from(individual_divisions)
         .where(
             and(
@@ -270,6 +278,7 @@ export async function getPrepareForDraftData(
         )
         .limit(1)
 
+    const usesCoaches = indivDiv?.coaches ?? false
     const completionThreshold = (indivDiv?.numTeams ?? 0) * 8
 
     // Query A: Draft homework entries for this season + division
@@ -411,12 +420,23 @@ export async function getPrepareForDraftData(
             }
         }
 
+        const captain1Completed = captainsFullyCompleted.has(cap1.userId)
+        const captain2Completed =
+            cap2 !== null && captainsFullyCompleted.has(cap2.userId)
+        const coachesTotal = cap2 ? 2 : 1
+        const coachesCompleted =
+            (captain1Completed ? 1 : 0) + (captain2Completed ? 1 : 0)
+
         teamInfos.push({
             teamId: r.teamId,
             teamName: r.teamName,
             teamNumber: r.teamNumber,
             captain1: cap1,
-            captain2: cap2
+            captain1Completed,
+            captain2: cap2,
+            captain2Completed,
+            coachesTotal,
+            coachesCompleted
         })
     }
 
@@ -921,6 +941,7 @@ export async function getPrepareForDraftData(
             seasonLabel,
             divisionId,
             divisionName,
+            usesCoaches,
             captains,
             teams: teamInfos,
             players,

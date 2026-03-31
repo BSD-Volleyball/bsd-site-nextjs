@@ -475,22 +475,57 @@ export function PrepareForDraftTable({
                                         key={team.teamId}
                                         className="whitespace-nowrap px-3 py-2 text-center font-medium"
                                     >
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                handleCaptainNameClick(
-                                                    team.captain1.userId
-                                                )
-                                            }
-                                            className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
-                                            title={
-                                                team.captain2
-                                                    ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName} — view homework`
-                                                    : `${team.captain1.displayName} ${team.captain1.lastName} — view homework`
-                                            }
-                                        >
-                                            {team.captain1.displayName}
-                                        </button>
+                                        {data.usesCoaches ? (
+                                            <span className="inline-flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleCaptainNameClick(
+                                                            team.captain1.userId
+                                                        )
+                                                    }
+                                                    className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
+                                                    title={
+                                                        team.captain2
+                                                            ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName} — view homework`
+                                                            : `${team.captain1.displayName} ${team.captain1.lastName} — view homework`
+                                                    }
+                                                >
+                                                    {team.teamName}
+                                                </button>
+                                                <span
+                                                    className="cursor-default font-normal text-muted-foreground"
+                                                    title={[
+                                                        `${team.captain1.displayName} ${team.captain1.lastName}: ${team.captain1Completed ? "completed" : "not completed"}`,
+                                                        team.captain2
+                                                            ? `${team.captain2.displayName} ${team.captain2.lastName}: ${team.captain2Completed ? "completed" : "not completed"}`
+                                                            : null
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join("\n")}
+                                                >
+                                                    ({team.coachesCompleted}/
+                                                    {team.coachesTotal})
+                                                </span>
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleCaptainNameClick(
+                                                        team.captain1.userId
+                                                    )
+                                                }
+                                                className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary"
+                                                title={
+                                                    team.captain2
+                                                        ? `${team.captain1.displayName} ${team.captain1.lastName} & ${team.captain2.displayName} ${team.captain2.lastName} — view homework`
+                                                        : `${team.captain1.displayName} ${team.captain1.lastName} — view homework`
+                                                }
+                                            >
+                                                {team.captain1.displayName}
+                                            </button>
+                                        )}
                                     </th>
                                 ))}
                                 <th className="whitespace-nowrap px-3 py-2 text-center font-medium">
