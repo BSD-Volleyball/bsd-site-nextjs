@@ -725,15 +725,14 @@ function MatchScoreEntry({
         <div
             className={`rounded-md border p-3 ${hasWarnings ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : ""}`}
         >
-            {/* Match Header */}
-            <div className="mb-3 flex items-center gap-2 text-muted-foreground text-xs">
-                {match.court && <span>Court {match.court}</span>}
-                {isPlayoff && (
-                    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
+            {/* Playoff badge */}
+            {isPlayoff && (
+                <div className="mb-3">
+                    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 text-xs dark:bg-purple-900 dark:text-purple-300">
                         Playoff
                     </span>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Score table */}
             <div className="overflow-x-auto">
