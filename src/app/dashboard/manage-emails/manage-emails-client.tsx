@@ -162,7 +162,7 @@ function EmailCard({
                                     From:{" "}
                                 </span>
                                 <a
-                                    href={`mailto:${email.from_address}`}
+                                    href={`mailto:${email.from_address}?subject=${encodeURIComponent(`Re: ${email.subject}`)}`}
                                     className="underline hover:no-underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
@@ -192,7 +192,7 @@ function EmailCard({
                                     From
                                 </p>
                                 <a
-                                    href={`mailto:${email.from_address}`}
+                                    href={`mailto:${email.from_address}?subject=${encodeURIComponent(`Re: ${email.subject}`)}`}
                                     className="underline hover:no-underline"
                                 >
                                     {email.from_name

@@ -244,7 +244,7 @@ function ConcernCard({
                                     concern.contact_email) ? (
                                         <p className="text-muted-foreground">
                                             <a
-                                                href={`mailto:${concern.submitter_email ?? concern.contact_email}`}
+                                                href={`mailto:${concern.submitter_email ?? concern.contact_email}?subject=${encodeURIComponent(`Re: ${concern.source === "email" ? concern.person_involved : "Your concern"}`)}`}
                                                 className="underline hover:no-underline"
                                                 onClick={(e) =>
                                                     e.stopPropagation()
@@ -276,7 +276,7 @@ function ConcernCard({
                                 </p>
                                 {concern.contact_email ? (
                                     <a
-                                        href={`mailto:${concern.contact_email}`}
+                                        href={`mailto:${concern.contact_email}?subject=${encodeURIComponent(`Re: ${concern.source === "email" ? concern.person_involved : "Your concern"}`)}`}
                                         className="underline hover:no-underline"
                                     >
                                         {concern.contact_email}
