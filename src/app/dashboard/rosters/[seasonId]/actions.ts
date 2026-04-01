@@ -8,7 +8,8 @@ import {
     divisions,
     teams,
     drafts,
-    commissioners
+    commissioners,
+    individual_divisions
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
@@ -24,6 +25,7 @@ interface RosterTeam {
     id: number
     name: string
     number: number | null
+    coaches: string[]
     players: RosterPlayer[]
 }
 
@@ -89,6 +91,7 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
                 name: teams.name,
                 number: teams.number,
                 captain: teams.captain,
+                captain2: teams.captain2,
                 divisionId: teams.division
             })
             .from(teams)
@@ -104,6 +107,47 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
         }
 
         const divisionIds = [...new Set(teamRows.map((t) => t.divisionId))]
+
+        const indivDivRows = await db
+            .select({
+                divisionId: individual_divisions.division,
+                coaches: individual_divisions.coaches
+            })
+            .from(individual_divisions)
+            .where(
+                and(
+                    eq(individual_divisions.season, seasonId),
+                    inArray(individual_divisions.division, divisionIds)
+                )
+            )
+
+        const coachesDivisionIds = new Set(
+            indivDivRows.filter((r) => r.coaches).map((r) => r.divisionId)
+        )
+
+        const coachUserIds = [
+            ...new Set(
+                teamRows
+                    .filter((t) => coachesDivisionIds.has(t.divisionId))
+                    .flatMap((t) => [t.captain, t.captain2].filter(Boolean) as string[])
+            )
+        ]
+
+        const coachNameMap = new Map<string, string>()
+        if (coachUserIds.length > 0) {
+            const coachUserRows = await db
+                .select({
+                    id: users.id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name
+                })
+                .from(users)
+                .where(inArray(users.id, coachUserIds))
+            for (const u of coachUserRows) {
+                coachNameMap.set(u.id, `${u.preferredName || u.firstName} ${u.lastName}`)
+            }
+        }
 
         const divisionRows = await db
             .select({
@@ -184,10 +228,17 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
 
         const teamsByDivision = new Map<number, RosterTeam[]>()
         for (const t of teamRows) {
+            const coaches = coachesDivisionIds.has(t.divisionId)
+                ? [t.captain, t.captain2]
+                    .filter(Boolean)
+                    .map((id) => coachNameMap.get(id!) ?? "")
+                    .filter(Boolean)
+                : []
             const rosterTeam: RosterTeam = {
                 id: t.id,
                 name: t.name,
                 number: t.number,
+                coaches,
                 players: playersByTeam.get(t.id) || []
             }
             const arr = teamsByDivision.get(t.divisionId) || []

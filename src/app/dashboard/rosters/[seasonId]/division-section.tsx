@@ -19,6 +19,7 @@ interface RosterTeam {
     id: number
     name: string
     number: number | null
+    coaches: string[]
     players: RosterPlayer[]
 }
 
@@ -73,9 +74,18 @@ export function DivisionSection({
                                         key={team.id}
                                         className="rounded-lg border bg-background p-4 shadow-sm"
                                     >
-                                        <h3 className="mb-3 border-b pb-2 font-semibold text-lg">
+                                        <h3 className={cn(
+                                            "border-b pb-2 font-semibold text-lg",
+                                            team.coaches.length > 0 ? "mb-1" : "mb-3"
+                                        )}>
                                             {team.name}
                                         </h3>
+                                        {team.coaches.length > 0 && (
+                                            <p className="mb-3 text-muted-foreground text-sm">
+                                                Coach{team.coaches.length > 1 ? "es" : ""}:{" "}
+                                                {team.coaches.join(", ")}
+                                            </p>
+                                        )}
                                         {team.players.length === 0 ? (
                                             <p className="text-muted-foreground text-sm">
                                                 No players drafted yet.
