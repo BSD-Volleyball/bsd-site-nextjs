@@ -306,7 +306,9 @@ function ConcernCard({
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">
-                                    Person(s) Involved
+                                    {concern.source === "email"
+                                        ? "Subject"
+                                        : "Person(s) Involved"}
                                 </p>
                                 <p>{concern.person_involved}</p>
                             </div>
