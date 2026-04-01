@@ -554,7 +554,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
     const showTeamAvailability =
-        (hasCaptainPagesAccess && showDraftItems) || isCoach
+        (hasCaptainPagesAccess && inRange("prep_tryout_week_2", "playoffs")) ||
+        isCoach
     const visibleCaptainItems = [
         ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
         ...(captainBaseVisible ? captainPagesNavItems.slice(1, 4) : []),

@@ -798,9 +798,12 @@ export default async function DashboardPage() {
             }
 
             if (
-                ["prep_tryout_week_3", "draft"].includes(
-                    signupStatus.config.phase
-                )
+                [
+                    "prep_tryout_week_3",
+                    "draft",
+                    "regular_season",
+                    "playoffs"
+                ].includes(signupStatus.config.phase)
             ) {
                 const [captainTeamEntry] = await db
                     .select({ id: teams.id, divisionId: teams.division })
