@@ -553,12 +553,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         (phaseConfig.showTryoutTools ||
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
+    // View Signups and Player Lookup are only relevant through draft
+    const captainSignupsLookupVisible =
+        hasCaptainPagesAccess &&
+        !!phaseConfig &&
+        (phaseConfig.showTryoutTools || phaseConfig.showDraftTools)
     const showTeamAvailability =
         (hasCaptainPagesAccess && inRange("prep_tryout_week_2", "playoffs")) ||
         isCoach
     const visibleCaptainItems = [
         ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
-        ...(captainBaseVisible ? captainPagesNavItems.slice(1, 4) : []),
+        ...(captainSignupsLookupVisible
+            ? captainPagesNavItems.slice(1, 3)
+            : []),
+        ...(captainBaseVisible ? [captainPagesNavItems[3]] : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
             ? [captainPagesNavItems[4]]
             : []),
@@ -650,6 +658,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
             if (item.url === "/dashboard/team-availability")
                 return !showTeamAvailability
+            if (
+                item.url === "/dashboard/view-signups" ||
+                item.url === "/dashboard/player-lookup-signups"
+            )
+                return !captainSignupsLookupVisible
             if (item.url === "/dashboard/week-2-homework")
                 return !showWeek2Homework
             if (
