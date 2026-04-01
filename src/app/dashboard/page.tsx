@@ -23,7 +23,7 @@ import {
     playerUnavailability,
     seasonEvents
 } from "@/database/schema"
-import { eq, and, desc, count, inArray, isNotNull } from "drizzle-orm"
+import { eq, and, desc, count, inArray, isNotNull, or } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
@@ -648,6 +648,7 @@ export default async function DashboardPage() {
     let hasWeek3RosterData = false
     let isWeek2Captain = false
     let isSeasonCaptain = false
+    let isSeasonCoach = false
     let isDivisionDrafted = false
     let captainWelcomeData: CaptainWelcomeData | null = null
     let playerTeamAssignment: PlayerTeamAssignment | null = null
@@ -813,7 +814,41 @@ export default async function DashboardPage() {
                     .limit(1)
                 isSeasonCaptain = !!captainTeamEntry
 
-                if (isSeasonCaptain && captainTeamEntry) {
+                // Check for coaches (captain or captain2 in a coaches-mode division)
+                let teamCardEntry = captainTeamEntry
+                if (!isSeasonCaptain) {
+                    const [coachTeamEntry] = await db
+                        .select({ id: teams.id, divisionId: teams.division })
+                        .from(teams)
+                        .innerJoin(
+                            individual_divisions,
+                            and(
+                                eq(
+                                    individual_divisions.season,
+                                    signupStatus.config.seasonId
+                                ),
+                                eq(
+                                    individual_divisions.division,
+                                    teams.division
+                                ),
+                                eq(individual_divisions.coaches, true)
+                            )
+                        )
+                        .where(
+                            and(
+                                eq(teams.season, signupStatus.config.seasonId),
+                                or(
+                                    eq(teams.captain, session.user.id),
+                                    eq(teams.captain2, session.user.id)
+                                )
+                            )
+                        )
+                        .limit(1)
+                    isSeasonCoach = !!coachTeamEntry
+                    teamCardEntry = coachTeamEntry
+                }
+
+                if ((isSeasonCaptain || isSeasonCoach) && teamCardEntry) {
                     const [draftRecord] = await db
                         .select({ id: drafts.id })
                         .from(drafts)
@@ -821,14 +856,14 @@ export default async function DashboardPage() {
                         .where(
                             and(
                                 eq(teams.season, signupStatus.config.seasonId),
-                                eq(teams.division, captainTeamEntry.divisionId)
+                                eq(teams.division, teamCardEntry.divisionId)
                             )
                         )
                         .limit(1)
                     isDivisionDrafted = !!draftRecord
                 }
 
-                if (isSeasonCaptain && isDivisionDrafted) {
+                if ((isSeasonCaptain || isSeasonCoach) && isDivisionDrafted) {
                     captainWelcomeData = await getCaptainWelcomeData()
                 }
             }
@@ -1205,7 +1240,7 @@ export default async function DashboardPage() {
             "playoffs",
             "complete"
         ].includes(signupStatus.config.phase) &&
-        isSeasonCaptain &&
+        (isSeasonCaptain || isSeasonCoach) &&
         isDivisionDrafted &&
         captainWelcomeData
     )
@@ -1306,7 +1341,9 @@ export default async function DashboardPage() {
                                 >
                                     update your availability
                                 </Link>
-                                {nextMatch.isUnavailable ? "." : " so your captain knows."}
+                                {nextMatch.isUnavailable
+                                    ? "."
+                                    : " so your captain knows."}
                             </p>
                             <Link
                                 href="/dashboard/season-schedule"

@@ -133,7 +133,7 @@ export async function getTeamAvailabilityData(
     if (availableTeams.length === 0) {
         return {
             status: false,
-            message: "You are not a captain of any team this season.",
+            message: "You are not a captain or coach of any team this season.",
             isAdmin,
             allTeams: isAdmin ? allTeamRows.map(toOption) : undefined
         }
@@ -147,8 +147,7 @@ export async function getTeamAvailabilityData(
         // If the admin is also a captain, default to their own team
         const captainRow = allTeamRows.find(
             (t) =>
-                t.captain === session.user.id ||
-                t.captain2 === session.user.id
+                t.captain === session.user.id || t.captain2 === session.user.id
         )
         selectedTeam = captainRow
             ? (availableTeams.find((t) => t.id === captainRow.id) ??

@@ -11,6 +11,7 @@ import {
     teams,
     drafts,
     divisions,
+    individual_divisions,
     matches,
     emailTemplates,
     seasonEvents,
@@ -169,6 +170,7 @@ export interface SidebarData {
     isAdmin: boolean
     isCommissioner: boolean
     hasCaptainPagesAccess: boolean
+    isCoach: boolean
     hasPicturesAccess: boolean
     hasScoresAccess: boolean
     hasConcernsAccess: boolean
@@ -185,6 +187,7 @@ export async function getSidebarData(): Promise<SidebarData> {
             isAdmin: false,
             isCommissioner: false,
             hasCaptainPagesAccess: false,
+            isCoach: false,
             hasPicturesAccess: false,
             hasScoresAccess: false,
             hasConcernsAccess: false,
@@ -204,7 +207,8 @@ export async function getSidebarData(): Promise<SidebarData> {
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,
-        seasonNav
+        seasonNav,
+        isCoach
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
         isAdminOrDirectorBySession(),
@@ -219,7 +223,33 @@ export async function getSidebarData(): Promise<SidebarData> {
         seasonId
             ? hasPermissionBySession("concerns:view", { seasonId })
             : Promise.resolve(false),
-        getRecentSeasonsNav()
+        getRecentSeasonsNav(),
+        seasonId
+            ? (async () => {
+                  const [coachEntry] = await db
+                      .select({ id: teams.id })
+                      .from(teams)
+                      .innerJoin(
+                          individual_divisions,
+                          and(
+                              eq(individual_divisions.season, seasonId),
+                              eq(individual_divisions.division, teams.division),
+                              eq(individual_divisions.coaches, true)
+                          )
+                      )
+                      .where(
+                          and(
+                              eq(teams.season, seasonId),
+                              or(
+                                  eq(teams.captain, session.user.id),
+                                  eq(teams.captain2, session.user.id)
+                              )
+                          )
+                      )
+                      .limit(1)
+                  return !!coachEntry
+              })()
+            : Promise.resolve(false)
     ])
 
     return {
@@ -227,6 +257,7 @@ export async function getSidebarData(): Promise<SidebarData> {
         isAdmin,
         isCommissioner,
         hasCaptainPagesAccess,
+        isCoach,
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,
@@ -359,7 +390,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
     if (!config.seasonId) return null
 
     try {
-        const [teamRow] = await db
+        const [primaryTeamRow] = await db
             .select({
                 id: teams.id,
                 name: teams.name,
@@ -373,6 +404,35 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 )
             )
             .limit(1)
+
+        // If not the primary captain, check if this user is a co-coach (captain2)
+        // in a coaches-mode division
+        let teamRow = primaryTeamRow
+        if (!teamRow) {
+            const [coachTeamRow] = await db
+                .select({
+                    id: teams.id,
+                    name: teams.name,
+                    divisionId: teams.division
+                })
+                .from(teams)
+                .innerJoin(
+                    individual_divisions,
+                    and(
+                        eq(individual_divisions.season, config.seasonId),
+                        eq(individual_divisions.division, teams.division),
+                        eq(individual_divisions.coaches, true)
+                    )
+                )
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        eq(teams.captain2, session.user.id)
+                    )
+                )
+                .limit(1)
+            teamRow = coachTeamRow
+        }
 
         if (!teamRow) return null
 

@@ -496,6 +496,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isAdmin, setIsAdmin] = useState(false)
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
+    const [isCoach, setIsCoach] = useState(false)
     const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
     const [hasScoresAccess, setHasScoresAccess] = useState(false)
     const [hasConcernsAccess, setHasConcernsAccess] = useState(false)
@@ -508,6 +509,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setIsAdmin(data.isAdmin)
             setIsCommissioner(data.isCommissioner)
             setHasCaptainPagesAccess(data.hasCaptainPagesAccess)
+            setIsCoach(data.isCoach)
             setHasPicturesAccess(data.hasPicturesAccess)
             setHasScoresAccess(data.hasScoresAccess)
             setHasConcernsAccess(data.hasConcernsAccess)
@@ -551,10 +553,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         (phaseConfig.showTryoutTools ||
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
+    const showTeamAvailability =
+        (hasCaptainPagesAccess && showDraftItems) || isCoach
     const visibleCaptainItems = [
-        ...(hasCaptainPagesAccess && showDraftItems
-            ? [captainPagesNavItems[0]]
-            : []),
+        ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
         ...(captainBaseVisible ? captainPagesNavItems.slice(1, 4) : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
             ? [captainPagesNavItems[4]]
@@ -646,7 +648,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         // Captain page items currently suppressed
         const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
             if (item.url === "/dashboard/team-availability")
-                return !showDraftItems
+                return !showTeamAvailability
             if (item.url === "/dashboard/week-2-homework")
                 return !showWeek2Homework
             if (
