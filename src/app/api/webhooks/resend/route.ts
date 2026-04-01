@@ -58,7 +58,7 @@ async function notifyOmbudsmen(appUrl: string) {
     }
 }
 
-async function notifyAdmins(appUrl: string, subject: string) {
+async function notifyAdmins(appUrl: string, subject: string, from: string) {
     const adminRows = await db
         .select({ email: users.email })
         .from(userRoles)
@@ -73,7 +73,7 @@ async function notifyAdmins(appUrl: string, subject: string) {
                 from: site.mailFrom,
                 to,
                 subject: "New Inbound Email Received",
-                html: `<p>A new email has been received.</p><p><strong>Subject:</strong> ${subject}</p><p><a href="${appUrl}/dashboard/manage-emails">View emails</a></p>`
+                html: `<p>A new email has been received.</p><p><strong>From:</strong> ${from}</p><p><strong>Subject:</strong> ${subject}</p><p><a href="${appUrl}/dashboard/manage-emails">View emails</a></p>`
             }))
         )
     }
@@ -132,7 +132,7 @@ async function handleAdminEmail(
     })
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
-    await notifyAdmins(appUrl, subject || "(No subject)")
+    await notifyAdmins(appUrl, subject || "(No subject)", from)
 }
 
 export async function POST(request: NextRequest) {
