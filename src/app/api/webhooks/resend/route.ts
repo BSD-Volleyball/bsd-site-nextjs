@@ -15,9 +15,22 @@ function parseFromAddress(from: string): {
     // "Display Name <email@example.com>" or just "email@example.com"
     const match = from.match(/^(.+?)\s*<(.+?)>$/)
     if (match) {
-        return { name: match[1].trim(), email: match[2].trim() }
+        return {
+            name: match[1].trim().replace(/^"|"$/g, ""),
+            email: match[2].trim()
+        }
     }
     return { name: null, email: from.trim() }
+}
+
+function fromHeaderValue(
+    headers: Record<string, string> | null | undefined,
+    fallback: string
+): string {
+    if (!headers) return fallback
+    // Header keys can be any casing — find the From header case-insensitively
+    const key = Object.keys(headers).find((k) => k.toLowerCase() === "from")
+    return key && headers[key] ? headers[key] : fallback
 }
 
 async function notifyOmbudsmen(appUrl: string) {
@@ -173,10 +186,13 @@ export async function POST(request: NextRequest) {
         const bodyText = fullEmail?.text ?? null
         const bodyHtml = fullEmail?.html ?? null
         const subject = data.subject ?? ""
-        // Prefer the from field from the full email response — it includes the
-        // display name (e.g. "Jane Smith <jane@example.com>"), whereas the
-        // webhook event data only carries the bare email address.
-        const from = fullEmail?.from ?? data.from ?? ""
+        // The top-level `from` field often carries only the bare address.
+        // The original RFC 5322 From header preserves the full display name,
+        // so prefer it and fall back through the API field then the webhook event.
+        const from = fromHeaderValue(
+            fullEmail?.headers,
+            fullEmail?.from ?? data.from ?? ""
+        )
         const toAddresses = data.to ?? []
 
         // Route based on to-address
