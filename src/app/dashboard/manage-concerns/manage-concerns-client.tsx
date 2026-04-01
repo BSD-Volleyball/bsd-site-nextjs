@@ -269,13 +269,24 @@ function ConcernCard({
                                 <p className="font-medium text-muted-foreground">
                                     Contact Phone
                                 </p>
-                                <p>{concern.contact_phone || "Not provided"}</p>
+                                <p>
+                                    {concern.source === "email"
+                                        ? "—"
+                                        : concern.contact_phone ||
+                                          "Not provided"}
+                                </p>
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">
                                     Wants Follow-up
                                 </p>
-                                <p>{concern.want_followup ? "Yes" : "No"}</p>
+                                <p>
+                                    {concern.source === "email"
+                                        ? "—"
+                                        : concern.want_followup
+                                          ? "Yes"
+                                          : "No"}
+                                </p>
                             </div>
                         </div>
 

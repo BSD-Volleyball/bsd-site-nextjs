@@ -50,9 +50,7 @@ async function notifyAdmins(appUrl: string, subject: string) {
         .innerJoin(users, eq(userRoles.user_id, users.id))
         .where(eq(userRoles.role, "admin"))
 
-    const emails = [
-        ...new Set(adminRows.map((r) => r.email).filter(Boolean))
-    ]
+    const emails = [...new Set(adminRows.map((r) => r.email).filter(Boolean))]
 
     if (emails.length > 0) {
         await resend.batch.send(
@@ -82,18 +80,18 @@ async function handleConcernEmail(
         anonymous: false,
         contact_name: parsed.name,
         contact_email: parsed.email,
+        contact_phone: null,
         want_followup: false,
         incident_date: new Date().toISOString().split("T")[0],
         location: "Submitted via email",
-        person_involved: "See description",
-        description: `[Email Subject: ${subject}]\n\n${description}`,
+        person_involved: subject || "(No subject)",
+        description,
         status: "new",
         source: "email",
         source_email_id: emailId
     })
 
-    const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
     await notifyOmbudsmen(appUrl)
 }
 
@@ -118,8 +116,7 @@ async function handleAdminEmail(
         status: "new"
     })
 
-    const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
     await notifyAdmins(appUrl, subject || "(No subject)")
 }
 
@@ -153,8 +150,25 @@ export async function POST(request: NextRequest) {
         const { data } = event
         const emailId = data.email_id
 
-        // Fetch full email content
-        const { data: fullEmail } = await resend.emails.receiving.get(emailId)
+        // Fetch full email content — log both data and error for diagnostics
+        const emailResponse = await resend.emails.receiving.get(emailId)
+        if (emailResponse.error) {
+            console.error(
+                "[resend-webhook] receiving.get error:",
+                JSON.stringify(emailResponse.error)
+            )
+        }
+        const fullEmail = emailResponse.data
+        console.log(
+            "[resend-webhook] receiving.get result:",
+            JSON.stringify({
+                emailId,
+                hasData: !!fullEmail,
+                textLen: fullEmail?.text?.length ?? null,
+                htmlLen: fullEmail?.html?.length ?? null,
+                error: emailResponse.error ?? null
+            })
+        )
 
         const bodyText = fullEmail?.text ?? null
         const bodyHtml = fullEmail?.html ?? null
@@ -172,13 +186,7 @@ export async function POST(request: NextRequest) {
             )
 
         if (isConcern) {
-            await handleConcernEmail(
-                emailId,
-                from,
-                subject,
-                bodyText,
-                bodyHtml
-            )
+            await handleConcernEmail(emailId, from, subject, bodyText, bodyHtml)
         } else {
             await handleAdminEmail(
                 emailId,
