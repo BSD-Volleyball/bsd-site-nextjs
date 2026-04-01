@@ -191,7 +191,10 @@ function ConcernCard({
                             </p>
                             <p className="truncate text-muted-foreground text-sm">
                                 <span className="font-medium text-foreground">
-                                    Person involved:{" "}
+                                    {concern.source === "email"
+                                        ? "Subject"
+                                        : "Person involved"}
+                                    :{" "}
                                 </span>
                                 {concern.person_involved}
                             </p>
