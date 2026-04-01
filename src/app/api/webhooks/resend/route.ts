@@ -173,7 +173,10 @@ export async function POST(request: NextRequest) {
         const bodyText = fullEmail?.text ?? null
         const bodyHtml = fullEmail?.html ?? null
         const subject = data.subject ?? ""
-        const from = data.from ?? ""
+        // Prefer the from field from the full email response — it includes the
+        // display name (e.g. "Jane Smith <jane@example.com>"), whereas the
+        // webhook event data only carries the bare email address.
+        const from = fullEmail?.from ?? data.from ?? ""
         const toAddresses = data.to ?? []
 
         // Route based on to-address
