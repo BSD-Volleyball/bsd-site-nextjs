@@ -23,13 +23,15 @@ function parseFromAddress(from: string): {
     return { name: null, email: from.trim() }
 }
 
-function fromHeaderValue(
+function headerValue(
     headers: Record<string, string> | null | undefined,
+    name: string,
     fallback: string
 ): string {
     if (!headers) return fallback
-    // Header keys can be any casing — find the From header case-insensitively
-    const key = Object.keys(headers).find((k) => k.toLowerCase() === "from")
+    const key = Object.keys(headers).find(
+        (k) => k.toLowerCase() === name.toLowerCase()
+    )
     return key && headers[key] ? headers[key] : fallback
 }
 
@@ -189,20 +191,30 @@ export async function POST(request: NextRequest) {
         // The top-level `from` field often carries only the bare address.
         // The original RFC 5322 From header preserves the full display name,
         // so prefer it and fall back through the API field then the webhook event.
-        const from = fromHeaderValue(
+        const from = headerValue(
             fullEmail?.headers,
+            "from",
             fullEmail?.from ?? data.from ?? ""
+        )
+        // The webhook `to` array reflects the forwarded delivery path, not the
+        // original recipient. Pull the To header from the raw headers instead.
+        const originalTo = headerValue(
+            fullEmail?.headers,
+            "to",
+            data.to?.[0] ?? ""
         )
         const toAddresses = data.to ?? []
 
-        // Route based on to-address
+        // Route based on to-address — check both the original header and the
+        // forwarded delivery addresses to catch the concern address either way.
         const concernAddress = process.env.INBOUND_CONCERN_ADDRESS ?? ""
         const isConcern =
             concernAddress &&
-            toAddresses.some(
-                (addr: string) =>
-                    addr.toLowerCase() === concernAddress.toLowerCase()
-            )
+            (originalTo.toLowerCase().includes(concernAddress.toLowerCase()) ||
+                toAddresses.some(
+                    (addr: string) =>
+                        addr.toLowerCase() === concernAddress.toLowerCase()
+                ))
 
         if (isConcern) {
             await handleConcernEmail(emailId, from, subject, bodyText, bodyHtml)
@@ -210,7 +222,7 @@ export async function POST(request: NextRequest) {
             await handleAdminEmail(
                 emailId,
                 from,
-                toAddresses[0] ?? "",
+                originalTo || toAddresses[0] || "",
                 subject,
                 bodyText,
                 bodyHtml

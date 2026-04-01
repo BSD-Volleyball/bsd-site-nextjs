@@ -243,8 +243,16 @@ function ConcernCard({
                                     {(concern.submitter_email ??
                                     concern.contact_email) ? (
                                         <p className="text-muted-foreground">
-                                            {concern.submitter_email ??
-                                                concern.contact_email}
+                                            <a
+                                                href={`mailto:${concern.submitter_email ?? concern.contact_email}`}
+                                                className="underline hover:no-underline"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                            >
+                                                {concern.submitter_email ??
+                                                    concern.contact_email}
+                                            </a>
                                         </p>
                                     ) : null}
                                     {concern.contact_phone && (
@@ -266,7 +274,16 @@ function ConcernCard({
                                 <p className="font-medium text-muted-foreground">
                                     Contact Email
                                 </p>
-                                <p>{concern.contact_email || "Not provided"}</p>
+                                {concern.contact_email ? (
+                                    <a
+                                        href={`mailto:${concern.contact_email}`}
+                                        className="underline hover:no-underline"
+                                    >
+                                        {concern.contact_email}
+                                    </a>
+                                ) : (
+                                    <p>Not provided</p>
+                                )}
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">

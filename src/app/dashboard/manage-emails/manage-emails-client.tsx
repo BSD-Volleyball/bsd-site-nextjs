@@ -117,10 +117,7 @@ function EmailCard({
         if (!newComment.trim()) return
         setCommentMsg(null)
         startTransition(async () => {
-            const result = await addInboundEmailComment(
-                email.id,
-                newComment
-            )
+            const result = await addInboundEmailComment(email.id, newComment)
             if (result.status) {
                 setNewComment("")
                 const updated = await getInboundEmailComments(email.id)
@@ -153,10 +150,7 @@ function EmailCard({
                                     #{email.id}
                                 </span>
                                 <StatusBadge status={email.status} />
-                                <Badge
-                                    variant="outline"
-                                    className="text-xs"
-                                >
+                                <Badge variant="outline" className="text-xs">
                                     Email
                                 </Badge>
                             </div>
@@ -167,9 +161,15 @@ function EmailCard({
                                 <span className="font-medium text-foreground">
                                     From:{" "}
                                 </span>
-                                {email.from_name
-                                    ? `${email.from_name} <${email.from_address}>`
-                                    : email.from_address}
+                                <a
+                                    href={`mailto:${email.from_address}`}
+                                    className="underline hover:no-underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    {email.from_name
+                                        ? `${email.from_name} <${email.from_address}>`
+                                        : email.from_address}
+                                </a>
                             </p>
                         </div>
                         <div className="shrink-0 text-right text-muted-foreground text-xs">
@@ -191,11 +191,14 @@ function EmailCard({
                                 <p className="font-medium text-muted-foreground">
                                     From
                                 </p>
-                                <p>
+                                <a
+                                    href={`mailto:${email.from_address}`}
+                                    className="underline hover:no-underline"
+                                >
                                     {email.from_name
                                         ? `${email.from_name} <${email.from_address}>`
                                         : email.from_address}
-                                </p>
+                                </a>
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">
@@ -237,9 +240,7 @@ function EmailCard({
                                     Assign To
                                 </p>
                                 <Select
-                                    value={
-                                        email.assigned_to ?? "unassigned"
-                                    }
+                                    value={email.assigned_to ?? "unassigned"}
                                     onValueChange={handleAssignChange}
                                     disabled={isPending}
                                 >
@@ -251,10 +252,7 @@ function EmailCard({
                                             Unassigned
                                         </SelectItem>
                                         {assignableAdmins.map((u) => (
-                                            <SelectItem
-                                                key={u.id}
-                                                value={u.id}
-                                            >
+                                            <SelectItem key={u.id} value={u.id}>
                                                 {u.name}
                                             </SelectItem>
                                         ))}
@@ -341,9 +339,7 @@ function EmailCard({
                                 <Button
                                     size="sm"
                                     onClick={handleAddComment}
-                                    disabled={
-                                        isPending || !newComment.trim()
-                                    }
+                                    disabled={isPending || !newComment.trim()}
                                 >
                                     {isPending ? "Saving..." : "Add Comment"}
                                 </Button>
