@@ -111,6 +111,9 @@ export function SeasonDivisionSection({
                                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                                                     Match
                                                 </th>
+                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                                    Ref
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -120,7 +123,11 @@ export function SeasonDivisionSection({
                                                     className="border-b align-top last:border-0"
                                                 >
                                                     <td className="whitespace-nowrap px-3 py-2">
-                                                        {week.date ? formatShortDate(week.date) : "—"}
+                                                        {week.date
+                                                            ? formatShortDate(
+                                                                  week.date
+                                                              )
+                                                            : "—"}
                                                     </td>
                                                     <td className="px-3 py-2">
                                                         <div className="space-y-1">
@@ -139,7 +146,9 @@ export function SeasonDivisionSection({
                                                                                 "font-semibold text-primary"
                                                                         )}
                                                                     >
-                                                                        {formatMatchTime(m.time) ||
+                                                                        {formatMatchTime(
+                                                                            m.time
+                                                                        ) ||
                                                                             "—"}
                                                                     </div>
                                                                 )
@@ -188,6 +197,21 @@ export function SeasonDivisionSection({
                                                                         {
                                                                             m.matchLabel
                                                                         }
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <div className="space-y-1">
+                                                            {week.matches.map(
+                                                                (m) => (
+                                                                    <div
+                                                                        key={`ref-${m.id}`}
+                                                                        className="whitespace-nowrap text-muted-foreground"
+                                                                    >
+                                                                        {m.refName ??
+                                                                            "—"}
                                                                     </div>
                                                                 )
                                                             )}

@@ -1,7 +1,16 @@
 "use server"
 
 import { db } from "@/database/db"
-import { divisions, matches, seasons, teams, drafts, seasonEvents } from "@/database/schema"
+import {
+    divisions,
+    matches,
+    matchReferees,
+    seasons,
+    teams,
+    drafts,
+    seasonEvents,
+    users
+} from "@/database/schema"
 import { and, asc, eq, inArray } from "drizzle-orm"
 
 interface StandingTeam {
@@ -26,6 +35,7 @@ export interface WeekMatchLine {
     loserName: string
     loserGames: number
     scoresDisplay: string
+    refName: string | null
 }
 
 interface WeekRow {
@@ -225,60 +235,71 @@ export async function getCurrentSeasonScheduleData(
                 .map((t) => t.divisionId)
         )
 
-        const [divisionRows, matchRows, rsEventRows] = await Promise.all([
-            db
-                .select({
-                    id: divisions.id,
-                    name: divisions.name,
-                    level: divisions.level
-                })
-                .from(divisions)
-                .where(inArray(divisions.id, divisionIds))
-                .orderBy(divisions.level),
-            db
-                .select({
-                    id: matches.id,
-                    divisionId: matches.division,
-                    week: matches.week,
-                    date: matches.date,
-                    time: matches.time,
-                    court: matches.court,
-                    homeTeamId: matches.home_team,
-                    awayTeamId: matches.away_team,
-                    homeScore: matches.home_score,
-                    awayScore: matches.away_score,
-                    home_set1_score: matches.home_set1_score,
-                    away_set1_score: matches.away_set1_score,
-                    home_set2_score: matches.home_set2_score,
-                    away_set2_score: matches.away_set2_score,
-                    home_set3_score: matches.home_set3_score,
-                    away_set3_score: matches.away_set3_score
-                })
-                .from(matches)
-                .where(
-                    and(
-                        eq(matches.season, seasonId),
-                        inArray(matches.division, divisionIds),
-                        eq(matches.playoff, false),
-                        inArray(matches.home_team, teamIds),
-                        inArray(matches.away_team, teamIds)
+        const [divisionRows, matchRows, rsEventRows, refRows] =
+            await Promise.all([
+                db
+                    .select({
+                        id: divisions.id,
+                        name: divisions.name,
+                        level: divisions.level
+                    })
+                    .from(divisions)
+                    .where(inArray(divisions.id, divisionIds))
+                    .orderBy(divisions.level),
+                db
+                    .select({
+                        id: matches.id,
+                        divisionId: matches.division,
+                        week: matches.week,
+                        date: matches.date,
+                        time: matches.time,
+                        court: matches.court,
+                        homeTeamId: matches.home_team,
+                        awayTeamId: matches.away_team,
+                        homeScore: matches.home_score,
+                        awayScore: matches.away_score,
+                        home_set1_score: matches.home_set1_score,
+                        away_set1_score: matches.away_set1_score,
+                        home_set2_score: matches.home_set2_score,
+                        away_set2_score: matches.away_set2_score,
+                        home_set3_score: matches.home_set3_score,
+                        away_set3_score: matches.away_set3_score
+                    })
+                    .from(matches)
+                    .where(
+                        and(
+                            eq(matches.season, seasonId),
+                            inArray(matches.division, divisionIds),
+                            eq(matches.playoff, false),
+                            inArray(matches.home_team, teamIds),
+                            inArray(matches.away_team, teamIds)
+                        )
+                    ),
+                db
+                    .select({ eventDate: seasonEvents.event_date })
+                    .from(seasonEvents)
+                    .where(
+                        and(
+                            eq(seasonEvents.season_id, seasonId),
+                            eq(seasonEvents.event_type, "regular_season")
+                        )
                     )
-                ),
-            db
-                .select({ eventDate: seasonEvents.event_date })
-                .from(seasonEvents)
-                .where(
-                    and(
-                        eq(seasonEvents.season_id, seasonId),
-                        eq(seasonEvents.event_type, "regular_season")
-                    )
-                )
-                .orderBy(asc(seasonEvents.event_date))
-        ])
+                    .orderBy(asc(seasonEvents.event_date)),
+                db
+                    .select({
+                        matchId: matchReferees.match_id,
+                        refName: users.name
+                    })
+                    .from(matchReferees)
+                    .innerJoin(users, eq(matchReferees.referee_id, users.id))
+                    .where(eq(matchReferees.season_id, seasonId))
+            ])
 
         // Build week number → date fallback from season_events (week 1 = first event, etc.)
         const weekToDate = new Map<number, string>()
         rsEventRows.forEach((e, idx) => weekToDate.set(idx + 1, e.eventDate))
+
+        const refByMatchId = new Map(refRows.map((r) => [r.matchId, r.refName]))
 
         const teamById = new Map(teamRows.map((t) => [t.id, t]))
         const teamsByDivision = new Map<number, typeof teamRows>()
@@ -446,7 +467,8 @@ export async function getCurrentSeasonScheduleData(
                         winnerGames,
                         loserName,
                         loserGames,
-                        scoresDisplay
+                        scoresDisplay,
+                        refName: refByMatchId.get(match.id) ?? null
                     })
                     weeksMap.set(week, existing)
                 }
