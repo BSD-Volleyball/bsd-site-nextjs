@@ -103,13 +103,13 @@ export function SeasonDivisionSection({
                                                     Date
                                                 </th>
                                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                                    Match
+                                                </th>
+                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                                                     Time
                                                 </th>
                                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                                                     Court
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Match
                                                 </th>
                                                 <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                                                     Ref
@@ -128,6 +128,30 @@ export function SeasonDivisionSection({
                                                                   week.date
                                                               )
                                                             : "—"}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <div className="space-y-1">
+                                                            {week.matches.map(
+                                                                (m) => (
+                                                                    <div
+                                                                        key={`match-${m.id}`}
+                                                                        className={cn(
+                                                                            userTeamId !==
+                                                                                null &&
+                                                                                (m.homeTeamId ===
+                                                                                    userTeamId ||
+                                                                                    m.awayTeamId ===
+                                                                                        userTeamId) &&
+                                                                                "font-semibold text-primary"
+                                                                        )}
+                                                                    >
+                                                                        {
+                                                                            m.matchLabel
+                                                                        }
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-3 py-2">
                                                         <div className="space-y-1">
@@ -173,30 +197,6 @@ export function SeasonDivisionSection({
                                                                     >
                                                                         {m.court ??
                                                                             "—"}
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`match-${m.id}`}
-                                                                        className={cn(
-                                                                            userTeamId !==
-                                                                                null &&
-                                                                                (m.homeTeamId ===
-                                                                                    userTeamId ||
-                                                                                    m.awayTeamId ===
-                                                                                        userTeamId) &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            m.matchLabel
-                                                                        }
                                                                     </div>
                                                                 )
                                                             )}
