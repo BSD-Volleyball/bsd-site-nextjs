@@ -9,7 +9,7 @@ import {
     seasons,
     seasonRefs
 } from "@/database/schema"
-import { eq, and, lt, asc, desc } from "drizzle-orm"
+import { eq, and, lt, desc } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     withAction,

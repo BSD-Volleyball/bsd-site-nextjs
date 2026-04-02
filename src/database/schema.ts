@@ -116,7 +116,9 @@ export const seasons = pgTable("seasons", {
         .notNull(),
     season_amount: numeric("season_amount"),
     late_amount: numeric("late_amount"),
-    max_players: integer("max_players")
+    max_players: integer("max_players"),
+    certified_ref_rate: numeric("certified_ref_rate"),
+    uncertified_ref_rate: numeric("uncertified_ref_rate")
 })
 
 export const eventTypeEnum = pgEnum("event_type", [
@@ -837,5 +839,87 @@ export const userRoles = pgTable(
     (table) => ({
         userRolesUserIdx: index("user_roles_user_idx").on(table.user_id),
         userRolesSeasonIdx: index("user_roles_season_idx").on(table.season_id)
+    })
+)
+
+export const seasonRefs = pgTable(
+    "season_refs",
+    {
+        id: serial("id").primaryKey(),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        is_certified: boolean("is_certified")
+            .$defaultFn(() => false)
+            .notNull(),
+        max_division_level: integer("max_division_level").notNull(),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        seasonRefsSeasonIdx: index("season_refs_season_idx").on(
+            table.season_id
+        ),
+        seasonRefsUserIdx: index("season_refs_user_idx").on(table.user_id),
+        seasonRefsUnique: uniqueIndex("season_refs_unique").on(
+            table.season_id,
+            table.user_id
+        )
+    })
+)
+
+export const matchReferees = pgTable(
+    "match_referees",
+    {
+        id: serial("id").primaryKey(),
+        match_id: integer("match_id")
+            .notNull()
+            .references(() => matches.id, { onDelete: "cascade" }),
+        referee_id: text("referee_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        matchRefereesMatchIdx: uniqueIndex("match_referees_match_idx").on(
+            table.match_id
+        ),
+        matchRefereesRefereeIdx: index("match_referees_referee_idx").on(
+            table.referee_id
+        ),
+        matchRefereesSeasonIdx: index("match_referees_season_idx").on(
+            table.season_id
+        )
+    })
+)
+
+export const refUnavailability = pgTable(
+    "ref_unavailability",
+    {
+        id: serial("id").primaryKey(),
+        season_ref_id: integer("season_ref_id")
+            .notNull()
+            .references(() => seasonRefs.id, { onDelete: "cascade" }),
+        event_id: integer("event_id")
+            .notNull()
+            .references(() => seasonEvents.id, { onDelete: "cascade" }),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        refUnavailabilityUnique: uniqueIndex("ref_unavailability_unique").on(
+            table.season_ref_id,
+            table.event_id
+        )
     })
 )

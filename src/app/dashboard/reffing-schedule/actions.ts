@@ -1,12 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
-import {
-    matchReferees,
-    matches,
-    teams,
-    divisions
-} from "@/database/schema"
+import { matchReferees, matches, teams, divisions } from "@/database/schema"
 import { eq, and, gte, asc } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {

@@ -91,9 +91,7 @@ export default async function ReffingSchedulePage() {
                                     <TableCell className="whitespace-nowrap">
                                         {m.time ? formatTime(m.time) : "—"}
                                     </TableCell>
-                                    <TableCell>
-                                        {m.court ?? "—"}
-                                    </TableCell>
+                                    <TableCell>{m.court ?? "—"}</TableCell>
                                     <TableCell>{m.divisionName}</TableCell>
                                     <TableCell>
                                         {m.homeTeamName} vs {m.awayTeamName}

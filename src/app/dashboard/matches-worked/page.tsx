@@ -71,7 +71,7 @@ export default async function MatchesWorkedPage() {
             <div className="grid gap-4 sm:grid-cols-3">
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-muted-foreground text-sm font-medium">
+                        <CardTitle className="font-medium text-muted-foreground text-sm">
                             Matches Worked
                         </CardTitle>
                     </CardHeader>
@@ -81,7 +81,7 @@ export default async function MatchesWorkedPage() {
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-muted-foreground text-sm font-medium">
+                        <CardTitle className="font-medium text-muted-foreground text-sm">
                             Rate per Match
                             {isCertified ? " (Certified)" : " (Uncertified)"}
                         </CardTitle>
@@ -92,7 +92,7 @@ export default async function MatchesWorkedPage() {
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-muted-foreground text-sm font-medium">
+                        <CardTitle className="font-medium text-muted-foreground text-sm">
                             Total Compensation
                         </CardTitle>
                     </CardHeader>
@@ -131,9 +131,7 @@ export default async function MatchesWorkedPage() {
                                     <TableCell className="whitespace-nowrap">
                                         {m.time ? formatTime(m.time) : "—"}
                                     </TableCell>
-                                    <TableCell>
-                                        {m.court ?? "—"}
-                                    </TableCell>
+                                    <TableCell>{m.court ?? "—"}</TableCell>
                                     <TableCell>{m.divisionName}</TableCell>
                                     <TableCell>
                                         {m.homeTeamName} vs {m.awayTeamName}

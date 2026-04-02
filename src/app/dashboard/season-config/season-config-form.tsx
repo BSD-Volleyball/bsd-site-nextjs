@@ -115,6 +115,12 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
     const [maxPlayers, setMaxPlayers] = useState(
         initialData.max_players?.toString() || ""
     )
+    const [certifiedRefRate, setCertifiedRefRate] = useState(
+        initialData.certified_ref_rate || ""
+    )
+    const [uncertifiedRefRate, setUncertifiedRefRate] = useState(
+        initialData.uncertified_ref_rate || ""
+    )
 
     const [events, setEvents] = useState<EventState[]>(() =>
         buildInitialEvents(initialData)
@@ -262,7 +268,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             {
                 season_amount: seasonAmount,
                 late_amount: lateAmount,
-                max_players: maxPlayers ? Number.parseInt(maxPlayers, 10) : null
+                max_players: maxPlayers
+                    ? Number.parseInt(maxPlayers, 10)
+                    : null,
+                certified_ref_rate: certifiedRefRate,
+                uncertified_ref_rate: uncertifiedRefRate
             },
             eventData
         )
@@ -336,10 +346,44 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                             />
                         </div>
                     </div>
+                    <Separator />
+                    <p className="text-muted-foreground text-sm">
+                        Referee Rates
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="certified-ref-rate">
+                                Certified Ref Rate ($)
+                            </Label>
+                            <Input
+                                id="certified-ref-rate"
+                                type="text"
+                                inputMode="decimal"
+                                value={certifiedRefRate}
+                                onChange={(e) =>
+                                    setCertifiedRefRate(e.target.value)
+                                }
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="uncertified-ref-rate">
+                                Uncertified Ref Rate ($)
+                            </Label>
+                            <Input
+                                id="uncertified-ref-rate"
+                                type="text"
+                                inputMode="decimal"
+                                value={uncertifiedRefRate}
+                                onChange={(e) =>
+                                    setUncertifiedRefRate(e.target.value)
+                                }
+                                placeholder="0.00"
+                            />
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
-
-            {/* Event Sections */}
             {EVENT_TYPE_ORDER.map((type) => {
                 const config = EVENT_TYPE_CONFIG[type]
                 const typeEvents = getEventsByType(type)

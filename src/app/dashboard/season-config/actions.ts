@@ -33,6 +33,8 @@ export interface SeasonMetadata {
     season_amount: string
     late_amount: string
     max_players: number | null
+    certified_ref_rate: string
+    uncertified_ref_rate: string
 }
 
 export interface SeasonConfigData {
@@ -44,6 +46,8 @@ export interface SeasonConfigData {
     season_amount: string | null
     late_amount: string | null
     max_players: number | null
+    certified_ref_rate: string | null
+    uncertified_ref_rate: string | null
     events: {
         id: number
         event_type: EventType
@@ -136,6 +140,8 @@ export async function getSeasonConfigData(): Promise<{
                 season_amount: season.season_amount,
                 late_amount: season.late_amount,
                 max_players: season.max_players,
+                certified_ref_rate: season.certified_ref_rate,
+                uncertified_ref_rate: season.uncertified_ref_rate,
                 events
             }
         }
@@ -167,7 +173,11 @@ export async function saveSeasonConfig(
                 .set({
                     season_amount: metadata.season_amount || null,
                     late_amount: metadata.late_amount || null,
-                    max_players: metadata.max_players
+                    max_players: metadata.max_players,
+                    certified_ref_rate:
+                        metadata.certified_ref_rate || null,
+                    uncertified_ref_rate:
+                        metadata.uncertified_ref_rate || null
                 })
                 .where(eq(seasons.id, seasonId))
 

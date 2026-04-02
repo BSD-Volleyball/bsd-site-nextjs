@@ -174,6 +174,8 @@ export interface SidebarData {
     hasPicturesAccess: boolean
     hasScoresAccess: boolean
     hasConcernsAccess: boolean
+    isReferee: boolean
+    isRefCoordinator: boolean
     seasonNav: SeasonNavItem[]
     phase: SeasonPhase | null
 }
@@ -191,6 +193,8 @@ export async function getSidebarData(): Promise<SidebarData> {
             hasPicturesAccess: false,
             hasScoresAccess: false,
             hasConcernsAccess: false,
+            isReferee: false,
+            isRefCoordinator: false,
             seasonNav: [],
             phase: null
         }
@@ -207,6 +211,8 @@ export async function getSidebarData(): Promise<SidebarData> {
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,
+        isReferee,
+        isRefCoordinator,
         seasonNav,
         isCoach
     ] = await Promise.all([
@@ -222,6 +228,12 @@ export async function getSidebarData(): Promise<SidebarData> {
             : Promise.resolve(false),
         seasonId
             ? hasPermissionBySession("concerns:view", { seasonId })
+            : Promise.resolve(false),
+        seasonId
+            ? hasPermissionBySession("schedule:view", { seasonId })
+            : Promise.resolve(false),
+        seasonId
+            ? hasPermissionBySession("schedule:manage", { seasonId })
             : Promise.resolve(false),
         getRecentSeasonsNav(),
         seasonId
@@ -261,6 +273,8 @@ export async function getSidebarData(): Promise<SidebarData> {
         hasPicturesAccess,
         hasScoresAccess,
         hasConcernsAccess,
+        isReferee,
+        isRefCoordinator,
         seasonNav,
         phase: seasonId ? config.phase : null
     }

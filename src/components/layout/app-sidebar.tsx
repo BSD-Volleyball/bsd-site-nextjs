@@ -108,6 +108,37 @@ const concernsNavItems = [
     }
 ]
 
+const reffingNavItems = [
+    {
+        title: "Reffing Schedule",
+        url: "/dashboard/reffing-schedule",
+        icon: RiCalendarLine
+    },
+    {
+        title: "Matches Worked",
+        url: "/dashboard/matches-worked",
+        icon: RiClipboardLine
+    }
+]
+
+const manageRefsNavItems = [
+    {
+        title: "Select Refs",
+        url: "/dashboard/select-refs",
+        icon: RiGroupLine
+    },
+    {
+        title: "Schedule Refs",
+        url: "/dashboard/schedule-refs",
+        icon: RiCalendarLine
+    },
+    {
+        title: "Ref Compensation",
+        url: "/dashboard/ref-compensation",
+        icon: RiCoupon3Line
+    }
+]
+
 const signupNavItem = {
     title: "Sign-up for Season",
     url: "/dashboard/pay-season",
@@ -500,6 +531,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
     const [hasScoresAccess, setHasScoresAccess] = useState(false)
     const [hasConcernsAccess, setHasConcernsAccess] = useState(false)
+    const [isReferee, setIsReferee] = useState(false)
+    const [isRefCoordinator, setIsRefCoordinator] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
 
@@ -513,6 +546,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setHasPicturesAccess(data.hasPicturesAccess)
             setHasScoresAccess(data.hasScoresAccess)
             setHasConcernsAccess(data.hasConcernsAccess)
+            setIsReferee(data.isReferee)
+            setIsRefCoordinator(data.isRefCoordinator)
             setSeasonNav(data.seasonNav)
             setPhase(data.phase)
         })
@@ -545,6 +580,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showReviewPairs = isAdmin && inRange("select_commissioners", "draft")
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
+
+    // Reffing section — visible to refs during regular_season and playoffs
+    const showReffingSection =
+        isReferee && inRange("regular_season", "complete")
+    // Manage Refs section — visible to ref coordinators and admins during draft through complete
+    const showManageRefsSection =
+        (isRefCoordinator || isAdmin) && inRange("draft", "complete")
 
     // Captain pages — per-item filtering
     const captainBaseVisible =
@@ -842,6 +884,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={concernsNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {showReffingSection && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Reffing
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={reffingNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {showManageRefsSection && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Manage Refs
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={manageRefsNavItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

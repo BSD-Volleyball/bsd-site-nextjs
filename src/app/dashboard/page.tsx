@@ -21,15 +21,19 @@ import {
     week2Rosters,
     week3Rosters,
     playerUnavailability,
-    seasonEvents
+    seasonEvents,
+    matchReferees,
+    matches,
+    seasonRefs
 } from "@/database/schema"
-import { eq, and, desc, count, inArray, isNotNull, or } from "drizzle-orm"
+import { eq, and, desc, count, inArray, isNotNull, or, gte, asc } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
     RiCalendarLine,
     RiCoupon3Line,
-    RiStarLine
+    RiStarLine,
+    RiAlertLine
 } from "@remixicon/react"
 import Link from "next/link"
 import {
@@ -670,6 +674,22 @@ export default async function DashboardPage() {
         sessionTime: string
     } | null = null
     let assignedActiveConcernsCount = 0
+    let refUpcomingMatches: {
+        date: string
+        time: string
+        court: number | null
+        divisionName: string
+        homeTeamName: string
+        awayTeamName: string
+    }[] = []
+    let isRefForSeason = false
+    let isRefCoordinatorOrAdmin = false
+    let refScheduleStatus: {
+        nextDateLabel: string
+        totalMatches: number
+        assignedMatches: number
+        fullyScheduled: boolean
+    } | null = null
 
     if (session?.user) {
         const [signupResult, discountResult, userResult] = await Promise.all([
@@ -1141,6 +1161,136 @@ export default async function DashboardPage() {
                             session.user.id,
                             signupStatus.config.seasonId
                         )
+                }
+            }
+        }
+    }
+
+    // Ref dashboard card data
+    if (
+        session?.user &&
+        signupStatus?.config.seasonId &&
+        ["regular_season", "playoffs", "complete"].includes(
+            signupStatus.config.phase
+        )
+    ) {
+        const seasonId = signupStatus.config.seasonId
+        const todayStr = new Date().toISOString().slice(0, 10)
+
+        const [refCheck, coordCheck] = await Promise.all([
+            hasPermissionBySession("schedule:view", { seasonId }),
+            hasPermissionBySession("schedule:manage", { seasonId })
+        ])
+        isRefForSeason = refCheck
+        isRefCoordinatorOrAdmin = coordCheck || isAdmin
+
+        if (isRefForSeason) {
+            // Get upcoming matches for this ref on the next game night
+            const homeTeam = db
+                .select({
+                    id: teams.id,
+                    name: teams.name
+                })
+                .from(teams)
+                .as("home_team_t")
+            const awayTeam = db
+                .select({
+                    id: teams.id,
+                    name: teams.name
+                })
+                .from(teams)
+                .as("away_team_t")
+
+            const upcomingRefMatches = await db
+                .select({
+                    date: matches.date,
+                    time: matches.time,
+                    court: matches.court,
+                    divisionName: divisions.name,
+                    homeTeamName: homeTeam.name,
+                    awayTeamName: awayTeam.name
+                })
+                .from(matchReferees)
+                .innerJoin(matches, eq(matchReferees.match_id, matches.id))
+                .innerJoin(divisions, eq(matches.division, divisions.id))
+                .leftJoin(homeTeam, eq(matches.home_team, homeTeam.id))
+                .leftJoin(awayTeam, eq(matches.away_team, awayTeam.id))
+                .where(
+                    and(
+                        eq(matchReferees.referee_id, session.user.id),
+                        eq(matchReferees.season_id, seasonId),
+                        gte(matches.date, todayStr)
+                    )
+                )
+                .orderBy(asc(matches.date), asc(matches.time))
+
+            // Filter to only next game night
+            if (upcomingRefMatches.length > 0) {
+                const nextDate = upcomingRefMatches[0].date
+                refUpcomingMatches = upcomingRefMatches
+                    .filter((m) => m.date === nextDate)
+                    .map((m) => ({
+                        date: m.date ?? "",
+                        time: m.time ?? "",
+                        court: m.court,
+                        divisionName: m.divisionName,
+                        homeTeamName: m.homeTeamName ?? "TBD",
+                        awayTeamName: m.awayTeamName ?? "TBD"
+                    }))
+            }
+        }
+
+        if (isRefCoordinatorOrAdmin) {
+            // Find next game date and check if fully scheduled
+            const nextDateRow = await db
+                .select({ date: matches.date })
+                .from(matches)
+                .where(
+                    and(
+                        eq(matches.season, seasonId),
+                        gte(matches.date, todayStr)
+                    )
+                )
+                .orderBy(asc(matches.date))
+                .limit(1)
+
+            if (nextDateRow.length > 0 && nextDateRow[0].date) {
+                const nextDate = nextDateRow[0].date
+                const matchesOnDate = await db
+                    .select({ id: matches.id })
+                    .from(matches)
+                    .where(
+                        and(
+                            eq(matches.season, seasonId),
+                            eq(matches.date, nextDate)
+                        )
+                    )
+
+                const assignedOnDate = await db
+                    .select({ id: matchReferees.id })
+                    .from(matchReferees)
+                    .innerJoin(
+                        matches,
+                        eq(matchReferees.match_id, matches.id)
+                    )
+                    .where(
+                        and(
+                            eq(matchReferees.season_id, seasonId),
+                            eq(matches.date, nextDate)
+                        )
+                    )
+
+                const dateObj = new Date(nextDate + "T00:00:00")
+                refScheduleStatus = {
+                    nextDateLabel: dateObj.toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric"
+                    }),
+                    totalMatches: matchesOnDate.length,
+                    assignedMatches: assignedOnDate.length,
+                    fullyScheduled:
+                        assignedOnDate.length >= matchesOnDate.length
                 }
             }
         }
@@ -2318,6 +2468,134 @@ export default async function DashboardPage() {
                     </Card>
                 )}
             </div>
+
+            {/* Referee Dashboard Cards */}
+            {(isRefForSeason || isRefCoordinatorOrAdmin) && (
+                <div className="flex flex-wrap gap-6">
+                    {isRefForSeason && refUpcomingMatches.length > 0 && (
+                        <Card className="min-w-[280px] flex-1 border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center gap-2">
+                                    <RiCalendarLine className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                                    <CardTitle className="text-teal-700 text-lg dark:text-teal-300">
+                                        Your Upcoming Ref Assignments
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p className="text-teal-700 text-sm dark:text-teal-300">
+                                    You have{" "}
+                                    {refUpcomingMatches.length} match
+                                    {refUpcomingMatches.length !== 1
+                                        ? "es"
+                                        : ""}{" "}
+                                    to ref on{" "}
+                                    {new Date(
+                                        refUpcomingMatches[0].date + "T00:00:00"
+                                    ).toLocaleDateString("en-US", {
+                                        weekday: "short",
+                                        month: "short",
+                                        day: "numeric"
+                                    })}
+                                    .
+                                </p>
+                                <div className="space-y-2">
+                                    {refUpcomingMatches.map((m, i) => (
+                                        <div
+                                            key={`ref-match-${m.court}-${m.time}-${i}`}
+                                            className="rounded-md bg-teal-100 p-2 text-teal-800 text-sm dark:bg-teal-900 dark:text-teal-200"
+                                        >
+                                            <span className="font-medium">
+                                                {m.divisionName}
+                                            </span>{" "}
+                                            — Court {m.court},{" "}
+                                            {m.time
+                                                ? new Date(
+                                                      `2000-01-01T${m.time}`
+                                                  ).toLocaleTimeString(
+                                                      "en-US",
+                                                      {
+                                                          hour: "numeric",
+                                                          minute: "2-digit"
+                                                      }
+                                                  )
+                                                : "TBD"}
+                                            <br />
+                                            {m.homeTeamName} vs{" "}
+                                            {m.awayTeamName}
+                                        </div>
+                                    ))}
+                                </div>
+                                <Link
+                                    href="/dashboard/reffing-schedule"
+                                    className="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 font-medium text-sm text-white hover:bg-teal-700"
+                                >
+                                    View Full Schedule
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {isRefCoordinatorOrAdmin && refScheduleStatus && (
+                        <Card
+                            className={cn(
+                                "min-w-[280px] flex-1",
+                                refScheduleStatus.fullyScheduled
+                                    ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                                    : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
+                            )}
+                        >
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center gap-2">
+                                    {refScheduleStatus.fullyScheduled ? (
+                                        <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                    ) : (
+                                        <RiAlertLine className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                    )}
+                                    <CardTitle
+                                        className={cn(
+                                            "text-lg",
+                                            refScheduleStatus.fullyScheduled
+                                                ? "text-green-700 dark:text-green-300"
+                                                : "text-amber-700 dark:text-amber-300"
+                                        )}
+                                    >
+                                        Ref Scheduling —{" "}
+                                        {refScheduleStatus.nextDateLabel}
+                                    </CardTitle>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p
+                                    className={cn(
+                                        "text-sm",
+                                        refScheduleStatus.fullyScheduled
+                                            ? "text-green-700 dark:text-green-300"
+                                            : "text-amber-700 dark:text-amber-300"
+                                    )}
+                                >
+                                    {refScheduleStatus.fullyScheduled
+                                        ? `All ${refScheduleStatus.totalMatches} matches are fully staffed with referees.`
+                                        : `${refScheduleStatus.assignedMatches} of ${refScheduleStatus.totalMatches} matches have refs assigned. ${refScheduleStatus.totalMatches - refScheduleStatus.assignedMatches} still need attention.`}
+                                </p>
+                                <Link
+                                    href="/dashboard/schedule-refs"
+                                    className={cn(
+                                        "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                        refScheduleStatus.fullyScheduled
+                                            ? "bg-green-600 hover:bg-green-700"
+                                            : "bg-amber-600 hover:bg-amber-700"
+                                    )}
+                                >
+                                    {refScheduleStatus.fullyScheduled
+                                        ? "View Schedule"
+                                        : "Finish Scheduling"}
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
 
             {session?.user && (
                 <Suspense>
