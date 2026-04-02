@@ -70,6 +70,7 @@ export interface RefStatus {
 export interface EligibleRef {
     userId: string
     name: string
+    isUnavailable: boolean
 }
 
 export interface MatchesAndRefsData {
@@ -479,18 +480,15 @@ export async function getMatchesAndRefsForDate(
         for (const match of matchList) {
             const eligible: EligibleRef[] = []
             for (const ref of refStatusList) {
-                // a. Not unavailable
-                if (ref.isUnavailable) continue
-
-                // b. Qualified for division level
+                // a. Qualified for division level (hard filter)
                 if (ref.maxDivisionLevel > match.divisionLevel) continue
 
-                // c. Not playing at same time
+                // b. Not playing at same time (hard filter)
                 if (ref.playingTimeSlot && ref.playingTimeSlot === match.time) {
                     continue
                 }
 
-                // d. Not already assigned to another match at same time
+                // c. Not already assigned to another match at same time (hard filter)
                 const assignedAtTime = assignedByTime.get(match.time)
                 if (assignedAtTime?.has(ref.userId)) {
                     // Allow if the ref is assigned to THIS match
@@ -502,7 +500,12 @@ export async function getMatchesAndRefsForDate(
                     }
                 }
 
-                eligible.push({ userId: ref.userId, name: ref.name })
+                // Unavailable refs are included but flagged — scheduler must confirm
+                eligible.push({
+                    userId: ref.userId,
+                    name: ref.name,
+                    isUnavailable: ref.isUnavailable
+                })
             }
             eligibleRefsByMatch[match.matchId] = eligible
         }

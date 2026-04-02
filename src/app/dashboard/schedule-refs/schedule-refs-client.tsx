@@ -11,6 +11,16 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { getMatchesAndRefsForDate, saveRefAssignments } from "./actions"
 import type {
@@ -76,6 +86,11 @@ export function ScheduleRefsClient({
     >({})
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useTransition()
+    const [pendingAssignment, setPendingAssignment] = useState<{
+        matchId: number
+        refId: string
+        refName: string
+    } | null>(null)
 
     // Initialize assignments from match data
     useEffect(() => {
@@ -144,12 +159,36 @@ export function ScheduleRefsClient({
         return result
     }, [matchData, assignments])
 
-    const handleRefChange = useCallback((matchId: number, value: string) => {
+    const handleRefChange = useCallback(
+        (matchId: number, value: string) => {
+            if (value === UNASSIGNED) {
+                setAssignments((prev) => ({ ...prev, [matchId]: null }))
+                return
+            }
+            // Check if this ref is unavailable
+            const eligible = computedEligible[matchId] ?? []
+            const ref = eligible.find((r) => r.userId === value)
+            if (ref?.isUnavailable) {
+                setPendingAssignment({
+                    matchId,
+                    refId: value,
+                    refName: ref.name
+                })
+                return
+            }
+            setAssignments((prev) => ({ ...prev, [matchId]: value }))
+        },
+        [computedEligible]
+    )
+
+    const confirmUnavailableAssignment = useCallback(() => {
+        if (!pendingAssignment) return
         setAssignments((prev) => ({
             ...prev,
-            [matchId]: value === UNASSIGNED ? null : value
+            [pendingAssignment.matchId]: pendingAssignment.refId
         }))
-    }, [])
+        setPendingAssignment(null)
+    }, [pendingAssignment])
 
     const handleSave = useCallback(() => {
         if (!selectedDate) return
@@ -295,7 +334,7 @@ export function ScheduleRefsClient({
                                                                     Unavailable
                                                                 </Badge>
                                                             ) : ref.playingTimeSlot ? (
-                                                                <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
+                                                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300">
                                                                     {
                                                                         ref.playingInfo
                                                                     }
@@ -449,6 +488,11 @@ export function ScheduleRefsClient({
                                                                                             {
                                                                                                 ref.name
                                                                                             }
+                                                                                            {ref.isUnavailable && (
+                                                                                                <span className="ml-1 text-xs text-destructive">
+                                                                                                    (unavailable)
+                                                                                                </span>
+                                                                                            )}
                                                                                         </SelectItem>
                                                                                     )
                                                                                 )}
@@ -475,6 +519,35 @@ export function ScheduleRefsClient({
                     )}
                 </>
             )}
+
+            {/* Confirmation dialog for scheduling an unavailable ref */}
+            <AlertDialog
+                open={!!pendingAssignment}
+                onOpenChange={(open) => {
+                    if (!open) setPendingAssignment(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Schedule unavailable ref?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            <strong>{pendingAssignment?.refName}</strong> has
+                            marked themselves as unavailable for this date. Are
+                            you sure you want to schedule them for this match?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmUnavailableAssignment}
+                        >
+                            Schedule Anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
