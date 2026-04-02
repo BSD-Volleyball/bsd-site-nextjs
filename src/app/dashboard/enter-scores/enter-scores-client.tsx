@@ -749,7 +749,9 @@ function MatchScoreEntry({
                                     className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
                                         form.winner === match.homeTeamId
                                             ? "bg-green-600 text-white"
-                                            : "bg-muted hover:bg-muted/80"
+                                            : form.winner === null
+                                              ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
+                                              : "bg-muted hover:bg-muted/80"
                                     }`}
                                     onClick={() =>
                                         onSelectWinner(match.homeTeamId)
@@ -768,7 +770,9 @@ function MatchScoreEntry({
                                     className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
                                         form.winner === match.awayTeamId
                                             ? "bg-green-600 text-white"
-                                            : "bg-muted hover:bg-muted/80"
+                                            : form.winner === null
+                                              ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
+                                              : "bg-muted hover:bg-muted/80"
                                     }`}
                                     onClick={() =>
                                         onSelectWinner(match.awayTeamId)
@@ -878,7 +882,13 @@ function ScoreInputRow({
                 <input
                     type="number"
                     min={0}
-                    className="h-8 w-20 rounded-md border bg-background px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                        homeValue !== ""
+                            ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/40"
+                            : optional
+                              ? "bg-background"
+                              : "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/40"
+                    }`}
                     value={homeValue}
                     onChange={(e) => onHomeChange(e.target.value)}
                     placeholder={optional ? "—" : ""}
@@ -891,7 +901,13 @@ function ScoreInputRow({
                 <input
                     type="number"
                     min={0}
-                    className="h-8 w-20 rounded-md border bg-background px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                        awayValue !== ""
+                            ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/40"
+                            : optional
+                              ? "bg-background"
+                              : "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/40"
+                    }`}
                     value={awayValue}
                     onChange={(e) => onAwayChange(e.target.value)}
                     placeholder={optional ? "—" : ""}
