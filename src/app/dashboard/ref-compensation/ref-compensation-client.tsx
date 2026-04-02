@@ -6,6 +6,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react"
 
+function formatTime(time: string): string {
+    if (!time) return "—"
+    const [hours, minutes] = time.split(":").map(Number)
+    const period = hours >= 12 ? "PM" : "AM"
+    const displayHour = hours % 12 || 12
+    return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`
+}
+
 type MatchWorked = {
     matchId: number
     date: string
@@ -212,7 +220,9 @@ export function RefCompensationClient({ data }: { data: CompensationData }) {
                                                                     {m.date}
                                                                 </td>
                                                                 <td className="py-2 pr-4">
-                                                                    {m.time}
+                                                                    {formatTime(
+                                                                        m.time
+                                                                    )}
                                                                 </td>
                                                                 <td className="py-2 pr-4">
                                                                     {m.court ??
