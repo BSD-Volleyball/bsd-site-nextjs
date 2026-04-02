@@ -112,6 +112,7 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
         .from(seasonRefs)
         .innerJoin(users, eq(seasonRefs.user_id, users.id))
         .where(eq(seasonRefs.season_id, config.seasonId))
+        .orderBy(asc(users.last_name), asc(users.first_name))
 
     const refs: SeasonRefRow[] = refRows.map((r) => ({
         id: r.seasonRefId,
