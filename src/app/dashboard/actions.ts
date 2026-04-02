@@ -377,6 +377,12 @@ export interface CaptainWelcomeMember {
     phone: string | null
 }
 
+export interface CaptainSeasonInfo {
+    id: number
+    year: number
+    name: string
+}
+
 export interface CaptainWelcomeData {
     teamName: string
     divisionName: string
@@ -394,6 +400,8 @@ export interface CaptainWelcomeData {
         eventDate: string
         unavailableUserIds: string[]
     } | null
+    allSeasons: CaptainSeasonInfo[]
+    playerPicUrl: string
 }
 
 export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null> {
@@ -641,6 +649,12 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             console.error("Error fetching next match availability:", availError)
         }
 
+        const allSeasonRows = await db
+            .select({ id: seasons.id, year: seasons.year, name: seasons.season })
+            .from(seasons)
+            .orderBy(desc(seasons.id))
+            .limit(11)
+
         return {
             teamName: teamRow.name,
             divisionName: divisionRow?.name ?? "",
@@ -657,7 +671,13 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 "",
             currentUserLastName: currentUserRow?.lastName || "",
             divisionDraftDate,
-            nextMatchAvailability
+            nextMatchAvailability,
+            allSeasons: allSeasonRows.map((s) => ({
+                id: s.id,
+                year: s.year,
+                name: s.name
+            })),
+            playerPicUrl: process.env.PLAYER_PIC_URL || ""
         }
     } catch (error) {
         console.error("Error fetching captain welcome data:", error)

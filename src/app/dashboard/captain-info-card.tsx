@@ -26,10 +26,16 @@ import {
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
 import type { CaptainWelcomeData } from "./actions"
 import { logContactDetailsViewed } from "./actions"
+import {
+    usePlayerDetailModal,
+    PlayerDetailPopup
+} from "@/components/player-detail"
+import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import { buildEventVariableValues } from "@/lib/email-template-variables"
 import Link from "next/link"
 
 export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
+    const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [showContactWarning, setShowContactWarning] = useState(false)
     const [showContactDetails, setShowContactDetails] = useState(false)
@@ -325,15 +331,17 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                             ) : (
                                                 <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                                             )}
-                                            <span
+                                            <button
+                                                type="button"
+                                                onClick={() => modal.openPlayerDetail(m.userId)}
                                                 className={
                                                     isUnavailable
-                                                        ? "text-destructive"
-                                                        : "text-teal-700 dark:text-teal-300"
+                                                        ? "text-destructive underline decoration-dotted hover:opacity-80"
+                                                        : "text-teal-700 underline decoration-dotted hover:opacity-80 dark:text-teal-300"
                                                 }
                                             >
                                                 {name} {m.lastName}
-                                            </span>
+                                            </button>
                                         </li>
                                     )
                                 })}
@@ -563,9 +571,13 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                     key={m.email}
                                     className="rounded border p-3 text-sm"
                                 >
-                                    <p className="font-medium">
+                                    <button
+                                        type="button"
+                                        onClick={() => modal.openPlayerDetail(m.userId)}
+                                        className="font-medium underline decoration-dotted hover:opacity-80"
+                                    >
                                         {m.displayName} {m.lastName}
-                                    </p>
+                                    </button>
                                     <p className="text-muted-foreground">
                                         {m.email}
                                     </p>
@@ -602,6 +614,23 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                     </div>
                 </div>
             )}
+            <PlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                allSeasons={data.allSeasons}
+                playerPicUrl={data.playerPicUrl}
+                isLoading={modal.isLoading}
+                pairPickName={modal.pairPickName}
+                pairReason={modal.pairReason}
+                datesMissing={modal.unavailableDates}
+                playoffDates={modal.playoffDates}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
+            />
         </>
     )
 }
