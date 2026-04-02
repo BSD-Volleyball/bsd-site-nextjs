@@ -20,7 +20,7 @@ import {
     week1Rosters,
     week2Rosters,
     week3Rosters,
-    playerUnavailability,
+    userUnavailability,
     seasonEvents,
     matchReferees,
     matches,
@@ -148,12 +148,12 @@ async function getSeasonSignup(userId: string) {
     if (signup) {
         const unavailRows = await db
             .select({ eventDate: seasonEvents.event_date })
-            .from(playerUnavailability)
+            .from(userUnavailability)
             .innerJoin(
                 seasonEvents,
-                eq(seasonEvents.id, playerUnavailability.event_id)
+                eq(seasonEvents.id, userUnavailability.event_id)
             )
-            .where(eq(playerUnavailability.signup_id, signup.id))
+            .where(eq(userUnavailability.signup_id, signup.id))
 
         if (unavailRows.length > 0) {
             unavailableDates = unavailRows

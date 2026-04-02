@@ -15,7 +15,7 @@ import {
     drafts,
     teams,
     seasons,
-    playerUnavailability
+    userUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import {
@@ -158,17 +158,17 @@ export async function getEditWeek1Data(): Promise<{
         if (tryout1Event && signupIds.length > 0) {
             const unavailRows = await db
                 .select({
-                    signupId: playerUnavailability.signup_id
+                    signupId: userUnavailability.signup_id
                 })
-                .from(playerUnavailability)
+                .from(userUnavailability)
                 .where(
                     and(
-                        inArray(playerUnavailability.signup_id, signupIds),
-                        eq(playerUnavailability.event_id, tryout1Event.id)
+                        inArray(userUnavailability.signup_id, signupIds),
+                        eq(userUnavailability.event_id, tryout1Event.id)
                     )
                 )
             for (const row of unavailRows) {
-                unavailableForTryout1.add(row.signupId)
+                unavailableForTryout1.add(row.signupId!)
             }
         }
 

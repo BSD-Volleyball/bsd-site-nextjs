@@ -10,9 +10,7 @@ import {
     teams,
     drafts,
     seasonEvents,
-    signups,
-    playerUnavailability,
-    refUnavailability,
+    userUnavailability,
     seasons
 } from "@/database/schema"
 import { eq, and, asc, inArray, or } from "drizzle-orm"
@@ -295,51 +293,20 @@ export async function getMatchesAndRefsForDate(
 
         const eventIds = eventsForDate.map((e) => e.id)
 
-        // Player unavailability: signup -> playerUnavailability
+        // Unified unavailability: all refs via userUnavailability.user_id
         const unavailablePlayerIds = new Set<string>()
         if (eventIds.length > 0) {
-            const playerUnavailRows = await db
-                .select({
-                    playerId: signups.player
-                })
-                .from(playerUnavailability)
-                .innerJoin(
-                    signups,
-                    eq(playerUnavailability.signup_id, signups.id)
-                )
+            const unavailRows = await db
+                .select({ userId: userUnavailability.user_id })
+                .from(userUnavailability)
                 .where(
                     and(
-                        inArray(signups.player, refUserIds),
-                        eq(signups.season, seasonId),
-                        inArray(playerUnavailability.event_id, eventIds)
+                        inArray(userUnavailability.user_id, refUserIds),
+                        inArray(userUnavailability.event_id, eventIds)
                     )
                 )
-
-            for (const row of playerUnavailRows) {
-                unavailablePlayerIds.add(row.playerId)
-            }
-
-            // Ref unavailability: seasonRef -> refUnavailability
-            const seasonRefIds = refRows.map((r) => r.seasonRefId)
-            const refUnavailRows = await db
-                .select({
-                    seasonRefId: refUnavailability.season_ref_id
-                })
-                .from(refUnavailability)
-                .where(
-                    and(
-                        inArray(refUnavailability.season_ref_id, seasonRefIds),
-                        inArray(refUnavailability.event_id, eventIds)
-                    )
-                )
-
-            const unavailSeasonRefIds = new Set(
-                refUnavailRows.map((r) => r.seasonRefId)
-            )
-            for (const ref of refRows) {
-                if (unavailSeasonRefIds.has(ref.seasonRefId)) {
-                    unavailablePlayerIds.add(ref.userId)
-                }
+            for (const row of unavailRows) {
+                unavailablePlayerIds.add(row.userId)
             }
         }
 

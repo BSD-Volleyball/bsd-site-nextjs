@@ -8,7 +8,7 @@ import {
     drafts,
     signups,
     seasonEvents,
-    playerUnavailability,
+    userUnavailability,
     divisions
 } from "@/database/schema"
 import { eq, and, inArray, asc } from "drizzle-orm"
@@ -209,24 +209,24 @@ export async function getTeamAvailabilityData(
 
     // Get unavailability for all roster signups
     const signupIds = rosterRows.map((r) => r.signupId)
-    let unavailabilityRows: { signupId: number; eventId: number }[] = []
+    let unavailabilityRows: { signupId: number | null; eventId: number }[] = []
     if (signupIds.length > 0) {
         unavailabilityRows = await db
             .select({
-                signupId: playerUnavailability.signup_id,
-                eventId: playerUnavailability.event_id
+                signupId: userUnavailability.signup_id,
+                eventId: userUnavailability.event_id
             })
-            .from(playerUnavailability)
-            .where(inArray(playerUnavailability.signup_id, signupIds))
+            .from(userUnavailability)
+            .where(inArray(userUnavailability.signup_id, signupIds))
     }
 
     // Build unavailability lookup: signupId -> Set of eventIds
     const unavailBySignup = new Map<number, Set<number>>()
     for (const row of unavailabilityRows) {
-        if (!unavailBySignup.has(row.signupId)) {
-            unavailBySignup.set(row.signupId, new Set())
+        if (!unavailBySignup.has(row.signupId!)) {
+            unavailBySignup.set(row.signupId!, new Set())
         }
-        unavailBySignup.get(row.signupId)!.add(row.eventId)
+        unavailBySignup.get(row.signupId!)!.add(row.eventId)
     }
 
     const roster: RosterPlayer[] = rosterRows.map((r) => ({

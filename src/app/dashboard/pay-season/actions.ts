@@ -10,12 +10,7 @@ import React from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import {
-    signups,
-    users,
-    waitlist,
-    playerUnavailability
-} from "@/database/schema"
+import { signups, users, waitlist, userUnavailability } from "@/database/schema"
 import { eq, and, count } from "drizzle-orm"
 import {
     getSeasonConfig,
@@ -341,8 +336,9 @@ export async function submitSeasonPayment(
 
                 // Insert player unavailability rows
                 if (formData.unavailableEventIds.length > 0 && newSignup) {
-                    await db.insert(playerUnavailability).values(
+                    await db.insert(userUnavailability).values(
                         formData.unavailableEventIds.map((eventId) => ({
+                            user_id: session.user.id,
                             signup_id: newSignup.id,
                             event_id: eventId
                         }))
@@ -496,8 +492,9 @@ export async function submitFreeSignup(
 
         // Insert player unavailability rows
         if (formData.unavailableEventIds.length > 0 && newSignup) {
-            await db.insert(playerUnavailability).values(
+            await db.insert(userUnavailability).values(
                 formData.unavailableEventIds.map((eventId) => ({
+                    user_id: session.user.id,
                     signup_id: newSignup.id,
                     event_id: eventId
                 }))

@@ -2,19 +2,24 @@ import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import {
     signups,
-    playerUnavailability,
+    userUnavailability,
     week1Rosters,
     week2Rosters,
     week3Rosters,
     teams,
     drafts,
-    matches
+    matches,
+    seasonRefs
 } from "@/database/schema"
 import { eq, and, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getSeasonConfig } from "@/lib/site-config"
-import { getEventsByType, formatEventTime, formatMatchTime } from "@/lib/season-utils"
+import {
+    getEventsByType,
+    formatEventTime,
+    formatMatchTime
+} from "@/lib/season-utils"
 import { PageHeader } from "@/components/layout/page-header"
 import { AvailabilityForm } from "./availability-form"
 import type { Metadata } from "next"
@@ -62,72 +67,107 @@ export default async function MyAvailabilityPage() {
         .limit(1)
 
     if (!signup) {
+        // Check if user is a ref for this season — they also need availability management
+        const [seasonRefRow] = await db
+            .select({ id: seasonRefs.id })
+            .from(seasonRefs)
+            .where(
+                and(
+                    eq(seasonRefs.season_id, config.seasonId),
+                    eq(seasonRefs.user_id, session.user.id)
+                )
+            )
+            .limit(1)
+
+        if (!seasonRefRow) {
+            return (
+                <div className="space-y-6">
+                    <PageHeader
+                        title="My Availability"
+                        description="Manage which season dates you will miss."
+                    />
+                    <p className="text-muted-foreground">
+                        You don&apos;t have a signup for the current season.
+                    </p>
+                </div>
+            )
+        }
+
+        // Ref without a player signup — show availability form with no scheduled times
+        const unavailRows = await db
+            .select({ eventId: userUnavailability.event_id })
+            .from(userUnavailability)
+            .where(eq(userUnavailability.user_id, session.user.id))
+
         return (
             <div className="space-y-6">
                 <PageHeader
                     title="My Availability"
                     description="Manage which season dates you will miss."
                 />
-                <p className="text-muted-foreground">
-                    You don&apos;t have a signup for the current season.
-                </p>
+                <AvailabilityForm
+                    signupId={null}
+                    config={config}
+                    initialUnavailableIds={unavailRows.map((r) => r.eventId)}
+                    scheduledTimesByEventId={{}}
+                />
             </div>
         )
     }
 
     // Fetch unavailability + roster placements + team assignment in parallel
-    const [
-        unavailRows,
-        week1Row,
-        week2Row,
-        week3Row,
-        draftRow
-    ] = await Promise.all([
-        db.select({ eventId: playerUnavailability.event_id })
-            .from(playerUnavailability)
-            .where(eq(playerUnavailability.signup_id, signup.id)),
-        db.select({ sessionNumber: week1Rosters.session_number })
-            .from(week1Rosters)
-            .where(
-                and(
-                    eq(week1Rosters.season, config.seasonId),
-                    eq(week1Rosters.user, session.user.id)
+    const [unavailRows, week1Row, week2Row, week3Row, draftRow] =
+        await Promise.all([
+            db
+                .select({ eventId: userUnavailability.event_id })
+                .from(userUnavailability)
+                .where(eq(userUnavailability.user_id, session.user.id)),
+            db
+                .select({ sessionNumber: week1Rosters.session_number })
+                .from(week1Rosters)
+                .where(
+                    and(
+                        eq(week1Rosters.season, config.seasonId),
+                        eq(week1Rosters.user, session.user.id)
+                    )
                 )
-            )
-            .limit(1)
-            .then((r) => r[0] ?? null),
-        db.select({ teamNumber: week2Rosters.team_number })
-            .from(week2Rosters)
-            .where(
-                and(
-                    eq(week2Rosters.season, config.seasonId),
-                    eq(week2Rosters.user, session.user.id)
+                .limit(1)
+                .then((r) => r[0] ?? null),
+            db
+                .select({ teamNumber: week2Rosters.team_number })
+                .from(week2Rosters)
+                .where(
+                    and(
+                        eq(week2Rosters.season, config.seasonId),
+                        eq(week2Rosters.user, session.user.id)
+                    )
                 )
-            )
-            .limit(1)
-            .then((r) => r[0] ?? null),
-        db.select({ teamNumber: week3Rosters.team_number })
-            .from(week3Rosters)
-            .where(
-                and(
-                    eq(week3Rosters.season, config.seasonId),
-                    eq(week3Rosters.user, session.user.id)
+                .limit(1)
+                .then((r) => r[0] ?? null),
+            db
+                .select({ teamNumber: week3Rosters.team_number })
+                .from(week3Rosters)
+                .where(
+                    and(
+                        eq(week3Rosters.season, config.seasonId),
+                        eq(week3Rosters.user, session.user.id)
+                    )
                 )
-            )
-            .limit(1)
-            .then((r) => r[0] ?? null),
-        db.select({ teamId: drafts.team })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .where(
-                and(
-                    eq(drafts.user, session.user.id),
-                    eq(teams.season, config.seasonId)
+                .limit(1)
+                .then((r) => r[0] ?? null),
+            db
+                .select({ teamId: drafts.team })
+                .from(drafts)
+                .innerJoin(teams, eq(drafts.team, teams.id))
+                .where(
+                    and(
+                        eq(drafts.user, session.user.id),
+                        eq(teams.season, config.seasonId)
+                    )
                 )
-            )
-            .limit(1)
-            .then((r) => r[0] ?? null)
-    ])
+                .limit(1)
+                .then((r) => r[0] ?? null)
+        ])
 
     const initialUnavailableIds = unavailRows.map((r) => r.eventId)
 

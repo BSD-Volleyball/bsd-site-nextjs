@@ -8,7 +8,7 @@ import {
     drafts,
     teams,
     divisions,
-    playerUnavailability,
+    userUnavailability,
     seasonEvents
 } from "@/database/schema"
 import { eq, desc, ne } from "drizzle-orm"
@@ -272,12 +272,12 @@ export async function getPlayerDetails(playerId: string): Promise<{
                     .select({
                         eventDate: seasonEvents.event_date
                     })
-                    .from(playerUnavailability)
+                    .from(userUnavailability)
                     .innerJoin(
                         seasonEvents,
-                        eq(seasonEvents.id, playerUnavailability.event_id)
+                        eq(seasonEvents.id, userUnavailability.event_id)
                     )
-                    .where(eq(playerUnavailability.signup_id, signup.id))
+                    .where(eq(userUnavailability.signup_id, signup.id))
 
                 const unavailableDates =
                     unavailRows.length > 0

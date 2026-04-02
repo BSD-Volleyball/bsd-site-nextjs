@@ -256,13 +256,16 @@ export const deletedSignups = pgTable(
     })
 )
 
-export const playerUnavailability = pgTable(
-    "player_unavailability",
+export const userUnavailability = pgTable(
+    "user_unavailability",
     {
         id: serial("id").primaryKey(),
-        signup_id: integer("signup_id")
+        user_id: text("user_id")
             .notNull()
-            .references(() => signups.id, { onDelete: "cascade" }),
+            .references(() => users.id, { onDelete: "cascade" }),
+        signup_id: integer("signup_id").references(() => signups.id, {
+            onDelete: "cascade"
+        }),
         event_id: integer("event_id")
             .notNull()
             .references(() => seasonEvents.id, { onDelete: "cascade" }),
@@ -274,15 +277,15 @@ export const playerUnavailability = pgTable(
             .notNull()
     },
     (table) => ({
-        playerUnavailabilitySignupIdx: index(
-            "player_unavailability_signup_idx"
-        ).on(table.signup_id),
-        playerUnavailabilityEventIdx: index(
-            "player_unavailability_event_idx"
+        userUnavailabilityUserIdx: index("user_unavailability_user_idx").on(
+            table.user_id
+        ),
+        userUnavailabilityEventIdx: index(
+            "user_unavailability_event_idx"
         ).on(table.event_id),
-        playerUnavailabilityUnique: uniqueIndex(
-            "player_unavailability_signup_event_unique"
-        ).on(table.signup_id, table.event_id)
+        userUnavailabilityUnique: uniqueIndex(
+            "user_unavailability_user_event_unique"
+        ).on(table.user_id, table.event_id)
     })
 )
 
@@ -898,28 +901,6 @@ export const matchReferees = pgTable(
         ),
         matchRefereesSeasonIdx: index("match_referees_season_idx").on(
             table.season_id
-        )
-    })
-)
-
-export const refUnavailability = pgTable(
-    "ref_unavailability",
-    {
-        id: serial("id").primaryKey(),
-        season_ref_id: integer("season_ref_id")
-            .notNull()
-            .references(() => seasonRefs.id, { onDelete: "cascade" }),
-        event_id: integer("event_id")
-            .notNull()
-            .references(() => seasonEvents.id, { onDelete: "cascade" }),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
-    },
-    (table) => ({
-        refUnavailabilityUnique: uniqueIndex("ref_unavailability_unique").on(
-            table.season_ref_id,
-            table.event_id
         )
     })
 )

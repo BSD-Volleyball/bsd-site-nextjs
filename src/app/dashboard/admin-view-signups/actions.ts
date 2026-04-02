@@ -12,7 +12,7 @@ import {
     divisions,
     seasons,
     discounts,
-    playerUnavailability,
+    userUnavailability,
     seasonEvents
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
@@ -150,21 +150,21 @@ export async function getSeasonSignups(): Promise<{
         if (signupIds.length > 0) {
             const unavailRows = await db
                 .select({
-                    signupId: playerUnavailability.signup_id,
+                    signupId: userUnavailability.signup_id,
                     eventDate: seasonEvents.event_date
                 })
-                .from(playerUnavailability)
+                .from(userUnavailability)
                 .innerJoin(
                     seasonEvents,
-                    eq(seasonEvents.id, playerUnavailability.event_id)
+                    eq(seasonEvents.id, userUnavailability.event_id)
                 )
-                .where(inArray(playerUnavailability.signup_id, signupIds))
+                .where(inArray(userUnavailability.signup_id, signupIds))
 
             const bySignup = new Map<number, string[]>()
             for (const row of unavailRows) {
-                const dates = bySignup.get(row.signupId) || []
+                const dates = bySignup.get(row.signupId!) || []
                 dates.push(formatEventDate(row.eventDate))
-                bySignup.set(row.signupId, dates)
+                bySignup.set(row.signupId!, dates)
             }
             for (const [sid, dates] of bySignup) {
                 unavailabilityMap.set(sid, dates.join(", "))
@@ -484,7 +484,7 @@ export async function deleteSignupEntry(
             reason: trimmedReason
         })
 
-        // Delete the signup (cascades to playerUnavailability)
+        // Delete the signup (cascades to userUnavailability)
         await db
             .delete(signups)
             .where(

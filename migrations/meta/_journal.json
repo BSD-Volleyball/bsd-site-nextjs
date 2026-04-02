@@ -57,6 +57,13 @@
       "when": 1775137895024,
       "tag": "0007_broken_mojo",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775225898000,
+      "tag": "0008_user_unavailability",
+      "breakpoints": true
     }
   ]
 }

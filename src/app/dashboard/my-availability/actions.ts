@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
-import { signups, playerUnavailability } from "@/database/schema"
+import { signups, userUnavailability } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
 import { headers } from "next/headers"
 
@@ -38,16 +38,46 @@ export async function updatePlayerAvailability(
         }
     }
 
-    // Delete all existing unavailability rows for this signup
+    // Delete all existing unavailability rows for this user
     await db
-        .delete(playerUnavailability)
-        .where(eq(playerUnavailability.signup_id, signupId))
+        .delete(userUnavailability)
+        .where(eq(userUnavailability.user_id, session.user.id))
 
     // Insert new unavailability rows
     if (unavailableEventIds.length > 0) {
-        await db.insert(playerUnavailability).values(
+        await db.insert(userUnavailability).values(
             unavailableEventIds.map((eventId) => ({
+                user_id: session.user.id,
                 signup_id: signupId,
+                event_id: eventId
+            }))
+        )
+    }
+
+    return { status: true, message: "Your availability has been updated." }
+}
+
+// For refs who are not players — no signup_id, just user_id
+export async function updateRefAvailability(
+    unavailableEventIds: number[]
+): Promise<UpdateResult> {
+    const session = await auth.api.getSession({
+        headers: await headers()
+    })
+    if (!session) {
+        return { status: false, message: "You need to be logged in." }
+    }
+
+    // Delete all existing unavailability rows for this user
+    await db
+        .delete(userUnavailability)
+        .where(eq(userUnavailability.user_id, session.user.id))
+
+    // Insert new unavailability rows
+    if (unavailableEventIds.length > 0) {
+        await db.insert(userUnavailability).values(
+            unavailableEventIds.map((eventId) => ({
+                user_id: session.user.id,
                 event_id: eventId
             }))
         )

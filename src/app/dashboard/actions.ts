@@ -16,7 +16,7 @@ import {
     emailTemplates,
     seasonEvents,
     signups,
-    playerUnavailability
+    userUnavailability
 } from "@/database/schema"
 import { eq, and, lt, desc, inArray, asc, or, isNull, gte } from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -616,20 +616,20 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 if (signupIds.length > 0) {
                     const unavailRows = await db
                         .select({
-                            signup_id: playerUnavailability.signup_id
+                            signup_id: userUnavailability.signup_id
                         })
-                        .from(playerUnavailability)
+                        .from(userUnavailability)
                         .where(
                             and(
                                 inArray(
-                                    playerUnavailability.signup_id,
+                                    userUnavailability.signup_id,
                                     signupIds
                                 ),
-                                eq(playerUnavailability.event_id, nextEvent.id)
+                                eq(userUnavailability.event_id, nextEvent.id)
                             )
                         )
                     unavailableUserIds = unavailRows
-                        .map((r) => signupToUser.get(r.signup_id)!)
+                        .map((r) => signupToUser.get(r.signup_id!)!)
                         .filter(Boolean)
                 }
                 nextMatchAvailability = {
@@ -967,12 +967,12 @@ export async function getNextMatch(
 
             if (signup) {
                 const [unavailRecord] = await db
-                    .select({ id: playerUnavailability.id })
-                    .from(playerUnavailability)
+                    .select({ id: userUnavailability.id })
+                    .from(userUnavailability)
                     .where(
                         and(
-                            eq(playerUnavailability.signup_id, signup.id),
-                            eq(playerUnavailability.event_id, matchEventId)
+                            eq(userUnavailability.signup_id, signup.id),
+                            eq(userUnavailability.event_id, matchEventId)
                         )
                     )
                     .limit(1)

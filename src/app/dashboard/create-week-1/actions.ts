@@ -12,7 +12,7 @@ import {
     seasons,
     divisions,
     week1Rosters,
-    playerUnavailability
+    userUnavailability
 } from "@/database/schema"
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
@@ -171,29 +171,29 @@ export async function getCreateWeek1Data(): Promise<{
         ].filter((id): id is number => id != null)
 
         let unavailabilityRows: {
-            signupId: number
+            signupId: number | null
             eventId: number
         }[] = []
         if (allSignupIds.length > 0 && tryoutEventIds.length > 0) {
             unavailabilityRows = await db
                 .select({
-                    signupId: playerUnavailability.signup_id,
-                    eventId: playerUnavailability.event_id
+                    signupId: userUnavailability.signup_id,
+                    eventId: userUnavailability.event_id
                 })
-                .from(playerUnavailability)
+                .from(userUnavailability)
                 .where(
                     and(
-                        inArray(playerUnavailability.signup_id, allSignupIds),
-                        inArray(playerUnavailability.event_id, tryoutEventIds)
+                        inArray(userUnavailability.signup_id, allSignupIds),
+                        inArray(userUnavailability.event_id, tryoutEventIds)
                     )
                 )
         }
 
         const unavailBySignup = new Map<number, Set<number>>()
         for (const row of unavailabilityRows) {
-            const set = unavailBySignup.get(row.signupId) ?? new Set<number>()
+            const set = unavailBySignup.get(row.signupId!) ?? new Set<number>()
             set.add(row.eventId)
-            unavailBySignup.set(row.signupId, set)
+            unavailBySignup.set(row.signupId!, set)
         }
 
         const signupRows = signupRowsRaw.filter((row) => {
