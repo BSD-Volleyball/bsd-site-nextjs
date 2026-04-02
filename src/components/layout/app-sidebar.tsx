@@ -910,7 +910,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 {showManageRefsSection && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Manage Refs
+                            Ref Management
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>

@@ -175,6 +175,34 @@ export function ScheduleRefsClient({
         })
     }, [selectedDate, assignments, fetchDateData])
 
+    // Group matches by division, sorted by divisionLevel then time
+    const matchesByDivision = useMemo(() => {
+        if (!matchData) return []
+        const divMap = new Map<
+            number,
+            {
+                divisionId: number
+                divisionName: string
+                divisionLevel: number
+                matches: MatchRow[]
+            }
+        >()
+        for (const m of matchData.matches) {
+            if (!divMap.has(m.divisionId)) {
+                divMap.set(m.divisionId, {
+                    divisionId: m.divisionId,
+                    divisionName: m.divisionName,
+                    divisionLevel: m.divisionLevel,
+                    matches: []
+                })
+            }
+            divMap.get(m.divisionId)!.matches.push(m)
+        }
+        return [...divMap.values()].sort(
+            (a, b) => a.divisionLevel - b.divisionLevel
+        )
+    }, [matchData])
+
     const currentDateLabel =
         matchDates.find((d) => d.date === selectedDate)?.label ?? selectedDate
 
@@ -219,7 +247,7 @@ export function ScheduleRefsClient({
 
             {!loading && matchData && (
                 <>
-                    {/* Ref summary panel */}
+                    {/* Ref summary table */}
                     {matchData.refs.length > 0 && (
                         <Card>
                             <CardHeader>
@@ -228,193 +256,216 @@ export function ScheduleRefsClient({
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex flex-wrap gap-3">
-                                    {matchData.refs.map((ref) => (
-                                        <div
-                                            key={ref.userId}
-                                            className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                                        >
-                                            <span className="font-medium">
-                                                {ref.name}
-                                            </span>
-                                            {ref.isUnavailable ? (
-                                                <Badge variant="destructive">
-                                                    Unavailable
-                                                </Badge>
-                                            ) : ref.playingTimeSlot ? (
-                                                <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
-                                                    {ref.playingInfo}
-                                                </Badge>
-                                            ) : (
-                                                <Badge className="bg-green-600 text-white hover:bg-green-700">
-                                                    Available
-                                                </Badge>
-                                            )}
-                                            <Badge variant="outline">
-                                                Up to{" "}
-                                                {divisionLevelLabel(
-                                                    ref.maxDivisionLevel
-                                                )}
-                                            </Badge>
-                                            {ref.isCertified && (
-                                                <Badge variant="secondary">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-left">
+                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                    Name
+                                                </th>
+                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                    Status
+                                                </th>
+                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                    Max Division
+                                                </th>
+                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
                                                     Certified
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    ))}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {matchData.refs.map((ref) => (
+                                                <tr
+                                                    key={ref.userId}
+                                                    className="border-b last:border-0"
+                                                >
+                                                    <td className="px-3 py-2 font-medium">
+                                                        {ref.name}
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        {ref.isUnavailable ? (
+                                                            <Badge variant="destructive">
+                                                                Unavailable
+                                                            </Badge>
+                                                        ) : ref.playingTimeSlot ? (
+                                                            <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
+                                                                {
+                                                                    ref.playingInfo
+                                                                }
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge className="bg-green-600 text-white hover:bg-green-700">
+                                                                Available
+                                                            </Badge>
+                                                        )}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                        <Badge variant="outline">
+                                                            Up to{" "}
+                                                            {divisionLevelLabel(
+                                                                ref.maxDivisionLevel
+                                                            )}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        {ref.isCertified ? (
+                                                            <Badge variant="secondary">
+                                                                Certified
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Matches table */}
+                    {/* Matches grouped by division */}
                     {matchData.matches.length === 0 ? (
                         <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                             No matches on this date.
                         </div>
                     ) : (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    Matches — {currentDateLabel}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="border-b text-left">
-                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                        Time
-                                                    </th>
-                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                        Court
-                                                    </th>
-                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                        Division
-                                                    </th>
-                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                        Match
-                                                    </th>
-                                                    <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                        Assigned Ref
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {matchData.matches.map(
-                                                    (match) => {
-                                                        const eligible =
-                                                            computedEligible[
-                                                                match.matchId
-                                                            ] ?? []
-                                                        const currentRefId =
-                                                            assignments[
-                                                                match.matchId
-                                                            ]
-                                                        return (
-                                                            <tr
-                                                                key={
-                                                                    match.matchId
-                                                                }
-                                                                className="border-b"
-                                                            >
-                                                                <td className="whitespace-nowrap px-3 py-2">
-                                                                    {formatTime(
-                                                                        match.time
-                                                                    )}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    {match.court ??
-                                                                        "—"}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    {
-                                                                        match.divisionName
+                        <div className="space-y-4">
+                            {matchesByDivision.map((division) => (
+                                <Card key={division.divisionId}>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base">
+                                            {division.divisionName}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left">
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Time
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Court
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Match
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Assigned Ref
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {division.matches.map(
+                                                        (match) => {
+                                                            const eligible =
+                                                                computedEligible[
+                                                                    match
+                                                                        .matchId
+                                                                ] ?? []
+                                                            const currentRefId =
+                                                                assignments[
+                                                                    match
+                                                                        .matchId
+                                                                ]
+                                                            return (
+                                                                <tr
+                                                                    key={
+                                                                        match.matchId
                                                                     }
-                                                                </td>
-                                                                <td className="whitespace-nowrap px-3 py-2">
-                                                                    {
-                                                                        match.homeTeamName
-                                                                    }{" "}
-                                                                    vs{" "}
-                                                                    {
-                                                                        match.awayTeamName
-                                                                    }
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <Select
-                                                                        value={
-                                                                            currentRefId ??
-                                                                            UNASSIGNED
+                                                                    className="border-b last:border-0"
+                                                                >
+                                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                                        {formatTime(
+                                                                            match.time
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-3 py-2">
+                                                                        {match.court ??
+                                                                            "—"}
+                                                                    </td>
+                                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                                        {
+                                                                            match.homeTeamName
+                                                                        }{" "}
+                                                                        vs{" "}
+                                                                        {
+                                                                            match.awayTeamName
                                                                         }
-                                                                        onValueChange={(
-                                                                            v
-                                                                        ) =>
-                                                                            handleRefChange(
-                                                                                match.matchId,
+                                                                    </td>
+                                                                    <td className="px-3 py-2">
+                                                                        <Select
+                                                                            value={
+                                                                                currentRefId ??
+                                                                                UNASSIGNED
+                                                                            }
+                                                                            onValueChange={(
                                                                                 v
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <SelectTrigger className="w-[220px]">
-                                                                            <SelectValue placeholder="Select ref" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            <SelectItem
-                                                                                value={
-                                                                                    UNASSIGNED
-                                                                                }
-                                                                            >
-                                                                                —
-                                                                                No
-                                                                                ref
-                                                                                —
-                                                                            </SelectItem>
-                                                                            {eligible.map(
-                                                                                (
-                                                                                    ref
-                                                                                ) => (
-                                                                                    <SelectItem
-                                                                                        key={
-                                                                                            ref.userId
-                                                                                        }
-                                                                                        value={
-                                                                                            ref.userId
-                                                                                        }
-                                                                                    >
-                                                                                        {
-                                                                                            ref.name
-                                                                                        }
-                                                                                    </SelectItem>
+                                                                            ) =>
+                                                                                handleRefChange(
+                                                                                    match.matchId,
+                                                                                    v
                                                                                 )
-                                                                            )}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                </td>
-                                                            </tr>
-                                                        )
-                                                    }
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                                            }
+                                                                        >
+                                                                            <SelectTrigger className="w-[220px]">
+                                                                                <SelectValue placeholder="Select ref" />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem
+                                                                                    value={
+                                                                                        UNASSIGNED
+                                                                                    }
+                                                                                >
+                                                                                    —
+                                                                                    No
+                                                                                    ref
+                                                                                    —
+                                                                                </SelectItem>
+                                                                                {eligible.map(
+                                                                                    (
+                                                                                        ref
+                                                                                    ) => (
+                                                                                        <SelectItem
+                                                                                            key={
+                                                                                                ref.userId
+                                                                                            }
+                                                                                            value={
+                                                                                                ref.userId
+                                                                                            }
+                                                                                        >
+                                                                                            {
+                                                                                                ref.name
+                                                                                            }
+                                                                                        </SelectItem>
+                                                                                    )
+                                                                                )}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    </td>
+                                                                </tr>
+                                                            )
+                                                        }
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
 
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            onClick={handleSave}
-                                            disabled={saving}
-                                        >
-                                            {saving
-                                                ? "Saving…"
-                                                : "Save Assignments"}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                            <div className="flex justify-end pt-2">
+                                <Button onClick={handleSave} disabled={saving}>
+                                    {saving ? "Saving…" : "Save Assignments"}
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </>
             )}
