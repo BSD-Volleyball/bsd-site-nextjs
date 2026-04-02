@@ -275,52 +275,58 @@ export function ScheduleRefsClient({
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {matchData.refs.map((ref) => (
-                                                <tr
-                                                    key={ref.userId}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="px-3 py-2 font-medium">
-                                                        {ref.name}
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        {ref.isUnavailable ? (
-                                                            <Badge variant="destructive">
-                                                                Unavailable
-                                                            </Badge>
-                                                        ) : ref.playingTimeSlot ? (
-                                                            <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
-                                                                {
-                                                                    ref.playingInfo
-                                                                }
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge className="bg-green-600 text-white hover:bg-green-700">
-                                                                Available
-                                                            </Badge>
-                                                        )}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-2">
-                                                        <Badge variant="outline">
-                                                            Up to{" "}
-                                                            {divisionLevelLabel(
-                                                                ref.maxDivisionLevel
+                                            {[...matchData.refs]
+                                                .sort(
+                                                    (a, b) =>
+                                                        a.maxDivisionLevel -
+                                                        b.maxDivisionLevel
+                                                )
+                                                .map((ref) => (
+                                                    <tr
+                                                        key={ref.userId}
+                                                        className="border-b last:border-0"
+                                                    >
+                                                        <td className="px-3 py-2 font-medium">
+                                                            {ref.name}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            {ref.isUnavailable ? (
+                                                                <Badge variant="destructive">
+                                                                    Unavailable
+                                                                </Badge>
+                                                            ) : ref.playingTimeSlot ? (
+                                                                <Badge className="bg-yellow-500 text-white hover:bg-yellow-600">
+                                                                    {
+                                                                        ref.playingInfo
+                                                                    }
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge className="bg-green-600 text-white hover:bg-green-700">
+                                                                    Available
+                                                                </Badge>
                                                             )}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        {ref.isCertified ? (
-                                                            <Badge variant="secondary">
-                                                                Certified
+                                                        </td>
+                                                        <td className="whitespace-nowrap px-3 py-2">
+                                                            <Badge variant="outline">
+                                                                Up to{" "}
+                                                                {divisionLevelLabel(
+                                                                    ref.maxDivisionLevel
+                                                                )}
                                                             </Badge>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                —
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            {ref.isCertified ? (
+                                                                <Badge variant="secondary">
+                                                                    Certified
+                                                                </Badge>
+                                                            ) : (
+                                                                <span className="text-muted-foreground">
+                                                                    —
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
                                         </tbody>
                                     </table>
                                 </div>
