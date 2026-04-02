@@ -31,6 +31,7 @@ export interface SeasonRefRow {
     preferredName: string | null
     email: string
     isCertified: boolean
+    hasW9: boolean
     maxDivisionLevel: number
 }
 
@@ -101,6 +102,7 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
             seasonRefId: seasonRefs.id,
             userId: seasonRefs.user_id,
             isCertified: seasonRefs.is_certified,
+            hasW9: seasonRefs.has_w9,
             maxDivisionLevel: seasonRefs.max_division_level,
             firstName: users.first_name,
             lastName: users.last_name,
@@ -120,6 +122,7 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
         preferredName: r.preferredName,
         email: r.email,
         isCertified: r.isCertified,
+        hasW9: r.hasW9,
         maxDivisionLevel: r.maxDivisionLevel
     }))
 
@@ -213,12 +216,14 @@ export const addSeasonRef = withAction(
         const highestLevel = activeDivisions[0]?.level ?? 1
 
         let isCertified = false
+        let hasW9 = false
         let maxDivisionLevel = highestLevel
 
         // Use previous season values if they exist and are from a different season
         const [prevSeasonRef] = await db
             .select({
                 isCertified: seasonRefs.is_certified,
+                hasW9: seasonRefs.has_w9,
                 maxDivisionLevel: seasonRefs.max_division_level,
                 seasonId: seasonRefs.season_id
             })
@@ -230,6 +235,7 @@ export const addSeasonRef = withAction(
 
         if (prevSeasonRef && prevSeasonRef.seasonId !== config.seasonId) {
             isCertified = prevSeasonRef.isCertified
+            hasW9 = prevSeasonRef.hasW9
             maxDivisionLevel = prevSeasonRef.maxDivisionLevel
         }
 
@@ -237,6 +243,7 @@ export const addSeasonRef = withAction(
             season_id: config.seasonId,
             user_id: userId,
             is_certified: isCertified,
+            has_w9: hasW9,
             max_division_level: maxDivisionLevel
         })
 
@@ -312,6 +319,7 @@ export const updateSeasonRef = withAction(
     async (
         seasonRefId: number,
         isCertified: boolean,
+        hasW9: boolean,
         maxDivisionLevel: number
     ): Promise<ActionResult> => {
         const session = await requireSession()
@@ -323,6 +331,7 @@ export const updateSeasonRef = withAction(
             .update(seasonRefs)
             .set({
                 is_certified: isCertified,
+                has_w9: hasW9,
                 max_division_level: level
             })
             .where(eq(seasonRefs.id, id))
@@ -332,7 +341,7 @@ export const updateSeasonRef = withAction(
             action: "update",
             entityType: "season_refs",
             entityId: String(id),
-            summary: `Updated ref ${id}: certified=${isCertified}, maxLevel=${level}`
+            summary: `Updated ref ${id}: certified=${isCertified}, w9=${hasW9}, maxLevel=${level}`
         })
 
         revalidatePath("/dashboard/select-refs")

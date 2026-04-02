@@ -30,6 +30,7 @@ type RefSummary = {
     name: string
     email: string
     isCertified: boolean
+    hasW9: boolean
     ratePerMatch: string
     matchesWorked: MatchWorked[]
     totalMatches: number
@@ -144,6 +145,15 @@ export function RefCompensationClient({ data }: { data: CompensationData }) {
                                             {ref.isCertified
                                                 ? "Certified"
                                                 : "Uncertified"}
+                                        </Badge>
+                                        <Badge
+                                            variant={
+                                                ref.hasW9
+                                                    ? "default"
+                                                    : "outline"
+                                            }
+                                        >
+                                            {ref.hasW9 ? "W9 ✓" : "No W9"}
                                         </Badge>
                                     </div>
                                     <div className="flex items-center gap-4">

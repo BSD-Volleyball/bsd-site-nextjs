@@ -37,6 +37,7 @@ type RefSummary = {
     name: string
     email: string
     isCertified: boolean
+    hasW9: boolean
     ratePerMatch: string
     matchesWorked: MatchWorked[]
     totalMatches: number
@@ -105,6 +106,7 @@ export const getRefCompensationData = withAction(
             .select({
                 userId: seasonRefs.user_id,
                 isCertified: seasonRefs.is_certified,
+                hasW9: seasonRefs.has_w9,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preferred_name,
@@ -187,6 +189,7 @@ export const getRefCompensationData = withAction(
                     ),
                     email: ref.email,
                     isCertified: ref.isCertified,
+                    hasW9: ref.hasW9,
                     ratePerMatch: rate.toFixed(2),
                     matchesWorked,
                     totalMatches: matchesWorked.length,

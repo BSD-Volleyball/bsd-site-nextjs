@@ -280,9 +280,9 @@ export const userUnavailability = pgTable(
         userUnavailabilityUserIdx: index("user_unavailability_user_idx").on(
             table.user_id
         ),
-        userUnavailabilityEventIdx: index(
-            "user_unavailability_event_idx"
-        ).on(table.event_id),
+        userUnavailabilityEventIdx: index("user_unavailability_event_idx").on(
+            table.event_id
+        ),
         userUnavailabilityUnique: uniqueIndex(
             "user_unavailability_user_event_unique"
         ).on(table.user_id, table.event_id)
@@ -856,6 +856,9 @@ export const seasonRefs = pgTable(
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
         is_certified: boolean("is_certified")
+            .$defaultFn(() => false)
+            .notNull(),
+        has_w9: boolean("has_w9")
             .$defaultFn(() => false)
             .notNull(),
         max_division_level: integer("max_division_level").notNull(),

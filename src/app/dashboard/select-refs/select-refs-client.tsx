@@ -106,6 +106,7 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
             const result = await updateSeasonRef(
                 ref.seasonRefId,
                 checked,
+                ref.hasW9,
                 ref.maxDivisionLevel
             )
             if (result.status) {
@@ -119,11 +120,31 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
         })
     }
 
+    function handleToggleW9(ref: SeasonRefRow, checked: boolean) {
+        startTransition(async () => {
+            const result = await updateSeasonRef(
+                ref.seasonRefId,
+                ref.isCertified,
+                checked,
+                ref.maxDivisionLevel
+            )
+            if (result.status) {
+                toast.success(
+                    `Updated W9 status for ${formatPlayerName(ref.firstName, ref.lastName, ref.preferredName)}`
+                )
+                await refreshData()
+            } else {
+                toast.error(result.message)
+            }
+        })
+    }
+
     function handleChangeDivisionLevel(ref: SeasonRefRow, level: string) {
         startTransition(async () => {
             const result = await updateSeasonRef(
                 ref.seasonRefId,
                 ref.isCertified,
+                ref.hasW9,
                 Number(level)
             )
             if (result.status) {
@@ -238,6 +259,9 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
                                 <th className="px-4 py-3 text-center font-medium">
                                     Certified
                                 </th>
+                                <th className="px-4 py-3 text-center font-medium">
+                                    W9
+                                </th>
                                 <th className="px-4 py-3 text-left font-medium">
                                     Max Division
                                 </th>
@@ -270,6 +294,15 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
                                                     ref,
                                                     checked
                                                 )
+                                            }
+                                            disabled={isPending}
+                                        />
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <Switch
+                                            checked={ref.hasW9}
+                                            onCheckedChange={(checked) =>
+                                                handleToggleW9(ref, checked)
                                             }
                                             disabled={isPending}
                                         />
