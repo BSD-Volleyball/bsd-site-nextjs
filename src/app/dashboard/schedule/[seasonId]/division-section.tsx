@@ -106,7 +106,9 @@ export function DivisionSection({ division }: { division: ScheduleDivision }) {
                                                                         key={`time-${m.id}`}
                                                                         className="whitespace-nowrap"
                                                                     >
-                                                                        {formatMatchTime(m.time) ||
+                                                                        {formatMatchTime(
+                                                                            m.time
+                                                                        ) ||
                                                                             "—"}
                                                                     </div>
                                                                 )
@@ -170,87 +172,42 @@ export function DivisionSection({ division }: { division: ScheduleDivision }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {division.weeks.map((week) => (
-                                                <tr
-                                                    key={`results-${week.week}`}
-                                                    className="border-b align-top last:border-0"
-                                                >
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`winner-${m.id}`}
-                                                                    >
-                                                                        {
-                                                                            m.winnerName
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`wg-${m.id}`}
-                                                                    >
-                                                                        {
-                                                                            m.winnerGames
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`loser-${m.id}`}
-                                                                    >
-                                                                        {
-                                                                            m.loserName
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`lg-${m.id}`}
-                                                                    >
-                                                                        {
-                                                                            m.loserGames
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`scores-${m.id}`}
-                                                                    >
-                                                                        {m.scoresDisplay ||
-                                                                            "—"}
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {division.weeks.flatMap(
+                                                (week, wi) =>
+                                                    week.matches.map(
+                                                        (m, mi) => (
+                                                            <tr
+                                                                key={`results-${m.id}`}
+                                                                className={`border-b last:border-0 ${wi > 0 && mi === 0 ? "border-t-2 border-t-muted" : ""}`}
+                                                            >
+                                                                <td className="px-3 py-2">
+                                                                    {
+                                                                        m.winnerName
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {
+                                                                        m.winnerGames
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {
+                                                                        m.loserName
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {
+                                                                        m.loserGames
+                                                                    }
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-3 py-2">
+                                                                    {m.scoresDisplay ||
+                                                                        "—"}
+                                                                </td>
+                                                            </tr>
+                                                        )
+                                                    )
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>

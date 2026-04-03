@@ -412,7 +412,7 @@ export async function getSeasonScheduleData(
                                 : `${set.away}-${set.home}`
                             return winnerFirst
                         })
-                        .join("  ")
+                        .join(", ")
 
                     existing.matches.push({
                         id: match.id,
