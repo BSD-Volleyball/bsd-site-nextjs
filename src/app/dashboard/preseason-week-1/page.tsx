@@ -218,7 +218,9 @@ export default async function DraftPreseasonWeek1Page() {
                         .pw1-player-empty { font-size: 10.5pt; color: #999; font-style: italic; }
                     }
                 `}</style>
-                <p className="pw1-title">{seasonLabel} Pre-Season Week 1 — {tryout1DateDisplay}</p>
+                <p className="pw1-title">
+                    {seasonLabel} Pre-Season Week 1 — {tryout1DateDisplay}
+                </p>
                 {[1, 2].map((sessionNumber) => (
                     <div key={`print-session-${sessionNumber}`}>
                         <p className="pw1-session-header">

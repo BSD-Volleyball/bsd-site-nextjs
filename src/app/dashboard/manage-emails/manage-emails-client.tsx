@@ -154,7 +154,7 @@ function EmailCard({
                                     Email
                                 </Badge>
                             </div>
-                            <p className="mt-1 truncate text-sm font-medium">
+                            <p className="mt-1 truncate font-medium text-sm">
                                 {email.subject}
                             </p>
                             <p className="truncate text-muted-foreground text-sm">

@@ -305,7 +305,7 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                     Team Availability for Next Match
                                 </h3>
                             </div>
-                            <p className="text-xs text-teal-600 dark:text-teal-400">
+                            <p className="text-teal-600 text-xs dark:text-teal-400">
                                 {new Date(
                                     `${data.nextMatchAvailability.eventDate}T00:00:00`
                                 ).toLocaleDateString("en-US", {
@@ -333,7 +333,11 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                             )}
                                             <button
                                                 type="button"
-                                                onClick={() => modal.openPlayerDetail(m.userId)}
+                                                onClick={() =>
+                                                    modal.openPlayerDetail(
+                                                        m.userId
+                                                    )
+                                                }
                                                 className={
                                                     isUnavailable
                                                         ? "text-destructive underline decoration-dotted hover:opacity-80"
@@ -573,7 +577,9 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                 >
                                     <button
                                         type="button"
-                                        onClick={() => modal.openPlayerDetail(m.userId)}
+                                        onClick={() =>
+                                            modal.openPlayerDetail(m.userId)
+                                        }
                                         className="font-medium underline decoration-dotted hover:opacity-80"
                                     >
                                         {m.displayName} {m.lastName}

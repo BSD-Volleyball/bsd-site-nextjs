@@ -14,14 +14,9 @@ import type {
     EventType,
     TimeSlot,
     SeasonEvent,
-    SeasonConfig,
-    PlayerUnavailability
+    SeasonConfig
 } from "@/lib/season-types"
-import {
-    getEventsByType,
-    formatEventDate,
-    formatEventTime
-} from "@/lib/season-utils"
+import { getEventsByType } from "@/lib/season-utils"
 
 // Re-export types from season-types.ts (client-safe)
 export type {

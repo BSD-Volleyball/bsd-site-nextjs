@@ -3,10 +3,7 @@ import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
-import {
-    sessions,
-    userRoles
-} from "@/database/schema"
+import { sessions, userRoles } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     type Permission,
@@ -134,9 +131,7 @@ export async function isCaptainForSeason(
     seasonId: number
 ): Promise<boolean> {
     const rows = await getUserRoleRows(userId)
-    return rows.some(
-        (r) => r.role === "captain" && r.season_id === seasonId
-    )
+    return rows.some((r) => r.role === "captain" && r.season_id === seasonId)
 }
 
 export async function isCommissionerBySession(): Promise<boolean> {

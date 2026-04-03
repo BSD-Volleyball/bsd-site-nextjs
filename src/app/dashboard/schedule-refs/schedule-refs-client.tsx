@@ -334,7 +334,7 @@ export function ScheduleRefsClient({
                                                                     Unavailable
                                                                 </Badge>
                                                             ) : ref.playingTimeSlot ? (
-                                                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300">
+                                                                <Badge className="border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200">
                                                                     {
                                                                         ref.playingInfo
                                                                     }
@@ -489,7 +489,7 @@ export function ScheduleRefsClient({
                                                                                                 ref.name
                                                                                             }
                                                                                             {ref.isUnavailable && (
-                                                                                                <span className="ml-1 text-xs text-destructive">
+                                                                                                <span className="ml-1 text-destructive text-xs">
                                                                                                     (unavailable)
                                                                                                 </span>
                                                                                             )}

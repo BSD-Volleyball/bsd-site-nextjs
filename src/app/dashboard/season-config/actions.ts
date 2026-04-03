@@ -174,10 +174,8 @@ export async function saveSeasonConfig(
                     season_amount: metadata.season_amount || null,
                     late_amount: metadata.late_amount || null,
                     max_players: metadata.max_players,
-                    certified_ref_rate:
-                        metadata.certified_ref_rate || null,
-                    uncertified_ref_rate:
-                        metadata.uncertified_ref_rate || null
+                    certified_ref_rate: metadata.certified_ref_rate || null,
+                    uncertified_ref_rate: metadata.uncertified_ref_rate || null
                 })
                 .where(eq(seasons.id, seasonId))
 

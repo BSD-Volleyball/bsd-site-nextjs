@@ -144,10 +144,7 @@ export async function getEditWeek3Data(): Promise<{
                     .from(userUnavailability)
                     .where(
                         and(
-                            inArray(
-                                userUnavailability.signup_id,
-                                allSignupIds
-                            ),
+                            inArray(userUnavailability.signup_id, allSignupIds),
                             eq(userUnavailability.event_id, tryout3Event.id)
                         )
                     )

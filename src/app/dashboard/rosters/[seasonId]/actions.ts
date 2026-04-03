@@ -129,7 +129,10 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             ...new Set(
                 teamRows
                     .filter((t) => coachesDivisionIds.has(t.divisionId))
-                    .flatMap((t) => [t.captain, t.captain2].filter(Boolean) as string[])
+                    .flatMap(
+                        (t) =>
+                            [t.captain, t.captain2].filter(Boolean) as string[]
+                    )
             )
         ]
 
@@ -145,7 +148,10 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
                 .from(users)
                 .where(inArray(users.id, coachUserIds))
             for (const u of coachUserRows) {
-                coachNameMap.set(u.id, `${u.preferredName || u.firstName} ${u.lastName}`)
+                coachNameMap.set(
+                    u.id,
+                    `${u.preferredName || u.firstName} ${u.lastName}`
+                )
             }
         }
 
@@ -230,9 +236,9 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
         for (const t of teamRows) {
             const coaches = coachesDivisionIds.has(t.divisionId)
                 ? [t.captain, t.captain2]
-                    .filter(Boolean)
-                    .map((id) => coachNameMap.get(id!) ?? "")
-                    .filter(Boolean)
+                      .filter(Boolean)
+                      .map((id) => coachNameMap.get(id!) ?? "")
+                      .filter(Boolean)
                 : []
             const rosterTeam: RosterTeam = {
                 id: t.id,

@@ -20,10 +20,7 @@ import {
 import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import {
-    invalidateAllSessionsForUser,
-    isAdminOrDirectorBySession
-} from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
 import {
     getPlayerPictureDbPath,

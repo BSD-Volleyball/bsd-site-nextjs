@@ -23,10 +23,19 @@ import {
     userUnavailability,
     seasonEvents,
     matchReferees,
-    matches,
-    seasonRefs
+    matches
 } from "@/database/schema"
-import { eq, and, desc, count, inArray, isNotNull, or, gte, asc } from "drizzle-orm"
+import {
+    eq,
+    and,
+    desc,
+    count,
+    inArray,
+    isNotNull,
+    or,
+    gte,
+    asc
+} from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
@@ -1269,10 +1278,7 @@ export default async function DashboardPage() {
                 const assignedOnDate = await db
                     .select({ id: matchReferees.id })
                     .from(matchReferees)
-                    .innerJoin(
-                        matches,
-                        eq(matchReferees.match_id, matches.id)
-                    )
+                    .innerJoin(matches, eq(matchReferees.match_id, matches.id))
                     .where(
                         and(
                             eq(matchReferees.season_id, seasonId),
@@ -1280,7 +1286,7 @@ export default async function DashboardPage() {
                         )
                     )
 
-                const dateObj = new Date(nextDate + "T00:00:00")
+                const dateObj = new Date(`${nextDate}T00:00:00`)
                 refScheduleStatus = {
                     nextDateLabel: dateObj.toLocaleDateString("en-US", {
                         weekday: "short",
@@ -1513,21 +1519,18 @@ export default async function DashboardPage() {
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
                                 <RiCalendarLine className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                                <CardTitle className="text-teal-700 text-lg dark:text-teal-300">
+                                <CardTitle className="text-lg text-teal-700 dark:text-teal-300">
                                     Your Upcoming Ref Assignments
                                 </CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-teal-700 text-sm dark:text-teal-300">
-                                You have{" "}
-                                {refUpcomingMatches.length} match
-                                {refUpcomingMatches.length !== 1
-                                    ? "es"
-                                    : ""}{" "}
-                                to ref on{" "}
+                            <p className="text-sm text-teal-700 dark:text-teal-300">
+                                You have {refUpcomingMatches.length} match
+                                {refUpcomingMatches.length !== 1 ? "es" : ""} to
+                                ref on{" "}
                                 {new Date(
-                                    refUpcomingMatches[0].date + "T00:00:00"
+                                    `${refUpcomingMatches[0].date}T00:00:00`
                                 ).toLocaleDateString("en-US", {
                                     weekday: "short",
                                     month: "short",
@@ -1539,7 +1542,7 @@ export default async function DashboardPage() {
                                 {refUpcomingMatches.map((m, i) => (
                                     <div
                                         key={`ref-match-${m.court}-${m.time}-${i}`}
-                                        className="rounded-md bg-teal-100 p-2 text-teal-800 text-sm dark:bg-teal-900 dark:text-teal-200"
+                                        className="rounded-md bg-teal-100 p-2 text-sm text-teal-800 dark:bg-teal-900 dark:text-teal-200"
                                     >
                                         <span className="font-medium">
                                             {m.divisionName}
@@ -1548,17 +1551,13 @@ export default async function DashboardPage() {
                                         {m.time
                                             ? new Date(
                                                   `2000-01-01T${m.time}`
-                                              ).toLocaleTimeString(
-                                                  "en-US",
-                                                  {
-                                                      hour: "numeric",
-                                                      minute: "2-digit"
-                                                  }
-                                              )
+                                              ).toLocaleTimeString("en-US", {
+                                                  hour: "numeric",
+                                                  minute: "2-digit"
+                                              })
                                             : "TBD"}
                                         <br />
-                                        {m.homeTeamName} vs{" "}
-                                        {m.awayTeamName}
+                                        {m.homeTeamName} vs {m.awayTeamName}
                                     </div>
                                 ))}
                             </div>

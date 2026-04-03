@@ -650,7 +650,11 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
         }
 
         const allSeasonRows = await db
-            .select({ id: seasons.id, year: seasons.year, name: seasons.season })
+            .select({
+                id: seasons.id,
+                year: seasons.year,
+                name: seasons.season
+            })
             .from(seasons)
             .orderBy(desc(seasons.id))
             .limit(11)

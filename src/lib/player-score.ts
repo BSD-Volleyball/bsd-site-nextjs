@@ -12,7 +12,9 @@ import {
 
 const DEFAULT_SCORE = 200
 
-async function getAdminEvaluatorIds(evaluatorIds: string[]): Promise<Set<string>> {
+async function getAdminEvaluatorIds(
+    evaluatorIds: string[]
+): Promise<Set<string>> {
     if (evaluatorIds.length === 0) return new Set()
     const rows = await db
         .select({ user_id: userRoles.user_id })

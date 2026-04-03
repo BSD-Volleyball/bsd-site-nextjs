@@ -437,9 +437,8 @@ export async function getHomeworkStatusData(
                 }
 
                 const homeworkRowCount =
-                    draftHomeworkCountMap
-                        .get(captainId)
-                        ?.get(div.divisionId) ?? 0
+                    draftHomeworkCountMap.get(captainId)?.get(div.divisionId) ??
+                    0
                 const completionThreshold = div.numTeams * 8
                 const draftHomeworkComplete =
                     completionThreshold > 0 &&

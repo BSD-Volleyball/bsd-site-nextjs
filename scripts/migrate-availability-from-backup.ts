@@ -9,14 +9,14 @@
  */
 
 import { config } from "dotenv"
-import { readFileSync } from "fs"
+import { readFileSync } from "node:fs"
 import { Client } from "pg"
 
 config({ path: ".env.local" })
 
 // Original season 68 dates from the backup
 const SEASON_ID = 68
-const SEASON_YEAR = 2026
+const _SEASON_YEAR = 2026
 
 const ORIGINAL_EVENTS = {
     late_date: { date: "2026-02-24", label: "Late Registration Starts" },
@@ -24,7 +24,7 @@ const ORIGINAL_EVENTS = {
     tryouts: [
         { date: "2026-03-05", label: "Tryout #1" },
         { date: "2026-03-12", label: "Tryout #2" },
-        { date: "2026-03-19", label: "Tryout #3" },
+        { date: "2026-03-19", label: "Tryout #3" }
     ],
     drafts: [
         { date: "2026-03-19", label: "Draft #1" },
@@ -32,7 +32,7 @@ const ORIGINAL_EVENTS = {
         { date: "2026-03-24", label: "Draft #3" },
         { date: "2026-03-26", label: "Draft #4" },
         { date: "2026-03-29", label: "Draft #5" },
-        { date: "2026-03-31", label: "Draft #6" },
+        { date: "2026-03-31", label: "Draft #6" }
     ],
     regular_season: [
         { date: "2026-04-02", label: "Week 1" },
@@ -40,19 +40,19 @@ const ORIGINAL_EVENTS = {
         { date: "2026-04-16", label: "Week 3" },
         { date: "2026-04-23", label: "Week 4" },
         { date: "2026-04-30", label: "Week 5" },
-        { date: "2026-05-07", label: "Week 6" },
+        { date: "2026-05-07", label: "Week 6" }
     ],
     playoffs: [
         { date: "2026-05-14", label: "Playoff Round 1" },
         { date: "2026-05-21", label: "Playoff Round 2" },
-        { date: "2026-05-28", label: "Championship" },
-    ],
+        { date: "2026-05-28", label: "Championship" }
+    ]
 }
 
 const TRYOUT_TIMES = {
-    "2026-03-05": ["19:00:00", "20:30:00"],           // 7pm, 8:30pm
+    "2026-03-05": ["19:00:00", "20:30:00"], // 7pm, 8:30pm
     "2026-03-12": ["19:00:00", "20:00:00", "21:00:00"], // 7pm, 8pm, 9pm
-    "2026-03-19": ["19:00:00", "20:00:00", "21:00:00"], // 7pm, 8pm, 9pm
+    "2026-03-19": ["19:00:00", "20:00:00", "21:00:00"] // 7pm, 8pm, 9pm
 }
 
 // Build a lookup: MM/DD -> YYYY-MM-DD for season 68
@@ -61,10 +61,10 @@ function buildDateLookup(): Map<string, string> {
     const allDates = [
         ...ORIGINAL_EVENTS.tryouts,
         ...ORIGINAL_EVENTS.regular_season,
-        ...ORIGINAL_EVENTS.playoffs,
+        ...ORIGINAL_EVENTS.playoffs
     ]
     for (const e of allDates) {
-        const d = new Date(e.date + "T12:00:00")
+        const d = new Date(`${e.date}T12:00:00`)
         const mm = String(d.getMonth() + 1).padStart(2, "0")
         const dd = String(d.getDate()).padStart(2, "0")
         lookup.set(`${mm}/${dd}`, e.date)
@@ -99,9 +99,11 @@ async function main() {
         console.log("🗑️  Deleting existing test events for season 68...")
         const deleted = await client.query(
             "DELETE FROM season_events WHERE season_id = $1 RETURNING id",
-            [SEASON_ID],
+            [SEASON_ID]
         )
-        console.log(`   Deleted ${deleted.rowCount} existing events (cascade deletes time_slots and unavailability)`)
+        console.log(
+            `   Deleted ${deleted.rowCount} existing events (cascade deletes time_slots and unavailability)`
+        )
 
         // Step 2: Create correct events
         console.log("\n📅 Creating correct season events from backup data...")
@@ -114,18 +116,30 @@ async function main() {
             const res = await client.query(
                 `INSERT INTO season_events (season_id, event_type, event_date, label, sort_order)
                  VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-                [SEASON_ID, type, date, label, sortOrder],
+                [SEASON_ID, type, date, label, sortOrder]
             )
             return res.rows[0].id
         }
 
         // Late date
-        const lateId = await insertEvent("late_date", ORIGINAL_EVENTS.late_date.date, ORIGINAL_EVENTS.late_date.label)
-        console.log(`   Created late_date: ${ORIGINAL_EVENTS.late_date.date} (ID ${lateId})`)
+        const lateId = await insertEvent(
+            "late_date",
+            ORIGINAL_EVENTS.late_date.date,
+            ORIGINAL_EVENTS.late_date.label
+        )
+        console.log(
+            `   Created late_date: ${ORIGINAL_EVENTS.late_date.date} (ID ${lateId})`
+        )
 
         // Captain select
-        const captId = await insertEvent("captain_select", ORIGINAL_EVENTS.captain_select.date, ORIGINAL_EVENTS.captain_select.label)
-        console.log(`   Created captain_select: ${ORIGINAL_EVENTS.captain_select.date} (ID ${captId})`)
+        const captId = await insertEvent(
+            "captain_select",
+            ORIGINAL_EVENTS.captain_select.date,
+            ORIGINAL_EVENTS.captain_select.label
+        )
+        console.log(
+            `   Created captain_select: ${ORIGINAL_EVENTS.captain_select.date} (ID ${captId})`
+        )
 
         // Tryouts
         for (const t of ORIGINAL_EVENTS.tryouts) {
@@ -140,7 +154,7 @@ async function main() {
                     await client.query(
                         `INSERT INTO event_time_slots (event_id, start_time, sort_order, slot_label)
                          VALUES ($1, $2, $3, $4)`,
-                        [id, times[i], i + 1, `Session ${i + 1}`],
+                        [id, times[i], i + 1, `Session ${i + 1}`]
                     )
                 }
                 console.log(`     Added ${times.length} time slots`)
@@ -158,7 +172,9 @@ async function main() {
         for (const s of ORIGINAL_EVENTS.regular_season) {
             const id = await insertEvent("regular_season", s.date, s.label)
             eventIdMap.set(s.date, id)
-            console.log(`   Created regular_season: ${s.date} - ${s.label} (ID ${id})`)
+            console.log(
+                `   Created regular_season: ${s.date} - ${s.label} (ID ${id})`
+            )
         }
 
         // Playoffs
@@ -171,7 +187,7 @@ async function main() {
         // Build event_date -> event_id[] lookup (multiple events can share a date)
         const allEventsRes = await client.query(
             `SELECT id, event_date FROM season_events WHERE season_id = $1`,
-            [SEASON_ID],
+            [SEASON_ID]
         )
         const eventIdsMap = new Map<string, number[]>()
         for (const row of allEventsRes.rows) {
@@ -194,7 +210,7 @@ async function main() {
         console.log("\n📦 Parsing dates_missing from backup...")
         const backupSql = readFileSync("/tmp/signups_data.sql", "utf-8")
         const copyMatch = backupSql.match(
-            /COPY public\.signups \(([^)]+)\) FROM stdin;\n([\s\S]*?)\n\\\./,
+            /COPY public\.signups \(([^)]+)\) FROM stdin;\n([\s\S]*?)\n\\\./
         )
         if (!copyMatch) throw new Error("Could not find COPY data in backup")
 
@@ -215,7 +231,11 @@ async function main() {
             const signupId = parseInt(fields[0])
             const datesMissing = fields[datesMissingIdx]
 
-            if (!datesMissing || datesMissing === "" || datesMissing === "\\N") {
+            if (
+                !datesMissing ||
+                datesMissing === "" ||
+                datesMissing === "\\N"
+            ) {
                 skippedEmpty++
                 continue
             }
@@ -240,10 +260,12 @@ async function main() {
                 // Check if signup still exists in prod DB
                 const signupExists = await client.query(
                     "SELECT id FROM signups WHERE id = $1",
-                    [signupId],
+                    [signupId]
                 )
                 if (signupExists.rows.length === 0) {
-                    console.log(`   ⚠️  Signup ${signupId} not found in database, skipping`)
+                    console.log(
+                        `   ⚠️  Signup ${signupId} not found in database, skipping`
+                    )
                     continue
                 }
 
@@ -254,11 +276,14 @@ async function main() {
                             `INSERT INTO player_unavailability (signup_id, event_id, created_at, updated_at)
                              VALUES ($1, $2, NOW(), NOW())
                              ON CONFLICT (signup_id, event_id) DO NOTHING`,
-                            [signupId, eventId],
+                            [signupId, eventId]
                         )
                         insertedCount++
+                        // biome-ignore lint/suspicious/noExplicitAny: accessing .message on caught error
                     } catch (err: any) {
-                        console.log(`   ⚠️  Error inserting unavailability for signup ${signupId}, event ${eventId}: ${err.message}`)
+                        console.log(
+                            `   ⚠️  Error inserting unavailability for signup ${signupId}, event ${eventId}: ${err.message}`
+                        )
                     }
                 }
             }
@@ -269,14 +294,18 @@ async function main() {
         console.log(`   Skipped (empty dates_missing): ${skippedEmpty}`)
         console.log(`   Skipped (no matching event): ${skippedNoMatch}`)
         if (unmatchedDates.size > 0) {
-            console.log(`   ⚠️  Unmatched date strings: ${Array.from(unmatchedDates).join(", ")}`)
+            console.log(
+                `   ⚠️  Unmatched date strings: ${Array.from(unmatchedDates).join(", ")}`
+            )
         }
 
         // Step 4: Verify
         const verifyCount = await client.query(
-            "SELECT COUNT(*) as cnt FROM player_unavailability",
+            "SELECT COUNT(*) as cnt FROM player_unavailability"
         )
-        console.log(`\n📊 Total unavailability records in DB: ${verifyCount.rows[0].cnt}`)
+        console.log(
+            `\n📊 Total unavailability records in DB: ${verifyCount.rows[0].cnt}`
+        )
 
         const sampleData = await client.query(`
             SELECT pu.signup_id, u.first_name, u.last_name, se.label, se.event_date
@@ -292,7 +321,9 @@ async function main() {
             const d = new Date(row.event_date)
             const mm = String(d.getUTCMonth() + 1).padStart(2, "0")
             const dd = String(d.getUTCDate()).padStart(2, "0")
-            console.log(`   ${row.first_name} ${row.last_name} (signup ${row.signup_id}): ${row.label} (${mm}/${dd})`)
+            console.log(
+                `   ${row.first_name} ${row.last_name} (signup ${row.signup_id}): ${row.label} (${mm}/${dd})`
+            )
         }
 
         await client.query("COMMIT")

@@ -74,13 +74,7 @@ function normalizeMembershipValue(value: string | null | undefined): string {
         : ""
 }
 
-const readOnlyFields = new Set([
-    "id",
-    "name",
-    "image",
-    "avatar",
-    "avatarUrl"
-])
+const readOnlyFields = new Set(["id", "name", "image", "avatar", "avatarUrl"])
 
 interface SignupFormData {
     id: number
