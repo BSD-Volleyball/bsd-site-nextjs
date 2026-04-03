@@ -451,7 +451,7 @@ export async function getCurrentSeasonScheduleData(
                                 ? `${set.home}-${set.away}`
                                 : `${set.away}-${set.home}`
                         )
-                        .join("  ")
+                        .join(", ")
 
                     existing.matches.push({
                         id: match.id,

@@ -87,6 +87,7 @@ export async function getMatchDatesForSeason(): Promise<{
 
 export interface MatchScoreData {
     matchId: number
+    time: string | null
     court: number | null
     homeTeamId: number | null
     homeTeamName: string
@@ -173,6 +174,7 @@ export async function getMatchesForDate(date: string): Promise<{
             .select({
                 id: matches.id,
                 division: matches.division,
+                time: matches.time,
                 court: matches.court,
                 homeTeam: matches.home_team,
                 awayTeam: matches.away_team,
@@ -189,7 +191,7 @@ export async function getMatchesForDate(date: string): Promise<{
             })
             .from(matches)
             .where(and(eq(matches.season, seasonId), eq(matches.date, date)))
-            .orderBy(asc(matches.court))
+            .orderBy(asc(matches.time), asc(matches.court))
 
         // Group matches by division
         const divisionMap = new Map<number, MatchScoreData[]>()
@@ -199,6 +201,7 @@ export async function getMatchesForDate(date: string): Promise<{
 
             const matchData: MatchScoreData = {
                 matchId: row.id,
+                time: row.time,
                 court: row.court,
                 homeTeamId: row.homeTeam,
                 homeTeamName: homeTeam?.name ?? "TBD",

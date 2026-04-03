@@ -23,6 +23,7 @@ import {
     type MatchScoreInput
 } from "./actions"
 import { compressImageForUpload } from "@/lib/image-compression"
+import { formatMatchTime } from "@/lib/season-utils"
 
 interface EnterScoresClientProps {
     matchDates: MatchDateOption[]
@@ -70,88 +71,108 @@ function parseIntOrNull(value: string): number | null {
     return Number.isNaN(num) ? null : num
 }
 
+function isMatchEmpty(form: MatchFormState): boolean {
+    return (
+        form.winner === null &&
+        form.homeScore === "" &&
+        form.awayScore === "" &&
+        form.homeSet1Score === "" &&
+        form.awaySet1Score === "" &&
+        form.homeSet2Score === "" &&
+        form.awaySet2Score === "" &&
+        form.homeSet3Score === "" &&
+        form.awaySet3Score === ""
+    )
+}
+
 function validateMatch(match: MatchScoreData, form: MatchFormState): string[] {
-    const warnings: string[] = []
+    if (isMatchEmpty(form)) return []
 
-    const sets: { home: number | null; away: number | null }[] = [
-        {
-            home: parseIntOrNull(form.homeSet1Score),
-            away: parseIntOrNull(form.awaySet1Score)
-        },
-        {
-            home: parseIntOrNull(form.homeSet2Score),
-            away: parseIntOrNull(form.awaySet2Score)
-        },
-        {
-            home: parseIntOrNull(form.homeSet3Score),
-            away: parseIntOrNull(form.awaySet3Score)
-        }
+    const errors: string[] = []
+
+    const homeGamesWon = parseIntOrNull(form.homeScore)
+    const awayGamesWon = parseIntOrNull(form.awayScore)
+    const set1Home = parseIntOrNull(form.homeSet1Score)
+    const set1Away = parseIntOrNull(form.awaySet1Score)
+    const set2Home = parseIntOrNull(form.homeSet2Score)
+    const set2Away = parseIntOrNull(form.awaySet2Score)
+    const set3Home = parseIntOrNull(form.homeSet3Score)
+    const set3Away = parseIntOrNull(form.awaySet3Score)
+
+    // Completeness checks
+    if (form.winner === null) errors.push("Overall Winner must be selected")
+    if (homeGamesWon === null) errors.push("Home Total Games Won is required")
+    if (awayGamesWon === null) errors.push("Away Total Games Won is required")
+    if (set1Home === null) errors.push("Game 1 Score (Home) is required")
+    if (set1Away === null) errors.push("Game 1 Score (Away) is required")
+    if (set2Home === null) errors.push("Game 2 Score (Home) is required")
+    if (set2Away === null) errors.push("Game 2 Score (Away) is required")
+
+    // Game 3 is required when total games played = 3
+    const totalGames = (homeGamesWon ?? 0) + (awayGamesWon ?? 0)
+    if (homeGamesWon !== null && awayGamesWon !== null && totalGames === 3) {
+        if (set3Home === null)
+            errors.push("Game 3 Score (Home) is required when total games is 3")
+        if (set3Away === null)
+            errors.push("Game 3 Score (Away) is required when total games is 3")
+    }
+
+    // Stop here if any fields are missing — logic checks need complete data
+    if (errors.length > 0) return errors
+
+    // Logic alignment checks (all fields guaranteed non-null at this point)
+    const sets: { home: number; away: number }[] = [
+        { home: set1Home!, away: set1Away! },
+        { home: set2Home!, away: set2Away! }
     ]
+    if (set3Home !== null && set3Away !== null) {
+        sets.push({ home: set3Home, away: set3Away })
+    }
 
-    const enteredHomeWins = parseIntOrNull(form.homeScore)
-    const enteredAwayWins = parseIntOrNull(form.awayScore)
-
-    // Count implied wins from game scores
     let impliedHomeWins = 0
     let impliedAwayWins = 0
-    let gamesWithScores = 0
-
     for (const set of sets) {
-        if (set.home !== null && set.away !== null) {
-            gamesWithScores++
-            if (set.home > set.away) impliedHomeWins++
-            else if (set.away > set.home) impliedAwayWins++
+        if (set.home > set.away) impliedHomeWins++
+        else if (set.away > set.home) impliedAwayWins++
+    }
+
+    if (homeGamesWon !== impliedHomeWins) {
+        errors.push(
+            `Home Total Games Won is ${homeGamesWon} but game scores show ${impliedHomeWins}`
+        )
+    }
+    if (awayGamesWon !== impliedAwayWins) {
+        errors.push(
+            `Away Total Games Won is ${awayGamesWon} but game scores show ${impliedAwayWins}`
+        )
+    }
+
+    if (form.winner !== null) {
+        const winnerIsHome = form.winner === match.homeTeamId
+        const winnerIsAway = form.winner === match.awayTeamId
+        if (winnerIsHome && impliedAwayWins > impliedHomeWins) {
+            errors.push(
+                `${match.homeTeamName} is selected as winner but Away won more games from scores`
+            )
+        }
+        if (winnerIsAway && impliedHomeWins > impliedAwayWins) {
+            errors.push(
+                `${match.awayTeamName} is selected as winner but Home won more games from scores`
+            )
+        }
+        if (winnerIsHome && awayGamesWon! > homeGamesWon!) {
+            errors.push(
+                `${match.homeTeamName} is selected as winner but Away Total Games Won is higher`
+            )
+        }
+        if (winnerIsAway && homeGamesWon! > awayGamesWon!) {
+            errors.push(
+                `${match.awayTeamName} is selected as winner but Home Total Games Won is higher`
+            )
         }
     }
 
-    // Only validate if we have some scores entered
-    if (gamesWithScores > 0) {
-        // Check 1: game scores vs games won
-        if (enteredHomeWins !== null && enteredHomeWins !== impliedHomeWins) {
-            warnings.push(
-                `Home games won: entered ${enteredHomeWins} but game scores show ${impliedHomeWins}`
-            )
-        }
-        if (enteredAwayWins !== null && enteredAwayWins !== impliedAwayWins) {
-            warnings.push(
-                `Away games won: entered ${enteredAwayWins} but game scores show ${impliedAwayWins}`
-            )
-        }
-
-        // Check 2: winner vs games won
-        if (form.winner !== null) {
-            const winnerIsHome = form.winner === match.homeTeamId
-            const winnerIsAway = form.winner === match.awayTeamId
-            if (winnerIsHome && impliedAwayWins > impliedHomeWins) {
-                warnings.push("Selected winner is Home but Away won more games")
-            }
-            if (winnerIsAway && impliedHomeWins > impliedAwayWins) {
-                warnings.push("Selected winner is Away but Home won more games")
-            }
-        }
-
-        // Check 3: winner vs entered games won
-        if (
-            form.winner !== null &&
-            enteredHomeWins !== null &&
-            enteredAwayWins !== null
-        ) {
-            const winnerIsHome = form.winner === match.homeTeamId
-            const winnerIsAway = form.winner === match.awayTeamId
-            if (winnerIsHome && enteredAwayWins > enteredHomeWins) {
-                warnings.push(
-                    "Selected winner is Home but entered Away wins > Home wins"
-                )
-            }
-            if (winnerIsAway && enteredHomeWins > enteredAwayWins) {
-                warnings.push(
-                    "Selected winner is Away but entered Home wins > Away wins"
-                )
-            }
-        }
-    }
-
-    return warnings
+    return errors
 }
 
 function isSupportedImageFile(file: File): boolean {
@@ -289,9 +310,11 @@ export function EnterScoresClient({
         })
 
         if (newWarnings.length > 0) {
-            toast.warning(
-                "Scores saved with warnings — please review highlighted matches."
+            toast.error(
+                "Cannot save — fix errors in highlighted matches first."
             )
+            setSavingDivision(null)
+            return
         }
 
         try {
@@ -734,14 +757,22 @@ function MatchScoreEntry({
                 </div>
             )}
 
+            {/* Time and court */}
+            {(match.time || match.court !== null) && (
+                <div className="mb-2 flex items-center gap-3 text-muted-foreground text-sm">
+                    {match.time && <span>{formatMatchTime(match.time)}</span>}
+                    {match.court !== null && <span>Court {match.court}</span>}
+                </div>
+            )}
+
             {/* Score table */}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
                         <tr>
                             {/* Row label column */}
-                            <th className="w-36 pb-2 text-left font-normal text-muted-foreground">
-                                Winner
+                            <th className="w-44 pb-2 text-left font-normal text-muted-foreground">
+                                Overall Winner: (select)
                             </th>
                             <th className="w-24 pb-2 text-center">
                                 <button
@@ -787,7 +818,7 @@ function MatchScoreEntry({
                     <tbody className="divide-y">
                         {/* Game score rows */}
                         <ScoreInputRow
-                            label="Game 1"
+                            label="Game 1 Score"
                             homeValue={form.homeSet1Score}
                             awayValue={form.awaySet1Score}
                             onHomeChange={(v) =>
@@ -798,7 +829,7 @@ function MatchScoreEntry({
                             }
                         />
                         <ScoreInputRow
-                            label="Game 2"
+                            label="Game 2 Score"
                             homeValue={form.homeSet2Score}
                             awayValue={form.awaySet2Score}
                             onHomeChange={(v) =>
@@ -809,7 +840,11 @@ function MatchScoreEntry({
                             }
                         />
                         <ScoreInputRow
-                            label={isPlayoff ? "Game 3 (if needed)" : "Game 3"}
+                            label={
+                                isPlayoff
+                                    ? "Game 3 Score (if needed)"
+                                    : "Game 3 Score"
+                            }
                             homeValue={form.homeSet3Score}
                             awayValue={form.awaySet3Score}
                             onHomeChange={(v) =>
@@ -821,9 +856,9 @@ function MatchScoreEntry({
                             optional={isPlayoff}
                         />
 
-                        {/* Games won — separated */}
+                        {/* Total games won — separated */}
                         <ScoreInputRow
-                            label="Games Won"
+                            label="Total Games Won"
                             homeValue={form.homeScore}
                             awayValue={form.awayScore}
                             onHomeChange={(v) => onFieldChange("homeScore", v)}
