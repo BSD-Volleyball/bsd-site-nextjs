@@ -10,9 +10,10 @@ import {
     seasonEvents,
     userUnavailability,
     divisions,
-    seasons
+    seasons,
+    matches
 } from "@/database/schema"
-import { eq, and, inArray, asc, desc } from "drizzle-orm"
+import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
@@ -57,6 +58,7 @@ export type TeamAvailabilityData = {
     roster: RosterPlayer[]
     allSeasons: SeasonInfo[]
     playerPicUrl: string
+    teamMatchTimeByEventDate: Record<string, string | null>
 }
 
 export type TeamAvailabilityError = {
@@ -261,6 +263,25 @@ export async function getTeamAvailabilityData(
         name: s.season
     }))
 
+    // Fetch team's match times so captains can see when they play on each date
+    const teamMatchRows = await db
+        .select({ date: matches.date, time: matches.time })
+        .from(matches)
+        .where(
+            and(
+                eq(matches.season, config.seasonId),
+                or(
+                    eq(matches.home_team, selectedTeam.id),
+                    eq(matches.away_team, selectedTeam.id)
+                )
+            )
+        )
+
+    const teamMatchTimeByEventDate: Record<string, string | null> = {}
+    for (const m of teamMatchRows) {
+        if (m.date) teamMatchTimeByEventDate[m.date] = m.time ?? null
+    }
+
     return {
         status: true,
         isAdmin,
@@ -269,6 +290,7 @@ export async function getTeamAvailabilityData(
         events: events as EventInfo[],
         roster,
         allSeasons,
-        playerPicUrl: process.env.PLAYER_PIC_URL ?? ""
+        playerPicUrl: process.env.PLAYER_PIC_URL ?? "",
+        teamMatchTimeByEventDate
     }
 }

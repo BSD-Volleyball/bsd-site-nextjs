@@ -39,7 +39,15 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
     const [data, setData] = useState<TeamAvailabilityData>(initialData)
     const [isPending, startTransition] = useTransition()
 
-    const { team, allTeams, events, roster, allSeasons, playerPicUrl } = data
+    const {
+        team,
+        allTeams,
+        events,
+        roster,
+        allSeasons,
+        playerPicUrl,
+        teamMatchTimeByEventDate
+    } = data
 
     function handleTeamChange(teamIdStr: string) {
         const teamId = parseInt(teamIdStr, 10)
@@ -278,6 +286,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                         roster={roster}
                         allSeasons={allSeasons}
                         playerPicUrl={playerPicUrl}
+                        teamMatchTimeByEventDate={teamMatchTimeByEventDate}
                     />
                 </div>
             )}

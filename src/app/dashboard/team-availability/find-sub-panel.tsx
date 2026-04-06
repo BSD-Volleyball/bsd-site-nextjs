@@ -64,6 +64,7 @@ type FindSubPanelProps = {
     roster: RosterPlayer[]
     allSeasons: SeasonInfo[]
     playerPicUrl: string
+    teamMatchTimeByEventDate: Record<string, string | null>
 }
 
 export function FindSubPanel({
@@ -71,7 +72,8 @@ export function FindSubPanel({
     redEvents,
     roster,
     allSeasons,
-    playerPicUrl
+    playerPicUrl,
+    teamMatchTimeByEventDate
 }: FindSubPanelProps) {
     // Player detail modal
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
@@ -162,17 +164,26 @@ export function FindSubPanel({
                                     <SelectValue placeholder="Select a date needing a sub…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {redEvents.map((e) => (
-                                        <SelectItem
-                                            key={e.id}
-                                            value={e.id.toString()}
-                                        >
-                                            {formatDate(e.eventDate)}
-                                            {e.eventType === "playoff"
-                                                ? " (Playoff)"
-                                                : ""}
-                                        </SelectItem>
-                                    ))}
+                                    {redEvents.map((e) => {
+                                        const matchTime =
+                                            teamMatchTimeByEventDate[
+                                                e.eventDate
+                                            ] ?? null
+                                        return (
+                                            <SelectItem
+                                                key={e.id}
+                                                value={e.id.toString()}
+                                            >
+                                                {formatDate(e.eventDate)}
+                                                {matchTime
+                                                    ? ` — ${formatMatchTime(matchTime)}`
+                                                    : ""}
+                                                {e.eventType === "playoff"
+                                                    ? " (Playoff)"
+                                                    : ""}
+                                            </SelectItem>
+                                        )
+                                    })}
                                 </SelectContent>
                             </Select>
 
@@ -351,6 +362,7 @@ function RegularCandidateRow({
                         className="font-medium text-sm hover:underline"
                     >
                         {name}
+                        {genderLabel(c.male) ? ` (${genderLabel(c.male)})` : ""}
                     </button>
                     {nonMaleNeeded && c.male !== true && (
                         <Badge variant="secondary" className="text-xs">
@@ -373,7 +385,6 @@ function RegularCandidateRow({
                     {c.matchTime
                         ? ` · Their match: ${formatMatchTime(c.matchTime)}`
                         : ""}
-                    {genderLabel(c.male) ? ` · ${genderLabel(c.male)}` : ""}
                 </p>
                 {c.notes.length > 0 && (
                     <p className="mt-0.5 text-muted-foreground/70 text-xs">
@@ -410,6 +421,7 @@ function PermanentCandidateRow({
                         className="font-medium text-sm hover:underline"
                     >
                         {name}
+                        {genderLabel(c.male) ? ` (${genderLabel(c.male)})` : ""}
                     </button>
                     {c.approved ? (
                         <Badge variant="secondary" className="text-xs">
@@ -425,12 +437,10 @@ function PermanentCandidateRow({
                     <p className="text-muted-foreground text-xs">
                         Last played: {c.lastDivisionName}
                         {c.lastSeasonLabel ? ` (${c.lastSeasonLabel})` : ""}
-                        {genderLabel(c.male) ? ` · ${genderLabel(c.male)}` : ""}
                     </p>
                 ) : (
                     <p className="text-muted-foreground text-xs">
                         No prior season history
-                        {genderLabel(c.male) ? ` · ${genderLabel(c.male)}` : ""}
                     </p>
                 )}
                 {c.lastOverall != null && (

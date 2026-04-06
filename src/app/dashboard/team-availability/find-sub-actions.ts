@@ -59,17 +59,6 @@ function parseTimeMins(timeStr: string | null): number | null {
     return h * 60 + m
 }
 
-function formatMatchTime(timeStr: string | null): string {
-    if (!timeStr) return ""
-    const mins = parseTimeMins(timeStr)
-    if (mins === null) return timeStr
-    const h = Math.floor(mins / 60)
-    const m = mins % 60
-    const ampm = h >= 12 ? "PM" : "AM"
-    const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h
-    return `${displayH}:${m.toString().padStart(2, "0")} ${ampm}`
-}
-
 export async function getRegularSubCandidates(
     teamId: number,
     eventId: number
@@ -402,12 +391,8 @@ export async function getRegularSubCandidates(
             const timeDiff = Math.abs(candidateTimeMins - ourMatchTimeMins)
             if (timeDiff <= 90) {
                 score += 50
-                notes.push(`Adjacent time (${formatMatchTime(matchTime)})`)
-            } else {
-                notes.push(`Plays at ${formatMatchTime(matchTime)}`)
+                notes.push("Adjacent time slot")
             }
-        } else if (matchTime) {
-            notes.push(`Plays at ${formatMatchTime(matchTime)}`)
         }
 
         // Same division bonus
@@ -510,6 +495,17 @@ export async function getPermanentSubCandidates(
         return { status: true, candidates: [], replacedPlayerName }
     }
 
+    // Fetch all divisions with their levels for proximity scoring
+    const allDivisionRows = await db
+        .select({ id: divisions.id, level: divisions.level })
+        .from(divisions)
+        .where(eq(divisions.active, true))
+
+    const divisionLevelMap = new Map(
+        allDivisionRows.map((d) => [d.id, d.level])
+    )
+    const playerDivLevel = divisionLevelMap.get(playerRow.divisionId) ?? null
+
     // Get historical draft data for waitlist players to find their most recent division
     const waitlistUserIds = sameGenderRows.map((r) => r.userId)
     const draftHistoryRows = await db
@@ -554,11 +550,24 @@ export async function getPermanentSubCandidates(
         const history = historyMap.get(r.userId)
         let score = 0
 
-        // Division match is the primary factor
-        if (history?.lastDivisionId === playerRow.divisionId) {
-            score += 200
-        } else if (history) {
-            score += 50 // Has history, wrong division
+        // Division proximity is the primary factor (same division = highest score)
+        if (history) {
+            const histLevel =
+                divisionLevelMap.get(history.lastDivisionId) ?? null
+            if (playerDivLevel !== null && histLevel !== null) {
+                const levelDiff = Math.abs(histLevel - playerDivLevel)
+                if (levelDiff === 0) {
+                    score += 300
+                } else if (levelDiff === 1) {
+                    score += 100
+                } else if (levelDiff === 2) {
+                    score += 50
+                } else {
+                    score += 20
+                }
+            } else {
+                score += 20 // has history but level unknown
+            }
         }
 
         // Overall pick proximity
