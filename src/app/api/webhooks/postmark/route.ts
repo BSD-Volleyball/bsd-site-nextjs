@@ -136,32 +136,79 @@ async function notifyAssignee(opts: {
     from: string
     bodyPreview: string | null
 }) {
-    if (!opts.assignedTo) return
-
-    const [assignee] = await db
-        .select({ email: users.email, name: users.name })
-        .from(users)
-        .where(eq(users.id, opts.assignedTo))
-        .limit(1)
-
-    if (!assignee?.email) return
-
     const label = opts.ticketType === "email" ? "Email" : "Concern"
-    await sendBatchEmails([
-        {
-            from: site.mailFrom,
-            to: assignee.email,
-            subject: `New Reply on ${label} #${opts.ticketId}: ${opts.subject}`,
-            htmlBody: buildThreadReplyNotificationHtml({
-                appUrl: opts.appUrl,
-                ticketType: opts.ticketType,
-                ticketId: opts.ticketId,
-                subject: opts.subject,
-                from: opts.from,
-                bodyPreview: opts.bodyPreview
-            })
+    const notifSubject = `New Reply on ${label} #${opts.ticketId}: ${opts.subject}`
+    const notifHtml = buildThreadReplyNotificationHtml({
+        appUrl: opts.appUrl,
+        ticketType: opts.ticketType,
+        ticketId: opts.ticketId,
+        subject: opts.subject,
+        from: opts.from,
+        bodyPreview: opts.bodyPreview
+    })
+
+    if (opts.assignedTo) {
+        const [assignee] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, opts.assignedTo))
+            .limit(1)
+
+        if (assignee?.email) {
+            await sendBatchEmails([
+                {
+                    from: site.mailFrom,
+                    to: assignee.email,
+                    subject: notifSubject,
+                    htmlBody: notifHtml
+                }
+            ])
+            return
         }
-    ])
+    }
+
+    // No assignee (or assignee has no email) — notify the whole group
+    if (opts.ticketType === "email") {
+        const adminRows = await db
+            .select({ email: users.email })
+            .from(userRoles)
+            .innerJoin(users, eq(userRoles.user_id, users.id))
+            .where(eq(userRoles.role, "admin"))
+
+        const emails = [
+            ...new Set(adminRows.map((r) => r.email).filter(Boolean))
+        ]
+        if (emails.length > 0) {
+            await sendBatchEmails(
+                emails.map((to) => ({
+                    from: site.mailFrom,
+                    to,
+                    subject: notifSubject,
+                    htmlBody: notifHtml
+                }))
+            )
+        }
+    } else {
+        const ombudsmenRows = await db
+            .select({ email: users.email })
+            .from(userRoles)
+            .innerJoin(users, eq(userRoles.user_id, users.id))
+            .where(eq(userRoles.role, "ombudsman"))
+
+        const emails = [
+            ...new Set(ombudsmenRows.map((r) => r.email).filter(Boolean))
+        ]
+        if (emails.length > 0) {
+            await sendBatchEmails(
+                emails.map((to) => ({
+                    from: site.mailFrom,
+                    to,
+                    subject: notifSubject,
+                    htmlBody: notifHtml
+                }))
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
