@@ -135,7 +135,6 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const concernAddress = (
         process.env.INBOUND_CONCERN_ADDRESS ?? ""
     ).toLowerCase()
-    const adminAddress = (process.env.INBOUND_ADMIN_ADDRESS ?? "").toLowerCase()
 
     const isConcern =
         concernAddress &&
@@ -166,10 +165,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             email_id: messageId,
             from_address: fromEmail,
             from_name: fromName,
-            to_address:
-                toAddresses.find((a) => a === adminAddress) ||
-                toAddresses[0] ||
-                payload.To,
+            to_address: toAddresses[0] || payload.To,
             subject,
             body_text: bodyText,
             body_html: bodyHtml,
