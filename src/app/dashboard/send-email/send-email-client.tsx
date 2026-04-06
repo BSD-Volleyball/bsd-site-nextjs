@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
@@ -26,33 +28,57 @@ import {
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
 import { createAndSendBroadcast } from "./actions"
-import { BROADCAST_STREAMS } from "./streams"
 import type {
-    RecipientGroupOption,
+    DivisionOption,
+    TeamOption,
     TemplateOption,
-    BroadcastHistoryItem
+    BroadcastHistoryItem,
+    SendToType
 } from "./actions"
 
 interface SendEmailClientProps {
-    groups: RecipientGroupOption[]
+    canSendToAll: boolean
+    divisions: DivisionOption[]
+    teams: TeamOption[]
     templates: TemplateOption[]
     history: BroadcastHistoryItem[]
 }
 
 const EMPTY_CONTENT = normalizeEmailTemplateContent("")
 
+function sendToLabel(
+    groupType: string | null,
+    divisionId: number | null,
+    teamId: number | null,
+    divisions: DivisionOption[],
+    teams: TeamOption[]
+): string {
+    if (groupType === "all_users") return "Everyone"
+    if (groupType === "season_signups") return "Current Season Players"
+    if (groupType === "season_division") {
+        const div = divisions.find((d) => d.id === divisionId)
+        return div ? `Division: ${div.name}` : "Division"
+    }
+    if (groupType === "season_team") {
+        const team = teams.find((t) => t.id === teamId)
+        return team ? `Team: ${team.name}` : "Team"
+    }
+    return "Unknown"
+}
+
 export function SendEmailClient({
-    groups,
+    canSendToAll,
+    divisions,
+    teams,
     templates,
     history: initialHistory
 }: SendEmailClientProps) {
     const router = useRouter()
 
     // Compose form state
-    const [selectedGroupId, setSelectedGroupId] = useState<string>("")
-    const [selectedStreamId, setSelectedStreamId] = useState<string>(
-        BROADCAST_STREAMS[0].id
-    )
+    const [sendToType, setSendToType] = useState<SendToType | "">("")
+    const [selectedDivisionId, setSelectedDivisionId] = useState<string>("")
+    const [selectedTeamId, setSelectedTeamId] = useState<string>("")
     const [subject, setSubject] = useState("")
     const [content, setContent] =
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
@@ -64,11 +90,23 @@ export function SendEmailClient({
         text: string
     } | null>(null)
 
-    // Loading states
     const [sending, setSending] = useState(false)
-
-    // History expand state
     const [historyOpen, setHistoryOpen] = useState(false)
+
+    // Group teams by division for the team dropdown
+    const teamsByDivision = divisions
+        .map((div) => ({
+            division: div,
+            teams: teams.filter((t) => t.divisionId === div.id)
+        }))
+        .filter((g) => g.teams.length > 0)
+
+    const handleSendToTypeChange = useCallback((value: string) => {
+        setSendToType(value as SendToType)
+        setSelectedDivisionId("")
+        setSelectedTeamId("")
+        setSendMessage(null)
+    }, [])
 
     const handleTemplateSelect = useCallback(
         (templateId: string) => {
@@ -76,30 +114,57 @@ export function SendEmailClient({
             if (!template) return
             if (template.subject) setSubject(template.subject)
             setContent(template.content)
-            // Bump key to force LexicalEmailEditor to remount with new content
             setEditorKey((k) => k + 1)
         },
         [templates]
     )
 
-    const handleSendAgain = useCallback((item: BroadcastHistoryItem) => {
-        setSubject(item.subject)
-        setSelectedGroupId(item.groupId ? String(item.groupId) : "")
-        setSelectedStreamId(item.streamId ?? BROADCAST_STREAMS[0].id)
-        setContent(item.lexicalContent)
-        setEditorKey((k) => k + 1)
-        setSendMessage(null)
-        window.scrollTo({ top: 0, behavior: "smooth" })
-    }, [])
+    const handleSendAgain = useCallback(
+        (item: BroadcastHistoryItem) => {
+            setSubject(item.subject)
+            setContent(item.lexicalContent)
+            setEditorKey((k) => k + 1)
+            setSendMessage(null)
+
+            const type = item.groupType as SendToType | null
+            if (type) {
+                setSendToType(type)
+                if (type === "division" && item.divisionId) {
+                    setSelectedDivisionId(String(item.divisionId))
+                } else if (type === "team" && item.teamId) {
+                    setSelectedTeamId(String(item.teamId))
+                    // Also set the division for context
+                    const team = teams.find((t) => t.id === item.teamId)
+                    if (team) setSelectedDivisionId(String(team.divisionId))
+                }
+            } else {
+                setSendToType("")
+            }
+
+            window.scrollTo({ top: 0, behavior: "smooth" })
+        },
+        [teams]
+    )
 
     const handleSend = async () => {
         setSendMessage(null)
 
-        if (!selectedGroupId) {
+        if (!sendToType) {
             setSendMessage({
                 type: "error",
-                text: "Please select a recipient group."
+                text: "Please select who to send this email to."
             })
+            return
+        }
+        if (sendToType === "division" && !selectedDivisionId) {
+            setSendMessage({
+                type: "error",
+                text: "Please select a division."
+            })
+            return
+        }
+        if (sendToType === "team" && !selectedTeamId) {
+            setSendMessage({ type: "error", text: "Please select a team." })
             return
         }
         if (!subject.trim()) {
@@ -110,8 +175,11 @@ export function SendEmailClient({
         setSending(true)
         try {
             const result = await createAndSendBroadcast({
-                recipientGroupId: Number(selectedGroupId),
-                streamId: selectedStreamId,
+                sendToType,
+                divisionId: selectedDivisionId
+                    ? Number(selectedDivisionId)
+                    : undefined,
+                teamId: selectedTeamId ? Number(selectedTeamId) : undefined,
                 subject,
                 lexicalContent: content
             })
@@ -119,12 +187,13 @@ export function SendEmailClient({
             if (result.status) {
                 setSendMessage({
                     type: "success",
-                    text: `Email sent successfully (${result.data.broadcastId}).`
+                    text: "Email sent successfully!"
                 })
                 setSubject("")
                 setContent(EMPTY_CONTENT)
-                setSelectedGroupId("")
-                setSelectedStreamId(BROADCAST_STREAMS[0].id)
+                setSendToType("")
+                setSelectedDivisionId("")
+                setSelectedTeamId("")
                 setEditorKey((k) => k + 1)
                 router.refresh()
             } else {
@@ -134,6 +203,12 @@ export function SendEmailClient({
             setSending(false)
         }
     }
+
+    const canSend =
+        !!sendToType &&
+        (sendToType !== "division" || !!selectedDivisionId) &&
+        (sendToType !== "team" || !!selectedTeamId) &&
+        !!subject.trim()
 
     return (
         <div className="space-y-6">
@@ -165,54 +240,103 @@ export function SendEmailClient({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {/* Recipient group picker */}
+                    {/* Send To */}
+                    <div className="space-y-3">
                         <div className="space-y-1.5">
-                            <Label htmlFor="group-select">
+                            <Label htmlFor="send-to-select">
                                 Send to{" "}
                                 <span className="text-destructive">*</span>
                             </Label>
                             <Select
-                                value={selectedGroupId}
-                                onValueChange={setSelectedGroupId}
+                                value={sendToType}
+                                onValueChange={handleSendToTypeChange}
                             >
-                                <SelectTrigger id="group-select">
-                                    <SelectValue placeholder="Select a recipient group…" />
+                                <SelectTrigger id="send-to-select">
+                                    <SelectValue placeholder="Select recipients…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {groups.map((g) => (
-                                        <SelectItem
-                                            key={g.id}
-                                            value={String(g.id)}
-                                        >
-                                            {g.name}
-                                        </SelectItem>
-                                    ))}
+                                    {canSendToAll && (
+                                        <>
+                                            <SelectItem value="everyone">
+                                                Everyone
+                                            </SelectItem>
+                                            <SelectItem value="season">
+                                                Current Season Players
+                                            </SelectItem>
+                                        </>
+                                    )}
+                                    <SelectItem value="division">
+                                        Division
+                                    </SelectItem>
+                                    <SelectItem value="team">Team</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {/* Stream picker */}
-                        <div className="space-y-1.5">
-                            <Label htmlFor="stream-select">
-                                Message stream
-                            </Label>
-                            <Select
-                                value={selectedStreamId}
-                                onValueChange={setSelectedStreamId}
-                            >
-                                <SelectTrigger id="stream-select">
-                                    <SelectValue placeholder="Select a stream…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {BROADCAST_STREAMS.map((s) => (
-                                        <SelectItem key={s.id} value={s.id}>
-                                            {s.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        {/* Division picker */}
+                        {sendToType === "division" && (
+                            <div className="space-y-1.5 border-muted border-l-2 pl-4">
+                                <Label htmlFor="division-select">
+                                    Division{" "}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Select
+                                    value={selectedDivisionId}
+                                    onValueChange={setSelectedDivisionId}
+                                >
+                                    <SelectTrigger id="division-select">
+                                        <SelectValue placeholder="Select a division…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {divisions.map((d) => (
+                                            <SelectItem
+                                                key={d.id}
+                                                value={String(d.id)}
+                                            >
+                                                {d.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        {/* Team picker */}
+                        {sendToType === "team" && (
+                            <div className="space-y-1.5 border-muted border-l-2 pl-4">
+                                <Label htmlFor="team-select">
+                                    Team{" "}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Select
+                                    value={selectedTeamId}
+                                    onValueChange={setSelectedTeamId}
+                                >
+                                    <SelectTrigger id="team-select">
+                                        <SelectValue placeholder="Select a team…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {teamsByDivision.map(
+                                            ({ division, teams: divTeams }) => (
+                                                <SelectGroup key={division.id}>
+                                                    <SelectLabel>
+                                                        {division.name}
+                                                    </SelectLabel>
+                                                    {divTeams.map((t) => (
+                                                        <SelectItem
+                                                            key={t.id}
+                                                            value={String(t.id)}
+                                                        >
+                                                            {t.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectGroup>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
 
                     {/* Subject */}
@@ -254,9 +378,7 @@ export function SendEmailClient({
                     <div className="flex justify-end">
                         <Button
                             onClick={handleSend}
-                            disabled={
-                                sending || !selectedGroupId || !subject.trim()
-                            }
+                            disabled={sending || !canSend}
                         >
                             <RiSendPlaneLine className="mr-2 size-4" />
                             {sending ? "Sending…" : "Send Email"}
@@ -291,15 +413,16 @@ export function SendEmailClient({
                                                 {item.subject}
                                             </p>
                                             <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-                                                <span>→ {item.groupName}</span>
-                                                {item.streamId && (
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-xs"
-                                                    >
-                                                        {item.streamId}
-                                                    </Badge>
-                                                )}
+                                                <span>
+                                                    →{" "}
+                                                    {sendToLabel(
+                                                        item.groupType,
+                                                        item.divisionId,
+                                                        item.teamId,
+                                                        divisions,
+                                                        teams
+                                                    )}
+                                                </span>
                                                 <Badge
                                                     variant={
                                                         item.status === "sent"
@@ -313,6 +436,12 @@ export function SendEmailClient({
                                                 >
                                                     {item.status}
                                                 </Badge>
+                                                {item.sentCount != null && (
+                                                    <span>
+                                                        {item.sentCount}{" "}
+                                                        recipients
+                                                    </span>
+                                                )}
                                                 <span>
                                                     by {item.sentByName}
                                                 </span>

@@ -15,7 +15,8 @@ import {
     divisions,
     seasons,
     emailRecipientGroups,
-    emailSuppressions
+    emailSuppressions,
+    userRoles
 } from "@/database/schema"
 import { eq, and, inArray, isNotNull } from "drizzle-orm"
 
@@ -128,6 +129,49 @@ export async function getRecipientsForGroup(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+type UserRow = {
+    id: string
+    email: string | null
+    first_name: string | null
+    last_name: string | null
+}
+
+function toRecipient(r: UserRow): Recipient | null {
+    if (!r.email) return null
+    return {
+        email: r.email,
+        firstName: r.first_name ?? "",
+        lastName: r.last_name ?? "",
+        userId: r.id
+    }
+}
+
+function deduplicateRecipients(recipients: Recipient[]): Recipient[] {
+    const seen = new Map<string, Recipient>()
+    for (const r of recipients) {
+        if (!seen.has(r.userId)) seen.set(r.userId, r)
+    }
+    return Array.from(seen.values())
+}
+
+async function getUsersByIds(ids: string[]): Promise<Recipient[]> {
+    if (ids.length === 0) return []
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(users)
+        .where(inArray(users.id, ids))
+    return rows.map(toRecipient).filter(Boolean) as Recipient[]
+}
+
 async function getAllUserRecipients(): Promise<Recipient[]> {
     const rows = await db
         .select({
@@ -138,21 +182,18 @@ async function getAllUserRecipients(): Promise<Recipient[]> {
         })
         .from(users)
         .where(isNotNull(users.email))
-
-    return rows
-        .filter((r) => r.email)
-        .map((r) => ({
-            email: r.email,
-            firstName: r.first_name ?? "",
-            lastName: r.last_name ?? "",
-            userId: r.id
-        }))
+    return rows.map(toRecipient).filter(Boolean) as Recipient[]
 }
 
+/**
+ * Season signups: signed-up players + admins/directors (global) +
+ * commissioners for this season + team captains/coaches for this season.
+ */
 async function getSeasonSignupRecipients(
     seasonId: number
 ): Promise<Recipient[]> {
-    const rows = await db
+    // 1. Players signed up for this season
+    const signupRows = await db
         .select({
             id: users.id,
             email: users.email,
@@ -163,21 +204,71 @@ async function getSeasonSignupRecipients(
         .innerJoin(users, eq(signups.player, users.id))
         .where(eq(signups.season, seasonId))
 
-    return rows
-        .filter((r) => r.email)
-        .map((r) => ({
-            email: r.email,
-            firstName: r.first_name ?? "",
-            lastName: r.last_name ?? "",
-            userId: r.id
-        }))
+    // 2. Admins and directors (global roles, no season restriction)
+    const adminRows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(inArray(userRoles.role, ["admin", "director"]))
+
+    // 3. Commissioners assigned to this season
+    const commRows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(
+            and(
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, seasonId)
+            )
+        )
+
+    // 4. Team captains/coaches for this season
+    const teamRows = await db
+        .select({ captain: teams.captain, captain2: teams.captain2 })
+        .from(teams)
+        .where(eq(teams.season, seasonId))
+
+    const captainIds = [
+        ...new Set([
+            ...teamRows.map((t) => t.captain),
+            ...teamRows
+                .filter((t) => t.captain2)
+                .map((t) => t.captain2 as string)
+        ])
+    ]
+    const captainRows = await getUsersByIds(captainIds)
+
+    return deduplicateRecipients(
+        [
+            ...signupRows.map(toRecipient),
+            ...adminRows.map(toRecipient),
+            ...commRows.map(toRecipient),
+            ...captainRows
+        ].filter(Boolean) as Recipient[]
+    )
 }
 
+/**
+ * Division recipients: drafted players in that division + commissioners
+ * scoped to that division + team captains/coaches in that division.
+ */
 async function getDivisionRecipients(
     seasonId: number,
     divisionId: number
 ): Promise<Recipient[]> {
-    const rows = await db
+    // 1. Players drafted onto teams in this division
+    const draftRows = await db
         .select({
             id: users.id,
             email: users.email,
@@ -189,21 +280,58 @@ async function getDivisionRecipients(
         .innerJoin(users, eq(drafts.user, users.id))
         .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
 
-    return rows
-        .filter((r) => r.email)
-        .map((r) => ({
-            email: r.email,
-            firstName: r.first_name ?? "",
-            lastName: r.last_name ?? "",
-            userId: r.id
-        }))
+    // 2. Commissioners scoped to this division
+    const commRows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(
+            and(
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, seasonId),
+                eq(userRoles.division_id, divisionId)
+            )
+        )
+
+    // 3. Team captains/coaches in this division
+    const teamRows = await db
+        .select({ captain: teams.captain, captain2: teams.captain2 })
+        .from(teams)
+        .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
+
+    const captainIds = [
+        ...new Set([
+            ...teamRows.map((t) => t.captain),
+            ...teamRows
+                .filter((t) => t.captain2)
+                .map((t) => t.captain2 as string)
+        ])
+    ]
+    const captainRows = await getUsersByIds(captainIds)
+
+    return deduplicateRecipients(
+        [
+            ...draftRows.map(toRecipient),
+            ...commRows.map(toRecipient),
+            ...captainRows
+        ].filter(Boolean) as Recipient[]
+    )
 }
 
+/**
+ * Team recipients: players on the team (from drafts) + team captains/coaches.
+ */
 async function getTeamRecipients(
     seasonId: number,
     teamId: number
 ): Promise<Recipient[]> {
-    const rows = await db
+    // 1. Drafted players on this team
+    const draftRows = await db
         .select({
             id: users.id,
             email: users.email,
@@ -215,14 +343,23 @@ async function getTeamRecipients(
         .innerJoin(users, eq(drafts.user, users.id))
         .where(and(eq(teams.season, seasonId), eq(drafts.team, teamId)))
 
-    return rows
-        .filter((r) => r.email)
-        .map((r) => ({
-            email: r.email,
-            firstName: r.first_name ?? "",
-            lastName: r.last_name ?? "",
-            userId: r.id
-        }))
+    // 2. Team captains/coaches
+    const [teamRow] = await db
+        .select({ captain: teams.captain, captain2: teams.captain2 })
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1)
+
+    const captainIds = teamRow
+        ? [teamRow.captain, ...(teamRow.captain2 ? [teamRow.captain2] : [])]
+        : []
+    const captainRows = await getUsersByIds(captainIds)
+
+    return deduplicateRecipients(
+        [...draftRows.map(toRecipient), ...captainRows].filter(
+            Boolean
+        ) as Recipient[]
+    )
 }
 
 // ---------------------------------------------------------------------------
