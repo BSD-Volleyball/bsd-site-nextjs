@@ -62,7 +62,8 @@ import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession,
     isAdminOrDirectorBySession,
-    isCommissionerForSeason
+    isCommissionerForSeason,
+    getUserRolesForUser
 } from "@/lib/rbac"
 import {
     getCaptainWelcomeData,
@@ -692,7 +693,7 @@ export default async function DashboardPage() {
         awayTeamName: string
     }[] = []
     let isRefForSeason = false
-    let isRefCoordinatorOrAdmin = false
+    let isRefCoordinator = false
     let refScheduleStatus: {
         nextDateLabel: string
         totalMatches: number
@@ -1186,12 +1187,18 @@ export default async function DashboardPage() {
         const seasonId = signupStatus.config.seasonId
         const todayStr = new Date().toISOString().slice(0, 10)
 
-        const [refCheck, coordCheck] = await Promise.all([
+        const [refCheck, userRoles] = await Promise.all([
             hasPermissionBySession("schedule:view", { seasonId }),
-            hasPermissionBySession("schedule:manage", { seasonId })
+            session?.user
+                ? getUserRolesForUser(session.user.id)
+                : Promise.resolve([])
         ])
         isRefForSeason = refCheck
-        isRefCoordinatorOrAdmin = coordCheck || isAdmin
+        isRefCoordinator = userRoles.some(
+            (r) =>
+                r.role === "referee_coordinator" &&
+                (r.season_id === null || r.season_id === seasonId)
+        )
 
         if (isRefForSeason) {
             // Get upcoming matches for this ref on the next game night
@@ -1249,7 +1256,7 @@ export default async function DashboardPage() {
             }
         }
 
-        if (isRefCoordinatorOrAdmin) {
+        if (isRefCoordinator) {
             // Find next game date and check if fully scheduled
             const nextDateRow = await db
                 .select({ date: matches.date })
@@ -1570,7 +1577,7 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
                 )}
-                {isRefCoordinatorOrAdmin && refScheduleStatus && (
+                {isRefCoordinator && refScheduleStatus && (
                     <Card
                         className={cn(
                             "min-w-[280px] flex-1",
