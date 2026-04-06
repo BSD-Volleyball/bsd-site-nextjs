@@ -6,6 +6,7 @@ import {
     inboundEmails,
     inboundEmailComments,
     inboundEmailReplies,
+    inboundEmailReceived,
     users,
     userRoles
 } from "@/database/schema"
@@ -56,12 +57,25 @@ export interface InboundEmailReply {
     sent_by_name: string
     subject: string
     body_text: string
+    sent_to: string
     sent_at: Date
+}
+
+export interface InboundEmailReceived {
+    id: number
+    email_id: number
+    from_address: string
+    from_name: string | null
+    subject: string
+    body_text: string | null
+    body_html: string | null
+    received_at: Date
 }
 
 export type ThreadItem =
     | ({ type: "comment" } & InboundEmailComment)
     | ({ type: "reply" } & InboundEmailReply)
+    | ({ type: "received" } & InboundEmailReceived)
 
 export interface AssignableAdmin {
     id: string
@@ -155,7 +169,7 @@ export async function getEmailThread(
     if (!canView) return { status: false, items: [] }
 
     try {
-        const [commentRows, replyRows] = await Promise.all([
+        const [commentRows, replyRows, receivedRows] = await Promise.all([
             db
                 .select({
                     id: inboundEmailComments.id,
@@ -177,12 +191,27 @@ export async function getEmailThread(
                     sent_by_name: users.name,
                     subject: inboundEmailReplies.subject,
                     body_text: inboundEmailReplies.body_text,
+                    sent_to: inboundEmailReplies.sent_to,
                     sent_at: inboundEmailReplies.sent_at
                 })
                 .from(inboundEmailReplies)
                 .leftJoin(users, eq(inboundEmailReplies.sent_by, users.id))
                 .where(eq(inboundEmailReplies.email_id, emailId))
-                .orderBy(asc(inboundEmailReplies.sent_at))
+                .orderBy(asc(inboundEmailReplies.sent_at)),
+            db
+                .select({
+                    id: inboundEmailReceived.id,
+                    email_id: inboundEmailReceived.email_id,
+                    from_address: inboundEmailReceived.from_address,
+                    from_name: inboundEmailReceived.from_name,
+                    subject: inboundEmailReceived.subject,
+                    body_text: inboundEmailReceived.body_text,
+                    body_html: inboundEmailReceived.body_html,
+                    received_at: inboundEmailReceived.received_at
+                })
+                .from(inboundEmailReceived)
+                .where(eq(inboundEmailReceived.email_id, emailId))
+                .orderBy(asc(inboundEmailReceived.received_at))
         ])
 
         const comments: ThreadItem[] = commentRows.map((r) => ({
@@ -203,19 +232,36 @@ export async function getEmailThread(
             sent_by_name: r.sent_by_name ?? r.sent_by,
             subject: r.subject,
             body_text: r.body_text,
+            sent_to: r.sent_to,
             sent_at: r.sent_at
         }))
 
+        const received: ThreadItem[] = receivedRows.map((r) => ({
+            type: "received" as const,
+            id: r.id,
+            email_id: r.email_id,
+            from_address: r.from_address,
+            from_name: r.from_name,
+            subject: r.subject,
+            body_text: r.body_text,
+            body_html: r.body_html,
+            received_at: r.received_at
+        }))
+
         // Merge and sort chronologically
-        const items = [...comments, ...replies].sort((a, b) => {
+        const items = [...comments, ...replies, ...received].sort((a, b) => {
             const aTime =
                 a.type === "comment"
                     ? a.created_at.getTime()
-                    : a.sent_at.getTime()
+                    : a.type === "reply"
+                      ? a.sent_at.getTime()
+                      : a.received_at.getTime()
             const bTime =
                 b.type === "comment"
                     ? b.created_at.getTime()
-                    : b.sent_at.getTime()
+                    : b.type === "reply"
+                      ? b.sent_at.getTime()
+                      : b.received_at.getTime()
             return aTime - bTime
         })
 
@@ -244,6 +290,7 @@ export async function sendEmailReply(
     // Load the original email
     const [email] = await db
         .select({
+            email_id: inboundEmails.email_id,
             from_address: inboundEmails.from_address,
             subject: inboundEmails.subject,
             status: inboundEmails.status
@@ -263,19 +310,23 @@ export async function sendEmailReply(
     const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
 
     try {
-        await sendEmail({
+        const postmarkMessageId = await sendEmail({
             from: site.mailFrom,
             to: email.from_address,
             subject: replySubject,
             htmlBody: bodyHtml,
-            textBody: body.trim()
+            textBody: body.trim(),
+            inReplyTo: email.email_id,
+            headers: [{ name: "X-BSD-Ticket-ID", value: `email-${emailId}` }]
         })
 
         await db.insert(inboundEmailReplies).values({
             email_id: emailId,
             sent_by: userId,
             subject: replySubject,
-            body_text: body.trim()
+            body_text: body.trim(),
+            sent_to: email.from_address,
+            postmark_message_id: postmarkMessageId
         })
 
         revalidatePath("/dashboard/manage-emails")

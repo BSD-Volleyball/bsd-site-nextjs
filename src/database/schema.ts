@@ -706,7 +706,24 @@ export const concernReplies = pgTable("concern_replies", {
     subject: text("subject").notNull(),
     body_text: text("body_text").notNull(),
     sent_to: text("sent_to").notNull(),
+    postmark_message_id: text("postmark_message_id"),
     sent_at: timestamp("sent_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+export const concernReceived = pgTable("concern_received", {
+    id: serial("id").primaryKey(),
+    concern_id: integer("concern_id")
+        .notNull()
+        .references(() => concerns.id, { onDelete: "cascade" }),
+    from_address: text("from_address").notNull(),
+    from_name: text("from_name"),
+    subject: text("subject").notNull(),
+    body_text: text("body_text"),
+    body_html: text("body_html"),
+    postmark_message_id: text("postmark_message_id"),
+    received_at: timestamp("received_at")
         .$defaultFn(() => new Date())
         .notNull()
 })
@@ -758,7 +775,25 @@ export const inboundEmailReplies = pgTable("inbound_email_replies", {
         .references(() => users.id),
     subject: text("subject").notNull(),
     body_text: text("body_text").notNull(),
+    sent_to: text("sent_to").notNull(),
+    postmark_message_id: text("postmark_message_id"),
     sent_at: timestamp("sent_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+export const inboundEmailReceived = pgTable("inbound_email_received", {
+    id: serial("id").primaryKey(),
+    email_id: integer("email_id")
+        .notNull()
+        .references(() => inboundEmails.id, { onDelete: "cascade" }),
+    from_address: text("from_address").notNull(),
+    from_name: text("from_name"),
+    subject: text("subject").notNull(),
+    body_text: text("body_text"),
+    body_html: text("body_html"),
+    postmark_message_id: text("postmark_message_id"),
+    received_at: timestamp("received_at")
         .$defaultFn(() => new Date())
         .notNull()
 })

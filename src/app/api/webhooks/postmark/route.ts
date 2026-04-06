@@ -3,12 +3,16 @@ import type { NextRequest } from "next/server"
 import { db } from "@/database/db"
 import {
     concerns,
+    concernReceived,
+    concernReplies,
     inboundEmails,
+    inboundEmailReceived,
+    inboundEmailReplies,
     users,
     userRoles,
     emailSuppressions
 } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
@@ -20,6 +24,11 @@ import {
 // Postmark Inbound Email Payload (subset of fields we use)
 // https://postmarkapp.com/developer/webhooks/inbound-webhook
 // ---------------------------------------------------------------------------
+
+interface PostmarkHeader {
+    Name: string
+    Value: string
+}
 
 interface PostmarkInboundPayload {
     MessageID: string
@@ -33,6 +42,7 @@ interface PostmarkInboundPayload {
     HtmlBody: string
     Tag: string
     MessageStream: string
+    Headers: PostmarkHeader[]
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +127,80 @@ async function notifyAdmins(appUrl: string, subject: string, from: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Thread detection helpers
+// ---------------------------------------------------------------------------
+
+function getHeader(headers: PostmarkHeader[], name: string): string | null {
+    const lower = name.toLowerCase()
+    return headers.find((h) => h.Name.toLowerCase() === lower)?.Value ?? null
+}
+
+/**
+ * Parse a list of Message-IDs from an In-Reply-To or References header.
+ * Returns cleaned IDs with angle brackets stripped.
+ */
+function parseMessageIds(header: string | null): string[] {
+    if (!header) return []
+    return header
+        .split(/\s+/)
+        .map((s) => s.replace(/^<|>$/g, "").trim())
+        .filter(Boolean)
+}
+
+/**
+ * Returns the matched ticket if this inbound email is a reply to an existing
+ * admin-email thread or concern thread. Checks:
+ *   1. X-BSD-Ticket-ID custom header (most reliable)
+ *   2. In-Reply-To / References against stored postmark_message_ids
+ */
+async function detectExistingThread(
+    headers: PostmarkHeader[]
+): Promise<
+    { type: "email"; id: number } | { type: "concern"; id: number } | null
+> {
+    // 1. Custom header (primary)
+    const ticketId = getHeader(headers, "X-BSD-Ticket-ID")
+    if (ticketId) {
+        const emailMatch = ticketId.match(/^email-(\d+)$/)
+        if (emailMatch) return { type: "email", id: parseInt(emailMatch[1]) }
+        const concernMatch = ticketId.match(/^concern-(\d+)$/)
+        if (concernMatch)
+            return { type: "concern", id: parseInt(concernMatch[1]) }
+    }
+
+    // 2. In-Reply-To / References fallback
+    const inReplyTo = getHeader(headers, "In-Reply-To")
+    const references = getHeader(headers, "References")
+    const messageIds = [
+        ...parseMessageIds(inReplyTo),
+        ...parseMessageIds(references)
+    ]
+    if (messageIds.length === 0) return null
+
+    // Check against stored postmark_message_id in email replies
+    const emailReplyMatch = await db
+        .select({ email_id: inboundEmailReplies.email_id })
+        .from(inboundEmailReplies)
+        .where(inArray(inboundEmailReplies.postmark_message_id, messageIds))
+        .limit(1)
+    if (emailReplyMatch.length > 0) {
+        return { type: "email", id: emailReplyMatch[0].email_id }
+    }
+
+    // Check against stored postmark_message_id in concern replies
+    const concernReplyMatch = await db
+        .select({ concern_id: concernReplies.concern_id })
+        .from(concernReplies)
+        .where(inArray(concernReplies.postmark_message_id, messageIds))
+        .limit(1)
+    if (concernReplyMatch.length > 0) {
+        return { type: "concern", id: concernReplyMatch[0].concern_id }
+    }
+
+    return null
+}
+
+// ---------------------------------------------------------------------------
 // Inbound email handling
 // ---------------------------------------------------------------------------
 
@@ -130,6 +214,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const subject = payload.Subject || "(No subject)"
     const bodyText = payload.TextBody || null
     const bodyHtml = payload.HtmlBody || null
+    const headers = payload.Headers ?? []
 
     const toAddresses = payload.ToFull?.map((t) => t.Email.toLowerCase()) ?? []
     const concernAddress = (
@@ -142,6 +227,40 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             payload.To.toLowerCase().includes(concernAddress))
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
+
+    // Check if this is a reply to an existing thread
+    const existingThread = await detectExistingThread(headers)
+
+    if (existingThread) {
+        if (existingThread.type === "email") {
+            await db.insert(inboundEmailReceived).values({
+                email_id: existingThread.id,
+                from_address: fromEmail,
+                from_name: fromName,
+                subject,
+                body_text: bodyText,
+                body_html: bodyHtml,
+                postmark_message_id: messageId
+            })
+            console.log(
+                `[postmark-webhook] Routed reply to email thread #${existingThread.id}`
+            )
+        } else {
+            await db.insert(concernReceived).values({
+                concern_id: existingThread.id,
+                from_address: fromEmail,
+                from_name: fromName,
+                subject,
+                body_text: bodyText,
+                body_html: bodyHtml,
+                postmark_message_id: messageId
+            })
+            console.log(
+                `[postmark-webhook] Routed reply to concern thread #${existingThread.id}`
+            )
+        }
+        return
+    }
 
     if (isConcern) {
         await db.insert(concerns).values({

@@ -49,6 +49,8 @@ export interface SendEmailOptions {
     stream?: MessageStream
     tag?: string
     replyTo?: string
+    inReplyTo?: string
+    headers?: Array<{ name: string; value: string }>
     attachments?: Array<{
         name: string
         content: string // base64
@@ -68,6 +70,13 @@ export async function sendEmail(opts: SendEmailOptions): Promise<string> {
         MessageStream: opts.stream ?? STREAM_OUTBOUND,
         Tag: opts.tag,
         ReplyTo: opts.replyTo,
+        Headers: [
+            ...(opts.inReplyTo
+                ? [{ Name: "In-Reply-To", Value: opts.inReplyTo }]
+                : []),
+            ...(opts.headers?.map((h) => ({ Name: h.name, Value: h.value })) ??
+                [])
+        ],
         Attachments: opts.attachments?.map((a) => ({
             Name: a.name,
             Content: a.content,

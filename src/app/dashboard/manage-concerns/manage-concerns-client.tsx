@@ -463,7 +463,7 @@ function ConcernCard({
                                     >
                                         <div className="mb-1 flex items-center justify-between gap-2">
                                             <span className="font-medium text-blue-900 dark:text-blue-100">
-                                                {item.sent_by_name}{" "}
+                                                ↪ {item.sent_by_name}{" "}
                                                 <span className="font-normal text-xs">
                                                     → {item.sent_to}
                                                 </span>
@@ -474,6 +474,28 @@ function ConcernCard({
                                         </div>
                                         <p className="whitespace-pre-wrap text-blue-900 dark:text-blue-100">
                                             {item.body_text}
+                                        </p>
+                                    </div>
+                                ) : item.type === "received" ? (
+                                    <div
+                                        key={`received-${item.id}`}
+                                        className="rounded-md border border-green-200 bg-green-50 p-3 text-sm dark:border-green-800 dark:bg-green-950/40"
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="font-medium text-green-800 dark:text-green-200">
+                                                ↩ Reply from{" "}
+                                                {item.from_name ??
+                                                    item.from_address}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {formatDate(item.received_at)}
+                                            </span>
+                                        </div>
+                                        <p className="mb-1 text-muted-foreground text-xs">
+                                            Subject: {item.subject}
+                                        </p>
+                                        <p className="whitespace-pre-wrap text-foreground">
+                                            {item.body_text ?? "(No body)"}
                                         </p>
                                     </div>
                                 ) : (

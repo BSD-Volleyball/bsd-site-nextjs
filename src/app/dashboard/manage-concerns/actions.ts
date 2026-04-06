@@ -6,6 +6,7 @@ import {
     concerns,
     concernComments,
     concernReplies,
+    concernReceived,
     users,
     userRoles
 } from "@/database/schema"
@@ -66,9 +67,21 @@ export interface ConcernReply {
     sent_at: Date
 }
 
+export interface ConcernReceived {
+    id: number
+    concern_id: number
+    from_address: string
+    from_name: string | null
+    subject: string
+    body_text: string | null
+    body_html: string | null
+    received_at: Date
+}
+
 export type ConcernThreadItem =
     | ({ type: "comment" } & ConcernComment)
     | ({ type: "reply" } & ConcernReply)
+    | ({ type: "received" } & ConcernReceived)
 
 export interface AssignableUser {
     id: string
@@ -219,33 +232,47 @@ export async function getConcernThread(
     }
 
     try {
-        const commentRows = await db
-            .select({
-                id: concernComments.id,
-                concern_id: concernComments.concern_id,
-                author_id: concernComments.author_id,
-                author_name: users.name,
-                content: concernComments.content,
-                created_at: concernComments.created_at
-            })
-            .from(concernComments)
-            .leftJoin(users, eq(concernComments.author_id, users.id))
-            .where(eq(concernComments.concern_id, concernId))
-
-        const replyRows = await db
-            .select({
-                id: concernReplies.id,
-                concern_id: concernReplies.concern_id,
-                sent_by: concernReplies.sent_by,
-                sent_by_name: users.name,
-                subject: concernReplies.subject,
-                body_text: concernReplies.body_text,
-                sent_to: concernReplies.sent_to,
-                sent_at: concernReplies.sent_at
-            })
-            .from(concernReplies)
-            .leftJoin(users, eq(concernReplies.sent_by, users.id))
-            .where(eq(concernReplies.concern_id, concernId))
+        const [commentRows, replyRows, receivedRows] = await Promise.all([
+            db
+                .select({
+                    id: concernComments.id,
+                    concern_id: concernComments.concern_id,
+                    author_id: concernComments.author_id,
+                    author_name: users.name,
+                    content: concernComments.content,
+                    created_at: concernComments.created_at
+                })
+                .from(concernComments)
+                .leftJoin(users, eq(concernComments.author_id, users.id))
+                .where(eq(concernComments.concern_id, concernId)),
+            db
+                .select({
+                    id: concernReplies.id,
+                    concern_id: concernReplies.concern_id,
+                    sent_by: concernReplies.sent_by,
+                    sent_by_name: users.name,
+                    subject: concernReplies.subject,
+                    body_text: concernReplies.body_text,
+                    sent_to: concernReplies.sent_to,
+                    sent_at: concernReplies.sent_at
+                })
+                .from(concernReplies)
+                .leftJoin(users, eq(concernReplies.sent_by, users.id))
+                .where(eq(concernReplies.concern_id, concernId)),
+            db
+                .select({
+                    id: concernReceived.id,
+                    concern_id: concernReceived.concern_id,
+                    from_address: concernReceived.from_address,
+                    from_name: concernReceived.from_name,
+                    subject: concernReceived.subject,
+                    body_text: concernReceived.body_text,
+                    body_html: concernReceived.body_html,
+                    received_at: concernReceived.received_at
+                })
+                .from(concernReceived)
+                .where(eq(concernReceived.concern_id, concernId))
+        ])
 
         const items: ConcernThreadItem[] = [
             ...commentRows.map((r) => ({
@@ -267,13 +294,34 @@ export async function getConcernThread(
                 body_text: r.body_text,
                 sent_to: r.sent_to,
                 sent_at: r.sent_at
+            })),
+            ...receivedRows.map((r) => ({
+                type: "received" as const,
+                id: r.id,
+                concern_id: r.concern_id,
+                from_address: r.from_address,
+                from_name: r.from_name,
+                subject: r.subject,
+                body_text: r.body_text,
+                body_html: r.body_html,
+                received_at: r.received_at
             }))
         ]
 
         items.sort((a, b) => {
-            const aTime = a.type === "comment" ? a.created_at : a.sent_at
-            const bTime = b.type === "comment" ? b.created_at : b.sent_at
-            return aTime.getTime() - bTime.getTime()
+            const aTime =
+                a.type === "comment"
+                    ? a.created_at.getTime()
+                    : a.type === "reply"
+                      ? a.sent_at.getTime()
+                      : a.received_at.getTime()
+            const bTime =
+                b.type === "comment"
+                    ? b.created_at.getTime()
+                    : b.type === "reply"
+                      ? b.sent_at.getTime()
+                      : b.received_at.getTime()
+            return aTime - bTime
         })
 
         return { status: true, items }
@@ -348,13 +396,16 @@ export async function sendConcernReply(
     const subject = `Re: Concern #${concernId}`
 
     try {
-        await sendEmail({
+        const postmarkMessageId = await sendEmail({
             from: fromAddress,
             to: replyTo,
             subject,
             htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
             textBody: body.trim(),
-            stream: "outbound"
+            stream: "outbound",
+            headers: [
+                { name: "X-BSD-Ticket-ID", value: `concern-${concernId}` }
+            ]
         })
 
         await db.insert(concernReplies).values({
@@ -362,7 +413,8 @@ export async function sendConcernReply(
             sent_by: userId,
             subject,
             body_text: body.trim(),
-            sent_to: replyTo
+            sent_to: replyTo,
+            postmark_message_id: postmarkMessageId
         })
 
         revalidatePath("/dashboard/manage-concerns")
