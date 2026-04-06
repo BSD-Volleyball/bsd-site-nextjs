@@ -732,6 +732,21 @@ export const inboundEmailComments = pgTable("inbound_email_comments", {
         .notNull()
 })
 
+export const inboundEmailReplies = pgTable("inbound_email_replies", {
+    id: serial("id").primaryKey(),
+    email_id: integer("email_id")
+        .notNull()
+        .references(() => inboundEmails.id, { onDelete: "cascade" }),
+    sent_by: text("sent_by")
+        .notNull()
+        .references(() => users.id),
+    subject: text("subject").notNull(),
+    body_text: text("body_text").notNull(),
+    sent_at: timestamp("sent_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 export const draftCaptRounds = pgTable(
     "draft_capt_rounds",
     {

@@ -5,10 +5,11 @@ import {
     addInboundEmailComment,
     assignInboundEmail,
     closeInboundEmail,
-    getInboundEmailComments,
+    getEmailThread,
     reopenInboundEmail,
+    sendEmailReply,
     type AssignableAdmin,
-    type InboundEmailComment,
+    type ThreadItem,
     type InboundEmailRow
 } from "./actions"
 import { Button } from "@/components/ui/button"
@@ -121,25 +122,34 @@ function EmailCard({
 }) {
     const [isPending, startTransition] = useTransition()
     const [expanded, setExpanded] = useState(false)
-    const [comments, setComments] = useState<InboundEmailComment[]>([])
-    const [commentsLoaded, setCommentsLoaded] = useState(false)
+    const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
+    const [threadLoaded, setThreadLoaded] = useState(false)
     const [newComment, setNewComment] = useState("")
     const [commentMsg, setCommentMsg] = useState<string | null>(null)
+    const [replyBody, setReplyBody] = useState("")
+    const [replyMsg, setReplyMsg] = useState<string | null>(null)
 
-    function loadComments() {
-        if (commentsLoaded) return
+    function loadThread() {
+        if (threadLoaded) return
         startTransition(async () => {
-            const result = await getInboundEmailComments(email.id)
+            const result = await getEmailThread(email.id)
             if (result.status) {
-                setComments(result.comments)
-                setCommentsLoaded(true)
+                setThreadItems(result.items)
+                setThreadLoaded(true)
             }
+        })
+    }
+
+    function refreshThread() {
+        startTransition(async () => {
+            const result = await getEmailThread(email.id)
+            if (result.status) setThreadItems(result.items)
         })
     }
 
     function handleToggle(open: boolean) {
         setExpanded(open)
-        if (open) loadComments()
+        if (open) loadThread()
     }
 
     function handleAssignChange(assigneeId: string) {
@@ -173,11 +183,25 @@ function EmailCard({
             const result = await addInboundEmailComment(email.id, newComment)
             if (result.status) {
                 setNewComment("")
-                const updated = await getInboundEmailComments(email.id)
-                if (updated.status) setComments(updated.comments)
+                refreshThread()
                 setCommentMsg(null)
             } else {
                 setCommentMsg(result.message)
+            }
+        })
+    }
+
+    function handleSendReply() {
+        if (!replyBody.trim()) return
+        setReplyMsg(null)
+        startTransition(async () => {
+            const result = await sendEmailReply(email.id, replyBody)
+            if (result.status) {
+                setReplyBody("")
+                refreshThread()
+                setReplyMsg(null)
+            } else {
+                setReplyMsg(result.message)
             }
         })
     }
@@ -341,41 +365,101 @@ function EmailCard({
                             )}
                         </div>
 
-                        {/* Comments */}
+                        {/* Thread: replies + internal comments (chronological) */}
                         <div className="space-y-3 border-t pt-2">
-                            <p className="font-medium text-sm">
-                                Internal Comments
-                            </p>
+                            <p className="font-medium text-sm">Thread</p>
 
-                            {comments.length === 0 && commentsLoaded && (
+                            {threadItems.length === 0 && threadLoaded && (
                                 <p className="text-muted-foreground text-sm">
-                                    No comments yet.
+                                    No activity yet.
                                 </p>
                             )}
 
-                            {comments.map((c) => (
-                                <div
-                                    key={c.id}
-                                    className="rounded-md border bg-muted/30 p-3 text-sm"
-                                >
-                                    <div className="mb-1 flex items-center justify-between gap-2">
-                                        <span className="font-medium">
-                                            {c.author_name}
-                                        </span>
-                                        <span className="text-muted-foreground text-xs">
-                                            {formatDate(c.created_at)}
-                                        </span>
+                            {threadItems.map((item) =>
+                                item.type === "reply" ? (
+                                    <div
+                                        key={`reply-${item.id}`}
+                                        className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/40"
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="font-medium text-blue-800 dark:text-blue-200">
+                                                ↪ Reply sent by{" "}
+                                                {item.sent_by_name}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {formatDate(item.sent_at)}
+                                            </span>
+                                        </div>
+                                        <p className="mb-1 text-muted-foreground text-xs">
+                                            Subject: {item.subject}
+                                        </p>
+                                        <p className="whitespace-pre-wrap text-foreground">
+                                            {item.body_text}
+                                        </p>
                                     </div>
-                                    <p className="whitespace-pre-wrap text-foreground">
-                                        {c.content}
-                                    </p>
-                                </div>
-                            ))}
+                                ) : (
+                                    <div
+                                        key={`comment-${item.id}`}
+                                        className="rounded-md border bg-muted/30 p-3 text-sm"
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="font-medium">
+                                                🔒 {item.author_name}
+                                                <span className="ml-1 font-normal text-muted-foreground text-xs">
+                                                    (internal)
+                                                </span>
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {formatDate(item.created_at)}
+                                            </span>
+                                        </div>
+                                        <p className="whitespace-pre-wrap text-foreground">
+                                            {item.content}
+                                        </p>
+                                    </div>
+                                )
+                            )}
 
+                            {/* Reply composer — active emails only */}
+                            {email.status === "active" && (
+                                <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
+                                    <p className="font-medium text-sm">
+                                        Send Reply to{" "}
+                                        {email.from_name ?? email.from_address}
+                                    </p>
+                                    <Textarea
+                                        rows={4}
+                                        placeholder="Write your reply…"
+                                        value={replyBody}
+                                        onChange={(e) =>
+                                            setReplyBody(e.target.value)
+                                        }
+                                    />
+                                    {replyMsg && (
+                                        <p className="text-destructive text-sm">
+                                            {replyMsg}
+                                        </p>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSendReply}
+                                        disabled={
+                                            isPending || !replyBody.trim()
+                                        }
+                                    >
+                                        {isPending ? "Sending…" : "Send Reply"}
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Internal comment composer */}
                             <div className="space-y-2">
+                                <p className="font-medium text-muted-foreground text-sm">
+                                    Add Internal Note
+                                </p>
                                 <Textarea
                                     rows={3}
-                                    placeholder="Add an internal comment..."
+                                    placeholder="Internal note (not visible to sender)…"
                                     value={newComment}
                                     onChange={(e) =>
                                         setNewComment(e.target.value)
@@ -388,10 +472,11 @@ function EmailCard({
                                 )}
                                 <Button
                                     size="sm"
+                                    variant="outline"
                                     onClick={handleAddComment}
                                     disabled={isPending || !newComment.trim()}
                                 >
-                                    {isPending ? "Saving..." : "Add Comment"}
+                                    {isPending ? "Saving…" : "Add Note"}
                                 </Button>
                             </div>
                         </div>

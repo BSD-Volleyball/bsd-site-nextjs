@@ -5,12 +5,15 @@ import { db } from "@/database/db"
 import {
     inboundEmails,
     inboundEmailComments,
+    inboundEmailReplies,
     users,
     userRoles
 } from "@/database/schema"
-import { eq, desc, or } from "drizzle-orm"
+import { eq, desc, or, asc } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import { sendEmail } from "@/lib/postmark"
+import { site } from "@/config/site"
 
 async function hasAdminEmailPermission(
     permission: "admin_emails:view" | "admin_emails:manage"
@@ -45,6 +48,20 @@ export interface InboundEmailComment {
     content: string
     created_at: Date
 }
+
+export interface InboundEmailReply {
+    id: number
+    email_id: number
+    sent_by: string
+    sent_by_name: string
+    subject: string
+    body_text: string
+    sent_at: Date
+}
+
+export type ThreadItem =
+    | ({ type: "comment" } & InboundEmailComment)
+    | ({ type: "reply" } & InboundEmailReply)
 
 export interface AssignableAdmin {
     id: string
@@ -131,43 +148,141 @@ export async function getInboundEmails(): Promise<{
     }
 }
 
-export async function getInboundEmailComments(
+export async function getEmailThread(
     emailId: number
-): Promise<{ status: boolean; comments: InboundEmailComment[] }> {
+): Promise<{ status: boolean; items: ThreadItem[] }> {
     const canView = await hasAdminEmailPermission("admin_emails:view")
-    if (!canView) {
-        return { status: false, comments: [] }
-    }
+    if (!canView) return { status: false, items: [] }
 
     try {
-        const rows = await db
-            .select({
-                id: inboundEmailComments.id,
-                email_id: inboundEmailComments.email_id,
-                author_id: inboundEmailComments.author_id,
-                author_name: users.name,
-                content: inboundEmailComments.content,
-                created_at: inboundEmailComments.created_at
-            })
-            .from(inboundEmailComments)
-            .leftJoin(users, eq(inboundEmailComments.author_id, users.id))
-            .where(eq(inboundEmailComments.email_id, emailId))
-            .orderBy(desc(inboundEmailComments.created_at))
+        const [commentRows, replyRows] = await Promise.all([
+            db
+                .select({
+                    id: inboundEmailComments.id,
+                    email_id: inboundEmailComments.email_id,
+                    author_id: inboundEmailComments.author_id,
+                    author_name: users.name,
+                    content: inboundEmailComments.content,
+                    created_at: inboundEmailComments.created_at
+                })
+                .from(inboundEmailComments)
+                .leftJoin(users, eq(inboundEmailComments.author_id, users.id))
+                .where(eq(inboundEmailComments.email_id, emailId))
+                .orderBy(asc(inboundEmailComments.created_at)),
+            db
+                .select({
+                    id: inboundEmailReplies.id,
+                    email_id: inboundEmailReplies.email_id,
+                    sent_by: inboundEmailReplies.sent_by,
+                    sent_by_name: users.name,
+                    subject: inboundEmailReplies.subject,
+                    body_text: inboundEmailReplies.body_text,
+                    sent_at: inboundEmailReplies.sent_at
+                })
+                .from(inboundEmailReplies)
+                .leftJoin(users, eq(inboundEmailReplies.sent_by, users.id))
+                .where(eq(inboundEmailReplies.email_id, emailId))
+                .orderBy(asc(inboundEmailReplies.sent_at))
+        ])
 
-        return {
-            status: true,
-            comments: rows.map((r) => ({
-                id: r.id,
-                email_id: r.email_id,
-                author_id: r.author_id,
-                author_name: r.author_name ?? r.author_id,
-                content: r.content,
-                created_at: r.created_at
-            }))
-        }
+        const comments: ThreadItem[] = commentRows.map((r) => ({
+            type: "comment" as const,
+            id: r.id,
+            email_id: r.email_id,
+            author_id: r.author_id,
+            author_name: r.author_name ?? r.author_id,
+            content: r.content,
+            created_at: r.created_at
+        }))
+
+        const replies: ThreadItem[] = replyRows.map((r) => ({
+            type: "reply" as const,
+            id: r.id,
+            email_id: r.email_id,
+            sent_by: r.sent_by,
+            sent_by_name: r.sent_by_name ?? r.sent_by,
+            subject: r.subject,
+            body_text: r.body_text,
+            sent_at: r.sent_at
+        }))
+
+        // Merge and sort chronologically
+        const items = [...comments, ...replies].sort((a, b) => {
+            const aTime =
+                a.type === "comment"
+                    ? a.created_at.getTime()
+                    : a.sent_at.getTime()
+            const bTime =
+                b.type === "comment"
+                    ? b.created_at.getTime()
+                    : b.sent_at.getTime()
+            return aTime - bTime
+        })
+
+        return { status: true, items }
     } catch (error) {
-        console.error("Error fetching email comments:", error)
-        return { status: false, comments: [] }
+        console.error("Error fetching email thread:", error)
+        return { status: false, items: [] }
+    }
+}
+
+export async function sendEmailReply(
+    emailId: number,
+    body: string
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasAdminEmailPermission("admin_emails:manage")
+    const canView = await hasAdminEmailPermission("admin_emails:view")
+    if (!canManage && !canView)
+        return { status: false, message: "Unauthorized." }
+
+    const userId = await getSessionUserId()
+    if (!userId) return { status: false, message: "Not authenticated." }
+
+    if (!body?.trim())
+        return { status: false, message: "Reply cannot be empty." }
+
+    // Load the original email
+    const [email] = await db
+        .select({
+            from_address: inboundEmails.from_address,
+            subject: inboundEmails.subject,
+            status: inboundEmails.status
+        })
+        .from(inboundEmails)
+        .where(eq(inboundEmails.id, emailId))
+        .limit(1)
+
+    if (!email) return { status: false, message: "Email not found." }
+    if (email.status !== "active")
+        return { status: false, message: "Can only reply to active emails." }
+
+    const replySubject = email.subject.startsWith("Re:")
+        ? email.subject
+        : `Re: ${email.subject}`
+
+    const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+
+    try {
+        await sendEmail({
+            from: site.mailFrom,
+            to: email.from_address,
+            subject: replySubject,
+            htmlBody: bodyHtml,
+            textBody: body.trim()
+        })
+
+        await db.insert(inboundEmailReplies).values({
+            email_id: emailId,
+            sent_by: userId,
+            subject: replySubject,
+            body_text: body.trim()
+        })
+
+        revalidatePath("/dashboard/manage-emails")
+        return { status: true, message: "Reply sent." }
+    } catch (error) {
+        console.error("Error sending reply:", error)
+        return { status: false, message: "Failed to send reply." }
     }
 }
 
