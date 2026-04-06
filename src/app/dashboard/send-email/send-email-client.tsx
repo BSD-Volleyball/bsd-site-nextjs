@@ -25,7 +25,8 @@ import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
-import { createAndSendBroadcast, BROADCAST_STREAMS } from "./actions"
+import { createAndSendBroadcast } from "./actions"
+import { BROADCAST_STREAMS } from "./streams"
 import type {
     RecipientGroupOption,
     TemplateOption,
