@@ -28,6 +28,8 @@ import {
 } from "@/components/ui/collapsible"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
+import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
+import { AdminPlayerDetailPopup } from "@/components/player-detail/admin-player-detail-popup"
 
 function formatDate(date: Date | string) {
     return new Date(date).toLocaleDateString("en-US", {
@@ -37,6 +39,55 @@ function formatDate(date: Date | string) {
         hour: "2-digit",
         minute: "2-digit"
     })
+}
+
+/** Renders sender name (optionally as a player-detail link) + email as mailto */
+function FromDisplay({
+    name,
+    email,
+    userId,
+    subject,
+    onPlayerClick
+}: {
+    name: string | null
+    email: string
+    userId: string | null
+    subject: string
+    onPlayerClick: (userId: string) => void
+}) {
+    const mailtoHref = `mailto:${email}?subject=${encodeURIComponent(`Re: ${subject}`)}`
+
+    return (
+        <span>
+            {name && (
+                <>
+                    {userId ? (
+                        <button
+                            type="button"
+                            className="font-medium underline hover:no-underline"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                onPlayerClick(userId)
+                            }}
+                        >
+                            {name}
+                        </button>
+                    ) : (
+                        <span>{name}</span>
+                    )}{" "}
+                    &lt;
+                </>
+            )}
+            <a
+                href={mailtoHref}
+                className="underline hover:no-underline"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {email}
+            </a>
+            {name && <>&gt;</>}
+        </span>
+    )
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -60,11 +111,13 @@ function StatusBadge({ status }: { status: string }) {
 function EmailCard({
     email,
     assignableAdmins,
-    onUpdate
+    onUpdate,
+    onPlayerClick
 }: {
     email: InboundEmailRow
     assignableAdmins: AssignableAdmin[]
     onUpdate: () => void
+    onPlayerClick: (userId: string) => void
 }) {
     const [isPending, startTransition] = useTransition()
     const [expanded, setExpanded] = useState(false)
@@ -161,15 +214,13 @@ function EmailCard({
                                 <span className="font-medium text-foreground">
                                     From:{" "}
                                 </span>
-                                <a
-                                    href={`mailto:${email.from_address}?subject=${encodeURIComponent(`Re: ${email.subject}`)}`}
-                                    className="underline hover:no-underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    {email.from_name
-                                        ? `${email.from_name} <${email.from_address}>`
-                                        : email.from_address}
-                                </a>
+                                <FromDisplay
+                                    name={email.from_name}
+                                    email={email.from_address}
+                                    userId={email.from_user_id}
+                                    subject={email.subject}
+                                    onPlayerClick={onPlayerClick}
+                                />
                             </p>
                         </div>
                         <div className="shrink-0 text-right text-muted-foreground text-xs">
@@ -191,14 +242,13 @@ function EmailCard({
                                 <p className="font-medium text-muted-foreground">
                                     From
                                 </p>
-                                <a
-                                    href={`mailto:${email.from_address}?subject=${encodeURIComponent(`Re: ${email.subject}`)}`}
-                                    className="underline hover:no-underline"
-                                >
-                                    {email.from_name
-                                        ? `${email.from_name} <${email.from_address}>`
-                                        : email.from_address}
-                                </a>
+                                <FromDisplay
+                                    name={email.from_name}
+                                    email={email.from_address}
+                                    userId={email.from_user_id}
+                                    subject={email.subject}
+                                    onPlayerClick={onPlayerClick}
+                                />
                             </div>
                             <div>
                                 <p className="font-medium text-muted-foreground">
@@ -357,13 +407,15 @@ function EmailSection({
     emails,
     assignableAdmins,
     defaultOpen,
-    onUpdate
+    onUpdate,
+    onPlayerClick
 }: {
     title: string
     emails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
     defaultOpen: boolean
     onUpdate: () => void
+    onPlayerClick: (userId: string) => void
 }) {
     const [open, setOpen] = useState(defaultOpen)
 
@@ -398,6 +450,7 @@ function EmailSection({
                                 email={e}
                                 assignableAdmins={assignableAdmins}
                                 onUpdate={onUpdate}
+                                onPlayerClick={onPlayerClick}
                             />
                         ))
                     )}
@@ -409,13 +462,31 @@ function EmailSection({
 
 export function ManageEmailsClient({
     initialEmails,
-    assignableAdmins
+    assignableAdmins,
+    playerPicUrl
 }: {
     initialEmails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
+    playerPicUrl: string
 }) {
     const [emails, setEmails] = useState(initialEmails)
     const [_isRefreshing, startRefresh] = useTransition()
+
+    const {
+        selectedUserId,
+        playerDetails,
+        draftHistory,
+        signupHistory,
+        ratingAverages,
+        sharedRatingNotes,
+        privateRatingNotes,
+        viewerRating,
+        pairPickName,
+        pairReason,
+        isLoading: playerLoading,
+        openPlayerDetail,
+        closePlayerDetail
+    } = usePlayerDetailModal()
 
     function refresh() {
         startRefresh(async () => {
@@ -439,6 +510,7 @@ export function ManageEmailsClient({
                 assignableAdmins={assignableAdmins}
                 defaultOpen={true}
                 onUpdate={refresh}
+                onPlayerClick={openPlayerDetail}
             />
             <EmailSection
                 title="Active Emails"
@@ -446,6 +518,7 @@ export function ManageEmailsClient({
                 assignableAdmins={assignableAdmins}
                 defaultOpen={true}
                 onUpdate={refresh}
+                onPlayerClick={openPlayerDetail}
             />
             <EmailSection
                 title="Closed Emails"
@@ -453,6 +526,22 @@ export function ManageEmailsClient({
                 assignableAdmins={assignableAdmins}
                 defaultOpen={false}
                 onUpdate={refresh}
+                onPlayerClick={openPlayerDetail}
+            />
+            <AdminPlayerDetailPopup
+                open={!!selectedUserId}
+                onClose={closePlayerDetail}
+                playerDetails={playerDetails}
+                draftHistory={draftHistory}
+                signupHistory={signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={playerLoading}
+                pairPickName={pairPickName}
+                pairReason={pairReason}
+                ratingAverages={ratingAverages}
+                sharedRatingNotes={sharedRatingNotes}
+                privateRatingNotes={privateRatingNotes}
+                viewerRating={viewerRating}
             />
         </div>
     )

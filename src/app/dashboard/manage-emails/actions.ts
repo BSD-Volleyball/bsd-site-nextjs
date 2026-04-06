@@ -25,6 +25,7 @@ export interface InboundEmailRow {
     email_id: string
     from_address: string
     from_name: string | null
+    from_user_id: string | null
     to_address: string
     subject: string
     body_text: string | null
@@ -67,6 +68,7 @@ export async function getInboundEmails(): Promise<{
                 email_id: inboundEmails.email_id,
                 from_address: inboundEmails.from_address,
                 from_name: inboundEmails.from_name,
+                from_user_id: users.id,
                 to_address: inboundEmails.to_address,
                 subject: inboundEmails.subject,
                 body_text: inboundEmails.body_text,
@@ -77,6 +79,7 @@ export async function getInboundEmails(): Promise<{
                 updated_at: inboundEmails.updated_at
             })
             .from(inboundEmails)
+            .leftJoin(users, eq(inboundEmails.from_address, users.email))
             .orderBy(desc(inboundEmails.created_at))
 
         const assigneeIds = [
@@ -103,6 +106,7 @@ export async function getInboundEmails(): Promise<{
             email_id: r.email_id,
             from_address: r.from_address,
             from_name: r.from_name,
+            from_user_id: r.from_user_id ?? null,
             to_address: r.to_address,
             subject: r.subject,
             body_text: r.body_text,

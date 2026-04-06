@@ -44,6 +44,7 @@ export default async function ManageEmailsPage() {
                 <ManageEmailsClient
                     initialEmails={emailsResult.emails}
                     assignableAdmins={assignableAdmins}
+                    playerPicUrl={process.env.PLAYER_PIC_URL ?? ""}
                 />
             )}
         </div>
