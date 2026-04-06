@@ -59,6 +59,10 @@ export const users = pgTable("users", {
         .notNull(),
     captain_eligible: boolean("captain_eligible")
         .$defaultFn(() => true)
+        .notNull(),
+    resend_contact_id: text("resend_contact_id"),
+    unsubscribed: boolean("unsubscribed")
+        .$defaultFn(() => false)
         .notNull()
 })
 
@@ -907,3 +911,94 @@ export const matchReferees = pgTable(
         )
     })
 )
+
+// --- Resend Audience / Segment / Topic tracking ---
+
+/**
+ * Tracks Resend Segment IDs created for targeting broadcasts.
+ * Segments are created lazily via ensureSegment() in src/lib/resend-sync.ts.
+ * season_division and season_team segments are cleaned up when a season moves
+ * to the "complete" phase; season_signups and all_users segments are permanent.
+ */
+export const resendSegments = pgTable(
+    "resend_segments",
+    {
+        id: serial("id").primaryKey(),
+        name: text("name").notNull(),
+        resend_segment_id: text("resend_segment_id").notNull().unique(),
+        // 'all_users' | 'season_signups' | 'season_division' | 'season_team'
+        segment_type: text("segment_type").notNull(),
+        season_id: integer("season_id").references(() => seasons.id, {
+            onDelete: "set null"
+        }),
+        division_id: integer("division_id").references(() => divisions.id, {
+            onDelete: "set null"
+        }),
+        team_id: integer("team_id").references(() => teams.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        resendSegmentsTypeSeasonDivTeamUniq: uniqueIndex(
+            "resend_segments_type_season_div_team_uniq"
+        ).on(
+            table.segment_type,
+            table.season_id,
+            table.division_id,
+            table.team_id
+        )
+    })
+)
+
+/**
+ * Tracks the two Resend Topic IDs (General Updates, In Season Updates).
+ * Created once via ensureTopics() and stored here to avoid repeated API lookups.
+ */
+export const resendTopics = pgTable("resend_topics", {
+    id: serial("id").primaryKey(),
+    // 'general_updates' | 'in_season_updates'
+    topic_type: text("topic_type").notNull().unique(),
+    name: text("name").notNull(),
+    resend_topic_id: text("resend_topic_id").notNull().unique(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+/**
+ * Tracks all bulk email broadcasts sent via the Send Email admin page.
+ * Stores both rendered HTML and raw Lexical JSON so "Send Again" can
+ * reload the editor without lossy HTML-to-Lexical conversion.
+ */
+export const emailBroadcasts = pgTable("email_broadcasts", {
+    id: serial("id").primaryKey(),
+    resend_broadcast_id: text("resend_broadcast_id"),
+    segment_id: integer("segment_id")
+        .notNull()
+        .references(() => resendSegments.id),
+    topic_id: integer("topic_id").references(() => resendTopics.id),
+    template_id: integer("template_id"),
+    subject: text("subject").notNull(),
+    html_content: text("html_content").notNull(),
+    lexical_content: jsonb("lexical_content")
+        .$type<Record<string, unknown>>()
+        .notNull(),
+    sent_by: text("sent_by")
+        .notNull()
+        .references(() => users.id),
+    // 'draft' | 'sent' | 'failed'
+    status: text("status")
+        .$defaultFn(() => "draft")
+        .notNull(),
+    error_message: text("error_message"),
+    sent_at: timestamp("sent_at"),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull(),
+    updated_at: timestamp("updated_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})

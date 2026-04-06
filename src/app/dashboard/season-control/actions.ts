@@ -12,6 +12,7 @@ import {
     isValidPhaseTransition,
     isValidPhaseRevert
 } from "@/lib/season-phases"
+import { cleanupSeasonSegments } from "@/lib/resend-sync"
 
 export async function advanceSeasonPhase(
     seasonId: number,
@@ -58,6 +59,17 @@ export async function advanceSeasonPhase(
             entityId: seasonId,
             summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
         })
+
+        // When season completes, clean up granular Resend segments (fire-and-forget)
+        if (targetPhase === "complete") {
+            cleanupSeasonSegments(seasonId).catch((err) =>
+                console.error(
+                    "[season-control] Resend segment cleanup failed",
+                    seasonId,
+                    err
+                )
+            )
+        }
 
         revalidatePath("/dashboard/season-control")
         return {

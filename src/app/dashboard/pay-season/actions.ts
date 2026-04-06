@@ -24,6 +24,7 @@ import {
 } from "@/lib/discount"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
+import { syncUserToResend } from "@/lib/resend-sync"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
@@ -391,6 +392,15 @@ export async function submitSeasonPayment(
                     response.payment.receiptUrl,
                     discountInfo
                 )
+
+                // Sync user to Resend season signups segment (fire-and-forget)
+                syncUserToResend(session.user.id).catch((err) =>
+                    console.error(
+                        "[pay-season] Resend sync failed",
+                        session.user.id,
+                        err
+                    )
+                )
             }
 
             return {
@@ -547,6 +557,15 @@ export async function submitFreeSignup(
                 originalAmount,
                 percentage: discount.percentage
             }
+        )
+
+        // Sync user to Resend season signups segment (fire-and-forget)
+        syncUserToResend(session.user.id).catch((err) =>
+            console.error(
+                "[pay-season] Resend sync failed",
+                session.user.id,
+                err
+            )
         )
 
         return {

@@ -5,6 +5,7 @@ import { db } from "@/database/db"
 import { concerns, inboundEmails, users, userRoles } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { site } from "@/config/site"
+import type { ContactUpdatedEvent } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -110,6 +111,32 @@ async function handleConcernEmail(
     await notifyOmbudsmen(appUrl)
 }
 
+async function handleContactUpdated(
+    data: ContactUpdatedEvent["data"]
+): Promise<void> {
+    const { email, unsubscribed } = data
+
+    if (!email || typeof unsubscribed !== "boolean") return
+
+    const [user] = await db
+        .select({ id: users.id, unsubscribed: users.unsubscribed })
+        .from(users)
+        .where(eq(users.email, email.toLowerCase()))
+        .limit(1)
+
+    if (!user) return
+
+    if (user.unsubscribed !== unsubscribed) {
+        await db
+            .update(users)
+            .set({ unsubscribed })
+            .where(eq(users.id, user.id))
+        console.log(
+            `[resend-webhook] Updated unsubscribed=${unsubscribed} for user ${user.id}`
+        )
+    }
+}
+
 async function handleAdminEmail(
     emailId: string,
     from: string,
@@ -157,6 +184,12 @@ export async function POST(request: NextRequest) {
             },
             webhookSecret
         })
+
+        // Handle contact.updated (unsubscribe sync)
+        if (event.type === "contact.updated") {
+            await handleContactUpdated((event as ContactUpdatedEvent).data)
+            return NextResponse.json({ received: true })
+        }
 
         if (event.type !== "email.received") {
             return NextResponse.json({ received: true })

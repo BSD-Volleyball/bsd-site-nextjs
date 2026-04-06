@@ -157,6 +157,11 @@ const adminNavItems = [
         icon: RiGroupLine
     },
     {
+        title: "Send Email",
+        url: "/dashboard/send-email",
+        icon: RiMailLine
+    },
+    {
         title: "Manage Emails",
         url: "/dashboard/manage-emails",
         icon: RiInboxLine
@@ -331,6 +336,11 @@ const addPicturesNavItem = {
 }
 
 const commissionerNavItems = [
+    {
+        title: "Send Email",
+        url: "/dashboard/send-email",
+        icon: RiMailLine
+    },
     {
         title: "Homework Status",
         url: "/dashboard/homework-status",

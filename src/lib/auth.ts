@@ -3,6 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { Resend } from "resend"
+import { syncUserToResend } from "@/lib/resend-sync"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
 import { db } from "@/database/db"
@@ -51,6 +52,16 @@ export const auth = betterAuth({
                         }
                     }
                 }
+            },
+            after: async (user: { id: string }) => {
+                // Fire-and-forget: sync new user to Resend Contacts
+                syncUserToResend(user.id).catch((err) =>
+                    console.error(
+                        "[auth] Resend sync failed for new user",
+                        user.id,
+                        err
+                    )
+                )
             }
         }
     },
