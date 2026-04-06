@@ -46,6 +46,7 @@ interface SendEmailClientProps {
 }
 
 const EMPTY_CONTENT = normalizeEmailTemplateContent("")
+const NO_TOPIC = "__none__"
 
 export function SendEmailClient({
     segments,
@@ -58,7 +59,7 @@ export function SendEmailClient({
 
     // Compose form state
     const [selectedSegmentId, setSelectedSegmentId] = useState<string>("")
-    const [selectedTopicId, setSelectedTopicId] = useState<string>("")
+    const [selectedTopicId, setSelectedTopicId] = useState<string>(NO_TOPIC)
     const [subject, setSubject] = useState("")
     const [content, setContent] =
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
@@ -96,7 +97,7 @@ export function SendEmailClient({
     const handleSendAgain = useCallback((item: BroadcastHistoryItem) => {
         setSubject(item.subject)
         setSelectedSegmentId(String(item.segmentId))
-        setSelectedTopicId(item.topicId ? String(item.topicId) : "")
+        setSelectedTopicId(item.topicId ? String(item.topicId) : NO_TOPIC)
         setContent(item.lexicalContent)
         setEditorKey((k) => k + 1)
         setSendMessage(null)
@@ -119,7 +120,10 @@ export function SendEmailClient({
         try {
             const result = await createAndSendBroadcast({
                 segmentDbId: Number(selectedSegmentId),
-                topicDbId: selectedTopicId ? Number(selectedTopicId) : null,
+                topicDbId:
+                    selectedTopicId && selectedTopicId !== NO_TOPIC
+                        ? Number(selectedTopicId)
+                        : null,
                 subject,
                 lexicalContent: content
             })
@@ -133,7 +137,7 @@ export function SendEmailClient({
                 setSubject("")
                 setContent(EMPTY_CONTENT)
                 setSelectedSegmentId("")
-                setSelectedTopicId("")
+                setSelectedTopicId(NO_TOPIC)
                 setEditorKey((k) => k + 1)
                 router.refresh()
             } else {
@@ -260,7 +264,7 @@ export function SendEmailClient({
                                         <SelectValue placeholder="All topics" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">
+                                        <SelectItem value={NO_TOPIC}>
                                             All topics
                                         </SelectItem>
                                         {topics.map((t) => (

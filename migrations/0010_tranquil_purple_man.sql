@@ -38,7 +38,7 @@ CREATE TABLE "resend_topics" (
 );
 --> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN "resend_contact_id" text;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "unsubscribed" boolean NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "unsubscribed" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "email_broadcasts" ADD CONSTRAINT "email_broadcasts_segment_id_resend_segments_id_fk" FOREIGN KEY ("segment_id") REFERENCES "public"."resend_segments"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_broadcasts" ADD CONSTRAINT "email_broadcasts_topic_id_resend_topics_id_fk" FOREIGN KEY ("topic_id") REFERENCES "public"."resend_topics"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_broadcasts" ADD CONSTRAINT "email_broadcasts_sent_by_users_id_fk" FOREIGN KEY ("sent_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

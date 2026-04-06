@@ -1,8 +1,8 @@
 "use client"
-import { SignedIn, SignedOut } from "@daveyplate/better-auth-ui"
 import { Menu, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import dynamic from "next/dynamic"
 import React from "react"
 import { ModeToggle } from "./mode-toggle"
 import { Button } from "../ui/button"
@@ -24,6 +24,22 @@ import {
     SheetTrigger
 } from "../ui/sheet"
 import { site } from "@/config/site"
+
+const NavDesktopAuthButtons = dynamic(
+    () =>
+        import("./nav-auth-buttons").then((m) => ({
+            default: m.NavDesktopAuthButtons
+        })),
+    { ssr: false }
+)
+
+const NavMobileAuthButtons = dynamic(
+    () =>
+        import("./nav-auth-buttons").then((m) => ({
+            default: m.NavMobileAuthButtons
+        })),
+    { ssr: false }
+)
 
 interface RouteProps {
     href: string
@@ -216,37 +232,7 @@ export const Navbar = () => {
                     <div className="hidden items-center gap-2 lg:flex">
                         <ModeToggle />
 
-                        <SignedOut>
-                            <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="ml-2"
-                            >
-                                <Link href="/auth/sign-in?redirectTo=/dashboard">
-                                    Sign In
-                                </Link>
-                            </Button>
-                            <Button
-                                asChild
-                                size="sm"
-                                className="bg-primary hover:bg-primary/90"
-                            >
-                                <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                    Register
-                                </Link>
-                            </Button>
-                        </SignedOut>
-                        <SignedIn>
-                            <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="ml-2"
-                            >
-                                <Link href="/dashboard">Dashboard</Link>
-                            </Button>
-                        </SignedIn>
+                        <NavDesktopAuthButtons />
                     </div>
 
                     {/* Mobile Menu Button */}
@@ -383,39 +369,9 @@ export const Navbar = () => {
 
                                     {/* Mobile Actions */}
                                     <SheetFooter className="flex-row gap-2 border-border/50 border-t pt-4">
-                                        <SignedOut>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/auth/sign-in?redirectTo=/dashboard">
-                                                    Sign In
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                asChild
-                                                className="w-full bg-primary hover:bg-primary/90"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/auth/sign-up?redirectTo=/dashboard">
-                                                    Register
-                                                </Link>
-                                            </Button>
-                                        </SignedOut>
-                                        <SignedIn>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                className="w-full"
-                                                onClick={() => setIsOpen(false)}
-                                            >
-                                                <Link href="/dashboard">
-                                                    Dashboard
-                                                </Link>
-                                            </Button>
-                                        </SignedIn>
+                                        <NavMobileAuthButtons
+                                            onNavigate={() => setIsOpen(false)}
+                                        />
                                     </SheetFooter>
                                 </div>
                             </SheetContent>
