@@ -5,11 +5,12 @@ import {
     addConcernComment,
     assignConcern,
     closeConcern,
-    getConcernComments,
+    getConcernThread,
     reopenConcern,
+    sendConcernReply,
     type AssignableUser,
-    type ConcernComment,
-    type ConcernRow
+    type ConcernRow,
+    type ConcernThreadItem
 } from "./actions"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -74,25 +75,34 @@ function ConcernCard({
 }) {
     const [isPending, startTransition] = useTransition()
     const [expanded, setExpanded] = useState(false)
-    const [comments, setComments] = useState<ConcernComment[]>([])
-    const [commentsLoaded, setCommentsLoaded] = useState(false)
+    const [thread, setThread] = useState<ConcernThreadItem[]>([])
+    const [threadLoaded, setThreadLoaded] = useState(false)
     const [newComment, setNewComment] = useState("")
     const [commentMsg, setCommentMsg] = useState<string | null>(null)
+    const [replyBody, setReplyBody] = useState("")
+    const [replyMsg, setReplyMsg] = useState<string | null>(null)
 
-    function loadComments() {
-        if (commentsLoaded) return
+    // Determine whether replies can be sent for this concern
+    const canReply =
+        concern.status === "active" &&
+        (concern.source === "email"
+            ? !!concern.contact_email
+            : !concern.anonymous || !!concern.contact_email)
+
+    function loadThread() {
+        if (threadLoaded) return
         startTransition(async () => {
-            const result = await getConcernComments(concern.id)
+            const result = await getConcernThread(concern.id)
             if (result.status) {
-                setComments(result.comments)
-                setCommentsLoaded(true)
+                setThread(result.items)
+                setThreadLoaded(true)
             }
         })
     }
 
     function handleToggle(open: boolean) {
         setExpanded(open)
-        if (open) loadComments()
+        if (open) loadThread()
     }
 
     function handleAssignChange(assigneeId: string) {
@@ -126,12 +136,27 @@ function ConcernCard({
             const result = await addConcernComment(concern.id, newComment)
             if (result.status) {
                 setNewComment("")
-                // Reload comments
-                const updated = await getConcernComments(concern.id)
-                if (updated.status) setComments(updated.comments)
+                const updated = await getConcernThread(concern.id)
+                if (updated.status) setThread(updated.items)
                 setCommentMsg(null)
             } else {
                 setCommentMsg(result.message)
+            }
+        })
+    }
+
+    function handleSendReply() {
+        if (!replyBody.trim()) return
+        setReplyMsg(null)
+        startTransition(async () => {
+            const result = await sendConcernReply(concern.id, replyBody)
+            if (result.status) {
+                setReplyBody("")
+                const updated = await getConcernThread(concern.id)
+                if (updated.status) setThread(updated.items)
+                setReplyMsg(null)
+            } else {
+                setReplyMsg(result.message)
             }
         })
     }
@@ -420,36 +445,89 @@ function ConcernCard({
                             )}
                         </div>
 
-                        {/* Comments */}
+                        {/* Thread: replies + internal comments */}
                         <div className="space-y-3 border-t pt-2">
-                            <p className="font-medium text-sm">
-                                Internal Comments
-                            </p>
+                            <p className="font-medium text-sm">Thread</p>
 
-                            {comments.length === 0 && commentsLoaded && (
+                            {thread.length === 0 && threadLoaded && (
                                 <p className="text-muted-foreground text-sm">
-                                    No comments yet.
+                                    No activity yet.
                                 </p>
                             )}
 
-                            {comments.map((c) => (
-                                <div
-                                    key={c.id}
-                                    className="rounded-md border bg-muted/30 p-3 text-sm"
-                                >
-                                    <div className="mb-1 flex items-center justify-between gap-2">
-                                        <span className="font-medium">
-                                            {c.author_name}
-                                        </span>
-                                        <span className="text-muted-foreground text-xs">
-                                            {formatDate(c.created_at)}
-                                        </span>
+                            {thread.map((item) =>
+                                item.type === "reply" ? (
+                                    <div
+                                        key={`reply-${item.id}`}
+                                        className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950"
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="font-medium text-blue-900 dark:text-blue-100">
+                                                {item.sent_by_name}{" "}
+                                                <span className="font-normal text-xs">
+                                                    → {item.sent_to}
+                                                </span>
+                                            </span>
+                                            <span className="text-blue-700 text-xs dark:text-blue-300">
+                                                {formatDate(item.sent_at)}
+                                            </span>
+                                        </div>
+                                        <p className="whitespace-pre-wrap text-blue-900 dark:text-blue-100">
+                                            {item.body_text}
+                                        </p>
                                     </div>
-                                    <p className="whitespace-pre-wrap text-foreground">
-                                        {c.content}
+                                ) : (
+                                    <div
+                                        key={`comment-${item.id}`}
+                                        className="rounded-md border bg-muted/30 p-3 text-sm"
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="font-medium">
+                                                {item.author_name}
+                                            </span>
+                                            <span className="text-muted-foreground text-xs">
+                                                {formatDate(item.created_at)}
+                                            </span>
+                                        </div>
+                                        <p className="whitespace-pre-wrap text-foreground">
+                                            {item.content}
+                                        </p>
+                                    </div>
+                                )
+                            )}
+
+                            {/* Reply composer — active concerns with a reachable address */}
+                            {canReply && (
+                                <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+                                    <p className="font-medium text-sm">
+                                        Send Reply
                                     </p>
+                                    <Textarea
+                                        rows={3}
+                                        placeholder="Write a reply to send via email..."
+                                        value={replyBody}
+                                        onChange={(e) =>
+                                            setReplyBody(e.target.value)
+                                        }
+                                    />
+                                    {replyMsg && (
+                                        <p className="text-destructive text-sm">
+                                            {replyMsg}
+                                        </p>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSendReply}
+                                        disabled={
+                                            isPending || !replyBody.trim()
+                                        }
+                                    >
+                                        {isPending
+                                            ? "Sending..."
+                                            : "Send Reply"}
+                                    </Button>
                                 </div>
-                            ))}
+                            )}
 
                             <div className="space-y-2">
                                 <Textarea

@@ -695,6 +695,22 @@ export const concernComments = pgTable("concern_comments", {
         .notNull()
 })
 
+export const concernReplies = pgTable("concern_replies", {
+    id: serial("id").primaryKey(),
+    concern_id: integer("concern_id")
+        .notNull()
+        .references(() => concerns.id, { onDelete: "cascade" }),
+    sent_by: text("sent_by")
+        .notNull()
+        .references(() => users.id),
+    subject: text("subject").notNull(),
+    body_text: text("body_text").notNull(),
+    sent_to: text("sent_to").notNull(),
+    sent_at: timestamp("sent_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
 // --- Inbound Emails (admin inbox) ---
 
 export const inboundEmails = pgTable("inbound_emails", {

@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
-import { concerns, concernComments, users, userRoles } from "@/database/schema"
+import {
+    concerns,
+    concernComments,
+    concernReplies,
+    users,
+    userRoles
+} from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import { sendEmail } from "@/lib/postmark"
 
 async function hasConcernPermission(
     permission: "concerns:view" | "concerns:manage"
@@ -47,6 +54,21 @@ export interface ConcernComment {
     content: string
     created_at: Date
 }
+
+export interface ConcernReply {
+    id: number
+    concern_id: number
+    sent_by: string
+    sent_by_name: string
+    subject: string
+    body_text: string
+    sent_to: string
+    sent_at: Date
+}
+
+export type ConcernThreadItem =
+    | ({ type: "comment" } & ConcernComment)
+    | ({ type: "reply" } & ConcernReply)
 
 export interface AssignableUser {
     id: string
@@ -185,6 +207,169 @@ export async function getConcernComments(
     } catch (error) {
         console.error("Error fetching concern comments:", error)
         return { status: false, comments: [] }
+    }
+}
+
+export async function getConcernThread(
+    concernId: number
+): Promise<{ status: boolean; items: ConcernThreadItem[] }> {
+    const canView = await hasConcernPermission("concerns:view")
+    if (!canView) {
+        return { status: false, items: [] }
+    }
+
+    try {
+        const commentRows = await db
+            .select({
+                id: concernComments.id,
+                concern_id: concernComments.concern_id,
+                author_id: concernComments.author_id,
+                author_name: users.name,
+                content: concernComments.content,
+                created_at: concernComments.created_at
+            })
+            .from(concernComments)
+            .leftJoin(users, eq(concernComments.author_id, users.id))
+            .where(eq(concernComments.concern_id, concernId))
+
+        const replyRows = await db
+            .select({
+                id: concernReplies.id,
+                concern_id: concernReplies.concern_id,
+                sent_by: concernReplies.sent_by,
+                sent_by_name: users.name,
+                subject: concernReplies.subject,
+                body_text: concernReplies.body_text,
+                sent_to: concernReplies.sent_to,
+                sent_at: concernReplies.sent_at
+            })
+            .from(concernReplies)
+            .leftJoin(users, eq(concernReplies.sent_by, users.id))
+            .where(eq(concernReplies.concern_id, concernId))
+
+        const items: ConcernThreadItem[] = [
+            ...commentRows.map((r) => ({
+                type: "comment" as const,
+                id: r.id,
+                concern_id: r.concern_id,
+                author_id: r.author_id,
+                author_name: r.author_name ?? r.author_id,
+                content: r.content,
+                created_at: r.created_at
+            })),
+            ...replyRows.map((r) => ({
+                type: "reply" as const,
+                id: r.id,
+                concern_id: r.concern_id,
+                sent_by: r.sent_by,
+                sent_by_name: r.sent_by_name ?? r.sent_by,
+                subject: r.subject,
+                body_text: r.body_text,
+                sent_to: r.sent_to,
+                sent_at: r.sent_at
+            }))
+        ]
+
+        items.sort((a, b) => {
+            const aTime = a.type === "comment" ? a.created_at : a.sent_at
+            const bTime = b.type === "comment" ? b.created_at : b.sent_at
+            return aTime.getTime() - bTime.getTime()
+        })
+
+        return { status: true, items }
+    } catch (error) {
+        console.error("Error fetching concern thread:", error)
+        return { status: false, items: [] }
+    }
+}
+
+export async function sendConcernReply(
+    concernId: number,
+    body: string
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasConcernPermission("concerns:manage")
+    const canView = await hasConcernPermission("concerns:view")
+    if (!canManage && !canView) {
+        return { status: false, message: "Unauthorized." }
+    }
+
+    const userId = await getSessionUserId()
+    if (!userId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    if (!body?.trim()) {
+        return { status: false, message: "Reply cannot be empty." }
+    }
+
+    const fromAddress = process.env.INBOUND_CONCERN_ADDRESS
+    if (!fromAddress) {
+        return {
+            status: false,
+            message: "Concern reply address is not configured."
+        }
+    }
+
+    const [concern] = await db
+        .select()
+        .from(concerns)
+        .where(eq(concerns.id, concernId))
+        .limit(1)
+
+    if (!concern) {
+        return { status: false, message: "Concern not found." }
+    }
+    if (concern.status !== "active") {
+        return { status: false, message: "Can only reply to active concerns." }
+    }
+
+    let replyTo: string | null = null
+
+    if (concern.source === "email") {
+        replyTo = concern.contact_email ?? null
+    } else if (!concern.anonymous && concern.user_id) {
+        const [userRow] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, concern.user_id))
+            .limit(1)
+        replyTo = userRow?.email ?? null
+    } else if (concern.contact_email) {
+        replyTo = concern.contact_email
+    }
+
+    if (!replyTo) {
+        return {
+            status: false,
+            message: "No reply address available for this concern."
+        }
+    }
+
+    const subject = `Re: Concern #${concernId}`
+
+    try {
+        await sendEmail({
+            from: fromAddress,
+            to: replyTo,
+            subject,
+            htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
+            textBody: body.trim(),
+            stream: "outbound"
+        })
+
+        await db.insert(concernReplies).values({
+            concern_id: concernId,
+            sent_by: userId,
+            subject,
+            body_text: body.trim(),
+            sent_to: replyTo
+        })
+
+        revalidatePath("/dashboard/manage-concerns")
+        return { status: true, message: "Reply sent." }
+    } catch (error) {
+        console.error("Error sending concern reply:", error)
+        return { status: false, message: "Failed to send reply." }
     }
 }
 

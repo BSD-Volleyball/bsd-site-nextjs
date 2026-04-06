@@ -83,7 +83,9 @@
     },
     "overrides": [
         {
-            "includes": ["src/app/dashboard/manage-emails/manage-emails-client.tsx"],
+            "includes": [
+                "src/app/dashboard/manage-emails/manage-emails-client.tsx"
+            ],
             "linter": {
                 "rules": {
                     "security": {
