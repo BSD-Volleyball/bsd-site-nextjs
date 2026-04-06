@@ -102,7 +102,7 @@ async function notifyOmbudsmen(appUrl: string) {
     }
 }
 
-async function notifyAdmins(appUrl: string, subject: string, from: string) {
+async function notifyAdmins(appUrl: string) {
     const adminRows = await db
         .select({ email: users.email })
         .from(userRoles)
@@ -117,11 +117,7 @@ async function notifyAdmins(appUrl: string, subject: string, from: string) {
                 from: site.mailFrom,
                 to,
                 subject: "New Inbound Email Received",
-                htmlBody: buildInboundEmailNotificationHtml({
-                    appUrl,
-                    from,
-                    subject
-                })
+                htmlBody: buildInboundEmailNotificationHtml({ appUrl })
             }))
         )
     }
@@ -132,19 +128,13 @@ async function notifyAssignee(opts: {
     appUrl: string
     ticketType: "email" | "concern"
     ticketId: number
-    subject: string
-    from: string
-    bodyPreview: string | null
 }) {
     const label = opts.ticketType === "email" ? "Email" : "Concern"
-    const notifSubject = `New Reply on ${label} #${opts.ticketId}: ${opts.subject}`
+    const notifSubject = `New Reply on ${label} #${opts.ticketId}`
     const notifHtml = buildThreadReplyNotificationHtml({
         appUrl: opts.appUrl,
         ticketType: opts.ticketType,
-        ticketId: opts.ticketId,
-        subject: opts.subject,
-        from: opts.from,
-        bodyPreview: opts.bodyPreview
+        ticketId: opts.ticketId
     })
 
     if (opts.assignedTo) {
@@ -295,7 +285,6 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
         payload.FromFull?.Email ?? parseFromAddress(payload.From).email
     const fromName =
         payload.FromFull?.Name ?? parseFromAddress(payload.From).name
-    const from = payload.From
     const subject = payload.Subject || "(No subject)"
     const bodyText = payload.TextBody || null
     const bodyHtml = payload.HtmlBody || null
@@ -339,10 +328,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 assignedTo: ticket?.assigned_to ?? null,
                 appUrl,
                 ticketType: "email",
-                ticketId: existingThread.id,
-                subject,
-                from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
-                bodyPreview: bodyText
+                ticketId: existingThread.id
             })
 
             console.log(
@@ -369,10 +355,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 assignedTo: ticket?.assigned_to ?? null,
                 appUrl,
                 ticketType: "concern",
-                ticketId: existingThread.id,
-                subject,
-                from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
-                bodyPreview: bodyText
+                ticketId: existingThread.id
             })
 
             console.log(
@@ -410,7 +393,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             body_html: bodyHtml,
             status: "new"
         })
-        await notifyAdmins(appUrl, subject, from)
+        await notifyAdmins(appUrl)
     }
 }
 
