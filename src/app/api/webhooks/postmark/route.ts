@@ -259,24 +259,17 @@ async function handleSubscriptionChange(
 // Webhook token verification
 // ---------------------------------------------------------------------------
 
-function verifyWebhookToken(request: NextRequest): boolean {
-    const token = process.env.POSTMARK_WEBHOOK_TOKEN
-    if (!token) return true // No token configured = skip verification
+function verifyWebhookAuth(request: NextRequest): boolean {
+    const user = process.env.POSTMARK_WEBHOOK_USER
+    const password = process.env.POSTMARK_WEBHOOK_PASSWORD
+    if (!user && !password) return true // No credentials configured = skip verification
 
-    // Check Authorization header (Bearer or Basic)
     const authHeader = request.headers.get("authorization")
-    if (authHeader) {
-        // Support "Bearer <token>" or raw token
-        const provided = authHeader.replace(/^Bearer\s+/i, "").trim()
-        if (provided === token) return true
-    }
+    if (!authHeader?.startsWith("Basic ")) return false
 
-    // Check query parameter fallback
-    const url = new URL(request.url)
-    const queryToken = url.searchParams.get("token")
-    if (queryToken === token) return true
-
-    return false
+    const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8")
+    const [providedUser, providedPassword] = decoded.split(":")
+    return providedUser === user && providedPassword === password
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +277,7 @@ function verifyWebhookToken(request: NextRequest): boolean {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
-    if (!verifyWebhookToken(request)) {
+    if (!verifyWebhookAuth(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
