@@ -29,7 +29,7 @@ import {
     resendSegments,
     resendTopics
 } from "@/database/schema"
-import { eq, and, inArray, isNull } from "drizzle-orm"
+import { eq, and, inArray, isNull, isNotNull } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 
 // ---------------------------------------------------------------------------
@@ -314,6 +314,10 @@ function buildSeasonLabel(year: number, season: string): string {
     return `${season.charAt(0).toUpperCase() + season.slice(1)} ${year}`
 }
 
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 // ---------------------------------------------------------------------------
 // Full single-user sync
 // ---------------------------------------------------------------------------
@@ -429,6 +433,156 @@ export async function syncUserToResend(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Season segment bootstrap (segment-first approach)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensures all current-season segments exist and are fully populated.
+ * Works segment-by-segment rather than user-by-user, which means:
+ *   - Segments are created even if individual user syncs previously failed.
+ *   - Uses stored resend_contact_id values — no contact creation API calls.
+ *
+ * Creates:
+ *   - season_signups: all users in signups table for the current season
+ *   - season_division: all drafted users per division
+ *   - season_team: all drafted users per team
+ *
+ * Safe to call multiple times (idempotent via ensureSegment + Resend dedup).
+ */
+export async function syncCurrentSeasonSegments(): Promise<void> {
+    try {
+        const config = await getSeasonConfig()
+        if (!config.seasonId) {
+            console.log("[resend-sync] No active season, skipping segment sync")
+            return
+        }
+        const seasonId = config.seasonId
+
+        const [seasonRow] = await db
+            .select({ year: seasons.year, season: seasons.season })
+            .from(seasons)
+            .where(eq(seasons.id, seasonId))
+            .limit(1)
+
+        if (!seasonRow) return
+        const seasonLabel = buildSeasonLabel(seasonRow.year, seasonRow.season)
+
+        // --- 1. Season signups segment ---
+        const signupsSegId = await ensureSegment("season_signups", {
+            seasonId,
+            name: `${seasonLabel} - All Signups`
+        })
+        if (signupsSegId) {
+            const signedUpContacts = await db
+                .select({ contactId: users.resend_contact_id })
+                .from(signups)
+                .innerJoin(users, eq(signups.player, users.id))
+                .where(
+                    and(
+                        eq(signups.season, seasonId),
+                        isNotNull(users.resend_contact_id)
+                    )
+                )
+            for (const row of signedUpContacts) {
+                if (row.contactId) {
+                    await addContactToSegment(row.contactId, signupsSegId)
+                }
+            }
+        }
+
+        // --- 2. Build team/division map for the season ---
+        const teamRows = await db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                divisionId: divisions.id,
+                divisionName: divisions.name
+            })
+            .from(teams)
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(eq(teams.season, seasonId))
+
+        if (teamRows.length === 0) {
+            console.log("[resend-sync] No teams found for season, skipping division/team segments")
+            return
+        }
+
+        // --- 3. Division segments ---
+        const divisionMap = new Map<
+            number,
+            { name: string; teamIds: number[] }
+        >()
+        for (const row of teamRows) {
+            if (!divisionMap.has(row.divisionId)) {
+                divisionMap.set(row.divisionId, {
+                    name: row.divisionName,
+                    teamIds: []
+                })
+            }
+            divisionMap.get(row.divisionId)!.teamIds.push(row.teamId)
+        }
+
+        for (const [divisionId, { name: divisionName, teamIds }] of divisionMap) {
+            const divSegId = await ensureSegment("season_division", {
+                seasonId,
+                divisionId,
+                name: `${seasonLabel} - ${divisionName}`
+            })
+            // Throttle: segment creation counts toward the 5 req/s limit
+            await sleep(250)
+            if (!divSegId) continue
+
+            const draftedContacts = await db
+                .select({ contactId: users.resend_contact_id })
+                .from(drafts)
+                .innerJoin(users, eq(drafts.user, users.id))
+                .where(
+                    and(
+                        inArray(drafts.team, teamIds),
+                        isNotNull(users.resend_contact_id)
+                    )
+                )
+            for (const row of draftedContacts) {
+                if (row.contactId) {
+                    await addContactToSegment(row.contactId, divSegId)
+                    await sleep(250)
+                }
+            }
+        }
+
+        // --- 4. Team segments ---
+        for (const team of teamRows) {
+            const teamSegId = await ensureSegment("season_team", {
+                seasonId,
+                teamId: team.teamId,
+                name: `${seasonLabel} - Team ${team.teamName}`
+            })
+            await sleep(250)
+            if (!teamSegId) continue
+
+            const teamContacts = await db
+                .select({ contactId: users.resend_contact_id })
+                .from(drafts)
+                .innerJoin(users, eq(drafts.user, users.id))
+                .where(
+                    and(
+                        eq(drafts.team, team.teamId),
+                        isNotNull(users.resend_contact_id)
+                    )
+                )
+            for (const row of teamContacts) {
+                if (row.contactId) {
+                    await addContactToSegment(row.contactId, teamSegId)
+                    await sleep(250)
+                }
+            }
+        }
+    } catch (err) {
+        console.error("[resend-sync] syncCurrentSeasonSegments error", err)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Bulk resync
 // ---------------------------------------------------------------------------
 
@@ -460,6 +614,10 @@ export async function fullResync(): Promise<{
                 failed++
             }
         }
+
+        // Ensure all current-season segments are created and fully populated
+        // even if individual user syncs failed due to rate limits.
+        await syncCurrentSeasonSegments()
     } catch (err) {
         console.error("[resend-sync] fullResync error", err)
     }

@@ -884,6 +884,7 @@ export async function getNextMatch(
                 time: matches.time,
                 court: matches.court,
                 week: matches.week,
+                playoff: matches.playoff,
                 homeTeamId: matches.home_team,
                 awayTeamId: matches.away_team,
                 divisionId: matches.division
@@ -906,27 +907,30 @@ export async function getNextMatch(
 
         if (!nextMatchRow) return null
 
-        // If match.date is null, resolve it from season_events using the week number
+        // Always resolve the season event by week so we can check availability.
+        // The match.date column may be set directly, but availability is stored
+        // against season_events entries — so we need matchEventId regardless.
         let matchDate: string | null = nextMatchRow.date
         let matchEventId: number | null = null
-        if (!matchDate) {
-            const rsEvents = await db
-                .select({
-                    eventDate: seasonEvents.event_date,
-                    id: seasonEvents.id
-                })
-                .from(seasonEvents)
-                .where(
-                    and(
-                        eq(seasonEvents.season_id, seasonId),
-                        eq(seasonEvents.event_type, "regular_season")
-                    )
+        const eventType = nextMatchRow.playoff ? "playoff" : "regular_season"
+        const seasonEventsForType = await db
+            .select({
+                eventDate: seasonEvents.event_date,
+                id: seasonEvents.id
+            })
+            .from(seasonEvents)
+            .where(
+                and(
+                    eq(seasonEvents.season_id, seasonId),
+                    eq(seasonEvents.event_type, eventType)
                 )
-                .orderBy(asc(seasonEvents.event_date))
-            const weekEvent = rsEvents[nextMatchRow.week - 1]
-            if (weekEvent) {
+            )
+            .orderBy(asc(seasonEvents.event_date))
+        const weekEvent = seasonEventsForType[nextMatchRow.week - 1]
+        if (weekEvent) {
+            matchEventId = weekEvent.id
+            if (!matchDate) {
                 matchDate = weekEvent.eventDate
-                matchEventId = weekEvent.id
             }
         }
 
