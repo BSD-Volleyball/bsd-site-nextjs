@@ -9,12 +9,19 @@ import {
     signups,
     seasonEvents,
     userUnavailability,
-    divisions
+    divisions,
+    seasons
 } from "@/database/schema"
-import { eq, and, inArray, asc } from "drizzle-orm"
+import { eq, and, inArray, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
+
+export type SeasonInfo = {
+    id: number
+    year: number
+    name: string
+}
 
 export type EventInfo = {
     id: number
@@ -31,6 +38,7 @@ export type RosterPlayer = {
     preferredName: string | null
     signupId: number
     unavailableEventIds: number[]
+    male: boolean | null
 }
 
 export type TeamOption = {
@@ -47,6 +55,8 @@ export type TeamAvailabilityData = {
     allTeams: TeamOption[]
     events: EventInfo[]
     roster: RosterPlayer[]
+    allSeasons: SeasonInfo[]
+    playerPicUrl: string
 }
 
 export type TeamAvailabilityError = {
@@ -173,6 +183,7 @@ export async function getTeamAvailabilityData(
             firstName: users.first_name,
             lastName: users.last_name,
             preferredName: users.preferred_name,
+            male: users.male,
             signupId: signups.id,
             round: drafts.round,
             overall: drafts.overall
@@ -234,8 +245,20 @@ export async function getTeamAvailabilityData(
         firstName: r.firstName,
         lastName: r.lastName,
         preferredName: r.preferredName,
+        male: r.male,
         signupId: r.signupId,
         unavailableEventIds: Array.from(unavailBySignup.get(r.signupId) ?? [])
+    }))
+
+    const allSeasonRows = await db
+        .select({ id: seasons.id, year: seasons.year, season: seasons.season })
+        .from(seasons)
+        .orderBy(desc(seasons.id))
+
+    const allSeasons: SeasonInfo[] = allSeasonRows.map((s) => ({
+        id: s.id,
+        year: s.year,
+        name: s.season
     }))
 
     return {
@@ -244,6 +267,8 @@ export async function getTeamAvailabilityData(
         team: selectedTeam,
         allTeams: availableTeams,
         events: events as EventInfo[],
-        roster
+        roster,
+        allSeasons,
+        playerPicUrl: process.env.PLAYER_PIC_URL ?? ""
     }
 }

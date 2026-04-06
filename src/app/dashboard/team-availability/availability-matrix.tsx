@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select"
 import { getTeamAvailabilityData } from "./actions"
 import type { RosterPlayer, TeamAvailabilityData } from "./actions"
+import { FindSubPanel } from "./find-sub-panel"
 
 function formatDate(dateStr: string): string {
     const date = new Date(`${dateStr}T00:00:00`)
@@ -38,7 +39,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
     const [data, setData] = useState<TeamAvailabilityData>(initialData)
     const [isPending, startTransition] = useTransition()
 
-    const { team, allTeams, events, roster } = data
+    const { team, allTeams, events, roster, allSeasons, playerPicUrl } = data
 
     function handleTeamChange(teamIdStr: string) {
         const teamId = parseInt(teamIdStr, 10)
@@ -58,17 +59,30 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
 
     // Compute available count per event
     const availableCountByEvent = new Map<number, number>()
+    const nonMaleMissingByEvent = new Map<number, number>()
     for (const event of events) {
         let count = 0
+        let nonMaleMissing = 0
         for (const player of roster) {
-            if (!unavailSets.get(player.userId)?.has(event.id)) {
+            const isUnavailable = unavailSets.get(player.userId)?.has(event.id)
+            if (!isUnavailable) {
                 count++
+            } else if (player.male !== true) {
+                nonMaleMissing++
             }
         }
         availableCountByEvent.set(event.id, count)
+        nonMaleMissingByEvent.set(event.id, nonMaleMissing)
     }
 
     const showTeamSelector = allTeams.length > 1
+
+    // Collect events marked red (< 6 players available or 2+ non-males missing)
+    const redEvents = events.filter((e) => {
+        const count = availableCountByEvent.get(e.id) ?? 0
+        const nonMaleMissing = nonMaleMissingByEvent.get(e.id) ?? 0
+        return count < 6 || nonMaleMissing >= 2
+    })
 
     return (
         <Card>
@@ -138,7 +152,12 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                                             availableCountByEvent.get(
                                                 event.id
                                             ) ?? 0
-                                        const isLow = count < 6
+                                        const nonMaleMissing =
+                                            nonMaleMissingByEvent.get(
+                                                event.id
+                                            ) ?? 0
+                                        const isLow =
+                                            count < 6 || nonMaleMissing >= 2
                                         return (
                                             <th
                                                 key={event.id}
@@ -219,8 +238,13 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                                             availableCountByEvent.get(
                                                 event.id
                                             ) ?? 0
+                                        const nonMaleMissing =
+                                            nonMaleMissingByEvent.get(
+                                                event.id
+                                            ) ?? 0
                                         const total = roster.length
-                                        const isLow = count < 6
+                                        const isLow =
+                                            count < 6 || nonMaleMissing >= 2
                                         return (
                                             <td
                                                 key={event.id}
@@ -245,6 +269,18 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                     </div>
                 )}
             </CardContent>
+            {roster.length > 0 && (
+                <div className="px-6 pb-6">
+                    <FindSubPanel
+                        key={team.id}
+                        teamId={team.id}
+                        redEvents={redEvents}
+                        roster={roster}
+                        allSeasons={allSeasons}
+                        playerPicUrl={playerPicUrl}
+                    />
+                </div>
+            )}
         </Card>
     )
 }
