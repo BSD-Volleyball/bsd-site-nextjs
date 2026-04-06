@@ -19,7 +19,7 @@ A web application for managing a draft-based community volleyball league. Player
 - **Drizzle ORM** - Type-safe database queries and migrations
 - **shadcn/ui** - UI component library
 - **Square** - Payment processing for season fees
-- **Resend** - Transactional emails
+- **Postmark** - Transactional and broadcast emails
 - **Biome** - Linting and formatting
 - **Tailwind CSS v4** - Styling
 

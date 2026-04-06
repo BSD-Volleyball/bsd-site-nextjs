@@ -2,23 +2,14 @@
 
 import { db } from "@/database/db"
 import {
-    resendSegments,
-    resendTopics,
+    emailRecipientGroups,
     emailBroadcasts,
     emailTemplates,
     users
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import {
-    withAction,
-    requireSession,
-    requireAdmin,
-    ok,
-    fail
-} from "@/lib/action-helpers"
+import { withAction, requireSession, ok, fail } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
-import { resend } from "@/lib/resend"
-import { fullResync } from "@/lib/resend-sync"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     isAdminOrDirectorBySession,
@@ -33,22 +24,22 @@ import {
     normalizeEmailTemplateContent,
     convertEmailTemplateContentToHtml
 } from "@/lib/email-template-content"
+import {
+    sendBroadcastEmails,
+    STREAM_BROADCAST,
+    STREAM_IN_SEASON_UPDATES
+} from "@/lib/postmark"
+import type { MessageStream } from "@/lib/postmark"
+import { getRecipientsForGroup, filterSuppressed } from "@/lib/email-recipients"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export interface SegmentOption {
+export interface RecipientGroupOption {
     id: number
     name: string
-    segmentType: string
-    resendSegmentId: string
-}
-
-export interface TopicOption {
-    id: number
-    name: string
-    topicType: string
+    groupType: string
 }
 
 export interface TemplateOption {
@@ -61,54 +52,68 @@ export interface TemplateOption {
 export interface BroadcastHistoryItem {
     id: number
     subject: string
-    segmentName: string
-    segmentId: number
-    topicId: number | null
-    topicName: string | null
+    groupName: string
+    groupId: number | null
+    streamId: string | null
     lexicalContent: LexicalEmailTemplateContent
     sentByName: string
     status: string
+    sentCount: number | null
     sentAt: Date | null
     createdAt: Date
 }
 
 // ---------------------------------------------------------------------------
-// getAvailableSegments
+// Stream options for the UI
+// ---------------------------------------------------------------------------
+
+export const BROADCAST_STREAMS = [
+    {
+        id: STREAM_BROADCAST,
+        name: "General League Updates",
+        description: "Sent to all users (broadcast stream)"
+    },
+    {
+        id: STREAM_IN_SEASON_UPDATES,
+        name: "In-Season Updates",
+        description:
+            "Sent to signed-up users, divisions, or teams (in-season stream)"
+    }
+] as const
+
+// ---------------------------------------------------------------------------
+// getAvailableRecipientGroups
 // ---------------------------------------------------------------------------
 
 /**
- * Returns Resend segments the current user can target.
- * Admins see all segments.
- * Commissioners see only their division's segment (and teams in that division).
+ * Returns recipient groups the current user can target.
+ * Admins see all groups.
+ * Commissioners see only their division's group (and teams in that division).
  */
-export async function getAvailableSegments(): Promise<{
-    segments: SegmentOption[]
-    topics: TopicOption[]
+export async function getAvailableRecipientGroups(): Promise<{
+    groups: RecipientGroupOption[]
     templates: TemplateOption[]
 }> {
     const isAdmin = await isAdminOrDirectorBySession()
     const isCommissioner = await isCommissionerBySession()
 
     if (!isAdmin && !isCommissioner) {
-        return { segments: [], topics: [], templates: [] }
+        return { groups: [], templates: [] }
     }
 
-    // Load all current segments
-    const allSegments = await db
+    const allGroups = await db
         .select({
-            id: resendSegments.id,
-            name: resendSegments.name,
-            segment_type: resendSegments.segment_type,
-            resend_segment_id: resendSegments.resend_segment_id,
-            season_id: resendSegments.season_id,
-            division_id: resendSegments.division_id
+            id: emailRecipientGroups.id,
+            name: emailRecipientGroups.name,
+            group_type: emailRecipientGroups.group_type,
+            season_id: emailRecipientGroups.season_id,
+            division_id: emailRecipientGroups.division_id
         })
-        .from(resendSegments)
-        .orderBy(resendSegments.segment_type, resendSegments.name)
+        .from(emailRecipientGroups)
+        .orderBy(emailRecipientGroups.group_type, emailRecipientGroups.name)
 
-    let filteredSegments = allSegments
+    let filteredGroups = allGroups
 
-    // Commissioners see only their division's segments
     if (!isAdmin && isCommissioner) {
         const config = await getSeasonConfig()
         const userId = await getSessionUserId()
@@ -120,45 +125,23 @@ export async function getAvailableSegments(): Promise<{
             )
 
             if (scope.type === "division_specific") {
-                filteredSegments = allSegments.filter(
-                    (s) =>
-                        // Allow: all_users segment
-                        s.segment_type === "all_users" ||
-                        // Allow: their division segment
-                        (s.segment_type === "season_division" &&
-                            scope.divisionIds.includes(s.division_id ?? -1)) ||
-                        // Allow: team segments within their division
-                        s.segment_type === "season_team"
+                filteredGroups = allGroups.filter(
+                    (g) =>
+                        g.group_type === "all_users" ||
+                        (g.group_type === "season_division" &&
+                            scope.divisionIds.includes(g.division_id ?? -1)) ||
+                        g.group_type === "season_team"
                 )
             }
-            // league_wide commissioners see all segments
         }
     }
 
-    const segments: SegmentOption[] = filteredSegments.map((s) => ({
-        id: s.id,
-        name: s.name,
-        segmentType: s.segment_type,
-        resendSegmentId: s.resend_segment_id
+    const groups: RecipientGroupOption[] = filteredGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        groupType: g.group_type
     }))
 
-    // Load topics
-    const topicRows = await db
-        .select({
-            id: resendTopics.id,
-            name: resendTopics.name,
-            topic_type: resendTopics.topic_type
-        })
-        .from(resendTopics)
-        .orderBy(resendTopics.name)
-
-    const topics: TopicOption[] = topicRows.map((t) => ({
-        id: t.id,
-        name: t.name,
-        topicType: t.topic_type
-    }))
-
-    // Load email templates
     const templateRows = await db
         .select({
             id: emailTemplates.id,
@@ -176,7 +159,7 @@ export async function getAvailableSegments(): Promise<{
         content: normalizeEmailTemplateContent(t.content)
     }))
 
-    return { segments, topics, templates }
+    return { groups, templates }
 }
 
 // ---------------------------------------------------------------------------
@@ -192,40 +175,39 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
         .select({
             id: emailBroadcasts.id,
             subject: emailBroadcasts.subject,
-            segmentName: resendSegments.name,
-            segmentId: emailBroadcasts.segment_id,
-            topicId: emailBroadcasts.topic_id,
-            topicName: resendTopics.name,
+            groupName: emailRecipientGroups.name,
+            groupId: emailBroadcasts.recipient_group_id,
+            streamId: emailBroadcasts.stream_id,
             lexicalContent: emailBroadcasts.lexical_content,
             sentByFirstName: users.first_name,
             sentByLastName: users.last_name,
             sentByPreferredName: users.preferred_name,
             status: emailBroadcasts.status,
+            sentCount: emailBroadcasts.sent_count,
             sentAt: emailBroadcasts.sent_at,
             createdAt: emailBroadcasts.created_at
         })
         .from(emailBroadcasts)
-        .innerJoin(
-            resendSegments,
-            eq(emailBroadcasts.segment_id, resendSegments.id)
+        .leftJoin(
+            emailRecipientGroups,
+            eq(emailBroadcasts.recipient_group_id, emailRecipientGroups.id)
         )
         .innerJoin(users, eq(emailBroadcasts.sent_by, users.id))
-        .leftJoin(resendTopics, eq(emailBroadcasts.topic_id, resendTopics.id))
         .orderBy(desc(emailBroadcasts.created_at))
         .limit(50)
 
     return rows.map((r) => ({
         id: r.id,
         subject: r.subject,
-        segmentName: r.segmentName,
-        segmentId: r.segmentId,
-        topicId: r.topicId,
-        topicName: r.topicName ?? null,
+        groupName: r.groupName ?? "Unknown",
+        groupId: r.groupId,
+        streamId: r.streamId,
         lexicalContent: normalizeEmailTemplateContent(r.lexicalContent),
         sentByName: r.sentByPreferredName
             ? `${r.sentByPreferredName} ${r.sentByLastName}`
             : `${r.sentByFirstName} ${r.sentByLastName}`,
         status: r.status,
+        sentCount: r.sentCount,
         sentAt: r.sentAt,
         createdAt: r.createdAt
     }))
@@ -236,8 +218,8 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
 // ---------------------------------------------------------------------------
 
 export interface SendBroadcastInput {
-    segmentDbId: number
-    topicDbId?: number | null
+    recipientGroupId: number
+    streamId: string
     subject: string
     lexicalContent: LexicalEmailTemplateContent
 }
@@ -253,50 +235,44 @@ export const createAndSendBroadcast = withAction(
             return fail("Unauthorized.")
         }
 
-        const { segmentDbId, topicDbId, subject, lexicalContent } = input
+        const { recipientGroupId, streamId, subject, lexicalContent } = input
 
         if (!subject.trim()) {
             return fail("Subject is required.")
         }
 
-        // Load segment
-        const [segment] = await db
-            .select({
-                id: resendSegments.id,
-                resend_segment_id: resendSegments.resend_segment_id,
-                name: resendSegments.name
-            })
-            .from(resendSegments)
-            .where(eq(resendSegments.id, segmentDbId))
-            .limit(1)
-
-        if (!segment) {
-            return fail("Segment not found.")
+        // Validate stream
+        const validStreams = [STREAM_BROADCAST, STREAM_IN_SEASON_UPDATES]
+        if (!validStreams.includes(streamId as MessageStream)) {
+            return fail("Invalid message stream.")
         }
 
-        // Load topic if provided
-        let resendTopicId: string | null = null
-        if (topicDbId) {
-            const [topic] = await db
-                .select({ resend_topic_id: resendTopics.resend_topic_id })
-                .from(resendTopics)
-                .where(eq(resendTopics.id, topicDbId))
-                .limit(1)
-            resendTopicId = topic?.resend_topic_id ?? null
+        // Load recipient group
+        const [group] = await db
+            .select({
+                id: emailRecipientGroups.id,
+                name: emailRecipientGroups.name
+            })
+            .from(emailRecipientGroups)
+            .where(eq(emailRecipientGroups.id, recipientGroupId))
+            .limit(1)
+
+        if (!group) {
+            return fail("Recipient group not found.")
         }
 
         // Render HTML from Lexical content
         const bodyHtml = convertEmailTemplateContentToHtml(lexicalContent)
 
-        // Always append the unsubscribe footer
-        const htmlWithFooter = `${bodyHtml}<p style="margin-top:2rem;font-size:12px;color:#666;"><a href="{{{RESEND_UNSUBSCRIBE_URL}}}">Unsubscribe</a></p>`
+        // Append unsubscribe footer (Postmark handles the link for broadcast streams)
+        const htmlWithFooter = `${bodyHtml}<p style="margin-top:2rem;font-size:12px;color:#666;"><a href="{{{pm:unsubscribe}}}">Unsubscribe</a></p>`
 
         // Insert broadcast record (draft status)
         const [broadcast] = await db
             .insert(emailBroadcasts)
             .values({
-                segment_id: segmentDbId,
-                topic_id: topicDbId ?? null,
+                recipient_group_id: recipientGroupId,
+                stream_id: streamId,
                 subject: subject.trim(),
                 html_content: htmlWithFooter,
                 lexical_content: lexicalContent as unknown as Record<
@@ -309,40 +285,43 @@ export const createAndSendBroadcast = withAction(
             .returning({ id: emailBroadcasts.id })
 
         try {
-            // Create and send broadcast via Resend
-            const created = await resend.broadcasts.create({
-                segmentId: segment.resend_segment_id,
-                from: site.mailFrom,
-                subject: subject.trim(),
-                html: htmlWithFooter,
-                name: `BSD - ${subject.trim()}`,
-                ...(resendTopicId ? { topicId: resendTopicId } : {}),
-                send: true
-            })
+            // Get recipients and filter suppressions
+            const allRecipients = await getRecipientsForGroup(recipientGroupId)
+            const recipients = await filterSuppressed(allRecipients, streamId)
 
-            if (!created.data?.id) {
+            if (recipients.length === 0) {
                 await db
                     .update(emailBroadcasts)
                     .set({
-                        status: "failed",
-                        error_message:
-                            created.error?.message ?? "Unknown Resend error",
+                        status: "sent",
+                        sent_count: 0,
+                        failed_count: 0,
+                        sent_at: new Date(),
                         updated_at: new Date()
                     })
                     .where(eq(emailBroadcasts.id, broadcast.id))
 
-                return fail(
-                    created.error?.message ??
-                        "Failed to send broadcast via Resend."
-                )
+                return ok({ broadcastId: broadcast.id })
             }
 
-            // Update record with Resend broadcast ID and sent status
+            // Send via Postmark batch API
+            const result = await sendBroadcastEmails({
+                from: site.mailFrom,
+                subject: subject.trim(),
+                htmlBody: htmlWithFooter,
+                recipients: recipients.map((r) => ({ email: r.email })),
+                stream: streamId as
+                    | typeof STREAM_BROADCAST
+                    | typeof STREAM_IN_SEASON_UPDATES,
+                tag: "broadcast"
+            })
+
             await db
                 .update(emailBroadcasts)
                 .set({
-                    resend_broadcast_id: created.data.id,
                     status: "sent",
+                    sent_count: result.sent,
+                    failed_count: result.failed,
                     sent_at: new Date(),
                     updated_at: new Date()
                 })
@@ -353,7 +332,7 @@ export const createAndSendBroadcast = withAction(
                 action: "create",
                 entityType: "email_broadcast",
                 entityId: broadcast.id,
-                summary: `Sent broadcast "${subject.trim()}" to segment "${segment.name}" (Resend ID: ${created.data.id})`
+                summary: `Sent broadcast "${subject.trim()}" to "${group.name}" via ${streamId} (${result.sent} sent, ${result.failed} failed)`
             })
 
             return ok({ broadcastId: broadcast.id })
@@ -370,17 +349,5 @@ export const createAndSendBroadcast = withAction(
 
             throw err
         }
-    }
-)
-
-// ---------------------------------------------------------------------------
-// triggerFullResync
-// ---------------------------------------------------------------------------
-
-export const triggerFullResync = withAction(
-    async (): Promise<ActionResult<{ synced: number; failed: number }>> => {
-        await requireAdmin()
-        const result = await fullResync()
-        return ok(result)
     }
 )

@@ -2,11 +2,13 @@
 
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-import { Resend } from "resend"
-import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
-import React from "react"
+import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import {
+    buildRosterAssignmentHtml,
+    buildRosterRemovalHtml,
+    renderDetailRow,
+    renderDetailsBlock
+} from "@/lib/email-html"
 import { db } from "@/database/db"
 import {
     signups,
@@ -29,9 +31,6 @@ import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 import { site } from "@/config/site"
-
-const resend = new Resend(process.env.RESEND_API_KEY)
-const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
 
 export interface Week3EditablePlayer {
     id: string
@@ -447,26 +446,6 @@ export async function sendWeek3RosterNotifications(
         assignmentsByUser.set(a.userId, list)
     }
 
-    const detailsStyle = {
-        fontSize: "14px",
-        color: "#444",
-        backgroundColor: "#f9f9f9",
-        border: "1px solid #e5e7eb",
-        borderRadius: "6px",
-        padding: "12px 16px",
-        margin: "8px 0"
-    }
-    const rowStyle = {
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "3px 0"
-    }
-    const labelStyle = { color: "#6b7280" }
-    const valueStyle = {
-        fontWeight: "600" as const,
-        textAlign: "right" as const
-    }
-
     const emailResults = await Promise.allSettled(
         allUserIds
             .filter((userId) => !!userById.get(userId)?.email)
@@ -479,51 +458,17 @@ export async function sendWeek3RosterNotifications(
                 const isRemoved = removedSet.has(userId)
 
                 if (isRemoved) {
-                    return resend.emails.send({
+                    return sendEmail({
                         from: site.mailFrom,
                         to: user.email!,
                         subject: `BSD Volleyball: Week 3 Roster Update — ${seasonLabel}`,
-                        react: EmailTemplate({
-                            heading: "Roster Update",
-                            content: React.createElement(
-                                React.Fragment,
-                                null,
-                                React.createElement(
-                                    "p",
-                                    null,
-                                    `Hi ${firstName},`
-                                ),
-                                React.createElement(
-                                    "p",
-                                    null,
-                                    `We wanted to let you know that your Week 3 assignment for the ${seasonLabel} season has been removed. If you have questions, please reach out to us.`
-                                ),
-                                React.createElement(
-                                    "p",
-                                    null,
-                                    "If you believe this is an error, contact us at ",
-                                    React.createElement(
-                                        "a",
-                                        { href: `mailto:${site.mailSupport}` },
-                                        site.mailSupport
-                                    ),
-                                    "."
-                                )
-                            ),
-                            action: "Go to Dashboard",
-                            url: `${site.url}/dashboard`,
-                            siteName: site.name,
-                            baseUrl: site.url,
-                            imageUrl: "cid:logo"
+                        htmlBody: buildRosterRemovalHtml({
+                            firstName,
+                            weekLabel: "Week 3",
+                            seasonLabel
                         }),
-                        attachments: [
-                            {
-                                filename: "logo.png",
-                                content: logoContent,
-                                contentType: "image/png",
-                                contentId: "logo"
-                            }
-                        ]
+                        stream: STREAM_OUTBOUND,
+                        tag: "roster-update"
                     })
                 }
 
@@ -543,156 +488,33 @@ export async function sendWeek3RosterNotifications(
                         null
 
                     const rows = [
-                        tryoutDate &&
-                            React.createElement(
-                                "div",
-                                { style: rowStyle, key: "date" },
-                                React.createElement(
-                                    "span",
-                                    { style: labelStyle },
-                                    "Date:"
-                                ),
-                                React.createElement(
-                                    "span",
-                                    { style: valueStyle },
-                                    tryoutDate
-                                )
-                            ),
-                        React.createElement(
-                            "div",
-                            { style: rowStyle, key: "time" },
-                            React.createElement(
-                                "span",
-                                { style: labelStyle },
-                                "Time:"
-                            ),
-                            React.createElement(
-                                "span",
-                                { style: valueStyle },
-                                sessionTime
-                            )
-                        ),
-                        React.createElement(
-                            "div",
-                            { style: rowStyle, key: "court" },
-                            React.createElement(
-                                "span",
-                                { style: labelStyle },
-                                "Court:"
-                            ),
-                            React.createElement(
-                                "span",
-                                { style: valueStyle },
-                                `Court ${courtNumber}`
-                            )
-                        ),
-                        React.createElement(
-                            "div",
-                            { style: rowStyle, key: "division" },
-                            React.createElement(
-                                "span",
-                                { style: labelStyle },
-                                "Division:"
-                            ),
-                            React.createElement(
-                                "span",
-                                { style: valueStyle },
-                                a.divisionName
-                            )
-                        ),
-                        React.createElement(
-                            "div",
-                            { style: rowStyle, key: "team" },
-                            React.createElement(
-                                "span",
-                                { style: labelStyle },
-                                "Team:"
-                            ),
-                            React.createElement(
-                                "span",
-                                { style: valueStyle },
-                                `Team ${a.teamNumber}`
-                            )
-                        ),
-                        captainName &&
-                            React.createElement(
-                                "div",
-                                { style: rowStyle, key: "captain" },
-                                React.createElement(
-                                    "span",
-                                    { style: labelStyle },
-                                    "Captain:"
-                                ),
-                                React.createElement(
-                                    "span",
-                                    { style: valueStyle },
-                                    captainName
-                                )
-                            )
+                        tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
+                        renderDetailRow("Time:", sessionTime),
+                        renderDetailRow("Court:", `Court ${courtNumber}`),
+                        renderDetailRow("Division:", a.divisionName),
+                        renderDetailRow("Team:", `Team ${a.teamNumber}`),
+                        captainName
+                            ? renderDetailRow("Captain:", captainName)
+                            : ""
                     ].filter(Boolean)
 
-                    return React.createElement(
-                        "div",
-                        {
-                            key: `${a.divisionId}-${a.teamNumber}`,
-                            style: detailsStyle
-                        },
-                        ...rows
-                    )
+                    return renderDetailsBlock(rows)
                 })
 
-                return resend.emails.send({
+                return sendEmail({
                     from: site.mailFrom,
                     to: user.email!,
                     subject: `BSD Volleyball: Your Week 3 Assignment — ${seasonLabel}`,
-                    react: EmailTemplate({
-                        heading: "Week 3 Roster Assignment",
-                        content: React.createElement(
-                            React.Fragment,
-                            null,
-                            React.createElement("p", null, `Hi ${firstName},`),
-                            React.createElement(
-                                "p",
-                                null,
-                                `You've been assigned to the Week 3 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`
-                            ),
-                            ...assignmentBlocks,
-                            React.createElement(
-                                "p",
-                                {
-                                    style: {
-                                        fontSize: "13px",
-                                        color: "#6b7280"
-                                    }
-                                },
-                                "Please plan to arrive 10 minutes early."
-                            ),
-                            React.createElement(
-                                "p",
-                                null,
-                                "Questions? Reach out at ",
-                                React.createElement(
-                                    "a",
-                                    { href: `mailto:${site.mailSupport}` },
-                                    site.mailSupport
-                                ),
-                                "."
-                            )
-                        ),
-                        action: "Go to Dashboard",
-                        url: `${site.url}/dashboard`,
-                        siteName: site.name,
-                        baseUrl: site.url,
-                        imageUrl: "cid:logo"
+                    htmlBody: buildRosterAssignmentHtml({
+                        firstName,
+                        weekLabel: "Week 3",
+                        seasonLabel,
+                        introText: `You've been assigned to the Week 3 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
+                        detailBlocks: assignmentBlocks,
+                        footnote: "Please plan to arrive 10 minutes early."
                     }),
-                    attachments: [
-                        {
-                            filename: "logo.png",
-                            content: logoContent,
-                            contentType: "image/png",
-                            contentId: "logo"
-                        }
-                    ]
+                    stream: STREAM_OUTBOUND,
+                    tag: "roster-assignment"
                 })
             })
     )

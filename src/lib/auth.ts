@@ -2,16 +2,17 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { Resend } from "resend"
-import { syncUserToResend } from "@/lib/resend-sync"
+import { renderToStaticMarkup } from "react-dom/server"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
 import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
+import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
+const logoBase64 = readFileSync(
+    join(process.cwd(), "public", "logo.png")
+).toString("base64")
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_BASE_URL,
@@ -53,15 +54,8 @@ export const auth = betterAuth({
                     }
                 }
             },
-            after: async (user: { id: string }) => {
-                // Fire-and-forget: sync new user to Resend Contacts
-                syncUserToResend(user.id).catch((err) =>
-                    console.error(
-                        "[auth] Resend sync failed for new user",
-                        user.id,
-                        err
-                    )
-                )
+            after: async (_user: { id: string }) => {
+                // No external contact sync needed with Postmark
             }
         }
     },
@@ -101,11 +95,8 @@ export const auth = betterAuth({
                 (user as { first_name?: string }).first_name ||
                 user.email.split("@")[0]
 
-            await resend.emails.send({
-                from: site.mailFrom,
-                to: user.email,
-                subject: "Reset your password",
-                react: EmailTemplate({
+            const htmlBody = renderToStaticMarkup(
+                EmailTemplate({
                     heading: "Reset your password",
                     content: React.createElement(
                         React.Fragment,
@@ -127,14 +118,23 @@ export const auth = betterAuth({
                     url,
                     siteName: site.name,
                     baseUrl: site.url,
-                    imageUrl: "cid:logo"
-                }),
+                    imageUrl: `${site.url}/logo.png`
+                })
+            )
+
+            await sendEmail({
+                from: site.mailFrom,
+                to: user.email,
+                subject: "Reset your password",
+                htmlBody,
+                stream: STREAM_OUTBOUND,
+                tag: "password-reset",
                 attachments: [
                     {
-                        filename: "logo.png",
-                        content: logoContent,
+                        name: "logo.png",
+                        content: logoBase64,
                         contentType: "image/png",
-                        contentId: "logo"
+                        contentId: "cid:logo"
                     }
                 ]
             })

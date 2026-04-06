@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth"
 import { isAdminOrDirectorBySession, isCommissionerBySession } from "@/lib/rbac"
 import { PageHeader } from "@/components/layout/page-header"
 import { SendEmailClient } from "./send-email-client"
-import { getAvailableSegments, getBroadcastHistory } from "./actions"
+import { getAvailableRecipientGroups, getBroadcastHistory } from "./actions"
 
 export const metadata = { title: "Send Email" }
 export const dynamic = "force-dynamic"
@@ -20,8 +20,8 @@ export default async function SendEmailPage() {
 
     if (!isAdmin && !isCommissioner) redirect("/dashboard")
 
-    const [{ segments, topics, templates }, history] = await Promise.all([
-        getAvailableSegments(),
+    const [{ groups, templates }, history] = await Promise.all([
+        getAvailableRecipientGroups(),
         getBroadcastHistory()
     ])
 
@@ -29,14 +29,12 @@ export default async function SendEmailPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Send Email"
-                description="Compose and send broadcast emails to your user population via Resend."
+                description="Compose and send broadcast emails to your user population."
             />
             <SendEmailClient
-                segments={segments}
-                topics={topics}
+                groups={groups}
                 templates={templates}
                 history={history}
-                isAdmin={isAdmin}
             />
         </div>
     )

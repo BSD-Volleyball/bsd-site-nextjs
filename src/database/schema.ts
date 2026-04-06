@@ -60,7 +60,6 @@ export const users = pgTable("users", {
     captain_eligible: boolean("captain_eligible")
         .$defaultFn(() => true)
         .notNull(),
-    resend_contact_id: text("resend_contact_id"),
     unsubscribed: boolean("unsubscribed")
         .$defaultFn(() => false)
         .notNull()
@@ -672,7 +671,7 @@ export const concerns = pgTable("concerns", {
     source: text("source")
         .$defaultFn(() => "web")
         .notNull(),
-    // Resend email_id when source = 'email'
+    // External email_id when source = 'email'
     source_email_id: text("source_email_id"),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
@@ -700,7 +699,7 @@ export const concernComments = pgTable("concern_comments", {
 
 export const inboundEmails = pgTable("inbound_emails", {
     id: serial("id").primaryKey(),
-    email_id: text("email_id").notNull(), // Resend email_id
+    email_id: text("email_id").notNull(), // Postmark MessageID
     from_address: text("from_address").notNull(),
     from_name: text("from_name"),
     to_address: text("to_address").notNull(),
@@ -912,22 +911,21 @@ export const matchReferees = pgTable(
     })
 )
 
-// --- Resend Audience / Segment / Topic tracking ---
+// --- Email Recipient Groups & Suppressions (Postmark) ---
 
 /**
- * Tracks Resend Segment IDs created for targeting broadcasts.
- * Segments are created lazily via ensureSegment() in src/lib/resend-sync.ts.
- * season_division and season_team segments are cleaned up when a season moves
- * to the "complete" phase; season_signups and all_users segments are permanent.
+ * Local recipient groups for targeting broadcast emails.
+ * Groups are created lazily via ensureRecipientGroup() in src/lib/email-recipients.ts.
+ * season_division and season_team groups are cleaned up when a season moves
+ * to the "complete" phase; season_signups and all_users groups are permanent.
  */
-export const resendSegments = pgTable(
-    "resend_segments",
+export const emailRecipientGroups = pgTable(
+    "email_recipient_groups",
     {
         id: serial("id").primaryKey(),
         name: text("name").notNull(),
-        resend_segment_id: text("resend_segment_id").notNull().unique(),
         // 'all_users' | 'season_signups' | 'season_division' | 'season_team'
-        segment_type: text("segment_type").notNull(),
+        group_type: text("group_type").notNull(),
         season_id: integer("season_id").references(() => seasons.id, {
             onDelete: "set null"
         }),
@@ -942,10 +940,10 @@ export const resendSegments = pgTable(
             .notNull()
     },
     (table) => ({
-        resendSegmentsTypeSeasonDivTeamUniq: uniqueIndex(
-            "resend_segments_type_season_div_team_uniq"
+        recipientGroupTypeUniq: uniqueIndex(
+            "email_recipient_groups_type_season_div_team_uniq"
         ).on(
-            table.segment_type,
+            table.group_type,
             table.season_id,
             table.division_id,
             table.team_id
@@ -954,19 +952,37 @@ export const resendSegments = pgTable(
 )
 
 /**
- * Tracks the two Resend Topic IDs (General Updates, In Season Updates).
- * Created once via ensureTopics() and stored here to avoid repeated API lookups.
+ * Tracks per-stream email suppressions (unsubscribes, bounces, spam complaints).
+ * Postmark manages suppressions per message stream; this table mirrors that state
+ * via the subscription-change webhook so we can filter recipients before sending.
  */
-export const resendTopics = pgTable("resend_topics", {
-    id: serial("id").primaryKey(),
-    // 'general_updates' | 'in_season_updates'
-    topic_type: text("topic_type").notNull().unique(),
-    name: text("name").notNull(),
-    resend_topic_id: text("resend_topic_id").notNull().unique(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const emailSuppressions = pgTable(
+    "email_suppressions",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id").references(() => users.id, {
+            onDelete: "cascade"
+        }),
+        email: text("email").notNull(),
+        // Postmark stream ID: 'outbound', 'broadcast', 'in-season-updates', etc.
+        stream_id: text("stream_id").notNull(),
+        // 'HardBounce' | 'SpamComplaint' | 'ManualSuppression'
+        reason: text("reason").notNull(),
+        // 'Recipient' | 'Customer' | 'Admin'
+        origin: text("origin").notNull(),
+        suppressed_at: timestamp("suppressed_at")
+            .$defaultFn(() => new Date())
+            .notNull(),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        suppressionEmailStreamUniq: uniqueIndex(
+            "email_suppressions_email_stream_uniq"
+        ).on(table.email, table.stream_id)
+    })
+)
 
 /**
  * Tracks all bulk email broadcasts sent via the Send Email admin page.
@@ -975,11 +991,11 @@ export const resendTopics = pgTable("resend_topics", {
  */
 export const emailBroadcasts = pgTable("email_broadcasts", {
     id: serial("id").primaryKey(),
-    resend_broadcast_id: text("resend_broadcast_id"),
-    segment_id: integer("segment_id")
-        .notNull()
-        .references(() => resendSegments.id),
-    topic_id: integer("topic_id").references(() => resendTopics.id),
+    recipient_group_id: integer("recipient_group_id").references(
+        () => emailRecipientGroups.id
+    ),
+    // Postmark stream used: 'broadcast' or 'in-season-updates'
+    stream_id: text("stream_id"),
     template_id: integer("template_id"),
     subject: text("subject").notNull(),
     html_content: text("html_content").notNull(),
@@ -994,6 +1010,8 @@ export const emailBroadcasts = pgTable("email_broadcasts", {
         .$defaultFn(() => "draft")
         .notNull(),
     error_message: text("error_message"),
+    sent_count: integer("sent_count"),
+    failed_count: integer("failed_count"),
     sent_at: timestamp("sent_at"),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())

@@ -2,11 +2,6 @@
 
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-import { Resend } from "resend"
-import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
-import React from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -24,10 +19,8 @@ import {
 } from "@/lib/discount"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
-import { syncUserToResend } from "@/lib/resend-sync"
-
-const resend = new Resend(process.env.RESEND_API_KEY)
-const logoContent = readFileSync(join(process.cwd(), "public", "logo.png"))
+import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import { buildSignupConfirmationHtml } from "@/lib/email-html"
 
 export interface SignupFormData {
     age: string
@@ -59,94 +52,28 @@ async function sendSignupConfirmationEmail(
 ) {
     const seasonLabel = `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
 
-    // Build payment details based on whether there was a discount
-    let paymentDetails: React.ReactNode
+    // Build amount display string
+    let amountDisplay = amountPaid
     if (discountInfo) {
         const isFree = parseFloat(amountPaid) === 0
         if (isFree) {
-            paymentDetails = React.createElement(
-                React.Fragment,
-                null,
-                React.createElement(
-                    "p",
-                    null,
-                    "Your registration is fully covered by your discount!"
-                ),
-                React.createElement(
-                    "p",
-                    { style: { fontSize: "14px", color: "#666" } },
-                    `Original fee: $${discountInfo.originalAmount}`,
-                    React.createElement("br"),
-                    `Your discount: ${discountInfo.percentage}% off`,
-                    React.createElement("br"),
-                    "Amount paid: $0.00"
-                )
-            )
-        } else {
-            const savings = (
-                parseFloat(discountInfo.originalAmount) - parseFloat(amountPaid)
-            ).toFixed(2)
-            paymentDetails = React.createElement(
-                "p",
-                { style: { fontSize: "14px", color: "#666" } },
-                `Original fee: $${discountInfo.originalAmount}`,
-                React.createElement("br"),
-                `Your discount: ${discountInfo.percentage}% off (-$${savings})`,
-                React.createElement("br"),
-                `You paid: $${amountPaid}`
-            )
+            amountDisplay = "0"
         }
-    } else {
-        paymentDetails = React.createElement(
-            "p",
-            null,
-            `Thank you for registering for the ${seasonLabel} season! Your payment of $${amountPaid} has been received.`
-        )
     }
 
     try {
-        await resend.emails.send({
+        await sendEmail({
             from: site.mailFrom,
             to: email,
             subject: `You're registered for BSD ${seasonLabel}!`,
-            react: EmailTemplate({
-                heading: "Registration Confirmed!",
-                content: React.createElement(
-                    React.Fragment,
-                    null,
-                    React.createElement("p", null, `Hi ${firstName},`),
-                    paymentDetails,
-                    React.createElement(
-                        "p",
-                        null,
-                        "We'll be in touch with more details as the season approaches, including team assignments and the game schedule."
-                    ),
-                    React.createElement(
-                        "p",
-                        null,
-                        "If you have any questions, feel free to reach out to us at ",
-                        React.createElement(
-                            "a",
-                            { href: `mailto:${site.mailSupport}` },
-                            site.mailSupport
-                        ),
-                        "."
-                    )
-                ),
-                action: receiptUrl ? "View Receipt" : "Go to Dashboard",
-                url: receiptUrl || `${site.url}/dashboard`,
-                siteName: site.name,
-                baseUrl: site.url,
-                imageUrl: "cid:logo"
+            htmlBody: buildSignupConfirmationHtml({
+                firstName,
+                seasonLabel,
+                amountPaid: amountDisplay,
+                receiptUrl
             }),
-            attachments: [
-                {
-                    filename: "logo.png",
-                    content: logoContent,
-                    contentType: "image/png",
-                    contentId: "logo"
-                }
-            ]
+            stream: STREAM_OUTBOUND,
+            tag: "signup-confirmation"
         })
     } catch (error) {
         console.error("Failed to send signup confirmation email:", error)
@@ -392,15 +319,6 @@ export async function submitSeasonPayment(
                     response.payment.receiptUrl,
                     discountInfo
                 )
-
-                // Sync user to Resend season signups segment (fire-and-forget)
-                syncUserToResend(session.user.id).catch((err) =>
-                    console.error(
-                        "[pay-season] Resend sync failed",
-                        session.user.id,
-                        err
-                    )
-                )
             }
 
             return {
@@ -557,15 +475,6 @@ export async function submitFreeSignup(
                 originalAmount,
                 percentage: discount.percentage
             }
-        )
-
-        // Sync user to Resend season signups segment (fire-and-forget)
-        syncUserToResend(session.user.id).catch((err) =>
-            console.error(
-                "[pay-season] Resend sync failed",
-                session.user.id,
-                err
-            )
         )
 
         return {

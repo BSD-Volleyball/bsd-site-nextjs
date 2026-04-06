@@ -21,7 +21,7 @@
         "UPLOADTHING_TOKEN",
         "STRIPE_SECRET_KEY",
         "STRIPE_WEBHOOK_SECRET",
-        "RESEND_API_KEY",
+        "POSTMARK_SERVER_TOKEN",
         "MAIL_FROM",
         "GITHUB_CLIENT_ID",
         "GITHUB_CLIENT_SECRET",

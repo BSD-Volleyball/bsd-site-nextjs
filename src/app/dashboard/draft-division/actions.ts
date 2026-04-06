@@ -18,7 +18,7 @@ import {
 import { eq, and, inArray, desc, lt, or } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
-import { syncTeamToSegment } from "@/lib/resend-sync"
+import { ensureTeamRecipientGroup } from "@/lib/email-recipients"
 import {
     isAdminOrDirector,
     isCommissionerBySession,
@@ -1056,14 +1056,14 @@ export async function submitDraft(
             })
         }
 
-        // Sync all drafted teams to their Resend segments (fire-and-forget)
+        // Ensure all drafted teams have recipient groups (fire-and-forget)
         const config = await getSeasonConfig()
         if (config.seasonId) {
             const draftedTeamIds = [...new Set(picks.map((p) => p.teamId))]
             for (const teamId of draftedTeamIds) {
-                syncTeamToSegment(teamId, config.seasonId).catch((err) =>
+                ensureTeamRecipientGroup(teamId, config.seasonId).catch((err) =>
                     console.error(
-                        "[draft] Resend team segment sync failed",
+                        "[draft] Team recipient group sync failed",
                         teamId,
                         err
                     )

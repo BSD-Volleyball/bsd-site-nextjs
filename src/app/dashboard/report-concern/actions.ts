@@ -5,10 +5,9 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { concerns, userRoles, users } from "@/database/schema"
 import { eq } from "drizzle-orm"
-import { Resend } from "resend"
 import { site } from "@/config/site"
-
-const resend = new Resend(process.env.RESEND_API_KEY)
+import { sendBatchEmails, STREAM_OUTBOUND } from "@/lib/postmark"
+import { buildConcernNotificationHtml } from "@/lib/email-html"
 
 export interface SubmitConcernInput {
     anonymous: boolean
@@ -79,12 +78,14 @@ export async function submitConcern(
         if (ombudsmanEmails.length > 0) {
             const appUrl =
                 process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
-            await resend.batch.send(
+            await sendBatchEmails(
                 ombudsmanEmails.map((to) => ({
                     from: site.mailFrom,
                     to,
                     subject: "New Concern Submitted",
-                    html: `<p>A new concern has been submitted.</p><p><a href="${appUrl}/dashboard/manage-concerns">View concerns</a></p>`
+                    htmlBody: buildConcernNotificationHtml(appUrl),
+                    stream: STREAM_OUTBOUND,
+                    tag: "concern-notification"
                 }))
             )
         }

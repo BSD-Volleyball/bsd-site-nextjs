@@ -19,47 +19,39 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
-import {
-    RiArrowDownSLine,
-    RiRefreshLine,
-    RiSendPlaneLine
-} from "@remixicon/react"
+import { RiArrowDownSLine, RiSendPlaneLine } from "@remixicon/react"
 import { LexicalEmailEditor } from "@/components/email-template/lexical-email-editor"
 import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
-import { createAndSendBroadcast, triggerFullResync } from "./actions"
+import { createAndSendBroadcast, BROADCAST_STREAMS } from "./actions"
 import type {
-    SegmentOption,
-    TopicOption,
+    RecipientGroupOption,
     TemplateOption,
     BroadcastHistoryItem
 } from "./actions"
 
 interface SendEmailClientProps {
-    segments: SegmentOption[]
-    topics: TopicOption[]
+    groups: RecipientGroupOption[]
     templates: TemplateOption[]
     history: BroadcastHistoryItem[]
-    isAdmin: boolean
 }
 
 const EMPTY_CONTENT = normalizeEmailTemplateContent("")
-const NO_TOPIC = "__none__"
 
 export function SendEmailClient({
-    segments,
-    topics,
+    groups,
     templates,
-    history: initialHistory,
-    isAdmin
+    history: initialHistory
 }: SendEmailClientProps) {
     const router = useRouter()
 
     // Compose form state
-    const [selectedSegmentId, setSelectedSegmentId] = useState<string>("")
-    const [selectedTopicId, setSelectedTopicId] = useState<string>(NO_TOPIC)
+    const [selectedGroupId, setSelectedGroupId] = useState<string>("")
+    const [selectedStreamId, setSelectedStreamId] = useState<string>(
+        BROADCAST_STREAMS[0].id
+    )
     const [subject, setSubject] = useState("")
     const [content, setContent] =
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
@@ -70,14 +62,9 @@ export function SendEmailClient({
         type: "success" | "error"
         text: string
     } | null>(null)
-    const [resyncMessage, setResyncMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
 
     // Loading states
     const [sending, setSending] = useState(false)
-    const [resyncing, setResyncing] = useState(false)
 
     // History expand state
     const [historyOpen, setHistoryOpen] = useState(false)
@@ -96,8 +83,8 @@ export function SendEmailClient({
 
     const handleSendAgain = useCallback((item: BroadcastHistoryItem) => {
         setSubject(item.subject)
-        setSelectedSegmentId(String(item.segmentId))
-        setSelectedTopicId(item.topicId ? String(item.topicId) : NO_TOPIC)
+        setSelectedGroupId(item.groupId ? String(item.groupId) : "")
+        setSelectedStreamId(item.streamId ?? BROADCAST_STREAMS[0].id)
         setContent(item.lexicalContent)
         setEditorKey((k) => k + 1)
         setSendMessage(null)
@@ -107,8 +94,11 @@ export function SendEmailClient({
     const handleSend = async () => {
         setSendMessage(null)
 
-        if (!selectedSegmentId) {
-            setSendMessage({ type: "error", text: "Please select a segment." })
+        if (!selectedGroupId) {
+            setSendMessage({
+                type: "error",
+                text: "Please select a recipient group."
+            })
             return
         }
         if (!subject.trim()) {
@@ -119,11 +109,8 @@ export function SendEmailClient({
         setSending(true)
         try {
             const result = await createAndSendBroadcast({
-                segmentDbId: Number(selectedSegmentId),
-                topicDbId:
-                    selectedTopicId && selectedTopicId !== NO_TOPIC
-                        ? Number(selectedTopicId)
-                        : null,
+                recipientGroupId: Number(selectedGroupId),
+                streamId: selectedStreamId,
                 subject,
                 lexicalContent: content
             })
@@ -131,13 +118,12 @@ export function SendEmailClient({
             if (result.status) {
                 setSendMessage({
                     type: "success",
-                    text: "Email sent successfully via Resend."
+                    text: `Email sent successfully (${result.data.broadcastId}).`
                 })
-                // Reset compose form
                 setSubject("")
                 setContent(EMPTY_CONTENT)
-                setSelectedSegmentId("")
-                setSelectedTopicId(NO_TOPIC)
+                setSelectedGroupId("")
+                setSelectedStreamId(BROADCAST_STREAMS[0].id)
                 setEditorKey((k) => k + 1)
                 router.refresh()
             } else {
@@ -148,50 +134,8 @@ export function SendEmailClient({
         }
     }
 
-    const handleResync = async () => {
-        setResyncMessage(null)
-        setResyncing(true)
-        try {
-            const result = await triggerFullResync()
-            if (result.status) {
-                setResyncMessage({
-                    type: "success",
-                    text: `Resync complete — ${result.data.synced} synced, ${result.data.failed} failed.`
-                })
-            } else {
-                setResyncMessage({ type: "error", text: result.message })
-            }
-        } finally {
-            setResyncing(false)
-        }
-    }
-
     return (
         <div className="space-y-6">
-            {/* Header actions */}
-            <div className="flex items-center justify-end gap-3">
-                {resyncMessage && (
-                    <p
-                        className={`text-sm ${resyncMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
-                    >
-                        {resyncMessage.text}
-                    </p>
-                )}
-                {isAdmin && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResync}
-                        disabled={resyncing}
-                    >
-                        <RiRefreshLine
-                            className={`mr-2 size-4 ${resyncing ? "animate-spin" : ""}`}
-                        />
-                        {resyncing ? "Resyncing..." : "Resync with Resend"}
-                    </Button>
-                )}
-            </div>
-
             {/* Compose card */}
             <Card>
                 <CardHeader>
@@ -221,64 +165,53 @@ export function SendEmailClient({
                     )}
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {/* Segment picker */}
+                        {/* Recipient group picker */}
                         <div className="space-y-1.5">
-                            <Label htmlFor="segment-select">
-                                Send to segment{" "}
+                            <Label htmlFor="group-select">
+                                Send to{" "}
                                 <span className="text-destructive">*</span>
                             </Label>
                             <Select
-                                value={selectedSegmentId}
-                                onValueChange={setSelectedSegmentId}
+                                value={selectedGroupId}
+                                onValueChange={setSelectedGroupId}
                             >
-                                <SelectTrigger id="segment-select">
-                                    <SelectValue placeholder="Select a segment…" />
+                                <SelectTrigger id="group-select">
+                                    <SelectValue placeholder="Select a recipient group…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {segments.map((s) => (
+                                    {groups.map((g) => (
                                         <SelectItem
-                                            key={s.id}
-                                            value={String(s.id)}
+                                            key={g.id}
+                                            value={String(g.id)}
                                         >
-                                            {s.name}
+                                            {g.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {/* Topic picker (optional) */}
-                        {topics.length > 0 && (
-                            <div className="space-y-1.5">
-                                <Label htmlFor="topic-select">
-                                    Topic{" "}
-                                    <span className="text-muted-foreground text-xs">
-                                        (optional)
-                                    </span>
-                                </Label>
-                                <Select
-                                    value={selectedTopicId}
-                                    onValueChange={setSelectedTopicId}
-                                >
-                                    <SelectTrigger id="topic-select">
-                                        <SelectValue placeholder="All topics" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NO_TOPIC}>
-                                            All topics
+                        {/* Stream picker */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="stream-select">
+                                Message stream
+                            </Label>
+                            <Select
+                                value={selectedStreamId}
+                                onValueChange={setSelectedStreamId}
+                            >
+                                <SelectTrigger id="stream-select">
+                                    <SelectValue placeholder="Select a stream…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {BROADCAST_STREAMS.map((s) => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.name}
                                         </SelectItem>
-                                        {topics.map((t) => (
-                                            <SelectItem
-                                                key={t.id}
-                                                value={String(t.id)}
-                                            >
-                                                {t.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* Subject */}
@@ -321,7 +254,7 @@ export function SendEmailClient({
                         <Button
                             onClick={handleSend}
                             disabled={
-                                sending || !selectedSegmentId || !subject.trim()
+                                sending || !selectedGroupId || !subject.trim()
                             }
                         >
                             <RiSendPlaneLine className="mr-2 size-4" />
@@ -357,15 +290,13 @@ export function SendEmailClient({
                                                 {item.subject}
                                             </p>
                                             <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-                                                <span>
-                                                    → {item.segmentName}
-                                                </span>
-                                                {item.topicName && (
+                                                <span>→ {item.groupName}</span>
+                                                {item.streamId && (
                                                     <Badge
                                                         variant="secondary"
                                                         className="text-xs"
                                                     >
-                                                        {item.topicName}
+                                                        {item.streamId}
                                                     </Badge>
                                                 )}
                                                 <Badge
