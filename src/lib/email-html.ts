@@ -170,3 +170,35 @@ export function buildInboundEmailNotificationHtml(opts: {
         actionUrl: `${opts.appUrl}/dashboard/manage-emails`
     })
 }
+
+export function buildThreadReplyNotificationHtml(opts: {
+    appUrl: string
+    ticketType: "email" | "concern"
+    ticketId: number
+    subject: string
+    from: string
+    bodyPreview: string | null
+}): string {
+    const pageUrl =
+        opts.ticketType === "email"
+            ? `${opts.appUrl}/dashboard/manage-emails`
+            : `${opts.appUrl}/dashboard/manage-concerns`
+
+    const label = opts.ticketType === "email" ? "Email" : "Concern"
+    const preview = opts.bodyPreview
+        ? escapeHtml(opts.bodyPreview.slice(0, 300)) +
+          (opts.bodyPreview.length > 300 ? "…" : "")
+        : "(no body)"
+
+    return renderEmailHtml({
+        heading: `New Reply on ${label} #${opts.ticketId}`,
+        bodyHtml: `
+            <p>A reply has been received on ${label} #${opts.ticketId}.</p>
+            <p><strong>From:</strong> ${escapeHtml(opts.from)}</p>
+            <p><strong>Subject:</strong> ${escapeHtml(opts.subject)}</p>
+            <blockquote style="border-left:3px solid #d1d5db;margin:12px 0;padding:8px 16px;color:#6b7280;font-size:14px;">${preview}</blockquote>
+        `,
+        action: `View ${label} Thread`,
+        actionUrl: pageUrl
+    })
+}

@@ -17,7 +17,8 @@ import { site } from "@/config/site"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
-    buildInboundEmailNotificationHtml
+    buildInboundEmailNotificationHtml,
+    buildThreadReplyNotificationHtml
 } from "@/lib/email-html"
 
 // ---------------------------------------------------------------------------
@@ -124,6 +125,43 @@ async function notifyAdmins(appUrl: string, subject: string, from: string) {
             }))
         )
     }
+}
+
+async function notifyAssignee(opts: {
+    assignedTo: string | null
+    appUrl: string
+    ticketType: "email" | "concern"
+    ticketId: number
+    subject: string
+    from: string
+    bodyPreview: string | null
+}) {
+    if (!opts.assignedTo) return
+
+    const [assignee] = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, opts.assignedTo))
+        .limit(1)
+
+    if (!assignee?.email) return
+
+    const label = opts.ticketType === "email" ? "Email" : "Concern"
+    await sendBatchEmails([
+        {
+            from: site.mailFrom,
+            to: assignee.email,
+            subject: `New Reply on ${label} #${opts.ticketId}: ${opts.subject}`,
+            htmlBody: buildThreadReplyNotificationHtml({
+                appUrl: opts.appUrl,
+                ticketType: opts.ticketType,
+                ticketId: opts.ticketId,
+                subject: opts.subject,
+                from: opts.from,
+                bodyPreview: opts.bodyPreview
+            })
+        }
+    ])
 }
 
 // ---------------------------------------------------------------------------
@@ -233,6 +271,13 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
 
     if (existingThread) {
         if (existingThread.type === "email") {
+            // Fetch assignee before inserting so we have it for notification
+            const [ticket] = await db
+                .select({ assigned_to: inboundEmails.assigned_to })
+                .from(inboundEmails)
+                .where(eq(inboundEmails.id, existingThread.id))
+                .limit(1)
+
             await db.insert(inboundEmailReceived).values({
                 email_id: existingThread.id,
                 from_address: fromEmail,
@@ -242,10 +287,27 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 body_html: bodyHtml,
                 postmark_message_id: messageId
             })
+
+            await notifyAssignee({
+                assignedTo: ticket?.assigned_to ?? null,
+                appUrl,
+                ticketType: "email",
+                ticketId: existingThread.id,
+                subject,
+                from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
+                bodyPreview: bodyText
+            })
+
             console.log(
                 `[postmark-webhook] Routed reply to email thread #${existingThread.id}`
             )
         } else {
+            const [ticket] = await db
+                .select({ assigned_to: concerns.assigned_to })
+                .from(concerns)
+                .where(eq(concerns.id, existingThread.id))
+                .limit(1)
+
             await db.insert(concernReceived).values({
                 concern_id: existingThread.id,
                 from_address: fromEmail,
@@ -255,6 +317,17 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 body_html: bodyHtml,
                 postmark_message_id: messageId
             })
+
+            await notifyAssignee({
+                assignedTo: ticket?.assigned_to ?? null,
+                appUrl,
+                ticketType: "concern",
+                ticketId: existingThread.id,
+                subject,
+                from: fromName ? `${fromName} <${fromEmail}>` : fromEmail,
+                bodyPreview: bodyText
+            })
+
             console.log(
                 `[postmark-webhook] Routed reply to concern thread #${existingThread.id}`
             )
