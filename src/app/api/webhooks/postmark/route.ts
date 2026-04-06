@@ -62,6 +62,32 @@ interface PostmarkSubscriptionChangePayload {
 }
 
 // ---------------------------------------------------------------------------
+// Postmark Bounce Payload
+// https://postmarkapp.com/developer/webhooks/bounce-webhook
+// ---------------------------------------------------------------------------
+
+interface PostmarkBouncePayload {
+    RecordType: "Bounce"
+    MessageStream: string
+    Type: string // e.g. 'HardBounce', 'SoftBounce', 'Transient'
+    Email: string
+    BouncedAt: string
+    Description: string
+}
+
+// ---------------------------------------------------------------------------
+// Postmark Spam Complaint Payload
+// https://postmarkapp.com/developer/webhooks/spam-complaint-webhook
+// ---------------------------------------------------------------------------
+
+interface PostmarkSpamComplaintPayload {
+    RecordType: "SpamComplaint"
+    MessageStream: string
+    Email: string
+    BouncedAt: string
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -409,7 +435,6 @@ async function handleSubscriptionChange(
     if (!email || !streamId) return
 
     if (payload.SuppressSending) {
-        // Upsert suppression record
         const existing = await db
             .select({ id: emailSuppressions.id })
             .from(emailSuppressions)
@@ -422,7 +447,6 @@ async function handleSubscriptionChange(
             .limit(1)
 
         if (existing.length === 0) {
-            // Try to find user_id
             const [user] = await db
                 .select({ id: users.id })
                 .from(users)
@@ -441,13 +465,13 @@ async function handleSubscriptionChange(
             })
         }
 
-        // Update users.unsubscribed for backward compatibility
+        // Only set to 'unsubscribed' if not already at a higher-priority status
         await db
             .update(users)
-            .set({ unsubscribed: true })
-            .where(eq(users.email, email))
+            .set({ email_status: "unsubscribed" })
+            .where(and(eq(users.email, email), eq(users.email_status, "valid")))
     } else {
-        // Remove suppression
+        // Remove this stream's suppression
         await db
             .delete(emailSuppressions)
             .where(
@@ -457,23 +481,153 @@ async function handleSubscriptionChange(
                 )
             )
 
-        // Check if user has any remaining suppressions before clearing the flag
+        // Only clear back to 'valid' if no other suppressions remain
         const remainingSuppressions = await db
-            .select({ id: emailSuppressions.id })
+            .select({
+                id: emailSuppressions.id,
+                reason: emailSuppressions.reason
+            })
             .from(emailSuppressions)
             .where(eq(emailSuppressions.email, email))
-            .limit(1)
 
         if (remainingSuppressions.length === 0) {
             await db
                 .update(users)
-                .set({ unsubscribed: false })
+                .set({ email_status: "valid" })
+                .where(eq(users.email, email))
+        } else {
+            // Re-evaluate status from remaining suppressions (highest priority wins)
+            const hasHardBounce = remainingSuppressions.some(
+                (s) => s.reason === "HardBounce"
+            )
+            const hasSpam = remainingSuppressions.some(
+                (s) => s.reason === "SpamComplaint"
+            )
+            const newStatus = hasHardBounce
+                ? "bounced"
+                : hasSpam
+                  ? "spam_complaint"
+                  : "unsubscribed"
+            await db
+                .update(users)
+                .set({ email_status: newStatus })
                 .where(eq(users.email, email))
         }
     }
 
     console.log(
         `[postmark-webhook] Subscription change: ${email} stream=${streamId} suppressed=${payload.SuppressSending}`
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Bounce handling
+// ---------------------------------------------------------------------------
+
+async function handleBounce(payload: PostmarkBouncePayload) {
+    const email = payload.Email?.toLowerCase()
+    const streamId = payload.MessageStream
+    if (!email) return
+
+    const isHardBounce = payload.Type === "HardBounce"
+
+    // Record suppression for all bounce types
+    const existing = await db
+        .select({ id: emailSuppressions.id })
+        .from(emailSuppressions)
+        .where(
+            and(
+                eq(emailSuppressions.email, email),
+                eq(emailSuppressions.stream_id, streamId ?? "outbound")
+            )
+        )
+        .limit(1)
+
+    if (existing.length === 0) {
+        const [user] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1)
+
+        await db.insert(emailSuppressions).values({
+            user_id: user?.id ?? null,
+            email,
+            stream_id: streamId ?? "outbound",
+            reason: payload.Type ?? "HardBounce",
+            origin: "Recipient",
+            suppressed_at: payload.BouncedAt
+                ? new Date(payload.BouncedAt)
+                : new Date()
+        })
+    }
+
+    // Only update email_status for hard bounces (soft bounces are transient)
+    if (isHardBounce) {
+        await db
+            .update(users)
+            .set({ email_status: "bounced" })
+            .where(eq(users.email, email))
+    }
+
+    console.log(
+        `[postmark-webhook] Bounce: ${email} type=${payload.Type} stream=${streamId}`
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Spam complaint handling
+// ---------------------------------------------------------------------------
+
+async function handleSpamComplaint(payload: PostmarkSpamComplaintPayload) {
+    const email = payload.Email?.toLowerCase()
+    const streamId = payload.MessageStream
+    if (!email) return
+
+    const existing = await db
+        .select({ id: emailSuppressions.id })
+        .from(emailSuppressions)
+        .where(
+            and(
+                eq(emailSuppressions.email, email),
+                eq(emailSuppressions.stream_id, streamId ?? "outbound")
+            )
+        )
+        .limit(1)
+
+    if (existing.length === 0) {
+        const [user] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1)
+
+        await db.insert(emailSuppressions).values({
+            user_id: user?.id ?? null,
+            email,
+            stream_id: streamId ?? "outbound",
+            reason: "SpamComplaint",
+            origin: "Recipient",
+            suppressed_at: payload.BouncedAt
+                ? new Date(payload.BouncedAt)
+                : new Date()
+        })
+    }
+
+    // Spam complaint takes priority over unsubscribed but not over bounced
+    await db
+        .update(users)
+        .set({ email_status: "spam_complaint" })
+        .where(and(eq(users.email, email), eq(users.email_status, "valid")))
+    await db
+        .update(users)
+        .set({ email_status: "spam_complaint" })
+        .where(
+            and(eq(users.email, email), eq(users.email_status, "unsubscribed"))
+        )
+
+    console.log(
+        `[postmark-webhook] Spam complaint: ${email} stream=${streamId}`
     )
 }
 
@@ -511,6 +665,16 @@ export async function POST(request: NextRequest) {
             await handleSubscriptionChange(
                 payload as PostmarkSubscriptionChangePayload
             )
+            return NextResponse.json({ received: true })
+        }
+
+        if (payload.RecordType === "Bounce") {
+            await handleBounce(payload as PostmarkBouncePayload)
+            return NextResponse.json({ received: true })
+        }
+
+        if (payload.RecordType === "SpamComplaint") {
+            await handleSpamComplaint(payload as PostmarkSpamComplaintPayload)
             return NextResponse.json({ received: true })
         }
 

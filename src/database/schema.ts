@@ -60,8 +60,10 @@ export const users = pgTable("users", {
     captain_eligible: boolean("captain_eligible")
         .$defaultFn(() => true)
         .notNull(),
-    unsubscribed: boolean("unsubscribed")
-        .$defaultFn(() => false)
+    // Email delivery status — updated by Postmark webhooks.
+    // Priority (highest wins): bounced > spam_complaint > unsubscribed > valid
+    email_status: text("email_status")
+        .$defaultFn(() => "valid")
         .notNull()
 })
 
