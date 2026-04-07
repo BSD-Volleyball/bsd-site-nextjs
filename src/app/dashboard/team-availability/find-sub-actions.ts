@@ -17,6 +17,7 @@ import {
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export type RegularSubCandidate = {
     userId: string
@@ -43,9 +44,8 @@ export type PermanentSubCandidate = {
     male: boolean | null
     lastDivisionName: string | null
     lastSeasonLabel: string | null
+    lastRound: number | null
     lastOverall: number | null
-    waitlistId: number
-    approved: boolean
     score: number
 }
 
@@ -68,6 +68,7 @@ export async function getRegularSubCandidates(
           candidates: RegularSubCandidate[]
           nonMaleNeeded: boolean
           missingCount: number
+          missingPlayers: { name: string; round: number }[]
       }
     | { status: false; message: string }
 > {
@@ -170,12 +171,21 @@ export async function getRegularSubCandidates(
     // Determine non-male missing count and best missing player's overall pick
     let nonMalesMissing = 0
     let bestMissingOverall: number | null = null
+    const missingPlayers: { name: string; round: number }[] = []
 
     if (missingUserIds.length > 0) {
         const missingUserRows = await db
-            .select({ id: users.id, male: users.male })
+            .select({
+                id: users.id,
+                male: users.male,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name
+            })
             .from(users)
             .where(inArray(users.id, missingUserIds))
+
+        const missingUserMap = new Map(missingUserRows.map((u) => [u.id, u]))
 
         for (const u of missingUserRows) {
             if (u.male !== true) nonMalesMissing++
@@ -185,7 +195,15 @@ export async function getRegularSubCandidates(
             if (bestMissingOverall === null || r.overall < bestMissingOverall) {
                 bestMissingOverall = r.overall
             }
+            const u = missingUserMap.get(r.userId)
+            if (u) {
+                const name = u.preferredName
+                    ? `${u.preferredName} ${u.lastName}`
+                    : `${u.firstName} ${u.lastName}`
+                missingPlayers.push({ name, round: r.round })
+            }
         }
+        missingPlayers.sort((a, b) => a.round - b.round)
     }
 
     const nonMaleNeeded = nonMalesMissing >= 2
@@ -248,7 +266,8 @@ export async function getRegularSubCandidates(
             status: true,
             candidates: [],
             nonMaleNeeded,
-            missingCount: missingUserIds.length
+            missingCount: missingUserIds.length,
+            missingPlayers
         }
     }
 
@@ -276,7 +295,8 @@ export async function getRegularSubCandidates(
             status: true,
             candidates: [],
             nonMaleNeeded,
-            missingCount: missingUserIds.length
+            missingCount: missingUserIds.length,
+            missingPlayers
         }
     }
 
@@ -304,7 +324,8 @@ export async function getRegularSubCandidates(
             status: true,
             candidates: [],
             nonMaleNeeded,
-            missingCount: missingUserIds.length
+            missingCount: missingUserIds.length,
+            missingPlayers
         }
     }
 
@@ -372,18 +393,14 @@ export async function getRegularSubCandidates(
             const overallDiff = candidate.overall - bestMissingOverall
             if (overallDiff === 0) {
                 score += 100
-                notes.push(`Pick ${candidate.overall} match`)
             } else if (overallDiff > 0) {
                 // Candidate drafted later = weaker or same skill, doesn't strengthen team
                 score += Math.max(0, 100 - overallDiff * 8)
-                notes.push(`Pick ${candidate.overall}`)
             } else {
                 // Candidate drafted earlier = stronger pick, less ideal
                 score += Math.max(-80, overallDiff * 10)
-                notes.push(`Pick ${candidate.overall} (stronger pick)`)
+                notes.push("Stronger pick")
             }
-        } else {
-            notes.push(`Pick ${candidate.overall}`)
         }
 
         // Time slot scoring — adjacent preferred
@@ -426,7 +443,8 @@ export async function getRegularSubCandidates(
         status: true,
         candidates: scored.slice(0, 5),
         nonMaleNeeded,
-        missingCount: missingUserIds.length
+        missingCount: missingUserIds.length,
+        missingPlayers
     }
 }
 
@@ -511,6 +529,7 @@ export async function getPermanentSubCandidates(
     const draftHistoryRows = await db
         .select({
             userId: drafts.user,
+            round: drafts.round,
             overall: drafts.overall,
             divisionId: teams.division,
             divisionName: divisions.name,
@@ -530,6 +549,7 @@ export async function getPermanentSubCandidates(
         lastDivisionId: number
         lastDivisionName: string
         lastSeasonLabel: string
+        lastRound: number
         lastOverall: number
     }
     const historyMap = new Map<string, DraftHistory>()
@@ -540,6 +560,7 @@ export async function getPermanentSubCandidates(
                 lastDivisionId: row.divisionId,
                 lastDivisionName: row.divisionName,
                 lastSeasonLabel: label,
+                lastRound: row.round,
                 lastOverall: row.overall
             })
         }
@@ -576,11 +597,7 @@ export async function getPermanentSubCandidates(
             score += Math.max(0, 100 - diff * 5)
         }
 
-        // Small boost for already-approved
-        if (r.approved) score += 10
-
         return {
-            waitlistId: r.waitlistId,
             userId: r.userId,
             firstName: r.firstName,
             lastName: r.lastName,
@@ -588,8 +605,8 @@ export async function getPermanentSubCandidates(
             male: r.male,
             lastDivisionName: history?.lastDivisionName ?? null,
             lastSeasonLabel: history?.lastSeasonLabel ?? null,
+            lastRound: history?.lastRound ?? null,
             lastOverall: history?.lastOverall ?? null,
-            approved: r.approved,
             score
         }
     })
@@ -601,4 +618,46 @@ export async function getPermanentSubCandidates(
         candidates: scored.slice(0, 5),
         replacedPlayerName
     }
+}
+
+export type SubContactDetails = {
+    email: string
+    phone: string | null
+}
+
+export async function getSubContactDetails(
+    targetUserId: string
+): Promise<
+    | { status: true; contact: SubContactDetails }
+    | { status: false; error: string }
+> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return { status: false, error: "Not authenticated" }
+
+    const [row] = await db
+        .select({ email: users.email, phone: users.phone })
+        .from(users)
+        .where(eq(users.id, targetUserId))
+        .limit(1)
+
+    if (!row) return { status: false, error: "User not found" }
+
+    return { status: true, contact: { email: row.email, phone: row.phone } }
+}
+
+export async function logSubContactViewed(
+    captainTeamId: number,
+    targetUserId: string,
+    targetName: string
+): Promise<void> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "view",
+        entityType: "users",
+        entityId: targetUserId,
+        summary: `Captain (${session.user.name ?? session.user.id}) viewed sub contact details for "${targetName}" while finding a sub for team ${captainTeamId}`
+    })
 }

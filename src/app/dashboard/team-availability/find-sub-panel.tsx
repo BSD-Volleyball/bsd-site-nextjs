@@ -16,6 +16,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -23,13 +24,22 @@ import {
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import {
     getRegularSubCandidates,
-    getPermanentSubCandidates
+    getPermanentSubCandidates,
+    getSubContactDetails,
+    logSubContactViewed
 } from "./find-sub-actions"
 import type {
     RegularSubCandidate,
-    PermanentSubCandidate
+    PermanentSubCandidate,
+    SubContactDetails
 } from "./find-sub-actions"
 import type { RosterPlayer, EventInfo, SeasonInfo } from "./actions"
+import {
+    RiAlertLine,
+    RiCloseLine,
+    RiPhoneLine,
+    RiMailLine
+} from "@remixicon/react"
 
 function formatMatchTime(timeStr: string | null): string {
     if (!timeStr) return ""
@@ -78,12 +88,61 @@ export function FindSubPanel({
     // Player detail modal
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
+    // Contact details state
+    const [contactWarningTarget, setContactWarningTarget] = useState<{
+        userId: string
+        name: string
+    } | null>(null)
+    const [contactDetails, setContactDetails] = useState<{
+        userId: string
+        name: string
+        data: SubContactDetails
+    } | null>(null)
+    const [isLoadingContact, setIsLoadingContact] = useState(false)
+
+    async function handleAcknowledgeContact() {
+        if (!contactWarningTarget) return
+        setIsLoadingContact(true)
+        try {
+            await logSubContactViewed(
+                teamId,
+                contactWarningTarget.userId,
+                contactWarningTarget.name
+            )
+            const result = await getSubContactDetails(
+                contactWarningTarget.userId
+            )
+            if (result.status) {
+                setContactDetails({
+                    userId: contactWarningTarget.userId,
+                    name: contactWarningTarget.name,
+                    data: result.contact
+                })
+            }
+        } catch (err) {
+            console.error("Failed to load contact details", err)
+        } finally {
+            setIsLoadingContact(false)
+            setContactWarningTarget(null)
+        }
+    }
+
+    function handleOpenContactWarning(userId: string, name: string) {
+        setContactDetails(null)
+        setContactWarningTarget({ userId, name })
+    }
+
+    function handleCloseContactWarning() {
+        setContactWarningTarget(null)
+    }
+
     // Regular sub state
     const [selectedEventId, setSelectedEventId] = useState<string>("")
     const [regularResult, setRegularResult] = useState<{
         candidates: RegularSubCandidate[]
         nonMaleNeeded: boolean
         missingCount: number
+        missingPlayers: { name: string; round: number }[]
     } | null>(null)
     const [regularError, setRegularError] = useState<string | null>(null)
     const [isPendingRegular, startRegularTransition] = useTransition()
@@ -110,7 +169,8 @@ export function FindSubPanel({
                 setRegularResult({
                     candidates: result.candidates,
                     nonMaleNeeded: result.nonMaleNeeded,
-                    missingCount: result.missingCount
+                    missingCount: result.missingCount,
+                    missingPlayers: result.missingPlayers
                 })
             } else {
                 setRegularError(result.message)
@@ -209,6 +269,20 @@ export function FindSubPanel({
                                             Non-male substitute needed
                                         </Badge>
                                     )}
+                                    {regularResult.missingPlayers.length >
+                                        0 && (
+                                        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+                                            <span className="font-medium">
+                                                Missing:{" "}
+                                            </span>
+                                            {regularResult.missingPlayers
+                                                .map(
+                                                    (p) =>
+                                                        `${p.name} (Rd ${p.round})`
+                                                )
+                                                .join(", ")}
+                                        </div>
+                                    )}
                                     {regularResult.missingCount === 0 && (
                                         <p className="text-muted-foreground text-sm">
                                             No players are marked unavailable
@@ -233,6 +307,9 @@ export function FindSubPanel({
                                             }
                                             onOpenDetail={
                                                 modal.openPlayerDetail
+                                            }
+                                            onOpenContact={
+                                                handleOpenContactWarning
                                             }
                                         />
                                     ))}
@@ -300,6 +377,7 @@ export function FindSubPanel({
                                         candidate={c}
                                         rank={i + 1}
                                         onOpenDetail={modal.openPlayerDetail}
+                                        onOpenContact={handleOpenContactWarning}
                                     />
                                 ))
                             )}
@@ -325,6 +403,121 @@ export function FindSubPanel({
                 privateRatingNotes={modal.privateRatingNotes}
                 viewerRating={modal.viewerRating}
             />
+
+            {/* Contact info warning modal */}
+            {contactWarningTarget && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={handleCloseContactWarning}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") handleCloseContactWarning()
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <button
+                            type="button"
+                            onClick={handleCloseContactWarning}
+                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                            <RiCloseLine className="h-5 w-5" />
+                        </button>
+                        <div className="mb-5 flex items-start gap-3">
+                            <RiAlertLine className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />
+                            <div>
+                                <h3 className="mb-2 font-semibold text-lg">
+                                    Contact Information Notice
+                                </h3>
+                                <p className="text-muted-foreground text-sm">
+                                    This contact information should only be used
+                                    exclusively for BSD Volleyball League
+                                    purposes. If you would like to contact
+                                    someone for any other purpose, please ask
+                                    them for their contact details directly in
+                                    person.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCloseContactWarning}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={handleAcknowledgeContact}
+                                disabled={isLoadingContact}
+                            >
+                                Acknowledge &amp; View Details
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Contact details modal */}
+            {contactDetails && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={() => setContactDetails(null)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape") setContactDetails(null)
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative w-full max-w-sm rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setContactDetails(null)}
+                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                            <RiCloseLine className="h-5 w-5" />
+                        </button>
+                        <h3 className="mb-4 font-semibold text-lg">
+                            {contactDetails.name}
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm">
+                                <RiMailLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <a
+                                    href={`mailto:${contactDetails.data.email}`}
+                                    className="hover:underline"
+                                >
+                                    {contactDetails.data.email}
+                                </a>
+                            </div>
+                            {contactDetails.data.phone && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <RiPhoneLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <a
+                                        href={`tel:${contactDetails.data.phone}`}
+                                        className="hover:underline"
+                                    >
+                                        {contactDetails.data.phone}
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -339,12 +532,14 @@ function RegularCandidateRow({
     candidate: c,
     rank,
     nonMaleNeeded,
-    onOpenDetail
+    onOpenDetail,
+    onOpenContact
 }: {
     candidate: RegularSubCandidate
     rank: number
     nonMaleNeeded: boolean
     onOpenDetail: (userId: string) => void
+    onOpenContact: (userId: string, name: string) => void
 }) {
     const name = c.preferredName
         ? `${c.preferredName} ${c.lastName}`
@@ -382,15 +577,39 @@ function RegularCandidateRow({
                 </p>
                 <p className="text-muted-foreground text-xs">
                     Round {c.round}, Pick {c.overall}
-                    {c.matchTime
-                        ? ` · Their match: ${formatMatchTime(c.matchTime)}`
-                        : ""}
                 </p>
-                {c.notes.length > 0 && (
-                    <p className="mt-0.5 text-muted-foreground/70 text-xs">
-                        {c.notes.join(" · ")}
+                {c.matchTime && (
+                    <p className="text-muted-foreground text-xs">
+                        Their match: {formatMatchTime(c.matchTime)}
                     </p>
                 )}
+                {c.notes.length > 0 && (
+                    <p className="mt-0.5 text-muted-foreground/70 text-xs">
+                        {c.notes.map((note, i) => (
+                            <span key={note}>
+                                {i > 0 && " · "}
+                                <span
+                                    className={
+                                        note === "Adjacent time slot"
+                                            ? "font-medium text-green-600 dark:text-green-400"
+                                            : undefined
+                                    }
+                                >
+                                    {note}
+                                </span>
+                            </span>
+                        ))}
+                    </p>
+                )}
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-6 px-2 text-xs"
+                    onClick={() => onOpenContact(c.userId, name)}
+                >
+                    Contact Info
+                </Button>
             </div>
         </div>
     )
@@ -399,11 +618,13 @@ function RegularCandidateRow({
 function PermanentCandidateRow({
     candidate: c,
     rank,
-    onOpenDetail
+    onOpenDetail,
+    onOpenContact
 }: {
     candidate: PermanentSubCandidate
     rank: number
     onOpenDetail: (userId: string) => void
+    onOpenContact: (userId: string, name: string) => void
 }) {
     const name = c.preferredName
         ? `${c.preferredName} ${c.lastName}`
@@ -423,15 +644,6 @@ function PermanentCandidateRow({
                         {name}
                         {genderLabel(c.male) ? ` (${genderLabel(c.male)})` : ""}
                     </button>
-                    {c.approved ? (
-                        <Badge variant="secondary" className="text-xs">
-                            Approved
-                        </Badge>
-                    ) : (
-                        <Badge variant="outline" className="text-xs">
-                            Pending Approval
-                        </Badge>
-                    )}
                 </div>
                 {c.lastDivisionName ? (
                     <p className="text-muted-foreground text-xs">
@@ -443,11 +655,20 @@ function PermanentCandidateRow({
                         No prior season history
                     </p>
                 )}
-                {c.lastOverall != null && (
+                {c.lastRound != null && (
                     <p className="text-muted-foreground text-xs">
-                        Previously drafted: Overall pick {c.lastOverall}
+                        Previously drafted: Round {c.lastRound}
                     </p>
                 )}
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 h-6 px-2 text-xs"
+                    onClick={() => onOpenContact(c.userId, name)}
+                >
+                    Contact Info
+                </Button>
             </div>
         </div>
     )
