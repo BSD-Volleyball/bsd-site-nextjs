@@ -393,6 +393,18 @@ export async function sendConcernReply(
         }
     }
 
+    // Find the most recent reply's postmark_message_id to chain the email
+    // thread. Fall back to the original inbound email's ID if no replies exist.
+    const [lastReply] = await db
+        .select({ postmark_message_id: concernReplies.postmark_message_id })
+        .from(concernReplies)
+        .where(eq(concernReplies.concern_id, concernId))
+        .orderBy(desc(concernReplies.sent_at))
+        .limit(1)
+
+    const inReplyTo =
+        lastReply?.postmark_message_id ?? concern.source_email_id ?? undefined
+
     const subject = `Re: Concern #${concernId}`
 
     try {
@@ -403,6 +415,7 @@ export async function sendConcernReply(
             htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
             textBody: body.trim(),
             stream: "outbound",
+            inReplyTo,
             headers: [
                 { name: "X-BSD-Ticket-ID", value: `concern-${concernId}` }
             ]

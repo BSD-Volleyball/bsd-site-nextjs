@@ -303,9 +303,8 @@ export async function sendEmailReply(
     if (email.status !== "active")
         return { status: false, message: "Can only reply to active emails." }
 
-    const replySubject = email.subject.startsWith("Re:")
-        ? email.subject
-        : `Re: ${email.subject}`
+    const cleanSubject = email.subject.replace(/^(Re:\s*)+/i, "").trim()
+    const replySubject = `Re: Email #${emailId}: ${cleanSubject}`
 
     const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
 
