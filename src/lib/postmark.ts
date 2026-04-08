@@ -42,6 +42,7 @@ export function getPostmarkClient(): ServerClient {
 
 export interface SendEmailOptions {
     from: string
+    fromName?: string
     to: string
     subject: string
     htmlBody: string
@@ -62,7 +63,7 @@ export interface SendEmailOptions {
 export async function sendEmail(opts: SendEmailOptions): Promise<string> {
     const client = getPostmarkClient()
     const result = await client.sendEmail({
-        From: opts.from,
+        From: opts.fromName ? `${opts.fromName} <${opts.from}>` : opts.from,
         To: opts.to,
         Subject: opts.subject,
         HtmlBody: opts.htmlBody,

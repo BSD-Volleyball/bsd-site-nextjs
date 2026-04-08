@@ -351,6 +351,7 @@ export async function sendConcernReply(
     }
 
     const fromAddress = process.env.INBOUND_CONCERN_ADDRESS
+    const fromName = process.env.INBOUND_CONCERN_FROM_NAME
     if (!fromAddress) {
         return {
             status: false,
@@ -405,11 +406,18 @@ export async function sendConcernReply(
     const inReplyTo =
         lastReply?.postmark_message_id ?? concern.source_email_id ?? undefined
 
-    const subject = `Re: Concern #${concernId}`
+    // Use the original inbound email's subject when the concern came from email;
+    // fall back to the generic "Re: Concern #N" for web-submitted concerns.
+    const baseSubject =
+        concern.source === "email" && concern.person_involved
+            ? concern.person_involved.replace(/^(Re:\s*)+/i, "").trim()
+            : `Concern #${concernId}`
+    const subject = `Re: ${baseSubject}`
 
     try {
         const postmarkMessageId = await sendEmail({
             from: fromAddress,
+            fromName: fromName || undefined,
             to: replyTo,
             subject,
             htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
