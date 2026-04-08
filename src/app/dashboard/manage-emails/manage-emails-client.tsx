@@ -42,6 +42,47 @@ function formatDate(date: Date | string) {
     })
 }
 
+function splitQuotedText(text: string): {
+    main: string
+    quoted: string | null
+} {
+    const lines = text.split("\n")
+    const firstQuoteIdx = lines.findIndex((l) => /^\s*>/.test(l))
+    if (firstQuoteIdx === -1) return { main: text, quoted: null }
+    return {
+        main: lines.slice(0, firstQuoteIdx).join("\n").trimEnd(),
+        quoted: lines.slice(firstQuoteIdx).join("\n")
+    }
+}
+
+function MessageBody({ text }: { text: string }) {
+    const [showQuoted, setShowQuoted] = useState(false)
+    const { main, quoted } = splitQuotedText(text)
+    return (
+        <>
+            <p className="whitespace-pre-wrap text-foreground">
+                {main || "(No body)"}
+            </p>
+            {quoted && (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setShowQuoted((v) => !v)}
+                        className="mt-1 text-xs text-muted-foreground underline hover:text-foreground"
+                    >
+                        {showQuoted ? "Hide Quoted Text" : "Show Quoted Text"}
+                    </button>
+                    {showQuoted && (
+                        <p className="mt-1 whitespace-pre-wrap border-l-2 border-muted-foreground/30 pl-2 text-muted-foreground text-xs">
+                            {quoted}
+                        </p>
+                    )}
+                </>
+            )}
+        </>
+    )
+}
+
 /** Renders sender name (optionally as a player-detail link) + email as mailto */
 function FromDisplay({
     name,
@@ -289,19 +330,19 @@ function EmailCard({
                         </div>
 
                         {/* Email body */}
-                        <div className="text-sm">
-                            <p className="font-medium text-muted-foreground">
-                                Body
+                        <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm dark:border-green-800 dark:bg-green-950/40">
+                            <p className="mb-1 font-medium text-green-800 dark:text-green-200">
+                                Original Email
                             </p>
                             {email.body_html ? (
                                 <div
-                                    className="prose prose-sm dark:prose-invert mt-1 max-w-none rounded-md border bg-background p-3"
+                                    className="prose prose-sm dark:prose-invert mt-1 max-w-none"
                                     dangerouslySetInnerHTML={{
                                         __html: email.body_html
                                     }}
                                 />
                             ) : (
-                                <p className="mt-1 whitespace-pre-wrap">
+                                <p className="mt-1 whitespace-pre-wrap text-foreground">
                                     {email.body_text || "(No body)"}
                                 </p>
                             )}
@@ -415,9 +456,9 @@ function EmailCard({
                                         <p className="mb-1 text-muted-foreground text-xs">
                                             Subject: {item.subject}
                                         </p>
-                                        <p className="whitespace-pre-wrap text-foreground">
-                                            {item.body_text ?? "(No body)"}
-                                        </p>
+                                        <MessageBody
+                                            text={item.body_text ?? "(No body)"}
+                                        />
                                     </div>
                                 ) : (
                                     <div
