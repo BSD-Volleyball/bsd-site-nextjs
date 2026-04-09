@@ -163,7 +163,13 @@ export function FindSubPanel({
 
     function handleEventChange(eventIdStr: string) {
         setSelectedEventId(eventIdStr)
-        setSelectedMissingUserIds(new Set())
+        const eventId = parseInt(eventIdStr, 10)
+        const defaultMissing = new Set(
+            roster
+                .filter((p) => p.unavailableEventIds.includes(eventId))
+                .map((p) => p.userId)
+        )
+        setSelectedMissingUserIds(defaultMissing)
         setRegularError(null)
         setRegularResult(null)
     }
