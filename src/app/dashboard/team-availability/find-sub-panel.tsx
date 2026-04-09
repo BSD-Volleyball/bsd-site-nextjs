@@ -38,7 +38,9 @@ import {
     RiAlertLine,
     RiCloseLine,
     RiPhoneLine,
-    RiMailLine
+    RiMailLine,
+    RiCloseCircleFill,
+    RiCheckboxCircleLine
 } from "@remixicon/react"
 
 function formatMatchTime(timeStr: string | null): string {
@@ -70,7 +72,7 @@ function formatDate(dateStr: string): string {
 
 type FindSubPanelProps = {
     teamId: number
-    redEvents: EventInfo[]
+    futureEvents: EventInfo[]
     roster: RosterPlayer[]
     allSeasons: SeasonInfo[]
     playerPicUrl: string
@@ -79,7 +81,7 @@ type FindSubPanelProps = {
 
 export function FindSubPanel({
     teamId,
-    redEvents,
+    futureEvents,
     roster,
     allSeasons,
     playerPicUrl,
@@ -138,6 +140,9 @@ export function FindSubPanel({
 
     // Regular sub state
     const [selectedEventId, setSelectedEventId] = useState<string>("")
+    const [selectedMissingUserIds, setSelectedMissingUserIds] = useState<
+        Set<string>
+    >(new Set())
     const [regularResult, setRegularResult] = useState<{
         candidates: RegularSubCandidate[]
         nonMaleNeeded: boolean
@@ -158,12 +163,34 @@ export function FindSubPanel({
 
     function handleEventChange(eventIdStr: string) {
         setSelectedEventId(eventIdStr)
+        setSelectedMissingUserIds(new Set())
+        setRegularError(null)
+        setRegularResult(null)
+    }
+
+    function handleToggleMissing(userId: string) {
+        setSelectedMissingUserIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(userId)) {
+                next.delete(userId)
+            } else {
+                next.add(userId)
+            }
+            return next
+        })
+        setRegularResult(null)
+        setRegularError(null)
+    }
+
+    function handleFindSub() {
+        if (!selectedEventId) return
         setRegularError(null)
         setRegularResult(null)
         startRegularTransition(async () => {
             const result = await getRegularSubCandidates(
                 teamId,
-                parseInt(eventIdStr, 10)
+                parseInt(selectedEventId, 10),
+                Array.from(selectedMissingUserIds)
             )
             if (result.status) {
                 setRegularResult({
@@ -204,14 +231,14 @@ export function FindSubPanel({
                         Find a Regular Sub
                     </CardTitle>
                     <CardDescription>
-                        Suggests available players from the same division at an
-                        adjacent time slot for dates when your team is short.
+                        Select a date, pick who will be out, then find available
+                        players from the same division at an adjacent time slot.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {redEvents.length === 0 ? (
+                    {futureEvents.length === 0 ? (
                         <p className="text-muted-foreground text-sm">
-                            No dates currently need a substitute.
+                            No upcoming game dates.
                         </p>
                     ) : (
                         <>
@@ -221,10 +248,10 @@ export function FindSubPanel({
                                 disabled={isPendingRegular}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select a date needing a sub…" />
+                                    <SelectValue placeholder="Select a date…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {redEvents.map((e) => {
+                                    {futureEvents.map((e) => {
                                         const matchTime =
                                             teamMatchTimeByEventDate[
                                                 e.eventDate
@@ -246,6 +273,67 @@ export function FindSubPanel({
                                     })}
                                 </SelectContent>
                             </Select>
+
+                            {selectedEventId && (
+                                <>
+                                    <div>
+                                        <p className="mb-2 font-medium text-sm">
+                                            Who will be out?
+                                        </p>
+                                        <div className="space-y-0.5">
+                                            {roster.map((player) => {
+                                                const isOut =
+                                                    selectedMissingUserIds.has(
+                                                        player.userId
+                                                    )
+                                                return (
+                                                    <button
+                                                        key={player.userId}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            handleToggleMissing(
+                                                                player.userId
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            isPendingRegular
+                                                        }
+                                                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50"
+                                                    >
+                                                        {isOut ? (
+                                                            <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+                                                        ) : (
+                                                            <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                        )}
+                                                        <span
+                                                            className={
+                                                                isOut
+                                                                    ? "text-red-600"
+                                                                    : ""
+                                                            }
+                                                        >
+                                                            {displayName(
+                                                                player
+                                                            )}
+                                                        </span>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={handleFindSub}
+                                        disabled={
+                                            isPendingRegular ||
+                                            selectedMissingUserIds.size === 0
+                                        }
+                                        className="w-full"
+                                    >
+                                        Find Sub
+                                    </Button>
+                                </>
+                            )}
 
                             {isPendingRegular && (
                                 <p className="text-muted-foreground text-sm">
@@ -283,20 +371,12 @@ export function FindSubPanel({
                                                 .join(", ")}
                                         </div>
                                     )}
-                                    {regularResult.missingCount === 0 && (
+                                    {regularResult.candidates.length === 0 && (
                                         <p className="text-muted-foreground text-sm">
-                                            No players are marked unavailable
-                                            for this date.
+                                            No available substitutes found for
+                                            this date.
                                         </p>
                                     )}
-                                    {regularResult.missingCount > 0 &&
-                                        regularResult.candidates.length ===
-                                            0 && (
-                                            <p className="text-muted-foreground text-sm">
-                                                No available substitutes found
-                                                for this date.
-                                            </p>
-                                        )}
                                     {regularResult.candidates.map((c, i) => (
                                         <RegularCandidateRow
                                             key={c.userId}

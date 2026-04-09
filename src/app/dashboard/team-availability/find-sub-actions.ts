@@ -61,7 +61,8 @@ function parseTimeMins(timeStr: string | null): number | null {
 
 export async function getRegularSubCandidates(
     teamId: number,
-    eventId: number
+    eventId: number,
+    missingUserIds: string[]
 ): Promise<
     | {
           status: true
@@ -129,44 +130,27 @@ export async function getRegularSubCandidates(
             : teamMatch.homeTeam
         : null
 
-    // Get our roster with signup IDs
-    const ourRosterRows = await db
-        .select({
-            userId: drafts.user,
-            signupId: signups.id,
-            round: drafts.round,
-            overall: drafts.overall
-        })
-        .from(drafts)
-        .innerJoin(
-            signups,
-            and(
-                eq(signups.player, drafts.user),
-                eq(signups.season, config.seasonId)
-            )
-        )
-        .where(eq(drafts.team, teamId))
-
-    // Find who on our team is unavailable for this event
-    const ourSignupIds = ourRosterRows.map((r) => r.signupId)
-    let unavailOurSignupIds = new Set<number>()
-    if (ourSignupIds.length > 0) {
-        const rows = await db
-            .select({ signupId: userUnavailability.signup_id })
-            .from(userUnavailability)
+    // Fetch draft data (round/overall) for the manually selected missing players
+    let missingRosterRows: {
+        userId: string
+        round: number
+        overall: number
+    }[] = []
+    if (missingUserIds.length > 0) {
+        missingRosterRows = await db
+            .select({
+                userId: drafts.user,
+                round: drafts.round,
+                overall: drafts.overall
+            })
+            .from(drafts)
             .where(
                 and(
-                    inArray(userUnavailability.signup_id, ourSignupIds),
-                    eq(userUnavailability.event_id, eventId)
+                    eq(drafts.team, teamId),
+                    inArray(drafts.user, missingUserIds)
                 )
             )
-        unavailOurSignupIds = new Set(rows.map((r) => r.signupId!))
     }
-
-    const missingRosterRows = ourRosterRows.filter((r) =>
-        unavailOurSignupIds.has(r.signupId)
-    )
-    const missingUserIds = missingRosterRows.map((r) => r.userId)
 
     // Determine non-male missing count and best missing player's overall pick
     let nonMalesMissing = 0

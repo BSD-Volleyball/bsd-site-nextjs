@@ -85,12 +85,9 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
 
     const showTeamSelector = allTeams.length > 1
 
-    // Collect events marked red (< 6 players available or 2+ non-males missing)
-    const redEvents = events.filter((e) => {
-        const count = availableCountByEvent.get(e.id) ?? 0
-        const nonMaleMissing = nonMaleMissingByEvent.get(e.id) ?? 0
-        return count < 6 || nonMaleMissing >= 2
-    })
+    // All future events (today and beyond) for the sub finder
+    const today = new Date().toISOString().slice(0, 10)
+    const futureEvents = events.filter((e) => e.eventDate >= today)
 
     return (
         <Card>
@@ -282,7 +279,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                     <FindSubPanel
                         key={team.id}
                         teamId={team.id}
-                        redEvents={redEvents}
+                        futureEvents={futureEvents}
                         roster={roster}
                         allSeasons={allSeasons}
                         playerPicUrl={playerPicUrl}
