@@ -167,6 +167,7 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
 
 export interface SidebarData {
     showSignupLink: boolean
+    hasCurrentSeasonSignup: boolean
     isAdmin: boolean
     isCommissioner: boolean
     hasCaptainPagesAccess: boolean
@@ -186,6 +187,7 @@ export async function getSidebarData(): Promise<SidebarData> {
     if (!session?.user) {
         return {
             showSignupLink: false,
+            hasCurrentSeasonSignup: false,
             isAdmin: false,
             isCommissioner: false,
             hasCaptainPagesAccess: false,
@@ -205,6 +207,7 @@ export async function getSidebarData(): Promise<SidebarData> {
 
     const [
         showSignupLink,
+        hasCurrentSeasonSignup,
         isAdmin,
         isCommissioner,
         hasCaptainPagesAccess,
@@ -217,6 +220,21 @@ export async function getSidebarData(): Promise<SidebarData> {
         isCoach
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
+        seasonId
+            ? (async () => {
+                  const [signup] = await db
+                      .select({ id: signups.id })
+                      .from(signups)
+                      .where(
+                          and(
+                              eq(signups.season, seasonId),
+                              eq(signups.player, session.user.id)
+                          )
+                      )
+                      .limit(1)
+                  return !!signup
+              })()
+            : Promise.resolve(false),
         isAdminOrDirectorBySession(),
         isCommissionerBySession(),
         hasCaptainPagesAccessBySession(),
@@ -266,6 +284,7 @@ export async function getSidebarData(): Promise<SidebarData> {
 
     return {
         showSignupLink,
+        hasCurrentSeasonSignup,
         isAdmin,
         isCommissioner,
         hasCaptainPagesAccess,

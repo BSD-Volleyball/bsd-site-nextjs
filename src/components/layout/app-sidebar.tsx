@@ -64,13 +64,14 @@ import {
     type SeasonPhase
 } from "@/lib/season-phases"
 
+const myAvailabilityNavItem = {
+    title: "My Availability",
+    url: "/dashboard/my-availability",
+    icon: RiCheckboxLine
+}
+
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
-    {
-        title: "My Availability",
-        url: "/dashboard/my-availability",
-        icon: RiCheckboxLine
-    },
     {
         title: "League Rules",
         url: "/dashboard/rules",
@@ -534,6 +535,7 @@ function SeasonNavMenuItem({
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const pathname = usePathname()
     const [showSignupLink, setShowSignupLink] = useState(false)
+    const [hasCurrentSeasonSignup, setHasCurrentSeasonSignup] = useState(false)
     const [isAdmin, setIsAdmin] = useState(false)
     const [isCommissioner, setIsCommissioner] = useState(false)
     const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
@@ -549,6 +551,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     useEffect(() => {
         getSidebarData().then((data) => {
             setShowSignupLink(data.showSignupLink)
+            setHasCurrentSeasonSignup(data.hasCurrentSeasonSignup)
             setIsAdmin(data.isAdmin)
             setIsCommissioner(data.isCommissioner)
             setHasCaptainPagesAccess(data.hasCaptainPagesAccess)
@@ -656,6 +659,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
     }
 
+    // Insert My Availability after Dashboard (and signup, if present) for players signed up this season
+    if (hasCurrentSeasonSignup) {
+        const dashboardIdx = navItems.findIndex((i) => i.url === "/dashboard")
+        navItems = [
+            ...navItems.slice(0, dashboardIdx + 1),
+            myAvailabilityNavItem,
+            ...navItems.slice(dashboardIdx + 1)
+        ]
+    }
+
     // Admin hidden section — collect all currently-suppressed items by group
     type NavItem = { title: string; url: string; icon: typeof RiSpeedUpLine }
     const hiddenGroups: { label: string; items: NavItem[] }[] = []
@@ -666,6 +679,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             label: "Always Hidden",
             items: alwaysHiddenAdminItems
         })
+
+        // My Availability — hidden when user has no current-season signup
+        if (!hasCurrentSeasonSignup) {
+            hiddenGroups.push({
+                label: "My Availability (no signup)",
+                items: [myAvailabilityNavItem]
+            })
+        }
 
         // Season week pages currently suppressed
         const hiddenSeasonItems = [
