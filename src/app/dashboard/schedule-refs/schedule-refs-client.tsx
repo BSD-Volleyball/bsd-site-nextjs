@@ -21,6 +21,12 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
+} from "@/components/ui/collapsible"
+import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { toast } from "sonner"
 import { getMatchesAndRefsForDate, saveRefAssignments } from "./actions"
 import type {
@@ -91,6 +97,7 @@ export function ScheduleRefsClient({
         refId: string
         refName: string
     } | null>(null)
+    const [refsOpen, setRefsOpen] = useState(false)
 
     // Initialize assignments from match data
     useEffect(() => {
@@ -245,6 +252,40 @@ export function ScheduleRefsClient({
     const currentDateLabel =
         matchDates.find((d) => d.date === selectedDate)?.label ?? selectedDate
 
+    // Build schedule grid: rows = distinct times, cols = distinct courts
+    const scheduleGrid = useMemo(() => {
+        if (!matchData) return null
+
+        const times = [...new Set(matchData.matches.map((m) => m.time))].sort()
+        const courts = [
+            ...new Set(
+                matchData.matches
+                    .map((m) => m.court)
+                    .filter((c): c is number => c != null)
+            )
+        ].sort((a, b) => a - b)
+
+        if (times.length === 0 || courts.length === 0) return null
+
+        // Build a map from "time:court" -> assigned ref name
+        const refNameById = new Map<string, string>()
+        for (const ref of matchData.refs) {
+            refNameById.set(ref.userId, ref.name)
+        }
+
+        const cellMap = new Map<string, string>()
+        for (const match of matchData.matches) {
+            if (match.court == null) continue
+            const key = `${match.time}:${match.court}`
+            const refId = assignments[match.matchId]
+            if (refId) {
+                cellMap.set(key, refNameById.get(refId) ?? refId)
+            }
+        }
+
+        return { times, courts, cellMap }
+    }, [matchData, assignments])
+
     return (
         <div className="space-y-6">
             {/* Date selector */}
@@ -286,91 +327,110 @@ export function ScheduleRefsClient({
 
             {!loading && matchData && (
                 <>
-                    {/* Ref summary table */}
+                    {/* Ref summary table — collapsible, initially collapsed */}
                     {matchData.refs.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-lg">
-                                    Refs — {currentDateLabel}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b text-left">
-                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                    Name
-                                                </th>
-                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                    Status
-                                                </th>
-                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                    Max Division
-                                                </th>
-                                                <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                    Certified
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {[...matchData.refs]
-                                                .sort(
-                                                    (a, b) =>
-                                                        a.maxDivisionLevel -
-                                                        b.maxDivisionLevel
-                                                )
-                                                .map((ref) => (
-                                                    <tr
-                                                        key={ref.userId}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="px-3 py-2 font-medium">
-                                                            {ref.name}
-                                                        </td>
-                                                        <td className="px-3 py-2">
-                                                            {ref.isUnavailable ? (
-                                                                <Badge variant="destructive">
-                                                                    Unavailable
-                                                                </Badge>
-                                                            ) : ref.playingTimeSlot ? (
-                                                                <Badge className="border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200">
-                                                                    {
-                                                                        ref.playingInfo
-                                                                    }
-                                                                </Badge>
-                                                            ) : (
-                                                                <Badge className="bg-green-600 text-white hover:bg-green-700">
-                                                                    Available
-                                                                </Badge>
-                                                            )}
-                                                        </td>
-                                                        <td className="whitespace-nowrap px-3 py-2">
-                                                            <Badge variant="outline">
-                                                                Up to{" "}
-                                                                {divisionLevelLabel(
-                                                                    ref.maxDivisionLevel
-                                                                )}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="px-3 py-2">
-                                                            {ref.isCertified ? (
-                                                                <Badge variant="secondary">
-                                                                    Certified
-                                                                </Badge>
-                                                            ) : (
-                                                                <span className="text-muted-foreground">
-                                                                    —
-                                                                </span>
-                                                            )}
-                                                        </td>
+                        <Collapsible open={refsOpen} onOpenChange={setRefsOpen}>
+                            <Card>
+                                <CardHeader className="py-3">
+                                    <CollapsibleTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between text-left"
+                                        >
+                                            <CardTitle className="text-lg">
+                                                Refs — {currentDateLabel}
+                                                <span className="ml-2 font-normal text-muted-foreground text-sm">
+                                                    ({matchData.refs.length})
+                                                </span>
+                                            </CardTitle>
+                                            {refsOpen ? (
+                                                <RiArrowDownSLine className="h-5 w-5 text-muted-foreground" />
+                                            ) : (
+                                                <RiArrowRightSLine className="h-5 w-5 text-muted-foreground" />
+                                            )}
+                                        </button>
+                                    </CollapsibleTrigger>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                    <CardContent className="pt-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b text-left">
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Name
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Status
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Max Division
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Certified
+                                                        </th>
                                                     </tr>
-                                                ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                                </thead>
+                                                <tbody>
+                                                    {[...matchData.refs]
+                                                        .sort(
+                                                            (a, b) =>
+                                                                a.maxDivisionLevel -
+                                                                b.maxDivisionLevel
+                                                        )
+                                                        .map((ref) => (
+                                                            <tr
+                                                                key={ref.userId}
+                                                                className="border-b last:border-0"
+                                                            >
+                                                                <td className="px-3 py-2 font-medium">
+                                                                    {ref.name}
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {ref.isUnavailable ? (
+                                                                        <Badge variant="destructive">
+                                                                            Unavailable
+                                                                        </Badge>
+                                                                    ) : ref.playingTimeSlot ? (
+                                                                        <Badge className="border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200">
+                                                                            {
+                                                                                ref.playingInfo
+                                                                            }
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <Badge className="bg-green-600 text-white hover:bg-green-700">
+                                                                            Available
+                                                                        </Badge>
+                                                                    )}
+                                                                </td>
+                                                                <td className="whitespace-nowrap px-3 py-2">
+                                                                    <Badge variant="outline">
+                                                                        Up to{" "}
+                                                                        {divisionLevelLabel(
+                                                                            ref.maxDivisionLevel
+                                                                        )}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {ref.isCertified ? (
+                                                                        <Badge variant="secondary">
+                                                                            Certified
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground">
+                                                                            —
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </CollapsibleContent>
+                            </Card>
+                        </Collapsible>
                     )}
 
                     {/* Matches grouped by division */}
@@ -515,6 +575,86 @@ export function ScheduleRefsClient({
                                     {saving ? "Saving…" : "Save Assignments"}
                                 </Button>
                             </div>
+
+                            {/* Schedule grid: time rows × court columns */}
+                            {scheduleGrid && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">
+                                            Ref Schedule Grid —{" "}
+                                            {currentDateLabel}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full border-collapse text-sm">
+                                                <thead>
+                                                    <tr className="bg-muted/50">
+                                                        <th className="whitespace-nowrap border px-3 py-2 text-left font-medium">
+                                                            Time
+                                                        </th>
+                                                        {scheduleGrid.courts.map(
+                                                            (court) => (
+                                                                <th
+                                                                    key={court}
+                                                                    className="whitespace-nowrap border px-3 py-2 text-center font-medium"
+                                                                >
+                                                                    Court{" "}
+                                                                    {court}
+                                                                </th>
+                                                            )
+                                                        )}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {scheduleGrid.times.map(
+                                                        (time) => (
+                                                            <tr
+                                                                key={time}
+                                                                className="even:bg-muted/20"
+                                                            >
+                                                                <td className="whitespace-nowrap border px-3 py-2 font-medium">
+                                                                    {formatTime(
+                                                                        time
+                                                                    )}
+                                                                </td>
+                                                                {scheduleGrid.courts.map(
+                                                                    (court) => {
+                                                                        const refName =
+                                                                            scheduleGrid.cellMap.get(
+                                                                                `${time}:${court}`
+                                                                            )
+                                                                        return (
+                                                                            <td
+                                                                                key={
+                                                                                    court
+                                                                                }
+                                                                                className="border px-3 py-2 text-center"
+                                                                            >
+                                                                                {refName ? (
+                                                                                    <span className="font-medium">
+                                                                                        {
+                                                                                            refName
+                                                                                        }
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-muted-foreground">
+                                                                                        —
+                                                                                    </span>
+                                                                                )}
+                                                                            </td>
+                                                                        )
+                                                                    }
+                                                                )}
+                                                            </tr>
+                                                        )
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     )}
                 </>

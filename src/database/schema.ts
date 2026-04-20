@@ -932,6 +932,12 @@ export const seasonRefs = pgTable(
         has_w9: boolean("has_w9")
             .$defaultFn(() => false)
             .notNull(),
+        passed_test: boolean("passed_test")
+            .$defaultFn(() => false)
+            .notNull(),
+        is_active: boolean("is_active")
+            .$defaultFn(() => true)
+            .notNull(),
         max_division_level: integer("max_division_level").notNull(),
         created_at: timestamp("created_at")
             .$defaultFn(() => new Date())

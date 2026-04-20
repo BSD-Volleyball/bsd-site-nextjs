@@ -13,7 +13,7 @@ import {
     userUnavailability,
     seasons
 } from "@/database/schema"
-import { eq, and, asc, inArray, or } from "drizzle-orm"
+import { eq, and, asc, inArray, or, gt } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { revalidatePath } from "next/cache"
 import {
@@ -255,7 +255,7 @@ export async function getMatchesAndRefsForDate(
             }
         })
 
-        // ── Fetch all season refs ───────────────────────────────
+        // ── Fetch all season refs (active only, with a valid division level) ──
         const refRows = await db
             .select({
                 seasonRefId: seasonRefs.id,
@@ -268,7 +268,13 @@ export async function getMatchesAndRefsForDate(
             })
             .from(seasonRefs)
             .innerJoin(users, eq(seasonRefs.user_id, users.id))
-            .where(eq(seasonRefs.season_id, seasonId))
+            .where(
+                and(
+                    eq(seasonRefs.season_id, seasonId),
+                    eq(seasonRefs.is_active, true),
+                    gt(seasonRefs.max_division_level, 0)
+                )
+            )
 
         if (refRows.length === 0) {
             return ok({
