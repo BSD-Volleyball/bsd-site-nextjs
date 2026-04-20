@@ -28,10 +28,10 @@ interface WeekMatchLine {
     time: string | null
     court: number | null
     matchLabel: string
-    winnerName: string
-    winnerGames: number
-    loserName: string
-    loserGames: number
+    winnerName: string | null
+    winnerGames: number | null
+    loserName: string | null
+    loserGames: number | null
     scoresDisplay: string
     refName: string | null
 }
@@ -409,20 +409,35 @@ export async function getSeasonScheduleData(
                         }
                     }
 
-                    if (setScores.length === 0) {
+                    const hasResult =
+                        setScores.length > 0 ||
+                        (match.homeScore !== null && match.awayScore !== null)
+                    if (setScores.length === 0 && hasResult) {
                         homeGames = match.homeScore || 0
                         awayGames = match.awayScore || 0
                     }
 
                     const homeWinsMatch = homeGames >= awayGames
-                    const winnerName = homeWinsMatch
-                        ? homeTeam.name
-                        : awayTeam.name
-                    const loserName = homeWinsMatch
-                        ? awayTeam.name
-                        : homeTeam.name
-                    const winnerGames = homeWinsMatch ? homeGames : awayGames
-                    const loserGames = homeWinsMatch ? awayGames : homeGames
+                    const winnerName = hasResult
+                        ? homeWinsMatch
+                            ? homeTeam.name
+                            : awayTeam.name
+                        : null
+                    const loserName = hasResult
+                        ? homeWinsMatch
+                            ? awayTeam.name
+                            : homeTeam.name
+                        : null
+                    const winnerGames = hasResult
+                        ? homeWinsMatch
+                            ? homeGames
+                            : awayGames
+                        : null
+                    const loserGames = hasResult
+                        ? homeWinsMatch
+                            ? awayGames
+                            : homeGames
+                        : null
 
                     const scoresDisplay = setScores
                         .map((set) => {

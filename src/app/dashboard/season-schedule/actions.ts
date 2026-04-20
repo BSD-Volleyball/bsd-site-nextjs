@@ -32,12 +32,12 @@ export interface WeekMatchLine {
     awayTeamLabel: string
     homeTeamId: number
     awayTeamId: number
-    winnerName: string
-    winnerTeamId: number
-    winnerGames: number
-    loserName: string
-    loserTeamId: number
-    loserGames: number
+    winnerName: string | null
+    winnerTeamId: number | null
+    winnerGames: number | null
+    loserName: string | null
+    loserTeamId: number | null
+    loserGames: number | null
     scoresDisplay: string
     refName: string | null
 }
@@ -432,7 +432,10 @@ export async function getCurrentSeasonScheduleData(
                         if (set.home > set.away) homeGames++
                         else if (set.away > set.home) awayGames++
                     }
-                    if (setScores.length === 0) {
+                    const hasResult =
+                        setScores.length > 0 ||
+                        (match.homeScore !== null && match.awayScore !== null)
+                    if (setScores.length === 0 && hasResult) {
                         homeGames = match.homeScore || 0
                         awayGames = match.awayScore || 0
                     }
@@ -448,14 +451,26 @@ export async function getCurrentSeasonScheduleData(
                     const awayTeamLabel = useTeamNumbers
                         ? `${awayTeam.number}`
                         : awayDisplayName
-                    const winnerName = homeWinsMatch
-                        ? homeDisplayName
-                        : awayDisplayName
-                    const loserName = homeWinsMatch
-                        ? awayDisplayName
-                        : homeDisplayName
-                    const winnerGames = homeWinsMatch ? homeGames : awayGames
-                    const loserGames = homeWinsMatch ? awayGames : homeGames
+                    const winnerName = hasResult
+                        ? homeWinsMatch
+                            ? homeDisplayName
+                            : awayDisplayName
+                        : null
+                    const loserName = hasResult
+                        ? homeWinsMatch
+                            ? awayDisplayName
+                            : homeDisplayName
+                        : null
+                    const winnerGames = hasResult
+                        ? homeWinsMatch
+                            ? homeGames
+                            : awayGames
+                        : null
+                    const loserGames = hasResult
+                        ? homeWinsMatch
+                            ? awayGames
+                            : homeGames
+                        : null
 
                     const scoresDisplay = setScores
                         .map((set) =>
@@ -475,14 +490,18 @@ export async function getCurrentSeasonScheduleData(
                         homeTeamId: match.homeTeamId,
                         awayTeamId: match.awayTeamId,
                         winnerName,
-                        winnerTeamId: homeWinsMatch
-                            ? match.homeTeamId
-                            : match.awayTeamId,
+                        winnerTeamId: hasResult
+                            ? homeWinsMatch
+                                ? match.homeTeamId
+                                : match.awayTeamId
+                            : null,
                         winnerGames,
                         loserName,
-                        loserTeamId: homeWinsMatch
-                            ? match.awayTeamId
-                            : match.homeTeamId,
+                        loserTeamId: hasResult
+                            ? homeWinsMatch
+                                ? match.awayTeamId
+                                : match.homeTeamId
+                            : null,
                         loserGames,
                         scoresDisplay,
                         refName: refByMatchId.get(match.id) ?? null

@@ -10,11 +10,11 @@ export interface ScheduleResultsMatch {
     awayTeamLabel?: string
     highlightedMatchTeam?: "home" | "away" | null
     highlightScheduleDetails?: boolean
-    winnerName: string
-    winnerGames: number
+    winnerName: string | null
+    winnerGames: number | null
     winnerHighlighted?: boolean
-    loserName: string
-    loserGames: number
+    loserName: string | null
+    loserGames: number | null
     loserHighlighted?: boolean
     scoresDisplay: string
     refName?: string | null
@@ -161,9 +161,11 @@ export function ScheduleResultsTable<TMatch extends ScheduleResultsMatch>({
                                         "font-semibold text-primary"
                                 )}
                             >
-                                {row.winnerName}
+                                {row.winnerName ?? "—"}
                             </td>
-                            <td className="px-3 py-2">{row.winnerGames}</td>
+                            <td className="px-3 py-2">
+                                {row.winnerGames ?? "—"}
+                            </td>
                             <td
                                 className={cn(
                                     "px-3 py-2",
@@ -171,9 +173,11 @@ export function ScheduleResultsTable<TMatch extends ScheduleResultsMatch>({
                                         "font-semibold text-primary"
                                 )}
                             >
-                                {row.loserName}
+                                {row.loserName ?? "—"}
                             </td>
-                            <td className="px-3 py-2">{row.loserGames}</td>
+                            <td className="px-3 py-2">
+                                {row.loserGames ?? "—"}
+                            </td>
                             <td className="whitespace-nowrap px-3 py-2">
                                 {row.scoresDisplay || "—"}
                             </td>
