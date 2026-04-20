@@ -18,6 +18,35 @@ import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { isAdminOrDirector, getCommissionerDivisionScope } from "@/lib/rbac"
+
+async function canAccessTeam(
+    userId: string,
+    teamId: number,
+    seasonId: number
+): Promise<boolean> {
+    if (await isAdminOrDirector(userId)) return true
+
+    const [teamRow] = await db
+        .select({
+            captain: teams.captain,
+            captain2: teams.captain2,
+            division: teams.division
+        })
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1)
+
+    if (!teamRow) return false
+    if (teamRow.captain === userId || teamRow.captain2 === userId) return true
+
+    const scope = await getCommissionerDivisionScope(userId, seasonId)
+    if (scope.type === "league_wide") return true
+    if (scope.type === "division_specific") {
+        return scope.divisionIds.includes(teamRow.division)
+    }
+    return false
+}
 
 export type RegularSubCandidate = {
     userId: string
@@ -78,6 +107,10 @@ export async function getRegularSubCandidates(
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return { status: false, message: "No active season." }
+
+    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+        return { status: false, message: "Not authorized." }
+    }
 
     // Get team's division info
     const [teamRow] = await db
@@ -449,6 +482,10 @@ export async function getPermanentSubCandidates(
     const config = await getSeasonConfig()
     if (!config.seasonId) return { status: false, message: "No active season." }
 
+    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+        return { status: false, message: "Not authorized." }
+    }
+
     // Get the player being replaced — their gender, draft position, and division
     const [playerRow] = await db
         .select({
@@ -610,13 +647,21 @@ export type SubContactDetails = {
 }
 
 export async function getSubContactDetails(
-    targetUserId: string
+    targetUserId: string,
+    teamId: number
 ): Promise<
     | { status: true; contact: SubContactDetails }
     | { status: false; error: string }
 > {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) return { status: false, error: "Not authenticated" }
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return { status: false, error: "No active season." }
+
+    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+        return { status: false, error: "Not authorized." }
+    }
 
     const [row] = await db
         .select({ email: users.email, phone: users.phone })
@@ -636,6 +681,12 @@ export async function logSubContactViewed(
 ): Promise<void> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) return
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return
+
+    if (!(await canAccessTeam(session.user.id, captainTeamId, config.seasonId)))
+        return
 
     await logAuditEntry({
         userId: session.user.id,

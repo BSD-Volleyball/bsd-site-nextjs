@@ -16,7 +16,10 @@ import {
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import {
+    isAdminOrDirectorBySession,
+    getCommissionerDivisionScope
+} from "@/lib/rbac"
 
 export type SeasonInfo = {
     id: number
@@ -107,6 +110,16 @@ export async function getTeamAvailabilityData(
     }
 
     const isAdmin = await isAdminOrDirectorBySession()
+    const commissionerScope = await getCommissionerDivisionScope(
+        session.user.id,
+        config.seasonId
+    )
+    const isLeagueWideCommissioner =
+        !isAdmin && commissionerScope.type === "league_wide"
+    const scopedDivisionIds =
+        commissionerScope.type === "division_specific"
+            ? commissionerScope.divisionIds
+            : null
 
     // Find teams for the current season with captain info
     const allTeamRows = await db
@@ -115,6 +128,7 @@ export async function getTeamAvailabilityData(
             name: teams.name,
             number: teams.number,
             divisionName: divisions.name,
+            division: teams.division,
             captain: teams.captain,
             captain2: teams.captain2
         })
@@ -126,12 +140,28 @@ export async function getTeamAvailabilityData(
     const toOption = ({
         captain,
         captain2,
+        division: _division,
         ...rest
     }: (typeof allTeamRows)[number]): TeamOption => rest
 
     let availableTeams: TeamOption[]
-    if (isAdmin) {
+    if (isAdmin || isLeagueWideCommissioner) {
         availableTeams = allTeamRows.map(toOption)
+    } else if (scopedDivisionIds) {
+        const seen = new Set<number>()
+        availableTeams = allTeamRows
+            .filter((t) => {
+                const include =
+                    t.captain === session.user.id ||
+                    t.captain2 === session.user.id ||
+                    scopedDivisionIds.includes(t.division)
+                if (include && !seen.has(t.id)) {
+                    seen.add(t.id)
+                    return true
+                }
+                return false
+            })
+            .map(toOption)
     } else {
         availableTeams = allTeamRows
             .filter(
@@ -145,18 +175,19 @@ export async function getTeamAvailabilityData(
     if (availableTeams.length === 0) {
         return {
             status: false,
-            message: "You are not a captain or coach of any team this season.",
+            message:
+                "You do not have access to any team availability this season.",
             isAdmin,
             allTeams: isAdmin ? allTeamRows.map(toOption) : undefined
         }
     }
 
-    // Determine which team to show
+    // Determine which team to show; admins and commissioners prefer their
+    // own captained team (if any) to avoid landing on an arbitrary team
     let selectedTeam: TeamOption | undefined
     if (teamId) {
         selectedTeam = availableTeams.find((t) => t.id === teamId)
-    } else if (isAdmin) {
-        // If the admin is also a captain, default to their own team
+    } else if (commissionerScope.type !== "denied" || isAdmin) {
         const captainRow = allTeamRows.find(
             (t) =>
                 t.captain === session.user.id || t.captain2 === session.user.id
@@ -172,7 +203,7 @@ export async function getTeamAvailabilityData(
     if (!selectedTeam) {
         return {
             status: false,
-            message: "Team not found or you do not have access.",
+            message: "Team not found or you do not have access to it.",
             isAdmin,
             allTeams: isAdmin ? allTeamRows.map(toOption) : undefined
         }

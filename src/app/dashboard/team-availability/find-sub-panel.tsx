@@ -112,7 +112,8 @@ export function FindSubPanel({
                 contactWarningTarget.name
             )
             const result = await getSubContactDetails(
-                contactWarningTarget.userId
+                contactWarningTarget.userId,
+                teamId
             )
             if (result.status) {
                 setContactDetails({
