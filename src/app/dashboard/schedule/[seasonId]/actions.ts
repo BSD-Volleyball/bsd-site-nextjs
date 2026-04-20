@@ -1,7 +1,14 @@
 "use server"
 
 import { db } from "@/database/db"
-import { divisions, matches, seasons, teams } from "@/database/schema"
+import {
+    divisions,
+    matches,
+    matchReferees,
+    seasons,
+    teams,
+    users
+} from "@/database/schema"
 import { and, eq, inArray } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -26,6 +33,7 @@ interface WeekMatchLine {
     loserName: string
     loserGames: number
     scoresDisplay: string
+    refName: string | null
 }
 
 interface WeekRow {
@@ -215,7 +223,7 @@ export async function getSeasonScheduleData(
         const divisionIds = [...new Set(teamRows.map((t) => t.divisionId))]
         const teamIds = teamRows.map((t) => t.id)
 
-        const [divisionRows, matchRows] = await Promise.all([
+        const [divisionRows, matchRows, refRows] = await Promise.all([
             db
                 .select({
                     id: divisions.id,
@@ -253,9 +261,20 @@ export async function getSeasonScheduleData(
                         inArray(matches.home_team, teamIds),
                         inArray(matches.away_team, teamIds)
                     )
-                )
+                ),
+            db
+                .select({
+                    matchId: matchReferees.match_id,
+                    refName: users.name
+                })
+                .from(matchReferees)
+                .innerJoin(users, eq(matchReferees.referee_id, users.id))
+                .where(eq(matchReferees.season_id, seasonId))
         ])
 
+        const refByMatchId = new Map(
+            refRows.map((row) => [row.matchId, row.refName])
+        )
         const teamById = new Map(teamRows.map((t) => [t.id, t]))
         const teamsByDivision = new Map<number, typeof teamRows>()
         for (const team of teamRows) {
@@ -426,7 +445,8 @@ export async function getSeasonScheduleData(
                         winnerGames,
                         loserName,
                         loserGames,
-                        scoresDisplay
+                        scoresDisplay,
+                        refName: refByMatchId.get(match.id) ?? null
                     })
                     weeksMap.set(week, existing)
                 }

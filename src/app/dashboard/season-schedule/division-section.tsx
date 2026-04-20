@@ -6,8 +6,8 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
+import { ScheduleResultsTable } from "@/components/schedule-results-table"
 import { cn } from "@/lib/utils"
-import { formatMatchTime, formatShortDate } from "@/lib/season-utils"
 import type { CurrentSeasonScheduleDivision } from "./actions"
 
 interface Props {
@@ -94,225 +94,33 @@ export function SeasonDivisionSection({
                                 division.
                             </div>
                         ) : (
-                            <div className="grid gap-4 xl:grid-cols-2">
-                                <div className="overflow-x-auto rounded-md border">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/40">
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Date
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Match
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Time
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Court
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Ref
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {division.weeks.map((week) => (
-                                                <tr
-                                                    key={`schedule-${week.week}`}
-                                                    className="border-b align-top last:border-0"
-                                                >
-                                                    <td className="whitespace-nowrap px-3 py-2">
-                                                        {week.date
-                                                            ? formatShortDate(
-                                                                  week.date
-                                                              )
-                                                            : "—"}
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`match-${m.id}`}
-                                                                        className={cn(
-                                                                            userTeamId !==
-                                                                                null &&
-                                                                                (m.homeTeamId ===
-                                                                                    userTeamId ||
-                                                                                    m.awayTeamId ===
-                                                                                        userTeamId) &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            m.matchLabel
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`time-${m.id}`}
-                                                                        className={cn(
-                                                                            "whitespace-nowrap",
-                                                                            userTeamId !==
-                                                                                null &&
-                                                                                (m.homeTeamId ===
-                                                                                    userTeamId ||
-                                                                                    m.awayTeamId ===
-                                                                                        userTeamId) &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {formatMatchTime(
-                                                                            m.time
-                                                                        ) ||
-                                                                            "—"}
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`court-${m.id}`}
-                                                                        className={cn(
-                                                                            userTeamId !==
-                                                                                null &&
-                                                                                (m.homeTeamId ===
-                                                                                    userTeamId ||
-                                                                                    m.awayTeamId ===
-                                                                                        userTeamId) &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {m.court ??
-                                                                            "—"}
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <div className="space-y-1">
-                                                            {week.matches.map(
-                                                                (m) => (
-                                                                    <div
-                                                                        key={`ref-${m.id}`}
-                                                                        className="whitespace-nowrap text-muted-foreground"
-                                                                    >
-                                                                        {m.refName ??
-                                                                            "—"}
-                                                                    </div>
-                                                                )
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div className="overflow-x-auto rounded-md border">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/40">
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Winner
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Games
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Loser
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Games
-                                                </th>
-                                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                                    Scores
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {division.weeks.flatMap(
-                                                (week, wi) =>
-                                                    week.matches.map(
-                                                        (m, mi) => {
-                                                            const isUserMatch =
-                                                                userTeamId !==
-                                                                    null &&
-                                                                (m.homeTeamId ===
-                                                                    userTeamId ||
-                                                                    m.awayTeamId ===
-                                                                        userTeamId)
-                                                            return (
-                                                                <tr
-                                                                    key={`results-${m.id}`}
-                                                                    className={cn(
-                                                                        "border-b last:border-0",
-                                                                        wi >
-                                                                            0 &&
-                                                                            mi ===
-                                                                                0 &&
-                                                                            "border-t-2 border-t-muted"
-                                                                    )}
-                                                                >
-                                                                    <td
-                                                                        className={cn(
-                                                                            "px-3 py-2",
-                                                                            isUserMatch &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            m.winnerName
-                                                                        }
-                                                                    </td>
-                                                                    <td className="px-3 py-2">
-                                                                        {
-                                                                            m.winnerGames
-                                                                        }
-                                                                    </td>
-                                                                    <td
-                                                                        className={cn(
-                                                                            "px-3 py-2",
-                                                                            isUserMatch &&
-                                                                                "font-semibold text-primary"
-                                                                        )}
-                                                                    >
-                                                                        {
-                                                                            m.loserName
-                                                                        }
-                                                                    </td>
-                                                                    <td className="px-3 py-2">
-                                                                        {
-                                                                            m.loserGames
-                                                                        }
-                                                                    </td>
-                                                                    <td className="whitespace-nowrap px-3 py-2">
-                                                                        {m.scoresDisplay ||
-                                                                            "—"}
-                                                                    </td>
-                                                                </tr>
-                                                            )
-                                                        }
-                                                    )
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                            <ScheduleResultsTable
+                                weeks={division.weeks.map((week) => ({
+                                    ...week,
+                                    matches: week.matches.map((match) => ({
+                                        ...match,
+                                        highlightedMatchTeam:
+                                            userTeamId === match.homeTeamId
+                                                ? "home"
+                                                : userTeamId ===
+                                                    match.awayTeamId
+                                                  ? "away"
+                                                  : null,
+                                        highlightScheduleDetails:
+                                            userTeamId !== null &&
+                                            (match.homeTeamId === userTeamId ||
+                                                match.awayTeamId ===
+                                                    userTeamId),
+                                        winnerHighlighted:
+                                            userTeamId !== null &&
+                                            match.winnerTeamId === userTeamId,
+                                        loserHighlighted:
+                                            userTeamId !== null &&
+                                            match.loserTeamId === userTeamId
+                                    }))
+                                }))}
+                                showRef
+                            />
                         )}
                     </div>
                 </CollapsibleContent>

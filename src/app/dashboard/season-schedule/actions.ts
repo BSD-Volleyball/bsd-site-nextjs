@@ -28,11 +28,15 @@ export interface WeekMatchLine {
     time: string | null
     court: number | null
     matchLabel: string
+    homeTeamLabel: string
+    awayTeamLabel: string
     homeTeamId: number
     awayTeamId: number
     winnerName: string
+    winnerTeamId: number
     winnerGames: number
     loserName: string
+    loserTeamId: number
     loserGames: number
     scoresDisplay: string
     refName: string | null
@@ -436,6 +440,14 @@ export async function getCurrentSeasonScheduleData(
                     const homeWinsMatch = homeGames >= awayGames
                     const homeDisplayName = displayName(homeTeam)
                     const awayDisplayName = displayName(awayTeam)
+                    const useTeamNumbers =
+                        homeTeam.number !== null && awayTeam.number !== null
+                    const homeTeamLabel = useTeamNumbers
+                        ? `${homeTeam.number}`
+                        : homeDisplayName
+                    const awayTeamLabel = useTeamNumbers
+                        ? `${awayTeam.number}`
+                        : awayDisplayName
                     const winnerName = homeWinsMatch
                         ? homeDisplayName
                         : awayDisplayName
@@ -457,15 +469,20 @@ export async function getCurrentSeasonScheduleData(
                         id: match.id,
                         time: match.time,
                         court: match.court,
-                        matchLabel:
-                            homeTeam.number !== null && awayTeam.number !== null
-                                ? `${homeTeam.number} vs ${awayTeam.number}`
-                                : `${homeDisplayName} vs ${awayDisplayName}`,
+                        matchLabel: `${homeTeamLabel} vs ${awayTeamLabel}`,
+                        homeTeamLabel,
+                        awayTeamLabel,
                         homeTeamId: match.homeTeamId,
                         awayTeamId: match.awayTeamId,
                         winnerName,
+                        winnerTeamId: homeWinsMatch
+                            ? match.homeTeamId
+                            : match.awayTeamId,
                         winnerGames,
                         loserName,
+                        loserTeamId: homeWinsMatch
+                            ? match.awayTeamId
+                            : match.homeTeamId,
                         loserGames,
                         scoresDisplay,
                         refName: refByMatchId.get(match.id) ?? null
