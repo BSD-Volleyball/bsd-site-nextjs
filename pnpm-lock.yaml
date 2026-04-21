@@ -213,9 +213,6 @@ importers:
       tailwindcss:
         specifier: ^4.2.4
         version: 4.2.4
-      tailwindcss-safe-area:
-        specifier: ^0.6.0
-        version: 0.6.0(tailwindcss@4.2.4)
       turbo:
         specifier: ^2.9.6
         version: 2.9.6
@@ -4448,12 +4445,6 @@ packages:
 
   tailwind-merge@3.5.0:
     resolution: {integrity: sha512-I8K9wewnVDkL1NTGoqWmVEIlUcB9gFriAEkXkfCjX5ib8ezGxtR3xD7iZIxrfArjEsH7F1CHD4RFUtxefdqV/A==}
-
-  tailwindcss-safe-area@0.6.0:
-    resolution: {integrity: sha512-5PM3CKquzmaa6mow64zWJ0438/yGSqdPfjaXtwNDb31LezNWqFoGPSbvrW12T8iB4EBjeWot+qAA9nbUqqf3sw==}
-    engines: {node: '>=16'}
-    peerDependencies:
-      tailwindcss: ^2.0.0 || >=3.0.0
 
   tailwindcss@4.2.4:
     resolution: {integrity: sha512-HhKppgO81FQof5m6TEnuBWCZGgfRAWbaeOaGT00KOy/Pf/j6oUihdvBpA7ltCeAvZpFhW3j0PTclkxsd4IXYDA==}
@@ -9228,10 +9219,6 @@ snapshots:
   tabbable@6.4.0: {}
 
   tailwind-merge@3.5.0: {}
-
-  tailwindcss-safe-area@0.6.0(tailwindcss@4.2.4):
-    dependencies:
-      tailwindcss: 4.2.4
 
   tailwindcss@4.2.4: {}
 
