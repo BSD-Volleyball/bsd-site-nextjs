@@ -691,7 +691,7 @@ export async function getDraftSheetData(
                 const genderSplit = indDiv?.genderSplit ?? ""
                 const parts = genderSplit.split("-")
                 const nonMaleCount =
-                    parts.length >= 2 ? parseInt(parts[1]) || 0 : 0
+                    parts.length >= 2 ? parseInt(parts[1], 10) || 0 : 0
                 return {
                     divisionId: divId,
                     divisionName: div.divisionName,

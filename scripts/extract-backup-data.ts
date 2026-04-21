@@ -123,8 +123,8 @@ async function extractAndMigrateData() {
 
             // Expected format: id, season, player, age, captain, pair, pair_pick, pair_reason, dates_missing, ...
             if (parts.length >= 9) {
-                const id = parseInt(parts[0])
-                const season = parseInt(parts[1])
+                const id = parseInt(parts[0], 10)
+                const season = parseInt(parts[1], 10)
                 const datesMissing = parts[8]
 
                 if (

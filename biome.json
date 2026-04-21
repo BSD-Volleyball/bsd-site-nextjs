@@ -1,5 +1,5 @@
 {
-    "$schema": "https://biomejs.dev/schemas/2.0.0/schema.json",
+    "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
     "vcs": {
         "enabled": true,
         "clientKind": "git",
@@ -8,10 +8,10 @@
     "files": {
         "includes": [
             "**",
-            "!src/components/ui/**",
-            "!migrations/**",
+            "!src/components/ui",
+            "!migrations",
             "!**/*.css",
-            "!public/**"
+            "!public"
         ]
     },
     "formatter": {
@@ -34,7 +34,8 @@
                 "noUnusedImports": {
                     "fix": "safe",
                     "level": "error"
-                }
+                },
+                "useUniqueElementIds": "off"
             },
             "suspicious": {
                 "noArrayIndexKey": "off",
@@ -63,8 +64,7 @@
                     "options": {
                         "functions": ["cn"]
                     }
-                },
-                "useUniqueElementIds": "off"
+                }
             }
         }
     },

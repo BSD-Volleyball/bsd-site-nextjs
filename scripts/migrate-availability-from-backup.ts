@@ -228,7 +228,7 @@ async function main() {
 
         for (const line of lines) {
             const fields = line.split("\t")
-            const signupId = parseInt(fields[0])
+            const signupId = parseInt(fields[0], 10)
             const datesMissing = fields[datesMissingIdx]
 
             if (

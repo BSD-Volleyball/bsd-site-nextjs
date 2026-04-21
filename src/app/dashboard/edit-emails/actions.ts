@@ -150,7 +150,7 @@ export async function updateEmailTemplate(
             action: "update",
             entityType: "email_template",
             entityId: id,
-            summary: `Updated email template \"${name.trim()}\" (id ${id})`
+            summary: `Updated email template "${name.trim()}" (id ${id})`
         })
 
         return {

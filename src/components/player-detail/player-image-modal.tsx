@@ -37,7 +37,7 @@ export function PlayerImageModal({
                 <button
                     type="button"
                     onClick={onClose}
-                    className="-top-3 -right-3 absolute rounded-full bg-white p-1 text-black hover:bg-gray-200"
+                    className="absolute -top-3 -right-3 rounded-full bg-white p-1 text-black hover:bg-gray-200"
                 >
                     <RiCloseLine className="h-6 w-6" />
                 </button>

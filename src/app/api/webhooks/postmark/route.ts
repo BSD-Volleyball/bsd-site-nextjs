@@ -319,14 +319,14 @@ async function detectExistingThread(
             console.log(
                 `[postmark-webhook] Thread detected via X-BSD-Ticket-ID: email-${emailMatch[1]}`
             )
-            return { type: "email", id: parseInt(emailMatch[1]) }
+            return { type: "email", id: parseInt(emailMatch[1], 10) }
         }
         const concernMatch = ticketId.match(/^concern-(\d+)$/)
         if (concernMatch) {
             console.log(
                 `[postmark-webhook] Thread detected via X-BSD-Ticket-ID: concern-${concernMatch[1]}`
             )
-            return { type: "concern", id: parseInt(concernMatch[1]) }
+            return { type: "concern", id: parseInt(concernMatch[1], 10) }
         }
     }
 
@@ -419,7 +419,7 @@ async function detectExistingThread(
     if (subject) {
         const concernSubjectMatch = subject.match(/concern\s*#\s*(\d+)/i)
         if (concernSubjectMatch) {
-            const id = parseInt(concernSubjectMatch[1])
+            const id = parseInt(concernSubjectMatch[1], 10)
             const [ticket] = await db
                 .select({ id: concerns.id })
                 .from(concerns)
@@ -435,7 +435,7 @@ async function detectExistingThread(
 
         const emailSubjectMatch = subject.match(/\bemail\s*#\s*(\d+)\b/i)
         if (emailSubjectMatch) {
-            const id = parseInt(emailSubjectMatch[1])
+            const id = parseInt(emailSubjectMatch[1], 10)
             const [ticket] = await db
                 .select({ id: inboundEmails.id })
                 .from(inboundEmails)

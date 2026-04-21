@@ -10,9 +10,12 @@ async function main() {
         .limit(1)
 
     console.log("concern.source:", JSON.stringify(concern.source))
-    console.log("concern.person_involved:", JSON.stringify(concern.person_involved))
+    console.log(
+        "concern.person_involved:",
+        JSON.stringify(concern.person_involved)
+    )
     console.log("source === 'email':", concern.source === "email")
-    
+
     const baseSubject =
         concern.source === "email" && concern.person_involved
             ? concern.person_involved.replace(/^(Re:\s*)+/i, "").trim()
@@ -20,4 +23,7 @@ async function main() {
     console.log("computed subject:", `Re: ${baseSubject}`)
     process.exit(0)
 }
-main().catch(e => { console.error(e); process.exit(1) })
+main().catch((e) => {
+    console.error(e)
+    process.exit(1)
+})

@@ -70,7 +70,7 @@ export async function getMatchDatesForSeason(): Promise<{
         const dates: MatchDateOption[] = []
         for (const [date, isPlayoff] of dateMap) {
             const [year, month, day] = date.split("-")
-            const label = `${parseInt(month)}/${parseInt(day)}/${year}${isPlayoff ? " (Playoffs)" : ""}`
+            const label = `${parseInt(month, 10)}/${parseInt(day, 10)}/${year}${isPlayoff ? " (Playoffs)" : ""}`
             dates.push({ date, label, isPlayoff })
         }
 

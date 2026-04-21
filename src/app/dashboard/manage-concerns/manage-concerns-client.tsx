@@ -70,12 +70,12 @@ function MessageBody({ text }: { text: string }) {
                     <button
                         type="button"
                         onClick={() => setShowQuoted((v) => !v)}
-                        className="mt-1 text-xs text-muted-foreground underline hover:text-foreground"
+                        className="mt-1 text-muted-foreground text-xs underline hover:text-foreground"
                     >
                         {showQuoted ? "Hide Quoted Text" : "Show Quoted Text"}
                     </button>
                     {showQuoted && (
-                        <p className="mt-1 whitespace-pre-wrap border-l-2 border-muted-foreground/30 pl-2 text-muted-foreground text-xs">
+                        <p className="mt-1 whitespace-pre-wrap border-muted-foreground/30 border-l-2 pl-2 text-muted-foreground text-xs">
                             {quoted}
                         </p>
                     )}

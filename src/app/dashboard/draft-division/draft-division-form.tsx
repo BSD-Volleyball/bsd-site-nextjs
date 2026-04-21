@@ -105,7 +105,7 @@ export function DraftDivisionForm({
     )
 
     const genderSplit = divisionId
-        ? (divisionSplitsMap.get(parseInt(divisionId)) ?? null)
+        ? (divisionSplitsMap.get(parseInt(divisionId, 10)) ?? null)
         : null
 
     const handlePicksChange = useCallback(
@@ -126,7 +126,7 @@ export function DraftDivisionForm({
         picksRef.current = {}
 
         if (value) {
-            await loadDraftInitData(currentSeasonId, parseInt(value))
+            await loadDraftInitData(currentSeasonId, parseInt(value, 10))
         }
     }
 
@@ -310,7 +310,7 @@ export function DraftDivisionForm({
                                 </h3>
                                 <DraftRoomProvider
                                     seasonId={currentSeasonId}
-                                    divisionId={parseInt(divisionId)}
+                                    divisionId={parseInt(divisionId, 10)}
                                     initialPicks={initialPicks}
                                 >
                                     <DraftBoardWithBroadcast

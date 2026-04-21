@@ -228,7 +228,7 @@ export function DraftWatchlist({
                     >
                         <button
                             type="button"
-                            className="-top-2 -right-2 absolute rounded-full bg-background p-1 shadow-lg hover:bg-accent"
+                            className="absolute -top-2 -right-2 rounded-full bg-background p-1 shadow-lg hover:bg-accent"
                             onClick={() => setEnlargedUser(null)}
                         >
                             <RiCloseLine className="h-5 w-5" />

@@ -269,7 +269,7 @@ export function CommissionersForm({
                 <Select
                     value={selectedSeasonId?.toString() ?? ""}
                     onValueChange={(value) =>
-                        setSelectedSeasonId(Number.parseInt(value))
+                        setSelectedSeasonId(Number.parseInt(value, 10))
                     }
                 >
                     <SelectTrigger id="season">

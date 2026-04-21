@@ -261,7 +261,7 @@ export function SelectCaptainsForm({
     )
 
     useEffect(() => {
-        const parsedId = parseInt(divisionId)
+        const parsedId = parseInt(divisionId, 10)
         const existing =
             divisionId && !Number.isNaN(parsedId)
                 ? (existingTeamsByDivision?.[parsedId] ?? [])
@@ -597,7 +597,10 @@ export function SelectCaptainsForm({
 
         setIsLoading(true)
 
-        const result = await createTeams(parseInt(divisionId), teamsToCreate)
+        const result = await createTeams(
+            parseInt(divisionId, 10),
+            teamsToCreate
+        )
 
         if (result.status) {
             setSuccess(result.message)

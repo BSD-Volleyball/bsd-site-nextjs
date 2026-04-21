@@ -301,7 +301,9 @@ export async function getCurrentSeasonScheduleData(
 
         // Build week number → date fallback from season_events (week 1 = first event, etc.)
         const weekToDate = new Map<number, string>()
-        rsEventRows.forEach((e, idx) => weekToDate.set(idx + 1, e.eventDate))
+        rsEventRows.forEach((e, idx) => {
+            weekToDate.set(idx + 1, e.eventDate)
+        })
 
         const refByMatchId = new Map(refRows.map((r) => [r.matchId, r.refName]))
 

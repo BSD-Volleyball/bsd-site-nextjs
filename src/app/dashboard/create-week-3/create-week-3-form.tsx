@@ -2176,7 +2176,7 @@ export function CreateWeek3Form({
         for (const division of divisions) {
             const players = nextMap.get(division.id) || []
             const target = players.find((player) => player.entryId === entryId)
-            if (!target || !target.isDuplicateEntry) {
+            if (!target?.isDuplicateEntry) {
                 continue
             }
 

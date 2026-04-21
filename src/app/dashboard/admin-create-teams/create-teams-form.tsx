@@ -269,7 +269,7 @@ export function CreateTeamsForm({
             return
         }
 
-        const numTeams = parseInt(teamCount)
+        const numTeams = parseInt(teamCount, 10)
         const teamsToCreate = captains.slice(0, numTeams).map((c) => ({
             captainId: c.captainId || "",
             teamName: c.teamName
@@ -290,8 +290,8 @@ export function CreateTeamsForm({
         setIsLoading(true)
 
         const result = await createTeams(
-            parseInt(seasonId),
-            parseInt(divisionId),
+            parseInt(seasonId, 10),
+            parseInt(divisionId, 10),
             teamsToCreate
         )
 
@@ -310,7 +310,7 @@ export function CreateTeamsForm({
         setIsLoading(false)
     }
 
-    const numTeams = parseInt(teamCount)
+    const numTeams = parseInt(teamCount, 10)
 
     return (
         <form onSubmit={handleSubmit}>

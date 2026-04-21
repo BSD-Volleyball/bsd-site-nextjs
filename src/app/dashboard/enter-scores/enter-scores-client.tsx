@@ -620,7 +620,7 @@ export function EnterScoresClient({
                                                         </button>
                                                         <button
                                                             type="button"
-                                                            className="-top-2 -right-2 absolute flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
+                                                            className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs opacity-0 transition-opacity group-hover:opacity-100"
                                                             onClick={() =>
                                                                 void handleDeleteScoreSheet(
                                                                     sheet.id

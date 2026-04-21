@@ -428,7 +428,7 @@ function SidebarLogo() {
                     height={30}
                     className="transition-transform duration-300 ease-out group-data-[collapsible=icon]:scale-110"
                 />
-                <span className="group-data-[collapsible=icon]:-ml-2 font-bold text-sm leading-tight transition-[margin,opacity,transform,width] duration-300 ease-out group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0">
+                <span className="font-bold text-sm leading-tight transition-[margin,opacity,transform,width] duration-300 ease-out group-data-[collapsible=icon]:-ml-2 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:scale-95 group-data-[collapsible=icon]:opacity-0">
                     Bump Set Drink
                     <br />
                     Volleyball

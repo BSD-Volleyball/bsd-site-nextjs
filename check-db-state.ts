@@ -24,9 +24,9 @@ async function checkDatabaseState() {
             ORDER BY ordinal_position
         `)
         console.log("Seasons table columns:")
-        seasonsColumns.rows.forEach((row) =>
+        seasonsColumns.rows.forEach((row) => {
             console.log("  -", row.column_name)
-        )
+        })
 
         // Check if season_events exist and count
         const eventsCount = await client.query(

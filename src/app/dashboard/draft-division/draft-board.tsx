@@ -353,7 +353,7 @@ export function DraftBoard({
     )
 
     const genderSplit: GenderSplit | null = divisionId
-        ? (divisionSplitsMap.get(parseInt(divisionId)) ?? null)
+        ? (divisionSplitsMap.get(parseInt(divisionId, 10)) ?? null)
         : null
 
     const maxMales = !genderSplit
@@ -405,7 +405,7 @@ export function DraftBoard({
         }
         for (const [key, userId] of Object.entries(picksObj)) {
             if (!userId) continue
-            const teamId = parseInt(key.split("-")[1])
+            const teamId = parseInt(key.split("-")[1], 10)
             const user = usersMap.get(userId)
             if (user && counts[teamId]) {
                 if (user.male === true) {
@@ -425,7 +425,7 @@ export function DraftBoard({
         }
         for (const [key, userId] of Object.entries(picksObj)) {
             if (!userId) continue
-            const teamId = parseInt(key.split("-")[1])
+            const teamId = parseInt(key.split("-")[1], 10)
             const user = usersMap.get(userId)
             if (user && grouped[teamId]) {
                 grouped[teamId].push(user)
@@ -762,7 +762,7 @@ export function DraftBoard({
                     >
                         <button
                             type="button"
-                            className="-top-2 -right-2 absolute rounded-full bg-background p-1 shadow-lg hover:bg-accent"
+                            className="absolute -top-2 -right-2 rounded-full bg-background p-1 shadow-lg hover:bg-accent"
                             onClick={() => setEnlargedPlayer(null)}
                         >
                             <RiCloseLine className="h-5 w-5" />
