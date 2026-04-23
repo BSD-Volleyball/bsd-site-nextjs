@@ -8,7 +8,10 @@ import { db } from "@/database/db"
 import { signups, users } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/lib/rbac"
-import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
+import {
+    createPlayerPictureUploadPresignedUrl,
+    PLAYER_PICTURE_MAX_BYTES
+} from "@/lib/r2"
 import {
     getPlayerPictureDbPath,
     getExpectedPlayerPictureFilename,
@@ -110,7 +113,10 @@ export async function getPlayersNeedingPictures(): Promise<{
     }
 }
 
-export async function createMissingPictureUpload(userId: string): Promise<{
+export async function createMissingPictureUpload(
+    userId: string,
+    contentLength: number
+): Promise<{
     status: boolean
     message?: string
     uploadUrl?: string
@@ -119,6 +125,17 @@ export async function createMissingPictureUpload(userId: string): Promise<{
     const hasAccess = await checkAddPicturesAccess()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
+    }
+
+    if (
+        !Number.isInteger(contentLength) ||
+        contentLength <= 0 ||
+        contentLength > PLAYER_PICTURE_MAX_BYTES
+    ) {
+        return {
+            status: false,
+            message: `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+        }
     }
 
     try {
@@ -183,7 +200,8 @@ export async function createMissingPictureUpload(userId: string): Promise<{
 
         const uploadUrl = await createPlayerPictureUploadPresignedUrl({
             key: getPlayerPictureObjectKey(pictureFilename),
-            contentType: "image/jpeg"
+            contentType: "image/jpeg",
+            contentLength
         })
 
         return {

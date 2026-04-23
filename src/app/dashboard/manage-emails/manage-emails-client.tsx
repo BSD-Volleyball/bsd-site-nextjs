@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useTransition } from "react"
+import DOMPurify from "isomorphic-dompurify"
 import {
     addInboundEmailComment,
     assignInboundEmail,
@@ -338,7 +339,27 @@ function EmailCard({
                                 <div
                                     className="prose prose-sm dark:prose-invert mt-1 max-w-none"
                                     dangerouslySetInnerHTML={{
-                                        __html: email.body_html
+                                        __html: DOMPurify.sanitize(
+                                            email.body_html,
+                                            {
+                                                FORBID_TAGS: [
+                                                    "script",
+                                                    "style",
+                                                    "iframe",
+                                                    "object",
+                                                    "embed",
+                                                    "form"
+                                                ],
+                                                FORBID_ATTR: [
+                                                    "onerror",
+                                                    "onload",
+                                                    "onclick",
+                                                    "onmouseover",
+                                                    "onfocus",
+                                                    "formaction"
+                                                ]
+                                            }
+                                        )
                                     }}
                                 />
                             ) : (

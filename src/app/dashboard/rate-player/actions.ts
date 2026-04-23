@@ -15,7 +15,11 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUserId, hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import {
+    getSessionUserId,
+    hasCaptainPagesAccessBySession,
+    hasPermissionBySession
+} from "@/lib/rbac"
 
 export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3"
 
@@ -209,8 +213,8 @@ async function getSaveContext(): Promise<
           message: string
       }
 > {
-    const hasAccess = await hasCaptainPagesAccessBySession()
-    if (!hasAccess) {
+    const canRate = await hasPermissionBySession("players:rate")
+    if (!canRate) {
         return { status: false, message: "Unauthorized" }
     }
 

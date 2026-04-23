@@ -106,7 +106,10 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                 return
             }
 
-            const uploadStart = await createMissingPictureUpload(player.userId)
+            const uploadStart = await createMissingPictureUpload(
+                player.userId,
+                processedImage.blob.size
+            )
             if (
                 !uploadStart.status ||
                 !uploadStart.uploadUrl ||
@@ -126,7 +129,8 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
             const uploadResponse = await fetch(uploadStart.uploadUrl, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "image/jpeg"
+                    "Content-Type": "image/jpeg",
+                    "Content-Length": String(processedImage.blob.size)
                 },
                 body: processedImage.blob
             })

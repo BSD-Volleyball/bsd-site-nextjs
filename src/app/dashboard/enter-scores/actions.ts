@@ -14,7 +14,11 @@ import {
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/lib/rbac"
-import { createPlayerPictureUploadPresignedUrl, deleteR2Object } from "@/lib/r2"
+import {
+    createPlayerPictureUploadPresignedUrl,
+    deleteR2Object,
+    PLAYER_PICTURE_MAX_BYTES
+} from "@/lib/r2"
 import { logAuditEntry } from "@/lib/audit-log"
 
 async function checkEnterScoresAccess(): Promise<{
@@ -421,7 +425,8 @@ const SCORE_SHEET_PREFIX = "scoresheets"
 
 export async function createScoreSheetUpload(
     divisionId: number,
-    date: string
+    date: string,
+    contentLength: number
 ): Promise<{
     status: boolean
     message?: string
@@ -433,13 +438,25 @@ export async function createScoreSheetUpload(
         return { status: false, message: "Unauthorized" }
     }
 
+    if (
+        !Number.isInteger(contentLength) ||
+        contentLength <= 0 ||
+        contentLength > PLAYER_PICTURE_MAX_BYTES
+    ) {
+        return {
+            status: false,
+            message: `Upload must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+        }
+    }
+
     try {
         const timestamp = Date.now()
         const objectKey = `${SCORE_SHEET_PREFIX}/${seasonId}/${date}/div${divisionId}_${timestamp}.jpg`
 
         const uploadUrl = await createPlayerPictureUploadPresignedUrl({
             key: objectKey,
-            contentType: "image/jpeg"
+            contentType: "image/jpeg",
+            contentLength
         })
 
         return { status: true, uploadUrl, objectKey }

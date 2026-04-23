@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { timingSafeEqual } from "node:crypto"
 import { db } from "@/database/db"
 import {
     concerns,
@@ -800,14 +801,26 @@ async function handleSpamComplaint(payload: PostmarkSpamComplaintPayload) {
 function verifyWebhookAuth(request: NextRequest): boolean {
     const user = process.env.POSTMARK_WEBHOOK_USER
     const password = process.env.POSTMARK_WEBHOOK_PASSWORD
-    if (!user && !password) return true // No credentials configured = skip verification
+    if (!user || !password) {
+        console.error(
+            "[postmark-webhook] POSTMARK_WEBHOOK_USER/PASSWORD not configured; rejecting request"
+        )
+        return false
+    }
 
     const authHeader = request.headers.get("authorization")
     if (!authHeader?.startsWith("Basic ")) return false
 
     const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8")
-    const [providedUser, providedPassword] = decoded.split(":")
-    return providedUser === user && providedPassword === password
+    const sepIdx = decoded.indexOf(":")
+    if (sepIdx < 0) return false
+    const providedUser = decoded.slice(0, sepIdx)
+    const providedPassword = decoded.slice(sepIdx + 1)
+
+    const expected = Buffer.from(`${user}:${password}`, "utf-8")
+    const provided = Buffer.from(`${providedUser}:${providedPassword}`, "utf-8")
+    if (expected.length !== provided.length) return false
+    return timingSafeEqual(expected, provided)
 }
 
 // ---------------------------------------------------------------------------

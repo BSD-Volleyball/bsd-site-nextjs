@@ -21,7 +21,10 @@ import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
-import { createPlayerPictureUploadPresignedUrl } from "@/lib/r2"
+import {
+    createPlayerPictureUploadPresignedUrl,
+    PLAYER_PICTURE_MAX_BYTES
+} from "@/lib/r2"
 import {
     getPlayerPictureDbPath,
     getExpectedPlayerPictureFilename,
@@ -116,7 +119,10 @@ export async function getUserDetails(
     }
 }
 
-export async function createPlayerPictureUpload(userId: string): Promise<{
+export async function createPlayerPictureUpload(
+    userId: string,
+    contentLength: number
+): Promise<{
     status: boolean
     message?: string
     uploadUrl?: string
@@ -125,6 +131,17 @@ export async function createPlayerPictureUpload(userId: string): Promise<{
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
+    }
+
+    if (
+        !Number.isInteger(contentLength) ||
+        contentLength <= 0 ||
+        contentLength > PLAYER_PICTURE_MAX_BYTES
+    ) {
+        return {
+            status: false,
+            message: `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+        }
     }
 
     try {
@@ -161,7 +178,8 @@ export async function createPlayerPictureUpload(userId: string): Promise<{
 
         const uploadUrl = await createPlayerPictureUploadPresignedUrl({
             key: getPlayerPictureObjectKey(pictureFilename),
-            contentType: "image/jpeg"
+            contentType: "image/jpeg",
+            contentLength
         })
 
         return {

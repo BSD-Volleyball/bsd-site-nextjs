@@ -748,6 +748,16 @@ export async function getPlayerTeamAssignment(
     seasonId: number
 ): Promise<PlayerTeamAssignment | null> {
     try {
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session) return null
+        if (session.user.id !== userId) {
+            const allowed =
+                (await isAdminOrDirectorBySession()) ||
+                (await isCommissionerBySession()) ||
+                (await hasCaptainPagesAccessBySession())
+            if (!allowed) return null
+        }
+
         const [draftRecord] = await db
             .select({
                 teamId: teams.id,
@@ -887,6 +897,16 @@ export async function getNextMatch(
     seasonId: number
 ): Promise<NextMatch | null> {
     try {
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session) return null
+        if (session.user.id !== userId) {
+            const allowed =
+                (await isAdminOrDirectorBySession()) ||
+                (await isCommissionerBySession()) ||
+                (await hasCaptainPagesAccessBySession())
+            if (!allowed) return null
+        }
+
         const [draftRecord] = await db
             .select({ teamId: teams.id, divisionId: teams.division })
             .from(drafts)

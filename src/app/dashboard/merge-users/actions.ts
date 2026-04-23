@@ -7,12 +7,32 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
+    deletedSignups,
     teams,
     drafts,
     waitlist,
     discounts,
     evaluations,
-    commissioners
+    commissioners,
+    userRoles,
+    playerRatings,
+    auditLog,
+    movingDay,
+    draftHomework,
+    draftCaptRounds,
+    draftPairDiffs,
+    scoreSheets,
+    emailBroadcasts,
+    emailSuppressions,
+    concerns,
+    concernComments,
+    concernReplies,
+    inboundEmails,
+    inboundEmailComments,
+    inboundEmailReplies,
+    week1Rosters,
+    week2Rosters,
+    week3Rosters
 } from "@/database/schema"
 import { eq, lt, gt, and, ne } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -159,72 +179,213 @@ export async function mergeUsers(
             return { status: false, message: "New user not found." }
         }
 
-        // Copy old_id and picture to new user
-        await db
-            .update(users)
-            .set({
-                old_id: oldUser.old_id,
-                picture: oldUser.picture,
-                updatedAt: new Date()
-            })
-            .where(eq(users.id, newUserId))
+        // Rekey every table that holds a FK to users.id, then delete the
+        // old user. Wrapped in a transaction so a failure anywhere rolls back.
+        // Tables with ON DELETE CASCADE (sessions, accounts, user_unavailability,
+        // user_roles.user_id, season_refs, match_referees) are left to be
+        // cleaned up automatically by the final delete. Non-cascading columns
+        // must be repointed explicitly here or the final delete will raise a
+        // FK violation.
+        await db.transaction(async (tx) => {
+            // Copy old_id and picture to new user
+            await tx
+                .update(users)
+                .set({
+                    old_id: oldUser.old_id,
+                    picture: oldUser.picture,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, newUserId))
 
-        // Update signups:player
-        await db
-            .update(signups)
-            .set({ player: newUserId })
-            .where(eq(signups.player, oldUserId))
+            // signups
+            await tx
+                .update(signups)
+                .set({ player: newUserId })
+                .where(eq(signups.player, oldUserId))
+            await tx
+                .update(signups)
+                .set({ pair_pick: newUserId })
+                .where(eq(signups.pair_pick, oldUserId))
 
-        // Update signups:pair_pick
-        await db
-            .update(signups)
-            .set({ pair_pick: newUserId })
-            .where(eq(signups.pair_pick, oldUserId))
+            // deleted_signups
+            await tx
+                .update(deletedSignups)
+                .set({ player: newUserId })
+                .where(eq(deletedSignups.player, oldUserId))
+            await tx
+                .update(deletedSignups)
+                .set({ deleted_by: newUserId })
+                .where(eq(deletedSignups.deleted_by, oldUserId))
 
-        // Update teams:captain
-        await db
-            .update(teams)
-            .set({ captain: newUserId })
-            .where(eq(teams.captain, oldUserId))
+            // teams
+            await tx
+                .update(teams)
+                .set({ captain: newUserId })
+                .where(eq(teams.captain, oldUserId))
+            await tx
+                .update(teams)
+                .set({ captain2: newUserId })
+                .where(eq(teams.captain2, oldUserId))
 
-        // Update teams:captain2
-        await db
-            .update(teams)
-            .set({ captain2: newUserId })
-            .where(eq(teams.captain2, oldUserId))
+            // drafts / waitlist / discounts / evaluations / commissioners
+            await tx
+                .update(drafts)
+                .set({ user: newUserId })
+                .where(eq(drafts.user, oldUserId))
+            await tx
+                .update(waitlist)
+                .set({ user: newUserId })
+                .where(eq(waitlist.user, oldUserId))
+            await tx
+                .update(discounts)
+                .set({ user: newUserId })
+                .where(eq(discounts.user, oldUserId))
+            await tx
+                .update(evaluations)
+                .set({ player: newUserId })
+                .where(eq(evaluations.player, oldUserId))
+            await tx
+                .update(commissioners)
+                .set({ commissioner: newUserId })
+                .where(eq(commissioners.commissioner, oldUserId))
 
-        // Update drafts:user
-        await db
-            .update(drafts)
-            .set({ user: newUserId })
-            .where(eq(drafts.user, oldUserId))
+            // userRoles: user_id CASCADEs on delete, but granted_by does not.
+            await tx
+                .update(userRoles)
+                .set({ user_id: newUserId })
+                .where(eq(userRoles.user_id, oldUserId))
+            await tx
+                .update(userRoles)
+                .set({ granted_by: newUserId })
+                .where(eq(userRoles.granted_by, oldUserId))
 
-        // Update waitlist:user
-        await db
-            .update(waitlist)
-            .set({ user: newUserId })
-            .where(eq(waitlist.user, oldUserId))
+            // player_ratings
+            await tx
+                .update(playerRatings)
+                .set({ player: newUserId })
+                .where(eq(playerRatings.player, oldUserId))
+            await tx
+                .update(playerRatings)
+                .set({ evaluator: newUserId })
+                .where(eq(playerRatings.evaluator, oldUserId))
 
-        // Update discounts:user
-        await db
-            .update(discounts)
-            .set({ user: newUserId })
-            .where(eq(discounts.user, oldUserId))
+            // audit_log
+            await tx
+                .update(auditLog)
+                .set({ user: newUserId })
+                .where(eq(auditLog.user, oldUserId))
 
-        // Update evaluations:player
-        await db
-            .update(evaluations)
-            .set({ player: newUserId })
-            .where(eq(evaluations.player, oldUserId))
+            // moving_day
+            await tx
+                .update(movingDay)
+                .set({ submitted_by: newUserId })
+                .where(eq(movingDay.submitted_by, oldUserId))
+            await tx
+                .update(movingDay)
+                .set({ player: newUserId })
+                .where(eq(movingDay.player, oldUserId))
 
-        // Update commissioners:commissioner
-        await db
-            .update(commissioners)
-            .set({ commissioner: newUserId })
-            .where(eq(commissioners.commissioner, oldUserId))
+            // draft_homework
+            await tx
+                .update(draftHomework)
+                .set({ captain: newUserId })
+                .where(eq(draftHomework.captain, oldUserId))
+            await tx
+                .update(draftHomework)
+                .set({ player: newUserId })
+                .where(eq(draftHomework.player, oldUserId))
 
-        // Delete old user record
-        await db.delete(users).where(eq(users.id, oldUserId))
+            // draft_capt_rounds
+            await tx
+                .update(draftCaptRounds)
+                .set({ saved_by: newUserId })
+                .where(eq(draftCaptRounds.saved_by, oldUserId))
+            await tx
+                .update(draftCaptRounds)
+                .set({ captain: newUserId })
+                .where(eq(draftCaptRounds.captain, oldUserId))
+
+            // draft_pair_diffs
+            await tx
+                .update(draftPairDiffs)
+                .set({ saved_by: newUserId })
+                .where(eq(draftPairDiffs.saved_by, oldUserId))
+            await tx
+                .update(draftPairDiffs)
+                .set({ player1: newUserId })
+                .where(eq(draftPairDiffs.player1, oldUserId))
+            await tx
+                .update(draftPairDiffs)
+                .set({ player2: newUserId })
+                .where(eq(draftPairDiffs.player2, oldUserId))
+
+            // score_sheets
+            await tx
+                .update(scoreSheets)
+                .set({ uploaded_by: newUserId })
+                .where(eq(scoreSheets.uploaded_by, oldUserId))
+
+            // emails
+            await tx
+                .update(emailBroadcasts)
+                .set({ sent_by: newUserId })
+                .where(eq(emailBroadcasts.sent_by, oldUserId))
+            await tx
+                .update(emailSuppressions)
+                .set({ user_id: newUserId })
+                .where(eq(emailSuppressions.user_id, oldUserId))
+
+            // concerns
+            await tx
+                .update(concerns)
+                .set({ user_id: newUserId })
+                .where(eq(concerns.user_id, oldUserId))
+            await tx
+                .update(concerns)
+                .set({ assigned_to: newUserId })
+                .where(eq(concerns.assigned_to, oldUserId))
+            await tx
+                .update(concernComments)
+                .set({ author_id: newUserId })
+                .where(eq(concernComments.author_id, oldUserId))
+            await tx
+                .update(concernReplies)
+                .set({ sent_by: newUserId })
+                .where(eq(concernReplies.sent_by, oldUserId))
+
+            // inbound emails
+            await tx
+                .update(inboundEmails)
+                .set({ assigned_to: newUserId })
+                .where(eq(inboundEmails.assigned_to, oldUserId))
+            await tx
+                .update(inboundEmailComments)
+                .set({ author_id: newUserId })
+                .where(eq(inboundEmailComments.author_id, oldUserId))
+            await tx
+                .update(inboundEmailReplies)
+                .set({ sent_by: newUserId })
+                .where(eq(inboundEmailReplies.sent_by, oldUserId))
+
+            // roster tables
+            await tx
+                .update(week1Rosters)
+                .set({ user: newUserId })
+                .where(eq(week1Rosters.user, oldUserId))
+            await tx
+                .update(week2Rosters)
+                .set({ user: newUserId })
+                .where(eq(week2Rosters.user, oldUserId))
+            await tx
+                .update(week3Rosters)
+                .set({ user: newUserId })
+                .where(eq(week3Rosters.user, oldUserId))
+
+            // Finally delete the old user. Sessions, accounts,
+            // user_unavailability, season_refs, match_referees, and any
+            // remaining user_roles rows for the old id cascade automatically.
+            await tx.delete(users).where(eq(users.id, oldUserId))
+        })
 
         await logAuditEntry({
             userId: session.user.id,

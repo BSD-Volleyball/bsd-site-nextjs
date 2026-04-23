@@ -8,7 +8,8 @@ import { and, eq, or } from "drizzle-orm"
 import {
     isAdminOrDirector,
     isCommissionerForCurrentSeason,
-    isCaptainForSeason
+    isCaptainForSeason,
+    getCommissionerDivisionScope
 } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 
@@ -52,7 +53,7 @@ export async function POST() {
     // client can enforce captain-level restrictions in divisions where the user
     // is a captain (captain role takes priority over commissioner in those divisions).
     const captainTeams = await db
-        .select({ id: teams.id })
+        .select({ id: teams.id, division: teams.division })
         .from(teams)
         .where(
             and(
@@ -61,6 +62,7 @@ export async function POST() {
             )
         )
     const captainTeamIds = captainTeams.map((t) => t.id)
+    const captainDivisionIds = [...new Set(captainTeams.map((t) => t.division))]
 
     // Get user display name
     const [user] = await db
@@ -81,8 +83,34 @@ export async function POST() {
         }
     })
 
-    // Both commissioners and captains get write access; column restrictions are enforced in the UI
-    liveblocksSession.allow(`draft-s${seasonId}-d*`, ["room:write"])
+    // Scope write access to divisions this user actually has authority over.
+    // Admins + league-wide commissioners: all divisions in the season.
+    // Division-specific commissioners: only their assigned divisions.
+    // Captains: only divisions of teams they captain.
+    // Everyone authorized still gets read-only visibility on other division rooms
+    // so the draft UI can reflect cross-division context.
+    const commScope = isCommissioner
+        ? await getCommissionerDivisionScope(userId, seasonId)
+        : ({ type: "denied" } as const)
+    const hasLeagueWideWrite = isAdmin || commScope.type === "league_wide"
+
+    if (hasLeagueWideWrite) {
+        liveblocksSession.allow(`draft-s${seasonId}-d*`, ["room:write"])
+    } else {
+        const writableDivisionIds = new Set<number>()
+        if (commScope.type === "division_specific") {
+            for (const d of commScope.divisionIds) writableDivisionIds.add(d)
+        }
+        for (const d of captainDivisionIds) writableDivisionIds.add(d)
+
+        for (const divisionId of writableDivisionIds) {
+            liveblocksSession.allow(`draft-s${seasonId}-d${divisionId}`, [
+                "room:write"
+            ])
+        }
+        // Read-only on all other draft rooms in the season.
+        liveblocksSession.allow(`draft-s${seasonId}-d*`, ["room:read"])
+    }
 
     const { body, status } = await liveblocksSession.authorize()
     return new NextResponse(body, { status })

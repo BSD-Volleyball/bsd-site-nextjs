@@ -363,7 +363,8 @@ export function EnterScoresClient({
 
             const uploadStart = await createScoreSheetUpload(
                 divisionId,
-                selectedDate
+                selectedDate,
+                processedImage.blob.size
             )
             if (
                 !uploadStart.status ||
@@ -376,7 +377,10 @@ export function EnterScoresClient({
 
             const uploadResponse = await fetch(uploadStart.uploadUrl, {
                 method: "PUT",
-                headers: { "Content-Type": "image/jpeg" },
+                headers: {
+                    "Content-Type": "image/jpeg",
+                    "Content-Length": String(processedImage.blob.size)
+                },
                 body: processedImage.blob
             })
 

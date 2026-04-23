@@ -298,7 +298,10 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 return
             }
 
-            const uploadStart = await createPlayerPictureUpload(originalId)
+            const uploadStart = await createPlayerPictureUpload(
+                originalId,
+                processedImage.blob.size
+            )
             if (
                 !uploadStart.status ||
                 !uploadStart.uploadUrl ||
@@ -311,7 +314,8 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
             const uploadResponse = await fetch(uploadStart.uploadUrl, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "image/jpeg"
+                    "Content-Type": "image/jpeg",
+                    "Content-Length": String(processedImage.blob.size)
                 },
                 body: processedImage.blob
             })
