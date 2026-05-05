@@ -608,19 +608,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         (phaseConfig.showTryoutTools ||
             phaseConfig.showDraftTools ||
             phaseConfig.showSeasonTools)
-    // View Signups and Player Lookup are only relevant through draft
-    const captainSignupsLookupVisible =
+    // View Signups is only relevant through draft
+    const captainViewSignupsVisible =
         hasCaptainPagesAccess &&
         !!phaseConfig &&
         (phaseConfig.showTryoutTools || phaseConfig.showDraftTools)
+    // Player Lookup remains useful through regular season and playoffs
+    const captainPlayerLookupVisible =
+        hasCaptainPagesAccess &&
+        !!phaseConfig &&
+        (phaseConfig.showTryoutTools ||
+            phaseConfig.showDraftTools ||
+            phaseConfig.showSeasonTools)
     const showTeamAvailability =
         (hasCaptainPagesAccess && inRange("prep_tryout_week_2", "playoffs")) ||
         isCoach
     const visibleCaptainItems = [
         ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
-        ...(captainSignupsLookupVisible
-            ? captainPagesNavItems.slice(1, 3)
-            : []),
+        ...(captainViewSignupsVisible ? [captainPagesNavItems[1]] : []),
+        ...(captainPlayerLookupVisible ? [captainPagesNavItems[2]] : []),
         ...(captainBaseVisible ? [captainPagesNavItems[3]] : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
             ? [captainPagesNavItems[4]]
@@ -731,11 +737,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
             if (item.url === "/dashboard/team-availability")
                 return !showTeamAvailability
-            if (
-                item.url === "/dashboard/view-signups" ||
-                item.url === "/dashboard/player-lookup-signups"
-            )
-                return !captainSignupsLookupVisible
+            if (item.url === "/dashboard/view-signups")
+                return !captainViewSignupsVisible
+            if (item.url === "/dashboard/player-lookup-signups")
+                return !captainPlayerLookupVisible
             if (item.url === "/dashboard/week-2-homework")
                 return !showWeek2Homework
             if (
