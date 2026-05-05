@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import {
     Card,
     CardContent,
@@ -26,14 +27,23 @@ import {
     getRegularSubCandidates,
     getPermanentSubCandidates,
     getSubContactDetails,
-    logSubContactViewed
+    logSubContactViewed,
+    lockInPermanentSub,
+    lockInRegularSub,
+    getWaitlistOptions
 } from "./find-sub-actions"
 import type {
     RegularSubCandidate,
     PermanentSubCandidate,
-    SubContactDetails
+    SubContactDetails,
+    WaitlistOption
 } from "./find-sub-actions"
-import type { RosterPlayer, EventInfo, SeasonInfo } from "./actions"
+import type {
+    RosterPlayer,
+    EventInfo,
+    SeasonInfo,
+    DateMatchInfo
+} from "./actions"
 import {
     RiAlertLine,
     RiCloseLine,
@@ -77,6 +87,26 @@ type FindSubPanelProps = {
     allSeasons: SeasonInfo[]
     playerPicUrl: string
     teamMatchTimeByEventDate: Record<string, string | null>
+    dateMatchInfo: Record<string, DateMatchInfo>
+    canLockInPermanent: boolean
+    canSeeFullWaitlist: boolean
+    eventDateById: Record<number, string>
+}
+
+type RegularLockTarget = {
+    matchId: number
+    matchDate: string
+    originalUserId: string
+    originalName: string
+    subUserId: string
+    subName: string
+}
+
+type PermanentLockTarget = {
+    originalUserId: string
+    originalName: string
+    subUserId: string
+    subName: string
 }
 
 export function FindSubPanel({
@@ -85,8 +115,13 @@ export function FindSubPanel({
     roster,
     allSeasons,
     playerPicUrl,
-    teamMatchTimeByEventDate
+    teamMatchTimeByEventDate,
+    dateMatchInfo,
+    canLockInPermanent,
+    canSeeFullWaitlist,
+    eventDateById
 }: FindSubPanelProps) {
+    const router = useRouter()
     // Player detail modal
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
@@ -161,6 +196,142 @@ export function FindSubPanel({
     } | null>(null)
     const [permanentError, setPermanentError] = useState<string | null>(null)
     const [isPendingPermanent, startPermanentTransition] = useTransition()
+
+    // Full waitlist (Other dropdown) — only fetched for elevated viewers.
+    const [waitlistOptions, setWaitlistOptions] = useState<
+        WaitlistOption[] | null
+    >(null)
+    const [otherWaitlistUserId, setOtherWaitlistUserId] = useState<string>("")
+
+    useEffect(() => {
+        if (!canSeeFullWaitlist) return
+        let cancelled = false
+        ;(async () => {
+            const result = await getWaitlistOptions(teamId)
+            if (!cancelled && result.status) setWaitlistOptions(result.data)
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [canSeeFullWaitlist, teamId])
+
+    // Lock-in confirmation state
+    const [regularLockTarget, setRegularLockTarget] =
+        useState<RegularLockTarget | null>(null)
+    const [permanentLockTarget, setPermanentLockTarget] =
+        useState<PermanentLockTarget | null>(null)
+    const [lockNotes, setLockNotes] = useState("")
+    const [lockReason, setLockReason] = useState("")
+    const [lockError, setLockError] = useState<string | null>(null)
+    const [isLocking, setIsLocking] = useState(false)
+
+    // Active player roster — UI restricts permanent-sub target dropdown
+    // to currently-active players (so admins can't accidentally try to
+    // sub someone who's already been subbed out).
+    const activeRoster = roster.filter((p) => !p.isSubbedOut)
+
+    function lookupWaitlistOption(userId: string): WaitlistOption | null {
+        return waitlistOptions?.find((o) => o.userId === userId) ?? null
+    }
+
+    function handleOpenRegularLock(candidate: RegularSubCandidate) {
+        if (!selectedEventId) return
+        const eventDate = eventDateById[parseInt(selectedEventId, 10)]
+        const info = eventDate ? dateMatchInfo[eventDate] : undefined
+        if (!info?.matchId) {
+            setLockError(
+                "No match found for this date — cannot record a regular sub."
+            )
+            return
+        }
+        // Require exactly one selected missing player to disambiguate.
+        if (selectedMissingUserIds.size !== 1) {
+            setLockError(
+                "Select exactly one player to be replaced before locking in a sub."
+            )
+            return
+        }
+        const originalUserId = Array.from(selectedMissingUserIds)[0]
+        const originalPlayer = roster.find((p) => p.userId === originalUserId)
+        if (!originalPlayer) return
+        setLockError(null)
+        setLockNotes("")
+        setRegularLockTarget({
+            matchId: info.matchId,
+            matchDate: eventDate,
+            originalUserId,
+            originalName: displayName(originalPlayer),
+            subUserId: candidate.userId,
+            subName: candidate.preferredName
+                ? `${candidate.preferredName} ${candidate.lastName}`
+                : `${candidate.firstName} ${candidate.lastName}`
+        })
+    }
+
+    function handleOpenPermanentLock(args: { userId: string; name: string }) {
+        if (!selectedPlayerId) return
+        const original = roster.find((p) => p.userId === selectedPlayerId)
+        if (!original) return
+        setLockError(null)
+        setLockNotes("")
+        setLockReason("")
+        setPermanentLockTarget({
+            originalUserId: original.userId,
+            originalName: displayName(original),
+            subUserId: args.userId,
+            subName: args.name
+        })
+    }
+
+    async function handleConfirmRegularLock() {
+        if (!regularLockTarget) return
+        setIsLocking(true)
+        setLockError(null)
+        const result = await lockInRegularSub({
+            teamId,
+            matchId: regularLockTarget.matchId,
+            originalUserId: regularLockTarget.originalUserId,
+            subUserId: regularLockTarget.subUserId,
+            notes: lockNotes.trim() || undefined
+        })
+        setIsLocking(false)
+        if (!result.status) {
+            setLockError(result.message)
+            return
+        }
+        setRegularLockTarget(null)
+        setLockNotes("")
+        // Refresh server data so new sub is reflected on the matrix.
+        router.refresh()
+    }
+
+    async function handleConfirmPermanentLock() {
+        if (!permanentLockTarget) return
+        setIsLocking(true)
+        setLockError(null)
+        const result = await lockInPermanentSub({
+            teamId,
+            originalUserId: permanentLockTarget.originalUserId,
+            subUserId: permanentLockTarget.subUserId,
+            reason: lockReason.trim() || undefined,
+            notes: lockNotes.trim() || undefined
+        })
+        setIsLocking(false)
+        if (!result.status) {
+            setLockError(result.message)
+            return
+        }
+        setPermanentLockTarget(null)
+        setLockNotes("")
+        setLockReason("")
+        setSelectedPlayerId("")
+        setPermanentResult(null)
+        setOtherWaitlistUserId("")
+        // Refresh waitlist options (sub-in user just consumed their row).
+        const refresh = await getWaitlistOptions(teamId)
+        if (refresh.status) setWaitlistOptions(refresh.data)
+        router.refresh()
+    }
 
     function handleEventChange(eventIdStr: string) {
         setSelectedEventId(eventIdStr)
@@ -392,11 +563,18 @@ export function FindSubPanel({
                                             nonMaleNeeded={
                                                 regularResult.nonMaleNeeded
                                             }
+                                            canLockIn={
+                                                selectedMissingUserIds.size ===
+                                                1
+                                            }
                                             onOpenDetail={
                                                 modal.openPlayerDetail
                                             }
                                             onOpenContact={
                                                 handleOpenContactWarning
+                                            }
+                                            onLockIn={() =>
+                                                handleOpenRegularLock(c)
                                             }
                                         />
                                     ))}
@@ -429,7 +607,7 @@ export function FindSubPanel({
                             <SelectValue placeholder="Select player to replace…" />
                         </SelectTrigger>
                         <SelectContent>
-                            {roster.map((p) => (
+                            {activeRoster.map((p) => (
                                 <SelectItem key={p.userId} value={p.userId}>
                                     {displayName(p)}
                                 </SelectItem>
@@ -463,10 +641,94 @@ export function FindSubPanel({
                                         key={c.userId}
                                         candidate={c}
                                         rank={i + 1}
+                                        canLockIn={canLockInPermanent}
                                         onOpenDetail={modal.openPlayerDetail}
                                         onOpenContact={handleOpenContactWarning}
+                                        onLockIn={() =>
+                                            handleOpenPermanentLock({
+                                                userId: c.userId,
+                                                name: c.preferredName
+                                                    ? `${c.preferredName} ${c.lastName}`
+                                                    : `${c.firstName} ${c.lastName}`
+                                            })
+                                        }
                                     />
                                 ))
+                            )}
+
+                            {/* "Other" full-waitlist dropdown — elevated viewers only */}
+                            {canSeeFullWaitlist && (
+                                <div className="rounded-md border border-dashed p-3">
+                                    <p className="mb-2 font-medium text-sm">
+                                        Other (full waitlist)
+                                    </p>
+                                    <p className="mb-2 text-muted-foreground text-xs">
+                                        Pick any waitlisted player, regardless
+                                        of gender or division. Visible to admins
+                                        and division commissioners only.
+                                    </p>
+                                    <Select
+                                        value={otherWaitlistUserId}
+                                        onValueChange={(v) =>
+                                            setOtherWaitlistUserId(v)
+                                        }
+                                        disabled={!waitlistOptions}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue
+                                                placeholder={
+                                                    waitlistOptions
+                                                        ? "Select from waitlist…"
+                                                        : "Loading waitlist…"
+                                                }
+                                            />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {waitlistOptions?.map((o) => {
+                                                const name = o.preferredName
+                                                    ? `${o.preferredName} ${o.lastName}`
+                                                    : `${o.firstName} ${o.lastName}`
+                                                const sub = o.lastDivisionName
+                                                    ? `${o.lastDivisionName}${o.lastSeasonLabel ? ` (${o.lastSeasonLabel})` : ""}`
+                                                    : "No prior history"
+                                                return (
+                                                    <SelectItem
+                                                        key={o.userId}
+                                                        value={o.userId}
+                                                    >
+                                                        {name} — {sub}
+                                                    </SelectItem>
+                                                )
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    {otherWaitlistUserId && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            className="mt-2"
+                                            disabled={
+                                                !canLockInPermanent ||
+                                                !selectedPlayerId
+                                            }
+                                            onClick={() => {
+                                                const opt =
+                                                    lookupWaitlistOption(
+                                                        otherWaitlistUserId
+                                                    )
+                                                if (!opt) return
+                                                handleOpenPermanentLock({
+                                                    userId: opt.userId,
+                                                    name: opt.preferredName
+                                                        ? `${opt.preferredName} ${opt.lastName}`
+                                                        : `${opt.firstName} ${opt.lastName}`
+                                                })
+                                            }}
+                                        >
+                                            Lock in permanent sub
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
@@ -552,6 +814,186 @@ export function FindSubPanel({
                 </div>
             )}
 
+            {/* Regular sub lock-in modal */}
+            {regularLockTarget && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={() => !isLocking && setRegularLockTarget(null)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape" && !isLocking)
+                            setRegularLockTarget(null)
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <h3 className="mb-3 font-semibold text-lg">
+                            Lock in regular sub
+                        </h3>
+                        <div className="mb-3 space-y-1 text-sm">
+                            <p>
+                                <span className="text-muted-foreground">
+                                    Match:{" "}
+                                </span>
+                                {formatDate(regularLockTarget.matchDate)}
+                            </p>
+                            <p>
+                                <span className="text-muted-foreground">
+                                    Out:{" "}
+                                </span>
+                                {regularLockTarget.originalName}
+                            </p>
+                            <p>
+                                <span className="text-muted-foreground">
+                                    Sub:{" "}
+                                </span>
+                                {regularLockTarget.subName}
+                            </p>
+                        </div>
+                        <label
+                            htmlFor="regular-sub-notes"
+                            className="mb-1 block font-medium text-sm"
+                        >
+                            Notes (optional)
+                        </label>
+                        <textarea
+                            id="regular-sub-notes"
+                            value={lockNotes}
+                            onChange={(e) => setLockNotes(e.target.value)}
+                            disabled={isLocking}
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background p-2 text-sm"
+                        />
+                        {lockError && (
+                            <p className="mt-2 text-destructive text-sm">
+                                {lockError}
+                            </p>
+                        )}
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setRegularLockTarget(null)}
+                                disabled={isLocking}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={handleConfirmRegularLock}
+                                disabled={isLocking}
+                            >
+                                {isLocking ? "Recording…" : "Lock in"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Permanent sub lock-in modal */}
+            {permanentLockTarget && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+                    onClick={() => !isLocking && setPermanentLockTarget(null)}
+                    onKeyDown={(e) => {
+                        if (e.key === "Escape" && !isLocking)
+                            setPermanentLockTarget(null)
+                    }}
+                    role="dialog"
+                    aria-modal="true"
+                    tabIndex={-1}
+                >
+                    <div
+                        className="relative w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        role="document"
+                    >
+                        <h3 className="mb-3 font-semibold text-lg">
+                            Lock in permanent sub
+                        </h3>
+                        <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 text-xs dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                            <RiAlertLine className="mr-1 inline h-4 w-4 align-text-bottom" />
+                            This permanently replaces the player for the rest of
+                            the season and removes the sub-in player from the
+                            waitlist. The original draft round is preserved for
+                            historical records.
+                        </div>
+                        <div className="mb-3 space-y-1 text-sm">
+                            <p>
+                                <span className="text-muted-foreground">
+                                    Out:{" "}
+                                </span>
+                                {permanentLockTarget.originalName}
+                            </p>
+                            <p>
+                                <span className="text-muted-foreground">
+                                    Sub:{" "}
+                                </span>
+                                {permanentLockTarget.subName}
+                            </p>
+                        </div>
+                        <label
+                            htmlFor="permanent-sub-reason"
+                            className="mb-1 block font-medium text-sm"
+                        >
+                            Reason (optional)
+                        </label>
+                        <input
+                            id="permanent-sub-reason"
+                            type="text"
+                            value={lockReason}
+                            onChange={(e) => setLockReason(e.target.value)}
+                            disabled={isLocking}
+                            className="mb-3 w-full rounded-md border border-input bg-background p-2 text-sm"
+                            placeholder="injury, schedule conflict, drop-out…"
+                        />
+                        <label
+                            htmlFor="permanent-sub-notes"
+                            className="mb-1 block font-medium text-sm"
+                        >
+                            Notes (optional)
+                        </label>
+                        <textarea
+                            id="permanent-sub-notes"
+                            value={lockNotes}
+                            onChange={(e) => setLockNotes(e.target.value)}
+                            disabled={isLocking}
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background p-2 text-sm"
+                        />
+                        {lockError && (
+                            <p className="mt-2 text-destructive text-sm">
+                                {lockError}
+                            </p>
+                        )}
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setPermanentLockTarget(null)}
+                                disabled={isLocking}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={handleConfirmPermanentLock}
+                                disabled={isLocking}
+                            >
+                                {isLocking ? "Recording…" : "Lock in"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Contact details modal */}
             {contactDetails && (
                 <div
@@ -619,14 +1061,18 @@ function RegularCandidateRow({
     candidate: c,
     rank,
     nonMaleNeeded,
+    canLockIn,
     onOpenDetail,
-    onOpenContact
+    onOpenContact,
+    onLockIn
 }: {
     candidate: RegularSubCandidate
     rank: number
     nonMaleNeeded: boolean
+    canLockIn: boolean
     onOpenDetail: (userId: string) => void
     onOpenContact: (userId: string, name: string) => void
+    onLockIn: () => void
 }) {
     const name = c.preferredName
         ? `${c.preferredName} ${c.lastName}`
@@ -688,15 +1134,31 @@ function RegularCandidateRow({
                         ))}
                     </p>
                 )}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 h-6 px-2 text-xs"
-                    onClick={() => onOpenContact(c.userId, name)}
-                >
-                    Contact Info
-                </Button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => onOpenContact(c.userId, name)}
+                    >
+                        Contact Info
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        disabled={!canLockIn}
+                        title={
+                            canLockIn
+                                ? "Lock in for this match"
+                                : "Select exactly one missing player to enable"
+                        }
+                        onClick={onLockIn}
+                    >
+                        Lock in for this match
+                    </Button>
+                </div>
             </div>
         </div>
     )
@@ -705,13 +1167,17 @@ function RegularCandidateRow({
 function PermanentCandidateRow({
     candidate: c,
     rank,
+    canLockIn,
     onOpenDetail,
-    onOpenContact
+    onOpenContact,
+    onLockIn
 }: {
     candidate: PermanentSubCandidate
     rank: number
+    canLockIn: boolean
     onOpenDetail: (userId: string) => void
     onOpenContact: (userId: string, name: string) => void
+    onLockIn: () => void
 }) {
     const name = c.preferredName
         ? `${c.preferredName} ${c.lastName}`
@@ -747,15 +1213,27 @@ function PermanentCandidateRow({
                         Previously drafted: Round {c.lastRound}
                     </p>
                 )}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 h-6 px-2 text-xs"
-                    onClick={() => onOpenContact(c.userId, name)}
-                >
-                    Contact Info
-                </Button>
+                <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => onOpenContact(c.userId, name)}
+                    >
+                        Contact Info
+                    </Button>
+                    {canLockIn && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={onLockIn}
+                        >
+                            Lock in permanent sub
+                        </Button>
+                    )}
+                </div>
             </div>
         </div>
     )

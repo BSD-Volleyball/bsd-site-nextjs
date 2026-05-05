@@ -498,6 +498,99 @@ export const waitlist = pgTable("waitlist", {
     created_at: timestamp("created_at").notNull()
 })
 
+// Permanent sub: replaces a draftee on a team for the rest of the season.
+// drafts rows are never mutated; chained subs share the same original_draft.
+// Active player on a slot = latest substitutions row by effective_at, or the
+// original draftee if no rows exist.
+export const substitutions = pgTable(
+    "substitutions",
+    {
+        id: serial("id").primaryKey(),
+        team: integer("team")
+            .notNull()
+            .references(() => teams.id),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        original_draft: integer("original_draft")
+            .notNull()
+            .references(() => drafts.id),
+        original_user: text("original_user")
+            .notNull()
+            .references(() => users.id),
+        sub_user: text("sub_user")
+            .notNull()
+            .references(() => users.id),
+        effective_at: timestamp("effective_at")
+            .$defaultFn(() => new Date())
+            .notNull(),
+        performed_by: text("performed_by")
+            .notNull()
+            .references(() => users.id),
+        reason: text("reason"),
+        notes: text("notes")
+    },
+    (table) => ({
+        substitutionsTeamIdx: index("substitutions_team_idx").on(table.team),
+        substitutionsSeasonIdx: index("substitutions_season_idx").on(
+            table.season
+        ),
+        substitutionsOriginalDraftIdx: index(
+            "substitutions_original_draft_idx"
+        ).on(table.original_draft),
+        substitutionsSubUserIdx: index("substitutions_sub_user_idx").on(
+            table.sub_user
+        )
+    })
+)
+
+// Regular sub: covers one player for one match. Original player keeps their
+// roster slot. Waitlist row of the sub-in user is NOT consumed.
+export const matchSubstitutions = pgTable(
+    "match_substitutions",
+    {
+        id: serial("id").primaryKey(),
+        match: integer("match")
+            .notNull()
+            .references(() => matches.id),
+        team: integer("team")
+            .notNull()
+            .references(() => teams.id),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id),
+        original_user: text("original_user")
+            .notNull()
+            .references(() => users.id),
+        sub_user: text("sub_user")
+            .notNull()
+            .references(() => users.id),
+        performed_by: text("performed_by")
+            .notNull()
+            .references(() => users.id),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull(),
+        notes: text("notes")
+    },
+    (table) => ({
+        matchSubsMatchIdx: index("match_substitutions_match_idx").on(
+            table.match
+        ),
+        matchSubsTeamIdx: index("match_substitutions_team_idx").on(table.team),
+        matchSubsSeasonIdx: index("match_substitutions_season_idx").on(
+            table.season
+        ),
+        matchSubsSubUserIdx: index("match_substitutions_sub_user_idx").on(
+            table.sub_user
+        ),
+        // One player can't be subbed by two different people in the same match.
+        matchSubsMatchOriginalUniq: uniqueIndex(
+            "match_substitutions_match_original_uniq"
+        ).on(table.match, table.original_user)
+    })
+)
+
 export const discounts = pgTable("discounts", {
     id: serial("id").primaryKey(),
     user: text("user")

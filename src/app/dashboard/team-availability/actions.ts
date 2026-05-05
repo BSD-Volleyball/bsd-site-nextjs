@@ -3,9 +3,7 @@
 import { db } from "@/database/db"
 import { auth } from "@/lib/auth"
 import {
-    users,
     teams,
-    drafts,
     signups,
     seasonEvents,
     userUnavailability,
@@ -20,6 +18,12 @@ import {
     isAdminOrDirectorBySession,
     getCommissionerDivisionScope
 } from "@/lib/rbac"
+import {
+    getTeamRosterWithSubs,
+    getMatchSubsForTeamSeason,
+    formatPlayerSummaryName,
+    type MatchSubEntry
+} from "@/lib/roster"
 
 export type SeasonInfo = {
     id: number
@@ -43,6 +47,23 @@ export type RosterPlayer = {
     signupId: number
     unavailableEventIds: number[]
     male: boolean | null
+    // When this player has been permanently subbed out, this points to who
+    // replaced them. Subbed-out players are kept in the roster array so the
+    // UI can render the "Subbed out — Round X" annotation.
+    isSubbedOut?: boolean
+    subbedOutAt?: string | null
+    // When this player is here as a permanent sub, this records the original
+    // draftee they are filling in for and the original draft round/overall.
+    subForOriginalUserId?: string
+    subForOriginalName?: string
+    originalRound?: number
+    originalOverall?: number
+}
+
+export type DateMatchInfo = {
+    matchId: number | null
+    matchTime: string | null
+    regularSubs: { originalName: string; subName: string }[]
 }
 
 export type TeamOption = {
@@ -62,6 +83,16 @@ export type TeamAvailabilityData = {
     allSeasons: SeasonInfo[]
     playerPicUrl: string
     teamMatchTimeByEventDate: Record<string, string | null>
+    // Per-event-date: matchId, time, and any regular subs already recorded.
+    // Used so the panel can pass matchId to lockInRegularSub and the matrix
+    // can annotate cells.
+    dateMatchInfo: Record<string, DateMatchInfo>
+    // True when viewer can lock in a permanent sub for this team (admin or
+    // commissioner of the team's division).
+    canLockInPermanent: boolean
+    // True when viewer can see the full waitlist dropdown — same gate as
+    // canLockInPermanent. Captains do not see it.
+    canSeeFullWaitlist: boolean
 }
 
 export type TeamAvailabilityError = {
@@ -209,29 +240,82 @@ export async function getTeamAvailabilityData(
         }
     }
 
-    // Get roster: drafts joined with users and signups
-    const rosterRows = await db
-        .select({
-            userId: drafts.user,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male,
-            signupId: signups.id,
-            round: drafts.round,
-            overall: drafts.overall
-        })
-        .from(drafts)
-        .innerJoin(users, eq(drafts.user, users.id))
-        .innerJoin(
-            signups,
-            and(
-                eq(signups.player, drafts.user),
-                eq(signups.season, config.seasonId)
-            )
-        )
-        .where(eq(drafts.team, selectedTeam.id))
-        .orderBy(asc(drafts.round), asc(drafts.overall))
+    // Get roster with permanent-sub awareness.
+    const rosterEntries = await getTeamRosterWithSubs(
+        config.seasonId,
+        selectedTeam.id
+    )
+
+    // Pull signup ids for the active player on each slot (for unavailability
+    // lookup) AND for any subbed-out original who still has a signup row.
+    const slotActiveUserIds = rosterEntries.map((e) => e.activeUser.id)
+    const slotOriginalUserIds = rosterEntries.map((e) => e.originalUser.id)
+    const allRelevantUserIds = Array.from(
+        new Set([...slotActiveUserIds, ...slotOriginalUserIds])
+    )
+
+    const signupRows = allRelevantUserIds.length
+        ? await db
+              .select({ id: signups.id, player: signups.player })
+              .from(signups)
+              .where(
+                  and(
+                      eq(signups.season, config.seasonId),
+                      inArray(signups.player, allRelevantUserIds)
+                  )
+              )
+        : []
+    const signupIdByUser = new Map<string, number>()
+    for (const r of signupRows) signupIdByUser.set(r.player, r.id)
+
+    // Build flat roster: one row per draft slot for the active player, plus
+    // an extra row for each subbed-out original so the UI can show them.
+    type Built = {
+        active: RosterPlayer
+        out?: RosterPlayer
+    }
+    const built: Built[] = rosterEntries.map((e) => {
+        const isSubbed = e.chain.length > 0
+        const activeSignupId = signupIdByUser.get(e.activeUser.id) ?? -1
+        const active: RosterPlayer = {
+            userId: e.activeUser.id,
+            firstName: e.activeUser.firstName,
+            lastName: e.activeUser.lastName,
+            preferredName: e.activeUser.preferredName,
+            male: e.activeUser.male,
+            signupId: activeSignupId,
+            unavailableEventIds: [],
+            ...(isSubbed
+                ? {
+                      subForOriginalUserId: e.originalUser.id,
+                      subForOriginalName: formatPlayerSummaryName(
+                          e.originalUser
+                      ),
+                      originalRound: e.round,
+                      originalOverall: e.overall
+                  }
+                : {})
+        }
+        let out: RosterPlayer | undefined
+        if (isSubbed) {
+            const outSignupId = signupIdByUser.get(e.originalUser.id) ?? -1
+            const last = e.chain[e.chain.length - 1]
+            out = {
+                userId: e.originalUser.id,
+                firstName: e.originalUser.firstName,
+                lastName: e.originalUser.lastName,
+                preferredName: e.originalUser.preferredName,
+                male: e.originalUser.male,
+                signupId: outSignupId,
+                unavailableEventIds: [],
+                isSubbedOut: true,
+                subbedOutAt: last.effectiveAt.toISOString(),
+                originalRound: e.round,
+                originalOverall: e.overall
+            }
+        }
+        return { active, out }
+    })
 
     // Get season events (regular_season + playoff)
     const events = await db
@@ -251,8 +335,11 @@ export async function getTeamAvailabilityData(
         )
         .orderBy(asc(seasonEvents.sort_order))
 
-    // Get unavailability for all roster signups
-    const signupIds = rosterRows.map((r) => r.signupId)
+    // Get unavailability for all roster signups (active players + subbed-out
+    // originals so historical unavailability is still visible if needed).
+    const signupIds = built
+        .flatMap((b) => [b.active.signupId, b.out?.signupId ?? -1])
+        .filter((id) => id > 0)
     let unavailabilityRows: { signupId: number | null; eventId: number }[] = []
     if (signupIds.length > 0) {
         unavailabilityRows = await db
@@ -264,24 +351,32 @@ export async function getTeamAvailabilityData(
             .where(inArray(userUnavailability.signup_id, signupIds))
     }
 
-    // Build unavailability lookup: signupId -> Set of eventIds
     const unavailBySignup = new Map<number, Set<number>>()
     for (const row of unavailabilityRows) {
-        if (!unavailBySignup.has(row.signupId!)) {
-            unavailBySignup.set(row.signupId!, new Set())
+        if (row.signupId == null) continue
+        if (!unavailBySignup.has(row.signupId)) {
+            unavailBySignup.set(row.signupId, new Set())
         }
-        unavailBySignup.get(row.signupId!)!.add(row.eventId)
+        unavailBySignup.get(row.signupId)!.add(row.eventId)
     }
 
-    const roster: RosterPlayer[] = rosterRows.map((r) => ({
-        userId: r.userId,
-        firstName: r.firstName,
-        lastName: r.lastName,
-        preferredName: r.preferredName,
-        male: r.male,
-        signupId: r.signupId,
-        unavailableEventIds: Array.from(unavailBySignup.get(r.signupId) ?? [])
-    }))
+    const roster: RosterPlayer[] = []
+    for (const b of built) {
+        roster.push({
+            ...b.active,
+            unavailableEventIds: Array.from(
+                unavailBySignup.get(b.active.signupId) ?? []
+            )
+        })
+        if (b.out) {
+            roster.push({
+                ...b.out,
+                unavailableEventIds: Array.from(
+                    unavailBySignup.get(b.out.signupId) ?? []
+                )
+            })
+        }
+    }
 
     const allSeasonRows = await db
         .select({ id: seasons.id, year: seasons.year, season: seasons.season })
@@ -294,9 +389,10 @@ export async function getTeamAvailabilityData(
         name: s.season
     }))
 
-    // Fetch team's match times so captains can see when they play on each date
+    // Fetch team's match times + ids so the panel can pass matchId to
+    // lockInRegularSub and the matrix can annotate per-match info.
     const teamMatchRows = await db
-        .select({ date: matches.date, time: matches.time })
+        .select({ id: matches.id, date: matches.date, time: matches.time })
         .from(matches)
         .where(
             and(
@@ -309,9 +405,41 @@ export async function getTeamAvailabilityData(
         )
 
     const teamMatchTimeByEventDate: Record<string, string | null> = {}
+    const dateMatchInfo: Record<string, DateMatchInfo> = {}
     for (const m of teamMatchRows) {
-        if (m.date) teamMatchTimeByEventDate[m.date] = m.time ?? null
+        if (!m.date) continue
+        teamMatchTimeByEventDate[m.date] = m.time ?? null
+        dateMatchInfo[m.date] = {
+            matchId: m.id,
+            matchTime: m.time ?? null,
+            regularSubs: []
+        }
     }
+
+    // Attach any regular subs already recorded for this team's matches.
+    const subsByMatch = await getMatchSubsForTeamSeason(
+        config.seasonId,
+        selectedTeam.id
+    )
+    for (const m of teamMatchRows) {
+        if (!m.date) continue
+        const subs: MatchSubEntry[] = subsByMatch.get(m.id) ?? []
+        dateMatchInfo[m.date].regularSubs = subs.map((s) => ({
+            originalName: formatPlayerSummaryName(s.originalUser),
+            subName: formatPlayerSummaryName(s.subUser)
+        }))
+    }
+
+    // Authorization flags for the FindSubPanel.
+    const canLockInPermanent =
+        isAdmin ||
+        commissionerScope.type === "league_wide" ||
+        (commissionerScope.type === "division_specific" &&
+            commissionerScope.divisionIds.includes(
+                allTeamRows.find((t) => t.id === selectedTeam.id)?.division ??
+                    -1
+            ))
+    const canSeeFullWaitlist = canLockInPermanent
 
     return {
         status: true,
@@ -322,6 +450,9 @@ export async function getTeamAvailabilityData(
         roster,
         allSeasons,
         playerPicUrl: process.env.PLAYER_PIC_URL ?? "",
-        teamMatchTimeByEventDate
+        teamMatchTimeByEventDate,
+        dateMatchInfo,
+        canLockInPermanent,
+        canSeeFullWaitlist
     }
 }

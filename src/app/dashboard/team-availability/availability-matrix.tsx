@@ -46,7 +46,10 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
         roster,
         allSeasons,
         playerPicUrl,
-        teamMatchTimeByEventDate
+        teamMatchTimeByEventDate,
+        dateMatchInfo,
+        canLockInPermanent,
+        canSeeFullWaitlist
     } = data
 
     function handleTeamChange(teamIdStr: string) {
@@ -59,19 +62,22 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
         })
     }
 
-    // Build unavailability sets per player for quick lookup
+    // Subbed-out players don't play anymore — exclude from active counts but
+    // still render their row with an annotation for context.
+    const activePlayers = roster.filter((p) => !p.isSubbedOut)
+
     const unavailSets = new Map<string, Set<number>>()
     for (const player of roster) {
         unavailSets.set(player.userId, new Set(player.unavailableEventIds))
     }
 
-    // Compute available count per event
+    // Available count uses ACTIVE players only.
     const availableCountByEvent = new Map<number, number>()
     const nonMaleMissingByEvent = new Map<number, number>()
     for (const event of events) {
         let count = 0
         let nonMaleMissing = 0
-        for (const player of roster) {
+        for (const player of activePlayers) {
             const isUnavailable = unavailSets.get(player.userId)?.has(event.id)
             if (!isUnavailable) {
                 count++
@@ -82,6 +88,10 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
         availableCountByEvent.set(event.id, count)
         nonMaleMissingByEvent.set(event.id, nonMaleMissing)
     }
+
+    // event id -> event date so the panel can resolve the matchId.
+    const eventDateById: Record<number, string> = {}
+    for (const e of events) eventDateById[e.id] = e.eventDate
 
     const showTeamSelector = allTeams.length > 1
 
@@ -198,11 +208,40 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                                     )!
                                     return (
                                         <tr
-                                            key={player.userId}
-                                            className="border-b last:border-b-0 hover:bg-muted/50"
+                                            key={`${player.userId}-${player.isSubbedOut ? "out" : "in"}`}
+                                            className={`border-b last:border-b-0 hover:bg-muted/50 ${
+                                                player.isSubbedOut
+                                                    ? "opacity-60"
+                                                    : ""
+                                            }`}
                                         >
                                             <td className="sticky left-0 z-10 whitespace-nowrap bg-background px-3 py-2 font-medium">
-                                                {displayName(player)}
+                                                <span
+                                                    className={
+                                                        player.isSubbedOut
+                                                            ? "line-through"
+                                                            : ""
+                                                    }
+                                                >
+                                                    {displayName(player)}
+                                                </span>
+                                                {player.isSubbedOut && (
+                                                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                        Subbed out
+                                                        {player.originalRound !=
+                                                        null
+                                                            ? ` — Rd ${player.originalRound}`
+                                                            : ""}
+                                                    </span>
+                                                )}
+                                                {player.subForOriginalName && (
+                                                    <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
+                                                        Sub for{" "}
+                                                        {
+                                                            player.subForOriginalName
+                                                        }
+                                                    </span>
+                                                )}
                                             </td>
                                             {events.map((event) => {
                                                 const isUnavailable =
@@ -284,6 +323,10 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                         allSeasons={allSeasons}
                         playerPicUrl={playerPicUrl}
                         teamMatchTimeByEventDate={teamMatchTimeByEventDate}
+                        dateMatchInfo={dateMatchInfo}
+                        canLockInPermanent={canLockInPermanent}
+                        canSeeFullWaitlist={canSeeFullWaitlist}
+                        eventDateById={eventDateById}
                     />
                 </div>
             )}

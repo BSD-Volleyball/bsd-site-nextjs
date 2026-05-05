@@ -35,6 +35,7 @@ import {
     normalizeEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent
 } from "@/lib/email-template-content"
+import { getTeamRosterWithSubs, formatPlayerSummaryName } from "@/lib/roster"
 
 export async function getSignupEligibility(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -394,6 +395,16 @@ export interface CaptainWelcomeMember {
     lastName: string
     email: string
     phone: string | null
+    // Original draftee whose slot this player is filling, when applicable.
+    subForName?: string
+}
+
+export interface CaptainSubbedOutOriginal {
+    userId: string
+    displayName: string
+    lastName: string
+    originalRound: number
+    replacedByName: string
 }
 
 export interface CaptainSeasonInfo {
@@ -408,6 +419,7 @@ export interface CaptainWelcomeData {
     divisionLevel: number | null
     seasonLabel: string
     members: CaptainWelcomeMember[]
+    subbedOutOriginals: CaptainSubbedOutOriginal[]
     emailTemplate: string
     emailTemplateContent: LexicalEmailTemplateContent | null
     emailSubject: string
@@ -506,27 +518,67 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             ? `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
             : String(config.seasonId)
 
-        const draftRows = await db
-            .select({
-                userId: drafts.user,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name,
-                email: users.email,
-                phone: users.phone
-            })
-            .from(drafts)
-            .innerJoin(users, eq(drafts.user, users.id))
-            .where(eq(drafts.team, teamRow.id))
-            .orderBy(asc(users.last_name), asc(users.first_name))
+        // Sub-aware roster: members reflects the currently-active player on
+        // each slot (so a permanent sub takes the original draftee's place
+        // and receives the welcome email). Subbed-out originals are surfaced
+        // separately as a footnote on the welcome card.
+        const rosterEntries = await getTeamRosterWithSubs(
+            config.seasonId,
+            teamRow.id
+        )
+        const activeUserIds = rosterEntries.map((e) => e.activeUser.id)
+        const contactRows = activeUserIds.length
+            ? await db
+                  .select({
+                      id: users.id,
+                      email: users.email,
+                      phone: users.phone
+                  })
+                  .from(users)
+                  .where(inArray(users.id, activeUserIds))
+            : []
+        const contactByUser = new Map(contactRows.map((r) => [r.id, r]))
 
-        const members: CaptainWelcomeMember[] = draftRows.map((row) => ({
-            userId: row.userId,
-            displayName: row.preferredName || row.firstName,
-            lastName: row.lastName,
-            email: row.email,
-            phone: row.phone ?? null
-        }))
+        const members: CaptainWelcomeMember[] = rosterEntries
+            .map((e) => {
+                const c = contactByUser.get(e.activeUser.id)
+                const isSub = e.chain.length > 0
+                return {
+                    userId: e.activeUser.id,
+                    displayName:
+                        e.activeUser.preferredName || e.activeUser.firstName,
+                    lastName: e.activeUser.lastName,
+                    email: c?.email ?? "",
+                    phone: c?.phone ?? null,
+                    ...(isSub
+                        ? {
+                              subForName: formatPlayerSummaryName(
+                                  e.originalUser
+                              )
+                          }
+                        : {})
+                }
+            })
+            .sort((a, b) => {
+                const lc = a.lastName
+                    .toLowerCase()
+                    .localeCompare(b.lastName.toLowerCase())
+                if (lc !== 0) return lc
+                return a.displayName
+                    .toLowerCase()
+                    .localeCompare(b.displayName.toLowerCase())
+            })
+
+        const subbedOutOriginals: CaptainSubbedOutOriginal[] = rosterEntries
+            .filter((e) => e.chain.length > 0)
+            .map((e) => ({
+                userId: e.originalUser.id,
+                displayName:
+                    e.originalUser.preferredName || e.originalUser.firstName,
+                lastName: e.originalUser.lastName,
+                originalRound: e.round,
+                replacedByName: formatPlayerSummaryName(e.activeUser)
+            }))
 
         let emailTemplate = ""
         let emailTemplateContent: LexicalEmailTemplateContent | null = null
@@ -624,8 +676,8 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 .orderBy(asc(seasonEvents.sort_order))
                 .limit(1)
 
-            if (nextEvent && draftRows.length > 0) {
-                const memberIds = draftRows.map((r) => r.userId)
+            if (nextEvent && members.length > 0) {
+                const memberIds = members.map((m) => m.userId)
                 const signupRows = await db
                     .select({ id: signups.id, player: signups.player })
                     .from(signups)
@@ -684,6 +736,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             divisionLevel: divisionRow?.level ?? null,
             seasonLabel,
             members,
+            subbedOutOriginals,
             emailTemplate,
             emailTemplateContent,
             emailSubject,

@@ -7,18 +7,25 @@ import {
     seasons,
     divisions,
     teams,
-    drafts,
     commissioners,
     individual_divisions
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
+import { getTeamRosterWithSubs } from "@/lib/roster"
 
 interface RosterPlayer {
     id: string
     displayName: string
     lastName: string
     isCaptain: boolean
+    // When this player is a permanent sub, this is the original draftee they
+    // replaced. Used to render "Sub for [name]" on roster surfaces.
+    subForName?: string
+    // When this player has been permanently subbed out for the season, this
+    // is true and originalRound carries the round they were drafted in.
+    isSubbedOut?: boolean
+    originalRound?: number
 }
 
 interface RosterTeam {
@@ -189,34 +196,45 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             commissionersByDivision.set(c.divisionId, arr)
         }
 
-        const teamIds = teamRows.map((t) => t.id)
-
-        const draftRows = await db
-            .select({
-                teamId: drafts.team,
-                userId: drafts.user,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name
-            })
-            .from(drafts)
-            .innerJoin(users, eq(drafts.user, users.id))
-            .where(inArray(drafts.team, teamIds))
+        // Use the canonical sub-aware roster helper so permanent subs are
+        // reflected on this view. One entry per draft slot; each entry knows
+        // its current active player and the chain of subs (if any).
+        const rosterEntries = await getTeamRosterWithSubs(seasonId)
 
         const captainMap = new Map(teamRows.map((t) => [t.id, t.captain]))
 
         const playersByTeam = new Map<number, RosterPlayer[]>()
-        for (const row of draftRows) {
-            const displayName = row.preferredName || row.firstName
-            const player: RosterPlayer = {
-                id: row.userId,
-                displayName,
-                lastName: row.lastName,
-                isCaptain: row.userId === captainMap.get(row.teamId)
+        for (const entry of rosterEntries) {
+            const isSubbed = entry.chain.length > 0
+            // Active player row.
+            const active = entry.activeUser
+            const activePlayer: RosterPlayer = {
+                id: active.id,
+                displayName: active.preferredName || active.firstName,
+                lastName: active.lastName,
+                isCaptain: active.id === captainMap.get(entry.teamId)
             }
-            const arr = playersByTeam.get(row.teamId) || []
-            arr.push(player)
-            playersByTeam.set(row.teamId, arr)
+            if (isSubbed) {
+                const orig = entry.originalUser
+                activePlayer.subForName = orig.preferredName
+                    ? `${orig.preferredName} ${orig.lastName}`
+                    : `${orig.firstName} ${orig.lastName}`
+            }
+            const arr = playersByTeam.get(entry.teamId) || []
+            arr.push(activePlayer)
+            // Subbed-out original row (kept on roster with annotation).
+            if (isSubbed) {
+                const orig = entry.originalUser
+                arr.push({
+                    id: `${orig.id}-out-${entry.draftId}`,
+                    displayName: orig.preferredName || orig.firstName,
+                    lastName: orig.lastName,
+                    isCaptain: false,
+                    isSubbedOut: true,
+                    originalRound: entry.round
+                })
+            }
+            playersByTeam.set(entry.teamId, arr)
         }
 
         // Sort players alphabetically by last name, then first name

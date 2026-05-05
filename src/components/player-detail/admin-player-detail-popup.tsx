@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
     PlayerDetails,
     PlayerDraftHistory,
-    PlayerSignup
+    PlayerSignup,
+    PlayerSubHistoryEntry
 } from "@/app/dashboard/player-lookup/actions"
+import { getPlayerSubHistory } from "@/app/dashboard/player-lookup/actions"
 import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
@@ -27,6 +29,7 @@ interface AdminPlayerDetailPopupProps {
     playerDetails: PlayerDetails | null
     draftHistory: PlayerDraftHistory[]
     signupHistory: PlayerSignup[]
+    subHistory?: PlayerSubHistoryEntry[]
     playerPicUrl: string
     isLoading: boolean
     pairPickName?: string | null
@@ -51,6 +54,7 @@ export function AdminPlayerDetailPopup({
     playerDetails,
     draftHistory,
     signupHistory,
+    subHistory: subHistoryProp,
     playerPicUrl,
     isLoading,
     pairPickName,
@@ -63,6 +67,29 @@ export function AdminPlayerDetailPopup({
     children
 }: AdminPlayerDetailPopupProps) {
     const [showImageModal, setShowImageModal] = useState(false)
+    // Sub history: prefer the prop if a parent already fetched it, otherwise
+    // self-fetch when the popup is open and we know the player id. Most
+    // consumers don't pass it, so this avoids touching every call site.
+    const [fetchedSubHistory, setFetchedSubHistory] = useState<
+        PlayerSubHistoryEntry[]
+    >([])
+    const playerId = playerDetails?.id ?? null
+    useEffect(() => {
+        if (subHistoryProp !== undefined) return
+        if (!open || !playerId) {
+            setFetchedSubHistory([])
+            return
+        }
+        let cancelled = false
+        ;(async () => {
+            const result = await getPlayerSubHistory(playerId)
+            if (!cancelled) setFetchedSubHistory(result)
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [open, playerId, subHistoryProp])
+    const subHistory = subHistoryProp ?? fetchedSubHistory
 
     if (!open) return null
 
@@ -476,6 +503,63 @@ export function AdminPlayerDetailPopup({
                             </CardContent>
                         </Card>
                     ))}
+                </div>
+            )}
+
+            {/* Sub History */}
+            {subHistory.length > 0 && !isLoading && (
+                <div className={inline ? "" : "px-6 pb-6"}>
+                    <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                        Sub History
+                    </h3>
+                    <ul className="space-y-2">
+                        {subHistory.map((s) => {
+                            const key = `${s.kind}-${s.role}-${s.occurredAt.getTime()}-${s.counterpartName}`
+                            const verb =
+                                s.kind === "permanent"
+                                    ? s.role === "out"
+                                        ? "Permanently subbed out — replaced by"
+                                        : "Permanently subbed in for"
+                                    : s.role === "out"
+                                      ? "Match sub: replaced by"
+                                      : "Match sub: replaced"
+                            return (
+                                <li
+                                    key={key}
+                                    className="rounded border p-2 text-sm"
+                                >
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <span
+                                            className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+                                                s.kind === "permanent"
+                                                    ? "bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200"
+                                                    : "bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-200"
+                                            }`}
+                                        >
+                                            {s.kind}
+                                        </span>
+                                        <span className="font-medium">
+                                            {verb} {s.counterpartName}
+                                        </span>
+                                    </div>
+                                    <p className="text-muted-foreground text-xs">
+                                        {s.teamName} — {s.seasonLabel}
+                                        {s.matchDate ? ` (${s.matchDate})` : ""}
+                                    </p>
+                                    {s.reason && (
+                                        <p className="text-muted-foreground text-xs">
+                                            Reason: {s.reason}
+                                        </p>
+                                    )}
+                                    {s.notes && (
+                                        <p className="text-muted-foreground text-xs">
+                                            {s.notes}
+                                        </p>
+                                    )}
+                                </li>
+                            )
+                        })}
+                    </ul>
                 </div>
             )}
 

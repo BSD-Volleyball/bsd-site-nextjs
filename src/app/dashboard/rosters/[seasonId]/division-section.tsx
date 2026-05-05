@@ -13,6 +13,9 @@ interface RosterPlayer {
     displayName: string
     lastName: string
     isCaptain: boolean
+    subForName?: string
+    isSubbedOut?: boolean
+    originalRound?: number
 }
 
 interface RosterTeam {
@@ -103,19 +106,24 @@ export function DivisionSection({
                                                     <li
                                                         key={player.id}
                                                         className={cn(
-                                                            "flex items-center gap-2 rounded-sm px-2 py-1 text-sm",
-                                                            player.id ===
-                                                                currentUserId
-                                                                ? "bg-primary/15 font-semibold ring-1 ring-primary/50"
-                                                                : "bg-muted/40"
+                                                            "flex flex-wrap items-center gap-2 rounded-sm px-2 py-1 text-sm",
+                                                            player.isSubbedOut
+                                                                ? "bg-muted/20 opacity-60"
+                                                                : player.id ===
+                                                                    currentUserId
+                                                                  ? "bg-primary/15 font-semibold ring-1 ring-primary/50"
+                                                                  : "bg-muted/40"
                                                         )}
                                                     >
                                                         <span
-                                                            className={
+                                                            className={cn(
                                                                 player.isCaptain
                                                                     ? "font-semibold"
+                                                                    : "",
+                                                                player.isSubbedOut
+                                                                    ? "line-through"
                                                                     : ""
-                                                            }
+                                                            )}
                                                         >
                                                             {player.displayName}{" "}
                                                             {player.lastName}
@@ -125,6 +133,23 @@ export function DivisionSection({
                                                                 className="h-4 w-4 shrink-0 text-yellow-500"
                                                                 aria-label="Captain"
                                                             />
+                                                        )}
+                                                        {player.isSubbedOut && (
+                                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                                                Subbed out
+                                                                {player.originalRound !=
+                                                                null
+                                                                    ? ` — Rd ${player.originalRound}`
+                                                                    : ""}
+                                                            </span>
+                                                        )}
+                                                        {player.subForName && (
+                                                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
+                                                                Sub for{" "}
+                                                                {
+                                                                    player.subForName
+                                                                }
+                                                            </span>
                                                         )}
                                                     </li>
                                                 ))}

@@ -120,6 +120,13 @@
       "when": 1776714832825,
       "tag": "0016_bizarre_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778011596300,
+      "tag": "0017_curious_edwin_jarvis",
+      "breakpoints": true
     }
   ]
 }

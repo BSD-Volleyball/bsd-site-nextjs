@@ -9,9 +9,13 @@ import {
     teams,
     divisions,
     userUnavailability,
-    seasonEvents
+    seasonEvents,
+    substitutions,
+    matchSubstitutions,
+    matches
 } from "@/database/schema"
 import { eq, desc, ne } from "drizzle-orm"
+import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
     isCommissionerBySession,
@@ -95,6 +99,20 @@ export interface PlayerDraftHistory {
     teamName: string
     round: number
     overall: number
+}
+
+export interface PlayerSubHistoryEntry {
+    kind: "permanent" | "regular"
+    // Was this user the one subbed out, or the sub-in?
+    role: "out" | "in"
+    seasonLabel: string
+    seasonId: number
+    teamName: string
+    counterpartName: string
+    matchDate?: string | null
+    occurredAt: Date
+    reason?: string | null
+    notes?: string | null
 }
 
 async function checkAdminOrCommissionerAccess(): Promise<boolean> {
@@ -356,4 +374,190 @@ export async function getPlayerDetails(playerId: string): Promise<{
             playoffDates: []
         }
     }
+}
+
+/**
+ * Returns this player's substitution history — both permanent (substitutions)
+ * and regular (match_substitutions), as either the original (subbed out) or
+ * the sub (subbed in). Sorted most-recent first. Admin/commissioner only.
+ */
+export async function getPlayerSubHistory(
+    userId: string
+): Promise<PlayerSubHistoryEntry[]> {
+    if (!(await checkAdminOrCommissionerAccess())) return []
+    if (typeof userId !== "string" || !userId) return []
+
+    const counterpart = alias(users, "counterpart")
+
+    // Permanent subs where user is original_user (role = "out") or sub_user
+    // (role = "in"). One join per query keeps the SQL simple.
+    const permOut = await db
+        .select({
+            id: substitutions.id,
+            seasonId: teams.season,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            teamName: teams.name,
+            counterFirst: counterpart.first_name,
+            counterLast: counterpart.last_name,
+            counterPreferred: counterpart.preferred_name,
+            effectiveAt: substitutions.effective_at,
+            reason: substitutions.reason,
+            notes: substitutions.notes
+        })
+        .from(substitutions)
+        .innerJoin(teams, eq(substitutions.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(counterpart, eq(substitutions.sub_user, counterpart.id))
+        .where(eq(substitutions.original_user, userId))
+
+    const permIn = await db
+        .select({
+            id: substitutions.id,
+            seasonId: teams.season,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            teamName: teams.name,
+            counterFirst: counterpart.first_name,
+            counterLast: counterpart.last_name,
+            counterPreferred: counterpart.preferred_name,
+            effectiveAt: substitutions.effective_at,
+            reason: substitutions.reason,
+            notes: substitutions.notes
+        })
+        .from(substitutions)
+        .innerJoin(teams, eq(substitutions.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(counterpart, eq(substitutions.original_user, counterpart.id))
+        .where(eq(substitutions.sub_user, userId))
+
+    const regOut = await db
+        .select({
+            id: matchSubstitutions.id,
+            seasonId: teams.season,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            teamName: teams.name,
+            counterFirst: counterpart.first_name,
+            counterLast: counterpart.last_name,
+            counterPreferred: counterpart.preferred_name,
+            createdAt: matchSubstitutions.created_at,
+            matchDate: matches.date,
+            notes: matchSubstitutions.notes
+        })
+        .from(matchSubstitutions)
+        .innerJoin(teams, eq(matchSubstitutions.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(matches, eq(matchSubstitutions.match, matches.id))
+        .innerJoin(counterpart, eq(matchSubstitutions.sub_user, counterpart.id))
+        .where(eq(matchSubstitutions.original_user, userId))
+
+    const regIn = await db
+        .select({
+            id: matchSubstitutions.id,
+            seasonId: teams.season,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            teamName: teams.name,
+            counterFirst: counterpart.first_name,
+            counterLast: counterpart.last_name,
+            counterPreferred: counterpart.preferred_name,
+            createdAt: matchSubstitutions.created_at,
+            matchDate: matches.date,
+            notes: matchSubstitutions.notes
+        })
+        .from(matchSubstitutions)
+        .innerJoin(teams, eq(matchSubstitutions.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(matches, eq(matchSubstitutions.match, matches.id))
+        .innerJoin(
+            counterpart,
+            eq(matchSubstitutions.original_user, counterpart.id)
+        )
+        .where(eq(matchSubstitutions.sub_user, userId))
+
+    function makeName(
+        first: string,
+        last: string,
+        preferred: string | null
+    ): string {
+        return preferred ? `${preferred} ${last}` : `${first} ${last}`
+    }
+    function seasonLabel(name: string, year: number): string {
+        return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}`
+    }
+
+    const entries: PlayerSubHistoryEntry[] = [
+        ...permOut.map(
+            (r): PlayerSubHistoryEntry => ({
+                kind: "permanent",
+                role: "out",
+                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonId: r.seasonId,
+                teamName: r.teamName,
+                counterpartName: makeName(
+                    r.counterFirst,
+                    r.counterLast,
+                    r.counterPreferred
+                ),
+                occurredAt: r.effectiveAt,
+                reason: r.reason,
+                notes: r.notes
+            })
+        ),
+        ...permIn.map(
+            (r): PlayerSubHistoryEntry => ({
+                kind: "permanent",
+                role: "in",
+                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonId: r.seasonId,
+                teamName: r.teamName,
+                counterpartName: makeName(
+                    r.counterFirst,
+                    r.counterLast,
+                    r.counterPreferred
+                ),
+                occurredAt: r.effectiveAt,
+                reason: r.reason,
+                notes: r.notes
+            })
+        ),
+        ...regOut.map(
+            (r): PlayerSubHistoryEntry => ({
+                kind: "regular",
+                role: "out",
+                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonId: r.seasonId,
+                teamName: r.teamName,
+                counterpartName: makeName(
+                    r.counterFirst,
+                    r.counterLast,
+                    r.counterPreferred
+                ),
+                matchDate: r.matchDate,
+                occurredAt: r.createdAt,
+                notes: r.notes
+            })
+        ),
+        ...regIn.map(
+            (r): PlayerSubHistoryEntry => ({
+                kind: "regular",
+                role: "in",
+                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonId: r.seasonId,
+                teamName: r.teamName,
+                counterpartName: makeName(
+                    r.counterFirst,
+                    r.counterLast,
+                    r.counterPreferred
+                ),
+                matchDate: r.matchDate,
+                occurredAt: r.createdAt,
+                notes: r.notes
+            })
+        )
+    ]
+
+    entries.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+    return entries
 }

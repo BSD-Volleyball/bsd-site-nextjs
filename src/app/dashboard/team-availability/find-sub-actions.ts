@@ -12,13 +12,21 @@ import {
     divisions,
     matches,
     waitlist,
-    seasons
+    seasons,
+    substitutions,
+    matchSubstitutions
 } from "@/database/schema"
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirector, getCommissionerDivisionScope } from "@/lib/rbac"
+import {
+    getTeamRosterWithSubs,
+    resolveActiveUserForSlot,
+    formatPlayerSummaryName
+} from "@/lib/roster"
+import { ok, fail, type ActionResult } from "@/lib/action-helpers"
 
 async function canAccessTeam(
     userId: string,
@@ -672,6 +680,414 @@ export async function getSubContactDetails(
     if (!row) return { status: false, error: "User not found" }
 
     return { status: true, contact: { email: row.email, phone: row.phone } }
+}
+
+// True if the user is an admin/director or commissioner of the team's division.
+// Captains explicitly excluded — used to gate permanent-sub lock-ins and the
+// full waitlist dropdown.
+async function canManageTeamAsElevated(
+    userId: string,
+    teamId: number,
+    seasonId: number
+): Promise<boolean> {
+    if (await isAdminOrDirector(userId)) return true
+    const [teamRow] = await db
+        .select({ division: teams.division })
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1)
+    if (!teamRow) return false
+    const scope = await getCommissionerDivisionScope(userId, seasonId)
+    if (scope.type === "league_wide") return true
+    if (scope.type === "division_specific") {
+        return scope.divisionIds.includes(teamRow.division)
+    }
+    return false
+}
+
+async function findUserName(userId: string): Promise<string> {
+    const [u] = await db
+        .select({
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name
+        })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+    if (!u) return userId
+    return u.preferredName
+        ? `${u.preferredName} ${u.lastName}`
+        : `${u.firstName} ${u.lastName}`
+}
+
+export type WaitlistOption = {
+    userId: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    male: boolean | null
+    lastDivisionName: string | null
+    lastSeasonLabel: string | null
+}
+
+/**
+ * Full waitlist for the season (no gender filter), excluding anyone who is
+ * already on a team this season as a draftee or active permanent sub.
+ *
+ * Authorization: admin or commissioner only — captains do not see this list.
+ */
+export async function getWaitlistOptions(
+    teamId: number
+): Promise<ActionResult<WaitlistOption[]>> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return fail("Not authenticated.")
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return fail("No active season.")
+
+    if (
+        !(await canManageTeamAsElevated(
+            session.user.id,
+            teamId,
+            config.seasonId
+        ))
+    ) {
+        return fail("Not authorized.")
+    }
+
+    const waitlistRows = await db
+        .select({
+            userId: waitlist.user,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name,
+            male: users.male
+        })
+        .from(waitlist)
+        .innerJoin(users, eq(waitlist.user, users.id))
+        .where(eq(waitlist.season, config.seasonId))
+        .orderBy(asc(users.last_name), asc(users.first_name))
+
+    if (waitlistRows.length === 0) return ok([])
+
+    // Exclude users currently on any team this season (draftee or active sub).
+    const seasonRoster = await getTeamRosterWithSubs(config.seasonId)
+    const onTeamUserIds = new Set<string>()
+    for (const slot of seasonRoster) {
+        onTeamUserIds.add(slot.activeUser.id)
+    }
+
+    // Pull each waitlist user's most-recent draft division for context display.
+    const waitlistUserIds = waitlistRows.map((r) => r.userId)
+    const historyRows = await db
+        .select({
+            userId: drafts.user,
+            divisionName: divisions.name,
+            seasonId: seasons.id,
+            seasonYear: seasons.year,
+            seasonName: seasons.season
+        })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .where(inArray(drafts.user, waitlistUserIds))
+        .orderBy(desc(seasons.id))
+
+    const historyByUser = new Map<
+        string,
+        { divisionName: string; seasonLabel: string }
+    >()
+    for (const h of historyRows) {
+        if (!historyByUser.has(h.userId)) {
+            const label = `${h.seasonName.charAt(0).toUpperCase()}${h.seasonName.slice(1)} ${h.seasonYear}`
+            historyByUser.set(h.userId, {
+                divisionName: h.divisionName,
+                seasonLabel: label
+            })
+        }
+    }
+
+    const options: WaitlistOption[] = waitlistRows
+        .filter((r) => !onTeamUserIds.has(r.userId))
+        .map((r) => {
+            const h = historyByUser.get(r.userId)
+            return {
+                userId: r.userId,
+                firstName: r.firstName,
+                lastName: r.lastName,
+                preferredName: r.preferredName,
+                male: r.male,
+                lastDivisionName: h?.divisionName ?? null,
+                lastSeasonLabel: h?.seasonLabel ?? null
+            }
+        })
+
+    return ok(options)
+}
+
+/**
+ * Locks in a permanent sub. Admin or division commissioner only.
+ *
+ * The original draft row is never mutated. A new substitutions row is inserted
+ * referencing the original_draft so chain history is preserved. The sub-in
+ * user's waitlist row for this season is removed inside the same transaction.
+ */
+export async function lockInPermanentSub(input: {
+    teamId: number
+    originalUserId: string
+    subUserId: string
+    reason?: string
+    notes?: string
+}): Promise<ActionResult<{ substitutionId: number }>> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return fail("Not authenticated.")
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return fail("No active season.")
+
+    const { teamId, originalUserId, subUserId, reason, notes } = input
+    if (!Number.isInteger(teamId) || teamId <= 0) return fail("Invalid team.")
+    if (typeof originalUserId !== "string" || !originalUserId)
+        return fail("Invalid original user.")
+    if (typeof subUserId !== "string" || !subUserId)
+        return fail("Invalid sub user.")
+    if (originalUserId === subUserId)
+        return fail("Original and sub user must differ.")
+
+    if (
+        !(await canManageTeamAsElevated(
+            session.user.id,
+            teamId,
+            config.seasonId
+        ))
+    ) {
+        return fail("Not authorized to lock in a permanent sub.")
+    }
+
+    const [teamRow] = await db
+        .select({
+            id: teams.id,
+            name: teams.name,
+            number: teams.number,
+            season: teams.season,
+            division: teams.division
+        })
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1)
+    if (!teamRow) return fail("Team not found.")
+    if (teamRow.season !== config.seasonId)
+        return fail("Team is not in the active season.")
+
+    // Resolve roster slot — the UI may pass either the original draftee or the
+    // currently-active player. Find the slot whose active player is originalUserId.
+    const roster = await getTeamRosterWithSubs(config.seasonId, teamId)
+    const slot = roster.find((s) => s.activeUser.id === originalUserId)
+    if (!slot)
+        return fail(
+            "Player is not currently active on this team's roster (they may already have been subbed)."
+        )
+
+    // Sub-in user must be on the season's waitlist.
+    const [waitlistRow] = await db
+        .select({ id: waitlist.id })
+        .from(waitlist)
+        .where(
+            and(
+                eq(waitlist.season, config.seasonId),
+                eq(waitlist.user, subUserId)
+            )
+        )
+        .limit(1)
+    if (!waitlistRow)
+        return fail("Sub user is not on the waitlist for this season.")
+
+    // Sub-in user must not be on any team this season already.
+    const onTeam = roster.some((s) => s.activeUser.id === subUserId)
+    if (onTeam) return fail("Sub user is already on a team this season.")
+    const [otherDraft] = await db
+        .select({ id: drafts.id })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .where(
+            and(eq(drafts.user, subUserId), eq(teams.season, config.seasonId))
+        )
+        .limit(1)
+    if (otherDraft)
+        return fail("Sub user is already drafted on a team this season.")
+
+    const originalName = formatPlayerSummaryName(slot.activeUser)
+    const subName = await findUserName(subUserId)
+
+    let insertedId: number
+    try {
+        insertedId = await db.transaction(async (tx) => {
+            const inserted = await tx
+                .insert(substitutions)
+                .values({
+                    team: teamId,
+                    season: config.seasonId,
+                    original_draft: slot.draftId,
+                    original_user: slot.activeUser.id,
+                    sub_user: subUserId,
+                    performed_by: session.user.id,
+                    reason: reason?.trim() || null,
+                    notes: notes?.trim() || null
+                })
+                .returning({ id: substitutions.id })
+            await tx.delete(waitlist).where(eq(waitlist.id, waitlistRow.id))
+            return inserted[0].id
+        })
+    } catch (err) {
+        console.error("Failed to lock in permanent sub:", err)
+        return fail("Failed to record substitution.")
+    }
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "create",
+        entityType: "substitutions",
+        entityId: insertedId,
+        summary: `Locked in permanent sub: ${subName} replaces ${originalName} on ${teamRow.name}${teamRow.number != null ? ` (#${teamRow.number})` : ""} for season ${config.seasonId} (performed by ${session.user.name ?? session.user.id})`
+    })
+
+    return ok({ substitutionId: insertedId })
+}
+
+/**
+ * Locks in a regular (single-match) sub. Captain of the team, admin, or
+ * division commissioner. Does NOT consume the sub-in user's waitlist row.
+ */
+export async function lockInRegularSub(input: {
+    teamId: number
+    matchId: number
+    originalUserId: string
+    subUserId: string
+    notes?: string
+}): Promise<ActionResult<{ matchSubstitutionId: number }>> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return fail("Not authenticated.")
+
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return fail("No active season.")
+
+    const { teamId, matchId, originalUserId, subUserId, notes } = input
+    if (!Number.isInteger(teamId) || teamId <= 0) return fail("Invalid team.")
+    if (!Number.isInteger(matchId) || matchId <= 0)
+        return fail("Invalid match.")
+    if (typeof originalUserId !== "string" || !originalUserId)
+        return fail("Invalid original user.")
+    if (typeof subUserId !== "string" || !subUserId)
+        return fail("Invalid sub user.")
+    if (originalUserId === subUserId)
+        return fail("Original and sub user must differ.")
+
+    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+        return fail("Not authorized.")
+    }
+
+    const [matchRow] = await db
+        .select({
+            id: matches.id,
+            season: matches.season,
+            homeTeam: matches.home_team,
+            awayTeam: matches.away_team,
+            date: matches.date
+        })
+        .from(matches)
+        .where(eq(matches.id, matchId))
+        .limit(1)
+    if (!matchRow) return fail("Match not found.")
+    if (matchRow.season !== config.seasonId)
+        return fail("Match is not in the active season.")
+    if (matchRow.homeTeam !== teamId && matchRow.awayTeam !== teamId)
+        return fail("Match does not belong to this team.")
+
+    // Confirm originalUserId is currently active on the team (resolves the
+    // permanent-sub chain). Reject if they've been permanently subbed out.
+    const slot = await resolveActiveUserForSlot(teamId, originalUserId)
+    let activeOriginal: string
+    if (slot && slot.activeUserId === originalUserId) {
+        activeOriginal = originalUserId
+    } else {
+        // Allow callers to pass the original draftee even if no chain exists.
+        // Otherwise reject — the player isn't on this team's active roster.
+        const [draftRow] = await db
+            .select({ id: drafts.id })
+            .from(drafts)
+            .where(
+                and(eq(drafts.team, teamId), eq(drafts.user, originalUserId))
+            )
+            .limit(1)
+        if (!draftRow)
+            return fail(
+                "Player is not on this team's active roster for this match."
+            )
+        activeOriginal = originalUserId
+    }
+
+    // Sub-in user must be on the waitlist for this season.
+    const [waitlistRow] = await db
+        .select({ id: waitlist.id })
+        .from(waitlist)
+        .where(
+            and(
+                eq(waitlist.season, config.seasonId),
+                eq(waitlist.user, subUserId)
+            )
+        )
+        .limit(1)
+    if (!waitlistRow)
+        return fail("Sub user is not on the waitlist for this season.")
+
+    // Reject duplicate (match, original_user) — also enforced by unique index.
+    const [existing] = await db
+        .select({ id: matchSubstitutions.id })
+        .from(matchSubstitutions)
+        .where(
+            and(
+                eq(matchSubstitutions.match, matchId),
+                eq(matchSubstitutions.original_user, activeOriginal)
+            )
+        )
+        .limit(1)
+    if (existing)
+        return fail("A sub is already recorded for this player on this match.")
+
+    const originalName = await findUserName(activeOriginal)
+    const subName = await findUserName(subUserId)
+
+    let insertedId: number
+    try {
+        const inserted = await db
+            .insert(matchSubstitutions)
+            .values({
+                match: matchId,
+                team: teamId,
+                season: config.seasonId,
+                original_user: activeOriginal,
+                sub_user: subUserId,
+                performed_by: session.user.id,
+                notes: notes?.trim() || null
+            })
+            .returning({ id: matchSubstitutions.id })
+        insertedId = inserted[0].id
+    } catch (err) {
+        console.error("Failed to lock in regular sub:", err)
+        return fail("Failed to record substitution.")
+    }
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "create",
+        entityType: "match_substitutions",
+        entityId: insertedId,
+        summary: `Locked in regular sub: ${subName} subs for ${originalName} on team ${teamId} for match ${matchId}${matchRow.date ? ` (${matchRow.date})` : ""} (performed by ${session.user.name ?? session.user.id})`
+    })
+
+    return ok({ matchSubstitutionId: insertedId })
 }
 
 export async function logSubContactViewed(

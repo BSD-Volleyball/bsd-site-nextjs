@@ -346,10 +346,26 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                             >
                                                 {name} {m.lastName}
                                             </button>
+                                            {m.subForName && (
+                                                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
+                                                    Sub for {m.subForName}
+                                                </span>
+                                            )}
                                         </li>
                                     )
                                 })}
                             </ul>
+                            {data.subbedOutOriginals.length > 0 && (
+                                <p className="text-muted-foreground text-xs italic">
+                                    Originally drafted but subbed out:{" "}
+                                    {data.subbedOutOriginals
+                                        .map(
+                                            (o) =>
+                                                `${o.displayName} ${o.lastName} (Rd ${o.originalRound}, replaced by ${o.replacedByName})`
+                                        )
+                                        .join("; ")}
+                                </p>
+                            )}
                             <Link
                                 href="/dashboard/team-availability"
                                 className="inline-flex items-center gap-1 text-teal-700 text-xs underline underline-offset-2 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
@@ -575,15 +591,22 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                     key={m.email}
                                     className="rounded border p-3 text-sm"
                                 >
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            modal.openPlayerDetail(m.userId)
-                                        }
-                                        className="font-medium underline decoration-dotted hover:opacity-80"
-                                    >
-                                        {m.displayName} {m.lastName}
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                modal.openPlayerDetail(m.userId)
+                                            }
+                                            className="font-medium underline decoration-dotted hover:opacity-80"
+                                        >
+                                            {m.displayName} {m.lastName}
+                                        </button>
+                                        {m.subForName && (
+                                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">
+                                                Sub for {m.subForName}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-muted-foreground">
                                         {m.email}
                                     </p>
