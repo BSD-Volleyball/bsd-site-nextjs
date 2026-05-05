@@ -582,6 +582,58 @@ function WaitlistContent({
     )
 }
 
+function WaitlistInterestPanel({
+    signupStatus,
+    waitlistSeasonId,
+    pitch
+}: {
+    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
+    waitlistSeasonId: number | null
+    pitch: string
+}) {
+    if (signupStatus.onWaitlist) {
+        if (signupStatus.waitlistApproved) {
+            return (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                        <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
+                            <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p className="font-medium text-green-700 text-sm dark:text-green-400">
+                            You've been approved from the waitlist! Please sign
+                            up for the season now.
+                        </p>
+                    </div>
+                    <Link
+                        href="/dashboard/pay-season"
+                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
+                    >
+                        Sign-up Now
+                    </Link>
+                </div>
+            )
+        }
+        return (
+            <div className="flex items-center gap-3">
+                <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
+                    <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
+                    You've expressed interest in playing. We'll reach out if a
+                    spot opens up!
+                </p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">{pitch}</p>
+            <WaitlistButton seasonId={waitlistSeasonId!} />
+        </div>
+    )
+}
+
 function SignupCTA({
     signupStatus,
     seasonLabel
@@ -2471,55 +2523,11 @@ export default async function DashboardPage() {
                                             underway for the {seasonLabel}{" "}
                                             season.
                                         </p>
-                                        {signupStatus.onWaitlist ? (
-                                            signupStatus.waitlistApproved ? (
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                                                            <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                                        </div>
-                                                        <p className="font-medium text-green-700 text-sm dark:text-green-400">
-                                                            You've been approved
-                                                            from the waitlist!
-                                                            Please sign up for
-                                                            the season now.
-                                                        </p>
-                                                    </div>
-                                                    <Link
-                                                        href="/dashboard/pay-season"
-                                                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                                                    >
-                                                        Sign-up Now
-                                                    </Link>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-3">
-                                                    <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                                                        <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                                    </div>
-                                                    <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                                                        You've expressed
-                                                        interest in playing.
-                                                        We'll reach out if a
-                                                        spot opens up!
-                                                    </p>
-                                                </div>
-                                            )
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <p className="text-muted-foreground text-sm">
-                                                    Interested in joining? There
-                                                    are occasionally drop-outs,
-                                                    injuries, or scheduling
-                                                    conflicts. Express your
-                                                    interest to get on the
-                                                    waitlist.
-                                                </p>
-                                                <WaitlistButton
-                                                    seasonId={waitlistSeasonId!}
-                                                />
-                                            </div>
-                                        )}
+                                        <WaitlistInterestPanel
+                                            signupStatus={signupStatus}
+                                            waitlistSeasonId={waitlistSeasonId}
+                                            pitch="Interested in joining? There are occasionally drop-outs, injuries, or scheduling conflicts. Express your interest to get on the waitlist."
+                                        />
                                     </div>
                                 ) : (
                                     <p className="text-muted-foreground">
@@ -2554,10 +2562,21 @@ export default async function DashboardPage() {
                                         Check the schedule and standings for the
                                         latest results.
                                     </p>
-                                    {playerTeamAssignment && (
+                                    {playerTeamAssignment ? (
                                         <TeamAssignmentDisplay
                                             assignment={playerTeamAssignment}
                                         />
+                                    ) : (
+                                        !signupStatus.signup &&
+                                        signupStatus.season && (
+                                            <WaitlistInterestPanel
+                                                signupStatus={signupStatus}
+                                                waitlistSeasonId={
+                                                    waitlistSeasonId
+                                                }
+                                                pitch="Want to play? Drop-outs, injuries, and scheduling conflicts open spots mid-season. Express your interest to join the waitlist or sub list."
+                                            />
+                                        )
                                     )}
                                 </div>
                             ) : signupStatus.config.phase === "playoffs" ? (
@@ -2569,10 +2588,21 @@ export default async function DashboardPage() {
                                         Check the playoff bracket for matchups
                                         and results.
                                     </p>
-                                    {playerTeamAssignment && (
+                                    {playerTeamAssignment ? (
                                         <TeamAssignmentDisplay
                                             assignment={playerTeamAssignment}
                                         />
+                                    ) : (
+                                        !signupStatus.signup &&
+                                        signupStatus.season && (
+                                            <WaitlistInterestPanel
+                                                signupStatus={signupStatus}
+                                                waitlistSeasonId={
+                                                    waitlistSeasonId
+                                                }
+                                                pitch="Looking ahead to next season? Express your interest now to be on the waitlist for the next signup window or to sub during playoffs if a spot opens."
+                                            />
+                                        )
                                     )}
                                 </div>
                             ) : signupStatus.config.phase === "complete" ? (
