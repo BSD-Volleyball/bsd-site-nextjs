@@ -44,6 +44,7 @@ interface CombinedMatch {
     homeSource: ParsedSource
     awaySource: ParsedSource
     workTeamId: number | null
+    workSource: ParsedSource
     metaBracket: string | null
     section: SectionKey | null
     round: number
@@ -771,7 +772,7 @@ function buildBracketData(
             workTeamLabel:
                 m.workTeamId !== null
                     ? getTeamLabelById(m.workTeamId, labelContext)
-                    : null
+                    : resolveReferenceLabel(m.workSource, labelContext)
         }
     })
 
@@ -951,7 +952,8 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     awaySource: playoffMatchesMeta.away_source,
                     nextMatchNum: playoffMatchesMeta.next_match_num,
                     nextLoserMatchNum: playoffMatchesMeta.next_loser_match_num,
-                    workTeamId: playoffMatchesMeta.work_team
+                    workTeamId: playoffMatchesMeta.work_team,
+                    workSource: playoffMatchesMeta.work_source
                 })
                 .from(playoffMatchesMeta)
                 .where(eq(playoffMatchesMeta.season, seasonId))
@@ -1090,6 +1092,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     homeSource: parseSourceToken(meta?.homeSource || null),
                     awaySource: parseSourceToken(meta?.awaySource || null),
                     workTeamId: meta?.workTeamId ?? null,
+                    workSource: parseSourceToken(meta?.workSource ?? null),
                     metaBracket: meta?.bracket || null,
                     section: null,
                     round: 1,
@@ -1125,6 +1128,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     homeSource: parseSourceToken(meta.homeSource),
                     awaySource: parseSourceToken(meta.awaySource),
                     workTeamId: meta.workTeamId ?? null,
+                    workSource: parseSourceToken(meta.workSource ?? null),
                     metaBracket: meta.bracket || null,
                     section: null,
                     round: 1,
@@ -1255,7 +1259,10 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     workAssignmentLabel:
                         match.workTeamId !== null
                             ? getTeamLabelById(match.workTeamId, labelContext)
-                            : null,
+                            : resolveReferenceLabel(
+                                  match.workSource,
+                                  labelContext
+                              ),
                     round: match.round
                 })
             }

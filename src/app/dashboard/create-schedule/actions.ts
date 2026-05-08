@@ -510,7 +510,8 @@ export async function writePlayoffSchedule(
                     home_source: pm.homeSeed,
                     away_source: pm.awaySeed,
                     next_match_num: pm.nextMatchNum,
-                    next_loser_match_num: pm.nextLoserMatchNum
+                    next_loser_match_num: pm.nextLoserMatchNum,
+                    work_source: pm.workTeam
                 })
             }
         }

@@ -7,6 +7,10 @@ import {
 } from "@/database/schema"
 import { and, eq, isNotNull, or } from "drizzle-orm"
 import { rankDivision } from "@/lib/team-ranking"
+import {
+    FOUR_TEAM_PLAYOFF,
+    SIX_TEAM_PLAYOFF
+} from "@/app/dashboard/create-schedule/schedule-constants"
 
 export interface SeedPlayoffsResult {
     status: boolean
@@ -119,12 +123,24 @@ export async function seedPlayoffs(
                 .where(eq(teams.id, ranked[i].id))
         }
 
-        // Resolve direct-seed sources (S1..SN) on playoff matches for this division.
+        // Backfill work_source from the template for legacy rows that predate
+        // the work_source column, so existing seasons can advance to playoffs
+        // and have work assignments populate without re-running schedule
+        // generation.
+        const template =
+            div.teamCount === 4 ? FOUR_TEAM_PLAYOFF : SIX_TEAM_PLAYOFF
+        const workSourceByMatchNum = new Map(
+            template.map((t) => [t.matchNum, t.workTeam])
+        )
+
         const metaRows = await db
             .select({
+                id: playoffMatchesMeta.id,
                 matchId: playoffMatchesMeta.match_id,
+                matchNum: playoffMatchesMeta.match_num,
                 homeSource: playoffMatchesMeta.home_source,
-                awaySource: playoffMatchesMeta.away_source
+                awaySource: playoffMatchesMeta.away_source,
+                workSource: playoffMatchesMeta.work_source
             })
             .from(playoffMatchesMeta)
             .where(
@@ -135,6 +151,36 @@ export async function seedPlayoffs(
             )
 
         for (const meta of metaRows) {
+            const effectiveWorkSource =
+                meta.workSource ??
+                workSourceByMatchNum.get(meta.matchNum) ??
+                null
+
+            if (
+                effectiveWorkSource !== null &&
+                effectiveWorkSource !== meta.workSource
+            ) {
+                await db
+                    .update(playoffMatchesMeta)
+                    .set({ work_source: effectiveWorkSource })
+                    .where(eq(playoffMatchesMeta.id, meta.id))
+            }
+
+            // Resolve direct-seed work team to the work_team integer column.
+            const workSeedMatch = effectiveWorkSource
+                ? SEED_SOURCE_PATTERN.exec(effectiveWorkSource)
+                : null
+            if (workSeedMatch) {
+                const seedIdx = Number.parseInt(workSeedMatch[1], 10) - 1
+                const team = ranked[seedIdx]
+                if (team) {
+                    await db
+                        .update(playoffMatchesMeta)
+                        .set({ work_team: team.id })
+                        .where(eq(playoffMatchesMeta.id, meta.id))
+                }
+            }
+
             if (!meta.matchId) continue
 
             const homeMatch = SEED_SOURCE_PATTERN.exec(meta.homeSource)

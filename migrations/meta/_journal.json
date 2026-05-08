@@ -127,6 +127,13 @@
       "when": 1778011596300,
       "tag": "0017_curious_edwin_jarvis",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778249521018,
+      "tag": "0018_sudden_starfox",
+      "breakpoints": true
     }
   ]
 }

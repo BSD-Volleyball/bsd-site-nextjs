@@ -374,6 +374,7 @@ export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
     next_match_num: integer("next_match_num"),
     next_loser_match_num: integer("next_loser_match_num"),
     work_team: integer("work_team").references(() => teams.id),
+    work_source: text("work_source"),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull()
