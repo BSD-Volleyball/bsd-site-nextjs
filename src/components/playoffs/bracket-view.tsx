@@ -20,7 +20,7 @@ const DoubleEliminationBracket = dynamic(
 // Must provide ALL properties — the library does NOT merge with defaults.
 const BRACKET_STYLE = {
     width: 185,
-    boxHeight: 90,
+    boxHeight: 100,
     canvasPadding: 12,
     spaceBetweenColumns: 24,
     spaceBetweenRows: 16,
@@ -154,6 +154,22 @@ function CustomMatch(props: MatchComponentProps) {
                             }}
                         >
                             Sets: {bm.scoresDisplay}
+                        </div>
+                    )}
+
+                    {bm.workTeamLabel && (
+                        <div
+                            style={{
+                                fontSize: "9px",
+                                color: "var(--muted-foreground)",
+                                padding: "2px 6px",
+                                borderTop: "1px solid var(--border)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis"
+                            }}
+                        >
+                            Work: {bm.workTeamLabel}
                         </div>
                     )}
                 </>

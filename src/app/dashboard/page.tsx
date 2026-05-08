@@ -69,10 +69,13 @@ import {
     getCaptainWelcomeData,
     getPlayerTeamAssignment,
     getNextMatch,
+    getPlayoffNextMatches,
     type CaptainWelcomeData,
     type PlayerTeamAssignment,
-    type NextMatch
+    type NextMatch,
+    type PlayoffNextMatchData
 } from "./actions"
+import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -719,6 +722,7 @@ export default async function DashboardPage() {
     let captainWelcomeData: CaptainWelcomeData | null = null
     let playerTeamAssignment: PlayerTeamAssignment | null = null
     let nextMatch: NextMatch | null = null
+    let playoffNextMatches: PlayoffNextMatchData | null = null
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -970,6 +974,13 @@ export default async function DashboardPage() {
                 )
             ) {
                 nextMatch = await getNextMatch(
+                    session.user.id,
+                    signupStatus.config.seasonId
+                )
+            }
+
+            if (signupStatus.config.phase === "playoffs") {
+                playoffNextMatches = await getPlayoffNextMatches(
                     session.user.id,
                     signupStatus.config.seasonId
                 )
@@ -1476,7 +1487,10 @@ export default async function DashboardPage() {
             />
 
             <div className="flex flex-wrap gap-6">
-                {nextMatch && (
+                {playoffNextMatches && (
+                    <PlayoffNextMatchCard data={playoffNextMatches} />
+                )}
+                {!playoffNextMatches && nextMatch && (
                     <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
