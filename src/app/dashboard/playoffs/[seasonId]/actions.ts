@@ -92,6 +92,12 @@ export interface PlayoffMatchLine {
     workTeamId: number | null
     winnerTeamId: number | null
     loserTeamId: number | null
+    homeSourceRefMatch: number | null
+    homeSourceRefIsWin: boolean | null
+    awaySourceRefMatch: number | null
+    awaySourceRefIsWin: boolean | null
+    workSourceRefMatch: number | null
+    workSourceRefIsWin: boolean | null
 }
 
 export interface PlayoffRound {
@@ -140,6 +146,12 @@ export interface BracketMatch {
     homeTeamId: number | null
     awayTeamId: number | null
     workTeamId: number | null
+    homeSourceRefMatch: number | null
+    homeSourceRefIsWin: boolean | null
+    awaySourceRefMatch: number | null
+    awaySourceRefIsWin: boolean | null
+    workSourceRefMatch: number | null
+    workSourceRefIsWin: boolean | null
 }
 
 export interface PlayoffDivision {
@@ -152,6 +164,8 @@ export interface PlayoffDivision {
     scheduleMatches: PlayoffMatchLine[]
     resultsMatches: PlayoffMatchLine[]
     bracketMatches: { upper: BracketMatch[]; lower: BracketMatch[] } | null
+    userAnchorMatchNum: number | null
+    userAnchorWeek: number | null
 }
 
 interface PlayoffData {
@@ -792,7 +806,37 @@ function buildBracketData(
                     : resolveReferenceLabel(m.workSource, labelContext),
             homeTeamId: m.homeTeamId,
             awayTeamId: m.awayTeamId,
-            workTeamId: m.workTeamId
+            workTeamId: m.workTeamId,
+            homeSourceRefMatch:
+                m.homeSource.kind === "winner" || m.homeSource.kind === "loser"
+                    ? m.homeSource.value
+                    : null,
+            homeSourceRefIsWin:
+                m.homeSource.kind === "winner"
+                    ? true
+                    : m.homeSource.kind === "loser"
+                      ? false
+                      : null,
+            awaySourceRefMatch:
+                m.awaySource.kind === "winner" || m.awaySource.kind === "loser"
+                    ? m.awaySource.value
+                    : null,
+            awaySourceRefIsWin:
+                m.awaySource.kind === "winner"
+                    ? true
+                    : m.awaySource.kind === "loser"
+                      ? false
+                      : null,
+            workSourceRefMatch:
+                m.workSource.kind === "winner" || m.workSource.kind === "loser"
+                    ? m.workSource.value
+                    : null,
+            workSourceRefIsWin:
+                m.workSource.kind === "winner"
+                    ? true
+                    : m.workSource.kind === "loser"
+                      ? false
+                      : null
         }
     })
 
@@ -874,7 +918,13 @@ function buildBracketData(
             workTeamLabel: null,
             homeTeamId: byeSide === "home" ? byeTeamId : null,
             awayTeamId: byeSide === "away" ? byeTeamId : null,
-            workTeamId: null
+            workTeamId: null,
+            homeSourceRefMatch: null,
+            homeSourceRefIsWin: null,
+            awaySourceRefMatch: null,
+            awaySourceRefIsWin: null,
+            workSourceRefMatch: null,
+            workSourceRefIsWin: null
         })
     }
 
@@ -1358,7 +1408,40 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     awayTeamId: match.awayTeamId,
                     workTeamId: match.workTeamId,
                     winnerTeamId,
-                    loserTeamId
+                    loserTeamId,
+                    homeSourceRefMatch:
+                        match.homeSource.kind === "winner" ||
+                        match.homeSource.kind === "loser"
+                            ? match.homeSource.value
+                            : null,
+                    homeSourceRefIsWin:
+                        match.homeSource.kind === "winner"
+                            ? true
+                            : match.homeSource.kind === "loser"
+                              ? false
+                              : null,
+                    awaySourceRefMatch:
+                        match.awaySource.kind === "winner" ||
+                        match.awaySource.kind === "loser"
+                            ? match.awaySource.value
+                            : null,
+                    awaySourceRefIsWin:
+                        match.awaySource.kind === "winner"
+                            ? true
+                            : match.awaySource.kind === "loser"
+                              ? false
+                              : null,
+                    workSourceRefMatch:
+                        match.workSource.kind === "winner" ||
+                        match.workSource.kind === "loser"
+                            ? match.workSource.value
+                            : null,
+                    workSourceRefIsWin:
+                        match.workSource.kind === "winner"
+                            ? true
+                            : match.workSource.kind === "loser"
+                              ? false
+                              : null
                 })
             }
 
@@ -1490,6 +1573,30 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 labelContext
             )
 
+            // Compute the user's "anchor" for this division: the latest match
+            // (by matchNum) where the user's team is definitely involved as
+            // home/away/work. Drives the green/red one-level-lookahead path
+            // tinting in the bracket and schedule.
+            let userAnchorMatchNum: number | null = null
+            let userAnchorWeek: number | null = null
+            if (userTeamId !== null && division.id === userDivisionId) {
+                for (const line of scheduleMatches) {
+                    if (line.matchNum === null) continue
+                    const involves =
+                        line.homeTeamId === userTeamId ||
+                        line.awayTeamId === userTeamId ||
+                        line.workTeamId === userTeamId
+                    if (!involves) continue
+                    if (
+                        userAnchorMatchNum === null ||
+                        line.matchNum > userAnchorMatchNum
+                    ) {
+                        userAnchorMatchNum = line.matchNum
+                        userAnchorWeek = line.week
+                    }
+                }
+            }
+
             allDivisions.push({
                 id: division.id,
                 name: division.name,
@@ -1499,7 +1606,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 sections,
                 scheduleMatches,
                 resultsMatches,
-                bracketMatches
+                bracketMatches,
+                userAnchorMatchNum,
+                userAnchorWeek
             })
         }
 

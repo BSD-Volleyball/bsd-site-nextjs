@@ -31,16 +31,56 @@ const BracketView = dynamic(
     }
 )
 
+type PathTint = "win" | "lose" | null
+
+function pathTintBg(tint: PathTint): string {
+    if (tint === "win") return "bg-emerald-500/20 dark:bg-emerald-500/25"
+    if (tint === "lose") return "bg-rose-500/20 dark:bg-rose-500/25"
+    return ""
+}
+
 function MatchCard({
     match,
-    userTeamId
+    userTeamId,
+    anchorMatchNum,
+    anchorWeek
 }: {
     match: PlayoffMatchLine
     userTeamId: number | null
+    anchorMatchNum: number | null
+    anchorWeek: number | null
 }) {
     const isUserHome = userTeamId !== null && match.homeTeamId === userTeamId
     const isUserAway = userTeamId !== null && match.awayTeamId === userTeamId
     const isUserWork = userTeamId !== null && match.workTeamId === userTeamId
+
+    // Same-evening win/lose path tint: only fires when this match is in the
+    // anchor's week and one of its sides directly references the anchor's
+    // outcome. Doesn't apply on the anchor match itself.
+    const pathApplies =
+        anchorMatchNum !== null &&
+        anchorWeek !== null &&
+        match.matchNum !== anchorMatchNum &&
+        match.week === anchorWeek
+    const homeTint: PathTint =
+        pathApplies && match.homeSourceRefMatch === anchorMatchNum
+            ? match.homeSourceRefIsWin
+                ? "win"
+                : "lose"
+            : null
+    const awayTint: PathTint =
+        pathApplies && match.awaySourceRefMatch === anchorMatchNum
+            ? match.awaySourceRefIsWin
+                ? "win"
+                : "lose"
+            : null
+    const workTint: PathTint =
+        pathApplies && match.workSourceRefMatch === anchorMatchNum
+            ? match.workSourceRefIsWin
+                ? "win"
+                : "lose"
+            : null
+
     const cardHighlight =
         isUserHome || isUserAway || isUserWork ? "ring-2 ring-primary/40" : ""
     return (
@@ -68,7 +108,8 @@ function MatchCard({
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === true &&
                             "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
-                        isUserHome && "bg-primary/10 font-semibold"
+                        isUserHome && "bg-primary/10 font-semibold",
+                        !isUserHome && pathTintBg(homeTint)
                     )}
                 >
                     <span className="truncate pr-2">{match.homeLabel}</span>
@@ -82,7 +123,8 @@ function MatchCard({
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === false &&
                             "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
-                        isUserAway && "bg-primary/10 font-semibold"
+                        isUserAway && "bg-primary/10 font-semibold",
+                        !isUserAway && pathTintBg(awayTint)
                     )}
                 >
                     <span className="truncate pr-2">{match.awayLabel}</span>
@@ -114,7 +156,8 @@ function MatchCard({
                         variant={isUserWork ? "default" : "secondary"}
                         className={cn(
                             "px-1.5 py-0 text-[10px]",
-                            isUserWork && "bg-primary text-primary-foreground"
+                            isUserWork && "bg-primary text-primary-foreground",
+                            !isUserWork && pathTintBg(workTint)
                         )}
                     >
                         Work: {match.workAssignmentLabel}
@@ -131,10 +174,14 @@ function MatchCard({
 
 function BracketSectionView({
     section,
-    userTeamId
+    userTeamId,
+    anchorMatchNum,
+    anchorWeek
 }: {
     section: PlayoffSection
     userTeamId: number | null
+    anchorMatchNum: number | null
+    anchorWeek: number | null
 }) {
     return (
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
@@ -158,6 +205,8 @@ function BracketSectionView({
                                         key={match.key}
                                         match={match}
                                         userTeamId={userTeamId}
+                                        anchorMatchNum={anchorMatchNum}
+                                        anchorWeek={anchorWeek}
                                     />
                                 ))}
                             </div>
@@ -171,10 +220,14 @@ function BracketSectionView({
 
 function ScheduleTable({
     matches,
-    userTeamId
+    userTeamId,
+    anchorMatchNum,
+    anchorWeek
 }: {
     matches: PlayoffMatchLine[]
     userTeamId: number | null
+    anchorMatchNum: number | null
+    anchorWeek: number | null
 }) {
     return (
         <div className="overflow-x-auto rounded-md border">
@@ -211,6 +264,41 @@ function ScheduleTable({
                             (match.homeTeamId === userTeamId ||
                                 match.awayTeamId === userTeamId ||
                                 match.workTeamId === userTeamId)
+
+                        const pathApplies =
+                            anchorMatchNum !== null &&
+                            anchorWeek !== null &&
+                            match.matchNum !== anchorMatchNum &&
+                            match.week === anchorWeek
+                        const playRefIsAnchor =
+                            pathApplies &&
+                            (match.homeSourceRefMatch === anchorMatchNum ||
+                                match.awaySourceRefMatch === anchorMatchNum)
+                        const playTint: PathTint = playRefIsAnchor
+                            ? match.homeSourceRefMatch === anchorMatchNum
+                                ? match.homeSourceRefIsWin
+                                    ? "win"
+                                    : "lose"
+                                : match.awaySourceRefIsWin
+                                  ? "win"
+                                  : "lose"
+                            : null
+                        const workTint: PathTint =
+                            pathApplies &&
+                            match.workSourceRefMatch === anchorMatchNum
+                                ? match.workSourceRefIsWin
+                                    ? "win"
+                                    : "lose"
+                                : null
+                        const teamsCellTint =
+                            !involvesUser && playTint
+                                ? pathTintBg(playTint)
+                                : ""
+                        const workCellTint =
+                            !involvesUser && workTint
+                                ? pathTintBg(workTint)
+                                : ""
+
                         return (
                             <tr
                                 key={`schedule-${match.key}`}
@@ -235,10 +323,10 @@ function ScheduleTable({
                                 <td className="px-3 py-2">
                                     {match.court !== null ? match.court : "—"}
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className={cn("px-3 py-2", teamsCellTint)}>
                                     {match.homeLabel} vs {match.awayLabel}
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className={cn("px-3 py-2", workCellTint)}>
                                     {match.workAssignmentLabel || "—"}
                                 </td>
                             </tr>
@@ -441,6 +529,10 @@ export function DivisionSection({
                                     <BracketView
                                         matches={division.bracketMatches}
                                         userTeamId={userTeamId}
+                                        anchorMatchNum={
+                                            division.userAnchorMatchNum
+                                        }
+                                        anchorWeek={division.userAnchorWeek}
                                     />
                                 ) : division.sections.length === 0 ? (
                                     <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
@@ -453,6 +545,10 @@ export function DivisionSection({
                                             key={section.key}
                                             section={section}
                                             userTeamId={userTeamId}
+                                            anchorMatchNum={
+                                                division.userAnchorMatchNum
+                                            }
+                                            anchorWeek={division.userAnchorWeek}
                                         />
                                     ))
                                 )}
@@ -463,6 +559,10 @@ export function DivisionSection({
                                     <ScheduleTable
                                         matches={division.scheduleMatches}
                                         userTeamId={userTeamId}
+                                        anchorMatchNum={
+                                            division.userAnchorMatchNum
+                                        }
+                                        anchorWeek={division.userAnchorWeek}
                                     />
                                     <ResultsTable
                                         matches={division.resultsMatches}

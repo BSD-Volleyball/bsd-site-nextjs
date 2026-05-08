@@ -51,7 +51,17 @@ const BRACKET_STYLE = {
     lostByNoShowText: "NS"
 }
 
-function makeCustomMatch(userTeamId: number | null) {
+type PathTint = "win" | "lose" | null
+const PATH_TINT_BG: Record<"win" | "lose", string> = {
+    win: "rgba(16, 185, 129, 0.22)",
+    lose: "rgba(244, 63, 94, 0.22)"
+}
+
+function makeCustomMatch(
+    userTeamId: number | null,
+    anchorMatchNum: number | null,
+    anchorWeek: number | null
+) {
     return function CustomMatch(props: MatchComponentProps) {
         const {
             match,
@@ -80,6 +90,31 @@ function makeCustomMatch(userTeamId: number | null) {
                 : isBye
                   ? "1px dashed var(--border)"
                   : "1px solid var(--border)"
+
+        // Same-evening one-level lookahead path tint.
+        const pathApplies =
+            !isBye &&
+            anchorMatchNum !== null &&
+            anchorWeek !== null &&
+            bm.matchNum !== anchorMatchNum &&
+            bm.week === anchorWeek
+        const tintForRef = (
+            refMatch: number | null,
+            refIsWin: boolean | null
+        ): PathTint => {
+            if (!pathApplies) return null
+            if (refMatch !== anchorMatchNum) return null
+            return refIsWin ? "win" : "lose"
+        }
+        const homeTint: PathTint = isUserHome
+            ? null
+            : tintForRef(bm.homeSourceRefMatch, bm.homeSourceRefIsWin)
+        const awayTint: PathTint = isUserAway
+            ? null
+            : tintForRef(bm.awaySourceRefMatch, bm.awaySourceRefIsWin)
+        const workTint: PathTint = isUserWork
+            ? null
+            : tintForRef(bm.workSourceRefMatch, bm.workSourceRefIsWin)
 
         return (
             <div
@@ -149,6 +184,7 @@ function makeCustomMatch(userTeamId: number | null) {
                             hovered={topHovered}
                             partyId={topParty?.id}
                             isUserTeam={isUserHome}
+                            pathTint={homeTint}
                             onMouseEnter={onMouseEnter}
                             onMouseLeave={onMouseLeave}
                         />
@@ -161,6 +197,7 @@ function makeCustomMatch(userTeamId: number | null) {
                             hovered={bottomHovered}
                             partyId={bottomParty?.id}
                             isUserTeam={isUserAway}
+                            pathTint={awayTint}
                             onMouseEnter={onMouseEnter}
                             onMouseLeave={onMouseLeave}
                         />
@@ -190,7 +227,9 @@ function makeCustomMatch(userTeamId: number | null) {
                                     borderTop: "1px solid var(--border)",
                                     backgroundColor: isUserWork
                                         ? "color-mix(in srgb, var(--primary) 18%, transparent)"
-                                        : "transparent",
+                                        : workTint
+                                          ? PATH_TINT_BG[workTint]
+                                          : "transparent",
                                     whiteSpace: "nowrap",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis"
@@ -213,6 +252,7 @@ function PartyRow({
     hovered,
     partyId,
     isUserTeam,
+    pathTint,
     onMouseEnter,
     onMouseLeave
 }: {
@@ -222,6 +262,7 @@ function PartyRow({
     hovered: boolean
     partyId?: string | number
     isUserTeam?: boolean
+    pathTint?: PathTint
     onMouseEnter?: (partyId: string | number) => void
     onMouseLeave?: () => void
 }) {
@@ -229,9 +270,11 @@ function PartyRow({
         ? "rgba(16, 185, 129, 0.15)"
         : isUserTeam
           ? "color-mix(in srgb, var(--primary) 22%, transparent)"
-          : won
-            ? "color-mix(in srgb, var(--primary) 12%, transparent)"
-            : "transparent"
+          : pathTint
+            ? PATH_TINT_BG[pathTint]
+            : won
+              ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+              : "transparent"
     return (
         // biome-ignore lint/a11y: decorative hover highlight inside SVG bracket
         <div
@@ -329,18 +372,22 @@ function ScrollWrapper({ children }: SvgWrapperProps) {
 
 export function BracketView({
     matches,
-    userTeamId = null
+    userTeamId = null,
+    anchorMatchNum = null,
+    anchorWeek = null
 }: {
     matches: { upper: BracketMatch[]; lower: BracketMatch[] }
     userTeamId?: number | null
+    anchorMatchNum?: number | null
+    anchorWeek?: number | null
 }) {
     const svgWrapper = useCallback(
         (props: SvgWrapperProps) => <ScrollWrapper {...props} />,
         []
     )
     const matchComponent = useMemo(
-        () => makeCustomMatch(userTeamId),
-        [userTeamId]
+        () => makeCustomMatch(userTeamId, anchorMatchNum, anchorWeek),
+        [userTeamId, anchorMatchNum, anchorWeek]
     )
 
     return (
