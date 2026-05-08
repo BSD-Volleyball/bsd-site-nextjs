@@ -5,12 +5,17 @@ import { db } from "@/database/db"
 import { auth } from "@/lib/auth"
 import {
     divisions,
+    individual_divisions,
     matches,
     playoffMatchesMeta,
     seasons,
     teams
 } from "@/database/schema"
 import { headers } from "next/headers"
+import {
+    FOUR_TEAM_PLAYOFF,
+    SIX_TEAM_PLAYOFF
+} from "@/app/dashboard/create-schedule/schedule-constants"
 
 type SectionKey = "winners" | "losers" | "championship"
 type SourceKind = "none" | "seed" | "winner" | "loser" | "team" | "unknown"
@@ -974,7 +979,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             }
         }
 
-        const [teamRows, divisionRowsFromDb] = await Promise.all([
+        const [teamRows, divisionRowsFromDb, indivDivRows] = await Promise.all([
             db
                 .select({
                     id: teams.id,
@@ -997,7 +1002,14 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 })
                 .from(divisions)
                 .where(inArray(divisions.id, divisionIds))
-                .orderBy(divisions.level)
+                .orderBy(divisions.level),
+            db
+                .select({
+                    divisionId: individual_divisions.division,
+                    teamCount: individual_divisions.teams
+                })
+                .from(individual_divisions)
+                .where(eq(individual_divisions.season, seasonId))
         ])
 
         const divisionRows = [...divisionRowsFromDb]
@@ -1024,6 +1036,10 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             championship: "Championship"
         }
 
+        const teamCountByDivision = new Map(
+            indivDivRows.map((d) => [d.divisionId, d.teamCount])
+        )
+
         for (const division of divisionRows) {
             const divisionTeams: TeamLookup[] = teamRows.filter(
                 (team) => team.divisionId === division.id
@@ -1034,6 +1050,29 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             const divisionMeta = metaRows.filter(
                 (meta) => meta.divisionId === division.id
             )
+
+            // Fallback: if a meta row's work_source is null (e.g. predates the
+            // column), look it up by matchNum from the division's playoff
+            // template. This keeps the work-team display populated for any
+            // season that hasn't been re-seeded since the column was added.
+            const teamCount = teamCountByDivision.get(division.id)
+            const template =
+                teamCount === 4
+                    ? FOUR_TEAM_PLAYOFF
+                    : teamCount === 6
+                      ? SIX_TEAM_PLAYOFF
+                      : null
+            const workSourceByMatchNum = new Map<number, string | null>(
+                template?.map((t) => [t.matchNum, t.workTeam]) ?? []
+            )
+            const resolveWorkSource = (
+                workSource: string | null,
+                matchNum: number | null
+            ): string | null => {
+                if (workSource) return workSource
+                if (matchNum === null) return null
+                return workSourceByMatchNum.get(matchNum) ?? null
+            }
 
             const teamLabelById = new Map<number, string>()
             const teamLabelByNumber = new Map<number, string>()
@@ -1092,7 +1131,12 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     homeSource: parseSourceToken(meta?.homeSource || null),
                     awaySource: parseSourceToken(meta?.awaySource || null),
                     workTeamId: meta?.workTeamId ?? null,
-                    workSource: parseSourceToken(meta?.workSource ?? null),
+                    workSource: parseSourceToken(
+                        resolveWorkSource(
+                            meta?.workSource ?? null,
+                            meta?.matchNum ?? null
+                        )
+                    ),
                     metaBracket: meta?.bracket || null,
                     section: null,
                     round: 1,
@@ -1128,7 +1172,12 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     homeSource: parseSourceToken(meta.homeSource),
                     awaySource: parseSourceToken(meta.awaySource),
                     workTeamId: meta.workTeamId ?? null,
-                    workSource: parseSourceToken(meta.workSource ?? null),
+                    workSource: parseSourceToken(
+                        resolveWorkSource(
+                            meta.workSource ?? null,
+                            meta.matchNum
+                        )
+                    ),
                     metaBracket: meta.bracket || null,
                     section: null,
                     round: 1,
