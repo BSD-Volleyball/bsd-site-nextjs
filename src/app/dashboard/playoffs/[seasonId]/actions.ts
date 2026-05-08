@@ -5,6 +5,7 @@ import { db } from "@/database/db"
 import { auth } from "@/lib/auth"
 import {
     divisions,
+    drafts,
     individual_divisions,
     matches,
     playoffMatchesMeta,
@@ -86,6 +87,11 @@ export interface PlayoffMatchLine {
     awaySourceLabel: string | null
     workAssignmentLabel: string | null
     round: number
+    homeTeamId: number | null
+    awayTeamId: number | null
+    workTeamId: number | null
+    winnerTeamId: number | null
+    loserTeamId: number | null
 }
 
 export interface PlayoffRound {
@@ -102,6 +108,7 @@ export interface PlayoffSection {
 export interface PlayoffSeed {
     seed: number
     teamLabel: string
+    teamId: number | null
 }
 
 export interface BracketParticipant {
@@ -130,6 +137,9 @@ export interface BracketMatch {
     homeSourceLabel: string | null
     awaySourceLabel: string | null
     workTeamLabel: string | null
+    homeTeamId: number | null
+    awayTeamId: number | null
+    workTeamId: number | null
 }
 
 export interface PlayoffDivision {
@@ -149,6 +159,8 @@ interface PlayoffData {
     message?: string
     seasonLabel: string
     divisions: PlayoffDivision[]
+    userTeamId: number | null
+    userDivisionId: number | null
 }
 
 function parseTimeForSort(time: string | null): number {
@@ -777,7 +789,10 @@ function buildBracketData(
             workTeamLabel:
                 m.workTeamId !== null
                     ? getTeamLabelById(m.workTeamId, labelContext)
-                    : resolveReferenceLabel(m.workSource, labelContext)
+                    : resolveReferenceLabel(m.workSource, labelContext),
+            homeTeamId: m.homeTeamId,
+            awayTeamId: m.awayTeamId,
+            workTeamId: m.workTeamId
         }
     })
 
@@ -856,7 +871,10 @@ function buildBracketData(
             scoresDisplay: "\u2014",
             homeSourceLabel: null,
             awaySourceLabel: null,
-            workTeamLabel: null
+            workTeamLabel: null,
+            homeTeamId: byeSide === "home" ? byeTeamId : null,
+            awayTeamId: byeSide === "away" ? byeTeamId : null,
+            workTeamId: null
         })
     }
 
@@ -886,7 +904,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             status: false,
             message: "Not authenticated.",
             seasonLabel: "",
-            divisions: []
+            divisions: [],
+            userTeamId: null,
+            userDivisionId: null
         }
     }
 
@@ -895,7 +915,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             status: false,
             message: "Invalid season.",
             seasonLabel: "",
-            divisions: []
+            divisions: [],
+            userTeamId: null,
+            userDivisionId: null
         }
     }
 
@@ -914,7 +936,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 status: false,
                 message: "Season not found.",
                 seasonLabel: "",
-                divisions: []
+                divisions: [],
+                userTeamId: null,
+                userDivisionId: null
             }
         }
 
@@ -971,11 +995,28 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             ])
         ]
 
+        // Resolve which team (if any) the current user plays for in this season.
+        const [userDraft] = await db
+            .select({ teamId: teams.id, divisionId: teams.division })
+            .from(drafts)
+            .innerJoin(teams, eq(drafts.team, teams.id))
+            .where(
+                and(
+                    eq(drafts.user, session.user.id),
+                    eq(teams.season, seasonId)
+                )
+            )
+            .limit(1)
+        const userTeamId = userDraft?.teamId ?? null
+        const userDivisionId = userDraft?.divisionId ?? null
+
         if (divisionIds.length === 0) {
             return {
                 status: true,
                 seasonLabel,
-                divisions: []
+                divisions: [],
+                userTeamId,
+                userDivisionId
             }
         }
 
@@ -1312,7 +1353,12 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                                   match.workSource,
                                   labelContext
                               ),
-                    round: match.round
+                    round: match.round,
+                    homeTeamId: match.homeTeamId,
+                    awayTeamId: match.awayTeamId,
+                    workTeamId: match.workTeamId,
+                    winnerTeamId,
+                    loserTeamId
                 })
             }
 
@@ -1407,11 +1453,36 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     ? getTeamLabelById(fallbackChampionId, labelContext)
                     : null
 
+            const seedTeamIdBySeed = new Map<number, number>()
+            for (const match of combinedMatches) {
+                if (
+                    match.homeSource.kind === "seed" &&
+                    match.homeSource.value !== null &&
+                    match.homeTeamId !== null
+                ) {
+                    seedTeamIdBySeed.set(
+                        match.homeSource.value,
+                        match.homeTeamId
+                    )
+                }
+                if (
+                    match.awaySource.kind === "seed" &&
+                    match.awaySource.value !== null &&
+                    match.awayTeamId !== null
+                ) {
+                    seedTeamIdBySeed.set(
+                        match.awaySource.value,
+                        match.awayTeamId
+                    )
+                }
+            }
             const seeds: PlayoffSeed[] = [...seedNumbers]
                 .sort((a, b) => a - b)
                 .map((seedNum) => ({
                     seed: seedNum,
-                    teamLabel: seedLabelBySeed.get(seedNum) || `Seed ${seedNum}`
+                    teamLabel:
+                        seedLabelBySeed.get(seedNum) || `Seed ${seedNum}`,
+                    teamId: seedTeamIdBySeed.get(seedNum) ?? null
                 }))
 
             const bracketMatches = buildBracketData(
@@ -1435,7 +1506,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
         return {
             status: true,
             seasonLabel,
-            divisions: allDivisions
+            divisions: allDivisions,
+            userTeamId,
+            userDivisionId
         }
     } catch (error) {
         console.error("Error fetching playoff data:", error)
@@ -1443,7 +1516,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             status: false,
             message: "Something went wrong.",
             seasonLabel: "",
-            divisions: []
+            divisions: [],
+            userTeamId: null,
+            userDivisionId: null
         }
     }
 }

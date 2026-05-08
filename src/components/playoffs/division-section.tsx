@@ -31,9 +31,25 @@ const BracketView = dynamic(
     }
 )
 
-function MatchCard({ match }: { match: PlayoffMatchLine }) {
+function MatchCard({
+    match,
+    userTeamId
+}: {
+    match: PlayoffMatchLine
+    userTeamId: number | null
+}) {
+    const isUserHome = userTeamId !== null && match.homeTeamId === userTeamId
+    const isUserAway = userTeamId !== null && match.awayTeamId === userTeamId
+    const isUserWork = userTeamId !== null && match.workTeamId === userTeamId
+    const cardHighlight =
+        isUserHome || isUserAway || isUserWork ? "ring-2 ring-primary/40" : ""
     return (
-        <div className="rounded-lg border bg-background p-3 shadow-sm">
+        <div
+            className={cn(
+                "rounded-lg border bg-background p-3 shadow-sm",
+                cardHighlight
+            )}
+        >
             <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
                 <span>
                     Match {match.matchNum !== null ? `#${match.matchNum}` : "—"}{" "}
@@ -51,7 +67,8 @@ function MatchCard({ match }: { match: PlayoffMatchLine }) {
                     className={cn(
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === true &&
-                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300"
+                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
+                        isUserHome && "bg-primary/10 font-semibold"
                     )}
                 >
                     <span className="truncate pr-2">{match.homeLabel}</span>
@@ -64,7 +81,8 @@ function MatchCard({ match }: { match: PlayoffMatchLine }) {
                     className={cn(
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === false &&
-                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300"
+                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
+                        isUserAway && "bg-primary/10 font-semibold"
                     )}
                 >
                     <span className="truncate pr-2">{match.awayLabel}</span>
@@ -93,8 +111,11 @@ function MatchCard({ match }: { match: PlayoffMatchLine }) {
                 )}
                 {match.workAssignmentLabel && (
                     <Badge
-                        variant="secondary"
-                        className="px-1.5 py-0 text-[10px]"
+                        variant={isUserWork ? "default" : "secondary"}
+                        className={cn(
+                            "px-1.5 py-0 text-[10px]",
+                            isUserWork && "bg-primary text-primary-foreground"
+                        )}
                     >
                         Work: {match.workAssignmentLabel}
                     </Badge>
@@ -108,7 +129,13 @@ function MatchCard({ match }: { match: PlayoffMatchLine }) {
     )
 }
 
-function BracketSectionView({ section }: { section: PlayoffSection }) {
+function BracketSectionView({
+    section,
+    userTeamId
+}: {
+    section: PlayoffSection
+    userTeamId: number | null
+}) {
     return (
         <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
             <h3 className="font-semibold text-sm uppercase tracking-wide">
@@ -127,7 +154,11 @@ function BracketSectionView({ section }: { section: PlayoffSection }) {
                             </div>
                             <div className="space-y-3">
                                 {round.matches.map((match) => (
-                                    <MatchCard key={match.key} match={match} />
+                                    <MatchCard
+                                        key={match.key}
+                                        match={match}
+                                        userTeamId={userTeamId}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -138,7 +169,13 @@ function BracketSectionView({ section }: { section: PlayoffSection }) {
     )
 }
 
-function ScheduleTable({ matches }: { matches: PlayoffMatchLine[] }) {
+function ScheduleTable({
+    matches,
+    userTeamId
+}: {
+    matches: PlayoffMatchLine[]
+    userTeamId: number | null
+}) {
     return (
         <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
@@ -168,41 +205,58 @@ function ScheduleTable({ matches }: { matches: PlayoffMatchLine[] }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {matches.map((match) => (
-                        <tr
-                            key={`schedule-${match.key}`}
-                            className="border-b last:border-0"
-                        >
-                            <td className="px-3 py-2">{match.week}</td>
-                            <td className="whitespace-nowrap px-3 py-2">
-                                {match.date || "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                                {match.matchNum !== null
-                                    ? `#${match.matchNum}`
-                                    : "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                                {formatMatchTime(match.time) || "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                                {match.court !== null ? match.court : "—"}
-                            </td>
-                            <td className="px-3 py-2">
-                                {match.homeLabel} vs {match.awayLabel}
-                            </td>
-                            <td className="px-3 py-2">
-                                {match.workAssignmentLabel || "—"}
-                            </td>
-                        </tr>
-                    ))}
+                    {matches.map((match) => {
+                        const involvesUser =
+                            userTeamId !== null &&
+                            (match.homeTeamId === userTeamId ||
+                                match.awayTeamId === userTeamId ||
+                                match.workTeamId === userTeamId)
+                        return (
+                            <tr
+                                key={`schedule-${match.key}`}
+                                className={cn(
+                                    "border-b last:border-0",
+                                    involvesUser &&
+                                        "bg-primary/10 font-semibold"
+                                )}
+                            >
+                                <td className="px-3 py-2">{match.week}</td>
+                                <td className="whitespace-nowrap px-3 py-2">
+                                    {match.date || "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {match.matchNum !== null
+                                        ? `#${match.matchNum}`
+                                        : "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {formatMatchTime(match.time) || "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {match.court !== null ? match.court : "—"}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {match.homeLabel} vs {match.awayLabel}
+                                </td>
+                                <td className="px-3 py-2">
+                                    {match.workAssignmentLabel || "—"}
+                                </td>
+                            </tr>
+                        )
+                    })}
                 </tbody>
             </table>
         </div>
     )
 }
 
-function ResultsTable({ matches }: { matches: PlayoffMatchLine[] }) {
+function ResultsTable({
+    matches,
+    userTeamId
+}: {
+    matches: PlayoffMatchLine[]
+    userTeamId: number | null
+}) {
     return (
         <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
@@ -236,32 +290,42 @@ function ResultsTable({ matches }: { matches: PlayoffMatchLine[] }) {
                             </td>
                         </tr>
                     ) : (
-                        matches.map((match) => (
-                            <tr
-                                key={`results-${match.key}`}
-                                className="border-b last:border-0"
-                            >
-                                <td className="px-3 py-2">
-                                    {match.winnerLabel || "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {match.winnerGames !== null
-                                        ? match.winnerGames
-                                        : "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {match.loserLabel || "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {match.loserGames !== null
-                                        ? match.loserGames
-                                        : "—"}
-                                </td>
-                                <td className="whitespace-nowrap px-3 py-2">
-                                    {match.scoresDisplay}
-                                </td>
-                            </tr>
-                        ))
+                        matches.map((match) => {
+                            const involvesUser =
+                                userTeamId !== null &&
+                                (match.winnerTeamId === userTeamId ||
+                                    match.loserTeamId === userTeamId)
+                            return (
+                                <tr
+                                    key={`results-${match.key}`}
+                                    className={cn(
+                                        "border-b last:border-0",
+                                        involvesUser &&
+                                            "bg-primary/10 font-semibold"
+                                    )}
+                                >
+                                    <td className="px-3 py-2">
+                                        {match.winnerLabel || "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {match.winnerGames !== null
+                                            ? match.winnerGames
+                                            : "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {match.loserLabel || "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {match.loserGames !== null
+                                            ? match.loserGames
+                                            : "—"}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                        {match.scoresDisplay}
+                                    </td>
+                                </tr>
+                            )
+                        })
                     )}
                 </tbody>
             </table>
@@ -269,9 +333,17 @@ function ResultsTable({ matches }: { matches: PlayoffMatchLine[] }) {
     )
 }
 
-export function DivisionSection({ division }: { division: PlayoffDivision }) {
+export function DivisionSection({
+    division,
+    userTeamId = null,
+    defaultOpen = true
+}: {
+    division: PlayoffDivision
+    userTeamId?: number | null
+    defaultOpen?: boolean
+}) {
     return (
-        <Collapsible defaultOpen>
+        <Collapsible defaultOpen={defaultOpen}>
             <div className="rounded-lg border bg-card shadow-sm">
                 <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-4 transition-colors hover:bg-muted/50">
                     <div className="space-y-1 text-left">
@@ -331,25 +403,36 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                             Seeds
                                         </h3>
                                         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                            {division.seeds.map((seed) => (
-                                                <div
-                                                    key={`seed-${seed.seed}`}
-                                                    className="rounded-md border bg-background px-3 py-2 text-sm"
-                                                >
-                                                    <span className="font-semibold">
-                                                        {seed.seed}
-                                                        {seed.seed === 1
-                                                            ? "st"
-                                                            : seed.seed === 2
-                                                              ? "nd"
-                                                              : seed.seed === 3
-                                                                ? "rd"
-                                                                : "th"}{" "}
-                                                        Seed:
-                                                    </span>{" "}
-                                                    {seed.teamLabel}
-                                                </div>
-                                            ))}
+                                            {division.seeds.map((seed) => {
+                                                const isUserSeed =
+                                                    userTeamId !== null &&
+                                                    seed.teamId === userTeamId
+                                                return (
+                                                    <div
+                                                        key={`seed-${seed.seed}`}
+                                                        className={cn(
+                                                            "rounded-md border bg-background px-3 py-2 text-sm",
+                                                            isUserSeed &&
+                                                                "border-primary bg-primary/10 font-semibold"
+                                                        )}
+                                                    >
+                                                        <span className="font-semibold">
+                                                            {seed.seed}
+                                                            {seed.seed === 1
+                                                                ? "st"
+                                                                : seed.seed ===
+                                                                    2
+                                                                  ? "nd"
+                                                                  : seed.seed ===
+                                                                      3
+                                                                    ? "rd"
+                                                                    : "th"}{" "}
+                                                            Seed:
+                                                        </span>{" "}
+                                                        {seed.teamLabel}
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -357,6 +440,7 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                 {division.bracketMatches ? (
                                     <BracketView
                                         matches={division.bracketMatches}
+                                        userTeamId={userTeamId}
                                     />
                                 ) : division.sections.length === 0 ? (
                                     <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
@@ -368,6 +452,7 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                         <BracketSectionView
                                             key={section.key}
                                             section={section}
+                                            userTeamId={userTeamId}
                                         />
                                     ))
                                 )}
@@ -377,9 +462,11 @@ export function DivisionSection({ division }: { division: PlayoffDivision }) {
                                 <div className="grid gap-4 xl:grid-cols-2">
                                     <ScheduleTable
                                         matches={division.scheduleMatches}
+                                        userTeamId={userTeamId}
                                     />
                                     <ResultsTable
                                         matches={division.resultsMatches}
+                                        userTeamId={userTeamId}
                                     />
                                 </div>
                             </TabsContent>

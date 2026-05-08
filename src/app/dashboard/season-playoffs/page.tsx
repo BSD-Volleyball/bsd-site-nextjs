@@ -73,7 +73,15 @@ export default async function SeasonPlayoffsPage() {
                 </div>
             ) : (
                 result.divisions.map((division) => (
-                    <DivisionSection key={division.id} division={division} />
+                    <DivisionSection
+                        key={division.id}
+                        division={division}
+                        userTeamId={result.userTeamId}
+                        defaultOpen={
+                            result.userDivisionId === null ||
+                            division.id === result.userDivisionId
+                        }
+                    />
                 ))
             )}
         </div>

@@ -1,6 +1,11 @@
 "use client"
 
-import { useCallback, useRef, type MouseEvent as ReactMouseEvent } from "react"
+import {
+    useCallback,
+    useMemo,
+    useRef,
+    type MouseEvent as ReactMouseEvent
+} from "react"
 import dynamic from "next/dynamic"
 import { formatMatchTime } from "@/lib/season-utils"
 import type {
@@ -46,136 +51,159 @@ const BRACKET_STYLE = {
     lostByNoShowText: "NS"
 }
 
-function CustomMatch(props: MatchComponentProps) {
-    const {
-        match,
-        topParty,
-        bottomParty,
-        topWon,
-        bottomWon,
-        topHovered,
-        bottomHovered,
-        teamNameFallback,
-        resultFallback,
-        onMouseEnter,
-        onMouseLeave
-    } = props
-    const bm = match as unknown as BracketMatch
-    const isBye = bm.matchNum < 0
+function makeCustomMatch(userTeamId: number | null) {
+    return function CustomMatch(props: MatchComponentProps) {
+        const {
+            match,
+            topParty,
+            bottomParty,
+            topWon,
+            bottomWon,
+            topHovered,
+            bottomHovered,
+            teamNameFallback,
+            resultFallback,
+            onMouseEnter,
+            onMouseLeave
+        } = props
+        const bm = match as unknown as BracketMatch
+        const isBye = bm.matchNum < 0
+        const isUserHome =
+            !isBye && userTeamId !== null && bm.homeTeamId === userTeamId
+        const isUserAway =
+            !isBye && userTeamId !== null && bm.awayTeamId === userTeamId
+        const isUserWork =
+            !isBye && userTeamId !== null && bm.workTeamId === userTeamId
+        const cardBorder =
+            isUserHome || isUserAway || isUserWork
+                ? "2px solid var(--primary)"
+                : isBye
+                  ? "1px dashed var(--border)"
+                  : "1px solid var(--border)"
 
-    return (
-        <div
-            style={{
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%",
-                background: isBye ? "var(--muted)" : "var(--card)",
-                borderRadius: "4px",
-                border: isBye
-                    ? "1px dashed var(--border)"
-                    : "1px solid var(--border)",
-                overflow: "hidden",
-                fontSize: "11px",
-                fontFamily: "system-ui, sans-serif",
-                color: "var(--foreground)",
-                opacity: isBye ? 0.7 : 1
-            }}
-        >
-            {isBye ? (
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flex: 1,
-                        fontSize: "10px",
-                        color: "var(--muted-foreground)"
-                    }}
-                >
-                    <span>
-                        {topParty?.name && topParty.name !== "BYE"
-                            ? topParty.name
-                            : bottomParty?.name && bottomParty.name !== "BYE"
-                              ? bottomParty.name
-                              : teamNameFallback}{" "}
-                        (BYE)
-                    </span>
-                </div>
-            ) : (
-                <>
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                    background: isBye ? "var(--muted)" : "var(--card)",
+                    borderRadius: "4px",
+                    border: cardBorder,
+                    overflow: "hidden",
+                    fontSize: "11px",
+                    fontFamily: "system-ui, sans-serif",
+                    color: "var(--foreground)",
+                    opacity: isBye ? 0.7 : 1
+                }}
+            >
+                {isBye ? (
                     <div
                         style={{
                             display: "flex",
-                            justifyContent: "space-between",
-                            padding: "2px 6px",
-                            fontSize: "9px",
-                            color: "var(--muted-foreground)",
-                            borderBottom: "1px solid var(--border)"
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flex: 1,
+                            fontSize: "10px",
+                            color: "var(--muted-foreground)"
                         }}
                     >
                         <span>
-                            #{bm.matchNum} W{bm.week}
-                        </span>
-                        <span>
-                            {bm.date || "TBD"}
-                            {bm.time ? ` ${formatMatchTime(bm.time)}` : ""}
-                            {bm.court !== null ? ` Ct${bm.court}` : ""}
+                            {topParty?.name && topParty.name !== "BYE"
+                                ? topParty.name
+                                : bottomParty?.name &&
+                                    bottomParty.name !== "BYE"
+                                  ? bottomParty.name
+                                  : teamNameFallback}{" "}
+                            (BYE)
                         </span>
                     </div>
-
-                    <PartyRow
-                        name={topParty?.name || teamNameFallback}
-                        resultText={topParty?.resultText ?? resultFallback}
-                        won={topWon}
-                        hovered={topHovered}
-                        partyId={topParty?.id}
-                        onMouseEnter={onMouseEnter}
-                        onMouseLeave={onMouseLeave}
-                    />
-                    <PartyRow
-                        name={bottomParty?.name || teamNameFallback}
-                        resultText={bottomParty?.resultText ?? resultFallback}
-                        won={bottomWon}
-                        hovered={bottomHovered}
-                        partyId={bottomParty?.id}
-                        onMouseEnter={onMouseEnter}
-                        onMouseLeave={onMouseLeave}
-                    />
-
-                    {bm.scoresDisplay !== "\u2014" && (
+                ) : (
+                    <>
                         <div
                             style={{
-                                fontSize: "10px",
-                                color: "var(--muted-foreground)",
+                                display: "flex",
+                                justifyContent: "space-between",
                                 padding: "2px 6px",
-                                borderTop: "1px solid var(--border)"
-                            }}
-                        >
-                            Sets: {bm.scoresDisplay}
-                        </div>
-                    )}
-
-                    {bm.workTeamLabel && (
-                        <div
-                            style={{
                                 fontSize: "9px",
                                 color: "var(--muted-foreground)",
-                                padding: "2px 6px",
-                                borderTop: "1px solid var(--border)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis"
+                                borderBottom: "1px solid var(--border)"
                             }}
                         >
-                            Work: {bm.workTeamLabel}
+                            <span>
+                                #{bm.matchNum} W{bm.week}
+                            </span>
+                            <span>
+                                {bm.date || "TBD"}
+                                {bm.time ? ` ${formatMatchTime(bm.time)}` : ""}
+                                {bm.court !== null ? ` Ct${bm.court}` : ""}
+                            </span>
                         </div>
-                    )}
-                </>
-            )}
-        </div>
-    )
+
+                        <PartyRow
+                            name={topParty?.name || teamNameFallback}
+                            resultText={topParty?.resultText ?? resultFallback}
+                            won={topWon}
+                            hovered={topHovered}
+                            partyId={topParty?.id}
+                            isUserTeam={isUserHome}
+                            onMouseEnter={onMouseEnter}
+                            onMouseLeave={onMouseLeave}
+                        />
+                        <PartyRow
+                            name={bottomParty?.name || teamNameFallback}
+                            resultText={
+                                bottomParty?.resultText ?? resultFallback
+                            }
+                            won={bottomWon}
+                            hovered={bottomHovered}
+                            partyId={bottomParty?.id}
+                            isUserTeam={isUserAway}
+                            onMouseEnter={onMouseEnter}
+                            onMouseLeave={onMouseLeave}
+                        />
+
+                        {bm.scoresDisplay !== "\u2014" && (
+                            <div
+                                style={{
+                                    fontSize: "10px",
+                                    color: "var(--muted-foreground)",
+                                    padding: "2px 6px",
+                                    borderTop: "1px solid var(--border)"
+                                }}
+                            >
+                                Sets: {bm.scoresDisplay}
+                            </div>
+                        )}
+
+                        {bm.workTeamLabel && (
+                            <div
+                                style={{
+                                    fontSize: "9px",
+                                    color: isUserWork
+                                        ? "var(--primary)"
+                                        : "var(--muted-foreground)",
+                                    fontWeight: isUserWork ? 600 : 400,
+                                    padding: "2px 6px",
+                                    borderTop: "1px solid var(--border)",
+                                    backgroundColor: isUserWork
+                                        ? "color-mix(in srgb, var(--primary) 18%, transparent)"
+                                        : "transparent",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis"
+                                }}
+                            >
+                                Work: {bm.workTeamLabel}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        )
+    }
 }
 
 function PartyRow({
@@ -184,6 +212,7 @@ function PartyRow({
     won,
     hovered,
     partyId,
+    isUserTeam,
     onMouseEnter,
     onMouseLeave
 }: {
@@ -192,9 +221,17 @@ function PartyRow({
     won: boolean
     hovered: boolean
     partyId?: string | number
+    isUserTeam?: boolean
     onMouseEnter?: (partyId: string | number) => void
     onMouseLeave?: () => void
 }) {
+    const baseBg = hovered
+        ? "rgba(16, 185, 129, 0.15)"
+        : isUserTeam
+          ? "color-mix(in srgb, var(--primary) 22%, transparent)"
+          : won
+            ? "color-mix(in srgb, var(--primary) 12%, transparent)"
+            : "transparent"
     return (
         // biome-ignore lint/a11y: decorative hover highlight inside SVG bracket
         <div
@@ -203,15 +240,11 @@ function PartyRow({
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "3px 6px",
-                backgroundColor: hovered
-                    ? "rgba(16, 185, 129, 0.15)"
-                    : won
-                      ? "color-mix(in srgb, var(--primary) 12%, transparent)"
-                      : "transparent",
-                fontWeight: won || hovered ? 600 : 400,
+                backgroundColor: baseBg,
+                fontWeight: won || hovered || isUserTeam ? 600 : 400,
                 color: hovered
                     ? "#059669"
-                    : won
+                    : won || isUserTeam
                       ? "var(--primary)"
                       : "var(--foreground)",
                 cursor: "pointer",
@@ -295,13 +328,19 @@ function ScrollWrapper({ children }: SvgWrapperProps) {
 }
 
 export function BracketView({
-    matches
+    matches,
+    userTeamId = null
 }: {
     matches: { upper: BracketMatch[]; lower: BracketMatch[] }
+    userTeamId?: number | null
 }) {
     const svgWrapper = useCallback(
         (props: SvgWrapperProps) => <ScrollWrapper {...props} />,
         []
+    )
+    const matchComponent = useMemo(
+        () => makeCustomMatch(userTeamId),
+        [userTeamId]
     )
 
     return (
@@ -309,7 +348,7 @@ export function BracketView({
             <DoubleEliminationBracket
                 // biome-ignore lint: library types don't match our extended BracketMatch
                 matches={matches as any}
-                matchComponent={CustomMatch}
+                matchComponent={matchComponent}
                 svgWrapper={svgWrapper}
                 options={{ style: BRACKET_STYLE }}
             />
