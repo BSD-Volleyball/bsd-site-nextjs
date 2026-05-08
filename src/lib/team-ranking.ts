@@ -187,14 +187,10 @@ export function computeStandings(
     })
 }
 
-// 6-team divisions repeat one matchup in week 1, so the duplicate is excluded
-// from the playoff seeding rank to avoid penalizing teams paired against a
-// strong opponent for that extra match.
 export function rankDivision(
     divisionTeams: RankableTeam[],
     divisionMatches: RankableMatch[],
-    teamCount: number
+    _teamCount: number
 ): StandingTeam[] {
-    const excludeWeeks = teamCount === 6 ? [1] : undefined
-    return computeStandings(divisionTeams, divisionMatches, { excludeWeeks })
+    return computeStandings(divisionTeams, divisionMatches)
 }

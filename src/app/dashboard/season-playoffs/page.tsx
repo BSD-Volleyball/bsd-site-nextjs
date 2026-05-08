@@ -60,13 +60,6 @@ export default async function SeasonPlayoffsPage() {
                 title={`${result.seasonLabel} Playoffs`}
                 description="Double-elimination bracket, schedule, and results by division."
             />
-            <p className="text-muted-foreground text-sm">
-                <span className="font-semibold">Seeding note:</span> in 6-team
-                divisions, week-1 results are excluded from the rank
-                calculation. The 6-team rotation reuses one matchup in week 1,
-                so including it could unfairly penalize a team paired with a
-                much stronger opponent for that duplicate match.
-            </p>
             {result.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No playoff matches found for this season.
