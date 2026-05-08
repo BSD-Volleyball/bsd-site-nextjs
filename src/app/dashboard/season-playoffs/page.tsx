@@ -2,8 +2,10 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { getPlayoffData } from "./actions"
+import { getSeasonConfig } from "@/lib/site-config"
+import { getPlayoffData } from "@/app/dashboard/playoffs/[seasonId]/actions"
 import { DivisionSection } from "@/components/playoffs/division-section"
+import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -12,19 +14,31 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic"
 
-export default async function PlayoffsPage({
-    params
-}: {
-    params: Promise<{ seasonId: string }>
-}) {
+const PLAYOFFS_START_PHASE: SeasonPhase = "playoffs"
+const PLAYOFFS_END_PHASE: SeasonPhase = "complete"
+
+export default async function SeasonPlayoffsPage() {
     const session = await auth.api.getSession({ headers: await headers() })
 
-    if (!session) {
+    if (!session?.user) {
         redirect("/auth/sign-in")
     }
 
-    const { seasonId } = await params
-    const result = await getPlayoffData(parseInt(seasonId, 10))
+    const config = await getSeasonConfig()
+
+    if (!config.seasonId || !config.phase) {
+        redirect("/dashboard")
+    }
+
+    const startIdx = SEASON_PHASES.indexOf(PLAYOFFS_START_PHASE)
+    const endIdx = SEASON_PHASES.indexOf(PLAYOFFS_END_PHASE)
+    const currentIdx = SEASON_PHASES.indexOf(config.phase)
+
+    if (currentIdx < startIdx || currentIdx > endIdx) {
+        redirect("/dashboard")
+    }
+
+    const result = await getPlayoffData(config.seasonId)
 
     if (!result.status) {
         return (
@@ -46,6 +60,13 @@ export default async function PlayoffsPage({
                 title={`${result.seasonLabel} Playoffs`}
                 description="Double-elimination bracket, schedule, and results by division."
             />
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                <span className="font-semibold">Seeding note:</span> in 6-team
+                divisions, week-1 results are excluded from the rank
+                calculation. The 6-team rotation reuses one matchup in week 1,
+                so including it could unfairly penalize a team paired with a
+                much stronger opponent for that duplicate match.
+            </div>
             {result.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No playoff matches found for this season.

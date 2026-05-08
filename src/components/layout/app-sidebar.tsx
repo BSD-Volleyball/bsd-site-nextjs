@@ -324,6 +324,12 @@ const scheduleNavItem = {
     icon: RiCalendarLine
 }
 
+const playoffsNavItem = {
+    title: "Playoffs",
+    url: "/dashboard/season-playoffs",
+    icon: RiTrophyLine
+}
+
 const enterScoresNavItem = {
     title: "Enter Scores",
     url: "/dashboard/enter-scores",
@@ -584,6 +590,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showWeek3 = inRange("select_captains", "draft")
     const showCurrentRosters = inRange("draft", "complete")
     const showSchedule = inRange("draft", "complete")
+    const showPlayoffsLink = inRange("playoffs", "complete")
     const showWeek2Homework = phase === "prep_tryout_week_3"
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
     const showPictures =
@@ -700,7 +707,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             ...(!showWeek2 ? [week2NavItem] : []),
             ...(!showWeek3 ? [week3NavItem] : []),
             ...(!showCurrentRosters ? [currentRostersNavItem] : []),
-            ...(!showSchedule ? [scheduleNavItem] : [])
+            ...(!showSchedule ? [scheduleNavItem] : []),
+            ...(!showPlayoffsLink ? [playoffsNavItem] : [])
         ]
         if (hiddenSeasonItems.length > 0)
             hiddenGroups.push({
@@ -814,13 +822,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     showWeek2 ||
                     showWeek3 ||
                     showCurrentRosters ||
-                    showSchedule) && (
+                    showSchedule ||
+                    showPlayoffsLink) && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
                             Season
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
+                                {showPlayoffsLink && (
+                                    <NavItems
+                                        items={[playoffsNavItem]}
+                                        pathname={pathname}
+                                    />
+                                )}
                                 {showSchedule && (
                                     <NavItems
                                         items={[scheduleNavItem]}

@@ -15,7 +15,7 @@ import type {
     PlayoffDivision,
     PlayoffMatchLine,
     PlayoffSection
-} from "./actions"
+} from "@/app/dashboard/playoffs/[seasonId]/actions"
 
 const BracketView = dynamic(
     () => import("./bracket-view").then((mod) => mod.BracketView),

@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
-import { seasons } from "@/database/schema"
-import { eq, desc } from "drizzle-orm"
+import { divisions, matches, seasons } from "@/database/schema"
+import { and, asc, eq, desc, isNull, or } from "drizzle-orm"
 import { isAdminOrDirectorBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -13,6 +13,7 @@ import {
     isValidPhaseRevert
 } from "@/lib/season-phases"
 import { cleanupSeasonRecipientGroups } from "@/lib/email-recipients"
+import { seedPlayoffs } from "./seed-playoffs"
 
 export async function advanceSeasonPhase(
     seasonId: number,
@@ -46,6 +47,56 @@ export async function advanceSeasonPhase(
             }
         }
 
+        let seedingSummary: string | null = null
+
+        if (targetPhase === "playoffs") {
+            const incomplete = await db
+                .select({
+                    week: matches.week,
+                    divisionName: divisions.name
+                })
+                .from(matches)
+                .innerJoin(divisions, eq(matches.division, divisions.id))
+                .where(
+                    and(
+                        eq(matches.season, seasonId),
+                        eq(matches.playoff, false),
+                        or(
+                            isNull(matches.home_set1_score),
+                            isNull(matches.away_set1_score),
+                            isNull(matches.home_set2_score),
+                            isNull(matches.away_set2_score)
+                        )
+                    )
+                )
+                .orderBy(asc(divisions.level), asc(matches.week))
+
+            if (incomplete.length > 0) {
+                const grouped = new Map<string, Set<number>>()
+                for (const row of incomplete) {
+                    const set = grouped.get(row.divisionName) ?? new Set()
+                    set.add(row.week)
+                    grouped.set(row.divisionName, set)
+                }
+                const summary = [...grouped.entries()]
+                    .map(
+                        ([div, weeks]) =>
+                            `${div} (week${weeks.size === 1 ? "" : "s"} ${[...weeks].sort((a, b) => a - b).join(", ")})`
+                    )
+                    .join("; ")
+                return {
+                    status: false,
+                    message: `Cannot advance to Playoffs: ${incomplete.length} regular-season match${incomplete.length === 1 ? "" : "es"} missing scores — ${summary}.`
+                }
+            }
+
+            const seedResult = await seedPlayoffs(seasonId)
+            if (!seedResult.status) {
+                return { status: false, message: seedResult.message }
+            }
+            seedingSummary = ` Seeded ${seedResult.divisionsSeeded} division${seedResult.divisionsSeeded === 1 ? "" : "s"}.`
+        }
+
         await db
             .update(seasons)
             .set({ phase: targetPhase })
@@ -57,7 +108,7 @@ export async function advanceSeasonPhase(
             action: "advance_season_phase",
             entityType: "season",
             entityId: seasonId,
-            summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+            summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}`
         })
 
         // When season completes, clean up granular recipient groups (fire-and-forget)
@@ -74,7 +125,7 @@ export async function advanceSeasonPhase(
         revalidatePath("/dashboard/season-control")
         return {
             status: true,
-            message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}"`
+            message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}`
         }
     } catch (error) {
         console.error("Failed to advance season phase:", error)
