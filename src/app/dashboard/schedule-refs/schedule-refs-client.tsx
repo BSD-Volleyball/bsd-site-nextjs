@@ -793,6 +793,11 @@ function RefPicker({
                 {eligible.map((ref) => (
                     <SelectItem key={ref.userId} value={ref.userId}>
                         {ref.name}
+                        {ref.possibleTeamName && (
+                            <span className="ml-1 text-amber-700 text-xs">
+                                ({ref.possibleTeamName})
+                            </span>
+                        )}
                         {ref.isUnavailable && (
                             <span className="ml-1 text-destructive text-xs">
                                 (unavailable)

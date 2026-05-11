@@ -87,6 +87,12 @@ export interface EligibleRef {
     userId: string
     name: string
     isUnavailable: boolean
+    /**
+     * Set on dynamic playoff matches when this ref's own team is one of the
+     * possible participants — surfaced to the picker so the scheduler avoids
+     * assigning two refs from the same team as primary + backup.
+     */
+    possibleTeamName: string | null
 }
 
 export interface MatchesAndRefsData {
@@ -789,12 +795,25 @@ export async function getMatchesAndRefsForDate(
             // team). Possible-but-undetermined teams do not constrain.
             const info = playoffInfoByMatchId.get(match.matchId)
             const knownParticipantTeamIds = new Set<number>()
+            const possibleTeamIds = new Set<number>()
             if (info) {
                 if (info.homeResolvedTeamId !== null) {
                     knownParticipantTeamIds.add(info.homeResolvedTeamId)
                 }
                 if (info.awayResolvedTeamId !== null) {
                     knownParticipantTeamIds.add(info.awayResolvedTeamId)
+                }
+                // Hint set is only meaningful when at least one side is
+                // unresolved — i.e. a dynamic match.
+                const hasUnresolvedSide =
+                    !match.homeTeamName || !match.awayTeamName
+                if (hasUnresolvedSide) {
+                    for (const id of info.homePossibleTeamIds) {
+                        possibleTeamIds.add(id)
+                    }
+                    for (const id of info.awayPossibleTeamIds) {
+                        possibleTeamIds.add(id)
+                    }
                 }
             }
 
@@ -833,11 +852,27 @@ export async function getMatchesAndRefsForDate(
                     }
                 }
 
+                // If the ref's team is one of the possible (but not yet
+                // guaranteed) participants of a dynamic match, surface the
+                // team name so the coordinator can avoid putting two refs
+                // from the same team on primary + backup.
+                let possibleTeamName: string | null = null
+                if (possibleTeamIds.size > 0) {
+                    const refTeamId = refTeamMap.get(ref.userId)
+                    if (
+                        refTeamId !== undefined &&
+                        possibleTeamIds.has(refTeamId)
+                    ) {
+                        possibleTeamName = teamNameById.get(refTeamId) ?? null
+                    }
+                }
+
                 // Unavailable refs are included but flagged — scheduler must confirm
                 eligible.push({
                     userId: ref.userId,
                     name: ref.name,
-                    isUnavailable: ref.isUnavailable
+                    isUnavailable: ref.isUnavailable,
+                    possibleTeamName
                 })
             }
             eligibleRefsByMatch[match.matchId] = eligible
