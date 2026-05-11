@@ -4,6 +4,7 @@ import { db } from "@/database/db"
 import {
     matches,
     matchReferees,
+    playoffMatchesMeta,
     seasonRefs,
     users,
     divisions,
@@ -27,6 +28,14 @@ import {
 import type { ActionResult } from "@/lib/action-helpers"
 import { hasPermissionBySession, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { formatPlayerName } from "@/lib/utils"
+import {
+    collectPossibleTeams,
+    formatSourceHumanLabel,
+    parseSourceToken,
+    resolveSourceToTeamId,
+    type BracketMatchRef,
+    type ParsedSource
+} from "@/lib/playoff-sources"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,10 +60,17 @@ export interface MatchRow {
     divisionId: number
     divisionName: string
     divisionLevel: number
-    homeTeamName: string
-    awayTeamName: string
-    assignedRefId: string | null
-    assignedRefName: string | null
+    isPlayoff: boolean
+    homeTeamName: string | null
+    awayTeamName: string | null
+    homeSourceLabel: string | null
+    awaySourceLabel: string | null
+    homePossibleTeams: string[]
+    awayPossibleTeams: string[]
+    primaryRefId: string | null
+    primaryRefName: string | null
+    backupRefId: string | null
+    backupRefName: string | null
 }
 
 export interface RefStatus {
@@ -194,13 +210,17 @@ export async function getMatchesAndRefsForDate(
                 divisionId: matches.division,
                 divisionName: divisions.name,
                 divisionLevel: divisions.level,
+                isPlayoff: matches.playoff,
+                week: matches.week,
+                homeTeamId: matches.home_team,
+                awayTeamId: matches.away_team,
                 homeTeamName: homeTeam.name,
                 awayTeamName: awayTeam.name
             })
             .from(matches)
             .innerJoin(divisions, eq(matches.division, divisions.id))
-            .innerJoin(homeTeam, eq(matches.home_team, homeTeam.id))
-            .innerJoin(awayTeam, eq(matches.away_team, awayTeam.id))
+            .leftJoin(homeTeam, eq(matches.home_team, homeTeam.id))
+            .leftJoin(awayTeam, eq(matches.away_team, awayTeam.id))
             .where(and(eq(matches.season, seasonId), eq(matches.date, date)))
             .orderBy(asc(matches.time), asc(matches.court))
 
@@ -210,11 +230,12 @@ export async function getMatchesAndRefsForDate(
 
         const matchIds = matchRows.map((m) => m.matchId)
 
-        // ── Fetch existing ref assignments ──────────────────────
+        // ── Fetch existing ref assignments (primary + backup) ───
         const assignmentRows = await db
             .select({
                 matchId: matchReferees.match_id,
                 refereeId: matchReferees.referee_id,
+                role: matchReferees.role,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preferred_name
@@ -223,24 +244,290 @@ export async function getMatchesAndRefsForDate(
             .innerJoin(users, eq(matchReferees.referee_id, users.id))
             .where(inArray(matchReferees.match_id, matchIds))
 
-        const assignmentByMatch = new Map<
+        const primaryByMatch = new Map<
+            number,
+            { refId: string; refName: string }
+        >()
+        const backupByMatch = new Map<
             number,
             { refId: string; refName: string }
         >()
         for (const a of assignmentRows) {
-            assignmentByMatch.set(a.matchId, {
+            const entry = {
                 refId: a.refereeId,
                 refName: formatPlayerName(
                     a.firstName,
                     a.lastName,
                     a.preferredName
                 )
-            })
+            }
+            if (a.role === "backup") {
+                backupByMatch.set(a.matchId, entry)
+            } else {
+                primaryByMatch.set(a.matchId, entry)
+            }
+        }
+
+        // ── Resolve playoff sources for dynamic matches ─────────
+        // Group matches by (division, week) so we walk the bracket within scope.
+        const playoffMatchIds = matchRows
+            .filter((m) => m.isPlayoff)
+            .map((m) => m.matchId)
+
+        // matchId -> resolved labels and possible-team sets (team IDs)
+        const playoffInfoByMatchId = new Map<
+            number,
+            {
+                homeSourceLabel: string | null
+                awaySourceLabel: string | null
+                homeResolvedTeamId: number | null
+                awayResolvedTeamId: number | null
+                homePossibleTeamIds: Set<number>
+                awayPossibleTeamIds: Set<number>
+            }
+        >()
+        const teamNameById = new Map<number, string>()
+
+        if (playoffMatchIds.length > 0) {
+            // Group target matches by (division, week)
+            const groupKey = (div: number, wk: number) => `${div}:${wk}`
+            const groupsOnDate = new Set<string>()
+            for (const m of matchRows) {
+                if (m.isPlayoff) {
+                    groupsOnDate.add(groupKey(m.divisionId, m.week))
+                }
+            }
+
+            // Fetch ALL playoff meta + matches for those (division, week)
+            // groups in the season — even ones not on this date — so we can
+            // walk W/L lineage and pull seed-resolved teams from already-realized matches.
+            const targetDivisions = Array.from(
+                new Set(
+                    matchRows
+                        .filter((m) => m.isPlayoff)
+                        .map((m) => m.divisionId)
+                )
+            )
+
+            const metaRows = await db
+                .select({
+                    metaId: playoffMatchesMeta.id,
+                    matchId: playoffMatchesMeta.match_id,
+                    matchNum: playoffMatchesMeta.match_num,
+                    division: playoffMatchesMeta.division,
+                    week: playoffMatchesMeta.week,
+                    homeSource: playoffMatchesMeta.home_source,
+                    awaySource: playoffMatchesMeta.away_source
+                })
+                .from(playoffMatchesMeta)
+                .where(
+                    and(
+                        eq(playoffMatchesMeta.season, seasonId),
+                        inArray(playoffMatchesMeta.division, targetDivisions)
+                    )
+                )
+
+            // Pull every playoff match referenced by these metas so we know
+            // who's already realized (home/away/winner).
+            const referencedMatchIds = metaRows
+                .map((mr) => mr.matchId)
+                .filter((id): id is number => id !== null)
+
+            type RealizedMatch = {
+                id: number
+                homeTeamId: number | null
+                awayTeamId: number | null
+                winner: number | null
+            }
+            const realizedMatches: RealizedMatch[] =
+                referencedMatchIds.length === 0
+                    ? []
+                    : await db
+                          .select({
+                              id: matches.id,
+                              homeTeamId: matches.home_team,
+                              awayTeamId: matches.away_team,
+                              winner: matches.winner
+                          })
+                          .from(matches)
+                          .where(inArray(matches.id, referencedMatchIds))
+
+            const realizedById = new Map<number, RealizedMatch>()
+            for (const rm of realizedMatches) {
+                realizedById.set(rm.id, rm)
+            }
+
+            // Build per-group bracket context: matchNum -> meta, plus
+            // resolution maps for seeds and known winners/losers.
+            const groupMetas = new Map<
+                string,
+                {
+                    matchByNum: Map<number, BracketMatchRef>
+                    metaByMatchId: Map<
+                        number,
+                        {
+                            home: ParsedSource
+                            away: ParsedSource
+                        }
+                    >
+                    seedToTeamId: Map<number, number>
+                    winnerByMatchNum: Map<number, number>
+                    loserByMatchNum: Map<number, number>
+                }
+            >()
+
+            for (const key of groupsOnDate) {
+                groupMetas.set(key, {
+                    matchByNum: new Map(),
+                    metaByMatchId: new Map(),
+                    seedToTeamId: new Map(),
+                    winnerByMatchNum: new Map(),
+                    loserByMatchNum: new Map()
+                })
+            }
+
+            for (const meta of metaRows) {
+                const key = groupKey(meta.division, meta.week)
+                const ctx = groupMetas.get(key)
+                if (!ctx) continue
+
+                const home = parseSourceToken(meta.homeSource)
+                const away = parseSourceToken(meta.awaySource)
+
+                ctx.matchByNum.set(meta.matchNum, {
+                    matchNum: meta.matchNum,
+                    homeSource: home,
+                    awaySource: away
+                })
+                if (meta.matchId !== null) {
+                    ctx.metaByMatchId.set(meta.matchId, { home, away })
+                }
+
+                const realized =
+                    meta.matchId !== null
+                        ? realizedById.get(meta.matchId)
+                        : null
+
+                // Derive seed -> teamId from already-realized seed sources
+                if (
+                    home.kind === "seed" &&
+                    home.value !== null &&
+                    realized?.homeTeamId
+                ) {
+                    ctx.seedToTeamId.set(home.value, realized.homeTeamId)
+                }
+                if (
+                    away.kind === "seed" &&
+                    away.value !== null &&
+                    realized?.awayTeamId
+                ) {
+                    ctx.seedToTeamId.set(away.value, realized.awayTeamId)
+                }
+                if (
+                    home.kind === "team" &&
+                    home.value !== null &&
+                    realized?.homeTeamId
+                ) {
+                    // direct team number — keep as-is in case ctx walks back to it
+                }
+
+                // Derive winnerByMatchNum / loserByMatchNum from realized results
+                if (
+                    realized?.winner &&
+                    realized.homeTeamId &&
+                    realized.awayTeamId
+                ) {
+                    ctx.winnerByMatchNum.set(meta.matchNum, realized.winner)
+                    const loser =
+                        realized.winner === realized.homeTeamId
+                            ? realized.awayTeamId
+                            : realized.homeTeamId
+                    ctx.loserByMatchNum.set(meta.matchNum, loser)
+                }
+            }
+
+            // Collect all team IDs we might need names for
+            const teamIdsToName = new Set<number>()
+            for (const ctx of groupMetas.values()) {
+                for (const id of ctx.seedToTeamId.values())
+                    teamIdsToName.add(id)
+                for (const id of ctx.winnerByMatchNum.values())
+                    teamIdsToName.add(id)
+                for (const id of ctx.loserByMatchNum.values())
+                    teamIdsToName.add(id)
+            }
+            // Plus all home/away ids on visible matches
+            for (const m of matchRows) {
+                if (m.homeTeamId) teamIdsToName.add(m.homeTeamId)
+                if (m.awayTeamId) teamIdsToName.add(m.awayTeamId)
+            }
+
+            if (teamIdsToName.size > 0) {
+                const teamNameRows = await db
+                    .select({ id: teams.id, name: teams.name })
+                    .from(teams)
+                    .where(inArray(teams.id, Array.from(teamIdsToName)))
+                for (const tn of teamNameRows) {
+                    teamNameById.set(tn.id, tn.name)
+                }
+            }
+
+            // Now compute per-match resolution
+            for (const m of matchRows) {
+                if (!m.isPlayoff) continue
+                const ctx = groupMetas.get(groupKey(m.divisionId, m.week))
+                if (!ctx) continue
+                const metaFor = ctx.metaByMatchId.get(m.matchId)
+                if (!metaFor) continue
+
+                const homeResolved = resolveSourceToTeamId(metaFor.home, ctx)
+                const awayResolved = resolveSourceToTeamId(metaFor.away, ctx)
+
+                const homePossible = collectPossibleTeams(
+                    metaFor.home,
+                    ctx,
+                    ctx.matchByNum
+                )
+                const awayPossible = collectPossibleTeams(
+                    metaFor.away,
+                    ctx,
+                    ctx.matchByNum
+                )
+
+                playoffInfoByMatchId.set(m.matchId, {
+                    homeSourceLabel: formatSourceHumanLabel(metaFor.home),
+                    awaySourceLabel: formatSourceHumanLabel(metaFor.away),
+                    homeResolvedTeamId: homeResolved,
+                    awayResolvedTeamId: awayResolved,
+                    homePossibleTeamIds: homePossible,
+                    awayPossibleTeamIds: awayPossible
+                })
+            }
         }
 
         // ── Build match result list ─────────────────────────────
         const matchList: MatchRow[] = matchRows.map((m) => {
-            const assignment = assignmentByMatch.get(m.matchId)
+            const primary = primaryByMatch.get(m.matchId)
+            const backup = backupByMatch.get(m.matchId)
+            const info = playoffInfoByMatchId.get(m.matchId)
+
+            const homePossibleNames: string[] = []
+            const awayPossibleNames: string[] = []
+            if (info && !m.homeTeamName) {
+                for (const id of info.homePossibleTeamIds) {
+                    const name = teamNameById.get(id)
+                    if (name) homePossibleNames.push(name)
+                }
+                homePossibleNames.sort()
+            }
+            if (info && !m.awayTeamName) {
+                for (const id of info.awayPossibleTeamIds) {
+                    const name = teamNameById.get(id)
+                    if (name) awayPossibleNames.push(name)
+                }
+                awayPossibleNames.sort()
+            }
+
             return {
                 matchId: m.matchId,
                 time: m.time ?? "",
@@ -248,10 +535,19 @@ export async function getMatchesAndRefsForDate(
                 divisionId: m.divisionId,
                 divisionName: m.divisionName,
                 divisionLevel: m.divisionLevel,
+                isPlayoff: m.isPlayoff,
                 homeTeamName: m.homeTeamName,
                 awayTeamName: m.awayTeamName,
-                assignedRefId: assignment?.refId ?? null,
-                assignedRefName: assignment?.refName ?? null
+                homeSourceLabel:
+                    !m.homeTeamName && info ? info.homeSourceLabel : null,
+                awaySourceLabel:
+                    !m.awayTeamName && info ? info.awaySourceLabel : null,
+                homePossibleTeams: homePossibleNames,
+                awayPossibleTeams: awayPossibleNames,
+                primaryRefId: primary?.refId ?? null,
+                primaryRefName: primary?.refName ?? null,
+                backupRefId: backup?.refId ?? null,
+                backupRefName: backup?.refName ?? null
             }
         })
 
@@ -469,21 +765,39 @@ export async function getMatchesAndRefsForDate(
 
         // Map: time -> set of referee IDs already assigned
         const assignedByTime = new Map<string, Set<string>>()
-        // Map: matchId -> assigned refId (to exclude the match's own ref)
-        const assignedRefByMatch = new Map<string, string>()
+        // Map: matchId -> set of refIds assigned to that match (primary + backup)
+        const assignedRefByMatch = new Map<string, Set<string>>()
         for (const a of allDateAssignments) {
             const t = a.matchTime ?? ""
             if (!assignedByTime.has(t)) {
                 assignedByTime.set(t, new Set())
             }
             assignedByTime.get(t)!.add(a.refereeId)
-            assignedRefByMatch.set(String(a.matchId), a.refereeId)
+            const key = String(a.matchId)
+            if (!assignedRefByMatch.has(key)) {
+                assignedRefByMatch.set(key, new Set())
+            }
+            assignedRefByMatch.get(key)!.add(a.refereeId)
         }
 
         // ── Build eligible refs per match ───────────────────────
         const eligibleRefsByMatch: Record<number, EligibleRef[]> = {}
 
         for (const match of matchList) {
+            // For dynamic playoff matches we exclude refs whose team is a
+            // KNOWN/GUARANTEED participant (source resolves to a concrete
+            // team). Possible-but-undetermined teams do not constrain.
+            const info = playoffInfoByMatchId.get(match.matchId)
+            const knownParticipantTeamIds = new Set<number>()
+            if (info) {
+                if (info.homeResolvedTeamId !== null) {
+                    knownParticipantTeamIds.add(info.homeResolvedTeamId)
+                }
+                if (info.awayResolvedTeamId !== null) {
+                    knownParticipantTeamIds.add(info.awayResolvedTeamId)
+                }
+            }
+
             const eligible: EligibleRef[] = []
             for (const ref of refStatusList) {
                 // a. Qualified for division level (hard filter)
@@ -498,10 +812,23 @@ export async function getMatchesAndRefsForDate(
                 const assignedAtTime = assignedByTime.get(match.time)
                 if (assignedAtTime?.has(ref.userId)) {
                     // Allow if the ref is assigned to THIS match
-                    const thisMatchRef = assignedRefByMatch.get(
-                        String(match.matchId)
-                    )
-                    if (thisMatchRef !== ref.userId) {
+                    const thisMatchAssigned =
+                        assignedRefByMatch.get(String(match.matchId)) ??
+                        new Set()
+                    if (!thisMatchAssigned.has(ref.userId)) {
+                        continue
+                    }
+                }
+
+                // d. For dynamic matches: exclude refs on a known participant
+                // team (only applies when team_team is null on the match but
+                // the source resolves concretely).
+                if (knownParticipantTeamIds.size > 0) {
+                    const refTeamId = refTeamMap.get(ref.userId)
+                    if (
+                        refTeamId !== undefined &&
+                        knownParticipantTeamIds.has(refTeamId)
+                    ) {
                         continue
                     }
                 }
@@ -535,7 +862,11 @@ export async function getMatchesAndRefsForDate(
 export const saveRefAssignments = withAction(
     async (
         date: string,
-        assignments: Array<{ matchId: number; refereeId: string | null }>
+        assignments: Array<{
+            matchId: number
+            primaryRefId: string | null
+            backupRefId: string | null
+        }>
     ): Promise<ActionResult> => {
         await requireSession()
         await requireScheduleRefsAccess()
@@ -550,21 +881,42 @@ export const saveRefAssignments = withAction(
             return fail("Invalid assignments.")
         }
 
+        for (const a of assignments) {
+            if (
+                a.primaryRefId &&
+                a.backupRefId &&
+                a.primaryRefId === a.backupRefId
+            ) {
+                return fail(
+                    `Primary and backup ref cannot be the same person (match ${a.matchId}).`
+                )
+            }
+        }
+
         await db.transaction(async (tx) => {
-            for (const { matchId, refereeId } of assignments) {
+            for (const { matchId, primaryRefId, backupRefId } of assignments) {
                 if (!matchId || typeof matchId !== "number") continue
 
-                // Delete existing assignment for this match
+                // Delete existing assignments for this match
                 await tx
                     .delete(matchReferees)
                     .where(eq(matchReferees.match_id, matchId))
 
-                // Insert new assignment if refereeId is set
-                if (refereeId && typeof refereeId === "string") {
+                if (primaryRefId && typeof primaryRefId === "string") {
                     await tx.insert(matchReferees).values({
                         match_id: matchId,
-                        referee_id: refereeId,
-                        season_id: seasonId
+                        referee_id: primaryRefId,
+                        season_id: seasonId,
+                        role: "primary"
+                    })
+                }
+
+                if (backupRefId && typeof backupRefId === "string") {
+                    await tx.insert(matchReferees).values({
+                        match_id: matchId,
+                        referee_id: backupRefId,
+                        season_id: seasonId,
+                        role: "backup"
                     })
                 }
             }

@@ -46,6 +46,9 @@ interface ScheduleRefsClientProps {
     initialData: MatchesAndRefsData | null
 }
 
+type RefRole = "primary" | "backup"
+type MatchAssignment = { primary: string | null; backup: string | null }
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -70,6 +73,24 @@ function divisionLevelLabel(level: number): string {
     return map[level] ?? `Level ${level}`
 }
 
+function renderTeamCell(
+    teamName: string | null,
+    sourceLabel: string | null,
+    possible: string[]
+) {
+    if (teamName) return <span>{teamName}</span>
+    return (
+        <span className="flex flex-col">
+            <span className="font-medium italic">{sourceLabel ?? "TBD"}</span>
+            {possible.length > 0 && (
+                <span className="text-muted-foreground text-xs">
+                    Possible: {possible.join(", ")}
+                </span>
+            )}
+        </span>
+    )
+}
+
 const UNASSIGNED = "__unassigned__"
 
 // ---------------------------------------------------------------------------
@@ -88,12 +109,13 @@ export function ScheduleRefsClient({
         initialData
     )
     const [assignments, setAssignments] = useState<
-        Record<number, string | null>
+        Record<number, MatchAssignment>
     >({})
     const [loading, setLoading] = useState(false)
     const [saving, setSaving] = useTransition()
     const [pendingAssignment, setPendingAssignment] = useState<{
         matchId: number
+        role: RefRole
         refId: string
         refName: string
     } | null>(null)
@@ -102,14 +124,16 @@ export function ScheduleRefsClient({
     // Initialize assignments from match data
     useEffect(() => {
         if (!matchData) return
-        const initial: Record<number, string | null> = {}
+        const initial: Record<number, MatchAssignment> = {}
         for (const m of matchData.matches) {
-            initial[m.matchId] = m.assignedRefId
+            initial[m.matchId] = {
+                primary: m.primaryRefId,
+                backup: m.backupRefId
+            }
         }
         setAssignments(initial)
     }, [matchData])
 
-    // Fetch data when date changes (skip if initial data matches)
     const fetchDateData = useCallback(async (date: string) => {
         setLoading(true)
         const result = await getMatchesAndRefsForDate(date)
@@ -129,12 +153,16 @@ export function ScheduleRefsClient({
         [fetchDateData]
     )
 
-    // Recompute eligible refs locally when assignments change
-    // A ref can't be assigned to two matches at the same time
+    // Recompute eligible refs locally when assignments change.
+    // - Refs already chosen at another match in the same time slot are excluded.
+    // - On a given match, the OTHER role's choice is also excluded (can't be both).
     const computedEligible = useMemo(() => {
         if (!matchData) return {}
 
-        const result: Record<number, EligibleRef[]> = {}
+        const result: Record<
+            number,
+            { primary: EligibleRef[]; backup: EligibleRef[] }
+        > = {}
 
         // Group matches by time
         const matchesByTime = new Map<string, MatchRow[]>()
@@ -149,60 +177,89 @@ export function ScheduleRefsClient({
             const baseEligible =
                 matchData.eligibleRefsByMatch[match.matchId] ?? []
 
-            // Find refs assigned to other matches at the same time
             const sameTimeMatches = matchesByTime.get(match.time) ?? []
             const assignedAtSameTime = new Set<string>()
             for (const otherMatch of sameTimeMatches) {
                 if (otherMatch.matchId === match.matchId) continue
-                const refId = assignments[otherMatch.matchId]
-                if (refId) assignedAtSameTime.add(refId)
+                const a = assignments[otherMatch.matchId]
+                if (a?.primary) assignedAtSameTime.add(a.primary)
+                if (a?.backup) assignedAtSameTime.add(a.backup)
             }
 
-            result[match.matchId] = baseEligible.filter(
-                (ref) => !assignedAtSameTime.has(ref.userId)
-            )
+            const here = assignments[match.matchId]
+            const filterForRole = (excludeRefId: string | null) =>
+                baseEligible.filter((ref) => {
+                    if (assignedAtSameTime.has(ref.userId)) return false
+                    if (excludeRefId && ref.userId === excludeRefId)
+                        return false
+                    return true
+                })
+
+            result[match.matchId] = {
+                primary: filterForRole(here?.backup ?? null),
+                backup: filterForRole(here?.primary ?? null)
+            }
         }
 
         return result
     }, [matchData, assignments])
 
+    const applyAssignment = useCallback(
+        (matchId: number, role: RefRole, refId: string | null) => {
+            setAssignments((prev) => {
+                const current = prev[matchId] ?? {
+                    primary: null,
+                    backup: null
+                }
+                return {
+                    ...prev,
+                    [matchId]: { ...current, [role]: refId }
+                }
+            })
+        },
+        []
+    )
+
     const handleRefChange = useCallback(
-        (matchId: number, value: string) => {
+        (matchId: number, role: RefRole, value: string) => {
             if (value === UNASSIGNED) {
-                setAssignments((prev) => ({ ...prev, [matchId]: null }))
+                applyAssignment(matchId, role, null)
                 return
             }
-            // Check if this ref is unavailable
-            const eligible = computedEligible[matchId] ?? []
-            const ref = eligible.find((r) => r.userId === value)
+            const slots = computedEligible[matchId]
+            const list = slots ? slots[role] : []
+            const ref = list.find((r) => r.userId === value)
             if (ref?.isUnavailable) {
                 setPendingAssignment({
                     matchId,
+                    role,
                     refId: value,
                     refName: ref.name
                 })
                 return
             }
-            setAssignments((prev) => ({ ...prev, [matchId]: value }))
+            applyAssignment(matchId, role, value)
         },
-        [computedEligible]
+        [computedEligible, applyAssignment]
     )
 
     const confirmUnavailableAssignment = useCallback(() => {
         if (!pendingAssignment) return
-        setAssignments((prev) => ({
-            ...prev,
-            [pendingAssignment.matchId]: pendingAssignment.refId
-        }))
+        applyAssignment(
+            pendingAssignment.matchId,
+            pendingAssignment.role,
+            pendingAssignment.refId
+        )
         setPendingAssignment(null)
-    }, [pendingAssignment])
+    }, [pendingAssignment, applyAssignment])
 
     const handleSave = useCallback(() => {
         if (!selectedDate) return
         const assignmentList = Object.entries(assignments).map(
-            ([matchId, refereeId]) => ({
+            ([matchId, slots]) => ({
                 matchId: Number(matchId),
-                refereeId
+                primaryRefId: slots.primary,
+                backupRefId: slots.backup
             })
         )
 
@@ -213,7 +270,6 @@ export function ScheduleRefsClient({
             )
             if (result.status) {
                 toast.success("Ref assignments saved")
-                // Refresh data to get updated server state
                 await fetchDateData(selectedDate)
             } else {
                 toast.error(result.message)
@@ -221,7 +277,6 @@ export function ScheduleRefsClient({
         })
     }, [selectedDate, assignments, fetchDateData])
 
-    // Group matches by division, sorted by divisionLevel then time
     const matchesByDivision = useMemo(() => {
         if (!matchData) return []
         const divMap = new Map<
@@ -252,7 +307,6 @@ export function ScheduleRefsClient({
     const currentDateLabel =
         matchDates.find((d) => d.date === selectedDate)?.label ?? selectedDate
 
-    // Build schedule grid: rows = distinct times, cols = distinct courts
     const scheduleGrid = useMemo(() => {
         if (!matchData) return null
 
@@ -267,20 +321,27 @@ export function ScheduleRefsClient({
 
         if (times.length === 0 || courts.length === 0) return null
 
-        // Build a map from "time:court" -> assigned ref name
         const refNameById = new Map<string, string>()
         for (const ref of matchData.refs) {
             refNameById.set(ref.userId, ref.name)
         }
 
-        const cellMap = new Map<string, string>()
+        const cellMap = new Map<
+            string,
+            { primary: string | null; backup: string | null }
+        >()
         for (const match of matchData.matches) {
             if (match.court == null) continue
             const key = `${match.time}:${match.court}`
-            const refId = assignments[match.matchId]
-            if (refId) {
-                cellMap.set(key, refNameById.get(refId) ?? refId)
-            }
+            const a = assignments[match.matchId]
+            cellMap.set(key, {
+                primary: a?.primary
+                    ? (refNameById.get(a.primary) ?? a.primary)
+                    : null,
+                backup: a?.backup
+                    ? (refNameById.get(a.backup) ?? a.backup)
+                    : null
+            })
         }
 
         return { times, courts, cellMap }
@@ -288,7 +349,6 @@ export function ScheduleRefsClient({
 
     return (
         <div className="space-y-6">
-            {/* Date selector */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-lg">Select Match Date</CardTitle>
@@ -327,7 +387,6 @@ export function ScheduleRefsClient({
 
             {!loading && matchData && (
                 <>
-                    {/* Ref summary table — collapsible, initially collapsed */}
                     {matchData.refs.length > 0 && (
                         <Collapsible open={refsOpen} onOpenChange={setRefsOpen}>
                             <Card>
@@ -433,7 +492,6 @@ export function ScheduleRefsClient({
                         </Collapsible>
                     )}
 
-                    {/* Matches grouped by division */}
                     {matchData.matches.length === 0 ? (
                         <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                             No matches on this date.
@@ -462,23 +520,35 @@ export function ScheduleRefsClient({
                                                             Match
                                                         </th>
                                                         <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                            Assigned Ref
+                                                            Primary Ref
+                                                        </th>
+                                                        <th className="whitespace-nowrap px-3 py-2 font-medium">
+                                                            Backup Ref
                                                         </th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {division.matches.map(
                                                         (match) => {
-                                                            const eligible =
+                                                            const slots =
                                                                 computedEligible[
                                                                     match
                                                                         .matchId
-                                                                ] ?? []
-                                                            const currentRefId =
+                                                                ] ?? {
+                                                                    primary: [],
+                                                                    backup: []
+                                                                }
+                                                            const a =
                                                                 assignments[
                                                                     match
                                                                         .matchId
                                                                 ]
+                                                            const primaryId =
+                                                                a?.primary ??
+                                                                null
+                                                            const backupId =
+                                                                a?.backup ??
+                                                                null
                                                             return (
                                                                 <tr
                                                                     key={
@@ -496,68 +566,65 @@ export function ScheduleRefsClient({
                                                                             "—"}
                                                                     </td>
                                                                     <td className="whitespace-nowrap px-3 py-2">
-                                                                        {
-                                                                            match.homeTeamName
-                                                                        }{" "}
-                                                                        vs{" "}
-                                                                        {
-                                                                            match.awayTeamName
-                                                                        }
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {renderTeamCell(
+                                                                                match.homeTeamName,
+                                                                                match.homeSourceLabel,
+                                                                                match.homePossibleTeams
+                                                                            )}
+                                                                            <span className="text-muted-foreground text-xs">
+                                                                                vs
+                                                                            </span>
+                                                                            {renderTeamCell(
+                                                                                match.awayTeamName,
+                                                                                match.awaySourceLabel,
+                                                                                match.awayPossibleTeams
+                                                                            )}
+                                                                        </div>
                                                                     </td>
                                                                     <td className="px-3 py-2">
-                                                                        <Select
+                                                                        <RefPicker
                                                                             value={
-                                                                                currentRefId ??
-                                                                                UNASSIGNED
+                                                                                primaryId
                                                                             }
-                                                                            onValueChange={(
+                                                                            eligible={
+                                                                                slots.primary
+                                                                            }
+                                                                            onChange={(
                                                                                 v
                                                                             ) =>
                                                                                 handleRefChange(
                                                                                     match.matchId,
+                                                                                    "primary",
                                                                                     v
                                                                                 )
                                                                             }
-                                                                        >
-                                                                            <SelectTrigger className="w-[220px]">
-                                                                                <SelectValue placeholder="Select ref" />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                <SelectItem
-                                                                                    value={
-                                                                                        UNASSIGNED
-                                                                                    }
-                                                                                >
-                                                                                    —
-                                                                                    No
-                                                                                    ref
-                                                                                    —
-                                                                                </SelectItem>
-                                                                                {eligible.map(
-                                                                                    (
-                                                                                        ref
-                                                                                    ) => (
-                                                                                        <SelectItem
-                                                                                            key={
-                                                                                                ref.userId
-                                                                                            }
-                                                                                            value={
-                                                                                                ref.userId
-                                                                                            }
-                                                                                        >
-                                                                                            {
-                                                                                                ref.name
-                                                                                            }
-                                                                                            {ref.isUnavailable && (
-                                                                                                <span className="ml-1 text-destructive text-xs">
-                                                                                                    (unavailable)
-                                                                                                </span>
-                                                                                            )}
-                                                                                        </SelectItem>
+                                                                        />
+                                                                    </td>
+                                                                    <td className="px-3 py-2">
+                                                                        {match.isPlayoff ? (
+                                                                            <RefPicker
+                                                                                value={
+                                                                                    backupId
+                                                                                }
+                                                                                eligible={
+                                                                                    slots.backup
+                                                                                }
+                                                                                onChange={(
+                                                                                    v
+                                                                                ) =>
+                                                                                    handleRefChange(
+                                                                                        match.matchId,
+                                                                                        "backup",
+                                                                                        v
                                                                                     )
-                                                                                )}
-                                                                            </SelectContent>
-                                                                        </Select>
+                                                                                }
+                                                                            />
+                                                                        ) : (
+                                                                            <span className="text-muted-foreground text-xs">
+                                                                                —
+                                                                            </span>
+                                                                        )}
                                                                     </td>
                                                                 </tr>
                                                             )
@@ -576,7 +643,6 @@ export function ScheduleRefsClient({
                                 </Button>
                             </div>
 
-                            {/* Schedule grid: time rows × court columns */}
                             {scheduleGrid && (
                                 <Card>
                                     <CardHeader>
@@ -620,7 +686,7 @@ export function ScheduleRefsClient({
                                                                 </td>
                                                                 {scheduleGrid.courts.map(
                                                                     (court) => {
-                                                                        const refName =
+                                                                        const cell =
                                                                             scheduleGrid.cellMap.get(
                                                                                 `${time}:${court}`
                                                                             )
@@ -631,10 +697,27 @@ export function ScheduleRefsClient({
                                                                                 }
                                                                                 className="border px-3 py-2 text-center"
                                                                             >
-                                                                                {refName ? (
-                                                                                    <span className="font-medium">
+                                                                                {cell?.primary ? (
+                                                                                    <div className="flex flex-col items-center">
+                                                                                        <span className="font-medium">
+                                                                                            {
+                                                                                                cell.primary
+                                                                                            }
+                                                                                        </span>
+                                                                                        {cell.backup && (
+                                                                                            <span className="text-muted-foreground text-xs">
+                                                                                                bk:{" "}
+                                                                                                {
+                                                                                                    cell.backup
+                                                                                                }
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ) : cell?.backup ? (
+                                                                                    <span className="text-muted-foreground text-xs">
+                                                                                        bk:{" "}
                                                                                         {
-                                                                                            refName
+                                                                                            cell.backup
                                                                                         }
                                                                                     </span>
                                                                                 ) : (
@@ -660,7 +743,6 @@ export function ScheduleRefsClient({
                 </>
             )}
 
-            {/* Confirmation dialog for scheduling an unavailable ref */}
             <AlertDialog
                 open={!!pendingAssignment}
                 onOpenChange={(open) => {
@@ -689,5 +771,36 @@ export function ScheduleRefsClient({
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+    )
+}
+
+function RefPicker({
+    value,
+    eligible,
+    onChange
+}: {
+    value: string | null
+    eligible: EligibleRef[]
+    onChange: (v: string) => void
+}) {
+    return (
+        <Select value={value ?? UNASSIGNED} onValueChange={onChange}>
+            <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select ref" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value={UNASSIGNED}>— No ref —</SelectItem>
+                {eligible.map((ref) => (
+                    <SelectItem key={ref.userId} value={ref.userId}>
+                        {ref.name}
+                        {ref.isUnavailable && (
+                            <span className="ml-1 text-destructive text-xs">
+                                (unavailable)
+                            </span>
+                        )}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
     )
 }

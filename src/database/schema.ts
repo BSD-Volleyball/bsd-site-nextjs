@@ -1062,14 +1062,15 @@ export const matchReferees = pgTable(
         season_id: integer("season_id")
             .notNull()
             .references(() => seasons.id, { onDelete: "cascade" }),
+        role: text("role").notNull().default("primary"),
         created_at: timestamp("created_at")
             .$defaultFn(() => new Date())
             .notNull()
     },
     (table) => ({
-        matchRefereesMatchIdx: uniqueIndex("match_referees_match_idx").on(
-            table.match_id
-        ),
+        matchRefereesMatchRoleIdx: uniqueIndex(
+            "match_referees_match_role_idx"
+        ).on(table.match_id, table.role),
         matchRefereesRefereeIdx: index("match_referees_referee_idx").on(
             table.referee_id
         ),

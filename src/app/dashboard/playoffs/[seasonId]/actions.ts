@@ -17,16 +17,14 @@ import {
     FOUR_TEAM_PLAYOFF,
     SIX_TEAM_PLAYOFF
 } from "@/app/dashboard/create-schedule/schedule-constants"
+import {
+    formatSourceShortLabel,
+    isWinnerLoserReset,
+    parseSourceToken,
+    type ParsedSource
+} from "@/lib/playoff-sources"
 
 type SectionKey = "winners" | "losers" | "championship"
-type SourceKind = "none" | "seed" | "winner" | "loser" | "team" | "unknown"
-
-interface ParsedSource {
-    raw: string | null
-    normalized: string | null
-    kind: SourceKind
-    value: number | null
-}
 
 interface CombinedMatch {
     key: string
@@ -241,109 +239,7 @@ function compareLineChronological(a: PlayoffMatchLine, b: PlayoffMatchLine) {
     return matchNumA - matchNumB
 }
 
-function parseSourceToken(source: string | null): ParsedSource {
-    if (!source) {
-        return {
-            raw: null,
-            normalized: null,
-            kind: "none",
-            value: null
-        }
-    }
-
-    const normalized = source.trim().replace(/^"|"$/g, "").toUpperCase()
-    if (!normalized) {
-        return {
-            raw: source,
-            normalized: null,
-            kind: "none",
-            value: null
-        }
-    }
-
-    const seedMatch = normalized.match(/^S(?:EED)?(\d+)$/)
-    if (seedMatch) {
-        return {
-            raw: source,
-            normalized,
-            kind: "seed",
-            value: Number.parseInt(seedMatch[1], 10)
-        }
-    }
-
-    const winnerMatch = normalized.match(/^W(?:INNER)?(\d+)$/)
-    if (winnerMatch) {
-        return {
-            raw: source,
-            normalized,
-            kind: "winner",
-            value: Number.parseInt(winnerMatch[1], 10)
-        }
-    }
-
-    const loserMatch = normalized.match(/^L(?:OSER)?(\d+)$/)
-    if (loserMatch) {
-        return {
-            raw: source,
-            normalized,
-            kind: "loser",
-            value: Number.parseInt(loserMatch[1], 10)
-        }
-    }
-
-    const directTeamNum = Number.parseInt(normalized, 10)
-    if (!Number.isNaN(directTeamNum)) {
-        return {
-            raw: source,
-            normalized,
-            kind: "team",
-            value: directTeamNum
-        }
-    }
-
-    return {
-        raw: source,
-        normalized,
-        kind: "unknown",
-        value: null
-    }
-}
-
-function formatSourceLabel(source: ParsedSource): string | null {
-    if (source.kind === "none") {
-        return null
-    }
-
-    if (source.kind === "seed" && source.value !== null) {
-        return `S${source.value}`
-    }
-
-    if (source.kind === "winner" && source.value !== null) {
-        return `W${source.value}`
-    }
-
-    if (source.kind === "loser" && source.value !== null) {
-        return `L${source.value}`
-    }
-
-    if (source.kind === "team" && source.value !== null) {
-        return `#${source.value}`
-    }
-
-    return source.normalized || source.raw || null
-}
-
-function isWinnerLoserReset(home: ParsedSource, away: ParsedSource): boolean {
-    if (home.value === null || away.value === null) {
-        return false
-    }
-
-    const isWinnerLoserPair =
-        (home.kind === "winner" && away.kind === "loser") ||
-        (home.kind === "loser" && away.kind === "winner")
-
-    return isWinnerLoserPair && home.value === away.value
-}
+const formatSourceLabel = formatSourceShortLabel
 
 function getSetScores(
     match: CombinedMatch

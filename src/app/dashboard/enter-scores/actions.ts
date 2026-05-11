@@ -7,6 +7,9 @@ import { and, asc, eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
     matches,
+    matchReferees,
+    playoffMatchesMeta,
+    drafts,
     teams,
     divisions,
     individual_divisions,
@@ -20,6 +23,7 @@ import {
     PLAYER_PICTURE_MAX_BYTES
 } from "@/lib/r2"
 import { logAuditEntry } from "@/lib/audit-log"
+import { parseSourceToken } from "@/lib/playoff-sources"
 
 async function checkEnterScoresAccess(): Promise<{
     hasAccess: boolean
@@ -376,7 +380,15 @@ export async function saveScoresForDivision(
             }
         }
 
-        // Update all matches in a transaction
+        const autoPromotions: Array<{
+            matchId: number
+            previousPrimaryId: string
+            promotedBackupId: string
+        }> = []
+
+        // Update all matches in a transaction, then realize any newly-resolvable
+        // downstream playoff matches and auto-promote backup refs when the
+        // primary ref's team becomes a participant.
         await db.transaction(async (tx) => {
             for (const score of matchScores) {
                 await tx
@@ -394,6 +406,238 @@ export async function saveScoresForDivision(
                     })
                     .where(eq(matches.id, score.matchId))
             }
+
+            // Identify match_nums of every just-updated playoff match in this
+            // (season, division). We use them to find dependent meta rows.
+            const playoffMetaForUpdated = await tx
+                .select({
+                    matchId: playoffMatchesMeta.match_id,
+                    matchNum: playoffMatchesMeta.match_num,
+                    week: playoffMatchesMeta.week
+                })
+                .from(playoffMatchesMeta)
+                .where(
+                    and(
+                        eq(playoffMatchesMeta.season, seasonId),
+                        eq(playoffMatchesMeta.division, divisionId),
+                        inArray(playoffMatchesMeta.match_id, matchIds)
+                    )
+                )
+
+            if (playoffMetaForUpdated.length === 0) return
+
+            const weeks = Array.from(
+                new Set(playoffMetaForUpdated.map((m) => m.week))
+            )
+
+            // Pull all meta rows in the (season, division, weeks) so we can
+            // chase forward dependencies of any depth in this batch.
+            const allMeta = await tx
+                .select({
+                    metaId: playoffMatchesMeta.id,
+                    matchId: playoffMatchesMeta.match_id,
+                    matchNum: playoffMatchesMeta.match_num,
+                    week: playoffMatchesMeta.week,
+                    homeSource: playoffMatchesMeta.home_source,
+                    awaySource: playoffMatchesMeta.away_source
+                })
+                .from(playoffMatchesMeta)
+                .where(
+                    and(
+                        eq(playoffMatchesMeta.season, seasonId),
+                        eq(playoffMatchesMeta.division, divisionId),
+                        inArray(playoffMatchesMeta.week, weeks)
+                    )
+                )
+
+            const matchIdsForMeta = allMeta
+                .map((m) => m.matchId)
+                .filter((id): id is number => id !== null)
+
+            type RealizedMatch = {
+                id: number
+                homeTeamId: number | null
+                awayTeamId: number | null
+                winner: number | null
+            }
+
+            const refreshRealized = async (): Promise<
+                Map<number, RealizedMatch>
+            > => {
+                if (matchIdsForMeta.length === 0)
+                    return new Map<number, RealizedMatch>()
+                const rows = await tx
+                    .select({
+                        id: matches.id,
+                        homeTeamId: matches.home_team,
+                        awayTeamId: matches.away_team,
+                        winner: matches.winner
+                    })
+                    .from(matches)
+                    .where(inArray(matches.id, matchIdsForMeta))
+                return new Map(rows.map((r) => [r.id, r]))
+            }
+
+            const matchNumToMatchId = new Map<number, number>()
+            for (const m of allMeta) {
+                if (m.matchId !== null) {
+                    matchNumToMatchId.set(m.matchNum, m.matchId)
+                }
+            }
+
+            const realizeOnce = async (): Promise<boolean> => {
+                const realizedById = await refreshRealized()
+
+                // Build winner / loser by matchNum from current realized state
+                const winnerByMatchNum = new Map<number, number>()
+                const loserByMatchNum = new Map<number, number>()
+                for (const m of allMeta) {
+                    if (m.matchId === null) continue
+                    const r = realizedById.get(m.matchId)
+                    if (r?.winner && r.homeTeamId && r.awayTeamId) {
+                        winnerByMatchNum.set(m.matchNum, r.winner)
+                        loserByMatchNum.set(
+                            m.matchNum,
+                            r.winner === r.homeTeamId
+                                ? r.awayTeamId
+                                : r.homeTeamId
+                        )
+                    }
+                }
+
+                let anyChange = false
+                for (const m of allMeta) {
+                    if (m.matchId === null) continue
+                    const realized = realizedById.get(m.matchId)
+                    if (!realized) continue
+
+                    const home = parseSourceToken(m.homeSource)
+                    const away = parseSourceToken(m.awaySource)
+
+                    const resolveSide = (
+                        src: ReturnType<typeof parseSourceToken>
+                    ): number | null => {
+                        if (src.kind === "winner" && src.value !== null) {
+                            return winnerByMatchNum.get(src.value) ?? null
+                        }
+                        if (src.kind === "loser" && src.value !== null) {
+                            return loserByMatchNum.get(src.value) ?? null
+                        }
+                        return null
+                    }
+
+                    const update: {
+                        home_team?: number
+                        away_team?: number
+                    } = {}
+
+                    if (realized.homeTeamId === null) {
+                        const hv = resolveSide(home)
+                        if (hv !== null) update.home_team = hv
+                    }
+                    if (realized.awayTeamId === null) {
+                        const av = resolveSide(away)
+                        if (av !== null) update.away_team = av
+                    }
+
+                    if (Object.keys(update).length === 0) continue
+
+                    await tx
+                        .update(matches)
+                        .set(update)
+                        .where(eq(matches.id, m.matchId))
+                    anyChange = true
+
+                    const newlySetTeamIds = new Set<number>()
+                    if (update.home_team !== undefined)
+                        newlySetTeamIds.add(update.home_team)
+                    if (update.away_team !== undefined)
+                        newlySetTeamIds.add(update.away_team)
+
+                    // Auto-promote backup if primary ref is on one of the
+                    // newly-set teams.
+                    if (newlySetTeamIds.size === 0) continue
+
+                    const refRows = await tx
+                        .select({
+                            id: matchReferees.id,
+                            refereeId: matchReferees.referee_id,
+                            role: matchReferees.role
+                        })
+                        .from(matchReferees)
+                        .where(eq(matchReferees.match_id, m.matchId))
+
+                    const primary = refRows.find((r) => r.role === "primary")
+                    const backup = refRows.find((r) => r.role === "backup")
+                    if (!primary || !backup) continue
+
+                    // Find primary's team for this season — drafts first,
+                    // then captain/captain2 of any team.
+                    const primaryDraft = await tx
+                        .select({ teamId: drafts.team })
+                        .from(drafts)
+                        .innerJoin(teams, eq(drafts.team, teams.id))
+                        .where(
+                            and(
+                                eq(drafts.user, primary.refereeId),
+                                eq(teams.season, seasonId)
+                            )
+                        )
+                        .limit(1)
+
+                    let primaryTeamId: number | null =
+                        primaryDraft[0]?.teamId ?? null
+
+                    if (primaryTeamId === null) {
+                        const capRows = await tx
+                            .select({
+                                id: teams.id,
+                                captain: teams.captain,
+                                captain2: teams.captain2
+                            })
+                            .from(teams)
+                            .where(eq(teams.season, seasonId))
+                        for (const t of capRows) {
+                            if (
+                                t.captain === primary.refereeId ||
+                                t.captain2 === primary.refereeId
+                            ) {
+                                primaryTeamId = t.id
+                                break
+                            }
+                        }
+                    }
+
+                    if (
+                        primaryTeamId !== null &&
+                        newlySetTeamIds.has(primaryTeamId)
+                    ) {
+                        // Swap: delete current primary, promote backup → primary.
+                        // The unique (match_id, role) index forces us to
+                        // delete-then-update rather than swap in place.
+                        await tx
+                            .delete(matchReferees)
+                            .where(eq(matchReferees.id, primary.id))
+                        await tx
+                            .update(matchReferees)
+                            .set({ role: "primary" })
+                            .where(eq(matchReferees.id, backup.id))
+
+                        autoPromotions.push({
+                            matchId: m.matchId,
+                            previousPrimaryId: primary.refereeId,
+                            promotedBackupId: backup.refereeId
+                        })
+                    }
+                }
+                return anyChange
+            }
+
+            // Cascade — keep realizing while progress is being made.
+            for (let i = 0; i < 8; i++) {
+                const changed = await realizeOnce()
+                if (!changed) break
+            }
         })
 
         const session = await auth.api.getSession({
@@ -407,10 +651,22 @@ export async function saveScoresForDivision(
                 entityId: String(divisionId),
                 summary: `Entered scores for ${matchScores.length} match(es) in division ${divisionId} on ${date}`
             })
+
+            for (const promo of autoPromotions) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "match_referees",
+                    entityId: String(promo.matchId),
+                    summary: `Auto-promoted backup ref ${promo.promotedBackupId} to primary on match ${promo.matchId} (replaced ${promo.previousPrimaryId} whose team is now a participant)`
+                })
+            }
         }
 
         revalidatePath("/dashboard/enter-scores")
         revalidatePath("/dashboard/season-schedule")
+        revalidatePath("/dashboard/schedule-refs")
+        revalidatePath("/dashboard/reffing-schedule")
         return {
             status: true,
             message: `Saved scores for ${matchScores.length} match(es).`
