@@ -55,6 +55,7 @@ import {
     formatEventTime
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
+import { getActiveWaiver } from "@/lib/waivers"
 import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
 import { WelcomeTeamCard } from "./captain-info-card"
@@ -529,11 +530,13 @@ function RegistrationConfirmation({
 function WaitlistContent({
     signupStatus,
     seasonLabel,
-    waitlistSeasonId
+    waitlistSeasonId,
+    activeWaiver
 }: {
     signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
     seasonLabel: string | null
     waitlistSeasonId: number | null
+    activeWaiver: { id: number; content: string } | null
 }) {
     return (
         <div className="space-y-3">
@@ -578,7 +581,10 @@ function WaitlistContent({
                         interest in a spot in the league if one opens up or
                         possibly a substitute if needed.
                     </p>
-                    <WaitlistButton seasonId={waitlistSeasonId!} />
+                    <WaitlistButton
+                        seasonId={waitlistSeasonId!}
+                        activeWaiver={activeWaiver}
+                    />
                 </div>
             )}
         </div>
@@ -588,11 +594,13 @@ function WaitlistContent({
 function WaitlistInterestPanel({
     signupStatus,
     waitlistSeasonId,
-    pitch
+    pitch,
+    activeWaiver
 }: {
     signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
     waitlistSeasonId: number | null
     pitch: string
+    activeWaiver: { id: number; content: string } | null
 }) {
     if (signupStatus.onWaitlist) {
         if (signupStatus.waitlistApproved) {
@@ -632,7 +640,10 @@ function WaitlistInterestPanel({
     return (
         <div className="space-y-2">
             <p className="text-muted-foreground text-sm">{pitch}</p>
-            <WaitlistButton seasonId={waitlistSeasonId!} />
+            <WaitlistButton
+                seasonId={waitlistSeasonId!}
+                activeWaiver={activeWaiver}
+            />
         </div>
     )
 }
@@ -698,6 +709,7 @@ function SignupCTA({
 
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
+    const activeWaiver = await getActiveWaiver()
     const [hasTryoutSheetAccess, isAdmin] = session?.user
         ? await Promise.all([
               hasCaptainPagesAccessBySession(),
@@ -2510,6 +2522,7 @@ export default async function DashboardPage() {
                                         signupStatus={signupStatus}
                                         seasonLabel={seasonLabel}
                                         waitlistSeasonId={waitlistSeasonId}
+                                        activeWaiver={activeWaiver}
                                     />
                                 ) : (
                                     <SignupCTA
@@ -2541,6 +2554,7 @@ export default async function DashboardPage() {
                                             signupStatus={signupStatus}
                                             waitlistSeasonId={waitlistSeasonId}
                                             pitch="Interested in joining? There are occasionally drop-outs, injuries, or scheduling conflicts. Express your interest to get on the waitlist."
+                                            activeWaiver={activeWaiver}
                                         />
                                     </div>
                                 ) : (
@@ -2589,6 +2603,7 @@ export default async function DashboardPage() {
                                                     waitlistSeasonId
                                                 }
                                                 pitch="Want to play? Drop-outs, injuries, and scheduling conflicts open spots mid-season. Express your interest to join the waitlist or sub list."
+                                                activeWaiver={activeWaiver}
                                             />
                                         )
                                     )}
@@ -2615,6 +2630,7 @@ export default async function DashboardPage() {
                                                     waitlistSeasonId
                                                 }
                                                 pitch="Looking ahead to next season? Express your interest now to be on the waitlist for the next signup window or to sub during playoffs if a spot opens."
+                                                activeWaiver={activeWaiver}
                                             />
                                         )
                                     )}

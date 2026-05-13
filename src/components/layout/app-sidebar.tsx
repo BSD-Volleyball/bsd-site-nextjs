@@ -221,6 +221,11 @@ const adminDangerNavItems = [
         icon: RiUserSettingsLine
     },
     {
+        title: "Manage Waivers",
+        url: "/dashboard/manage-waivers",
+        icon: RiFileWarningLine
+    },
+    {
         title: "Create Week 1",
         url: "/dashboard/create-week-1",
         icon: RiCalendarLine

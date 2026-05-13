@@ -41,6 +41,7 @@ import {
 import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 import Link from "next/link"
+import { WaiverContent } from "@/components/waiver-content"
 
 interface User {
     id: string
@@ -52,6 +53,7 @@ interface WizardFormProps {
     users: User[]
     config: SeasonConfig
     discount: { id: number; percentage: string } | null
+    activeWaiver: { id: number; content: string } | null
 }
 
 const TABS = ["info", "pairing", "schedule", "waivers", "payment"] as const
@@ -61,7 +63,8 @@ export function WizardForm({
     amount,
     users,
     config,
-    discount
+    discount,
+    activeWaiver
 }: WizardFormProps) {
     const router = useRouter()
     const { resolvedTheme } = useTheme()
@@ -564,79 +567,43 @@ export function WizardForm({
                             Liability and Conduct Waiver
                         </h3>
 
-                        <div className="max-h-64 overflow-y-auto rounded-lg border p-4 text-muted-foreground text-sm leading-relaxed">
-                            <p>
-                                By checking the &quot;I Agree&quot; box below, I
-                                hereby release, waive, discharge, and covenant
-                                not to sue, or hold responsible, Bump Set Drink,
-                                Inc. (BSD), Adventist HealthCare Fieldhouse
-                                referees, other participants, and any persons in
-                                a playing area, from all liability to you, your
-                                personal representatives, assigned heirs, and
-                                next of kin for any and all damage, and any
-                                claim or demands thereof on account of injury to
-                                you or your property or resulting in your death,
-                                whether caused by the negligence or otherwise
-                                while you are participating or working for or
-                                observing BSD events. You expressly acknowledge
-                                and agree that the activities at the event and
-                                in the playing areas are dangerous and involve
-                                the risk of serious injury and/or death and/or
-                                property damage. You expressly acknowledge that
-                                the activities at the event may involve the risk
-                                of exposure to Covid-19 or other harmful
-                                viruses. You consent to and will permit
-                                emergency medical treatment if required. You
-                                agree to allow your image to be used in
-                                promotional and informational material. You have
-                                read and agree to abide by the behavioral
-                                policies stated on the BSD website. You
-                                understand that this waiver may serve as the
-                                only warning to action being taken for improper
-                                behavior. You have read and voluntarily sign
-                                this release and waiver of liability and
-                                indemnity agreement which embraces each and
-                                every event sanctioned, authorized or promoted
-                                by the Bump Set Drink, Inc. league.
-                            </p>
-                            <p className="mt-4">
-                                Submitting this online registration implies
-                                compliance with the waiver and your agreement to
-                                adhere to league rules as stated on the website.
-                                This statement qualifies as the only warning
-                                given — violations of the rules will not be
-                                tolerated. By registering for this league you
-                                will be held accountable for all league policies
-                                and procedures.
-                            </p>
-                        </div>
+                        {activeWaiver ? (
+                            <>
+                                <WaiverContent content={activeWaiver.content} />
 
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="waiver-agree"
-                                checked={waiverAgreed}
-                                onCheckedChange={(
-                                    checked: boolean | "indeterminate"
-                                ) => setWaiverAgreed(checked === true)}
-                            />
-                            <Label
-                                htmlFor="waiver-agree"
-                                className="cursor-pointer font-medium"
-                            >
-                                I Agree
-                            </Label>
-                        </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="waiver-agree"
+                                        checked={waiverAgreed}
+                                        onCheckedChange={(
+                                            checked: boolean | "indeterminate"
+                                        ) => setWaiverAgreed(checked === true)}
+                                    />
+                                    <Label
+                                        htmlFor="waiver-agree"
+                                        className="cursor-pointer font-medium"
+                                    >
+                                        I Agree
+                                    </Label>
+                                </div>
 
-                        <div className="pt-4">
-                            <Button
-                                onClick={goToNextTab}
-                                disabled={!waiverAgreed}
-                                className="gap-2"
-                            >
-                                Next
-                                <RiArrowRightLine className="h-4 w-4" />
-                            </Button>
-                        </div>
+                                <div className="pt-4">
+                                    <Button
+                                        onClick={goToNextTab}
+                                        disabled={!waiverAgreed}
+                                        className="gap-2"
+                                    >
+                                        Next
+                                        <RiArrowRightLine className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800 text-sm dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+                                No active waiver is currently published. Please
+                                contact an administrator before continuing.
+                            </div>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="payment" className="space-y-6 pt-4">
@@ -736,7 +703,8 @@ export function WizardForm({
                                             const result =
                                                 await submitFreeSignup(
                                                     formData,
-                                                    discount!.id
+                                                    discount!.id,
+                                                    activeWaiver!.id
                                                 )
                                             setPaymentResult(result)
                                         } catch (_error) {
@@ -783,6 +751,7 @@ export function WizardForm({
                                             await submitSeasonPayment(
                                                 tokenResult.token,
                                                 formData,
+                                                activeWaiver!.id,
                                                 discount?.id
                                             )
                                         setPaymentResult(result)

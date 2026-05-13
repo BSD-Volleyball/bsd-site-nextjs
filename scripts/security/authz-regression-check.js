@@ -17,7 +17,12 @@ const guardPatterns = [
     /isAdminOrDirectorBySession\s*\(/,
     /isCommissionerBySession\s*\(/,
     /hasAdministrativeAccessBySession\s*\(/,
-    /hasViewSignupsAccessBySession\s*\(/
+    /hasViewSignupsAccessBySession\s*\(/,
+    /requireAdmin\s*\(/,
+    /requireSession\s*\(/,
+    /requireCommissioner\s*\(/,
+    /requireCaptainAccess\s*\(/,
+    /requirePermission\s*\(/
 ]
 
 const publicAllowlist = new Set([

@@ -1189,3 +1189,41 @@ export const emailBroadcasts = pgTable("email_broadcasts", {
         .$defaultFn(() => new Date())
         .notNull()
 })
+
+// Waivers: each row is a published, immutable version of the legal waiver.
+// Never UPDATE content or created_at — a DB trigger enforces this. To revise
+// the waiver, INSERT a new row and flip `active`.
+export const waivers = pgTable("waivers", {
+    id: serial("id").primaryKey(),
+    content: text("content").notNull(),
+    active: boolean("active")
+        .$defaultFn(() => false)
+        .notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull(),
+    created_by: text("created_by").references(() => users.id)
+})
+
+// One row per (user, waiver version) the first time that user accepts it.
+// Unique constraint makes acceptance idempotent.
+export const waiverAcceptances = pgTable(
+    "waiver_acceptances",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id),
+        waiver_id: integer("waiver_id")
+            .notNull()
+            .references(() => waivers.id),
+        accepted_at: timestamp("accepted_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        waiverAcceptancesUserWaiverIdx: uniqueIndex(
+            "waiver_acceptances_user_waiver_idx"
+        ).on(table.user_id, table.waiver_id)
+    })
+)

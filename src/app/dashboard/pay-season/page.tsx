@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { getActiveWaiver } from "@/lib/waivers"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic"
 export default async function PaySeasonPage() {
     const config = await getSeasonConfig()
     const users = await getUsers()
+    const activeWaiver = await getActiveWaiver()
 
     // Get user's discount if logged in
     let discount: { id: number; percentage: string } | null = null
@@ -45,6 +47,7 @@ export default async function PaySeasonPage() {
                 users={users}
                 config={config}
                 discount={discount}
+                activeWaiver={activeWaiver}
             />
         </div>
     )

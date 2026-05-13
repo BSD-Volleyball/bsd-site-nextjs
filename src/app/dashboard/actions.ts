@@ -34,6 +34,7 @@ import {
     SIX_TEAM_PLAYOFF
 } from "@/app/dashboard/create-schedule/schedule-constants"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
@@ -893,12 +894,30 @@ export async function getPlayerTeamAssignment(
 }
 
 export async function expressWaitlistInterest(
-    seasonId: number
+    seasonId: number,
+    waiverId: number,
+    waiverAgreed: boolean
 ): Promise<{ status: boolean; message: string }> {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session?.user) {
         return { status: false, message: "Not authenticated." }
+    }
+
+    if (!waiverAgreed) {
+        return {
+            status: false,
+            message: "You must agree to the waiver to join the waitlist."
+        }
+    }
+
+    const activeWaiver = await getActiveWaiver()
+    if (!activeWaiver || activeWaiver.id !== waiverId) {
+        return {
+            status: false,
+            message:
+                "The waiver was updated while you were submitting. Please reload and re-confirm the current waiver."
+        }
     }
 
     try {
@@ -920,6 +939,8 @@ export async function expressWaitlistInterest(
                 message: "You've already expressed interest for this season."
             }
         }
+
+        await recordWaiverAcceptance(session.user.id, activeWaiver.id)
 
         await db.insert(waitlist).values({
             season: seasonId,

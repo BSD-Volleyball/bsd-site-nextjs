@@ -21,6 +21,7 @@ import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
+import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 
 export interface SignupFormData {
     age: string
@@ -172,6 +173,7 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
 export async function submitSeasonPayment(
     sourceId: string,
     formData: SignupFormData,
+    waiverId: number,
     discountId?: number
 ): Promise<PaymentResult> {
     const session = await auth.api.getSession({ headers: await headers() })
@@ -179,6 +181,15 @@ export async function submitSeasonPayment(
         return {
             status: false,
             message: "You need to be logged in to make a payment."
+        }
+    }
+
+    const activeWaiver = await getActiveWaiver()
+    if (!activeWaiver || activeWaiver.id !== waiverId) {
+        return {
+            status: false,
+            message:
+                "The waiver was updated while you were signing up. Please reload and re-confirm the current waiver."
         }
     }
 
@@ -245,6 +256,8 @@ export async function submitSeasonPayment(
 
         if (response.payment) {
             if (config.seasonId) {
+                await recordWaiverAcceptance(session.user.id, activeWaiver.id)
+
                 // Create signup record
                 const [newSignup] = await db
                     .insert(signups)
@@ -346,13 +359,23 @@ export async function submitSeasonPayment(
 
 export async function submitFreeSignup(
     formData: SignupFormData,
-    discountId: number
+    discountId: number,
+    waiverId: number
 ): Promise<PaymentResult> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session) {
         return {
             status: false,
             message: "You need to be logged in to register."
+        }
+    }
+
+    const activeWaiver = await getActiveWaiver()
+    if (!activeWaiver || activeWaiver.id !== waiverId) {
+        return {
+            status: false,
+            message:
+                "The waiver was updated while you were signing up. Please reload and re-confirm the current waiver."
         }
     }
 
@@ -400,6 +423,8 @@ export async function submitFreeSignup(
                 shouldRefresh: availabilityCheck.shouldRefresh
             }
         }
+
+        await recordWaiverAcceptance(session.user.id, activeWaiver.id)
 
         // Create signup record with $0 amount
         const [newSignup] = await db
