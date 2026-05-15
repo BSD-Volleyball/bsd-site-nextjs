@@ -1401,35 +1401,43 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     match.scoresDisplay !== "—"
             )
 
-            const championshipWinnerId = [...combinedMatches]
-                .filter((match) => match.section === "championship")
-                .sort((a, b) => {
-                    if (a.round !== b.round) {
-                        return b.round - a.round
-                    }
+            const sortDeepestFirst = (a: CombinedMatch, b: CombinedMatch) => {
+                if (a.round !== b.round) {
+                    return b.round - a.round
+                }
 
-                    const matchNumA = a.matchNum ?? -1
-                    const matchNumB = b.matchNum ?? -1
-                    return matchNumB - matchNumA
-                })
-                .map((match) => getWinnerTeamId(match))
-                .find((teamId): teamId is number => teamId !== null)
+                const matchNumA = a.matchNum ?? -1
+                const matchNumB = b.matchNum ?? -1
+                return matchNumB - matchNumA
+            }
 
-            const fallbackChampionId =
-                championshipWinnerId ||
-                [...combinedMatches]
-                    .sort((a, b) => {
-                        const matchNumA = a.matchNum ?? -1
-                        const matchNumB = b.matchNum ?? -1
-                        return matchNumB - matchNumA
-                    })
+            const championshipMatches = combinedMatches.filter(
+                (match) => match.section === "championship"
+            )
+            // For a bracket without an explicit championship section
+            // (e.g. single-elimination), treat the deepest winners-bracket
+            // match as the final instead.
+            const finalSectionMatches =
+                championshipMatches.length > 0
+                    ? championshipMatches
+                    : combinedMatches.filter(
+                          (match) => match.section === "winners"
+                      )
+
+            // Walk from the deepest match (e.g. an "if necessary" reset)
+            // toward earlier rounds and crown the first match that has a
+            // recorded winner. Earlier rounds outside the final section are
+            // intentionally ignored — winning a quarterfinal does not make
+            // a team the champion.
+            const championTeamId =
+                [...finalSectionMatches]
+                    .sort(sortDeepestFirst)
                     .map((match) => getWinnerTeamId(match))
-                    .find((teamId): teamId is number => teamId !== null) ||
-                null
+                    .find((teamId): teamId is number => teamId !== null) ?? null
 
             const champion =
-                fallbackChampionId !== null
-                    ? getTeamLabelById(fallbackChampionId, labelContext)
+                championTeamId !== null
+                    ? getTeamLabelById(championTeamId, labelContext)
                     : null
 
             const seedTeamIdBySeed = new Map<number, number>()
