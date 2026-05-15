@@ -82,7 +82,7 @@ function MatchCard({
             : null
 
     const cardHighlight =
-        isUserHome || isUserAway || isUserWork ? "ring-2 ring-primary/40" : ""
+        isUserHome || isUserAway || isUserWork ? "ring-2 ring-amber-500/50" : ""
     return (
         <div
             className={cn(
@@ -107,8 +107,9 @@ function MatchCard({
                     className={cn(
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === true &&
-                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
-                        isUserHome && "bg-primary/10 font-semibold",
+                            "bg-primary/10 font-semibold text-primary",
+                        isUserHome &&
+                            "bg-amber-500/15 font-semibold text-amber-700 dark:text-amber-300",
                         !isUserHome && pathTintBg(homeTint)
                     )}
                 >
@@ -122,8 +123,9 @@ function MatchCard({
                     className={cn(
                         "flex items-center justify-between rounded-md px-2 py-1 text-sm",
                         match.homeIsWinner === false &&
-                            "bg-emerald-500/10 font-semibold text-emerald-700 dark:text-emerald-300",
-                        isUserAway && "bg-primary/10 font-semibold",
+                            "bg-primary/10 font-semibold text-primary",
+                        isUserAway &&
+                            "bg-amber-500/15 font-semibold text-amber-700 dark:text-amber-300",
                         !isUserAway && pathTintBg(awayTint)
                     )}
                 >
@@ -156,7 +158,8 @@ function MatchCard({
                         variant={isUserWork ? "default" : "secondary"}
                         className={cn(
                             "px-1.5 py-0 text-[10px]",
-                            isUserWork && "bg-primary text-primary-foreground",
+                            isUserWork &&
+                                "bg-amber-500 text-white hover:bg-amber-500",
                             !isUserWork && pathTintBg(workTint)
                         )}
                     >
@@ -305,7 +308,7 @@ function ScheduleTable({
                                 className={cn(
                                     "border-b last:border-0",
                                     involvesUser &&
-                                        "bg-primary/10 font-semibold"
+                                        "bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300"
                                 )}
                             >
                                 <td className="px-3 py-2">{match.week}</td>
@@ -501,7 +504,7 @@ export function DivisionSection({
                                                         className={cn(
                                                             "rounded-md border bg-background px-3 py-2 text-sm",
                                                             isUserSeed &&
-                                                                "border-primary bg-primary/10 font-semibold"
+                                                                "border-amber-500 bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300"
                                                         )}
                                                     >
                                                         <span className="font-semibold">

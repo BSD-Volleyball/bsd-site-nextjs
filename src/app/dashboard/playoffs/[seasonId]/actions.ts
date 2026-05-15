@@ -622,7 +622,11 @@ function resolveSideLabel(
 
 function buildBracketData(
     combinedMatches: CombinedMatch[],
-    labelContext: LabelContext
+    labelContext: LabelContext,
+    resolveEffective: (
+        teamId: number | null,
+        source: ParsedSource
+    ) => number | null = (teamId) => teamId
 ): { upper: BracketMatch[]; lower: BracketMatch[] } | null {
     const numbered = combinedMatches.filter(
         (m): m is CombinedMatch & { matchNum: number } => m.matchNum !== null
@@ -700,9 +704,9 @@ function buildBracketData(
                 m.workTeamId !== null
                     ? getTeamLabelById(m.workTeamId, labelContext)
                     : resolveReferenceLabel(m.workSource, labelContext),
-            homeTeamId: m.homeTeamId,
-            awayTeamId: m.awayTeamId,
-            workTeamId: m.workTeamId,
+            homeTeamId: resolveEffective(m.homeTeamId, m.homeSource),
+            awayTeamId: resolveEffective(m.awayTeamId, m.awaySource),
+            workTeamId: resolveEffective(m.workTeamId, m.workSource),
             homeSourceRefMatch:
                 m.homeSource.kind === "winner" || m.homeSource.kind === "loser"
                     ? m.homeSource.value
@@ -1197,6 +1201,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
 
             const seedNumbers = new Set<number>()
             const seedLabelBySeed = new Map<number, string>()
+            const seedTeamIdBySeed = new Map<number, number>()
             for (const match of combinedMatches) {
                 if (
                     match.homeSource.kind === "seed" &&
@@ -1208,6 +1213,10 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                             match.homeSource.value,
                             teamLabelById.get(match.homeTeamId) ||
                                 `Team ${match.homeTeamId}`
+                        )
+                        seedTeamIdBySeed.set(
+                            match.homeSource.value,
+                            match.homeTeamId
                         )
                     }
                 }
@@ -1223,6 +1232,10 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                             teamLabelById.get(match.awayTeamId) ||
                                 `Team ${match.awayTeamId}`
                         )
+                        seedTeamIdBySeed.set(
+                            match.awaySource.value,
+                            match.awayTeamId
+                        )
                     }
                 }
             }
@@ -1234,11 +1247,57 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 matchByNum
             }
 
+            // Deterministic team-id resolver: if a side has a real team_id in
+            // the DB, return it; else if its source is a decided seed/winner/
+            // loser, follow the chain one level. Returns null when the upstream
+            // match is undecided (so we never "promise" a team to a match it
+            // might not reach). Used to make the "user is in this match"
+            // highlight work even when downstream rows haven't been backfilled.
+            const resolveEffective = (
+                teamId: number | null,
+                source: ParsedSource
+            ): number | null => {
+                if (teamId !== null) return teamId
+                if (source.kind === "seed" && source.value !== null) {
+                    return seedTeamIdBySeed.get(source.value) ?? null
+                }
+                if (
+                    (source.kind === "winner" || source.kind === "loser") &&
+                    source.value !== null
+                ) {
+                    const ref = matchByNum.get(source.value)
+                    if (!ref) return null
+                    const winner = getWinnerTeamId(ref)
+                    if (winner === null) return null
+                    if (source.kind === "winner") return winner
+                    if (ref.homeTeamId === null || ref.awayTeamId === null) {
+                        return null
+                    }
+                    return winner === ref.homeTeamId
+                        ? ref.awayTeamId
+                        : ref.homeTeamId
+                }
+                return null
+            }
+
             const lineByKey = new Map<string, PlayoffMatchLine>()
             for (const match of combinedMatches) {
                 const winnerTeamId = getWinnerTeamId(match)
                 const loserTeamId = getLoserTeamId(match, winnerTeamId)
                 const wins = getGameWins(match)
+
+                const effectiveHomeTeamId = resolveEffective(
+                    match.homeTeamId,
+                    match.homeSource
+                )
+                const effectiveAwayTeamId = resolveEffective(
+                    match.awayTeamId,
+                    match.awaySource
+                )
+                const effectiveWorkTeamId = resolveEffective(
+                    match.workTeamId,
+                    match.workSource
+                )
 
                 const homeIsWinner =
                     winnerTeamId !== null && match.homeTeamId !== null
@@ -1300,9 +1359,9 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                                   labelContext
                               ),
                     round: match.round,
-                    homeTeamId: match.homeTeamId,
-                    awayTeamId: match.awayTeamId,
-                    workTeamId: match.workTeamId,
+                    homeTeamId: effectiveHomeTeamId,
+                    awayTeamId: effectiveAwayTeamId,
+                    workTeamId: effectiveWorkTeamId,
                     winnerTeamId,
                     loserTeamId,
                     homeSourceRefMatch:
@@ -1440,29 +1499,6 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     ? getTeamLabelById(championTeamId, labelContext)
                     : null
 
-            const seedTeamIdBySeed = new Map<number, number>()
-            for (const match of combinedMatches) {
-                if (
-                    match.homeSource.kind === "seed" &&
-                    match.homeSource.value !== null &&
-                    match.homeTeamId !== null
-                ) {
-                    seedTeamIdBySeed.set(
-                        match.homeSource.value,
-                        match.homeTeamId
-                    )
-                }
-                if (
-                    match.awaySource.kind === "seed" &&
-                    match.awaySource.value !== null &&
-                    match.awayTeamId !== null
-                ) {
-                    seedTeamIdBySeed.set(
-                        match.awaySource.value,
-                        match.awayTeamId
-                    )
-                }
-            }
             const seeds: PlayoffSeed[] = [...seedNumbers]
                 .sort((a, b) => a - b)
                 .map((seedNum) => ({
@@ -1474,16 +1510,23 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
 
             const bracketMatches = buildBracketData(
                 combinedMatches,
-                labelContext
+                labelContext,
+                resolveEffective
             )
 
-            // Compute the user's "anchor" for this division: the latest match
-            // (by matchNum) where the user's team is definitely involved as
-            // home/away/work. Drives the green/red one-level-lookahead path
-            // tinting in the bracket and schedule.
+            // Compute the user's "anchor" for this division: the user's next
+            // undecided match where their team is involved as home/away/work.
+            // Falls back to the most recently completed such match when every
+            // match they're in already has a winner. Drives the green/red
+            // one-level-lookahead path tinting. scheduleMatches now carries
+            // effective team IDs (resolved through decided winner/loser/seed
+            // sources), so direct equality works for downstream rows that the
+            // DB hasn't backfilled yet.
             let userAnchorMatchNum: number | null = null
             let userAnchorWeek: number | null = null
             if (userTeamId !== null && division.id === userDivisionId) {
+                let fallbackMatchNum: number | null = null
+                let fallbackWeek: number | null = null
                 for (const line of scheduleMatches) {
                     if (line.matchNum === null) continue
                     const involves =
@@ -1491,13 +1534,19 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                         line.awayTeamId === userTeamId ||
                         line.workTeamId === userTeamId
                     if (!involves) continue
-                    if (
-                        userAnchorMatchNum === null ||
-                        line.matchNum > userAnchorMatchNum
-                    ) {
-                        userAnchorMatchNum = line.matchNum
-                        userAnchorWeek = line.week
+                    if (line.winnerTeamId === null) {
+                        if (userAnchorMatchNum === null) {
+                            userAnchorMatchNum = line.matchNum
+                            userAnchorWeek = line.week
+                        }
+                    } else {
+                        fallbackMatchNum = line.matchNum
+                        fallbackWeek = line.week
                     }
+                }
+                if (userAnchorMatchNum === null) {
+                    userAnchorMatchNum = fallbackMatchNum
+                    userAnchorWeek = fallbackWeek
                 }
             }
 

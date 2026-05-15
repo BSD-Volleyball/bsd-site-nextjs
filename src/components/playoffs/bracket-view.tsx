@@ -25,7 +25,9 @@ const DoubleEliminationBracket = dynamic(
 // Must provide ALL properties — the library does NOT merge with defaults.
 const BRACKET_STYLE = {
     width: 185,
-    boxHeight: 100,
+    // Tall enough to fit header + 2 party rows + sets line + work line
+    // without the work text bleeding past the card border on completed matches.
+    boxHeight: 110,
     canvasPadding: 12,
     spaceBetweenColumns: 24,
     spaceBetweenRows: 16,
@@ -56,6 +58,13 @@ const PATH_TINT_BG: Record<"win" | "lose", string> = {
     win: "rgba(16, 185, 129, 0.22)",
     lose: "rgba(244, 63, 94, 0.22)"
 }
+// User-team highlight color (amber). Kept distinct from PATH_TINT_BG
+// (green/red), from the winner highlight (--primary, purple), and from the
+// dark-theme background hue (cool blue), so it reads in both modes.
+const USER_TINT_BG = "rgba(245, 158, 11, 0.28)"
+const USER_TINT_BORDER = "#f59e0b"
+// Amber-600 — readable on the amber-tinted row in both light and dark modes.
+const USER_TINT_TEXT = "#d97706"
 
 function makeCustomMatch(
     userTeamId: number | null,
@@ -86,7 +95,7 @@ function makeCustomMatch(
             !isBye && userTeamId !== null && bm.workTeamId === userTeamId
         const cardBorder =
             isUserHome || isUserAway || isUserWork
-                ? "2px solid var(--primary)"
+                ? `2px solid ${USER_TINT_BORDER}`
                 : isBye
                   ? "1px dashed var(--border)"
                   : "1px solid var(--border)"
@@ -220,13 +229,13 @@ function makeCustomMatch(
                                 style={{
                                     fontSize: "9px",
                                     color: isUserWork
-                                        ? "var(--primary)"
+                                        ? USER_TINT_TEXT
                                         : "var(--muted-foreground)",
                                     fontWeight: isUserWork ? 600 : 400,
                                     padding: "2px 6px",
                                     borderTop: "1px solid var(--border)",
                                     backgroundColor: isUserWork
-                                        ? "color-mix(in srgb, var(--primary) 18%, transparent)"
+                                        ? USER_TINT_BG
                                         : workTint
                                           ? PATH_TINT_BG[workTint]
                                           : "transparent",
@@ -269,7 +278,7 @@ function PartyRow({
     const baseBg = hovered
         ? "rgba(16, 185, 129, 0.15)"
         : isUserTeam
-          ? "color-mix(in srgb, var(--primary) 22%, transparent)"
+          ? USER_TINT_BG
           : pathTint
             ? PATH_TINT_BG[pathTint]
             : won
@@ -287,9 +296,11 @@ function PartyRow({
                 fontWeight: won || hovered || isUserTeam ? 600 : 400,
                 color: hovered
                     ? "#059669"
-                    : won || isUserTeam
-                      ? "var(--primary)"
-                      : "var(--foreground)",
+                    : isUserTeam
+                      ? USER_TINT_TEXT
+                      : won
+                        ? "var(--primary)"
+                        : "var(--foreground)",
                 cursor: "pointer",
                 transition: "background-color 0.15s"
             }}
