@@ -137,10 +137,6 @@ export function DivisionSection({
                                                         {player.isSubbedOut && (
                                                             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                                                 Subbed out
-                                                                {player.originalRound !=
-                                                                null
-                                                                    ? ` — Rd ${player.originalRound}`
-                                                                    : ""}
                                                             </span>
                                                         )}
                                                         {player.subForName && (
