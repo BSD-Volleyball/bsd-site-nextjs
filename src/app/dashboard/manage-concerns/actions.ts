@@ -14,6 +14,7 @@ import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import { sendEmail } from "@/lib/postmark"
+import { site } from "@/config/site"
 
 async function hasConcernPermission(
     permission: "concerns:view" | "concerns:manage"
@@ -481,7 +482,7 @@ export async function addConcernComment(
 
 export async function updateConcernStatus(
     concernId: number,
-    status: "new" | "active" | "closed"
+    status: "new" | "active" | "closed" | "spam"
 ): Promise<{ status: boolean; message: string }> {
     const canManage = await hasConcernPermission("concerns:manage")
     if (!canManage) {
@@ -525,7 +526,14 @@ export async function assignConcern(
 
         const [existingConcern] = await db
             .select({
-                status: concerns.status
+                status: concerns.status,
+                source: concerns.source,
+                anonymous: concerns.anonymous,
+                contact_name: concerns.contact_name,
+                contact_email: concerns.contact_email,
+                person_involved: concerns.person_involved,
+                location: concerns.location,
+                incident_date: concerns.incident_date
             })
             .from(concerns)
             .where(eq(concerns.id, concernId))
@@ -536,13 +544,15 @@ export async function assignConcern(
         }
 
         let assigneeName: string | null = null
+        let assigneeEmail: string | null = null
         if (assigneeId) {
             const [assignee] = await db
-                .select({ name: users.name })
+                .select({ name: users.name, email: users.email })
                 .from(users)
                 .where(eq(users.id, assigneeId))
                 .limit(1)
             assigneeName = assignee?.name ?? assigneeId
+            assigneeEmail = assignee?.email ?? null
         }
 
         const shouldMoveToActive =
@@ -571,6 +581,59 @@ export async function assignConcern(
             author_id: actorUserId,
             content: assignmentComment
         })
+
+        if (assigneeId && assigneeId !== actorUserId && assigneeEmail) {
+            const submitterLabel = existingConcern.anonymous
+                ? "Anonymous submission"
+                : existingConcern.contact_email
+                  ? existingConcern.contact_name
+                      ? `${existingConcern.contact_name} <${existingConcern.contact_email}>`
+                      : existingConcern.contact_email
+                  : (existingConcern.contact_name ?? "Unknown submitter")
+            const sourceLabel =
+                existingConcern.source === "email"
+                    ? "Email submission"
+                    : "Web submission"
+            const conciseSubject = `Concern #${concernId}: ${existingConcern.person_involved}`
+            const link = `${site.url}/dashboard/manage-concerns`
+            const subjectLine = `[BSD] A concern has been assigned to you: ${conciseSubject}`
+            const textBody = [
+                `Hi ${assigneeName ?? "there"},`,
+                "",
+                `${actorName} has assigned a concern to you.`,
+                "",
+                `Subject: ${conciseSubject}`,
+                `From: ${submitterLabel} (${sourceLabel})`,
+                "",
+                `View it here: ${link}`
+            ].join("\n")
+            const htmlBody = `
+                <div style="font-family:sans-serif;font-size:14px;line-height:1.5">
+                    <p>Hi ${assigneeName ?? "there"},</p>
+                    <p><strong>${actorName}</strong> has assigned a concern to you.</p>
+                    <p>
+                        <strong>Subject:</strong> ${conciseSubject}<br/>
+                        <strong>From:</strong> ${submitterLabel} (${sourceLabel})
+                    </p>
+                    <p><a href="${link}">Open Manage Concerns</a></p>
+                </div>
+            `
+            try {
+                await sendEmail({
+                    from: site.mailFrom,
+                    to: assigneeEmail,
+                    subject: subjectLine,
+                    htmlBody,
+                    textBody,
+                    tag: "concern-assignment"
+                })
+            } catch (notifyError) {
+                console.error(
+                    "Failed to send concern-assignment notification:",
+                    notifyError
+                )
+            }
+        }
 
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern assigned." }
@@ -657,6 +720,86 @@ export async function reopenConcern(
     } catch (error) {
         console.error("Error reopening concern:", error)
         return { status: false, message: "Failed to reopen concern." }
+    }
+}
+
+export async function markConcernAsSpam(
+    concernId: number
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasConcernPermission("concerns:manage")
+    if (!canManage) {
+        return { status: false, message: "Unauthorized." }
+    }
+
+    const actorUserId = await getSessionUserId()
+    if (!actorUserId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    try {
+        const [actor] = await db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, actorUserId))
+            .limit(1)
+        const actorName = actor?.name ?? actorUserId
+
+        await db
+            .update(concerns)
+            .set({ status: "spam", updated_at: new Date() })
+            .where(eq(concerns.id, concernId))
+
+        await db.insert(concernComments).values({
+            concern_id: concernId,
+            author_id: actorUserId,
+            content: `${actorName} marked this concern as spam.`
+        })
+
+        revalidatePath("/dashboard/manage-concerns")
+        return { status: true, message: "Concern marked as spam." }
+    } catch (error) {
+        console.error("Error marking concern as spam:", error)
+        return { status: false, message: "Failed to mark concern as spam." }
+    }
+}
+
+export async function unmarkConcernAsSpam(
+    concernId: number
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasConcernPermission("concerns:manage")
+    if (!canManage) {
+        return { status: false, message: "Unauthorized." }
+    }
+
+    const actorUserId = await getSessionUserId()
+    if (!actorUserId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    try {
+        const [actor] = await db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, actorUserId))
+            .limit(1)
+        const actorName = actor?.name ?? actorUserId
+
+        await db
+            .update(concerns)
+            .set({ status: "new", updated_at: new Date() })
+            .where(eq(concerns.id, concernId))
+
+        await db.insert(concernComments).values({
+            concern_id: concernId,
+            author_id: actorUserId,
+            content: `${actorName} removed the spam mark and returned this concern to new.`
+        })
+
+        revalidatePath("/dashboard/manage-concerns")
+        return { status: true, message: "Concern returned to new." }
+    } catch (error) {
+        console.error("Error unmarking concern as spam:", error)
+        return { status: false, message: "Failed to unmark concern as spam." }
     }
 }
 

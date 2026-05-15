@@ -392,7 +392,12 @@ export async function assignInboundEmail(
         const actorName = actor?.name ?? actorUserId
 
         const [existing] = await db
-            .select({ status: inboundEmails.status })
+            .select({
+                status: inboundEmails.status,
+                subject: inboundEmails.subject,
+                from_address: inboundEmails.from_address,
+                from_name: inboundEmails.from_name
+            })
             .from(inboundEmails)
             .where(eq(inboundEmails.id, emailId))
             .limit(1)
@@ -402,13 +407,15 @@ export async function assignInboundEmail(
         }
 
         let assigneeName: string | null = null
+        let assigneeEmail: string | null = null
         if (assigneeId) {
             const [assignee] = await db
-                .select({ name: users.name })
+                .select({ name: users.name, email: users.email })
                 .from(users)
                 .where(eq(users.id, assigneeId))
                 .limit(1)
             assigneeName = assignee?.name ?? assigneeId
+            assigneeEmail = assignee?.email ?? null
         }
 
         const shouldMoveToActive =
@@ -437,6 +444,50 @@ export async function assignInboundEmail(
             author_id: actorUserId,
             content: assignmentComment
         })
+
+        if (assigneeId && assigneeId !== actorUserId && assigneeEmail) {
+            const senderLabel = existing.from_name
+                ? `${existing.from_name} <${existing.from_address}>`
+                : existing.from_address
+            const link = `${site.url}/dashboard/manage-emails`
+            const subjectLine = `[BSD] An email has been assigned to you: ${existing.subject}`
+            const textBody = [
+                `Hi ${assigneeName ?? "there"},`,
+                "",
+                `${actorName} has assigned an email to you.`,
+                "",
+                `Subject: ${existing.subject}`,
+                `From: ${senderLabel}`,
+                "",
+                `View it here: ${link}`
+            ].join("\n")
+            const htmlBody = `
+                <div style="font-family:sans-serif;font-size:14px;line-height:1.5">
+                    <p>Hi ${assigneeName ?? "there"},</p>
+                    <p><strong>${actorName}</strong> has assigned an email to you.</p>
+                    <p>
+                        <strong>Subject:</strong> ${existing.subject}<br/>
+                        <strong>From:</strong> ${senderLabel}
+                    </p>
+                    <p><a href="${link}">Open Manage Emails</a></p>
+                </div>
+            `
+            try {
+                await sendEmail({
+                    from: site.mailFrom,
+                    to: assigneeEmail,
+                    subject: subjectLine,
+                    htmlBody,
+                    textBody,
+                    tag: "email-assignment"
+                })
+            } catch (notifyError) {
+                console.error(
+                    "Failed to send email-assignment notification:",
+                    notifyError
+                )
+            }
+        }
 
         revalidatePath("/dashboard/manage-emails")
         return { status: true, message: "Email assigned." }
@@ -523,6 +574,86 @@ export async function reopenInboundEmail(
     } catch (error) {
         console.error("Error reopening email:", error)
         return { status: false, message: "Failed to reopen email." }
+    }
+}
+
+export async function markInboundEmailAsSpam(
+    emailId: number
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasAdminEmailPermission("admin_emails:manage")
+    if (!canManage) {
+        return { status: false, message: "Unauthorized." }
+    }
+
+    const actorUserId = await getSessionUserId()
+    if (!actorUserId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    try {
+        const [actor] = await db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, actorUserId))
+            .limit(1)
+        const actorName = actor?.name ?? actorUserId
+
+        await db
+            .update(inboundEmails)
+            .set({ status: "spam", updated_at: new Date() })
+            .where(eq(inboundEmails.id, emailId))
+
+        await db.insert(inboundEmailComments).values({
+            email_id: emailId,
+            author_id: actorUserId,
+            content: `${actorName} marked this email as spam.`
+        })
+
+        revalidatePath("/dashboard/manage-emails")
+        return { status: true, message: "Email marked as spam." }
+    } catch (error) {
+        console.error("Error marking email as spam:", error)
+        return { status: false, message: "Failed to mark email as spam." }
+    }
+}
+
+export async function unmarkInboundEmailAsSpam(
+    emailId: number
+): Promise<{ status: boolean; message: string }> {
+    const canManage = await hasAdminEmailPermission("admin_emails:manage")
+    if (!canManage) {
+        return { status: false, message: "Unauthorized." }
+    }
+
+    const actorUserId = await getSessionUserId()
+    if (!actorUserId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
+    try {
+        const [actor] = await db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, actorUserId))
+            .limit(1)
+        const actorName = actor?.name ?? actorUserId
+
+        await db
+            .update(inboundEmails)
+            .set({ status: "new", updated_at: new Date() })
+            .where(eq(inboundEmails.id, emailId))
+
+        await db.insert(inboundEmailComments).values({
+            email_id: emailId,
+            author_id: actorUserId,
+            content: `${actorName} removed the spam mark and returned this email to new.`
+        })
+
+        revalidatePath("/dashboard/manage-emails")
+        return { status: true, message: "Email returned to new." }
+    } catch (error) {
+        console.error("Error unmarking email as spam:", error)
+        return { status: false, message: "Failed to unmark email as spam." }
     }
 }
 

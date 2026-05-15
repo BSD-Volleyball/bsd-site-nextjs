@@ -6,8 +6,10 @@ import {
     assignConcern,
     closeConcern,
     getConcernThread,
+    markConcernAsSpam,
     reopenConcern,
     sendConcernReply,
+    unmarkConcernAsSpam,
     type AssignableUser,
     type ConcernRow,
     type ConcernThreadItem
@@ -89,7 +91,8 @@ function StatusBadge({ status }: { status: string }) {
     const variants: Record<string, string> = {
         new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
         active: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-        closed: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        closed: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+        spam: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
     }
     return (
         <span
@@ -166,6 +169,20 @@ function ConcernCard({
     function handleReopenConcern() {
         startTransition(async () => {
             await reopenConcern(concern.id)
+            onUpdate()
+        })
+    }
+
+    function handleMarkSpam() {
+        startTransition(async () => {
+            await markConcernAsSpam(concern.id)
+            onUpdate()
+        })
+    }
+
+    function handleUnmarkSpam() {
+        startTransition(async () => {
+            await unmarkConcernAsSpam(concern.id)
             onUpdate()
         })
     }
@@ -486,6 +503,37 @@ function ConcernCard({
                                     </Button>
                                 </div>
                             )}
+
+                            {concern.status !== "spam" && (
+                                <div className="space-y-1">
+                                    <p className="font-medium text-muted-foreground text-xs">
+                                        Spam
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={handleMarkSpam}
+                                        disabled={isPending}
+                                    >
+                                        Mark as Spam
+                                    </Button>
+                                </div>
+                            )}
+
+                            {concern.status === "spam" && (
+                                <div className="space-y-1">
+                                    <p className="font-medium text-muted-foreground text-xs">
+                                        Action
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleUnmarkSpam}
+                                        disabled={isPending}
+                                    >
+                                        Move to New
+                                    </Button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Thread: replies + internal comments */}
@@ -711,6 +759,7 @@ export function ManageConcernsClient({
     const newConcerns = concerns.filter((c) => c.status === "new")
     const activeConcerns = concerns.filter((c) => c.status === "active")
     const closedConcerns = concerns.filter((c) => c.status === "closed")
+    const spamConcerns = concerns.filter((c) => c.status === "spam")
 
     return (
         <div className="space-y-4">
@@ -733,6 +782,14 @@ export function ManageConcernsClient({
             <ConcernSection
                 title="Closed Concerns"
                 concerns={closedConcerns}
+                assignableUsers={assignableUsers}
+                defaultOpen={false}
+                onUpdate={refresh}
+                onOpenPlayer={modal.openPlayerDetail}
+            />
+            <ConcernSection
+                title="Spam"
+                concerns={spamConcerns}
                 assignableUsers={assignableUsers}
                 defaultOpen={false}
                 onUpdate={refresh}

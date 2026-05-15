@@ -7,8 +7,10 @@ import {
     assignInboundEmail,
     closeInboundEmail,
     getEmailThread,
+    markInboundEmailAsSpam,
     reopenInboundEmail,
     sendEmailReply,
+    unmarkInboundEmailAsSpam,
     type AssignableAdmin,
     type ThreadItem,
     type InboundEmailRow
@@ -137,7 +139,8 @@ function StatusBadge({ status }: { status: string }) {
     const variants: Record<string, string> = {
         new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
         active: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-        closed: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        closed: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+        spam: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
     }
     return (
         <span
@@ -214,6 +217,20 @@ function EmailCard({
     function handleReopen() {
         startTransition(async () => {
             await reopenInboundEmail(email.id)
+            onUpdate()
+        })
+    }
+
+    function handleMarkSpam() {
+        startTransition(async () => {
+            await markInboundEmailAsSpam(email.id)
+            onUpdate()
+        })
+    }
+
+    function handleUnmarkSpam() {
+        startTransition(async () => {
+            await unmarkInboundEmailAsSpam(email.id)
             onUpdate()
         })
     }
@@ -422,6 +439,37 @@ function EmailCard({
                                         disabled={isPending}
                                     >
                                         Reopen
+                                    </Button>
+                                </div>
+                            )}
+
+                            {email.status !== "spam" && (
+                                <div className="space-y-1">
+                                    <p className="font-medium text-muted-foreground text-xs">
+                                        Spam
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={handleMarkSpam}
+                                        disabled={isPending}
+                                    >
+                                        Mark as Spam
+                                    </Button>
+                                </div>
+                            )}
+
+                            {email.status === "spam" && (
+                                <div className="space-y-1">
+                                    <p className="font-medium text-muted-foreground text-xs">
+                                        Action
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        onClick={handleUnmarkSpam}
+                                        disabled={isPending}
+                                    >
+                                        Move to New
                                     </Button>
                                 </div>
                             )}
@@ -670,6 +718,7 @@ export function ManageEmailsClient({
     const newEmails = emails.filter((e) => e.status === "new")
     const activeEmails = emails.filter((e) => e.status === "active")
     const closedEmails = emails.filter((e) => e.status === "closed")
+    const spamEmails = emails.filter((e) => e.status === "spam")
 
     return (
         <div className="space-y-4">
@@ -692,6 +741,14 @@ export function ManageEmailsClient({
             <EmailSection
                 title="Closed Emails"
                 emails={closedEmails}
+                assignableAdmins={assignableAdmins}
+                defaultOpen={false}
+                onUpdate={refresh}
+                onPlayerClick={openPlayerDetail}
+            />
+            <EmailSection
+                title="Spam"
+                emails={spamEmails}
                 assignableAdmins={assignableAdmins}
                 defaultOpen={false}
                 onUpdate={refresh}
