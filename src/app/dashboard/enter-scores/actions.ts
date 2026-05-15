@@ -111,12 +111,17 @@ export interface MatchScoreData {
     awaySet3Score: number | null
     winner: number | null
     playoff: boolean
+    playoffMatchNum: number | null
+    homeSource: string | null
+    awaySource: string | null
 }
 
 export interface DivisionMatchGroup {
     divisionId: number
     divisionName: string
     matches: MatchScoreData[]
+    seedToTeamId: Record<number, number>
+    teamNameById: Record<number, string>
 }
 
 export interface ScoreSheetData {
@@ -201,11 +206,123 @@ export async function getMatchesForDate(date: string): Promise<{
             .where(and(eq(matches.season, seasonId), eq(matches.date, date)))
             .orderBy(asc(matches.time), asc(matches.court))
 
+        // Look up playoff meta for any playoff matches on this date so the
+        // client can lock TBD slots and resolve them live as winners are
+        // selected for earlier matches on the same page.
+        const playoffMatchIds = matchRows
+            .filter((r) => r.playoff)
+            .map((r) => r.id)
+        const visibleDivisionIds = Array.from(
+            new Set(matchRows.map((r) => r.division))
+        )
+
+        const metaByMatchId = new Map<
+            number,
+            { matchNum: number; homeSource: string; awaySource: string }
+        >()
+        const seedToTeamIdByDivision = new Map<number, Map<number, number>>()
+
+        if (playoffMatchIds.length > 0 && visibleDivisionIds.length > 0) {
+            const metaRowsForDate = await db
+                .select({
+                    matchId: playoffMatchesMeta.match_id,
+                    matchNum: playoffMatchesMeta.match_num,
+                    homeSource: playoffMatchesMeta.home_source,
+                    awaySource: playoffMatchesMeta.away_source
+                })
+                .from(playoffMatchesMeta)
+                .where(
+                    and(
+                        eq(playoffMatchesMeta.season, seasonId),
+                        inArray(playoffMatchesMeta.match_id, playoffMatchIds)
+                    )
+                )
+
+            for (const m of metaRowsForDate) {
+                if (m.matchId === null) continue
+                metaByMatchId.set(m.matchId, {
+                    matchNum: m.matchNum,
+                    homeSource: m.homeSource,
+                    awaySource: m.awaySource
+                })
+            }
+
+            // Build seedToTeamId per visible division by walking all meta rows
+            // in that division and reading realized team ids for S* sources.
+            const allDivMeta = await db
+                .select({
+                    division: playoffMatchesMeta.division,
+                    matchId: playoffMatchesMeta.match_id,
+                    homeSource: playoffMatchesMeta.home_source,
+                    awaySource: playoffMatchesMeta.away_source
+                })
+                .from(playoffMatchesMeta)
+                .where(
+                    and(
+                        eq(playoffMatchesMeta.season, seasonId),
+                        inArray(playoffMatchesMeta.division, visibleDivisionIds)
+                    )
+                )
+
+            const metaMatchIds = allDivMeta
+                .map((m) => m.matchId)
+                .filter((id): id is number => id !== null)
+
+            const realizedTeamsById = new Map<
+                number,
+                { homeTeam: number | null; awayTeam: number | null }
+            >()
+            if (metaMatchIds.length > 0) {
+                const realizedRows = await db
+                    .select({
+                        id: matches.id,
+                        homeTeam: matches.home_team,
+                        awayTeam: matches.away_team
+                    })
+                    .from(matches)
+                    .where(inArray(matches.id, metaMatchIds))
+                for (const r of realizedRows) {
+                    realizedTeamsById.set(r.id, {
+                        homeTeam: r.homeTeam,
+                        awayTeam: r.awayTeam
+                    })
+                }
+            }
+
+            for (const m of allDivMeta) {
+                if (m.matchId === null) continue
+                const realized = realizedTeamsById.get(m.matchId)
+                if (!realized) continue
+                const home = parseSourceToken(m.homeSource)
+                const away = parseSourceToken(m.awaySource)
+                let seedMap = seedToTeamIdByDivision.get(m.division)
+                if (!seedMap) {
+                    seedMap = new Map<number, number>()
+                    seedToTeamIdByDivision.set(m.division, seedMap)
+                }
+                if (
+                    home.kind === "seed" &&
+                    home.value !== null &&
+                    realized.homeTeam !== null
+                ) {
+                    seedMap.set(home.value, realized.homeTeam)
+                }
+                if (
+                    away.kind === "seed" &&
+                    away.value !== null &&
+                    realized.awayTeam !== null
+                ) {
+                    seedMap.set(away.value, realized.awayTeam)
+                }
+            }
+        }
+
         // Group matches by division
         const divisionMap = new Map<number, MatchScoreData[]>()
         for (const row of matchRows) {
             const homeTeam = row.homeTeam ? teamMap.get(row.homeTeam) : null
             const awayTeam = row.awayTeam ? teamMap.get(row.awayTeam) : null
+            const meta = metaByMatchId.get(row.id)
 
             const matchData: MatchScoreData = {
                 matchId: row.id,
@@ -224,7 +341,10 @@ export async function getMatchesForDate(date: string): Promise<{
                 homeSet3Score: row.homeSet3Score,
                 awaySet3Score: row.awaySet3Score,
                 winner: row.winner,
-                playoff: row.playoff
+                playoff: row.playoff,
+                playoffMatchNum: meta?.matchNum ?? null,
+                homeSource: meta?.homeSource ?? null,
+                awaySource: meta?.awaySource ?? null
             }
 
             const list = divisionMap.get(row.division) ?? []
@@ -234,11 +354,28 @@ export async function getMatchesForDate(date: string): Promise<{
 
         const divisionGroups: DivisionMatchGroup[] = seasonDivisions
             .filter((d) => divisionMap.has(d.divisionId))
-            .map((d) => ({
-                divisionId: d.divisionId,
-                divisionName: d.divisionName,
-                matches: divisionMap.get(d.divisionId) ?? []
-            }))
+            .map((d) => {
+                const seedMap = seedToTeamIdByDivision.get(d.divisionId)
+                const seedToTeamId: Record<number, number> = {}
+                if (seedMap) {
+                    for (const [seed, teamId] of seedMap) {
+                        seedToTeamId[seed] = teamId
+                    }
+                }
+                const teamNameById: Record<number, string> = {}
+                for (const [id, info] of teamMap) {
+                    if (info.division === d.divisionId) {
+                        teamNameById[id] = info.name
+                    }
+                }
+                return {
+                    divisionId: d.divisionId,
+                    divisionName: d.divisionName,
+                    matches: divisionMap.get(d.divisionId) ?? [],
+                    seedToTeamId,
+                    teamNameById
+                }
+            })
 
         // Get existing score sheets
         const sheetRows = await db
@@ -363,12 +500,17 @@ export async function saveScoresForDivision(
             }
         }
 
-        // Validate winner is a participant in each match
+        // Validate winner is a participant in each match. For TBD playoff
+        // matches with NULL team slots we defer this check until after the
+        // cascade has filled in the dependent teams (re-validated inside the
+        // transaction below).
         for (const score of matchScores) {
             if (score.winner !== null) {
                 const match = validMatchMap.get(score.matchId)
                 if (
                     match &&
+                    match.homeTeam !== null &&
+                    match.awayTeam !== null &&
                     score.winner !== match.homeTeam &&
                     score.winner !== match.awayTeam
                 ) {
@@ -638,6 +780,36 @@ export async function saveScoresForDivision(
                 const changed = await realizeOnce()
                 if (!changed) break
             }
+
+            // Re-validate winners now that dependent teams have been resolved.
+            // If a winner doesn't match either participating team, abort.
+            const winnersToCheck = matchScores.filter((s) => s.winner !== null)
+            if (winnersToCheck.length > 0) {
+                const finalRows = await tx
+                    .select({
+                        id: matches.id,
+                        homeTeam: matches.home_team,
+                        awayTeam: matches.away_team
+                    })
+                    .from(matches)
+                    .where(
+                        inArray(
+                            matches.id,
+                            winnersToCheck.map((s) => s.matchId)
+                        )
+                    )
+                const finalById = new Map(finalRows.map((r) => [r.id, r]))
+                for (const score of winnersToCheck) {
+                    const m = finalById.get(score.matchId)
+                    if (!m) continue
+                    if (
+                        score.winner !== m.homeTeam &&
+                        score.winner !== m.awayTeam
+                    ) {
+                        throw new Error(`INVALID_WINNER:${score.matchId}`)
+                    }
+                }
+            }
         })
 
         const session = await auth.api.getSession({
@@ -673,6 +845,16 @@ export async function saveScoresForDivision(
         }
     } catch (error) {
         console.error("Error saving scores:", error)
+        if (
+            error instanceof Error &&
+            error.message.startsWith("INVALID_WINNER:")
+        ) {
+            const matchId = error.message.split(":")[1]
+            return {
+                status: false,
+                message: `Invalid winner for match ${matchId} — the selected team isn't a participant.`
+            }
+        }
         return { status: false, message: "Failed to save scores." }
     }
 }

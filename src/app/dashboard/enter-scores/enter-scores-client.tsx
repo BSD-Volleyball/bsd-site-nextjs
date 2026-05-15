@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,149 @@ import {
 } from "./actions"
 import { compressImageForUpload } from "@/lib/image-compression"
 import { formatMatchTime } from "@/lib/season-utils"
+import {
+    formatSourceHumanLabel,
+    parseSourceToken,
+    resolveSourceToTeamId
+} from "@/lib/playoff-sources"
+
+interface ResolvedMatchInfo {
+    homeTeamId: number | null
+    awayTeamId: number | null
+    homeTeamName: string
+    awayTeamName: string
+    homeIsResolved: boolean
+    awayIsResolved: boolean
+    homeLockLabel: string | null
+    awayLockLabel: string | null
+    isLocked: boolean
+}
+
+function emptyResolved(match: MatchScoreData): ResolvedMatchInfo {
+    return {
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
+        homeTeamName: match.homeTeamName,
+        awayTeamName: match.awayTeamName,
+        homeIsResolved: match.homeTeamId !== null,
+        awayIsResolved: match.awayTeamId !== null,
+        homeLockLabel: null,
+        awayLockLabel: null,
+        isLocked: false
+    }
+}
+
+// Compute the effective (resolved) team IDs and lock state for every match in
+// a division, using the current form state. Iterates to a fixed point so that
+// chained dependencies (W of a match whose W depends on another W) all
+// resolve in one render.
+function computeResolvedMatches(
+    division: DivisionMatchGroup,
+    formStates: Record<number, MatchFormState>
+): Map<number, ResolvedMatchInfo> {
+    const result = new Map<number, ResolvedMatchInfo>()
+    for (const m of division.matches) {
+        result.set(m.matchId, emptyResolved(m))
+    }
+
+    const seedToTeamId = new Map<number, number>()
+    for (const [seedStr, teamId] of Object.entries(division.seedToTeamId)) {
+        seedToTeamId.set(Number(seedStr), teamId)
+    }
+
+    const hasAnySource = division.matches.some(
+        (m) => m.homeSource !== null || m.awaySource !== null
+    )
+    if (!hasAnySource) return result
+
+    for (let iter = 0; iter < 8; iter++) {
+        const winnerByMatchNum = new Map<number, number>()
+        const loserByMatchNum = new Map<number, number>()
+
+        for (const m of division.matches) {
+            if (m.playoffMatchNum === null) continue
+            const info = result.get(m.matchId)
+            if (!info) continue
+            const form = formStates[m.matchId]
+            const winner = form?.winner ?? null
+            if (
+                winner !== null &&
+                info.homeTeamId !== null &&
+                info.awayTeamId !== null &&
+                (winner === info.homeTeamId || winner === info.awayTeamId)
+            ) {
+                winnerByMatchNum.set(m.playoffMatchNum, winner)
+                loserByMatchNum.set(
+                    m.playoffMatchNum,
+                    winner === info.homeTeamId
+                        ? info.awayTeamId
+                        : info.homeTeamId
+                )
+            }
+        }
+
+        const ctx = {
+            seedToTeamId,
+            winnerByMatchNum,
+            loserByMatchNum
+        }
+
+        let changed = false
+        for (const m of division.matches) {
+            if (m.homeSource === null && m.awaySource === null) continue
+            const info = result.get(m.matchId)
+            if (!info) continue
+
+            const parsedHome = parseSourceToken(m.homeSource)
+            const parsedAway = parseSourceToken(m.awaySource)
+
+            if (info.homeTeamId === null) {
+                const resolved = resolveSourceToTeamId(parsedHome, ctx)
+                if (resolved !== null) {
+                    const name =
+                        division.teamNameById[resolved] ?? `Team ${resolved}`
+                    info.homeTeamId = resolved
+                    info.homeTeamName = name
+                    info.homeIsResolved = true
+                    changed = true
+                } else {
+                    const label = formatSourceHumanLabel(parsedHome)
+                    if (label && info.homeLockLabel !== label) {
+                        info.homeLockLabel = label
+                    }
+                }
+            }
+            if (info.awayTeamId === null) {
+                const resolved = resolveSourceToTeamId(parsedAway, ctx)
+                if (resolved !== null) {
+                    const name =
+                        division.teamNameById[resolved] ?? `Team ${resolved}`
+                    info.awayTeamId = resolved
+                    info.awayTeamName = name
+                    info.awayIsResolved = true
+                    changed = true
+                } else {
+                    const label = formatSourceHumanLabel(parsedAway)
+                    if (label && info.awayLockLabel !== label) {
+                        info.awayLockLabel = label
+                    }
+                }
+            }
+        }
+        if (!changed) break
+    }
+
+    for (const m of division.matches) {
+        const info = result.get(m.matchId)
+        if (!info) continue
+        const hasSource = m.homeSource !== null || m.awaySource !== null
+        if (hasSource) {
+            info.isLocked = info.homeTeamId === null || info.awayTeamId === null
+        }
+    }
+
+    return result
+}
 
 interface EnterScoresClientProps {
     matchDates: MatchDateOption[]
@@ -85,7 +228,10 @@ function isMatchEmpty(form: MatchFormState): boolean {
     )
 }
 
-function validateMatch(match: MatchScoreData, form: MatchFormState): string[] {
+function validateMatch(
+    form: MatchFormState,
+    resolved: ResolvedMatchInfo
+): string[] {
     if (isMatchEmpty(form)) return []
 
     const errors: string[] = []
@@ -148,26 +294,26 @@ function validateMatch(match: MatchScoreData, form: MatchFormState): string[] {
     }
 
     if (form.winner !== null) {
-        const winnerIsHome = form.winner === match.homeTeamId
-        const winnerIsAway = form.winner === match.awayTeamId
+        const winnerIsHome = form.winner === resolved.homeTeamId
+        const winnerIsAway = form.winner === resolved.awayTeamId
         if (winnerIsHome && impliedAwayWins > impliedHomeWins) {
             errors.push(
-                `${match.homeTeamName} is selected as winner but Away won more games from scores`
+                `${resolved.homeTeamName} is selected as winner but Away won more games from scores`
             )
         }
         if (winnerIsAway && impliedHomeWins > impliedAwayWins) {
             errors.push(
-                `${match.awayTeamName} is selected as winner but Home won more games from scores`
+                `${resolved.awayTeamName} is selected as winner but Home won more games from scores`
             )
         }
         if (winnerIsHome && awayGamesWon! > homeGamesWon!) {
             errors.push(
-                `${match.homeTeamName} is selected as winner but Away Total Games Won is higher`
+                `${resolved.homeTeamName} is selected as winner but Away Total Games Won is higher`
             )
         }
         if (winnerIsAway && homeGamesWon! > awayGamesWon!) {
             errors.push(
-                `${match.awayTeamName} is selected as winner but Home Total Games Won is higher`
+                `${resolved.awayTeamName} is selected as winner but Home Total Games Won is higher`
             )
         }
     }
@@ -212,6 +358,78 @@ export function EnterScoresClient({
 
     const cameraInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
     const uploadInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+
+    // Per-division resolved match info, recomputed live from form state so
+    // TBD playoff slots fill in as soon as the user picks a winner for an
+    // earlier match on the same page.
+    const resolvedByMatchId = useMemo(() => {
+        const out = new Map<number, ResolvedMatchInfo>()
+        for (const div of divisionGroups) {
+            const divResolved = computeResolvedMatches(div, formStates)
+            for (const [matchId, info] of divResolved) {
+                out.set(matchId, info)
+            }
+        }
+        return out
+    }, [divisionGroups, formStates])
+
+    // When a TBD match's effective teams change (e.g. user switched the
+    // winner of a prerequisite), clear any entered scores for the dependent
+    // match — they were tied to the previously-resolved opponent.
+    const prevResolvedRef = useRef<
+        Map<number, { home: number | null; away: number | null }>
+    >(new Map())
+    useEffect(() => {
+        const prev = prevResolvedRef.current
+        const next = new Map<
+            number,
+            { home: number | null; away: number | null }
+        >()
+        const toClear: number[] = []
+        for (const [matchId, info] of resolvedByMatchId) {
+            next.set(matchId, {
+                home: info.homeTeamId,
+                away: info.awayTeamId
+            })
+            const last = prev.get(matchId)
+            if (
+                last &&
+                (last.home !== info.homeTeamId || last.away !== info.awayTeamId)
+            ) {
+                // Only clear when this match's slot was previously resolved
+                // and the resolved teams have shifted. A first-time
+                // null→teamId transition shouldn't clear (no stale data).
+                if (last.home !== null || last.away !== null) {
+                    toClear.push(matchId)
+                }
+            }
+        }
+        prevResolvedRef.current = next
+
+        if (toClear.length > 0) {
+            setFormStates((prevStates) => {
+                let mutated = false
+                const updated = { ...prevStates }
+                for (const matchId of toClear) {
+                    const current = updated[matchId]
+                    if (!current || isMatchEmpty(current)) continue
+                    updated[matchId] = {
+                        homeScore: "",
+                        awayScore: "",
+                        homeSet1Score: "",
+                        awaySet1Score: "",
+                        homeSet2Score: "",
+                        awaySet2Score: "",
+                        homeSet3Score: "",
+                        awaySet3Score: "",
+                        winner: null
+                    }
+                    mutated = true
+                }
+                return mutated ? updated : prevStates
+            })
+        }
+    }, [resolvedByMatchId])
 
     const maxSourceUploadBytes = 25 * 1024 * 1024
 
@@ -279,7 +497,17 @@ export function EnterScoresClient({
             const form = formStates[match.matchId]
             if (!form) continue
 
-            const matchWarnings = validateMatch(match, form)
+            const resolved =
+                resolvedByMatchId.get(match.matchId) ?? emptyResolved(match)
+
+            // Locked matches with no entered data: skip silently — the user
+            // hasn't had a chance to fill them out yet because their teams
+            // aren't determined.
+            if (resolved.isLocked && isMatchEmpty(form)) {
+                continue
+            }
+
+            const matchWarnings = validateMatch(form, resolved)
             if (matchWarnings.length > 0) {
                 newWarnings.push({
                     matchId: match.matchId,
@@ -651,12 +879,18 @@ export function EnterScoresClient({
                                                     match.matchId
                                                 ) ?? []
 
+                                            const resolved =
+                                                resolvedByMatchId.get(
+                                                    match.matchId
+                                                ) ?? emptyResolved(match)
+
                                             return (
                                                 <MatchScoreEntry
                                                     key={match.matchId}
                                                     match={match}
                                                     form={form}
                                                     warnings={matchWarnings}
+                                                    resolved={resolved}
                                                     onFieldChange={(
                                                         field,
                                                         value
@@ -736,28 +970,54 @@ function MatchScoreEntry({
     match,
     form,
     warnings,
+    resolved,
     onFieldChange,
     onSelectWinner
 }: {
     match: MatchScoreData
     form: MatchFormState
     warnings: string[]
+    resolved: ResolvedMatchInfo
     onFieldChange: (field: keyof MatchFormState, value: string) => void
     onSelectWinner: (teamId: number | null) => void
 }) {
     const isPlayoff = match.playoff
     const hasWarnings = warnings.length > 0
+    const isLocked = resolved.isLocked
+    const homeButtonLabel = resolved.homeIsResolved
+        ? resolved.homeTeamName
+        : (resolved.homeLockLabel ?? "TBD")
+    const awayButtonLabel = resolved.awayIsResolved
+        ? resolved.awayTeamName
+        : (resolved.awayLockLabel ?? "TBD")
+    const lockReason = (() => {
+        if (!isLocked) return null
+        const parts: string[] = []
+        if (!resolved.homeIsResolved && resolved.homeLockLabel) {
+            parts.push(resolved.homeLockLabel)
+        }
+        if (!resolved.awayIsResolved && resolved.awayLockLabel) {
+            parts.push(resolved.awayLockLabel)
+        }
+        if (parts.length === 0) return "awaiting earlier match result"
+        return `awaiting ${parts.join(" & ")}`
+    })()
 
     return (
         <div
-            className={`rounded-md border p-3 ${hasWarnings ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : ""}`}
+            className={`rounded-md border p-3 ${hasWarnings ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : ""} ${isLocked ? "bg-muted/30" : ""}`}
         >
             {/* Playoff badge */}
             {isPlayoff && (
-                <div className="mb-3">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
                     <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-700 text-xs dark:bg-purple-900 dark:text-purple-300">
                         Playoff
                     </span>
+                    {isLocked && lockReason && (
+                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-slate-700 text-xs dark:bg-slate-700 dark:text-slate-200">
+                            🔒 Locked — {lockReason}
+                        </span>
+                    )}
                 </div>
             )}
 
@@ -781,19 +1041,29 @@ function MatchScoreEntry({
                             <th className="w-24 pb-2 text-center">
                                 <button
                                     type="button"
+                                    disabled={
+                                        isLocked || !resolved.homeIsResolved
+                                    }
                                     className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
-                                        form.winner === match.homeTeamId
-                                            ? "bg-green-600 text-white"
-                                            : form.winner === null
-                                              ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
-                                              : "bg-muted hover:bg-muted/80"
+                                        !resolved.homeIsResolved
+                                            ? "cursor-not-allowed bg-muted text-muted-foreground italic"
+                                            : form.winner ===
+                                                resolved.homeTeamId
+                                              ? "bg-green-600 text-white"
+                                              : form.winner === null
+                                                ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
+                                                : "bg-muted hover:bg-muted/80"
                                     }`}
                                     onClick={() =>
-                                        onSelectWinner(match.homeTeamId)
+                                        onSelectWinner(resolved.homeTeamId)
                                     }
-                                    title="Click to select as winner"
+                                    title={
+                                        isLocked
+                                            ? "Match is locked until earlier results are entered"
+                                            : "Click to select as winner"
+                                    }
                                 >
-                                    {match.homeTeamName}
+                                    {homeButtonLabel}
                                 </button>
                             </th>
                             <th className="w-4 pb-2 text-center font-normal text-muted-foreground text-xs">
@@ -802,19 +1072,29 @@ function MatchScoreEntry({
                             <th className="w-24 pb-2 text-center">
                                 <button
                                     type="button"
+                                    disabled={
+                                        isLocked || !resolved.awayIsResolved
+                                    }
                                     className={`w-full rounded-md px-2 py-1 font-semibold transition-colors ${
-                                        form.winner === match.awayTeamId
-                                            ? "bg-green-600 text-white"
-                                            : form.winner === null
-                                              ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
-                                              : "bg-muted hover:bg-muted/80"
+                                        !resolved.awayIsResolved
+                                            ? "cursor-not-allowed bg-muted text-muted-foreground italic"
+                                            : form.winner ===
+                                                resolved.awayTeamId
+                                              ? "bg-green-600 text-white"
+                                              : form.winner === null
+                                                ? "bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/40 dark:hover:bg-yellow-900/60"
+                                                : "bg-muted hover:bg-muted/80"
                                     }`}
                                     onClick={() =>
-                                        onSelectWinner(match.awayTeamId)
+                                        onSelectWinner(resolved.awayTeamId)
                                     }
-                                    title="Click to select as winner"
+                                    title={
+                                        isLocked
+                                            ? "Match is locked until earlier results are entered"
+                                            : "Click to select as winner"
+                                    }
                                 >
-                                    {match.awayTeamName}
+                                    {awayButtonLabel}
                                 </button>
                             </th>
                         </tr>
@@ -831,6 +1111,7 @@ function MatchScoreEntry({
                             onAwayChange={(v) =>
                                 onFieldChange("awaySet1Score", v)
                             }
+                            disabled={isLocked}
                         />
                         <ScoreInputRow
                             label="Game 2 Score"
@@ -842,6 +1123,7 @@ function MatchScoreEntry({
                             onAwayChange={(v) =>
                                 onFieldChange("awaySet2Score", v)
                             }
+                            disabled={isLocked}
                         />
                         <ScoreInputRow
                             label={
@@ -858,6 +1140,7 @@ function MatchScoreEntry({
                                 onFieldChange("awaySet3Score", v)
                             }
                             optional={isPlayoff}
+                            disabled={isLocked}
                         />
 
                         {/* Total games won — separated */}
@@ -869,6 +1152,7 @@ function MatchScoreEntry({
                             onAwayChange={(v) => onFieldChange("awayScore", v)}
                             bold
                             topBorder
+                            disabled={isLocked}
                         />
                     </tbody>
                 </table>
@@ -899,7 +1183,8 @@ function ScoreInputRow({
     onAwayChange,
     optional = false,
     bold = false,
-    topBorder = false
+    topBorder = false,
+    disabled = false
 }: {
     label: string
     homeValue: string
@@ -909,7 +1194,21 @@ function ScoreInputRow({
     optional?: boolean
     bold?: boolean
     topBorder?: boolean
+    disabled?: boolean
 }) {
+    const inputClassFor = (value: string) => {
+        if (disabled) {
+            return "cursor-not-allowed border-muted bg-muted/40 text-muted-foreground"
+        }
+        if (value !== "") {
+            return "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/40"
+        }
+        if (optional) {
+            return "bg-background"
+        }
+        return "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/40"
+    }
+
     return (
         <tr className={topBorder ? "border-t-2" : ""}>
             <td
@@ -921,13 +1220,8 @@ function ScoreInputRow({
                 <input
                     type="number"
                     min={0}
-                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                        homeValue !== ""
-                            ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/40"
-                            : optional
-                              ? "bg-background"
-                              : "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/40"
-                    }`}
+                    disabled={disabled}
+                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${inputClassFor(homeValue)}`}
                     value={homeValue}
                     onChange={(e) => onHomeChange(e.target.value)}
                     placeholder={optional ? "—" : ""}
@@ -940,13 +1234,8 @@ function ScoreInputRow({
                 <input
                     type="number"
                     min={0}
-                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                        awayValue !== ""
-                            ? "border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950/40"
-                            : optional
-                              ? "bg-background"
-                              : "border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950/40"
-                    }`}
+                    disabled={disabled}
+                    className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${inputClassFor(awayValue)}`}
                     value={awayValue}
                     onChange={(e) => onAwayChange(e.target.value)}
                     placeholder={optional ? "—" : ""}
