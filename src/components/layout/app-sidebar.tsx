@@ -631,7 +631,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         !!phaseConfig &&
         (phaseConfig.showTryoutTools ||
             phaseConfig.showDraftTools ||
-            phaseConfig.showSeasonTools)
+            phaseConfig.showSeasonTools ||
+            phaseConfig.showPlayoffTools)
     const showTeamAvailability =
         (hasCaptainPagesAccess && inRange("prep_tryout_week_2", "playoffs")) ||
         isCoach
