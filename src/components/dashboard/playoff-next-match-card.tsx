@@ -14,6 +14,41 @@ function formatShortDate(date: string | null): string {
 }
 
 export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
+    // The team's last playoff night has passed but results aren't in yet, so
+    // there is no determinable upcoming match to show.
+    if (data.status === "pending_results") {
+        return (
+            <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                        <RiCalendarLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
+                            Your Next Match
+                        </CardTitle>
+                    </div>
+                    <p className="mt-1 text-blue-700 text-xs dark:text-blue-300">
+                        Playoffs
+                        {data.divisionName ? ` · ${data.divisionName}` : ""}
+                    </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="rounded-md bg-blue-100 p-3 text-sm dark:bg-blue-900">
+                        <p className="text-blue-700 dark:text-blue-300">
+                            Results Pending,{" "}
+                            <Link
+                                href="/dashboard/season-playoffs"
+                                className="underline underline-offset-2 hover:text-blue-900 dark:hover:text-blue-200"
+                            >
+                                check the bracket
+                            </Link>{" "}
+                            for more information.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
     if (data.items.length === 0) return null
 
     return (

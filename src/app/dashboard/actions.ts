@@ -1166,6 +1166,10 @@ export interface PlayoffNextMatchData {
     date: string | null
     divisionName: string
     items: PlayoffNextMatchItem[]
+    // "upcoming": items describe a genuine future touchpoint.
+    // "pending_results": the team's last playoff night has already passed but
+    // its matches are unscored, so the next match cannot be determined yet.
+    status: "upcoming" | "pending_results"
 }
 
 function decideMatchOutcome(row: {
@@ -1559,11 +1563,32 @@ export async function getPlayoffNextMatches(
             .where(eq(divisions.id, divisionId))
             .limit(1)
 
+        // If the target playoff night has already passed but its matches are
+        // still unscored, the team's outcome — and therefore its next match —
+        // can't be known yet. Surface a "results pending" state instead of
+        // presenting last night's matches as the upcoming one. Once scores are
+        // entered the target week advances (or the card drops out entirely for
+        // an eliminated team).
+        const todayStr = new Date().toLocaleDateString("en-CA", {
+            timeZone: "America/New_York"
+        })
+        const itemDates = items
+            .map((it) => it.date)
+            .filter((d): d is string => d !== null)
+            .sort()
+        const targetNightDate =
+            targetWeekDate ?? itemDates[itemDates.length - 1] ?? null
+        const status: PlayoffNextMatchData["status"] =
+            targetNightDate !== null && targetNightDate < todayStr
+                ? "pending_results"
+                : "upcoming"
+
         return {
             week: targetWeek,
             date: targetWeekDate,
             divisionName: divisionRow?.name ?? "",
-            items
+            items,
+            status
         }
     } catch (error) {
         console.error("Error fetching playoff next matches:", error)
