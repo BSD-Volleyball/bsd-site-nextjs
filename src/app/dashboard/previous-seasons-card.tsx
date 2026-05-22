@@ -26,6 +26,7 @@ export function PreviousSeasonsCard({
     const [seasonLabel, setSeasonLabel] = useState("")
     const [isChampionSeason, setIsChampionSeason] = useState(false)
     const [championPicture, setChampionPicture] = useState<string | null>(null)
+    const [teamPhotoUrl, setTeamPhotoUrl] = useState("")
 
     async function handleRowClick(ps: PreviousSeason) {
         setSeasonLabel(
@@ -34,6 +35,7 @@ export function PreviousSeasonsCard({
         setTeamName(ps.teamName)
         setIsChampionSeason(ps.champion)
         setChampionPicture(ps.championPicture)
+        setTeamPhotoUrl(ps.teamPhotoUrl)
         setPlayers([])
         setOpen(true)
         setLoading(true)
@@ -123,6 +125,14 @@ export function PreviousSeasonsCard({
                             {seasonLabel} Roster
                         </DialogDescription>
                     </DialogHeader>
+                    {teamPhotoUrl && (
+                        <img
+                            src={teamPhotoUrl}
+                            alt={`${teamName} team`}
+                            className="w-full rounded-md border object-cover"
+                            loading="lazy"
+                        />
+                    )}
                     {isChampionSeason && championPicture && (
                         <img
                             src={championPicture}

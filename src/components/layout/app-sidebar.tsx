@@ -29,7 +29,8 @@ import {
     RiFileWarningLine,
     RiCheckboxLine,
     RiClipboardLine,
-    RiInboxLine
+    RiInboxLine,
+    RiImageLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -347,6 +348,12 @@ const addPicturesNavItem = {
     icon: RiEditLine
 }
 
+const addTeamPicturesNavItem = {
+    title: "Add Team Pictures",
+    url: "/dashboard/add-team-pictures",
+    icon: RiImageLine
+}
+
 const commissionerNavItems = [
     {
         title: "Send Email",
@@ -601,7 +608,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showPictures =
         hasPicturesAccess && inRange("prep_tryout_week_1", "draft")
     const showEnterScores = hasScoresAccess && inRange("draft", "playoffs")
-    const showCourtMgmt = showPictures || showEnterScores
+    const showAddTeamPictures =
+        hasPicturesAccess && inRange("regular_season", "playoffs")
+    const showCourtMgmt = showPictures || showEnterScores || showAddTeamPictures
     const showReviewPairs = isAdmin && inRange("select_commissioners", "draft")
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
@@ -614,12 +623,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         (isRefCoordinator || isAdmin) && inRange("draft", "complete")
 
     // Captain pages — per-item filtering
+    // Rate Player stays useful from tryouts through playoffs (includes
+    // showPlayoffTools so the link survives the regular_season → playoffs
+    // phase change, where showSeasonTools flips off).
     const captainBaseVisible =
         hasCaptainPagesAccess &&
         !!phaseConfig &&
         (phaseConfig.showTryoutTools ||
             phaseConfig.showDraftTools ||
-            phaseConfig.showSeasonTools)
+            phaseConfig.showSeasonTools ||
+            phaseConfig.showPlayoffTools)
     // View Signups is only relevant through draft
     const captainViewSignupsVisible =
         hasCaptainPagesAccess &&
@@ -774,7 +787,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         // Court Mgmt
         const hiddenCourtMgmtItems = [
             ...(!showEnterScores ? [enterScoresNavItem] : []),
-            ...(!showPictures ? [addPicturesNavItem] : [])
+            ...(!showPictures ? [addPicturesNavItem] : []),
+            ...(!showAddTeamPictures ? [addTeamPicturesNavItem] : [])
         ]
         if (hiddenCourtMgmtItems.length > 0)
             hiddenGroups.push({
@@ -888,6 +902,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                     items={[
                                         ...(showEnterScores
                                             ? [enterScoresNavItem]
+                                            : []),
+                                        ...(showAddTeamPictures
+                                            ? [addTeamPicturesNavItem]
                                             : []),
                                         ...(showPictures
                                             ? [addPicturesNavItem]

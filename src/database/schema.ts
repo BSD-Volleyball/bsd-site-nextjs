@@ -310,7 +310,8 @@ export const teams = pgTable(
             .references(() => divisions.id),
         name: text("name").notNull(),
         number: integer("number"),
-        rank: integer("rank")
+        rank: integer("rank"),
+        picture_url: text("picture_url")
     },
     (table) => ({
         teamsSeasonIdx: index("teams_season_idx").on(table.season),

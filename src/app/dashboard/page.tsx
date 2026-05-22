@@ -77,7 +77,7 @@ import {
     type PlayoffNextMatchData
 } from "./actions"
 import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
-import { cn } from "@/lib/utils"
+import { buildPlayerPictureUrl, cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -197,6 +197,7 @@ export interface PreviousSeason {
     teamId: number
     champion: boolean
     championPicture: string | null
+    teamPhotoUrl: string
 }
 
 async function getPreviousSeasonsPlayed(
@@ -213,7 +214,8 @@ async function getPreviousSeasonsPlayed(
             captainLastName: users.last_name,
             captainPreferredName: users.preferred_name,
             championId: champions.id,
-            championPicture: champions.picture
+            championPicture: champions.picture,
+            teamPictureUrl: teams.picture_url
         })
         .from(drafts)
         .innerJoin(teams, eq(drafts.team, teams.id))
@@ -232,7 +234,11 @@ async function getPreviousSeasonsPlayed(
         teamId: r.teamId,
         captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`,
         champion: !!r.championId,
-        championPicture: r.championPicture
+        championPicture: r.championPicture,
+        teamPhotoUrl: buildPlayerPictureUrl(
+            process.env.PLAYER_PIC_URL ?? "",
+            r.teamPictureUrl
+        )
     }))
 }
 
