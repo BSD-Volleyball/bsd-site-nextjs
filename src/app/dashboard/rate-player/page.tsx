@@ -53,6 +53,8 @@ export default async function RatePlayerPage() {
                 tryout1Sessions={result.tryout1Sessions}
                 tryout2Divisions={result.tryout2Divisions}
                 tryout3Divisions={result.tryout3Divisions}
+                byTeamDivisions={result.byTeamDivisions}
+                captainTeam={result.captainTeam}
                 initialRatings={result.ratingsByPlayer}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />

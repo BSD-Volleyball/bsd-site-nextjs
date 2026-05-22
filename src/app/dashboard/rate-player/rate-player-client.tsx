@@ -32,7 +32,9 @@ import {
     type LookupType,
     type PlayerRatingValues,
     type RatePlayerEntry,
+    type CaptainTeamRef,
     type RatingSkill,
+    type SeasonTeamDivisionGroup,
     type TryoutDivisionGroup,
     type TryoutSessionGroup
 } from "./actions"
@@ -42,6 +44,8 @@ interface RatePlayerClientProps {
     tryout1Sessions: TryoutSessionGroup[]
     tryout2Divisions: TryoutDivisionGroup[]
     tryout3Divisions: TryoutDivisionGroup[]
+    byTeamDivisions: SeasonTeamDivisionGroup[]
+    captainTeam: CaptainTeamRef | null
     initialRatings: Record<string, PlayerRatingValues>
     playerPicUrl: string
 }
@@ -49,6 +53,7 @@ interface RatePlayerClientProps {
 interface PlayerTableProps {
     players: RatePlayerEntry[]
     onRate: (player: RatePlayerEntry) => void
+    playerPicUrl: string
 }
 
 function getDisplayName(player: RatePlayerEntry): string {
@@ -87,12 +92,13 @@ function getEmptyRating(): PlayerRatingValues {
     }
 }
 
-function PlayerTable({ players, onRate }: PlayerTableProps) {
+function PlayerTable({ players, onRate, playerPicUrl }: PlayerTableProps) {
     return (
         <div className="overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
                 <thead>
                     <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground" />
                         <th className="px-4 py-2.5 text-left font-medium text-muted-foreground" />
                         <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                             Old ID
@@ -115,7 +121,7 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
                     {players.length === 0 ? (
                         <tr>
                             <td
-                                colSpan={6}
+                                colSpan={7}
                                 className="px-4 py-8 text-center text-muted-foreground"
                             >
                                 No players match the current filter.
@@ -135,6 +141,19 @@ function PlayerTable({ players, onRate }: PlayerTableProps) {
                                     >
                                         Rate
                                     </Button>
+                                </td>
+                                <td className="px-4 py-2">
+                                    {playerPicUrl && player.picture ? (
+                                        <img
+                                            src={`${playerPicUrl}${player.picture}`}
+                                            alt={getDisplayName(player)}
+                                            className="h-12 w-9 rounded object-cover"
+                                        />
+                                    ) : (
+                                        <div className="flex h-12 w-9 items-center justify-center rounded border bg-muted text-[0.65rem] text-muted-foreground">
+                                            —
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-4 py-2 font-medium">
                                     {player.oldId ?? "—"}
@@ -222,10 +241,16 @@ export function RatePlayerClient({
     tryout1Sessions,
     tryout2Divisions,
     tryout3Divisions,
+    byTeamDivisions,
+    captainTeam,
     initialRatings,
     playerPicUrl
 }: RatePlayerClientProps) {
-    const [lookupType, setLookupType] = useState<LookupType>("direct")
+    // A captain lands directly on the "By Team" view, pre-expanded to their
+    // own team; everyone else starts on the Direct lookup.
+    const [lookupType, setLookupType] = useState<LookupType>(
+        captainTeam ? "byTeam" : "direct"
+    )
     const [tryoutSessionValue, setTryoutSessionValue] = useState<string>(
         tryout1Sessions.length > 0
             ? String(tryout1Sessions[0].sessionNumber)
@@ -337,7 +362,7 @@ export function RatePlayerClient({
     }, [lookupType, tryout1Sessions, tryout2Divisions, tryout3Divisions])
 
     useEffect(() => {
-        if (lookupType === "direct") return
+        if (lookupType === "direct" || lookupType === "byTeam") return
         const validValues = new Set(activeGroupOptions.map((o) => o.value))
         if (!validValues.has(tryoutSessionValue)) {
             setTryoutSessionValue(
@@ -561,11 +586,14 @@ export function RatePlayerClient({
                             <SelectItem value="tryout1">Tryout 1</SelectItem>
                             <SelectItem value="tryout2">Tryout 2</SelectItem>
                             <SelectItem value="tryout3">Tryout 3</SelectItem>
+                            {byTeamDivisions.length > 0 && (
+                                <SelectItem value="byTeam">By Team</SelectItem>
+                            )}
                         </SelectContent>
                     </Select>
                 </div>
 
-                {lookupType !== "direct" && (
+                {lookupType !== "direct" && lookupType !== "byTeam" && (
                     <div className="space-y-2">
                         <Label htmlFor="session_number">
                             {lookupType === "tryout1" ? "Session" : "Division"}
@@ -612,6 +640,7 @@ export function RatePlayerClient({
                 <PlayerTable
                     players={filteredPlayers}
                     onRate={openRateDialog}
+                    playerPicUrl={playerPicUrl}
                 />
             )}
 
@@ -645,6 +674,7 @@ export function RatePlayerClient({
                                             <PlayerTable
                                                 players={filteredCourtPlayers}
                                                 onRate={openRateDialog}
+                                                playerPicUrl={playerPicUrl}
                                             />
                                         </AccordionContent>
                                     </AccordionItem>
@@ -685,7 +715,110 @@ export function RatePlayerClient({
                                             <PlayerTable
                                                 players={filteredTeamPlayers}
                                                 onRate={openRateDialog}
+                                                playerPicUrl={playerPicUrl}
                                             />
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                )
+                            })}
+                        </Accordion>
+                    )}
+                </div>
+            )}
+
+            {lookupType === "byTeam" && (
+                <div className="space-y-3">
+                    {byTeamDivisions.length === 0 ? (
+                        <div className="rounded-md border bg-muted/50 p-5 text-muted-foreground text-sm">
+                            No teams found for the active season.
+                        </div>
+                    ) : (
+                        <Accordion
+                            type="multiple"
+                            className="w-full"
+                            defaultValue={
+                                captainTeam
+                                    ? [`division-${captainTeam.divisionName}`]
+                                    : undefined
+                            }
+                        >
+                            {byTeamDivisions.map((division) => {
+                                const divisionPlayerCount =
+                                    division.teams.reduce(
+                                        (sum, team) =>
+                                            sum +
+                                            team.players.filter((player) =>
+                                                filteredPlayerIds.has(player.id)
+                                            ).length,
+                                        0
+                                    )
+
+                                return (
+                                    <AccordionItem
+                                        key={division.divisionName}
+                                        value={`division-${division.divisionName}`}
+                                    >
+                                        <AccordionTrigger>
+                                            <span>
+                                                {division.divisionName} (
+                                                {divisionPlayerCount})
+                                            </span>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <Accordion
+                                                type="multiple"
+                                                className="w-full"
+                                                defaultValue={
+                                                    captainTeam
+                                                        ? [
+                                                              `team-${captainTeam.teamId}`
+                                                          ]
+                                                        : undefined
+                                                }
+                                            >
+                                                {division.teams.map((team) => {
+                                                    const filteredTeamPlayers =
+                                                        team.players.filter(
+                                                            (player) =>
+                                                                filteredPlayerIds.has(
+                                                                    player.id
+                                                                )
+                                                        )
+
+                                                    return (
+                                                        <AccordionItem
+                                                            key={team.teamId}
+                                                            value={`team-${team.teamId}`}
+                                                        >
+                                                            <AccordionTrigger>
+                                                                <span>
+                                                                    {
+                                                                        team.teamName
+                                                                    }{" "}
+                                                                    (
+                                                                    {
+                                                                        filteredTeamPlayers.length
+                                                                    }
+                                                                    )
+                                                                </span>
+                                                            </AccordionTrigger>
+                                                            <AccordionContent>
+                                                                <PlayerTable
+                                                                    players={
+                                                                        filteredTeamPlayers
+                                                                    }
+                                                                    onRate={
+                                                                        openRateDialog
+                                                                    }
+                                                                    playerPicUrl={
+                                                                        playerPicUrl
+                                                                    }
+                                                                />
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                    )
+                                                })}
+                                            </Accordion>
                                         </AccordionContent>
                                     </AccordionItem>
                                 )

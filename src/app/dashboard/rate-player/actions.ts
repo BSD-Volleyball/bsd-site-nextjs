@@ -15,13 +15,14 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getTeamRosterWithSubs } from "@/lib/roster"
 import {
     getSessionUserId,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
 } from "@/lib/rbac"
 
-export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3"
+export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3" | "byTeam"
 
 export interface RatePlayerEntry {
     id: string
@@ -63,6 +64,26 @@ export interface TryoutTeam {
 export interface TryoutDivisionGroup {
     divisionName: string
     teams: TryoutTeam[]
+}
+
+// "By Team" lookup: real drafted season teams grouped under their division.
+export interface SeasonTeamGroup {
+    teamId: number
+    teamName: string
+    teamNumber: number | null
+    players: RatePlayerEntry[]
+}
+
+export interface SeasonTeamDivisionGroup {
+    divisionName: string
+    teams: SeasonTeamGroup[]
+}
+
+// Points the "By Team" view at the team the viewing user captains, so it can
+// open pre-expanded to that team. Null when the viewer captains no team.
+export interface CaptainTeamRef {
+    divisionName: string
+    teamId: number
 }
 
 export type RatingSkill =
@@ -256,6 +277,8 @@ export async function getRatePlayerData(): Promise<{
     tryout1Sessions: TryoutSessionGroup[]
     tryout2Divisions: TryoutDivisionGroup[]
     tryout3Divisions: TryoutDivisionGroup[]
+    byTeamDivisions: SeasonTeamDivisionGroup[]
+    captainTeam: CaptainTeamRef | null
     ratingsByPlayer: Record<string, PlayerRatingValues>
 }> {
     const hasAccess = await hasCaptainPagesAccessBySession()
@@ -268,6 +291,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            byTeamDivisions: [],
+            captainTeam: null,
             ratingsByPlayer: {}
         }
     }
@@ -282,6 +307,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            byTeamDivisions: [],
+            captainTeam: null,
             ratingsByPlayer: {}
         }
     }
@@ -297,6 +324,8 @@ export async function getRatePlayerData(): Promise<{
                 tryout1Sessions: [],
                 tryout2Divisions: [],
                 tryout3Divisions: [],
+                byTeamDivisions: [],
+                captainTeam: null,
                 ratingsByPlayer: {}
             }
         }
@@ -329,6 +358,8 @@ export async function getRatePlayerData(): Promise<{
                 tryout1Sessions: [],
                 tryout2Divisions: [],
                 tryout3Divisions: [],
+                byTeamDivisions: [],
+                captainTeam: null,
                 ratingsByPlayer: {}
             }
         }
@@ -508,6 +539,90 @@ export async function getRatePlayerData(): Promise<{
             lastDivisionByPlayerId
         )
 
+        // "By Team" — actual drafted season teams. Each team's roster is the
+        // captain(s) plus drafted players with the permanent-sub chain resolved
+        // to the currently-active player. Members are filtered through
+        // playersById, which drops non-signups and the evaluator themselves.
+        const teamRows = await db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                teamNumber: teams.number,
+                captain: teams.captain,
+                captain2: teams.captain2,
+                divisionName: divisions.name
+            })
+            .from(teams)
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(eq(teams.season, config.seasonId))
+            .orderBy(divisions.level, teams.number)
+
+        const byTeamDivisions: SeasonTeamDivisionGroup[] = []
+        let captainTeam: CaptainTeamRef | null = null
+
+        if (teamRows.length > 0) {
+            const rosterEntries = await getTeamRosterWithSubs(config.seasonId)
+            const activeUserIdsByTeam = new Map<number, Set<string>>()
+            for (const entry of rosterEntries) {
+                const ids =
+                    activeUserIdsByTeam.get(entry.teamId) ?? new Set<string>()
+                ids.add(entry.activeUser.id)
+                activeUserIdsByTeam.set(entry.teamId, ids)
+            }
+
+            const divisionOrder: string[] = []
+            const teamsByDivision = new Map<string, SeasonTeamGroup[]>()
+
+            for (const team of teamRows) {
+                if (
+                    team.captain === evaluatorId ||
+                    team.captain2 === evaluatorId
+                ) {
+                    captainTeam = {
+                        divisionName: team.divisionName,
+                        teamId: team.teamId
+                    }
+                }
+
+                const memberIds = new Set<string>([team.captain])
+                if (team.captain2) {
+                    memberIds.add(team.captain2)
+                }
+                for (const id of activeUserIdsByTeam.get(team.teamId) ?? []) {
+                    memberIds.add(id)
+                }
+
+                const teamPlayers: RatePlayerEntry[] = []
+                for (const id of memberIds) {
+                    const player = playersById.get(id)
+                    if (player) {
+                        teamPlayers.push(player)
+                    }
+                }
+                teamPlayers.sort((a, b) =>
+                    sortPlayers(a, b, (p) => lastDivisionByPlayerId.has(p.id))
+                )
+
+                if (!teamsByDivision.has(team.divisionName)) {
+                    teamsByDivision.set(team.divisionName, [])
+                    divisionOrder.push(team.divisionName)
+                }
+                teamsByDivision.get(team.divisionName)!.push({
+                    teamId: team.teamId,
+                    teamName: team.teamName,
+                    teamNumber: team.teamNumber,
+                    players: teamPlayers
+                })
+            }
+
+            for (const divisionName of divisionOrder) {
+                byTeamDivisions.push({
+                    divisionName,
+                    teams: teamsByDivision.get(divisionName)!
+                })
+            }
+        }
+
         return {
             status: true,
             seasonLabel,
@@ -515,6 +630,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions,
             tryout2Divisions,
             tryout3Divisions,
+            byTeamDivisions,
+            captainTeam,
             ratingsByPlayer
         }
     } catch (error) {
@@ -527,6 +644,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            byTeamDivisions: [],
+            captainTeam: null,
             ratingsByPlayer: {}
         }
     }
