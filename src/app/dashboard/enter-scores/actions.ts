@@ -549,14 +549,11 @@ export async function saveScoresForDivision(
                     .where(eq(matches.id, score.matchId))
             }
 
-            // Identify match_nums of every just-updated playoff match in this
-            // (season, division). We use them to find dependent meta rows.
+            // Determine whether this save touched any playoff match in this
+            // (season, division). If not, there is nothing downstream to
+            // realize.
             const playoffMetaForUpdated = await tx
-                .select({
-                    matchId: playoffMatchesMeta.match_id,
-                    matchNum: playoffMatchesMeta.match_num,
-                    week: playoffMatchesMeta.week
-                })
+                .select({ matchId: playoffMatchesMeta.match_id })
                 .from(playoffMatchesMeta)
                 .where(
                     and(
@@ -568,12 +565,13 @@ export async function saveScoresForDivision(
 
             if (playoffMetaForUpdated.length === 0) return
 
-            const weeks = Array.from(
-                new Set(playoffMetaForUpdated.map((m) => m.week))
-            )
-
-            // Pull all meta rows in the (season, division, weeks) so we can
-            // chase forward dependencies of any depth in this batch.
+            // Pull EVERY meta row in this (season, division) — not just the
+            // weeks this save touched. Forward dependencies routinely cross
+            // playoff weeks (e.g. week-2 slots are fed by week-1 W/L results),
+            // so scoping to the saved weeks would leave later rounds with NULL
+            // team slots and show them as permanently "locked / TBD" on the
+            // Enter Scores page. realizeOnce only fills slots that are still
+            // NULL, so widening the scope is safe and idempotent.
             const allMeta = await tx
                 .select({
                     metaId: playoffMatchesMeta.id,
@@ -587,8 +585,7 @@ export async function saveScoresForDivision(
                 .where(
                     and(
                         eq(playoffMatchesMeta.season, seasonId),
-                        eq(playoffMatchesMeta.division, divisionId),
-                        inArray(playoffMatchesMeta.week, weeks)
+                        eq(playoffMatchesMeta.division, divisionId)
                     )
                 )
 
