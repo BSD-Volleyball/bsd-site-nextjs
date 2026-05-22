@@ -221,7 +221,7 @@ function BracketSectionView({
     )
 }
 
-function ScheduleTable({
+function ScheduleResultsTable({
     matches,
     userTeamId,
     anchorMatchNum,
@@ -253,106 +253,14 @@ function ScheduleTable({
                             Court
                         </th>
                         <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                            Referee
+                        </th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                             Teams
                         </th>
                         <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                             Work
                         </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {matches.map((match) => {
-                        const involvesUser =
-                            userTeamId !== null &&
-                            (match.homeTeamId === userTeamId ||
-                                match.awayTeamId === userTeamId ||
-                                match.workTeamId === userTeamId)
-
-                        const pathApplies =
-                            anchorMatchNum !== null &&
-                            anchorWeek !== null &&
-                            match.matchNum !== anchorMatchNum &&
-                            match.week === anchorWeek
-                        const playRefIsAnchor =
-                            pathApplies &&
-                            (match.homeSourceRefMatch === anchorMatchNum ||
-                                match.awaySourceRefMatch === anchorMatchNum)
-                        const playTint: PathTint = playRefIsAnchor
-                            ? match.homeSourceRefMatch === anchorMatchNum
-                                ? match.homeSourceRefIsWin
-                                    ? "win"
-                                    : "lose"
-                                : match.awaySourceRefIsWin
-                                  ? "win"
-                                  : "lose"
-                            : null
-                        const workTint: PathTint =
-                            pathApplies &&
-                            match.workSourceRefMatch === anchorMatchNum
-                                ? match.workSourceRefIsWin
-                                    ? "win"
-                                    : "lose"
-                                : null
-                        const teamsCellTint =
-                            !involvesUser && playTint
-                                ? pathTintBg(playTint)
-                                : ""
-                        const workCellTint =
-                            !involvesUser && workTint
-                                ? pathTintBg(workTint)
-                                : ""
-
-                        return (
-                            <tr
-                                key={`schedule-${match.key}`}
-                                className={cn(
-                                    "border-b last:border-0",
-                                    involvesUser &&
-                                        "bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300"
-                                )}
-                            >
-                                <td className="px-3 py-2">{match.week}</td>
-                                <td className="whitespace-nowrap px-3 py-2">
-                                    {match.date || "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {match.matchNum !== null
-                                        ? `#${match.matchNum}`
-                                        : "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {formatMatchTime(match.time) || "—"}
-                                </td>
-                                <td className="px-3 py-2">
-                                    {match.court !== null ? match.court : "—"}
-                                </td>
-                                <td className={cn("px-3 py-2", teamsCellTint)}>
-                                    {match.homeLabel} vs {match.awayLabel}
-                                </td>
-                                <td className={cn("px-3 py-2", workCellTint)}>
-                                    {match.workAssignmentLabel || "—"}
-                                </td>
-                            </tr>
-                        )
-                    })}
-                </tbody>
-            </table>
-        </div>
-    )
-}
-
-function ResultsTable({
-    matches,
-    userTeamId
-}: {
-    matches: PlayoffMatchLine[]
-    userTeamId: number | null
-}) {
-    return (
-        <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b bg-muted/40">
                         <th className="px-3 py-2 text-left font-medium text-muted-foreground">
                             Winner
                         </th>
@@ -374,27 +282,99 @@ function ResultsTable({
                     {matches.length === 0 ? (
                         <tr>
                             <td
-                                colSpan={5}
+                                colSpan={13}
                                 className="px-3 py-8 text-center text-muted-foreground"
                             >
-                                No completed playoff matches yet.
+                                No playoff matches found for this division.
                             </td>
                         </tr>
                     ) : (
                         matches.map((match) => {
                             const involvesUser =
                                 userTeamId !== null &&
-                                (match.winnerTeamId === userTeamId ||
-                                    match.loserTeamId === userTeamId)
+                                (match.homeTeamId === userTeamId ||
+                                    match.awayTeamId === userTeamId ||
+                                    match.workTeamId === userTeamId)
+
+                            const pathApplies =
+                                anchorMatchNum !== null &&
+                                anchorWeek !== null &&
+                                match.matchNum !== anchorMatchNum &&
+                                match.week === anchorWeek
+                            const playRefIsAnchor =
+                                pathApplies &&
+                                (match.homeSourceRefMatch === anchorMatchNum ||
+                                    match.awaySourceRefMatch === anchorMatchNum)
+                            const playTint: PathTint = playRefIsAnchor
+                                ? match.homeSourceRefMatch === anchorMatchNum
+                                    ? match.homeSourceRefIsWin
+                                        ? "win"
+                                        : "lose"
+                                    : match.awaySourceRefIsWin
+                                      ? "win"
+                                      : "lose"
+                                : null
+                            const workTint: PathTint =
+                                pathApplies &&
+                                match.workSourceRefMatch === anchorMatchNum
+                                    ? match.workSourceRefIsWin
+                                        ? "win"
+                                        : "lose"
+                                    : null
+                            const teamsCellTint =
+                                !involvesUser && playTint
+                                    ? pathTintBg(playTint)
+                                    : ""
+                            const workCellTint =
+                                !involvesUser && workTint
+                                    ? pathTintBg(workTint)
+                                    : ""
+
                             return (
                                 <tr
-                                    key={`results-${match.key}`}
+                                    key={`schedule-results-${match.key}`}
                                     className={cn(
                                         "border-b last:border-0",
                                         involvesUser &&
-                                            "bg-primary/10 font-semibold"
+                                            "bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300"
                                     )}
                                 >
+                                    <td className="px-3 py-2">{match.week}</td>
+                                    <td className="whitespace-nowrap px-3 py-2">
+                                        {match.date || "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {match.matchNum !== null
+                                            ? `#${match.matchNum}`
+                                            : "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {formatMatchTime(match.time) || "—"}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        {match.court !== null
+                                            ? match.court
+                                            : "—"}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                        {match.refName ?? "—"}
+                                    </td>
+                                    <td
+                                        className={cn(
+                                            "px-3 py-2",
+                                            teamsCellTint
+                                        )}
+                                    >
+                                        {match.homeLabel} vs {match.awayLabel}
+                                    </td>
+                                    <td
+                                        className={cn(
+                                            "px-3 py-2",
+                                            workCellTint
+                                        )}
+                                    >
+                                        {match.workAssignmentLabel || "—"}
+                                    </td>
                                     <td className="px-3 py-2">
                                         {match.winnerLabel || "—"}
                                     </td>
@@ -558,20 +538,12 @@ export function DivisionSection({
                             </TabsContent>
 
                             <TabsContent value="tables">
-                                <div className="grid gap-4 xl:grid-cols-2">
-                                    <ScheduleTable
-                                        matches={division.scheduleMatches}
-                                        userTeamId={userTeamId}
-                                        anchorMatchNum={
-                                            division.userAnchorMatchNum
-                                        }
-                                        anchorWeek={division.userAnchorWeek}
-                                    />
-                                    <ResultsTable
-                                        matches={division.resultsMatches}
-                                        userTeamId={userTeamId}
-                                    />
-                                </div>
+                                <ScheduleResultsTable
+                                    matches={division.scheduleMatches}
+                                    userTeamId={userTeamId}
+                                    anchorMatchNum={division.userAnchorMatchNum}
+                                    anchorWeek={division.userAnchorWeek}
+                                />
                             </TabsContent>
                         </Tabs>
                     </div>

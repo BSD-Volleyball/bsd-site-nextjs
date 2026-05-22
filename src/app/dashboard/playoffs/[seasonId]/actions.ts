@@ -8,9 +8,11 @@ import {
     drafts,
     individual_divisions,
     matches,
+    matchReferees,
     playoffMatchesMeta,
     seasons,
-    teams
+    teams,
+    users
 } from "@/database/schema"
 import { headers } from "next/headers"
 import {
@@ -81,6 +83,7 @@ export interface PlayoffMatchLine {
     loserLabel: string | null
     loserGames: number | null
     scoresDisplay: string
+    refName: string | null
     homeSourceLabel: string | null
     awaySourceLabel: string | null
     workAssignmentLabel: string | null
@@ -160,7 +163,6 @@ export interface PlayoffDivision {
     seeds: PlayoffSeed[]
     sections: PlayoffSection[]
     scheduleMatches: PlayoffMatchLine[]
-    resultsMatches: PlayoffMatchLine[]
     bracketMatches: { upper: BracketMatch[]; lower: BracketMatch[] } | null
     userAnchorMatchNum: number | null
     userAnchorWeek: number | null
@@ -894,7 +896,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
 
         const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
 
-        const [playoffMatchRows, metaRows] = await Promise.all([
+        const [playoffMatchRows, metaRows, refRows] = await Promise.all([
             db
                 .select({
                     id: matches.id,
@@ -935,8 +937,23 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                     workSource: playoffMatchesMeta.work_source
                 })
                 .from(playoffMatchesMeta)
-                .where(eq(playoffMatchesMeta.season, seasonId))
+                .where(eq(playoffMatchesMeta.season, seasonId)),
+            db
+                .select({
+                    matchId: matchReferees.match_id,
+                    refName: users.name
+                })
+                .from(matchReferees)
+                .innerJoin(users, eq(matchReferees.referee_id, users.id))
+                .where(eq(matchReferees.season_id, seasonId))
         ])
+
+        // Referee assignments live in the match_referees join table keyed by
+        // the real matches.id, so meta-only playoff rows (no scheduled match
+        // yet) simply won't have an entry and fall back to null.
+        const refByMatchId = new Map(
+            refRows.map((row) => [row.matchId, row.refName])
+        )
 
         const divisionIds = [
             ...new Set([
@@ -1349,6 +1366,10 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                             : null,
                     loserGames,
                     scoresDisplay: formatSetScoreDisplay(match, homeIsWinner),
+                    refName:
+                        match.id !== null
+                            ? (refByMatchId.get(match.id) ?? null)
+                            : null,
                     homeSourceLabel: formatSourceLabel(match.homeSource),
                     awaySourceLabel: formatSourceLabel(match.awaySource),
                     workAssignmentLabel:
@@ -1452,13 +1473,6 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             const scheduleMatches = [...lineByKey.values()].sort(
                 compareLineChronological
             )
-            const resultsMatches = scheduleMatches.filter(
-                (match) =>
-                    match.winnerLabel !== null ||
-                    match.winnerGames !== null ||
-                    match.loserGames !== null ||
-                    match.scoresDisplay !== "—"
-            )
 
             const sortDeepestFirst = (a: CombinedMatch, b: CombinedMatch) => {
                 if (a.round !== b.round) {
@@ -1558,7 +1572,6 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
                 seeds,
                 sections,
                 scheduleMatches,
-                resultsMatches,
                 bracketMatches,
                 userAnchorMatchNum,
                 userAnchorWeek
