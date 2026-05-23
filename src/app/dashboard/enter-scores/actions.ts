@@ -666,18 +666,36 @@ export async function saveScoresForDivision(
                     }
 
                     const update: {
-                        home_team?: number
-                        away_team?: number
+                        home_team?: number | null
+                        away_team?: number | null
                     } = {}
 
-                    if (realized.homeTeamId === null) {
-                        const hv = resolveSide(home)
-                        if (hv !== null) update.home_team = hv
+                    // Derived sources (W#/L#) must re-sync whenever the
+                    // upstream winner changes — including overwriting a
+                    // slot that was previously filled with a now-stale
+                    // team. Static sources (seed/team) are only filled
+                    // when NULL so initial seeding is preserved.
+                    const syncSide = (
+                        src: ReturnType<typeof parseSourceToken>,
+                        current: number | null
+                    ): { changed: boolean; value: number | null } => {
+                        if (src.kind === "winner" || src.kind === "loser") {
+                            const v = resolveSide(src)
+                            if (v !== current)
+                                return { changed: true, value: v }
+                            return { changed: false, value: current }
+                        }
+                        if (current === null) {
+                            const v = resolveSide(src)
+                            if (v !== null) return { changed: true, value: v }
+                        }
+                        return { changed: false, value: current }
                     }
-                    if (realized.awayTeamId === null) {
-                        const av = resolveSide(away)
-                        if (av !== null) update.away_team = av
-                    }
+
+                    const homeSync = syncSide(home, realized.homeTeamId)
+                    const awaySync = syncSide(away, realized.awayTeamId)
+                    if (homeSync.changed) update.home_team = homeSync.value
+                    if (awaySync.changed) update.away_team = awaySync.value
 
                     if (Object.keys(update).length === 0) continue
 
@@ -687,10 +705,44 @@ export async function saveScoresForDivision(
                         .where(eq(matches.id, m.matchId))
                     anyChange = true
 
+                    // If participants actually changed (not just a first-time
+                    // fill), any previously recorded winner/scores describe a
+                    // different physical pairing — clear them so downstream
+                    // rounds don't keep propagating stale advancement.
+                    const homeReplaced =
+                        homeSync.changed && realized.homeTeamId !== null
+                    const awayReplaced =
+                        awaySync.changed && realized.awayTeamId !== null
+                    if (
+                        (homeReplaced || awayReplaced) &&
+                        realized.winner !== null
+                    ) {
+                        await tx
+                            .update(matches)
+                            .set({
+                                winner: null,
+                                home_score: null,
+                                away_score: null,
+                                home_set1_score: null,
+                                away_set1_score: null,
+                                home_set2_score: null,
+                                away_set2_score: null,
+                                home_set3_score: null,
+                                away_set3_score: null
+                            })
+                            .where(eq(matches.id, m.matchId))
+                    }
+
                     const newlySetTeamIds = new Set<number>()
-                    if (update.home_team !== undefined)
+                    if (
+                        update.home_team !== undefined &&
+                        update.home_team !== null
+                    )
                         newlySetTeamIds.add(update.home_team)
-                    if (update.away_team !== undefined)
+                    if (
+                        update.away_team !== undefined &&
+                        update.away_team !== null
+                    )
                         newlySetTeamIds.add(update.away_team)
 
                     // Auto-promote backup if primary ref is on one of the
@@ -836,6 +888,7 @@ export async function saveScoresForDivision(
         revalidatePath("/dashboard/season-schedule")
         revalidatePath("/dashboard/schedule-refs")
         revalidatePath("/dashboard/reffing-schedule")
+        revalidatePath("/dashboard/playoffs", "layout")
         return {
             status: true,
             message: `Saved scores for ${matchScores.length} match(es).`
