@@ -133,12 +133,12 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                 <div className="container relative mx-auto max-w-5xl px-4 py-16 sm:py-20">
                     <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
                         <div className="space-y-3">
+                            <p className="font-bold text-primary text-xl uppercase tracking-widest sm:text-2xl">
+                                {t.tournament_type === "coed"
+                                    ? "Coed Tournament"
+                                    : "Reverse Coed Tournament"}
+                            </p>
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="secondary">
-                                    {t.tournament_type === "coed"
-                                        ? "Coed"
-                                        : "Reverse Coed"}
-                                </Badge>
                                 <Badge variant="outline">{t.year}</Badge>
                                 <Badge>{phaseLabel}</Badge>
                             </div>
@@ -244,6 +244,27 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                     )}
                 </div>
             </section>
+
+            {/* Additional Info (free-form notes from Tournament Config) */}
+            {t.additional_info && (
+                <section className="border-t">
+                    <div className="container mx-auto max-w-5xl px-4 py-12">
+                        <h2 className="mb-4 font-bold text-3xl">
+                            Additional Information
+                        </h2>
+                        <div className="space-y-4 text-base leading-relaxed">
+                            {t.additional_info
+                                .split(/\n\s*\n/)
+                                .filter((p) => p.trim().length > 0)
+                                .map((p, i) => (
+                                    <p key={i} className="whitespace-pre-line">
+                                        {p}
+                                    </p>
+                                ))}
+                        </div>
+                    </div>
+                </section>
+            )}
 
             {/* Divisions */}
             <section className="border-t bg-muted/30">

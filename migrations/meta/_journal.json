@@ -169,6 +169,13 @@
       "when": 1779930400000,
       "tag": "0023_tournament_divisions_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779930500000,
+      "tag": "0024_tournaments_additional_info",
+      "breakpoints": true
     }
   ]
 }

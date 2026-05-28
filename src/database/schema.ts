@@ -1257,6 +1257,9 @@ export const tournaments = pgTable("tournaments", {
     pool_size: integer("pool_size").notNull(),
     // 'single' | 'double'
     elimination_format: text("elimination_format").notNull(),
+    // Free-form notes shown on the public marketing page (formats, prizes,
+    // raffles, where to park, etc.). Plain text — newlines preserved.
+    additional_info: text("additional_info"),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull()

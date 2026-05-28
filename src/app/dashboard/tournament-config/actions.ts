@@ -44,6 +44,7 @@ export interface TournamentMetadataInput {
     tournamentType: "coed" | "reverse_coed"
     poolSize: number
     eliminationFormat: "single" | "double"
+    additionalInfo: string | null
 }
 
 export interface TournamentConfigDivisionRow {
@@ -76,6 +77,7 @@ export interface TournamentConfigData {
     tournament_type: string
     pool_size: number
     elimination_format: string
+    additional_info: string | null
     divisions: TournamentConfigDivisionRow[]
 }
 
@@ -157,6 +159,7 @@ export const getTournamentConfigData = withAction(
             tournament_type: t.tournament_type,
             pool_size: t.pool_size,
             elimination_format: t.elimination_format,
+            additional_info: t.additional_info,
             divisions: divs
         })
     }
@@ -217,7 +220,8 @@ export const createTournament = withAction(
                 roster_lock_date: metadata.rosterLockDate || null,
                 tournament_type: metadata.tournamentType,
                 pool_size: poolSize,
-                elimination_format: metadata.eliminationFormat
+                elimination_format: metadata.eliminationFormat,
+                additional_info: metadata.additionalInfo || null
             })
             .returning({ id: tournaments.id })
 
@@ -297,7 +301,8 @@ export const saveTournamentConfig = withAction(
                     roster_lock_date: metadata.rosterLockDate || null,
                     tournament_type: metadata.tournamentType,
                     pool_size: metadata.poolSize,
-                    elimination_format: metadata.eliminationFormat
+                    elimination_format: metadata.eliminationFormat,
+                    additional_info: metadata.additionalInfo || null
                 })
                 .where(eq(tournaments.id, id))
 

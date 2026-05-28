@@ -91,6 +91,9 @@ export function TournamentConfigForm({
     const [eliminationFormat, setEliminationFormat] = useState<
         "single" | "double"
     >((initialData?.elimination_format as "single" | "double") ?? "single")
+    const [additionalInfo, setAdditionalInfo] = useState(
+        initialData?.additional_info ?? ""
+    )
 
     const [divisions, setDivisions] = useState<DivisionState[]>(
         initialData?.divisions.map((d) => ({
@@ -142,7 +145,8 @@ export function TournamentConfigForm({
             rosterLockDate: rosterLockDate || null,
             tournamentType,
             poolSize,
-            eliminationFormat
+            eliminationFormat,
+            additionalInfo: additionalInfo.trim() || null
         }
     }
 
@@ -410,6 +414,23 @@ export function TournamentConfigForm({
                                 </option>
                             </select>
                         </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-2">
+                        <Label htmlFor="t-addl">Additional Information</Label>
+                        <p className="text-muted-foreground text-xs">
+                            Shown on the public tournament info page. Blank
+                            lines start a new paragraph.
+                        </p>
+                        <textarea
+                            id="t-addl"
+                            className="min-h-32 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                            value={additionalInfo}
+                            onChange={(e) => setAdditionalInfo(e.target.value)}
+                            placeholder="Where to park, what to bring, sponsor shoutouts, after-party details, etc."
+                        />
                     </div>
                 </CardContent>
             </Card>
