@@ -945,7 +945,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             !tournament.isRostered
                                         ) {
                                             items.push({
-                                                title: "Tournament Waitlist",
+                                                title: "Sign Up as a Player",
                                                 url: "/dashboard/tournament-waitlist",
                                                 icon: RiGroupLine
                                             })

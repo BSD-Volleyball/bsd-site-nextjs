@@ -15,7 +15,7 @@ import {
 import { TournamentWaitlistButton } from "@/components/dashboard/tournament-waitlist-button"
 
 export const metadata: Metadata = {
-    title: "Tournament Waitlist"
+    title: "Sign Up as a Player"
 }
 
 export default async function TournamentWaitlistPage() {
@@ -54,44 +54,58 @@ export default async function TournamentWaitlistPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Tournament Waitlist"
-                description={`Pre-register for ${config.name} — works two ways below.`}
+                title="Sign Up as a Player"
+                description={`Let us know you'd like to play in ${config.name} so a captain can add you to their team.`}
             />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base">Why use this?</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                    <p>
-                        <strong>If you don't have a team yet:</strong> join the
-                        list so captains can pick you up when they're filling
-                        rosters. They'll see your name and gender when they go
-                        to add players.
-                    </p>
-                    <p>
-                        <strong>If you know a captain plans to add you:</strong>{" "}
-                        pre-accept the waiver here. That way, when you're added
-                        to their roster, you're already cleared to play — no
-                        waiver pop-up to deal with on tournament day.
-                    </p>
-                </CardContent>
-            </Card>
 
             {alreadyOnList ? (
                 <Card className="border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950">
-                    <CardContent className="pt-6 text-sm">
-                        You're already on the list for{" "}
-                        <strong>{config.name}</strong>. The waiver is accepted;
-                        we'll show your status on the dashboard once a captain
-                        picks you up.
+                    <CardContent className="space-y-3 pt-6 text-sm">
+                        <p className="font-medium">
+                            Thanks for signing up to play in {config.name}!
+                        </p>
+                        <p>
+                            You're not on a team yet. If you already know which
+                            captain plans to add you, please reach out so they
+                            can put you on their roster. Otherwise we'll contact
+                            you if we can place you on a team.
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                            Your waiver is on file, so you're cleared to play as
+                            soon as a captain adds you.
+                        </p>
                     </CardContent>
                 </Card>
             ) : (
-                <TournamentWaitlistButton
-                    tournamentName={config.name}
-                    waiver={waiver}
-                />
+                <>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Why sign up?
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <p>
+                                <strong>If you don't have a team yet:</strong>{" "}
+                                signing up tells captains you're available to
+                                play — they'll see your name when filling
+                                rosters.
+                            </p>
+                            <p>
+                                <strong>
+                                    If you know a captain plans to add you:
+                                </strong>{" "}
+                                signing up here pre-accepts the waiver so you're
+                                cleared to play the moment they put you on their
+                                roster.
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <TournamentWaitlistButton
+                        tournamentName={config.name}
+                        waiver={waiver}
+                    />
+                </>
             )}
         </div>
     )

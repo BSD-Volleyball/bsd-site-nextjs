@@ -95,7 +95,7 @@ export function TournamentDashboardCard({ data }: Props) {
         )
     }
 
-    // Not on a team but on the waitlist (awaiting pickup).
+    // Player has expressed interest but isn't on a roster yet.
     if (data.onWaitlist) {
         return (
             <Card className="min-w-[280px] flex-1 border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950">
@@ -108,15 +108,19 @@ export function TournamentDashboardCard({ data }: Props) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
+                    <p className="font-medium">
+                        Thanks for signing up to play!
+                    </p>
                     <p>
-                        You're on the waitlist and your waiver is on file.
-                        Captains looking for players will see your name. We'll
-                        update this card once you're picked up.
+                        You're not on a team yet. If you know which captain
+                        plans to add you, please reach out so they can put you
+                        on their roster. Otherwise we'll contact you if we can
+                        place you on a team.
                     </p>
                     {data.registrationOpen && !data.allDivisionsFull && (
                         <p className="text-muted-foreground text-xs">
-                            Changed your mind and want to captain a team
-                            instead? Sign up below.
+                            Want to captain a team yourself instead? Sign up
+                            below.
                         </p>
                     )}
                     {data.registrationOpen && !data.allDivisionsFull && (
@@ -148,13 +152,13 @@ export function TournamentDashboardCard({ data }: Props) {
                         <>
                             <p>
                                 Every division is full — no more teams can
-                                register. You can still join as an individual so
-                                a captain can add you if a spot opens up.
+                                register. You can still sign up as a player so a
+                                captain can add you if a spot opens up.
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 <Link href="/dashboard/tournament-waitlist">
                                     <Button size="sm">
-                                        Join as an Individual
+                                        Sign Up as a Player
                                     </Button>
                                 </Link>
                             </div>
@@ -172,11 +176,10 @@ export function TournamentDashboardCard({ data }: Props) {
                                     fee.
                                 </li>
                                 <li>
-                                    <strong>Join as an individual</strong> if
-                                    you don't have a team yet, OR if you already
-                                    know a captain plans to add you — either way
-                                    it pre-accepts the waiver so you're cleared
-                                    to play.
+                                    <strong>Sign up as a player</strong> to let
+                                    captains know you'd like to be added to a
+                                    team — also pre-accepts the waiver so you're
+                                    cleared to play when a captain adds you.
                                 </li>
                             </ul>
                             <div className="flex flex-wrap gap-2">
@@ -185,7 +188,7 @@ export function TournamentDashboardCard({ data }: Props) {
                                 </Link>
                                 <Link href="/dashboard/tournament-waitlist">
                                     <Button variant="outline" size="sm">
-                                        Join as an Individual
+                                        Sign Up as a Player
                                     </Button>
                                 </Link>
                             </div>

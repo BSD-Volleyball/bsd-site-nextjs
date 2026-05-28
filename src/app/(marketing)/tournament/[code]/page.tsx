@@ -180,7 +180,7 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                                     }
                                 >
                                     <Link href="/dashboard/tournament-waitlist">
-                                        Join as an Individual
+                                        Sign Up as a Player
                                     </Link>
                                 </Button>
                             )}
@@ -189,7 +189,7 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                     {allDivisionsFull && registrationOpen && (
                         <p className="mt-4 text-amber-700 text-sm dark:text-amber-400">
                             Every division is full — team signups are closed.
-                            You can still join as an individual to get on a
+                            You can still sign up as a player to get on a
                             captain's radar if a spot opens up.
                         </p>
                     )}
@@ -349,8 +349,8 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                     <h2 className="font-bold text-3xl">Ready to play?</h2>
                     <p className="mt-2 text-muted-foreground">
                         {canSignUpTeam
-                            ? "Sign up as a team captain or join the player list as an individual."
-                            : "Team registration is closed, but you can still get on the player list."}
+                            ? "Sign up as a team captain, or sign up as a player so a captain can add you to their team."
+                            : "Team registration is closed, but you can still sign up as a player so a captain can add you to their team."}
                     </p>
                     <div className="mt-6 flex flex-wrap justify-center gap-3">
                         {canSignUpTeam && (

@@ -35,9 +35,7 @@ export function TournamentWaitlistButton({ tournamentName, waiver }: Props) {
             toast.error(result.message)
             return
         }
-        toast.success(
-            "You're on the waitlist. We'll let you know when a team has space."
-        )
+        toast.success("Thanks for signing up to play!")
         setOpen(false)
         router.refresh()
     }
@@ -45,20 +43,20 @@ export function TournamentWaitlistButton({ tournamentName, waiver }: Props) {
     return (
         <>
             <Button onClick={() => setOpen(true)}>
-                Join Waitlist &amp; Accept Waiver
+                Sign Up &amp; Accept Waiver
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>
-                            Pre-Register for {tournamentName}
+                            Sign Up as a Player — {tournamentName}
                         </DialogTitle>
                     </DialogHeader>
                     <p className="text-muted-foreground text-sm">
-                        This adds you to the player list so captains looking for
-                        roster spots can pick you up, AND records that you've
-                        accepted the waiver — so you're cleared to play either
-                        way.
+                        This tells captains you'd like to be added to a team AND
+                        records that you've accepted the waiver. Note that this
+                        does not place you on a team — a captain still needs to
+                        add you to their roster.
                     </p>
                     <WaiverContent content={waiver.content} />
                     <div className="flex items-start gap-2 pt-2">
@@ -86,7 +84,7 @@ export function TournamentWaitlistButton({ tournamentName, waiver }: Props) {
                             onClick={handleSubmit}
                             disabled={!agreed || busy}
                         >
-                            {busy ? "Joining..." : "Join Waitlist"}
+                            {busy ? "Signing up..." : "Sign Up"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
