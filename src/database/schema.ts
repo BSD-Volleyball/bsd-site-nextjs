@@ -1228,3 +1228,283 @@ export const waiverAcceptances = pgTable(
         ).on(table.user_id, table.waiver_id)
     })
 )
+
+// --- Tournaments ---
+// Single-day, captain-led tournaments that run in parallel to seasons.
+// Share users with seasons but otherwise standalone (no draft, no multi-week).
+
+export const tournaments = pgTable("tournaments", {
+    id: serial("id").primaryKey(),
+    code: text("code").notNull().unique(),
+    year: integer("year").notNull(),
+    name: text("name").notNull(),
+    phase: text("phase")
+        .$defaultFn(() => "registration_open")
+        .notNull(),
+    tournament_date: date("tournament_date", { mode: "string" }).notNull(),
+    checkin_time: time("checkin_time"),
+    first_serve_time: time("first_serve_time"),
+    address: text("address"),
+    cost: numeric("cost"),
+    late_cost: numeric("late_cost"),
+    late_date: date("late_date", { mode: "string" }),
+    registration_close_date: date("registration_close_date", {
+        mode: "string"
+    }),
+    roster_lock_date: date("roster_lock_date", { mode: "string" }),
+    // 'coed' | 'reverse_coed' — label/display only
+    tournament_type: text("tournament_type").notNull(),
+    pool_size: integer("pool_size").notNull(),
+    // 'single' | 'double'
+    elimination_format: text("elimination_format").notNull(),
+    created_at: timestamp("created_at")
+        .$defaultFn(() => new Date())
+        .notNull()
+})
+
+export const tournamentDivisions = pgTable(
+    "tournament_divisions",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        // Identity comes from the league-wide `divisions` table (e.g. "A", "BB").
+        // Display always uses divisions.name; sorting uses divisions.level.
+        division_id: integer("division_id")
+            .notNull()
+            .references(() => divisions.id),
+        team_count: integer("team_count").notNull(),
+        male_per_team: integer("male_per_team").notNull(),
+        non_male_per_team: integer("non_male_per_team").notNull(),
+        // Number of teams from each pool that advance to bracket play
+        teams_advancing_per_pool: integer("teams_advancing_per_pool")
+            .$defaultFn(() => 2)
+            .notNull(),
+        sort_order: integer("sort_order").notNull()
+    },
+    (table) => ({
+        tournamentDivisionsTournamentIdx: index(
+            "tournament_divisions_tournament_idx"
+        ).on(table.tournament_id),
+        // One row per (tournament, league-division) — can't list "A" twice.
+        tournamentDivisionsUniq: uniqueIndex(
+            "tournament_divisions_tournament_division_uniq"
+        ).on(table.tournament_id, table.division_id)
+    })
+)
+
+export const tournamentTeams = pgTable(
+    "tournament_teams",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        // Final division — set by admin during prepare phase; may differ from preferred.
+        division_id: integer("division_id").references(
+            () => tournamentDivisions.id
+        ),
+        preferred_division_id: integer("preferred_division_id")
+            .notNull()
+            .references(() => tournamentDivisions.id),
+        captain_user_id: text("captain_user_id")
+            .notNull()
+            .references(() => users.id),
+        name: text("name").notNull(),
+        order_id: text("order_id"),
+        amount_paid: numeric("amount_paid"),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        tournamentTeamsTournamentIdx: index(
+            "tournament_teams_tournament_idx"
+        ).on(table.tournament_id),
+        tournamentTeamsCaptainIdx: index("tournament_teams_captain_idx").on(
+            table.captain_user_id
+        ),
+        // One captain may only register one team per tournament.
+        tournamentTeamsCaptainUniq: uniqueIndex(
+            "tournament_teams_tournament_captain_uniq"
+        ).on(table.tournament_id, table.captain_user_id)
+    })
+)
+
+// Rostered players (includes the captain).
+// DB-level unique on (tournament_id, user_id) enforces "no player on two teams"
+// in the same tournament — defense-in-depth so app bugs can't double-roster.
+export const tournamentRoster = pgTable(
+    "tournament_roster",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        team_id: integer("team_id")
+            .notNull()
+            .references(() => tournamentTeams.id, { onDelete: "cascade" }),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id),
+        added_by_user_id: text("added_by_user_id")
+            .notNull()
+            .references(() => users.id),
+        added_at: timestamp("added_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        tournamentRosterTeamIdx: index("tournament_roster_team_idx").on(
+            table.team_id
+        ),
+        tournamentRosterUserIdx: index("tournament_roster_user_idx").on(
+            table.user_id
+        ),
+        tournamentRosterUserUniq: uniqueIndex(
+            "tournament_roster_tournament_user_uniq"
+        ).on(table.tournament_id, table.user_id)
+    })
+)
+
+// Players without a team express interest; waiver acceptance is required at
+// time of waitlist join. Admins later place them onto a team.
+export const tournamentWaitlist = pgTable(
+    "tournament_waitlist",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id),
+        waiver_id: integer("waiver_id")
+            .notNull()
+            .references(() => waivers.id),
+        approved: boolean("approved")
+            .$defaultFn(() => false)
+            .notNull(),
+        placed_team_id: integer("placed_team_id").references(
+            () => tournamentTeams.id,
+            { onDelete: "set null" }
+        ),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        tournamentWaitlistTournamentIdx: index(
+            "tournament_waitlist_tournament_idx"
+        ).on(table.tournament_id),
+        tournamentWaitlistUserUniq: uniqueIndex(
+            "tournament_waitlist_tournament_user_uniq"
+        ).on(table.tournament_id, table.user_id)
+    })
+)
+
+export const tournamentPools = pgTable(
+    "tournament_pools",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        division_id: integer("division_id")
+            .notNull()
+            .references(() => tournamentDivisions.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        sort_order: integer("sort_order").notNull()
+    },
+    (table) => ({
+        tournamentPoolsDivisionIdx: index("tournament_pools_division_idx").on(
+            table.division_id
+        )
+    })
+)
+
+export const tournamentPoolTeams = pgTable(
+    "tournament_pool_teams",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        pool_id: integer("pool_id")
+            .notNull()
+            .references(() => tournamentPools.id, { onDelete: "cascade" }),
+        team_id: integer("team_id")
+            .notNull()
+            .references(() => tournamentTeams.id, { onDelete: "cascade" })
+    },
+    (table) => ({
+        tournamentPoolTeamsPoolIdx: index("tournament_pool_teams_pool_idx").on(
+            table.pool_id
+        ),
+        // Each team belongs to exactly one pool in its tournament.
+        tournamentPoolTeamsTeamUniq: uniqueIndex(
+            "tournament_pool_teams_tournament_team_uniq"
+        ).on(table.tournament_id, table.team_id)
+    })
+)
+
+// Mirrors the league `matches` shape (3 sets, scores) but tournament-scoped.
+// `bracket` distinguishes pool play from bracket rounds.
+// `work_team_id` is the team responsible for entering the score (replaces the
+// season's referee_team concept) — auth for score entry checks the caller's
+// roster against this column.
+export const tournamentMatches = pgTable(
+    "tournament_matches",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        division_id: integer("division_id")
+            .notNull()
+            .references(() => tournamentDivisions.id),
+        // null for bracket matches
+        pool_id: integer("pool_id").references(() => tournamentPools.id, {
+            onDelete: "cascade"
+        }),
+        // 'pool' | 'winners' | 'losers' | 'final'
+        bracket: text("bracket").notNull(),
+        bracket_round: integer("bracket_round"),
+        bracket_slot: integer("bracket_slot"),
+        court: integer("court"),
+        start_time: time("start_time"),
+        home_team_id: integer("home_team_id").references(
+            () => tournamentTeams.id
+        ),
+        away_team_id: integer("away_team_id").references(
+            () => tournamentTeams.id
+        ),
+        home_set1_score: integer("home_set1_score"),
+        away_set1_score: integer("away_set1_score"),
+        home_set2_score: integer("home_set2_score"),
+        away_set2_score: integer("away_set2_score"),
+        home_set3_score: integer("home_set3_score"),
+        away_set3_score: integer("away_set3_score"),
+        winner_team_id: integer("winner_team_id").references(
+            () => tournamentTeams.id
+        ),
+        work_team_id: integer("work_team_id").references(
+            () => tournamentTeams.id
+        )
+    },
+    (table) => ({
+        tournamentMatchesTournamentIdx: index(
+            "tournament_matches_tournament_idx"
+        ).on(table.tournament_id),
+        tournamentMatchesPoolIdx: index("tournament_matches_pool_idx").on(
+            table.pool_id
+        ),
+        tournamentMatchesDivisionIdx: index(
+            "tournament_matches_division_idx"
+        ).on(table.division_id),
+        tournamentMatchesCourtTimeIdx: index(
+            "tournament_matches_court_time_idx"
+        ).on(table.tournament_id, table.court, table.start_time)
+    })
+)

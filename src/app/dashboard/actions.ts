@@ -180,6 +180,17 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     }
 }
 
+export interface TournamentSidebarInfo {
+    tournamentId: number
+    name: string
+    phase: string
+    canSignUp: boolean
+    isCaptain: boolean
+    isRostered: boolean
+    showPoolTools: boolean
+    showBracketTools: boolean
+}
+
 export interface SidebarData {
     showSignupLink: boolean
     hasCurrentSeasonSignup: boolean
@@ -194,6 +205,7 @@ export interface SidebarData {
     isRefCoordinator: boolean
     seasonNav: SeasonNavItem[]
     phase: SeasonPhase | null
+    tournament: TournamentSidebarInfo | null
 }
 
 export async function getSidebarData(): Promise<SidebarData> {
@@ -213,7 +225,8 @@ export async function getSidebarData(): Promise<SidebarData> {
             isReferee: false,
             isRefCoordinator: false,
             seasonNav: [],
-            phase: null
+            phase: null,
+            tournament: null
         }
     }
 
@@ -297,6 +310,8 @@ export async function getSidebarData(): Promise<SidebarData> {
             : Promise.resolve(false)
     ])
 
+    const tournament = await getTournamentSidebarInfo(session.user.id)
+
     return {
         showSignupLink,
         hasCurrentSeasonSignup,
@@ -310,7 +325,65 @@ export async function getSidebarData(): Promise<SidebarData> {
         isReferee,
         isRefCoordinator,
         seasonNav,
-        phase: seasonId ? config.phase : null
+        phase: seasonId ? config.phase : null,
+        tournament
+    }
+}
+
+async function getTournamentSidebarInfo(
+    userId: string
+): Promise<TournamentSidebarInfo | null> {
+    const { getTournamentConfig, isRegistrationClosed } = await import(
+        "@/lib/tournament-config"
+    )
+    const { TOURNAMENT_PHASE_CONFIG } = await import("@/lib/tournament-phases")
+    const { tournamentRoster, tournamentTeams } = await import(
+        "@/database/schema"
+    )
+
+    const config = await getTournamentConfig()
+    if (!config) return null
+
+    const [rosterRow] = await db
+        .select({ teamId: tournamentRoster.team_id })
+        .from(tournamentRoster)
+        .where(
+            and(
+                eq(tournamentRoster.tournament_id, config.tournamentId),
+                eq(tournamentRoster.user_id, userId)
+            )
+        )
+        .limit(1)
+    const isRostered = !!rosterRow
+
+    let isCaptain = false
+    if (rosterRow) {
+        const [team] = await db
+            .select({ captain: tournamentTeams.captain_user_id })
+            .from(tournamentTeams)
+            .where(eq(tournamentTeams.id, rosterRow.teamId))
+            .limit(1)
+        isCaptain = team?.captain === userId
+    }
+
+    const phaseCfg =
+        TOURNAMENT_PHASE_CONFIG[
+            config.phase as keyof typeof TOURNAMENT_PHASE_CONFIG
+        ]
+    const canSignUp =
+        phaseCfg?.showRegistration === true &&
+        !isRegistrationClosed(config) &&
+        !isRostered
+
+    return {
+        tournamentId: config.tournamentId,
+        name: config.name,
+        phase: config.phase,
+        canSignUp,
+        isCaptain,
+        isRostered,
+        showPoolTools: phaseCfg?.showPoolTools === true,
+        showBracketTools: phaseCfg?.showBracketTools === true
     }
 }
 

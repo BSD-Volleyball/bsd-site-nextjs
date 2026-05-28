@@ -155,6 +155,20 @@
       "when": 1779460428248,
       "tag": "0021_jazzy_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1779930314511,
+      "tag": "0022_naive_nico_minoru",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779930400000,
+      "tag": "0023_tournament_divisions_fk",
+      "breakpoints": true
     }
   ]
 }

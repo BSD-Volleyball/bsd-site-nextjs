@@ -77,6 +77,8 @@ import {
     type PlayoffNextMatchData
 } from "./actions"
 import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
+import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-card"
+import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { buildPlayerPictureUrl, cn } from "@/lib/utils"
 
 export const metadata: Metadata = {
@@ -716,6 +718,9 @@ function SignupCTA({
 export default async function DashboardPage() {
     const session = await auth.api.getSession({ headers: await headers() })
     const activeWaiver = await getActiveWaiver()
+    const tournamentWaiverGate = session?.user
+        ? await getTournamentWaiverGate(session.user.id)
+        : null
     const [hasTryoutSheetAccess, isAdmin] = session?.user
         ? await Promise.all([
               hasCaptainPagesAccessBySession(),
@@ -1505,6 +1510,12 @@ export default async function DashboardPage() {
             />
 
             <div className="flex flex-wrap gap-6">
+                {tournamentWaiverGate && activeWaiver && (
+                    <TournamentWaiverCard
+                        tournamentName={tournamentWaiverGate.tournamentName}
+                        waiver={activeWaiver}
+                    />
+                )}
                 {playoffNextMatches && (
                     <PlayoffNextMatchCard data={playoffNextMatches} />
                 )}

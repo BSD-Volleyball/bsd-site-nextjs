@@ -58,7 +58,11 @@ import {
     CollapsibleContent
 } from "@/components/ui/collapsible"
 import { site } from "@/config/site"
-import { getSidebarData, type SeasonNavItem } from "@/app/dashboard/actions"
+import {
+    getSidebarData,
+    type SeasonNavItem,
+    type TournamentSidebarInfo
+} from "@/app/dashboard/actions"
 import {
     PHASE_CONFIG,
     SEASON_PHASES,
@@ -215,6 +219,26 @@ const adminDangerNavItems = [
         title: "Season Configuration",
         url: "/dashboard/season-config",
         icon: RiCalendarLine
+    },
+    {
+        title: "Tournament Control",
+        url: "/dashboard/tournament-control",
+        icon: RiSettings3Line
+    },
+    {
+        title: "Tournament Configuration",
+        url: "/dashboard/tournament-config",
+        icon: RiTrophyLine
+    },
+    {
+        title: "Tournament Pools",
+        url: "/dashboard/tournament-pools",
+        icon: RiTeamLine
+    },
+    {
+        title: "View Tournament Waitlist",
+        url: "/dashboard/view-tournament-waitlist",
+        icon: RiGroupLine
     },
     {
         title: "Manage Roles",
@@ -565,6 +589,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isRefCoordinator, setIsRefCoordinator] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
+    const [tournament, setTournament] = useState<TournamentSidebarInfo | null>(
+        null
+    )
 
     useEffect(() => {
         getSidebarData().then((data) => {
@@ -581,6 +608,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setIsRefCoordinator(data.isRefCoordinator)
             setSeasonNav(data.seasonNav)
             setPhase(data.phase)
+            setTournament(data.tournament)
         })
     }, [])
 
@@ -1010,6 +1038,80 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
+
+                {tournament && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Tournament
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={(() => {
+                                        const items: {
+                                            title: string
+                                            url: string
+                                            icon: typeof RiTrophyLine
+                                        }[] = []
+                                        if (tournament.canSignUp) {
+                                            items.push({
+                                                title: "Sign Up for Tournament",
+                                                url: "/dashboard/tournament-signup",
+                                                icon: RiTrophyLine
+                                            })
+                                        }
+                                        if (
+                                            tournament.canSignUp &&
+                                            !tournament.isRostered
+                                        ) {
+                                            items.push({
+                                                title: "Tournament Waitlist",
+                                                url: "/dashboard/tournament-waitlist",
+                                                icon: RiGroupLine
+                                            })
+                                        }
+                                        if (
+                                            tournament.isCaptain ||
+                                            tournament.isRostered
+                                        ) {
+                                            items.push({
+                                                title: "My Tournament Team",
+                                                url: "/dashboard/tournament-team",
+                                                icon: RiTeamLine
+                                            })
+                                        }
+                                        if (tournament.showPoolTools) {
+                                            items.push({
+                                                title: "Tournament Schedule",
+                                                url: "/dashboard/tournament-schedule",
+                                                icon: RiCalendarLine
+                                            })
+                                            items.push({
+                                                title: "Enter Tournament Scores",
+                                                url: "/dashboard/tournament-scores",
+                                                icon: RiEditLine
+                                            })
+                                        }
+                                        if (tournament.showBracketTools) {
+                                            items.push({
+                                                title: "Tournament Bracket",
+                                                url: "/dashboard/tournament-bracket",
+                                                icon: RiTrophyLine
+                                            })
+                                            items.push({
+                                                title: "Enter Tournament Scores",
+                                                url: "/dashboard/tournament-scores",
+                                                icon: RiEditLine
+                                            })
+                                        }
+                                        return items
+                                    })()}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
 
                 <SidebarGroup>
                     <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
