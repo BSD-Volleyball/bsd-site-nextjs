@@ -79,7 +79,7 @@ export function TournamentWaitlistTable({
                             key={w.waitlistId}
                             className="flex flex-wrap items-center gap-2 rounded border p-3 text-sm"
                         >
-                            <div className="min-w-[200px]">
+                            <div className="min-w-[220px]">
                                 <div className="font-medium">{w.name}</div>
                                 <div className="text-muted-foreground text-xs">
                                     {w.email} —{" "}
@@ -88,6 +88,20 @@ export function TournamentWaitlistTable({
                                         : w.male === false
                                           ? "Non-Male"
                                           : "—"}
+                                </div>
+                                <div className="mt-0.5 text-xs">
+                                    <span className="text-muted-foreground">
+                                        Prefers:
+                                    </span>{" "}
+                                    {w.preferredDivisionName ? (
+                                        <span className="font-medium">
+                                            {w.preferredDivisionName}
+                                        </span>
+                                    ) : (
+                                        <span className="text-muted-foreground italic">
+                                            no preference
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <select

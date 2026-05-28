@@ -1393,6 +1393,13 @@ export const tournamentWaitlist = pgTable(
             () => tournamentTeams.id,
             { onDelete: "set null" }
         ),
+        // Optional: player's preferred division (e.g. "A", "BB"). Null = no
+        // preference. Cascade to null if the division row goes away so we
+        // never end up with a dangling reference.
+        preferred_division_id: integer("preferred_division_id").references(
+            () => tournamentDivisions.id,
+            { onDelete: "set null" }
+        ),
         created_at: timestamp("created_at")
             .$defaultFn(() => new Date())
             .notNull()

@@ -104,6 +104,10 @@ export default async function TournamentWaitlistPage() {
                     <TournamentWaitlistButton
                         tournamentName={config.name}
                         waiver={waiver}
+                        divisions={config.divisions.map((d) => ({
+                            id: d.id,
+                            name: d.divisionName
+                        }))}
                     />
                 </>
             )}

@@ -176,6 +176,13 @@
       "when": 1779930500000,
       "tag": "0024_tournaments_additional_info",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1779930600000,
+      "tag": "0025_tournament_waitlist_preferred_division",
+      "breakpoints": true
     }
   ]
 }

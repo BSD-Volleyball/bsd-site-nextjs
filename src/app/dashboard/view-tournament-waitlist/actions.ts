@@ -32,6 +32,7 @@ export interface WaitlistEntry {
     name: string
     email: string
     male: boolean | null
+    preferredDivisionName: string | null
     createdAt: Date
 }
 
@@ -45,7 +46,12 @@ export interface PlacementTarget {
 }
 
 export const expressTournamentInterest = withAction(
-    async (waiverId: number, agreed: boolean): Promise<ActionResult<void>> => {
+    async (
+        waiverId: number,
+        agreed: boolean,
+        // 0 / null means "no preference"
+        preferredDivisionId: number | null
+    ): Promise<ActionResult<void>> => {
         const session = await requireSession()
         if (!agreed) return fail("You must agree to the waiver.")
 
@@ -65,9 +71,31 @@ export const expressTournamentInterest = withAction(
             return fail("You are already on a team in this tournament.")
         }
 
+        // Validate division (if supplied) belongs to this tournament.
+        let resolvedDivisionId: number | null = null
+        if (preferredDivisionId && preferredDivisionId > 0) {
+            const [div] = await db
+                .select({ id: tournamentDivisions.id })
+                .from(tournamentDivisions)
+                .where(
+                    and(
+                        eq(tournamentDivisions.id, preferredDivisionId),
+                        eq(
+                            tournamentDivisions.tournament_id,
+                            config.tournamentId
+                        )
+                    )
+                )
+                .limit(1)
+            if (!div) return fail("Invalid preferred division.")
+            resolvedDivisionId = div.id
+        }
+
         await recordWaiverAcceptance(session.user.id, active.id)
 
-        // Idempotent upsert: insert; if conflict on (tournament, user), no-op.
+        // Insert if new; otherwise update the preferred division (player may
+        // re-submit with a different preference). Preserve placed_team_id
+        // and approved if already set.
         const [existing] = await db
             .select({ id: tournamentWaitlist.id })
             .from(tournamentWaitlist)
@@ -82,8 +110,14 @@ export const expressTournamentInterest = withAction(
             await db.insert(tournamentWaitlist).values({
                 tournament_id: config.tournamentId,
                 user_id: session.user.id,
-                waiver_id: active.id
+                waiver_id: active.id,
+                preferred_division_id: resolvedDivisionId
             })
+        } else {
+            await db
+                .update(tournamentWaitlist)
+                .set({ preferred_division_id: resolvedDivisionId })
+                .where(eq(tournamentWaitlist.id, existing.id))
         }
         revalidatePath("/dashboard")
         return ok()
@@ -103,6 +137,8 @@ export const getTournamentWaitlist = withAction(
         const config = await getTournamentConfig()
         if (!config) return ok(null)
 
+        // Left-join the preferred division — null when the player didn't
+        // pick one (or the division was later deleted).
         const rows = await db
             .select({
                 waitlistId: tournamentWaitlist.id,
@@ -112,10 +148,22 @@ export const getTournamentWaitlist = withAction(
                 last_name: users.last_name,
                 preferred_name: users.preferred_name,
                 email: users.email,
-                male: users.male
+                male: users.male,
+                preferredDivisionName: divisions.name
             })
             .from(tournamentWaitlist)
             .innerJoin(users, eq(users.id, tournamentWaitlist.user_id))
+            .leftJoin(
+                tournamentDivisions,
+                eq(
+                    tournamentDivisions.id,
+                    tournamentWaitlist.preferred_division_id
+                )
+            )
+            .leftJoin(
+                divisions,
+                eq(divisions.id, tournamentDivisions.division_id)
+            )
             .where(
                 and(
                     eq(tournamentWaitlist.tournament_id, config.tournamentId),
@@ -132,6 +180,7 @@ export const getTournamentWaitlist = withAction(
             name: `${r.first_name}${r.preferred_name ? ` (${r.preferred_name})` : ""} ${r.last_name}`,
             email: r.email,
             male: r.male,
+            preferredDivisionName: r.preferredDivisionName,
             createdAt: r.createdAt
         }))
 
