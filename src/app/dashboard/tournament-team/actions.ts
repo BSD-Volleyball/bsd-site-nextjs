@@ -341,6 +341,13 @@ export const acceptTournamentWaiver = withAction(
             )
         }
         await recordWaiverAcceptance(session.user.id, active.id)
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "accept_tournament_waiver",
+            entityType: "waiver",
+            entityId: active.id,
+            summary: `Accepted tournament waiver (id ${active.id})`
+        })
         revalidatePath("/dashboard")
         return ok()
     }

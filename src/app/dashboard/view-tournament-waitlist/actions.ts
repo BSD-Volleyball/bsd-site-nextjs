@@ -119,6 +119,17 @@ export const expressTournamentInterest = withAction(
                 .set({ preferred_division_id: resolvedDivisionId })
                 .where(eq(tournamentWaitlist.id, existing.id))
         }
+        await logAuditEntry({
+            userId: session.user.id,
+            action: existing
+                ? "update_tournament_player_signup"
+                : "create_tournament_player_signup",
+            entityType: "tournament",
+            entityId: config.tournamentId,
+            summary: existing
+                ? `Updated player signup preferred division (${resolvedDivisionId ?? "no preference"})`
+                : `Signed up as a player for ${config.name} (preferred division: ${resolvedDivisionId ?? "none"}); accepted waiver`
+        })
         revalidatePath("/dashboard")
         return ok()
     }
