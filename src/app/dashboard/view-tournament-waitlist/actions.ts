@@ -10,7 +10,7 @@ import {
     tournamentWaitlist,
     users
 } from "@/database/schema"
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull } from "drizzle-orm"
 import {
     fail,
     ok,
@@ -116,7 +116,14 @@ export const getTournamentWaitlist = withAction(
             })
             .from(tournamentWaitlist)
             .innerJoin(users, eq(users.id, tournamentWaitlist.user_id))
-            .where(eq(tournamentWaitlist.tournament_id, config.tournamentId))
+            .where(
+                and(
+                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
+                    // Only show entries not yet placed on a team — placed
+                    // rows stay in the table as a waiver-acceptance record.
+                    isNull(tournamentWaitlist.placed_team_id)
+                )
+            )
             .orderBy(asc(tournamentWaitlist.created_at))
 
         const waitlist: WaitlistEntry[] = rows.map((r) => ({

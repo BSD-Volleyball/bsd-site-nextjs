@@ -44,17 +44,21 @@ export function TournamentWaitlistButton({ tournamentName, waiver }: Props) {
 
     return (
         <>
-            <Button variant="outline" onClick={() => setOpen(true)}>
-                Express Interest in {tournamentName}
+            <Button onClick={() => setOpen(true)}>
+                Join Waitlist &amp; Accept Waiver
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Join Tournament Waitlist</DialogTitle>
+                        <DialogTitle>
+                            Pre-Register for {tournamentName}
+                        </DialogTitle>
                     </DialogHeader>
                     <p className="text-muted-foreground text-sm">
-                        Captains will see your name when looking for players.
-                        You must accept the waiver to join the list.
+                        This adds you to the player list so captains looking for
+                        roster spots can pick you up, AND records that you've
+                        accepted the waiver — so you're cleared to play either
+                        way.
                     </p>
                     <WaiverContent content={waiver.content} />
                     <div className="flex items-start gap-2 pt-2">

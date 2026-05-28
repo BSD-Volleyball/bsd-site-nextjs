@@ -248,9 +248,11 @@ export const addPlayerToRoster = withAction(
             return fail("Could not add player.")
         }
 
-        // Drop any waitlist row for this player.
+        // If the player is on the waitlist, mark them as placed on this team.
+        // (We update rather than delete so the pre-acceptance record stays.)
         await db
-            .delete(tournamentWaitlist)
+            .update(tournamentWaitlist)
+            .set({ placed_team_id: team.id, approved: true })
             .where(
                 and(
                     eq(tournamentWaitlist.tournament_id, config.tournamentId),
@@ -297,6 +299,20 @@ export const removePlayerFromRoster = withAction(
                 )
             )
 
+        // If the removed player was previously placed on this team via the
+        // waitlist, mark them available again so a captain (or admin) can
+        // pick them up. Don't touch rows placed on a *different* team.
+        await db
+            .update(tournamentWaitlist)
+            .set({ placed_team_id: null })
+            .where(
+                and(
+                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
+                    eq(tournamentWaitlist.user_id, userId),
+                    eq(tournamentWaitlist.placed_team_id, team.id)
+                )
+            )
+
         await logAuditEntry({
             userId: session.user.id,
             action: "remove_tournament_roster",
@@ -306,6 +322,7 @@ export const removePlayerFromRoster = withAction(
         })
 
         revalidatePath("/dashboard/tournament-team")
+        revalidatePath("/dashboard")
         return ok()
     }
 )

@@ -264,9 +264,12 @@ export const submitTournamentSignup = withAction(
             }))
         )
 
-        // Drop any waitlist row for rostered users in this tournament.
+        // Mark any waitlist row for rostered users as placed on this team —
+        // we keep the row (it's the historical record of the player's
+        // pre-acceptance of the waiver) rather than delete it.
         await db
-            .delete(tournamentWaitlist)
+            .update(tournamentWaitlist)
+            .set({ placed_team_id: team.id, approved: true })
             .where(
                 and(
                     eq(tournamentWaitlist.tournament_id, config.tournamentId),

@@ -2,7 +2,11 @@ import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { auth } from "@/lib/auth"
+import { db } from "@/database/db"
+import { tournamentWaitlist } from "@/database/schema"
+import { and, eq } from "drizzle-orm"
 import { getActiveWaiver } from "@/lib/waivers"
 import {
     getTournamentConfig,
@@ -35,16 +39,60 @@ export default async function TournamentWaitlistPage() {
         )
     }
 
+    const [existing] = await db
+        .select({ id: tournamentWaitlist.id })
+        .from(tournamentWaitlist)
+        .where(
+            and(
+                eq(tournamentWaitlist.tournament_id, config.tournamentId),
+                eq(tournamentWaitlist.user_id, session.user.id)
+            )
+        )
+        .limit(1)
+    const alreadyOnList = !!existing
+
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Join the Tournament Waitlist"
-                description={`Express interest in playing in ${config.name}. A captain can pick you up to fill a roster.`}
+                title="Tournament Waitlist"
+                description={`Pre-register for ${config.name} — works two ways below.`}
             />
-            <TournamentWaitlistButton
-                tournamentName={config.name}
-                waiver={waiver}
-            />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base">Why use this?</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                    <p>
+                        <strong>If you don't have a team yet:</strong> join the
+                        list so captains can pick you up when they're filling
+                        rosters. They'll see your name and gender when they go
+                        to add players.
+                    </p>
+                    <p>
+                        <strong>If you know a captain plans to add you:</strong>{" "}
+                        pre-accept the waiver here. That way, when you're added
+                        to their roster, you're already cleared to play — no
+                        waiver pop-up to deal with on tournament day.
+                    </p>
+                </CardContent>
+            </Card>
+
+            {alreadyOnList ? (
+                <Card className="border-green-300 bg-green-50 dark:border-green-700 dark:bg-green-950">
+                    <CardContent className="pt-6 text-sm">
+                        You're already on the list for{" "}
+                        <strong>{config.name}</strong>. The waiver is accepted;
+                        we'll show your status on the dashboard once a captain
+                        picks you up.
+                    </CardContent>
+                </Card>
+            ) : (
+                <TournamentWaitlistButton
+                    tournamentName={config.name}
+                    waiver={waiver}
+                />
+            )}
         </div>
     )
 }
