@@ -919,6 +919,80 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarGroup>
                 )}
 
+                {tournament && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Tournament
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={(() => {
+                                        const items: {
+                                            title: string
+                                            url: string
+                                            icon: typeof RiTrophyLine
+                                        }[] = []
+                                        if (tournament.canSignUp) {
+                                            items.push({
+                                                title: "Sign Up for Tournament",
+                                                url: "/dashboard/tournament-signup",
+                                                icon: RiTrophyLine
+                                            })
+                                        }
+                                        if (
+                                            tournament.canSignUp &&
+                                            !tournament.isRostered
+                                        ) {
+                                            items.push({
+                                                title: "Tournament Waitlist",
+                                                url: "/dashboard/tournament-waitlist",
+                                                icon: RiGroupLine
+                                            })
+                                        }
+                                        if (
+                                            tournament.isCaptain ||
+                                            tournament.isRostered
+                                        ) {
+                                            items.push({
+                                                title: "My Tournament Team",
+                                                url: "/dashboard/tournament-team",
+                                                icon: RiTeamLine
+                                            })
+                                        }
+                                        if (tournament.showPoolTools) {
+                                            items.push({
+                                                title: "Tournament Schedule",
+                                                url: "/dashboard/tournament-schedule",
+                                                icon: RiCalendarLine
+                                            })
+                                            items.push({
+                                                title: "Enter Tournament Scores",
+                                                url: "/dashboard/tournament-scores",
+                                                icon: RiEditLine
+                                            })
+                                        }
+                                        if (tournament.showBracketTools) {
+                                            items.push({
+                                                title: "Tournament Bracket",
+                                                url: "/dashboard/tournament-bracket",
+                                                icon: RiTrophyLine
+                                            })
+                                            items.push({
+                                                title: "Enter Tournament Scores",
+                                                url: "/dashboard/tournament-scores",
+                                                icon: RiEditLine
+                                            })
+                                        }
+                                        return items
+                                    })()}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
                 {showCourtMgmt && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
@@ -1038,80 +1112,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
-
-                {tournament && (
-                    <SidebarGroup>
-                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Tournament
-                        </SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                <NavItems
-                                    items={(() => {
-                                        const items: {
-                                            title: string
-                                            url: string
-                                            icon: typeof RiTrophyLine
-                                        }[] = []
-                                        if (tournament.canSignUp) {
-                                            items.push({
-                                                title: "Sign Up for Tournament",
-                                                url: "/dashboard/tournament-signup",
-                                                icon: RiTrophyLine
-                                            })
-                                        }
-                                        if (
-                                            tournament.canSignUp &&
-                                            !tournament.isRostered
-                                        ) {
-                                            items.push({
-                                                title: "Tournament Waitlist",
-                                                url: "/dashboard/tournament-waitlist",
-                                                icon: RiGroupLine
-                                            })
-                                        }
-                                        if (
-                                            tournament.isCaptain ||
-                                            tournament.isRostered
-                                        ) {
-                                            items.push({
-                                                title: "My Tournament Team",
-                                                url: "/dashboard/tournament-team",
-                                                icon: RiTeamLine
-                                            })
-                                        }
-                                        if (tournament.showPoolTools) {
-                                            items.push({
-                                                title: "Tournament Schedule",
-                                                url: "/dashboard/tournament-schedule",
-                                                icon: RiCalendarLine
-                                            })
-                                            items.push({
-                                                title: "Enter Tournament Scores",
-                                                url: "/dashboard/tournament-scores",
-                                                icon: RiEditLine
-                                            })
-                                        }
-                                        if (tournament.showBracketTools) {
-                                            items.push({
-                                                title: "Tournament Bracket",
-                                                url: "/dashboard/tournament-bracket",
-                                                icon: RiTrophyLine
-                                            })
-                                            items.push({
-                                                title: "Enter Tournament Scores",
-                                                url: "/dashboard/tournament-scores",
-                                                icon: RiEditLine
-                                            })
-                                        }
-                                        return items
-                                    })()}
-                                    pathname={pathname}
-                                />
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                )}
 
                 <SidebarGroup>
                     <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
