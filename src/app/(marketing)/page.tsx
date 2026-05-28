@@ -89,13 +89,11 @@ export default async function Home() {
 
     return (
         <>
-            <HeroSection />
-
             {/* Active Tournament Callout — renders only when a non-complete
-                tournament exists. Sits between the hero and Quick Links so
-                it's the first thing visitors see after the hero. */}
+                tournament exists. Sits at the very top, immediately below
+                the marketing nav, so visitors see it before scrolling. */}
             {tournament && (
-                <section className="container mx-auto px-4 pt-4 pb-12">
+                <section className="container mx-auto px-4 pt-8 pb-4">
                     <Link
                         href={`/tournament/${tournament.code}`}
                         className="group block"
@@ -139,6 +137,8 @@ export default async function Home() {
                     </Link>
                 </section>
             )}
+
+            <HeroSection />
 
             {/* Quick Links Section */}
             <section className="container mx-auto px-4 pb-24">
