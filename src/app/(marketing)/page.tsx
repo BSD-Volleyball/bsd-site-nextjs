@@ -1,6 +1,7 @@
 import { HeroSection } from "@/components/layout/sections/hero"
 import { site } from "@/config/site"
 import { auth } from "@/lib/auth"
+import { getTournamentConfig } from "@/lib/tournament-config"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,17 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import { FileText, Users, Gavel, Shield } from "lucide-react"
+import { Calendar, FileText, Users, Gavel, Shield, Trophy } from "lucide-react"
+
+function fmtTournamentDate(iso: string): string {
+    const d = new Date(`${iso}T00:00:00`)
+    return d.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+    })
+}
 
 export const metadata = {
     title: site.name,
@@ -74,9 +85,60 @@ const quickLinks = [
 
 export default async function Home() {
     const session = await auth.api.getSession({ headers: await headers() })
+    const tournament = await getTournamentConfig()
+
     return (
         <>
             <HeroSection />
+
+            {/* Active Tournament Callout — renders only when a non-complete
+                tournament exists. Sits between the hero and Quick Links so
+                it's the first thing visitors see after the hero. */}
+            {tournament && (
+                <section className="container mx-auto px-4 pt-4 pb-12">
+                    <Link
+                        href={`/tournament/${tournament.code}`}
+                        className="group block"
+                    >
+                        <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-gradient-to-br from-primary/10 via-background to-primary/5 p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                                        <Trophy className="size-7" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-semibold text-primary text-sm uppercase tracking-wider">
+                                            Upcoming Tournament
+                                        </p>
+                                        <h3 className="font-bold text-2xl sm:text-3xl">
+                                            {tournament.name}
+                                        </h3>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-sm">
+                                            <span className="flex items-center gap-1.5">
+                                                <Calendar className="size-4" />
+                                                {fmtTournamentDate(
+                                                    tournament.tournamentDate
+                                                )}
+                                            </span>
+                                            {tournament.address && (
+                                                <span>
+                                                    {tournament.address}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <Button
+                                    size="lg"
+                                    className="shrink-0 group-hover:bg-primary/90"
+                                >
+                                    Tournament Details →
+                                </Button>
+                            </div>
+                        </div>
+                    </Link>
+                </section>
+            )}
 
             {/* Quick Links Section */}
             <section className="container mx-auto px-4 pb-24">
