@@ -9,6 +9,7 @@ import {
 } from "@/database/schema"
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 import {
+    getTournamentAvailability,
     getTournamentConfig,
     isRegistrationClosed
 } from "@/lib/tournament-config"
@@ -37,6 +38,10 @@ export interface TournamentDashboardCardData {
     tournamentDate: string
     phase: TournamentPhase
     registrationOpen: boolean
+    // True when every division has hit its team_count cap. When this is true
+    // the dashboard card hides the "Sign Up a Team" CTA even if registration
+    // is otherwise open.
+    allDivisionsFull: boolean
     showSchedule: boolean
     team: null | {
         teamId: number
@@ -62,6 +67,10 @@ export async function getTournamentDashboardCard(
         config.phase === "pool_play" || config.phase === "playoffs"
     const registrationOpen =
         config.phase === "registration_open" && !isRegistrationClosed(config)
+    const availability = registrationOpen
+        ? await getTournamentAvailability(config)
+        : null
+    const allDivisionsFull = availability?.allDivisionsFull ?? false
 
     // Waitlist row check — counts as "on waitlist" only when not yet placed.
     const [waitlistRow] = await db
@@ -122,6 +131,7 @@ export async function getTournamentDashboardCard(
         tournamentDate: config.tournamentDate,
         phase: config.phase,
         registrationOpen,
+        allDivisionsFull,
         showSchedule,
         team,
         onWaitlist

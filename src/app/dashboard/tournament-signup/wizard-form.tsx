@@ -24,7 +24,10 @@ import {
     type EligiblePlayer,
     type TournamentSignupFormData
 } from "./actions"
-import type { TournamentDivisionConfig } from "@/lib/tournament-config"
+import type {
+    DivisionAvailability,
+    TournamentDivisionConfig
+} from "@/lib/tournament-config"
 
 interface Props {
     tournament: {
@@ -33,6 +36,7 @@ interface Props {
         divisions: TournamentDivisionConfig[]
         cost: string
     }
+    divisionAvailability: DivisionAvailability[]
     currentUserId: string
     // Captain's gender from users.male. Null means unknown (profile incomplete);
     // we still let them proceed but warn — the server will reject if needed.
@@ -56,6 +60,7 @@ function resizeSlots(
 
 export function TournamentSignupWizard({
     tournament,
+    divisionAvailability,
     currentUserId,
     currentUserMale,
     eligiblePlayers,
@@ -69,8 +74,18 @@ export function TournamentSignupWizard({
         "info"
     )
     const [teamName, setTeamName] = useState("")
+    // Lookup for capacity by tournament_divisions.id
+    const availabilityById = useMemo(
+        () => new Map(divisionAvailability.map((d) => [d.divisionId, d])),
+        [divisionAvailability]
+    )
+    // Default preferred division to the first non-full one.
     const [preferredDivisionId, setPreferredDivisionId] = useState<number>(
-        tournament.divisions[0]?.id ?? 0
+        () =>
+            tournament.divisions.find((d) => !availabilityById.get(d.id)?.full)
+                ?.id ??
+            tournament.divisions[0]?.id ??
+            0
     )
 
     // One entry per cap slot. Captain occupies index 0 of their gender bucket
@@ -145,7 +160,10 @@ export function TournamentSignupWizard({
         return ids
     }
 
-    const infoComplete = teamName.trim().length > 0 && preferredDivisionId > 0
+    const preferredFull =
+        availabilityById.get(preferredDivisionId)?.full ?? false
+    const infoComplete =
+        teamName.trim().length > 0 && preferredDivisionId > 0 && !preferredFull
     const canProceedToPayment = infoComplete && waiverAgreed
 
     return (
@@ -195,12 +213,23 @@ export function TournamentSignupWizard({
                                     )
                                 }
                             >
-                                {tournament.divisions.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.divisionName} — up to {d.malePerTeam}
-                                        M / {d.nonMalePerTeam}NM
-                                    </option>
-                                ))}
+                                {tournament.divisions.map((d) => {
+                                    const a = availabilityById.get(d.id)
+                                    const full = a?.full ?? false
+                                    return (
+                                        <option
+                                            key={d.id}
+                                            value={d.id}
+                                            disabled={full}
+                                        >
+                                            {d.divisionName} — up to{" "}
+                                            {d.malePerTeam}M /{" "}
+                                            {d.nonMalePerTeam}NM
+                                            {a &&
+                                                ` (${a.teamCount}/${a.maxTeams} teams${full ? " — full" : ""})`}
+                                        </option>
+                                    )
+                                })}
                             </select>
                         </div>
                         <div className="flex justify-end">

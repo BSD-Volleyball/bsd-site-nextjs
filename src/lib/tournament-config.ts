@@ -6,10 +6,11 @@ import {
     tournaments,
     tournamentDivisions,
     tournamentRoster,
+    tournamentTeams,
     waiverAcceptances,
     waivers
 } from "@/database/schema"
-import { and, asc, desc, eq, ne } from "drizzle-orm"
+import { and, asc, count, desc, eq, ne } from "drizzle-orm"
 import {
     TOURNAMENT_PHASES,
     type TournamentPhase
@@ -172,6 +173,56 @@ export function isRegistrationClosed(config: TournamentConfig): boolean {
 export function isRosterLocked(config: TournamentConfig): boolean {
     if (!config.rosterLockDate) return false
     return isPastDateET(config.rosterLockDate)
+}
+
+export interface DivisionAvailability {
+    divisionId: number
+    divisionName: string
+    teamCount: number
+    maxTeams: number
+    full: boolean
+}
+
+export interface TournamentAvailability {
+    divisions: DivisionAvailability[]
+    allDivisionsFull: boolean
+}
+
+/**
+ * Per-division team counts vs cap, plus an aggregate "all full" flag.
+ * "Count" is the number of teams whose **preferred division** matches —
+ * during registration this is what consumes a slot. Admin reassignment
+ * during the prepare phase can change `division_id` but does not affect
+ * signup gating.
+ */
+export async function getTournamentAvailability(
+    config: TournamentConfig
+): Promise<TournamentAvailability> {
+    const counts = await db
+        .select({
+            divisionId: tournamentTeams.preferred_division_id,
+            n: count()
+        })
+        .from(tournamentTeams)
+        .where(eq(tournamentTeams.tournament_id, config.tournamentId))
+        .groupBy(tournamentTeams.preferred_division_id)
+    const countByDivision = new Map(counts.map((c) => [c.divisionId, c.n]))
+
+    const rows: DivisionAvailability[] = config.divisions.map((d) => {
+        const teamCount = countByDivision.get(d.id) ?? 0
+        return {
+            divisionId: d.id,
+            divisionName: d.divisionName,
+            teamCount,
+            maxTeams: d.teamCount,
+            full: teamCount >= d.teamCount
+        }
+    })
+
+    return {
+        divisions: rows,
+        allDivisionsFull: rows.length > 0 && rows.every((r) => r.full)
+    }
 }
 
 /**

@@ -8,6 +8,7 @@ import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { getActiveWaiver } from "@/lib/waivers"
 import {
+    getTournamentAvailability,
     getTournamentConfig,
     getCurrentTournamentCost,
     isRegistrationClosed,
@@ -39,6 +40,13 @@ export default async function TournamentSignupPage() {
     if (isRegistrationClosed(config)) redirect("/dashboard")
     if (await isUserOnTournamentRoster(config.tournamentId, session.user.id)) {
         redirect("/dashboard/tournament-team")
+    }
+
+    const availability = await getTournamentAvailability(config)
+    if (availability.allDivisionsFull) {
+        // Every division is at capacity — no team can sign up. The
+        // dashboard card surfaces the waitlist instead.
+        redirect("/dashboard")
     }
 
     const activeWaiver = await getActiveWaiver()
@@ -78,6 +86,7 @@ export default async function TournamentSignupPage() {
                     divisions: config.divisions,
                     cost: currentCost
                 }}
+                divisionAvailability={availability.divisions}
                 currentUserId={session.user.id}
                 currentUserMale={currentUserMale}
                 eligiblePlayers={eligible}

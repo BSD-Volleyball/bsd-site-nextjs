@@ -113,13 +113,13 @@ export function TournamentDashboardCard({ data }: Props) {
                         Captains looking for players will see your name. We'll
                         update this card once you're picked up.
                     </p>
-                    {data.registrationOpen && (
+                    {data.registrationOpen && !data.allDivisionsFull && (
                         <p className="text-muted-foreground text-xs">
                             Changed your mind and want to captain a team
                             instead? Sign up below.
                         </p>
                     )}
-                    {data.registrationOpen && (
+                    {data.registrationOpen && !data.allDivisionsFull && (
                         <Link href="/dashboard/tournament-signup">
                             <Button variant="outline" size="sm">
                                 Sign Up a Team
@@ -144,29 +144,53 @@ export function TournamentDashboardCard({ data }: Props) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                    <p>Registration is open. Pick the path that fits you:</p>
-                    <ul className="ml-4 list-disc space-y-1 text-muted-foreground text-xs">
-                        <li>
-                            <strong>Sign up a team</strong> if you're a captain
-                            ready to register and pay the team fee.
-                        </li>
-                        <li>
-                            <strong>Join as an individual</strong> if you don't
-                            have a team yet, OR if you already know a captain
-                            plans to add you — either way it pre- accepts the
-                            waiver so you're cleared to play.
-                        </li>
-                    </ul>
-                    <div className="flex flex-wrap gap-2">
-                        <Link href="/dashboard/tournament-signup">
-                            <Button size="sm">Sign Up a Team</Button>
-                        </Link>
-                        <Link href="/dashboard/tournament-waitlist">
-                            <Button variant="outline" size="sm">
-                                Join as an Individual
-                            </Button>
-                        </Link>
-                    </div>
+                    {data.allDivisionsFull ? (
+                        <>
+                            <p>
+                                Every division is full — no more teams can
+                                register. You can still join as an individual so
+                                a captain can add you if a spot opens up.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <Link href="/dashboard/tournament-waitlist">
+                                    <Button size="sm">
+                                        Join as an Individual
+                                    </Button>
+                                </Link>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <p>
+                                Registration is open. Pick the path that fits
+                                you:
+                            </p>
+                            <ul className="ml-4 list-disc space-y-1 text-muted-foreground text-xs">
+                                <li>
+                                    <strong>Sign up a team</strong> if you're a
+                                    captain ready to register and pay the team
+                                    fee.
+                                </li>
+                                <li>
+                                    <strong>Join as an individual</strong> if
+                                    you don't have a team yet, OR if you already
+                                    know a captain plans to add you — either way
+                                    it pre-accepts the waiver so you're cleared
+                                    to play.
+                                </li>
+                            </ul>
+                            <div className="flex flex-wrap gap-2">
+                                <Link href="/dashboard/tournament-signup">
+                                    <Button size="sm">Sign Up a Team</Button>
+                                </Link>
+                                <Link href="/dashboard/tournament-waitlist">
+                                    <Button variant="outline" size="sm">
+                                        Join as an Individual
+                                    </Button>
+                                </Link>
+                            </div>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         )

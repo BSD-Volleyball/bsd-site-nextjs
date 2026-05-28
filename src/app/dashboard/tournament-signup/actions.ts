@@ -20,6 +20,7 @@ import {
     type ActionResult
 } from "@/lib/action-helpers"
 import {
+    getTournamentAvailability,
     getTournamentConfig,
     getCurrentTournamentCost,
     isRegistrationClosed,
@@ -213,6 +214,28 @@ export const submitTournamentSignup = withAction(
             formData.rosterUserIds
         )
         if (!validation.ok) return fail(validation.message)
+
+        // Final capacity check right before payment — guards against the race
+        // where another captain claims the last spot while this user has the
+        // signup page loaded. Mirrors validateFinalSignupAvailability on the
+        // season side.
+        const availability = await getTournamentAvailability(config)
+        const target = availability.divisions.find(
+            (d) => d.divisionId === formData.preferredDivisionId
+        )
+        if (!target) {
+            return fail("Preferred division not found.")
+        }
+        if (target.full) {
+            return fail(
+                `${target.divisionName} just filled up. Please reload and pick a different division.`
+            )
+        }
+        if (availability.allDivisionsFull) {
+            return fail(
+                "All divisions are now full. Please join the waitlist instead."
+            )
+        }
 
         const amount = getCurrentTournamentCost(config)
         const amountCents = BigInt(Math.round(parseFloat(amount) * 100))

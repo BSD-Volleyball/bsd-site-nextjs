@@ -333,9 +333,11 @@ export async function getSidebarData(): Promise<SidebarData> {
 async function getTournamentSidebarInfo(
     userId: string
 ): Promise<TournamentSidebarInfo | null> {
-    const { getTournamentConfig, isRegistrationClosed } = await import(
-        "@/lib/tournament-config"
-    )
+    const {
+        getTournamentAvailability,
+        getTournamentConfig,
+        isRegistrationClosed
+    } = await import("@/lib/tournament-config")
     const { TOURNAMENT_PHASE_CONFIG } = await import("@/lib/tournament-phases")
     const { tournamentRoster, tournamentTeams } = await import(
         "@/database/schema"
@@ -370,10 +372,12 @@ async function getTournamentSidebarInfo(
         TOURNAMENT_PHASE_CONFIG[
             config.phase as keyof typeof TOURNAMENT_PHASE_CONFIG
         ]
-    const canSignUp =
-        phaseCfg?.showRegistration === true &&
-        !isRegistrationClosed(config) &&
-        !isRostered
+    const registrationOpen =
+        phaseCfg?.showRegistration === true && !isRegistrationClosed(config)
+    const allDivisionsFull = registrationOpen
+        ? (await getTournamentAvailability(config)).allDivisionsFull
+        : false
+    const canSignUp = registrationOpen && !isRostered && !allDivisionsFull
 
     return {
         tournamentId: config.tournamentId,
