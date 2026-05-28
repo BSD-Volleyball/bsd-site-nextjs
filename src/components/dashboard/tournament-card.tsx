@@ -17,6 +17,40 @@ function fmtTime(t: string | null): string {
     return `${h12}:${m} ${period}`
 }
 
+function fmtDate(iso: string): string {
+    const d = new Date(`${iso}T00:00:00`)
+    return d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+    })
+}
+
+// Tournament type + date + info link rendered under the card title.
+// Shown in every state of the card so users always know what tournament
+// the card refers to and can jump to the full info page.
+function TournamentMeta({ data }: { data: TournamentDashboardCardData }) {
+    const typeLabel =
+        data.tournamentType === "coed"
+            ? "Coed Tournament"
+            : "Reverse Coed Tournament"
+    return (
+        <div className="space-y-0.5 pt-0.5 text-xs">
+            <p className="text-muted-foreground">
+                <span className="font-medium">{typeLabel}</span> ·{" "}
+                {fmtDate(data.tournamentDate)}
+            </p>
+            <Link
+                href={`/tournament/${data.tournamentCode}`}
+                className="text-primary hover:underline"
+            >
+                More details →
+            </Link>
+        </div>
+    )
+}
+
 export function TournamentDashboardCard({ data }: Props) {
     // On a team — show team + (if schedule available) next match + next work.
     if (data.team) {
@@ -29,6 +63,7 @@ export function TournamentDashboardCard({ data }: Props) {
                             {data.tournamentName}
                         </CardTitle>
                     </div>
+                    <TournamentMeta data={data} />
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                     <p>
@@ -106,6 +141,7 @@ export function TournamentDashboardCard({ data }: Props) {
                             {data.tournamentName}
                         </CardTitle>
                     </div>
+                    <TournamentMeta data={data} />
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                     <p className="font-medium">
@@ -146,6 +182,7 @@ export function TournamentDashboardCard({ data }: Props) {
                             {data.tournamentName}
                         </CardTitle>
                     </div>
+                    <TournamentMeta data={data} />
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                     {data.allDivisionsFull ? (

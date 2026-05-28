@@ -35,7 +35,9 @@ export interface NextWorkInfo {
 export interface TournamentDashboardCardData {
     tournamentId: number
     tournamentName: string
+    tournamentCode: string
     tournamentDate: string
+    tournamentType: "coed" | "reverse_coed"
     phase: TournamentPhase
     registrationOpen: boolean
     // True when every division has hit its team_count cap. When this is true
@@ -128,7 +130,9 @@ export async function getTournamentDashboardCard(
     return {
         tournamentId: config.tournamentId,
         tournamentName: config.name,
+        tournamentCode: config.code,
         tournamentDate: config.tournamentDate,
+        tournamentType: config.tournamentType,
         phase: config.phase,
         registrationOpen,
         allDivisionsFull,
