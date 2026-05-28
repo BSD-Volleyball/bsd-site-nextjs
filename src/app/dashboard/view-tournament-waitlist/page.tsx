@@ -8,7 +8,7 @@ import { getTournamentWaitlist } from "./actions"
 import { TournamentWaitlistTable } from "./waitlist-table"
 
 export const metadata: Metadata = {
-    title: "Tournament Waitlist"
+    title: "Place Tournament Players"
 }
 
 export default async function ViewTournamentWaitlistPage() {
@@ -23,8 +23,8 @@ export default async function ViewTournamentWaitlistPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Tournament Waitlist"
-                description="Place players who expressed interest onto teams with capacity."
+                title="Place Tournament Players"
+                description="Players who've signed up looking for a team. Place them onto rosters that still have capacity."
             />
             {!data ? (
                 <p className="text-muted-foreground">No active tournament.</p>

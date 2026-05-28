@@ -51,7 +51,7 @@ export function TournamentWaitlistTable({
                 </CardHeader>
                 <CardContent>
                     <p className="text-muted-foreground">
-                        No one on the waitlist yet.
+                        No players are looking for a team yet.
                     </p>
                 </CardContent>
             </Card>
@@ -61,7 +61,9 @@ export function TournamentWaitlistTable({
     return (
         <Card>
             <CardHeader>
-                <CardTitle>{tournamentName} — Waitlist</CardTitle>
+                <CardTitle>
+                    {tournamentName} — Players Looking for a Team
+                </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
                 {waitlist.map((w) => {

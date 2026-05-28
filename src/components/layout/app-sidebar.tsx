@@ -206,6 +206,16 @@ const adminNavItems = [
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
+    },
+    {
+        title: "Tournament Pools",
+        url: "/dashboard/tournament-pools",
+        icon: RiTeamLine
+    },
+    {
+        title: "Place Tournament Players",
+        url: "/dashboard/view-tournament-waitlist",
+        icon: RiGroupLine
     }
 ]
 
@@ -229,16 +239,6 @@ const adminDangerNavItems = [
         title: "Tournament Configuration",
         url: "/dashboard/tournament-config",
         icon: RiTrophyLine
-    },
-    {
-        title: "Tournament Pools",
-        url: "/dashboard/tournament-pools",
-        icon: RiTeamLine
-    },
-    {
-        title: "View Tournament Waitlist",
-        url: "/dashboard/view-tournament-waitlist",
-        icon: RiGroupLine
     },
     {
         title: "Manage Roles",
