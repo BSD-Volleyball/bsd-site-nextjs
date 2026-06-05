@@ -19,7 +19,18 @@ import {
     userUnavailability,
     playoffMatchesMeta
 } from "@/database/schema"
-import { eq, and, lt, desc, inArray, asc, or, isNull, gte } from "drizzle-orm"
+import {
+    eq,
+    and,
+    lt,
+    lte,
+    desc,
+    inArray,
+    asc,
+    or,
+    isNull,
+    gte
+} from "drizzle-orm"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import {
     parseSourceToken,
@@ -125,6 +136,9 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
             return []
         }
 
+        // Once the current season is marked Complete, treat it as historical
+        // so it shows up in this list alongside prior seasons.
+        const includeCurrent = config.phase === "complete"
         const recentSeasons = await db
             .select({
                 id: seasons.id,
@@ -132,7 +146,11 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
                 season: seasons.season
             })
             .from(seasons)
-            .where(lt(seasons.id, config.seasonId))
+            .where(
+                includeCurrent
+                    ? lte(seasons.id, config.seasonId)
+                    : lt(seasons.id, config.seasonId)
+            )
             .orderBy(desc(seasons.id))
             .limit(3)
 

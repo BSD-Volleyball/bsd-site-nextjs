@@ -82,8 +82,24 @@ export async function advanceSeasonPhase(
                       .from(teams)
                       .where(inArray(teams.id, teamIds))
                 : []
+            // teams.picture_url is an R2 object key (e.g.
+            // "teamphotos/123/team45.jpg"). The Hall of Champions renders
+            // champions.picture as an <img src> directly, so we need to
+            // store an absolute URL — matching the historical convention
+            // populated by scripts/import-hoc-champions.ts.
+            const picBase = (process.env.PLAYER_PIC_URL ?? "").replace(
+                /\/+$/,
+                ""
+            )
             const pictureByTeam = new Map(
-                teamRows.map((t) => [t.id, t.pictureUrl ?? null])
+                teamRows.map((t) => {
+                    if (!t.pictureUrl) return [t.id, null] as const
+                    const key = t.pictureUrl.replace(/^\/+/, "")
+                    return [
+                        t.id,
+                        picBase ? `${picBase}/${key}` : `/${key}`
+                    ] as const
+                })
             )
 
             for (const champ of champs) {
