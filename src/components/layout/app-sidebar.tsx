@@ -628,9 +628,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const showWeek1 = inRange("select_captains", "draft")
     const showWeek2 = inRange("select_captains", "draft")
     const showWeek3 = inRange("select_captains", "draft")
-    const showCurrentRosters = inRange("draft", "complete")
-    const showSchedule = inRange("draft", "complete")
-    const showPlayoffsLink = inRange("playoffs", "complete")
+    const showCurrentRosters = inRange("draft", "playoffs")
+    const showSchedule = inRange("draft", "playoffs")
+    const showPlayoffsLink = phase === "playoffs"
     const showWeek2Homework = phase === "prep_tryout_week_3"
     const showDraftItems = inRange("prep_tryout_week_2", "draft")
     const showPictures =
@@ -645,10 +645,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     // Reffing section — visible to refs during regular_season and playoffs
     const showReffingSection =
-        isReferee && inRange("regular_season", "complete")
-    // Manage Refs section — visible to ref coordinators and admins during draft through complete
+        isReferee && inRange("regular_season", "playoffs")
+    // Manage Refs section — visible to ref coordinators and admins during draft through playoffs
     const showManageRefsSection =
-        (isRefCoordinator || isAdmin) && inRange("draft", "complete")
+        (isRefCoordinator || isAdmin) && inRange("draft", "playoffs")
 
     // Captain pages — per-item filtering
     // Rate Player stays useful from tryouts through playoffs (includes

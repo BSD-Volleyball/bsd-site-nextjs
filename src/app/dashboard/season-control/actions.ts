@@ -2,8 +2,14 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
-import { divisions, matches, seasons } from "@/database/schema"
-import { and, asc, eq, desc, isNull, or } from "drizzle-orm"
+import {
+    champions,
+    divisions,
+    matches,
+    seasons,
+    teams
+} from "@/database/schema"
+import { and, asc, eq, desc, inArray, isNull, or } from "drizzle-orm"
 import { isAdminOrDirectorBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -13,6 +19,7 @@ import {
     isValidPhaseRevert
 } from "@/lib/season-phases"
 import { cleanupSeasonRecipientGroups } from "@/lib/email-recipients"
+import { getDivisionChampions } from "@/lib/playoff-champions"
 import { seedPlayoffs } from "./seed-playoffs"
 
 export async function advanceSeasonPhase(
@@ -48,6 +55,72 @@ export async function advanceSeasonPhase(
         }
 
         let seedingSummary: string | null = null
+        let championsSummary: string | null = null
+
+        if (targetPhase === "complete") {
+            const champs = await getDivisionChampions(seasonId)
+            const missing = champs.filter((c) => c.teamId === null)
+            if (missing.length > 0) {
+                return {
+                    status: false,
+                    message: `Cannot advance to Complete: no champion determined for ${missing
+                        .map((m) => m.divisionName)
+                        .join(", ")}. Finish the playoff bracket(s) first.`
+                }
+            }
+
+            const teamIds = champs
+                .map((c) => c.teamId)
+                .filter((id): id is number => id !== null)
+
+            const teamRows = teamIds.length
+                ? await db
+                      .select({
+                          id: teams.id,
+                          pictureUrl: teams.picture_url
+                      })
+                      .from(teams)
+                      .where(inArray(teams.id, teamIds))
+                : []
+            const pictureByTeam = new Map(
+                teamRows.map((t) => [t.id, t.pictureUrl ?? null])
+            )
+
+            for (const champ of champs) {
+                if (champ.teamId === null) continue
+                const picture = pictureByTeam.get(champ.teamId) ?? null
+
+                const [existing] = await db
+                    .select({ id: champions.id })
+                    .from(champions)
+                    .where(
+                        and(
+                            eq(champions.season, seasonId),
+                            eq(champions.division, champ.divisionId)
+                        )
+                    )
+                    .limit(1)
+
+                if (existing) {
+                    // Full upsert per user spec: overwrite team and refresh
+                    // picture from teams.picture_url. picture2/caption are
+                    // left in place so admin-curated extras survive re-runs.
+                    await db
+                        .update(champions)
+                        .set({ team: champ.teamId, picture })
+                        .where(eq(champions.id, existing.id))
+                } else {
+                    await db.insert(champions).values({
+                        season: seasonId,
+                        division: champ.divisionId,
+                        team: champ.teamId,
+                        picture
+                    })
+                }
+            }
+
+            championsSummary = ` Recorded champions for ${champs.length} division${champs.length === 1 ? "" : "s"}.`
+        }
 
         if (targetPhase === "playoffs") {
             const incomplete = await db
@@ -108,7 +181,7 @@ export async function advanceSeasonPhase(
             action: "advance_season_phase",
             entityType: "season",
             entityId: seasonId,
-            summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}`
+            summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}${championsSummary ?? ""}`
         })
 
         // When season completes, clean up granular recipient groups (fire-and-forget)
@@ -125,7 +198,7 @@ export async function advanceSeasonPhase(
         revalidatePath("/dashboard/season-control")
         return {
             status: true,
-            message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}`
+            message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}`
         }
     } catch (error) {
         console.error("Failed to advance season phase:", error)
