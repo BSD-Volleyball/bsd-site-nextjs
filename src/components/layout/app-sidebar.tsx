@@ -719,8 +719,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         navItems = [navItems[0], signupNavItem, ...navItems.slice(1)]
     }
 
-    // Insert My Availability after Dashboard (and signup, if present) for players signed up this season
-    if (hasCurrentSeasonSignup) {
+    // Insert My Availability after Dashboard (and signup, if present) for players signed up this season.
+    // Once the season is complete, availability no longer applies — hide it.
+    const showMyAvailability = hasCurrentSeasonSignup && phase !== "complete"
+    if (showMyAvailability) {
         const dashboardIdx = navItems.findIndex((i) => i.url === "/dashboard")
         navItems = [
             ...navItems.slice(0, dashboardIdx + 1),
@@ -740,10 +742,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             items: alwaysHiddenAdminItems
         })
 
-        // My Availability — hidden when user has no current-season signup
-        if (!hasCurrentSeasonSignup) {
+        // My Availability — hidden when user has no current-season signup,
+        // or when the season is complete (availability is no longer relevant).
+        if (!showMyAvailability) {
             hiddenGroups.push({
-                label: "My Availability (no signup)",
+                label: hasCurrentSeasonSignup
+                    ? "My Availability (season complete)"
+                    : "My Availability (no signup)",
                 items: [myAvailabilityNavItem]
             })
         }
