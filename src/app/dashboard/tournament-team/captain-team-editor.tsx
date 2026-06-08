@@ -11,6 +11,7 @@ import {
     addPlayerToRoster,
     removePlayerFromRoster,
     updatePreferredDivision,
+    updateTeamName,
     type CaptainTeamView
 } from "./actions"
 
@@ -25,12 +26,32 @@ export function CaptainTeamEditor({ view }: Props) {
         view.team.preferredDivisionId
     )
     const [search, setSearch] = useState("")
+    const [teamName, setTeamName] = useState(view.team.name)
 
     const locked = view.rosterLocked
     const males = view.roster.filter((r) => r.male === true).length
     const nonMales = view.roster.filter((r) => r.male === false).length
     const currentDivision =
         view.divisions.find((d) => d.id === division) ?? view.divisions[0]
+
+    async function handleTeamNameSave() {
+        const trimmed = teamName.trim()
+        if (!trimmed) {
+            toast.error("Team name is required.")
+            return
+        }
+        if (trimmed === view.team.name) return
+        setBusy(true)
+        const result = await updateTeamName(trimmed)
+        setBusy(false)
+        if (!result.status) {
+            toast.error(result.message)
+            setTeamName(view.team.name)
+            return
+        }
+        toast.success("Team name updated.")
+        router.refresh()
+    }
 
     async function handleDivisionChange(newId: number) {
         setDivision(newId)
@@ -70,8 +91,39 @@ export function CaptainTeamEditor({ view }: Props) {
         router.refresh()
     }
 
+    const nameDirty = teamName.trim() !== view.team.name
+
     return (
         <div className="space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Team Name</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                    <Label htmlFor="team-name">Name</Label>
+                    <div className="flex gap-2">
+                        <Input
+                            id="team-name"
+                            value={teamName}
+                            disabled={locked || busy}
+                            maxLength={80}
+                            onChange={(e) => setTeamName(e.target.value)}
+                        />
+                        <Button
+                            disabled={
+                                locked ||
+                                busy ||
+                                !nameDirty ||
+                                teamName.trim().length === 0
+                            }
+                            onClick={handleTeamNameSave}
+                        >
+                            Save
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card>
                 <CardHeader>
                     <CardTitle>Preferred Division</CardTitle>

@@ -167,6 +167,44 @@ export const getCaptainTeamView = withAction(
     }
 )
 
+export const updateTeamName = withAction(
+    async (rawName: string): Promise<ActionResult<void>> => {
+        const session = await requireSession()
+        const config = await getTournamentConfig()
+        if (!config) return fail("No active tournament.")
+        if (isRosterLocked(config)) return fail("Roster is locked.")
+
+        const name = rawName.trim()
+        if (!name) return fail("Team name is required.")
+        if (name.length > 80) return fail("Team name is too long.")
+
+        const team = await loadTeamForCaptain(
+            config.tournamentId,
+            session.user.id
+        )
+        if (!team) return fail("Team not found.")
+
+        if (team.name === name) return ok()
+
+        await db
+            .update(tournamentTeams)
+            .set({ name })
+            .where(eq(tournamentTeams.id, team.id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update_tournament_team_name",
+            entityType: "tournament_team",
+            entityId: team.id,
+            summary: `Captain renamed team from "${team.name}" to "${name}"`
+        })
+
+        revalidatePath("/dashboard/tournament-team")
+        revalidatePath("/dashboard")
+        return ok()
+    }
+)
+
 export const updatePreferredDivision = withAction(
     async (divisionId: number): Promise<ActionResult<void>> => {
         const session = await requireSession()
