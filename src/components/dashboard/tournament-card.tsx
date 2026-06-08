@@ -68,8 +68,36 @@ export function TournamentDashboardCard({ data }: Props) {
                 <CardContent className="space-y-3 text-sm">
                     <p>
                         You're on team <strong>{data.team.teamName}</strong>
-                        {data.team.isCaptain && " (captain)"}.
+                        {data.team.isCaptain && " (captain)"}
+                        {data.team.divisionName && (
+                            <>
+                                {" "}
+                                in division{" "}
+                                <strong>{data.team.divisionName}</strong>
+                            </>
+                        )}
+                        .
                     </p>
+
+                    {data.team.roster.length > 0 && (
+                        <div className="rounded-md border border-indigo-300 bg-white p-2 dark:border-indigo-700 dark:bg-indigo-900/40">
+                            <p className="font-medium text-indigo-700 text-xs uppercase tracking-wide dark:text-indigo-300">
+                                Roster
+                            </p>
+                            <ul className="mt-1 space-y-0.5">
+                                {data.team.roster.map((p) => (
+                                    <li key={p.userId} className="text-sm">
+                                        {p.name}
+                                        {p.isCaptain && (
+                                            <span className="ml-2 rounded bg-indigo-200 px-1.5 py-0.5 font-medium text-indigo-800 text-xs dark:bg-indigo-800 dark:text-indigo-100">
+                                                Captain
+                                            </span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     {data.showSchedule && data.team.nextMatch && (
                         <div className="rounded-md border border-indigo-300 bg-white p-2 dark:border-indigo-700 dark:bg-indigo-900/40">

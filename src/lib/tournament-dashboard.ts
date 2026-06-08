@@ -2,12 +2,16 @@ import "server-only"
 
 import { db } from "@/database/db"
 import {
+    divisions,
+    tournamentDivisions,
     tournamentMatches,
     tournamentRoster,
     tournamentTeams,
-    tournamentWaitlist
+    tournamentWaitlist,
+    users
 } from "@/database/schema"
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
+import { formatPlayerName } from "@/lib/utils"
 import {
     getTournamentAvailability,
     getTournamentConfig,
@@ -49,6 +53,8 @@ export interface TournamentDashboardCardData {
         teamId: number
         teamName: string
         isCaptain: boolean
+        divisionName: string | null
+        roster: { userId: string; name: string; isCaptain: boolean }[]
         nextMatch: NextMatchInfo | null
         nextWork: NextWorkInfo | null
     }
@@ -105,7 +111,9 @@ export async function getTournamentDashboardCard(
             .select({
                 id: tournamentTeams.id,
                 name: tournamentTeams.name,
-                captainId: tournamentTeams.captain_user_id
+                captainId: tournamentTeams.captain_user_id,
+                divisionId: tournamentTeams.division_id,
+                preferredDivisionId: tournamentTeams.preferred_division_id
             })
             .from(tournamentTeams)
             .where(eq(tournamentTeams.id, rosterRow.teamId))
@@ -117,10 +125,54 @@ export async function getTournamentDashboardCard(
             const nextWork = showSchedule
                 ? await loadNextWork(config.tournamentId, teamRow.id)
                 : null
+            // Final (admin-assigned) division wins; preferred is the fallback
+            // pre-prepare, matching the Tournament Overview admin page.
+            const effectiveDivisionId =
+                teamRow.divisionId ?? teamRow.preferredDivisionId
+            const [divRow] = await db
+                .select({ name: divisions.name })
+                .from(tournamentDivisions)
+                .innerJoin(
+                    divisions,
+                    eq(divisions.id, tournamentDivisions.division_id)
+                )
+                .where(eq(tournamentDivisions.id, effectiveDivisionId))
+                .limit(1)
+
+            const rosterRows = await db
+                .select({
+                    userId: tournamentRoster.user_id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name
+                })
+                .from(tournamentRoster)
+                .innerJoin(users, eq(users.id, tournamentRoster.user_id))
+                .where(eq(tournamentRoster.team_id, teamRow.id))
+                .orderBy(asc(users.last_name), asc(users.first_name))
+
+            const roster = rosterRows
+                .map((r) => ({
+                    userId: r.userId,
+                    name: formatPlayerName(
+                        r.firstName,
+                        r.lastName,
+                        r.preferredName
+                    ),
+                    isCaptain: r.userId === teamRow.captainId
+                }))
+                .sort((a, b) => {
+                    if (a.isCaptain && !b.isCaptain) return -1
+                    if (!a.isCaptain && b.isCaptain) return 1
+                    return a.name.localeCompare(b.name)
+                })
+
             team = {
                 teamId: teamRow.id,
                 teamName: teamRow.name,
                 isCaptain: teamRow.captainId === userId,
+                divisionName: divRow?.name ?? null,
+                roster,
                 nextMatch,
                 nextWork
             }
