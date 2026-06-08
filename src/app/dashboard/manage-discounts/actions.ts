@@ -9,6 +9,8 @@ import { eq, desc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 
+export type DiscountScope = "season" | "tournament"
+
 export interface DiscountEntry {
     id: number
     userId: string
@@ -17,6 +19,7 @@ export interface DiscountEntry {
     expiration: Date | null
     reason: string | null
     used: boolean
+    scope: DiscountScope
     createdAt: Date
 }
 
@@ -46,6 +49,7 @@ export async function getDiscounts(): Promise<{
                 expiration: discounts.expiration,
                 reason: discounts.reason,
                 used: discounts.used,
+                scope: discounts.scope,
                 createdAt: discounts.created_at
             })
             .from(discounts)
@@ -54,6 +58,8 @@ export async function getDiscounts(): Promise<{
 
         const entries: DiscountEntry[] = rows.map((row) => {
             const preferred = row.preferredName ? ` (${row.preferredName})` : ""
+            const scope: DiscountScope =
+                row.scope === "tournament" ? "tournament" : "season"
             return {
                 id: row.id,
                 userId: row.userId,
@@ -62,6 +68,7 @@ export async function getDiscounts(): Promise<{
                 expiration: row.expiration,
                 reason: row.reason,
                 used: row.used,
+                scope,
                 createdAt: row.createdAt
             }
         })
@@ -107,6 +114,7 @@ export async function createDiscount(data: {
     percentage: string
     expiration: string | null
     reason: string | null
+    scope: DiscountScope
 }): Promise<{ status: boolean; message: string }> {
     const hasAccess = await checkAdminAccess()
     if (!hasAccess) {
@@ -126,12 +134,17 @@ export async function createDiscount(data: {
             }
         }
 
+        if (data.scope !== "season" && data.scope !== "tournament") {
+            return { status: false, message: "Invalid discount scope." }
+        }
+
         await db.insert(discounts).values({
             user: data.userId,
             percentage: data.percentage,
             expiration: data.expiration ? new Date(data.expiration) : null,
             reason: data.reason || null,
             used: false,
+            scope: data.scope,
             created_at: new Date()
         })
 
@@ -141,7 +154,7 @@ export async function createDiscount(data: {
                 userId: session.user.id,
                 action: "create",
                 entityType: "discounts",
-                summary: `Created ${data.percentage}% discount for user ${data.userId}${data.reason ? ` (reason: ${data.reason})` : ""}`
+                summary: `Created ${data.percentage}% ${data.scope} discount for user ${data.userId}${data.reason ? ` (reason: ${data.reason})` : ""}`
             })
         }
 

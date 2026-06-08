@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
     addPlayerToRoster,
@@ -23,6 +24,7 @@ export function CaptainTeamEditor({ view }: Props) {
     const [division, setDivision] = useState<number>(
         view.team.preferredDivisionId
     )
+    const [search, setSearch] = useState("")
 
     const locked = view.rosterLocked
     const males = view.roster.filter((r) => r.male === true).length
@@ -155,35 +157,55 @@ export function CaptainTeamEditor({ view }: Props) {
                     <CardHeader>
                         <CardTitle>Add Players</CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-2">
+                        <Input
+                            placeholder="Search players..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
                         <div className="max-h-72 space-y-1 overflow-y-auto">
-                            {view.eligibleToAdd.map((u) => (
-                                <div
-                                    key={u.id}
-                                    className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50"
-                                >
-                                    <span>
-                                        {u.name}
-                                        <span className="ml-2 text-muted-foreground">
-                                            (
-                                            {u.male === true
-                                                ? "M"
-                                                : u.male === false
-                                                  ? "NM"
-                                                  : "—"}
-                                            )
-                                        </span>
-                                    </span>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        disabled={busy}
-                                        onClick={() => handleAdd(u.id)}
+                            {(() => {
+                                const q = search.trim().toLowerCase()
+                                const filtered = q
+                                    ? view.eligibleToAdd.filter((u) =>
+                                          u.name.toLowerCase().includes(q)
+                                      )
+                                    : view.eligibleToAdd
+                                if (filtered.length === 0) {
+                                    return (
+                                        <p className="px-2 py-1 text-muted-foreground text-sm">
+                                            No matching players.
+                                        </p>
+                                    )
+                                }
+                                return filtered.map((u) => (
+                                    <div
+                                        key={u.id}
+                                        className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-muted/50"
                                     >
-                                        Add
-                                    </Button>
-                                </div>
-                            ))}
+                                        <span>
+                                            {u.name}
+                                            <span className="ml-2 text-muted-foreground">
+                                                (
+                                                {u.male === true
+                                                    ? "M"
+                                                    : u.male === false
+                                                      ? "NM"
+                                                      : "—"}
+                                                )
+                                            </span>
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={busy}
+                                            onClick={() => handleAdd(u.id)}
+                                        >
+                                            Add
+                                        </Button>
+                                    </div>
+                                ))
+                            })()}
                         </div>
                     </CardContent>
                 </Card>

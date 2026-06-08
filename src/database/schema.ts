@@ -604,6 +604,9 @@ export const discounts = pgTable("discounts", {
     used: boolean("used")
         .$defaultFn(() => false)
         .notNull(),
+    scope: text("scope")
+        .$defaultFn(() => "season")
+        .notNull(),
     created_at: timestamp("created_at")
         .$defaultFn(() => new Date())
         .notNull()

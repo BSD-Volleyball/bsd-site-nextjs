@@ -372,7 +372,8 @@ export function SignupsList({
             userId: postDeleteUser.userId,
             percentage: discountPercentage,
             expiration: discountExpiration || null,
-            reason: discountReason || null
+            reason: discountReason || null,
+            scope: "season"
         })
         setDiscountCreateResult(result)
         setIsCreatingDiscount(false)

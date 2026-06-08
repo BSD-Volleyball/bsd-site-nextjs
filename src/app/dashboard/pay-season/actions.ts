@@ -204,7 +204,10 @@ export async function submitSeasonPayment(
 
         // Apply discount if provided and valid
         if (discountId) {
-            const discount = await getActiveDiscountForUser(session.user.id)
+            const discount = await getActiveDiscountForUser(
+                session.user.id,
+                "season"
+            )
             if (discount && discount.id === discountId) {
                 finalAmount = calculateDiscountedAmount(
                     originalAmount,
@@ -381,7 +384,10 @@ export async function submitFreeSignup(
 
     try {
         // Validate the discount is 100% and belongs to this user
-        const discount = await getActiveDiscountForUser(session.user.id)
+        const discount = await getActiveDiscountForUser(
+            session.user.id,
+            "season"
+        )
         if (!discount || discount.id !== discountId) {
             return {
                 status: false,

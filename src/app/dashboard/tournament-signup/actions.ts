@@ -28,6 +28,11 @@ import {
 } from "@/lib/tournament-config"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    calculateDiscountedAmount,
+    getActiveDiscountForUser,
+    markDiscountAsUsed
+} from "@/lib/discount"
 
 const getSquareClient = () =>
     new SquareClient({
@@ -173,9 +178,10 @@ async function validateRosterAgainstDivision(
 
 export const submitTournamentSignup = withAction(
     async (
-        sourceId: string,
+        sourceId: string | null,
         formData: TournamentSignupFormData,
-        waiverId: number
+        waiverId: number,
+        discountId?: number
     ): Promise<
         ActionResult<{
             paymentId?: string
@@ -237,30 +243,59 @@ export const submitTournamentSignup = withAction(
             )
         }
 
-        const amount = getCurrentTournamentCost(config)
-        const amountCents = BigInt(Math.round(parseFloat(amount) * 100))
-        if (amountCents <= BigInt(0)) {
+        const originalAmount = getCurrentTournamentCost(config)
+        if (BigInt(Math.round(parseFloat(originalAmount) * 100)) <= BigInt(0)) {
             return fail("Tournament cost is not configured.")
         }
+
+        let finalAmount = originalAmount
+        let discountInfo:
+            | { id: number; percentage: string; originalAmount: string }
+            | undefined
+        if (discountId !== undefined) {
+            const discount = await getActiveDiscountForUser(
+                userId,
+                "tournament"
+            )
+            if (discount && discount.id === discountId) {
+                finalAmount = calculateDiscountedAmount(
+                    originalAmount,
+                    discount.percentage
+                )
+                discountInfo = {
+                    id: discount.id,
+                    percentage: discount.percentage,
+                    originalAmount
+                }
+            }
+        }
+
+        const amountCents = BigInt(Math.round(parseFloat(finalAmount) * 100))
+        const isFree = amountCents <= BigInt(0)
 
         let paymentId: string | undefined
         let receiptUrl: string | undefined
 
-        try {
-            const client = getSquareClient()
-            const response = await client.payments.create({
-                idempotencyKey: randomUUID(),
-                sourceId,
-                amountMoney: { currency: "USD", amount: amountCents },
-                buyerEmailAddress: session.user.email,
-                note: `Volleyball Tournament ${config.name} (${config.year})`
-            })
-            if (!response.payment) return fail("Payment processing failed.")
-            paymentId = response.payment.id ?? undefined
-            receiptUrl = response.payment.receiptUrl ?? undefined
-        } catch (error) {
-            console.error("Tournament signup payment error:", error)
-            return fail("Payment failed. Please try again.")
+        if (!isFree) {
+            if (!sourceId) {
+                return fail("Payment information is required.")
+            }
+            try {
+                const client = getSquareClient()
+                const response = await client.payments.create({
+                    idempotencyKey: randomUUID(),
+                    sourceId,
+                    amountMoney: { currency: "USD", amount: amountCents },
+                    buyerEmailAddress: session.user.email,
+                    note: `Volleyball Tournament ${config.name} (${config.year})`
+                })
+                if (!response.payment) return fail("Payment processing failed.")
+                paymentId = response.payment.id ?? undefined
+                receiptUrl = response.payment.receiptUrl ?? undefined
+            } catch (error) {
+                console.error("Tournament signup payment error:", error)
+                return fail("Payment failed. Please try again.")
+            }
         }
 
         await recordWaiverAcceptance(userId, activeWaiver.id)
@@ -273,7 +308,7 @@ export const submitTournamentSignup = withAction(
                 captain_user_id: userId,
                 name: formData.teamName.trim(),
                 order_id: paymentId ?? null,
-                amount_paid: amount
+                amount_paid: finalAmount
             })
             .returning({ id: tournamentTeams.id })
 
@@ -300,12 +335,16 @@ export const submitTournamentSignup = withAction(
                 )
             )
 
+        if (discountInfo) {
+            await markDiscountAsUsed(discountInfo.id)
+        }
+
         await logAuditEntry({
             userId,
             action: "create_tournament_signup",
             entityType: "tournament",
             entityId: config.tournamentId,
-            summary: `Captain signed up team "${formData.teamName.trim()}" for ${config.name} ($${amount}, ${rosterIds.length} players)`
+            summary: `Captain signed up team "${formData.teamName.trim()}" for ${config.name} ($${finalAmount}, ${rosterIds.length} players)${discountInfo ? ` (${discountInfo.percentage}% discount applied)` : ""}`
         })
 
         return ok({ paymentId, receiptUrl })

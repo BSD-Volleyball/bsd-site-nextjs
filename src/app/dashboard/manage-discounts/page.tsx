@@ -45,16 +45,41 @@ export default async function ManageDiscountsPage() {
         )
     }
 
+    const seasonDiscounts = discountsResult.discounts.filter(
+        (d) => d.scope === "season"
+    )
+    const tournamentDiscounts = discountsResult.discounts.filter(
+        (d) => d.scope === "tournament"
+    )
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-8">
             <PageHeader
                 title="Manage Discounts"
-                description="Create and manage player discounts for season registration."
+                description="Create and manage player discounts for season and tournament registration."
             />
-            <DiscountsManager
-                discounts={discountsResult.discounts}
-                users={usersData}
-            />
+            <section className="space-y-3">
+                <h2 className="font-semibold text-xl">Season Discounts</h2>
+                <p className="text-muted-foreground text-sm">
+                    Applied during season registration / payment.
+                </p>
+                <DiscountsManager
+                    discounts={seasonDiscounts}
+                    users={usersData}
+                    scope="season"
+                />
+            </section>
+            <section className="space-y-3">
+                <h2 className="font-semibold text-xl">Tournament Discounts</h2>
+                <p className="text-muted-foreground text-sm">
+                    Applied when a captain signs up a team for a tournament.
+                </p>
+                <DiscountsManager
+                    discounts={tournamentDiscounts}
+                    users={usersData}
+                    scope="tournament"
+                />
+            </section>
         </div>
     )
 }

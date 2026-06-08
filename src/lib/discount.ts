@@ -8,8 +8,11 @@ export interface UserDiscount {
     expiration: Date | null
 }
 
+export type DiscountScope = "season" | "tournament"
+
 export async function getActiveDiscountForUser(
-    userId: string
+    userId: string,
+    scope: DiscountScope
 ): Promise<UserDiscount | null> {
     const now = new Date()
 
@@ -24,6 +27,7 @@ export async function getActiveDiscountForUser(
             and(
                 eq(discounts.user, userId),
                 eq(discounts.used, false),
+                eq(discounts.scope, scope),
                 or(isNull(discounts.expiration), gt(discounts.expiration, now))
             )
         )

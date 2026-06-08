@@ -35,7 +35,9 @@ interface Props {
         name: string
         divisions: TournamentDivisionConfig[]
         cost: string
+        originalCost: string
     }
+    discount: { id: number; percentage: string } | null
     divisionAvailability: DivisionAvailability[]
     currentUserId: string
     // Captain's gender from users.male. Null means unknown (profile incomplete);
@@ -60,6 +62,7 @@ function resizeSlots(
 
 export function TournamentSignupWizard({
     tournament,
+    discount,
     divisionAvailability,
     currentUserId,
     currentUserMale,
@@ -68,6 +71,7 @@ export function TournamentSignupWizard({
     squareAppId,
     squareLocationId
 }: Props) {
+    const isFree = parseFloat(tournament.cost) <= 0
     const router = useRouter()
     const { resolvedTheme } = useTheme()
     const [tab, setTab] = useState<"info" | "roster" | "waiver" | "payment">(
@@ -324,10 +328,65 @@ export function TournamentSignupWizard({
                     </TabsContent>
 
                     <TabsContent value="payment" className="space-y-4 pt-4">
-                        <p className="text-sm">
-                            Team fee: <strong>${tournament.cost}</strong>
-                        </p>
-                        {resolvedTheme == null ? null : (
+                        {discount ? (
+                            <div className="space-y-1 text-sm">
+                                <p>
+                                    Team fee:{" "}
+                                    <span className="text-muted-foreground line-through">
+                                        ${tournament.originalCost}
+                                    </span>{" "}
+                                    <strong>${tournament.cost}</strong>
+                                </p>
+                                <p className="text-green-700 text-xs dark:text-green-400">
+                                    {discount.percentage}% tournament discount
+                                    applied.
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="text-sm">
+                                Team fee: <strong>${tournament.cost}</strong>
+                            </p>
+                        )}
+                        {isFree ? (
+                            <Button
+                                disabled={isProcessing}
+                                onClick={async () => {
+                                    setIsProcessing(true)
+                                    try {
+                                        const payload: TournamentSignupFormData =
+                                            {
+                                                teamName: teamName.trim(),
+                                                preferredDivisionId,
+                                                rosterUserIds: pickedIds()
+                                            }
+                                        const result =
+                                            await submitTournamentSignup(
+                                                null,
+                                                payload,
+                                                activeWaiver.id,
+                                                discount?.id
+                                            )
+                                        if (result.status) {
+                                            toast.success(
+                                                "Registered! Your team is signed up."
+                                            )
+                                            router.push(
+                                                "/dashboard/tournament-team"
+                                            )
+                                            router.refresh()
+                                        } else {
+                                            toast.error(result.message)
+                                        }
+                                    } finally {
+                                        setIsProcessing(false)
+                                    }
+                                }}
+                            >
+                                {isProcessing
+                                    ? "Registering..."
+                                    : "Complete Free Registration"}
+                            </Button>
+                        ) : resolvedTheme == null ? null : (
                             <PaymentForm
                                 key={resolvedTheme}
                                 applicationId={squareAppId}
@@ -353,7 +412,8 @@ export function TournamentSignupWizard({
                                             await submitTournamentSignup(
                                                 tokenResult.token!,
                                                 payload,
-                                                activeWaiver.id
+                                                activeWaiver.id,
+                                                discount?.id
                                             )
                                         if (result.status) {
                                             toast.success(

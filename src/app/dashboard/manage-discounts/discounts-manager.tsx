@@ -18,15 +18,21 @@ import {
     createDiscount,
     updateDiscount,
     deleteDiscount,
-    type DiscountEntry
+    type DiscountEntry,
+    type DiscountScope
 } from "./actions"
 
 interface DiscountsManagerProps {
     discounts: DiscountEntry[]
     users: { id: string; name: string }[]
+    scope: DiscountScope
 }
 
-export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
+export function DiscountsManager({
+    discounts,
+    users,
+    scope
+}: DiscountsManagerProps) {
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [showAddForm, setShowAddForm] = useState(false)
@@ -62,7 +68,8 @@ export function DiscountsManager({ discounts, users }: DiscountsManagerProps) {
             userId: newUserId,
             percentage: newPercentage,
             expiration: newExpiration || null,
-            reason: newReason || null
+            reason: newReason || null,
+            scope
         })
 
         setIsLoading(false)

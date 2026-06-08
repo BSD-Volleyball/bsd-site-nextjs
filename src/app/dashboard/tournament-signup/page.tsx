@@ -16,6 +16,10 @@ import {
 } from "@/lib/tournament-config"
 import { getEligibleTournamentPlayers } from "./actions"
 import { TournamentSignupWizard } from "./wizard-form"
+import {
+    calculateDiscountedAmount,
+    getActiveDiscountForUser
+} from "@/lib/discount"
 
 function fmtTournamentDate(iso: string): string {
     const d = new Date(`${iso}T00:00:00`)
@@ -69,12 +73,23 @@ export default async function TournamentSignupPage() {
     const eligible = eligibleResult.status ? eligibleResult.data : []
     const currentCost = getCurrentTournamentCost(config)
     const currentUserMale = captainRow[0]?.male ?? null
+    const discount = await getActiveDiscountForUser(
+        session.user.id,
+        "tournament"
+    )
+    const discountedCost = discount
+        ? calculateDiscountedAmount(currentCost, discount.percentage)
+        : currentCost
 
     return (
         <div className="space-y-6">
             <PageHeader
                 title={`Sign Up: ${config.name}`}
-                description={`Team fee $${currentCost}`}
+                description={
+                    discount
+                        ? `Team fee $${discountedCost} (${discount.percentage}% off $${currentCost})`
+                        : `Team fee $${currentCost}`
+                }
             />
             <p className="-mt-6 text-muted-foreground">
                 Date: {fmtTournamentDate(config.tournamentDate)}
@@ -84,8 +99,17 @@ export default async function TournamentSignupPage() {
                     id: config.tournamentId,
                     name: config.name,
                     divisions: config.divisions,
-                    cost: currentCost
+                    cost: discountedCost,
+                    originalCost: currentCost
                 }}
+                discount={
+                    discount
+                        ? {
+                              id: discount.id,
+                              percentage: discount.percentage
+                          }
+                        : null
+                }
                 divisionAvailability={availability.divisions}
                 currentUserId={session.user.id}
                 currentUserMale={currentUserMale}

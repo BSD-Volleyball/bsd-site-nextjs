@@ -788,7 +788,7 @@ export default async function DashboardPage() {
     if (session?.user) {
         const [signupResult, discountResult, userResult] = await Promise.all([
             getSeasonSignup(session.user.id),
-            getActiveDiscountForUser(session.user.id),
+            getActiveDiscountForUser(session.user.id, "season"),
             db
                 .select({
                     preferred_name: users.preferred_name,

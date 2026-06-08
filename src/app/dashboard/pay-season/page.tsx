@@ -25,7 +25,7 @@ export default async function PaySeasonPage() {
     let discount: { id: number; percentage: string } | null = null
     const session = await auth.api.getSession({ headers: await headers() })
     if (session) {
-        discount = await getActiveDiscountForUser(session.user.id)
+        discount = await getActiveDiscountForUser(session.user.id, "season")
     }
 
     return (

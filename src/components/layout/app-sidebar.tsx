@@ -208,6 +208,11 @@ const adminNavItems = [
         icon: RiHistoryLine
     },
     {
+        title: "Tournament Overview",
+        url: "/dashboard/tournament-overview",
+        icon: RiTrophyLine
+    },
+    {
         title: "Tournament Pools",
         url: "/dashboard/tournament-pools",
         icon: RiTeamLine
