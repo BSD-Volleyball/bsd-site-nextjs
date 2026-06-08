@@ -370,9 +370,7 @@ export function TournamentSignupWizard({
                                             toast.success(
                                                 "Registered! Your team is signed up."
                                             )
-                                            router.push(
-                                                "/dashboard/tournament-team"
-                                            )
+                                            router.push("/dashboard")
                                             router.refresh()
                                         } else {
                                             toast.error(result.message)
@@ -419,9 +417,7 @@ export function TournamentSignupWizard({
                                             toast.success(
                                                 "Registered! Your team is signed up."
                                             )
-                                            router.push(
-                                                "/dashboard/tournament-team"
-                                            )
+                                            router.push("/dashboard")
                                             router.refresh()
                                         } else {
                                             toast.error(result.message)
