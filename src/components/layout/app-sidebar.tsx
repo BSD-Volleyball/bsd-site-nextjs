@@ -686,7 +686,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ...(showTeamAvailability ? [captainPagesNavItems[0]] : []),
         ...(captainViewSignupsVisible ? [captainPagesNavItems[1]] : []),
         ...(captainPlayerLookupVisible ? [captainPagesNavItems[2]] : []),
-        ...(captainBaseVisible ? [captainPagesNavItems[3]] : []),
+        ...(captainBaseVisible ||
+        (hasCaptainPagesAccess && phase === "complete")
+            ? [captainPagesNavItems[3]]
+            : []),
         ...(hasCaptainPagesAccess && showWeek2Homework
             ? [captainPagesNavItems[4]]
             : []),
