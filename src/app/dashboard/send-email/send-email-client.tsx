@@ -55,6 +55,9 @@ function sendToLabel(
 ): string {
     if (groupType === "all_users") return "Everyone"
     if (groupType === "season_signups") return "Current Season Players"
+    if (groupType === "season_captains") return "Current Season Captains"
+    if (groupType === "season_commissioners")
+        return "Current Season Commissioners"
     if (groupType === "season_division") {
         const div = divisions.find((d) => d.id === divisionId)
         return div ? `Division: ${div.name}` : "Division"
@@ -262,6 +265,12 @@ export function SendEmailClient({
                                             </SelectItem>
                                             <SelectItem value="season">
                                                 Current Season Players
+                                            </SelectItem>
+                                            <SelectItem value="season_captains">
+                                                Current Season Captains
+                                            </SelectItem>
+                                            <SelectItem value="season_commissioners">
+                                                Current Season Commissioners
                                             </SelectItem>
                                         </>
                                     )}

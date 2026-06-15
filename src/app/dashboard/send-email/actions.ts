@@ -81,7 +81,13 @@ export interface BroadcastHistoryItem {
     createdAt: Date
 }
 
-export type SendToType = "everyone" | "season" | "division" | "team"
+export type SendToType =
+    | "everyone"
+    | "season"
+    | "division"
+    | "team"
+    | "season_captains"
+    | "season_commissioners"
 
 // ---------------------------------------------------------------------------
 // getEmailFormData
@@ -289,6 +295,30 @@ async function resolveGroup(
         }
     }
 
+    if (sendToType === "season_captains") {
+        const groupId = await ensureRecipientGroup("season_captains", {
+            seasonId,
+            name: `${seasonLabel} – Captains`
+        })
+        return {
+            groupId,
+            groupName: `${seasonLabel} – Captains`,
+            stream: STREAM_IN_SEASON_UPDATES
+        }
+    }
+
+    if (sendToType === "season_commissioners") {
+        const groupId = await ensureRecipientGroup("season_commissioners", {
+            seasonId,
+            name: `${seasonLabel} – Commissioners`
+        })
+        return {
+            groupId,
+            groupName: `${seasonLabel} – Commissioners`,
+            stream: STREAM_IN_SEASON_UPDATES
+        }
+    }
+
     if (sendToType === "division") {
         if (!divisionId) throw new Error("Division is required.")
         const [divRow] = await db
@@ -344,10 +374,13 @@ export const createAndSendBroadcast = withAction(
         if (!subject.trim()) return fail("Subject is required.")
         if (!sendToType) return fail("Recipient selection is required.")
 
-        // Only admins can send to everyone or all season players
+        // Only admins can send to everyone, all season players, captains, or commissioners
         if (
             !isAdmin &&
-            (sendToType === "everyone" || sendToType === "season")
+            (sendToType === "everyone" ||
+                sendToType === "season" ||
+                sendToType === "season_captains" ||
+                sendToType === "season_commissioners")
         ) {
             return fail(
                 "Unauthorized: only admins can send league-wide emails."

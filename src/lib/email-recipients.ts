@@ -29,6 +29,8 @@ export type RecipientGroupType =
     | "season_signups"
     | "season_division"
     | "season_team"
+    | "season_captains"
+    | "season_commissioners"
 
 export interface Recipient {
     email: string
@@ -123,6 +125,14 @@ export async function getRecipientsForGroup(
         case "season_team":
             return group.season_id && group.team_id
                 ? getTeamRecipients(group.season_id, group.team_id)
+                : []
+        case "season_captains":
+            return group.season_id
+                ? getSeasonCaptainRecipients(group.season_id)
+                : []
+        case "season_commissioners":
+            return group.season_id
+                ? getSeasonCommissionerRecipients(group.season_id)
                 : []
         default:
             return []
@@ -359,6 +369,54 @@ async function getTeamRecipients(
         [...draftRows.map(toRecipient), ...captainRows].filter(
             Boolean
         ) as Recipient[]
+    )
+}
+
+/**
+ * Season captains: all team captains/coaches for the season.
+ */
+async function getSeasonCaptainRecipients(
+    seasonId: number
+): Promise<Recipient[]> {
+    const teamRows = await db
+        .select({ captain: teams.captain, captain2: teams.captain2 })
+        .from(teams)
+        .where(eq(teams.season, seasonId))
+
+    const captainIds = [
+        ...new Set([
+            ...teamRows.map((t) => t.captain),
+            ...teamRows
+                .filter((t) => t.captain2)
+                .map((t) => t.captain2 as string)
+        ])
+    ]
+    return getUsersByIds(captainIds)
+}
+
+/**
+ * Season commissioners: all users with the commissioner role for the season.
+ */
+async function getSeasonCommissionerRecipients(
+    seasonId: number
+): Promise<Recipient[]> {
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(
+            and(
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, seasonId)
+            )
+        )
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
     )
 }
 
