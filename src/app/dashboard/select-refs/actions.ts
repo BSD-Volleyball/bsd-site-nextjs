@@ -11,11 +11,11 @@ import {
     requireSession,
     requireSeasonConfig,
     requirePositiveInt,
-    requireNonEmptyString
+    requireNonEmptyString,
+    requirePermission
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import { grantRole, revokeRole } from "@/lib/rbac"
-import { hasPermissionBySession, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 
 // ---------------------------------------------------------------------------
@@ -59,23 +59,11 @@ export interface UserSearchResultRef {
 }
 
 // ---------------------------------------------------------------------------
-// Authorization helper
-// ---------------------------------------------------------------------------
-
-async function requireRefsAccess(): Promise<void> {
-    const hasSchedule = await hasPermissionBySession("schedule:manage")
-    if (hasSchedule) return
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (isAdmin) return
-    throw new Error("Unauthorized.")
-}
-
-// ---------------------------------------------------------------------------
 // Data loading
 // ---------------------------------------------------------------------------
 
 export async function getSelectRefsData(): Promise<SelectRefsData> {
-    await requireRefsAccess()
+    await requirePermission("schedule:manage")
     const config = await requireSeasonConfig()
 
     const season = await db
@@ -157,7 +145,7 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
 
 export const searchUsersForRef = withAction(
     async (query: string): Promise<ActionResult<UserSearchResultRef[]>> => {
-        await requireRefsAccess()
+        await requirePermission("schedule:manage")
         const q = requireNonEmptyString(query, "Search query")
         if (q.length < 2) return ok([])
 
@@ -192,7 +180,7 @@ export const searchUsersForRef = withAction(
 export const addSeasonRef = withAction(
     async (userId: string): Promise<ActionResult> => {
         const session = await requireSession()
-        await requireRefsAccess()
+        await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
         requireNonEmptyString(userId, "User ID")
 
@@ -285,7 +273,7 @@ export const addSeasonRef = withAction(
 export const removeSeasonRef = withAction(
     async (seasonRefId: number): Promise<ActionResult> => {
         const session = await requireSession()
-        await requireRefsAccess()
+        await requirePermission("schedule:manage")
         const id = requirePositiveInt(seasonRefId, "Season ref ID")
 
         // Look up the ref record to get the user_id
@@ -337,7 +325,7 @@ export const updateSeasonRef = withAction(
         maxDivisionLevel: number
     ): Promise<ActionResult> => {
         const session = await requireSession()
-        await requireRefsAccess()
+        await requirePermission("schedule:manage")
         const id = requirePositiveInt(seasonRefId, "Season ref ID")
         if (typeof maxDivisionLevel !== "number" || maxDivisionLevel < 0) {
             throw new Error("Max division level must be a non-negative integer")

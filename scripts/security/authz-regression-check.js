@@ -18,6 +18,7 @@ const guardPatterns = [
     /isCommissionerBySession\s*\(/,
     /hasAdministrativeAccessBySession\s*\(/,
     /hasViewSignupsAccessBySession\s*\(/,
+    /hasPermissionBySession\s*\(/,
     /requireAdmin\s*\(/,
     /requireSession\s*\(/,
     /requireCommissioner\s*\(/,
@@ -92,11 +93,18 @@ function getLineNumber(content, index) {
 }
 
 function extractExportedAsyncFunctions(content) {
-    const regex = /export\s+async\s+function\s+([A-Za-z0-9_]+)\s*\(/g
-    const matches = [...content.matchAll(regex)].map((match) => ({
-        name: match[1],
-        start: match.index ?? 0
-    }))
+    const asyncFnRegex = /export\s+async\s+function\s+([A-Za-z0-9_]+)\s*\(/g
+    const withActionRegex =
+        /export\s+const\s+([A-Za-z0-9_]+)\s*=\s*withAction\s*(?:<[^>]*>)?\s*\(/g
+    const matches = [
+        ...content.matchAll(asyncFnRegex),
+        ...content.matchAll(withActionRegex)
+    ]
+        .map((match) => ({
+            name: match[1],
+            start: match.index ?? 0
+        }))
+        .sort((a, b) => a.start - b.start)
 
     const functions = []
     for (let i = 0; i < matches.length; i++) {

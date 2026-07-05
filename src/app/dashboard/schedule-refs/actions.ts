@@ -23,10 +23,10 @@ import {
     fail,
     requireSession,
     requireSeasonConfig,
+    requirePermission,
     ActionError
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
-import { hasPermissionBySession, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { formatPlayerName } from "@/lib/utils"
 import {
     collectPossibleTeams,
@@ -102,18 +102,6 @@ export interface MatchesAndRefsData {
 }
 
 // ---------------------------------------------------------------------------
-// Authorization helper
-// ---------------------------------------------------------------------------
-
-async function requireScheduleRefsAccess(): Promise<void> {
-    const hasSchedule = await hasPermissionBySession("schedule:manage")
-    if (hasSchedule) return
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (isAdmin) return
-    throw new ActionError("Unauthorized.")
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -141,7 +129,7 @@ export async function getScheduleRefsData(): Promise<
     ActionResult<ScheduleRefsData>
 > {
     try {
-        await requireScheduleRefsAccess()
+        await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
 
         const [season] = await db
@@ -200,7 +188,7 @@ export async function getMatchesAndRefsForDate(
     date: string
 ): Promise<ActionResult<MatchesAndRefsData>> {
     try {
-        await requireScheduleRefsAccess()
+        await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
         const seasonId = config.seasonId
 
@@ -904,7 +892,7 @@ export const saveRefAssignments = withAction(
         }>
     ): Promise<ActionResult> => {
         await requireSession()
-        await requireScheduleRefsAccess()
+        await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
         const seasonId = config.seasonId
 
