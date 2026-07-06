@@ -20,7 +20,10 @@ import {
 import { eq, and } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import {
+    isAdminOrDirectorBySession,
+    invalidateAllSessionsForUser
+} from "@/lib/rbac"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
@@ -416,6 +419,12 @@ export async function updateUser(
         }
 
         const effectiveId = isIdChanging ? data.id! : originalId
+
+        // An account-ID change migrates live sessions to the new ID; force a
+        // clean re-login so no stale tokens survive the switch.
+        if (isIdChanging) {
+            await invalidateAllSessionsForUser(effectiveId)
+        }
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session) {

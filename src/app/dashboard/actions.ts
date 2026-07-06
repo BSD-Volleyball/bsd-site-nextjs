@@ -105,6 +105,9 @@ export async function getHasConcernsAccess(): Promise<boolean> {
 }
 
 export async function getSeasonPhase(): Promise<SeasonPhase | null> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) return null
+
     const config = await getSeasonConfig()
     if (!config.seasonId) return null
     return config.phase

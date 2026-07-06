@@ -61,10 +61,6 @@ export interface UserOption {
     picture: string | null
 }
 
-async function checkCommissionersAccess(): Promise<boolean> {
-    return isCommissionerBySession()
-}
-
 async function checkDraftReadAccess(): Promise<boolean> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) return false
@@ -978,7 +974,7 @@ export async function submitDraft(
     divisionLevel: number,
     picks: DraftPick[]
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkCommissionersAccess()
+    const hasAccess = await isCommissionerBySession()
     if (!hasAccess) {
         return {
             status: false,

@@ -83,17 +83,13 @@ export interface SignupGroup {
     players: SignupPlayer[]
 }
 
-export async function checkCaptainPagesAccess(): Promise<boolean> {
-    return hasCaptainPagesAccessBySession()
-}
-
 export async function getSignupsCsvData(): Promise<{
     status: boolean
     message?: string
     entries: SignupCsvEntry[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkCaptainPagesAccess()
+    const hasAccess = await hasCaptainPagesAccessBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -420,7 +416,7 @@ export async function getSignupsData(): Promise<{
     allSeasons: SeasonInfo[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkCaptainPagesAccess()
+    const hasAccess = await hasCaptainPagesAccessBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -700,7 +696,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
     unavailableDates: string | null
     playoffDates: string[]
 }> {
-    const hasAccess = await checkCaptainPagesAccess()
+    const hasAccess = await hasCaptainPagesAccessBySession()
     if (!hasAccess) {
         return {
             status: false,

@@ -11,6 +11,7 @@ const guardPatterns = [
     /checkAdminAccess\s*\(/,
     /checkViewSignupsAccess\s*\(/,
     /checkAdminOrCommissionerAccess\s*\(/,
+    /checkDraftReadAccess\s*\(/,
     /getIsAdminOrDirector\s*\(/,
     /getIsCommissioner\s*\(/,
     /getHasAdministrativeAccess\s*\(/,
@@ -35,8 +36,8 @@ const publicAllowlist = new Set([
 const strictExpectations = [
     {
         key: "src/app/dashboard/view-signups/actions.ts:getSignupsData",
-        pattern: /checkViewSignupsAccess\s*\(/,
-        description: "must gate access via checkViewSignupsAccess"
+        pattern: /hasCaptainPagesAccessBySession\s*\(/,
+        description: "must gate access via hasCaptainPagesAccessBySession"
     },
     {
         key: "src/app/dashboard/player-lookup/actions.ts:getPlayersForLookup",

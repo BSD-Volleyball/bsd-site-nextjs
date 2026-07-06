@@ -29,14 +29,6 @@ export interface MissingPicturePlayer {
     oldId: number | null
 }
 
-async function checkAddPicturesAccess(): Promise<boolean> {
-    const config = await getSeasonConfig()
-    if (!config.seasonId) return false
-    return hasPermissionBySession("pictures:manage", {
-        seasonId: config.seasonId
-    })
-}
-
 function getSeasonLabel(seasonName: string, seasonYear: number): string {
     return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
 }
@@ -47,7 +39,12 @@ export async function getPlayersNeedingPictures(): Promise<{
     seasonLabel?: string
     players: MissingPicturePlayer[]
 }> {
-    const hasAccess = await checkAddPicturesAccess()
+    const accessConfig = await getSeasonConfig()
+    const hasAccess = accessConfig.seasonId
+        ? await hasPermissionBySession("pictures:manage", {
+              seasonId: accessConfig.seasonId
+          })
+        : false
     if (!hasAccess) {
         return {
             status: false,
@@ -122,7 +119,12 @@ export async function createMissingPictureUpload(
     uploadUrl?: string
     pictureFilename?: string
 }> {
-    const hasAccess = await checkAddPicturesAccess()
+    const accessConfig = await getSeasonConfig()
+    const hasAccess = accessConfig.seasonId
+        ? await hasPermissionBySession("pictures:manage", {
+              seasonId: accessConfig.seasonId
+          })
+        : false
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -222,7 +224,12 @@ export async function finalizeMissingPictureUpload(
     userId: string,
     pictureFilename: string
 ): Promise<{ status: boolean; message: string; picturePath?: string }> {
-    const hasAccess = await checkAddPicturesAccess()
+    const accessConfig = await getSeasonConfig()
+    const hasAccess = accessConfig.seasonId
+        ? await hasPermissionBySession("pictures:manage", {
+              seasonId: accessConfig.seasonId
+          })
+        : false
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

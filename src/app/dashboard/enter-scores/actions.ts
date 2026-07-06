@@ -25,16 +25,9 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import { parseSourceToken } from "@/lib/playoff-sources"
 
-async function checkEnterScoresAccess(): Promise<{
-    hasAccess: boolean
-    seasonId: number | null
-}> {
+async function getEnterScoresSeasonId(): Promise<number | null> {
     const config = await getSeasonConfig()
-    if (!config.seasonId) return { hasAccess: false, seasonId: null }
-    const hasAccess = await hasPermissionBySession("scores:enter", {
-        seasonId: config.seasonId
-    })
-    return { hasAccess, seasonId: config.seasonId }
+    return config.seasonId || null
 }
 
 export interface MatchDateOption {
@@ -48,7 +41,10 @@ export async function getMatchDatesForSeason(): Promise<{
     message?: string
     dates: MatchDateOption[]
 }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized", dates: [] }
     }
@@ -136,7 +132,10 @@ export async function getMatchesForDate(date: string): Promise<{
     divisions: DivisionMatchGroup[]
     scoreSheets: ScoreSheetData[]
 }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return {
             status: false,
@@ -432,7 +431,10 @@ export async function saveScoresForDivision(
     date: string,
     matchScores: MatchScoreInput[]
 ): Promise<{ status: boolean; message: string }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }
@@ -921,7 +923,10 @@ export async function createScoreSheetUpload(
     uploadUrl?: string
     objectKey?: string
 }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }
@@ -959,7 +964,10 @@ export async function finalizeScoreSheetUpload(
     date: string,
     objectKey: string
 ): Promise<{ status: boolean; message: string; scoreSheet?: ScoreSheetData }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }
@@ -1017,7 +1025,10 @@ export async function finalizeScoreSheetUpload(
 export async function deleteScoreSheet(
     scoreSheetId: number
 ): Promise<{ status: boolean; message: string }> {
-    const { hasAccess, seasonId } = await checkEnterScoresAccess()
+    const seasonId = await getEnterScoresSeasonId()
+    const hasAccess = seasonId
+        ? await hasPermissionBySession("scores:enter", { seasonId })
+        : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }

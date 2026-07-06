@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SignupsList } from "./signups-list"
-import { getSignupsData, checkCaptainPagesAccess } from "./actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { getSignupsData } from "./actions"
+import { requireCaptainAccessOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -13,17 +11,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function ViewSignupsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await checkCaptainPagesAccess()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireCaptainAccessOrRedirect()
 
     const result = await getSignupsData()
 
