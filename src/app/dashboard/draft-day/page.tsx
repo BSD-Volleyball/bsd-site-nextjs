@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDayForm } from "./draft-day-form"
@@ -30,9 +31,9 @@ export default async function DraftDayPage() {
                     title="Draft Day"
                     description="Set the draft pick order for each division."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load draft day data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

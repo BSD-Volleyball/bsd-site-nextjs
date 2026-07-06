@@ -1,5 +1,6 @@
 "use client"
 
+import { StatusBanner } from "@/components/ui/status-banner"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -273,7 +274,7 @@ export function CreateScheduleClient({
             )}
 
             {playoffConflicts.length > 0 && (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     <p className="font-semibold">
                         ⚠ Court conflicts detected in the playoff schedule — two
                         matches are assigned to the same court at the same time:
@@ -294,7 +295,7 @@ export function CreateScheduleClient({
                             </li>
                         ))}
                     </ul>
-                </div>
+                </StatusBanner>
             )}
 
             {/* Regular Season Section */}

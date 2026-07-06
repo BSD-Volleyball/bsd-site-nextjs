@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SelectCaptainsForm } from "./select-captains-form"
@@ -30,9 +31,9 @@ export default async function SelectCaptainsPage() {
                     title="Select Captains"
                     description="Select captains for the current season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

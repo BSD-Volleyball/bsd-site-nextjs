@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { AuditLogList } from "./audit-log-list"
 import { getAuditLogs } from "./actions"
@@ -22,9 +23,9 @@ export default async function AuditLogPage() {
                 description="View a history of all actions performed in the system."
             />
             {!result.status ? (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load audit logs."}
-                </div>
+                </StatusBanner>
             ) : (
                 <AuditLogList
                     initialEntries={result.data.entries}

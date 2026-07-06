@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -43,9 +44,9 @@ export default async function SeasonSchedulePage() {
                     title="Season Schedule"
                     description="View standings, schedule, and results."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load season schedule data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

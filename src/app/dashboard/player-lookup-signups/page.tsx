@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PlayerLookupSignupsForm } from "./player-lookup-form"
 import { getSignedUpPlayers } from "./actions"
 import { requireCaptainAccessOrRedirect } from "@/lib/page-guards"
@@ -22,9 +23,9 @@ export default async function PlayerLookupSignupsPage() {
                     title="Player Lookup"
                     description="Search and view details of signed-up players."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load player data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

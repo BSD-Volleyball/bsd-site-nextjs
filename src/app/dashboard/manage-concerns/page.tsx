@@ -1,4 +1,5 @@
 import { requirePermissionOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageConcernsClient } from "./manage-concerns-client"
@@ -29,9 +30,9 @@ export default async function ManageConcernsPage() {
                 description="Review, assign, and track player concerns and incidents."
             />
             {!concernsResult.status ? (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {concernsResult.message || "Failed to load concerns."}
-                </div>
+                </StatusBanner>
             ) : (
                 <ManageConcernsClient
                     initialConcerns={concernsResult.data}

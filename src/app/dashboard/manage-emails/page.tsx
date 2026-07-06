@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageEmailsClient } from "./manage-emails-client"
 import { getInboundEmails, getAssignableAdmins } from "./actions"
@@ -25,9 +26,9 @@ export default async function ManageEmailsPage() {
                 description="Review, assign, and track inbound emails received by the league."
             />
             {!emailsResult.status ? (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {emailsResult.message || "Failed to load emails."}
-                </div>
+                </StatusBanner>
             ) : (
                 <ManageEmailsClient
                     initialEmails={emailsResult.data}

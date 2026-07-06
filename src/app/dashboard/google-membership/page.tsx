@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { getGoogleMembershipUsers } from "./actions"
 import { GoogleMembershipTable } from "./google-membership-table"
@@ -45,9 +46,9 @@ export default async function GoogleMembershipPage({
                     title="Google Membership"
                     description="Manage seasons and notification list membership values for users."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load users."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

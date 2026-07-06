@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 import { asc } from "drizzle-orm"
@@ -54,9 +55,9 @@ export default async function PrepareForDraftPage({
                     title="Prepare for Draft"
                     description="Aggregated captain draft homework for draft preparation."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

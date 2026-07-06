@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { CreateTeamsForm } from "./create-teams-form"
 import { getCreateTeamsData } from "./actions"
@@ -22,9 +23,9 @@ export default async function AdminCreateTeamsPage() {
                     title="Admin Create Teams"
                     description="Create teams for a season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

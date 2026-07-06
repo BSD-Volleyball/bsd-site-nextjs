@@ -15,6 +15,16 @@ import {
 } from "@remixicon/react"
 import { UserCombobox } from "@/components/user-combobox"
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog"
+import {
     createDiscount,
     updateDiscount,
     deleteDiscount,
@@ -38,6 +48,7 @@ export function DiscountsManager({
     const [showAddForm, setShowAddForm] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
     const [isLoading, setIsLoading] = useState(false)
+    const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
 
     // Add form state
     const [newUserId, setNewUserId] = useState<string | null>(null)
@@ -132,15 +143,12 @@ export function DiscountsManager({
     }
 
     const handleDelete = async (id: number) => {
-        if (!confirm("Are you sure you want to delete this discount?")) {
-            return
-        }
-
         setIsLoading(true)
 
         const result = await deleteDiscount(id)
 
         setIsLoading(false)
+        setDeleteTargetId(null)
 
         if (result.status) {
             toast.success(result.message)
@@ -429,7 +437,9 @@ export function DiscountsManager({
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() =>
-                                                    handleDelete(discount.id)
+                                                    setDeleteTargetId(
+                                                        discount.id
+                                                    )
                                                 }
                                                 disabled={isLoading}
                                                 className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
@@ -455,6 +465,34 @@ export function DiscountsManager({
                     </tbody>
                 </table>
             </div>
+            <AlertDialog
+                open={deleteTargetId !== null}
+                onOpenChange={(open) => {
+                    if (!open) setDeleteTargetId(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete discount?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this discount? This
+                            cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (deleteTargetId !== null) {
+                                    handleDelete(deleteTargetId)
+                                }
+                            }}
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { SignupsList } from "./signups-list"
 import { getSignupsData } from "./actions"
 import { requireCaptainAccessOrRedirect } from "@/lib/page-guards"
@@ -22,9 +23,9 @@ export default async function ViewSignupsPage() {
                     title="View Signups"
                     description="View all players signed up for the current season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load signups data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

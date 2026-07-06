@@ -1,5 +1,6 @@
 "use client"
 
+import { StatusBanner } from "@/components/ui/status-banner"
 import { useCallback, useEffect, useState } from "react"
 import {
     Select,
@@ -294,9 +295,7 @@ export function DraftHistoryClient({
             </div>
 
             {errorMessage && (
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
-                    {errorMessage}
-                </div>
+                <StatusBanner variant="error">{errorMessage}</StatusBanner>
             )}
 
             {loadingDraft && (

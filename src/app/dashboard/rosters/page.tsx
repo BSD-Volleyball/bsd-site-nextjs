@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -63,9 +64,9 @@ export default async function CurrentRosterPage() {
                     title="Rosters"
                     description="View team rosters for the current season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load roster data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

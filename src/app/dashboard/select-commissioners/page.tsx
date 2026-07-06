@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
@@ -42,9 +43,9 @@ export default async function SelectCommissionersPage() {
                     title="Select Commissioners"
                     description="Assign commissioners to divisions for each season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {seasonsResult.message || "Failed to load seasons."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }
@@ -56,9 +57,9 @@ export default async function SelectCommissionersPage() {
                     title="Select Commissioners"
                     description="Assign commissioners to divisions for each season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {usersResult.message || "Failed to load users."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }
@@ -70,9 +71,9 @@ export default async function SelectCommissionersPage() {
                     title="Select Commissioners"
                     description="Assign commissioners to divisions for each season."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {divisionsResult.message || "Failed to load divisions."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { getRosterData } from "./actions"
 import { DivisionSection } from "./division-section"
@@ -24,9 +25,9 @@ export default async function RosterPage({
         return (
             <div className="space-y-6">
                 <PageHeader title="Rosters" description="View team rosters." />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message || "Failed to load roster data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

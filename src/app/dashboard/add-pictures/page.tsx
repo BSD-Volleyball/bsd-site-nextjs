@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 import { hasPermissionBySession } from "@/lib/rbac"
@@ -36,10 +37,10 @@ export default async function AddPicturesPage() {
                     title="Add Pictures"
                     description="Capture and upload pictures for current-season signups missing player photos."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {result.message ||
                         "Failed to load players missing pictures."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }

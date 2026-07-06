@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import {
     getSeasonConfig,
@@ -90,9 +91,9 @@ export default async function PreseasonWeek2Page() {
                     title="Pre-Season Week 2"
                     description="Preseason week 2 roster assignments grouped by division."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     No current season found.
-                </div>
+                </StatusBanner>
             </div>
         )
     }

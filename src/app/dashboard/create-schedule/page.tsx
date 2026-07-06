@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { getCreateScheduleData } from "./actions"
 import { CreateScheduleClient } from "./create-schedule-client"
@@ -22,9 +23,9 @@ export default async function CreateSchedulePage() {
                     title="Create Schedule"
                     description="Generate regular season and playoff schedules."
                 />
-                <div className="rounded-md bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
+                <StatusBanner variant="error">
                     {data.message || "Failed to load data."}
-                </div>
+                </StatusBanner>
             </div>
         )
     }
