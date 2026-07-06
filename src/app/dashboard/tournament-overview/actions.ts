@@ -92,60 +92,65 @@ export async function getTournamentOverview(): Promise<{
         return { status: true, data: null }
     }
 
-    const divisionRows = await db
-        .select({
-            id: tournamentDivisions.id,
-            name: divisions.name,
-            sort_order: tournamentDivisions.sort_order,
-            team_count: tournamentDivisions.team_count,
-            male_per_team: tournamentDivisions.male_per_team,
-            non_male_per_team: tournamentDivisions.non_male_per_team
-        })
-        .from(tournamentDivisions)
-        .innerJoin(divisions, eq(divisions.id, tournamentDivisions.division_id))
-        .where(eq(tournamentDivisions.tournament_id, t.id))
-        .orderBy(asc(tournamentDivisions.sort_order))
-
-    const teamRows = await db
-        .select({
-            id: tournamentTeams.id,
-            name: tournamentTeams.name,
-            preferred_division_id: tournamentTeams.preferred_division_id,
-            division_id: tournamentTeams.division_id,
-            amount_paid: tournamentTeams.amount_paid,
-            captain_user_id: tournamentTeams.captain_user_id,
-            captain_first: users.first_name,
-            captain_last: users.last_name,
-            captain_preferred: users.preferred_name
-        })
-        .from(tournamentTeams)
-        .innerJoin(users, eq(users.id, tournamentTeams.captain_user_id))
-        .where(eq(tournamentTeams.tournament_id, t.id))
-        .orderBy(asc(tournamentTeams.name))
-
-    const rosterRows = await db
-        .select({
-            team_id: tournamentRoster.team_id,
-            user_id: tournamentRoster.user_id,
-            first_name: users.first_name,
-            last_name: users.last_name,
-            preferred_name: users.preferred_name,
-            male: users.male
-        })
-        .from(tournamentRoster)
-        .innerJoin(users, eq(users.id, tournamentRoster.user_id))
-        .where(eq(tournamentRoster.tournament_id, t.id))
-        .orderBy(asc(users.last_name), asc(users.first_name))
-
-    const [waitlistCountRow] = await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(tournamentWaitlist)
-        .where(
-            and(
-                eq(tournamentWaitlist.tournament_id, t.id),
-                isNull(tournamentWaitlist.placed_team_id)
-            )
-        )
+    // All four lookups depend only on the tournament id — run in parallel
+    const [divisionRows, teamRows, rosterRows, [waitlistCountRow]] =
+        await Promise.all([
+            db
+                .select({
+                    id: tournamentDivisions.id,
+                    name: divisions.name,
+                    sort_order: tournamentDivisions.sort_order,
+                    team_count: tournamentDivisions.team_count,
+                    male_per_team: tournamentDivisions.male_per_team,
+                    non_male_per_team: tournamentDivisions.non_male_per_team
+                })
+                .from(tournamentDivisions)
+                .innerJoin(
+                    divisions,
+                    eq(divisions.id, tournamentDivisions.division_id)
+                )
+                .where(eq(tournamentDivisions.tournament_id, t.id))
+                .orderBy(asc(tournamentDivisions.sort_order)),
+            db
+                .select({
+                    id: tournamentTeams.id,
+                    name: tournamentTeams.name,
+                    preferred_division_id:
+                        tournamentTeams.preferred_division_id,
+                    division_id: tournamentTeams.division_id,
+                    amount_paid: tournamentTeams.amount_paid,
+                    captain_user_id: tournamentTeams.captain_user_id,
+                    captain_first: users.first_name,
+                    captain_last: users.last_name,
+                    captain_preferred: users.preferred_name
+                })
+                .from(tournamentTeams)
+                .innerJoin(users, eq(users.id, tournamentTeams.captain_user_id))
+                .where(eq(tournamentTeams.tournament_id, t.id))
+                .orderBy(asc(tournamentTeams.name)),
+            db
+                .select({
+                    team_id: tournamentRoster.team_id,
+                    user_id: tournamentRoster.user_id,
+                    first_name: users.first_name,
+                    last_name: users.last_name,
+                    preferred_name: users.preferred_name,
+                    male: users.male
+                })
+                .from(tournamentRoster)
+                .innerJoin(users, eq(users.id, tournamentRoster.user_id))
+                .where(eq(tournamentRoster.tournament_id, t.id))
+                .orderBy(asc(users.last_name), asc(users.first_name)),
+            db
+                .select({ count: sql<number>`count(*)::int` })
+                .from(tournamentWaitlist)
+                .where(
+                    and(
+                        eq(tournamentWaitlist.tournament_id, t.id),
+                        isNull(tournamentWaitlist.placed_team_id)
+                    )
+                )
+        ])
     const waitlistCount = waitlistCountRow?.count ?? 0
 
     // Bucket roster rows by team

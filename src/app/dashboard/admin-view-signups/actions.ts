@@ -130,203 +130,214 @@ export async function getSeasonSignups(): Promise<{
             .where(eq(signups.season, config.seasonId))
             .orderBy(desc(signups.created_at), desc(signups.id))
 
-        // Determine which users are new (no entry in drafts table)
+        // The per-signup lookups below only depend on signupRows, so they
+        // run in parallel instead of as a sequential waterfall.
         const userIds = signupRows.map((r) => r.userId)
-        let draftedUserIds = new Set<string>()
-
-        if (userIds.length > 0) {
-            const draftedUsers = await db
-                .select({ user: drafts.user })
-                .from(drafts)
-                .where(inArray(drafts.user, userIds))
-
-            draftedUserIds = new Set(draftedUsers.map((d) => d.user))
-        }
-
-        // Fetch player unavailability per signup
         const signupIds = signupRows.map((r) => r.signupId)
-        const unavailabilityMap = new Map<number, string>()
-
-        if (signupIds.length > 0) {
-            const unavailRows = await db
-                .select({
-                    signupId: userUnavailability.signup_id,
-                    eventDate: seasonEvents.event_date
-                })
-                .from(userUnavailability)
-                .innerJoin(
-                    seasonEvents,
-                    eq(seasonEvents.id, userUnavailability.event_id)
-                )
-                .where(inArray(userUnavailability.signup_id, signupIds))
-
-            const bySignup = new Map<number, string[]>()
-            for (const row of unavailRows) {
-                const dates = bySignup.get(row.signupId!) || []
-                dates.push(formatEventDate(row.eventDate))
-                bySignup.set(row.signupId!, dates)
-            }
-            for (const [sid, dates] of bySignup) {
-                unavailabilityMap.set(sid, dates.join(", "))
-            }
-        }
-
-        // Fetch used discount codes for signup users and keep the most recent per user
-        const usedDiscountByUserId = new Map<string, string>()
-
-        if (userIds.length > 0) {
-            const usedDiscountRows = await db
-                .select({
-                    userId: discounts.user,
-                    discountId: discounts.id,
-                    reason: discounts.reason
-                })
-                .from(discounts)
-                .where(
-                    and(
-                        inArray(discounts.user, userIds),
-                        eq(discounts.used, true)
-                    )
-                )
-                .orderBy(desc(discounts.created_at), desc(discounts.id))
-
-            for (const discount of usedDiscountRows) {
-                if (!usedDiscountByUserId.has(discount.userId)) {
-                    usedDiscountByUserId.set(
-                        discount.userId,
-                        discount.reason || `Discount #${discount.discountId}`
-                    )
-                }
-            }
-        }
-
-        // Fetch pair pick user names
         const pairPickIds = signupRows
             .map((r) => r.pairPickId)
             .filter((id): id is string => id !== null)
-        let pairPickNames = new Map<string, string>()
 
-        if (pairPickIds.length > 0) {
-            const pairPickUsers = await db
-                .select({
-                    id: users.id,
-                    firstName: users.first_name,
-                    lastName: users.last_name,
-                    preferredName: users.preferred_name
-                })
-                .from(users)
-                .where(inArray(users.id, pairPickIds))
-
-            pairPickNames = new Map(
-                pairPickUsers.map((u) => {
-                    const preferred = u.preferredName
-                        ? ` (${u.preferredName})`
-                        : ""
-                    return [u.id, `${u.firstName}${preferred} ${u.lastName}`]
-                })
-            )
-        }
-
-        // Fetch last draft information for each user
-        const lastDraftInfo = new Map<
-            string,
-            {
-                season: string
-                division: string
-                captain: string
-                overall: number
-            }
-        >()
-
-        if (userIds.length > 0) {
-            const draftData = await db
-                .select({
-                    userId: drafts.user,
-                    teamId: drafts.team,
-                    overall: drafts.overall,
-                    seasonYear: seasons.year,
-                    seasonName: seasons.season,
-                    divisionName: divisions.name,
-                    captainId: teams.captain,
-                    captainFirstName: users.first_name,
-                    captainLastName: users.last_name,
-                    captainPreferredName: users.preferred_name
-                })
-                .from(drafts)
-                .innerJoin(teams, eq(drafts.team, teams.id))
-                .innerJoin(seasons, eq(teams.season, seasons.id))
-                .innerJoin(divisions, eq(teams.division, divisions.id))
-                .innerJoin(users, eq(teams.captain, users.id))
-                .where(inArray(drafts.user, userIds))
-                .orderBy(desc(seasons.year), desc(seasons.id))
-
-            // Keep only the most recent draft for each user
-            const processedUsers = new Set<string>()
-            for (const draft of draftData) {
-                if (!processedUsers.has(draft.userId)) {
-                    const captainPreferred = draft.captainPreferredName
-                        ? ` (${draft.captainPreferredName})`
-                        : ""
-                    const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
-                    const seasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
-
-                    lastDraftInfo.set(draft.userId, {
-                        season: seasonLabel,
-                        division: draft.divisionName,
-                        captain: captainName,
-                        overall: draft.overall
+        const [
+            draftedUserIds,
+            unavailabilityMap,
+            usedDiscountByUserId,
+            pairPickNames,
+            lastDraftInfo,
+            draftedInMap,
+            captainDivisionMap
+        ] = await Promise.all([
+            // Which users are new (no entry in drafts table)
+            (async () => {
+                if (userIds.length === 0) return new Set<string>()
+                const draftedUsers = await db
+                    .select({ user: drafts.user })
+                    .from(drafts)
+                    .where(inArray(drafts.user, userIds))
+                return new Set(draftedUsers.map((d) => d.user))
+            })(),
+            // Player unavailability per signup
+            (async () => {
+                const map = new Map<number, string>()
+                if (signupIds.length === 0) return map
+                const unavailRows = await db
+                    .select({
+                        signupId: userUnavailability.signup_id,
+                        eventDate: seasonEvents.event_date
                     })
-                    processedUsers.add(draft.userId)
+                    .from(userUnavailability)
+                    .innerJoin(
+                        seasonEvents,
+                        eq(seasonEvents.id, userUnavailability.event_id)
+                    )
+                    .where(inArray(userUnavailability.signup_id, signupIds))
+
+                const bySignup = new Map<number, string[]>()
+                for (const row of unavailRows) {
+                    const dates = bySignup.get(row.signupId!) || []
+                    dates.push(formatEventDate(row.eventDate))
+                    bySignup.set(row.signupId!, dates)
                 }
-            }
-        }
-
-        // Fetch current-season draft assignments
-        const draftedInMap = new Map<string, string>()
-
-        if (userIds.length > 0) {
-            const draftedRows = await db
-                .select({
-                    userId: drafts.user,
-                    divisionName: divisions.name
-                })
-                .from(drafts)
-                .innerJoin(teams, eq(drafts.team, teams.id))
-                .innerJoin(divisions, eq(teams.division, divisions.id))
-                .where(
-                    and(
-                        eq(teams.season, config.seasonId),
-                        inArray(drafts.user, userIds)
+                for (const [sid, dates] of bySignup) {
+                    map.set(sid, dates.join(", "))
+                }
+                return map
+            })(),
+            // Used discount codes, most recent per user
+            (async () => {
+                const map = new Map<string, string>()
+                if (userIds.length === 0) return map
+                const usedDiscountRows = await db
+                    .select({
+                        userId: discounts.user,
+                        discountId: discounts.id,
+                        reason: discounts.reason
+                    })
+                    .from(discounts)
+                    .where(
+                        and(
+                            inArray(discounts.user, userIds),
+                            eq(discounts.used, true)
+                        )
                     )
+                    .orderBy(desc(discounts.created_at), desc(discounts.id))
+
+                for (const discount of usedDiscountRows) {
+                    if (!map.has(discount.userId)) {
+                        map.set(
+                            discount.userId,
+                            discount.reason ||
+                                `Discount #${discount.discountId}`
+                        )
+                    }
+                }
+                return map
+            })(),
+            // Pair pick user names
+            (async () => {
+                if (pairPickIds.length === 0) return new Map<string, string>()
+                const pairPickUsers = await db
+                    .select({
+                        id: users.id,
+                        firstName: users.first_name,
+                        lastName: users.last_name,
+                        preferredName: users.preferred_name
+                    })
+                    .from(users)
+                    .where(inArray(users.id, pairPickIds))
+
+                return new Map(
+                    pairPickUsers.map((u) => {
+                        const preferred = u.preferredName
+                            ? ` (${u.preferredName})`
+                            : ""
+                        return [
+                            u.id,
+                            `${u.firstName}${preferred} ${u.lastName}`
+                        ]
+                    })
                 )
+            })(),
+            // Last draft information for each user
+            (async () => {
+                const map = new Map<
+                    string,
+                    {
+                        season: string
+                        division: string
+                        captain: string
+                        overall: number
+                    }
+                >()
+                if (userIds.length === 0) return map
+                const draftData = await db
+                    .select({
+                        userId: drafts.user,
+                        teamId: drafts.team,
+                        overall: drafts.overall,
+                        seasonYear: seasons.year,
+                        seasonName: seasons.season,
+                        divisionName: divisions.name,
+                        captainId: teams.captain,
+                        captainFirstName: users.first_name,
+                        captainLastName: users.last_name,
+                        captainPreferredName: users.preferred_name
+                    })
+                    .from(drafts)
+                    .innerJoin(teams, eq(drafts.team, teams.id))
+                    .innerJoin(seasons, eq(teams.season, seasons.id))
+                    .innerJoin(divisions, eq(teams.division, divisions.id))
+                    .innerJoin(users, eq(teams.captain, users.id))
+                    .where(inArray(drafts.user, userIds))
+                    .orderBy(desc(seasons.year), desc(seasons.id))
 
-            for (const draft of draftedRows) {
-                draftedInMap.set(draft.userId, draft.divisionName)
-            }
-        }
+                // Keep only the most recent draft for each user
+                for (const draft of draftData) {
+                    if (!map.has(draft.userId)) {
+                        const captainPreferred = draft.captainPreferredName
+                            ? ` (${draft.captainPreferredName})`
+                            : ""
+                        const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
+                        const seasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
 
-        // Fetch current-season captain roles
-        const captainDivisionMap = new Map<string, string>()
-
-        if (userIds.length > 0) {
-            const captainTeams = await db
-                .select({
-                    captainId: teams.captain,
-                    divisionName: divisions.name
-                })
-                .from(teams)
-                .innerJoin(divisions, eq(teams.division, divisions.id))
-                .where(
-                    and(
-                        eq(teams.season, config.seasonId),
-                        inArray(teams.captain, userIds)
+                        map.set(draft.userId, {
+                            season: seasonLabel,
+                            division: draft.divisionName,
+                            captain: captainName,
+                            overall: draft.overall
+                        })
+                    }
+                }
+                return map
+            })(),
+            // Current-season draft assignments
+            (async () => {
+                const map = new Map<string, string>()
+                if (userIds.length === 0) return map
+                const draftedRows = await db
+                    .select({
+                        userId: drafts.user,
+                        divisionName: divisions.name
+                    })
+                    .from(drafts)
+                    .innerJoin(teams, eq(drafts.team, teams.id))
+                    .innerJoin(divisions, eq(teams.division, divisions.id))
+                    .where(
+                        and(
+                            eq(teams.season, config.seasonId),
+                            inArray(drafts.user, userIds)
+                        )
                     )
-                )
 
-            for (const team of captainTeams) {
-                captainDivisionMap.set(team.captainId, team.divisionName)
-            }
-        }
+                for (const draft of draftedRows) {
+                    map.set(draft.userId, draft.divisionName)
+                }
+                return map
+            })(),
+            // Current-season captain roles
+            (async () => {
+                const map = new Map<string, string>()
+                if (userIds.length === 0) return map
+                const captainTeams = await db
+                    .select({
+                        captainId: teams.captain,
+                        divisionName: divisions.name
+                    })
+                    .from(teams)
+                    .innerJoin(divisions, eq(teams.division, divisions.id))
+                    .where(
+                        and(
+                            eq(teams.season, config.seasonId),
+                            inArray(teams.captain, userIds)
+                        )
+                    )
+
+                for (const team of captainTeams) {
+                    map.set(team.captainId, team.divisionName)
+                }
+                return map
+            })()
+        ])
 
         const entries: SignupEntry[] = signupRows.map((row) => {
             const lastDraft = lastDraftInfo.get(row.userId)

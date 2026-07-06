@@ -221,36 +221,116 @@ export async function getPrepareForDraftData(
         }
     }
 
-    // Season label
-    const [seasonRow] = await db
-        .select({ year: seasons.year, season: seasons.season })
-        .from(seasons)
-        .where(eq(seasons.id, seasonId))
-        .limit(1)
+    // All these lookups depend only on seasonId/divisionId — run in parallel
+    const [
+        [seasonRow],
+        [divisionRow],
+        seasonDivisionRows,
+        [indivDiv],
+        homeworkRows,
+        signupRows,
+        teamRows,
+        priorSeasonRows
+    ] = await Promise.all([
+        // Season label
+        db
+            .select({ year: seasons.year, season: seasons.season })
+            .from(seasons)
+            .where(eq(seasons.id, seasonId))
+            .limit(1),
+        // Division name
+        db
+            .select({ name: divisions.name })
+            .from(divisions)
+            .where(eq(divisions.id, divisionId))
+            .limit(1),
+        db
+            .select({
+                id: divisions.id,
+                name: divisions.name,
+                level: divisions.level
+            })
+            .from(individual_divisions)
+            .innerJoin(
+                divisions,
+                eq(individual_divisions.division, divisions.id)
+            )
+            .where(eq(individual_divisions.season, seasonId))
+            .orderBy(asc(divisions.level)),
+        // numTeams determines completion threshold: 5 male rounds + 3 non-male rounds = 8 slots per team
+        db
+            .select({
+                numTeams: individual_divisions.teams,
+                coaches: individual_divisions.coaches
+            })
+            .from(individual_divisions)
+            .where(
+                and(
+                    eq(individual_divisions.season, seasonId),
+                    eq(individual_divisions.division, divisionId)
+                )
+            )
+            .limit(1),
+        // Query A: Draft homework entries for this season + division
+        db
+            .select({
+                captainId: draftHomework.captain,
+                playerId: draftHomework.player,
+                round: draftHomework.round,
+                isMaleTab: draftHomework.is_male_tab
+            })
+            .from(draftHomework)
+            .where(
+                and(
+                    eq(draftHomework.season, seasonId),
+                    eq(draftHomework.division, divisionId)
+                )
+            ),
+        // Query B: All signups for the season with user info
+        db
+            .select({
+                userId: users.id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name,
+                male: users.male,
+                pairPick: signups.pair_pick
+            })
+            .from(signups)
+            .innerJoin(users, eq(signups.player, users.id))
+            .where(eq(signups.season, seasonId)),
+        // Query C: Teams with captains for this division+season
+        db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                teamNumber: teams.number,
+                captainId: teams.captain,
+                captain2Id: teams.captain2,
+                c1FirstName: users.first_name,
+                c1LastName: users.last_name,
+                c1PreferredName: users.preferred_name,
+                c1Email: users.email
+            })
+            .from(teams)
+            .innerJoin(users, eq(teams.captain, users.id))
+            .where(
+                and(eq(teams.season, seasonId), eq(teams.division, divisionId))
+            ),
+        // Query D1: 3 most recent prior season IDs (weighted: index 0 = ×3, 1 = ×2, 2 = ×1)
+        db
+            .select({ id: seasons.id })
+            .from(seasons)
+            .where(lt(seasons.id, seasonId))
+            .orderBy(desc(seasons.id))
+            .limit(3)
+    ])
 
     const seasonLabel = seasonRow
         ? `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
         : String(seasonId)
 
-    // Division name
-    const [divisionRow] = await db
-        .select({ name: divisions.name })
-        .from(divisions)
-        .where(eq(divisions.id, divisionId))
-        .limit(1)
-
     const divisionName = divisionRow?.name ?? ""
-
-    const seasonDivisionRows = await db
-        .select({
-            id: divisions.id,
-            name: divisions.name,
-            level: divisions.level
-        })
-        .from(individual_divisions)
-        .innerJoin(divisions, eq(individual_divisions.division, divisions.id))
-        .where(eq(individual_divisions.season, seasonId))
-        .orderBy(asc(divisions.level))
 
     const currentDivisionConfig =
         seasonDivisionRows.find((row) => row.id === divisionId) ?? null
@@ -264,39 +344,8 @@ export async function getPrepareForDraftData(
             ? higherDivisionRows[higherDivisionRows.length - 1]
             : null
 
-    // numTeams determines completion threshold: 5 male rounds + 3 non-male rounds = 8 slots per team
-    const [indivDiv] = await db
-        .select({
-            numTeams: individual_divisions.teams,
-            coaches: individual_divisions.coaches
-        })
-        .from(individual_divisions)
-        .where(
-            and(
-                eq(individual_divisions.season, seasonId),
-                eq(individual_divisions.division, divisionId)
-            )
-        )
-        .limit(1)
-
     const usesCoaches = indivDiv?.coaches ?? false
     const completionThreshold = (indivDiv?.numTeams ?? 0) * 8
-
-    // Query A: Draft homework entries for this season + division
-    const homeworkRows = await db
-        .select({
-            captainId: draftHomework.captain,
-            playerId: draftHomework.player,
-            round: draftHomework.round,
-            isMaleTab: draftHomework.is_male_tab
-        })
-        .from(draftHomework)
-        .where(
-            and(
-                eq(draftHomework.season, seasonId),
-                eq(draftHomework.division, divisionId)
-            )
-        )
 
     // Build homework lookup: `${captainId}:${playerId}` → { round, isMaleTab }
     // Use the first entry per captain+player pair
@@ -324,43 +373,12 @@ export async function getPrepareForDraftData(
             .map(([captainId]) => captainId)
     )
 
-    // Query B: All signups for the season with user info
-    const signupRows = await db
-        .select({
-            userId: users.id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male,
-            pairPick: signups.pair_pick
-        })
-        .from(signups)
-        .innerJoin(users, eq(signups.player, users.id))
-        .where(eq(signups.season, seasonId))
-
     // Build set of player IDs that have been nominated as someone's pair pick
     const pairPickSet = new Set(
         signupRows
             .map((r) => r.pairPick)
             .filter((id): id is string => id !== null)
     )
-
-    // Query C: Teams with captains for this division+season
-    const teamRows = await db
-        .select({
-            teamId: teams.id,
-            teamName: teams.name,
-            teamNumber: teams.number,
-            captainId: teams.captain,
-            captain2Id: teams.captain2,
-            c1FirstName: users.first_name,
-            c1LastName: users.last_name,
-            c1PreferredName: users.preferred_name,
-            c1Email: users.email
-        })
-        .from(teams)
-        .innerJoin(users, eq(teams.captain, users.id))
-        .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
 
     // Fetch captain2 user info separately for teams that have one
     const captain2Ids = teamRows
@@ -440,14 +458,6 @@ export async function getPrepareForDraftData(
             coachesCompleted
         })
     }
-
-    // Query D1: 3 most recent prior season IDs (weighted: index 0 = ×3, 1 = ×2, 2 = ×1)
-    const priorSeasonRows = await db
-        .select({ id: seasons.id })
-        .from(seasons)
-        .where(lt(seasons.id, seasonId))
-        .orderBy(desc(seasons.id))
-        .limit(3)
 
     const priorSeasonIds = priorSeasonRows.map((r) => r.id)
 

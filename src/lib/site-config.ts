@@ -1,5 +1,6 @@
 import "server-only"
 
+import { cache } from "react"
 import { db } from "@/database/db"
 import {
     seasons,
@@ -8,14 +9,9 @@ import {
     signups,
     waitlist
 } from "@/database/schema"
-import { eq, desc, count, and, asc, inArray } from "drizzle-orm"
+import { eq, desc, count, and, asc } from "drizzle-orm"
 import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
-import type {
-    EventType,
-    TimeSlot,
-    SeasonEvent,
-    SeasonConfig
-} from "@/lib/season-types"
+import type { EventType, SeasonEvent, SeasonConfig } from "@/lib/season-types"
 import { getEventsByType } from "@/lib/season-utils"
 
 // Re-export types from season-types.ts (client-safe)
@@ -47,7 +43,9 @@ const EMPTY_CONFIG: SeasonConfig = {
     events: []
 }
 
-export async function getSeasonConfig(): Promise<SeasonConfig> {
+// cache() memoizes per request, so the many callers across a single render
+// (pages, rbac helpers, actions) share one lookup instead of re-querying.
+export const getSeasonConfig = cache(async (): Promise<SeasonConfig> => {
     const [season] = await db
         .select()
         .from(seasons)
@@ -59,42 +57,39 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
     }
 
     const eventRows = await db
-        .select()
+        .select({ event: seasonEvents, slot: eventTimeSlots })
         .from(seasonEvents)
+        .leftJoin(eventTimeSlots, eq(eventTimeSlots.event_id, seasonEvents.id))
         .where(eq(seasonEvents.season_id, season.id))
-        .orderBy(asc(seasonEvents.event_type), asc(seasonEvents.sort_order))
+        .orderBy(
+            asc(seasonEvents.event_type),
+            asc(seasonEvents.sort_order),
+            asc(eventTimeSlots.sort_order)
+        )
 
-    const eventIds = eventRows.map((e) => e.id)
-
-    let timeSlotRows: (typeof eventTimeSlots.$inferSelect)[] = []
-    if (eventIds.length > 0) {
-        timeSlotRows = await db
-            .select()
-            .from(eventTimeSlots)
-            .where(inArray(eventTimeSlots.event_id, eventIds))
-            .orderBy(asc(eventTimeSlots.sort_order))
+    const eventsById = new Map<number, SeasonEvent>()
+    for (const row of eventRows) {
+        let event = eventsById.get(row.event.id)
+        if (!event) {
+            event = {
+                id: row.event.id,
+                eventType: row.event.event_type as EventType,
+                eventDate: row.event.event_date,
+                sortOrder: row.event.sort_order,
+                label: row.event.label,
+                timeSlots: []
+            }
+            eventsById.set(row.event.id, event)
+        }
+        if (row.slot) {
+            event.timeSlots.push({
+                id: row.slot.id,
+                startTime: row.slot.start_time,
+                slotLabel: row.slot.slot_label,
+                sortOrder: row.slot.sort_order
+            })
+        }
     }
-
-    const slotsByEvent = new Map<number, TimeSlot[]>()
-    for (const ts of timeSlotRows) {
-        const slots = slotsByEvent.get(ts.event_id) || []
-        slots.push({
-            id: ts.id,
-            startTime: ts.start_time,
-            slotLabel: ts.slot_label,
-            sortOrder: ts.sort_order
-        })
-        slotsByEvent.set(ts.event_id, slots)
-    }
-
-    const events: SeasonEvent[] = eventRows.map((e) => ({
-        id: e.id,
-        eventType: e.event_type as EventType,
-        eventDate: e.event_date,
-        sortOrder: e.sort_order,
-        label: e.label,
-        timeSlots: slotsByEvent.get(e.id) || []
-    }))
 
     return {
         seasonId: season.id,
@@ -106,9 +101,9 @@ export async function getSeasonConfig(): Promise<SeasonConfig> {
         phase: SEASON_PHASES.includes(season.phase as SeasonPhase)
             ? (season.phase as SeasonPhase)
             : "off_season",
-        events
+        events: [...eventsById.values()]
     }
-}
+})
 
 function isPastLateDateET(lateDate: string): boolean {
     const nowET = new Date(
