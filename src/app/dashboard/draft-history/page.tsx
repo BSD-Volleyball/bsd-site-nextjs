@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirector } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getAvailableYears } from "./actions"
 import { DraftHistoryClient } from "./draft-history-client"
@@ -12,17 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function DraftHistoryPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await isAdminOrDirector(session.user.id)
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const years = await getAvailableYears()
     const playerPicUrl = process.env.PLAYER_PIC_URL ?? ""

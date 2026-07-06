@@ -7,7 +7,8 @@ export const metadata = {
 }
 
 export default async function VolleyballProfilePage() {
-    const { profile } = await getVolleyballProfile()
+    const result = await getVolleyballProfile()
+    const profile = result.status ? result.data : null
 
     return (
         <div className="space-y-6">

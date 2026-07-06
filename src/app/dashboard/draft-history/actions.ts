@@ -11,6 +11,13 @@ import {
 } from "@/database/schema"
 import { eq, and, asc, desc, inArray } from "drizzle-orm"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import {
+    withAction,
+    ok,
+    requireAdmin,
+    requirePositiveInt
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export async function getAvailableYears(): Promise<number[]> {
     const isAdmin = await isAdminOrDirectorBySession()
@@ -85,78 +92,74 @@ export type DraftTeam = {
     players: DraftPlayer[]
 }
 
-export async function getDraftResults(
-    seasonId: number,
-    divisionId: number
-): Promise<{ status: boolean; teams: DraftTeam[]; message?: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return { status: false, teams: [], message: "Unauthorized" }
+export const getDraftResults = withAction(
+    async (
+        seasonId: number,
+        divisionId: number
+    ): Promise<ActionResult<DraftTeam[]>> => {
+        await requireAdmin()
+        requirePositiveInt(seasonId, "season")
+        requirePositiveInt(divisionId, "division")
 
-    if (
-        !Number.isInteger(seasonId) ||
-        seasonId <= 0 ||
-        !Number.isInteger(divisionId) ||
-        divisionId <= 0
-    ) {
-        return { status: false, teams: [], message: "Invalid parameters" }
+        const teamRows = await db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                teamNumber: teams.number,
+                captainId: teams.captain,
+                captainFirstName: users.first_name,
+                captainLastName: users.last_name,
+                captainPreferredName: users.preferred_name
+            })
+            .from(teams)
+            .innerJoin(users, eq(teams.captain, users.id))
+            .where(
+                and(eq(teams.season, seasonId), eq(teams.division, divisionId))
+            )
+            .orderBy(asc(teams.number))
+
+        if (teamRows.length === 0) {
+            return ok([])
+        }
+
+        const teamIds = teamRows.map((t) => t.teamId)
+
+        const pickRows = await db
+            .select({
+                teamId: drafts.team,
+                userId: drafts.user,
+                round: drafts.round,
+                overall: drafts.overall,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name,
+                male: users.male
+            })
+            .from(drafts)
+            .innerJoin(users, eq(drafts.user, users.id))
+            .where(inArray(drafts.team, teamIds))
+            .orderBy(asc(drafts.round), asc(drafts.overall))
+
+        const picksByTeam = new Map<number, DraftPlayer[]>()
+        for (const pick of pickRows) {
+            const list = picksByTeam.get(pick.teamId) ?? []
+            list.push({
+                userId: pick.userId,
+                firstName: pick.firstName,
+                lastName: pick.lastName,
+                preferredName: pick.preferredName,
+                round: pick.round,
+                overall: pick.overall,
+                male: pick.male
+            })
+            picksByTeam.set(pick.teamId, list)
+        }
+
+        const result: DraftTeam[] = teamRows.map((t) => ({
+            ...t,
+            players: picksByTeam.get(t.teamId) ?? []
+        }))
+
+        return ok(result)
     }
-
-    const teamRows = await db
-        .select({
-            teamId: teams.id,
-            teamName: teams.name,
-            teamNumber: teams.number,
-            captainId: teams.captain,
-            captainFirstName: users.first_name,
-            captainLastName: users.last_name,
-            captainPreferredName: users.preferred_name
-        })
-        .from(teams)
-        .innerJoin(users, eq(teams.captain, users.id))
-        .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
-        .orderBy(asc(teams.number))
-
-    if (teamRows.length === 0) {
-        return { status: true, teams: [] }
-    }
-
-    const teamIds = teamRows.map((t) => t.teamId)
-
-    const pickRows = await db
-        .select({
-            teamId: drafts.team,
-            userId: drafts.user,
-            round: drafts.round,
-            overall: drafts.overall,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male
-        })
-        .from(drafts)
-        .innerJoin(users, eq(drafts.user, users.id))
-        .where(inArray(drafts.team, teamIds))
-        .orderBy(asc(drafts.round), asc(drafts.overall))
-
-    const picksByTeam = new Map<number, DraftPlayer[]>()
-    for (const pick of pickRows) {
-        const list = picksByTeam.get(pick.teamId) ?? []
-        list.push({
-            userId: pick.userId,
-            firstName: pick.firstName,
-            lastName: pick.lastName,
-            preferredName: pick.preferredName,
-            round: pick.round,
-            overall: pick.overall,
-            male: pick.male
-        })
-        picksByTeam.set(pick.teamId, list)
-    }
-
-    const result: DraftTeam[] = teamRows.map((t) => ({
-        ...t,
-        players: picksByTeam.get(t.teamId) ?? []
-    }))
-
-    return { status: true, teams: result }
-}
+)

@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { WaitlistList } from "./waitlist-list"
 import { getSeasonWaitlist } from "./actions"
@@ -14,17 +11,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function ViewWaitlistPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await isAdminOrDirectorBySession()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getSeasonWaitlist()
 
@@ -45,11 +32,11 @@ export default async function ViewWaitlistPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`View Waitlist — ${result.seasonLabel}`}
+                title={`View Waitlist — ${result.data.seasonLabel}`}
                 description="View all players who have expressed interest in playing if a spot opens up."
             />
             <WaitlistList
-                entries={result.entries}
+                entries={result.data.entries}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>

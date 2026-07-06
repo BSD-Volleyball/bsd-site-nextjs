@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { AuditLogList } from "./audit-log-list"
 import { getAuditLogs } from "./actions"
@@ -14,17 +11,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function AuditLogPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await isAdminOrDirectorBySession()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getAuditLogs({ offset: 0, limit: 50 })
 
@@ -40,8 +27,8 @@ export default async function AuditLogPage() {
                 </div>
             ) : (
                 <AuditLogList
-                    initialEntries={result.entries}
-                    initialTotal={result.total}
+                    initialEntries={result.data.entries}
+                    initialTotal={result.data.total}
                 />
             )}
         </div>

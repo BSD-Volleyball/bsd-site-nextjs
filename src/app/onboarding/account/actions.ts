@@ -6,6 +6,8 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { withAction, ok, requireSession } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export interface OnboardingAccountData {
     preferred_name: string | null
@@ -38,15 +40,10 @@ export async function getOnboardingAccountData(): Promise<OnboardingAccountData 
     return profile ?? null
 }
 
-export async function updateOnboardingAccount(
-    data: OnboardingAccountData
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return { status: false, message: "You need to be logged in." }
-    }
+export const updateOnboardingAccount = withAction(
+    async (data: OnboardingAccountData): Promise<ActionResult> => {
+        const session = await requireSession()
 
-    try {
         // If preferred name matches first name, clear it
         const [currentUser] = await db
             .select({ first_name: users.first_name })
@@ -82,9 +79,6 @@ export async function updateOnboardingAccount(
             summary: "Updated onboarding account details"
         })
 
-        return { status: true, message: "Account updated successfully!" }
-    } catch (error) {
-        console.error("Error updating onboarding account:", error)
-        return { status: false, message: "Something went wrong." }
+        return ok(undefined, "Account updated successfully!")
     }
-}
+)

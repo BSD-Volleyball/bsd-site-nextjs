@@ -49,7 +49,7 @@ export function ReportConcernForm() {
 
             if (result.status) {
                 setSubmitted(true)
-                setSubmittedText(result.message)
+                setSubmittedText(result.message ?? "")
                 toast.success(result.message)
             } else {
                 toast.error(result.message)

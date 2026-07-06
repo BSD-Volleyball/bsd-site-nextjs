@@ -1,11 +1,11 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { withAction, ok, requireSession } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export interface VolleyballProfileData {
     experience: string | null
@@ -17,21 +17,10 @@ export interface VolleyballProfileData {
     skill_other: boolean | null
 }
 
-export async function getVolleyballProfile(): Promise<{
-    status: boolean
-    message?: string
-    profile: VolleyballProfileData | null
-}> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return {
-            status: false,
-            message: "You need to be logged in.",
-            profile: null
-        }
-    }
+export const getVolleyballProfile = withAction(
+    async (): Promise<ActionResult<VolleyballProfileData | null>> => {
+        const session = await requireSession()
 
-    try {
         const [user] = await db
             .select({
                 experience: users.experience,
@@ -46,29 +35,14 @@ export async function getVolleyballProfile(): Promise<{
             .where(eq(users.id, session.user.id))
             .limit(1)
 
-        return {
-            status: true,
-            profile: user || null
-        }
-    } catch (error) {
-        console.error("Error fetching volleyball profile:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            profile: null
-        }
+        return ok(user || null)
     }
-}
+)
 
-export async function updateVolleyballProfile(
-    data: VolleyballProfileData
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return { status: false, message: "You need to be logged in." }
-    }
+export const updateVolleyballProfile = withAction(
+    async (data: VolleyballProfileData): Promise<ActionResult> => {
+        const session = await requireSession()
 
-    try {
         await db
             .update(users)
             .set({
@@ -91,9 +65,6 @@ export async function updateVolleyballProfile(
             summary: `Updated volleyball profile (experience: ${data.experience}, height: ${data.height})`
         })
 
-        return { status: true, message: "Profile updated successfully!" }
-    } catch (error) {
-        console.error("Error updating volleyball profile:", error)
-        return { status: false, message: "Something went wrong." }
+        return ok(undefined, "Profile updated successfully!")
     }
-}
+)

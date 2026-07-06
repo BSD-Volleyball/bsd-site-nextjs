@@ -1,11 +1,11 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { withAction, ok, fail, requireSession } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export interface AccountProfileData {
     first_name: string | null
@@ -17,21 +17,10 @@ export interface AccountProfileData {
     pronouns: string | null
 }
 
-export async function getAccountProfile(): Promise<{
-    status: boolean
-    message?: string
-    profile: AccountProfileData | null
-}> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return {
-            status: false,
-            message: "You need to be logged in.",
-            profile: null
-        }
-    }
+export const getAccountProfile = withAction(
+    async (): Promise<ActionResult<AccountProfileData | null>> => {
+        const session = await requireSession()
 
-    try {
         const [user] = await db
             .select({
                 first_name: users.first_name,
@@ -46,43 +35,30 @@ export async function getAccountProfile(): Promise<{
             .where(eq(users.id, session.user.id))
             .limit(1)
 
-        return {
-            status: true,
-            profile: user || null
+        return ok(user || null)
+    }
+)
+
+export const updateAccountField = withAction(
+    async (
+        field: keyof AccountProfileData,
+        value: string | null
+    ): Promise<ActionResult> => {
+        const session = await requireSession()
+
+        const allowedFields: (keyof AccountProfileData)[] = [
+            "first_name",
+            "last_name",
+            "preferred_name",
+            "phone",
+            "emergency_contact",
+            "pronouns"
+        ]
+
+        if (!allowedFields.includes(field)) {
+            return fail("Invalid field.")
         }
-    } catch (error) {
-        console.error("Error fetching account profile:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            profile: null
-        }
-    }
-}
 
-export async function updateAccountField(
-    field: keyof AccountProfileData,
-    value: string | null
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return { status: false, message: "You need to be logged in." }
-    }
-
-    const allowedFields: (keyof AccountProfileData)[] = [
-        "first_name",
-        "last_name",
-        "preferred_name",
-        "phone",
-        "emergency_contact",
-        "pronouns"
-    ]
-
-    if (!allowedFields.includes(field)) {
-        return { status: false, message: "Invalid field." }
-    }
-
-    try {
         // If updating first_name or last_name, also update the name field
         if (field === "first_name" || field === "last_name") {
             // Fetch current values
@@ -131,30 +107,19 @@ export async function updateAccountField(
             summary: `Updated account field: ${field}`
         })
 
-        return { status: true, message: "Updated successfully!" }
-    } catch (error) {
-        console.error("Error updating account field:", error)
-        return { status: false, message: "Something went wrong." }
+        return ok(undefined, "Updated successfully!")
     }
-}
+)
 
-export async function updateAccountProfile(
-    data: AccountProfileData
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return { status: false, message: "You need to be logged in." }
-    }
+export const updateAccountProfile = withAction(
+    async (data: AccountProfileData): Promise<ActionResult> => {
+        const session = await requireSession()
 
-    try {
         // Validate email if provided
         if (data.email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
             if (!emailRegex.test(data.email)) {
-                return {
-                    status: false,
-                    message: "Please enter a valid email address."
-                }
+                return fail("Please enter a valid email address.")
             }
         }
 
@@ -184,9 +149,6 @@ export async function updateAccountProfile(
             summary: "Updated account profile"
         })
 
-        return { status: true, message: "Profile updated successfully!" }
-    } catch (error) {
-        console.error("Error updating account profile:", error)
-        return { status: false, message: "Something went wrong." }
+        return ok(undefined, "Profile updated successfully!")
     }
-}
+)

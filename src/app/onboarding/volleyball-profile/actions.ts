@@ -6,6 +6,14 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    withAction,
+    ok,
+    fail,
+    requireSession,
+    requireNonEmptyString
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export interface VolleyballProfileData {
     experience: string | null
@@ -50,22 +58,15 @@ export async function getOnboardingVolleyballData(): Promise<VolleyballProfileDa
     }
 }
 
-export async function completeOnboarding(
-    data: VolleyballProfileData
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        return { status: false, message: "You need to be logged in." }
-    }
+export const completeOnboarding = withAction(
+    async (data: VolleyballProfileData): Promise<ActionResult> => {
+        const session = await requireSession()
 
-    if (!data.experience?.trim()) {
-        return { status: false, message: "Experience is required." }
-    }
-    if (data.height == null) {
-        return { status: false, message: "Height is required." }
-    }
+        requireNonEmptyString(data.experience, "Experience")
+        if (data.height == null) {
+            return fail("Height is required.")
+        }
 
-    try {
         await db
             .update(users)
             .set({
@@ -89,9 +90,6 @@ export async function completeOnboarding(
             summary: "Completed onboarding (volleyball profile)"
         })
 
-        return { status: true, message: "Onboarding completed!" }
-    } catch (error) {
-        console.error("Error completing onboarding:", error)
-        return { status: false, message: "Something went wrong." }
+        return ok(undefined, "Onboarding completed!")
     }
-}
+)

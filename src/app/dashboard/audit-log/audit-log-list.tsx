@@ -48,8 +48,8 @@ export function AuditLogList({
             limit: PAGE_SIZE
         })
         if (result.status) {
-            setEntries((prev) => [...prev, ...result.entries])
-            setTotal(result.total)
+            setEntries((prev) => [...prev, ...result.data.entries])
+            setTotal(result.data.total)
         }
         setLoading(false)
     }

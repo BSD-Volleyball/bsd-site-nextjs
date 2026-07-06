@@ -14,13 +14,13 @@ import type { Permission } from "@/lib/permissions"
 // ---------------------------------------------------------------------------
 
 export type ActionResult<T = void> =
-    | { status: true; data: T }
+    | { status: true; data: T; message?: string }
     | { status: false; message: string }
 
 export function ok(): ActionResult<void>
-export function ok<T>(data: T): ActionResult<T>
-export function ok<T>(data?: T): ActionResult<T> {
-    return { status: true, data: data as T }
+export function ok<T>(data: T, message?: string): ActionResult<T>
+export function ok<T>(data?: T, message?: string): ActionResult<T> {
+    return { status: true, data: data as T, message }
 }
 
 export function fail(message: string): ActionResult<never> {
@@ -127,12 +127,6 @@ export class ActionError extends Error {
  *       return ok(data)
  *   })
  */
-export function withAction<T>(
-    fn: () => Promise<ActionResult<T>>
-): () => Promise<ActionResult<T>>
-export function withAction<T, A extends unknown[]>(
-    fn: (...args: A) => Promise<ActionResult<T>>
-): (...args: A) => Promise<ActionResult<T>>
 export function withAction<T, A extends unknown[]>(
     fn: (...args: A) => Promise<ActionResult<T>>
 ): (...args: A) => Promise<ActionResult<T>> {

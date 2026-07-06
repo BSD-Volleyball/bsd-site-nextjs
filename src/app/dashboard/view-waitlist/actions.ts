@@ -1,7 +1,5 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -12,9 +10,17 @@ import {
     divisions
 } from "@/database/schema"
 import { eq, desc, inArray, and } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import {
+    withAction,
+    ok,
+    fail,
+    requireSession,
+    requireAdmin,
+    requireSeasonConfig,
+    requirePositiveInt
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
 export interface WaitlistEntry {
     waitlistId: number
@@ -29,37 +35,12 @@ export interface WaitlistEntry {
     lastDivision: string | null
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
-export async function getSeasonWaitlist(): Promise<{
-    status: boolean
-    message?: string
-    entries: WaitlistEntry[]
-    seasonLabel: string
-}> {
-    const hasAccess = await checkAdminAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            entries: [],
-            seasonLabel: ""
-        }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                entries: [],
-                seasonLabel: ""
-            }
-        }
+export const getSeasonWaitlist = withAction(
+    async (): Promise<
+        ActionResult<{ entries: WaitlistEntry[]; seasonLabel: string }>
+    > => {
+        await requireAdmin()
+        const config = await requireSeasonConfig()
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
@@ -111,41 +92,16 @@ export async function getSeasonWaitlist(): Promise<{
             lastDivision: lastDivisionMap.get(row.userId) ?? null
         }))
 
-        return {
-            status: true,
-            entries,
-            seasonLabel
-        }
-    } catch (error) {
-        console.error("Error fetching season waitlist:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            entries: [],
-            seasonLabel: ""
-        }
+        return ok({ entries, seasonLabel })
     }
-}
+)
 
-export async function setWaitlistApproval(
-    waitlistId: number,
-    approved: boolean
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
+export const setWaitlistApproval = withAction(
+    async (waitlistId: number, approved: boolean): Promise<ActionResult> => {
+        await requireAdmin()
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+        requirePositiveInt(waitlistId, "waitlist entry")
 
         const [entry] = await db
             .select({
@@ -162,7 +118,7 @@ export async function setWaitlistApproval(
             .limit(1)
 
         if (!entry) {
-            return { status: false, message: "Waitlist entry not found." }
+            return fail("Waitlist entry not found.")
         }
 
         await db
@@ -178,17 +134,11 @@ export async function setWaitlistApproval(
             summary: `${approved ? "Approved" : "Unapproved"} waitlist entry for user ${entry.userId}`
         })
 
-        return {
-            status: true,
-            message: approved
+        return ok(
+            undefined,
+            approved
                 ? "Player approved from waitlist."
                 : "Player unapproved on waitlist."
-        }
-    } catch (error) {
-        console.error("Error updating waitlist approval:", error)
-        return {
-            status: false,
-            message: "Something went wrong."
-        }
+        )
     }
-}
+)

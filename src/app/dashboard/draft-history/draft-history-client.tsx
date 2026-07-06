@@ -201,7 +201,7 @@ export function DraftHistoryClient({
         getDraftResults(Number(selectedSeason), Number(selectedDivision))
             .then((result) => {
                 if (result.status) {
-                    setDraftTeams(result.teams)
+                    setDraftTeams(result.data)
                 } else {
                     setErrorMessage(
                         result.message ?? "Failed to load draft results"
