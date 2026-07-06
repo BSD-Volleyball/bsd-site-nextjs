@@ -19,7 +19,7 @@ interface EmailLayoutOptions {
     actionUrl?: string
 }
 
-export function renderEmailHtml(opts: EmailLayoutOptions): string {
+function renderEmailHtml(opts: EmailLayoutOptions): string {
     const buttonHtml = opts.action
         ? `<div style="text-align:center;margin:24px 0;">
             <a href="${escapeHtml(opts.actionUrl ?? site.url)}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${escapeHtml(opts.action)}</a>

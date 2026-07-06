@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import {
     isAdminOrDirectorBySession,
-    isCommissionerBySession,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
 } from "@/lib/rbac"
@@ -39,21 +38,12 @@ export async function requireSession() {
     return session
 }
 
-export async function getOptionalSession() {
-    return auth.api.getSession({ headers: await headers() })
-}
-
 // ---------------------------------------------------------------------------
 // Authorization helpers — throw on failure so callers stay clean
 // ---------------------------------------------------------------------------
 
 export async function requireAdmin(): Promise<void> {
     const allowed = await isAdminOrDirectorBySession()
-    if (!allowed) throw new ActionError("Unauthorized.")
-}
-
-export async function requireCommissioner(): Promise<void> {
-    const allowed = await isCommissionerBySession()
     if (!allowed) throw new ActionError("Unauthorized.")
 }
 

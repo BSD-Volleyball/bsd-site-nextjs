@@ -71,12 +71,13 @@ npx @better-auth/cli generate
 - After successful mutations, call `router.refresh()` in client components to resync server-rendered data.
 - Keep auth and RBAC checks explicit in actions/components.
 - Prefer centralized authorization helpers in `src/lib/rbac.ts` instead of duplicating role checks in each file.
-- **Server action helpers**: Use `requireSession()`, `requireAdmin()`, `requireSeasonConfig()`, and `withAction()` from `src/lib/action-helpers.ts` to reduce boilerplate. Return `ok(data)` / `fail(message)` for consistent `ActionResult<T>` response shapes.
+- **Server action helpers**: Use `requireSession()`, `requireAdmin()`, `requirePermission()`, `requireCaptainAccess()`, `requireSeasonConfig()`, and `withAction()` from `src/lib/action-helpers.ts` to reduce boilerplate. Return `ok(data)` / `fail(message)` for consistent `ActionResult<T>` response shapes (`ok(undefined, message)` for message-only mutations).
+- **Page guards**: In server `page.tsx` files, use `requireSessionOrRedirect()`, `requireAdminOrRedirect()`, `requireCaptainAccessOrRedirect()`, or `requirePermissionOrRedirect()` from `src/lib/page-guards.ts` instead of hand-rolling the session-fetch + role-check + redirect stanza.
 - **Shared utilities**: Use `formatPlayerName()`, `buildPlayerPictureUrl()`, `serializeCsvField()`, `splitByGender()` from `src/lib/utils.ts` instead of defining local copies.
 - **Shared components**: Use `UserCombobox` from `src/components/user-combobox.tsx` instead of local copies.
 - Use `auth.api.getSession({ headers: await headers() })` directly only when session data is needed for action payloads/logging.
 - Authorization uses a permission-based system: roles are stored in the `user_roles` table and permissions are defined in `src/lib/permissions.ts`. Use `hasPermissionBySession(permission)` or `hasPermission(userId, permission, context?)` for new checks.
-- Backward-compatible helpers (`isAdminOrDirectorBySession`, `isCommissionerBySession`, `hasCaptainPagesAccessBySession`, `hasViewSignupsAccessBySession`) remain available and route through the new system.
+- Backward-compatible helpers (`isAdminOrDirectorBySession`, `isCommissionerBySession`, `hasCaptainPagesAccessBySession`) remain available and route through the new system.
 - To add a new role: add it to the `Role` type and `ROLE_PERMISSIONS` map in `src/lib/permissions.ts`. No server action changes needed.
 - Assign/revoke roles via the admin UI at `/dashboard/manage-roles/` or programmatically via `grantRole()`/`revokeRole()` from `src/lib/rbac.ts`.
 - Administrative mutations should log audit entries through `logAuditEntry` when appropriate.

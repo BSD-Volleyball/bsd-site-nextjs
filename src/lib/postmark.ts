@@ -6,8 +6,7 @@ import { ServerClient } from "postmark"
 // ---------------------------------------------------------------------------
 
 export const STREAM_OUTBOUND = "outbound"
-export const STREAM_AUTOMATED_REMINDERS = "automated-reminders"
-export const STREAM_INBOUND = "inbound"
+const STREAM_AUTOMATED_REMINDERS = "automated-reminders"
 export const STREAM_BROADCAST = "broadcast"
 export const STREAM_IN_SEASON_UPDATES = "in-season-updates"
 
@@ -23,7 +22,7 @@ export type MessageStream =
 
 let _client: ServerClient | null = null
 
-export function getPostmarkClient(): ServerClient {
+function getPostmarkClient(): ServerClient {
     if (!_client) {
         const token = process.env.POSTMARK_SERVER_TOKEN
         if (!token) {

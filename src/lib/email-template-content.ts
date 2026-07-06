@@ -71,7 +71,7 @@ export interface LexicalEmailTemplateContent {
     root: LexicalRootNode
 }
 
-export function createLexicalContentFromPlainText(
+function createLexicalContentFromPlainText(
     value: string
 ): LexicalEmailTemplateContent {
     const normalized = value.replace(/\r\n/g, "\n")
@@ -137,7 +137,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null
 }
 
-export function isLexicalEmailTemplateContent(
+function isLexicalEmailTemplateContent(
     value: unknown
 ): value is LexicalEmailTemplateContent {
     if (!isObject(value)) {

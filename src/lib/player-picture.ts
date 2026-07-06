@@ -1,4 +1,4 @@
-export const PLAYER_PICTURE_OBJECT_PREFIX = "playerpics"
+const PLAYER_PICTURE_OBJECT_PREFIX = "playerpics"
 
 interface PlayerPictureIdentity {
     old_id: number | null

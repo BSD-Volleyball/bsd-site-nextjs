@@ -60,7 +60,7 @@ export function getSetScores(row: {
     return sets
 }
 
-export function getHeadToHeadStats(
+function getHeadToHeadStats(
     divisionMatches: RankableMatch[],
     teamAId: number,
     teamBId: number,

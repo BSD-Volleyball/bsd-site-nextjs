@@ -11,12 +11,12 @@ import { formatMatchTime } from "@/lib/season-utils"
 import type {
     MatchComponentProps,
     SvgWrapperProps
-} from "@/lib/playoff-brackets"
+} from "@/components/playoff-brackets"
 import type { BracketMatch } from "@/app/dashboard/playoffs/[seasonId]/actions"
 
 const DoubleEliminationBracket = dynamic(
     () =>
-        import("@/lib/playoff-brackets").then(
+        import("@/components/playoff-brackets").then(
             (mod) => mod.DoubleEliminationBracket
         ),
     { ssr: false }

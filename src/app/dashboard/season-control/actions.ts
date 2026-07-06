@@ -86,7 +86,7 @@ export async function advanceSeasonPhase(
             // "teamphotos/123/team45.jpg"). The Hall of Champions renders
             // champions.picture as an <img src> directly, so we need to
             // store an absolute URL — matching the historical convention
-            // populated by scripts/import-hoc-champions.ts.
+            // populated by scripts/archive/import-hoc-champions.ts.
             const picBase = (process.env.PLAYER_PIC_URL ?? "").replace(
                 /\/+$/,
                 ""

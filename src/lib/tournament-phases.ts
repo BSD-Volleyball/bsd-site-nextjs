@@ -88,10 +88,6 @@ export const TOURNAMENT_PHASE_CONFIG: Record<
     }
 }
 
-export function isActiveTournamentPhase(phase: TournamentPhase): boolean {
-    return phase !== "complete"
-}
-
 export function isValidTournamentPhaseTransition(
     currentPhase: TournamentPhase,
     targetPhase: TournamentPhase

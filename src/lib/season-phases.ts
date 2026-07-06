@@ -177,10 +177,6 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
     }
 }
 
-export function isActivePhase(phase: SeasonPhase): boolean {
-    return phase !== "off_season" && phase !== "complete"
-}
-
 export function isValidPhaseTransition(
     currentPhase: SeasonPhase,
     targetPhase: SeasonPhase

@@ -18,12 +18,10 @@ const guardPatterns = [
     /isAdminOrDirectorBySession\s*\(/,
     /isCommissionerBySession\s*\(/,
     /hasAdministrativeAccessBySession\s*\(/,
-    /hasViewSignupsAccessBySession\s*\(/,
     /hasCaptainPagesAccessBySession\s*\(/,
     /hasPermissionBySession\s*\(/,
     /requireAdmin\s*\(/,
     /requireSession\s*\(/,
-    /requireCommissioner\s*\(/,
     /requireCaptainAccess\s*\(/,
     /requirePermission\s*\(/
 ]

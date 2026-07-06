@@ -126,19 +126,6 @@ export async function getTournamentConfig(): Promise<TournamentConfig | null> {
     return rowToConfig(t, divisions)
 }
 
-export async function getTournamentConfigById(
-    tournamentId: number
-): Promise<TournamentConfig | null> {
-    const [t] = await db
-        .select()
-        .from(tournaments)
-        .where(eq(tournaments.id, tournamentId))
-        .limit(1)
-    if (!t) return null
-    const divisions = await loadDivisions(t.id)
-    return rowToConfig(t, divisions)
-}
-
 function isPastDateET(date: string): boolean {
     const nowET = new Date(
         new Date().toLocaleString("en-US", { timeZone: "America/New_York" })
@@ -152,11 +139,6 @@ export function getCurrentTournamentCost(config: TournamentConfig): string {
         return config.lateCost
     }
     return config.cost
-}
-
-export function isLateTournamentPricing(config: TournamentConfig): boolean {
-    if (!config.lateDate || !config.lateCost) return false
-    return isPastDateET(config.lateDate)
 }
 
 export function isRegistrationClosed(config: TournamentConfig): boolean {

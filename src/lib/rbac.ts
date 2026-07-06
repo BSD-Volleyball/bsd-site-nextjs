@@ -156,10 +156,6 @@ export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
     return hasPermissionBySession("signups:view", { seasonId: config.seasonId })
 }
 
-export async function hasViewSignupsAccessBySession(): Promise<boolean> {
-    return hasCaptainPagesAccessBySession()
-}
-
 // ---------------------------------------------------------------------------
 // Commissioner division scoping
 // ---------------------------------------------------------------------------

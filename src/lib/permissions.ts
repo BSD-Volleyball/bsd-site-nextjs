@@ -134,10 +134,6 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     ]
 }
 
-export function roleHasPermission(role: Role, permission: Permission): boolean {
-    return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
-}
-
 const VALID_ROLES = new Set<string>(Object.keys(ROLE_PERMISSIONS))
 
 export function isValidRole(value: string): value is Role {

@@ -250,65 +250,6 @@ export async function resolveActiveUserForSlot(
  * the original (subbed-out) and sub-in players so callers can render names
  * directly without a follow-up query.
  */
-export async function getMatchSubsForMatch(
-    matchId: number
-): Promise<MatchSubEntry[]> {
-    if (!Number.isInteger(matchId) || matchId <= 0) return []
-    const rows = await db
-        .select({
-            id: matchSubstitutions.id,
-            matchId: matchSubstitutions.match,
-            matchDate: matches.date,
-            teamId: matchSubstitutions.team,
-            originalUser: matchSubstitutions.original_user,
-            subUser: matchSubstitutions.sub_user,
-            notes: matchSubstitutions.notes
-        })
-        .from(matchSubstitutions)
-        .innerJoin(matches, eq(matchSubstitutions.match, matches.id))
-        .where(eq(matchSubstitutions.match, matchId))
-
-    if (rows.length === 0) return []
-
-    const ids = new Set<string>()
-    for (const r of rows) {
-        ids.add(r.originalUser)
-        ids.add(r.subUser)
-    }
-    const userRows = await db
-        .select({
-            id: users.id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male
-        })
-        .from(users)
-        .where(inArray(users.id, Array.from(ids)))
-    const userMap = new Map(userRows.map((u) => [u.id, toSummary(u)]))
-
-    return rows.map((r) => ({
-        matchSubId: r.id,
-        matchId: r.matchId,
-        matchDate: r.matchDate,
-        teamId: r.teamId,
-        originalUser: userMap.get(r.originalUser) ?? {
-            id: r.originalUser,
-            firstName: "",
-            lastName: "",
-            preferredName: null,
-            male: null
-        },
-        subUser: userMap.get(r.subUser) ?? {
-            id: r.subUser,
-            firstName: "",
-            lastName: "",
-            preferredName: null,
-            male: null
-        },
-        notes: r.notes
-    }))
-}
 
 /**
  * Returns regular-sub records grouped by match id for a set of matches.

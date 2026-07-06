@@ -230,22 +230,13 @@ function buildTimeSlotVariables(config: SeasonConfig): TemplateVariable[] {
  * Build the full list of template variables including season-specific
  * date and time slot entries derived from the given SeasonConfig.
  */
-export function buildTemplateVariables(
-    config: SeasonConfig
-): TemplateVariable[] {
+function buildTemplateVariables(config: SeasonConfig): TemplateVariable[] {
     return [
         ...STATIC_VARIABLES,
         ...buildDateVariables(config),
         ...buildTimeSlotVariables(config)
     ]
 }
-
-/**
- * Static-only variable list (General, People, Draft).
- * @deprecated Pass a SeasonConfig to {@link buildTemplateVariables} for the
- * complete list including dynamic date/time variables.
- */
-export const TEMPLATE_VARIABLES = STATIC_VARIABLES
 
 export function getTemplateVariable(
     key: string,
