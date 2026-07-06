@@ -77,10 +77,6 @@ export interface CreateScheduleData {
     playoffPreview: Map<number, PlayoffPreviewMatch[]> | null
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getCreateScheduleData(): Promise<{
     status: boolean
     message?: string
@@ -93,7 +89,7 @@ export async function getCreateScheduleData(): Promise<{
     seasonTimes: string[]
     playoffDates: string[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -297,7 +293,7 @@ function buildRegularSeasonMatches(
 export async function writeRegularSeasonSchedule(
     seasonId: number
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -412,7 +408,7 @@ export async function writeRegularSeasonSchedule(
 export async function writePlayoffSchedule(
     seasonId: number
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,

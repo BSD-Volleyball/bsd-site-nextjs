@@ -30,10 +30,6 @@ export interface UnmatchedPair {
     }
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 function buildDisplayName(
     firstName: string,
     lastName: string,
@@ -50,7 +46,7 @@ export async function getSeasonPairs(): Promise<{
     unmatched: UnmatchedPair[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -242,7 +238,7 @@ export async function bustMatchedPair(
     userAId: string,
     userBId: string
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -297,7 +293,7 @@ export async function bustMatchedPair(
 export async function bustUnmatchedPair(
     requesterId: string
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -349,7 +345,7 @@ export async function completeUnmatchedPair(
     requesterId: string,
     requestedId: string
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

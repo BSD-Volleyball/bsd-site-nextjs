@@ -34,12 +34,8 @@ import {
     getPlayerPictureObjectKey
 } from "@/lib/player-picture"
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return []
     }
@@ -99,7 +95,7 @@ export interface UserDetails {
 export async function getUserDetails(
     userId: string
 ): Promise<{ status: boolean; message?: string; user?: UserDetails }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -131,7 +127,7 @@ export async function createPlayerPictureUpload(
     uploadUrl?: string
     pictureFilename?: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -203,7 +199,7 @@ export async function finalizePlayerPictureUpload(
     userId: string,
     pictureFilename: string
 ): Promise<{ status: boolean; message: string; picturePath?: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -308,7 +304,7 @@ export async function updateUser(
         captain_eligible?: boolean
     }
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -476,7 +472,7 @@ export interface SignupDetails {
 export async function getSignupForCurrentSeason(
     userId: string
 ): Promise<{ status: boolean; signup?: SignupDetails }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false }
     }
@@ -538,7 +534,7 @@ export async function updateSignup(
         amount_paid?: string | null
     }
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

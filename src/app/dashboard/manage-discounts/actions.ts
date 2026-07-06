@@ -23,16 +23,12 @@ export interface DiscountEntry {
     createdAt: Date
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getDiscounts(): Promise<{
     status: boolean
     message?: string
     discounts: DiscountEntry[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", discounts: [] }
     }
@@ -85,7 +81,7 @@ export async function getDiscounts(): Promise<{
 }
 
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return []
     }
@@ -116,7 +112,7 @@ export async function createDiscount(data: {
     reason: string | null
     scope: DiscountScope
 }): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -172,7 +168,7 @@ export async function updateDiscount(data: {
     expiration: string | null
     reason: string | null
 }): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }
@@ -222,7 +218,7 @@ export async function updateDiscount(data: {
 export async function deleteDiscount(
     id: number
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

@@ -43,10 +43,6 @@ export interface NewPlayerEntry {
     evaluatorDetails: EvaluatorDetail[]
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getNewPlayers(): Promise<{
     status: boolean
     message?: string
@@ -54,7 +50,7 @@ export async function getNewPlayers(): Promise<{
     divisions: DivisionOption[]
     seasonLabel: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -235,7 +231,7 @@ export async function getNewPlayers(): Promise<{
 export async function saveEvaluations(
     data: { playerId: string; division: number }[]
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

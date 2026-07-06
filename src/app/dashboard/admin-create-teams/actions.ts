@@ -30,10 +30,6 @@ export interface UserOption {
     preferred_name: string | null
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getCreateTeamsData(): Promise<{
     status: boolean
     message?: string
@@ -41,7 +37,7 @@ export async function getCreateTeamsData(): Promise<{
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -112,7 +108,7 @@ export async function createTeams(
     divisionId: number,
     teamsToCreate: TeamToCreate[]
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,

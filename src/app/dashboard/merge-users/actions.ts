@@ -50,17 +50,13 @@ export interface UserOption {
     createdAt: Date
 }
 
-async function checkAdminAccess(userId: string): Promise<boolean> {
-    return isAdminOrDirector(userId)
-}
-
 export async function getOldUsers(): Promise<UserOption[]> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
         return []
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await isAdminOrDirector(session.user.id)
     if (!hasAccess) {
         return []
     }
@@ -99,7 +95,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
         return []
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await isAdminOrDirector(session.user.id)
     if (!hasAccess) {
         return []
     }
@@ -141,7 +137,7 @@ export async function mergeUsers(
         return { status: false, message: "Not authenticated." }
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await isAdminOrDirector(session.user.id)
     if (!hasAccess) {
         return { status: false, message: "Access denied." }
     }

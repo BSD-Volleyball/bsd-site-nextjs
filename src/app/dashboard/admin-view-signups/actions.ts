@@ -60,10 +60,6 @@ export interface SignupEntry {
     notificationList: string
 }
 
-async function checkAdminAccess(): Promise<boolean> {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getSeasonSignups(): Promise<{
     status: boolean
     message?: string
@@ -71,7 +67,7 @@ export async function getSeasonSignups(): Promise<{
     seasonLabel: string
     lateAmount: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -406,7 +402,7 @@ export async function deleteSignupEntry(
     status: boolean
     message: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -572,7 +568,7 @@ export async function getDeletedSignups(): Promise<{
     message: string
     entries: DeletedSignupEntry[]
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized", entries: [] }
     }

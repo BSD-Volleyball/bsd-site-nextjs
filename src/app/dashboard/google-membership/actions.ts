@@ -21,10 +21,6 @@ export interface GoogleMembershipUser {
     notificationList: string
 }
 
-async function checkAdminAccess() {
-    return isAdminOrDirectorBySession()
-}
-
 export async function getGoogleMembershipUsers(params?: {
     query?: string
     page?: number
@@ -41,7 +37,7 @@ export async function getGoogleMembershipUsers(params?: {
     query: string
     filter: string
 }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -202,7 +198,7 @@ export async function updateGoogleMembership(
         notificationList: string
     }
 ): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await checkAdminAccess()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return { status: false, message: "Unauthorized" }
     }

@@ -41,13 +41,13 @@ const strictExpectations = [
     },
     {
         key: "src/app/dashboard/player-lookup/actions.ts:getPlayersForLookup",
-        pattern: /checkAdminOrCommissionerAccess\s*\(/,
-        description: "must gate access via checkAdminOrCommissionerAccess"
+        pattern: /isCommissionerBySession\s*\(/,
+        description: "must gate access via isCommissionerBySession"
     },
     {
         key: "src/app/dashboard/player-lookup/actions.ts:getPlayerDetails",
-        pattern: /checkAdminOrCommissionerAccess\s*\(/,
-        description: "must gate access via checkAdminOrCommissionerAccess"
+        pattern: /isCommissionerBySession\s*\(/,
+        description: "must gate access via isCommissionerBySession"
     },
     {
         key: "src/app/dashboard/rosters/[seasonId]/actions.ts:getRosterData",

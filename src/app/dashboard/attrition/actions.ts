@@ -7,10 +7,6 @@ import { users, drafts, teams } from "@/database/schema"
 import { eq, sql, count, max } from "drizzle-orm"
 import { isAdminOrDirector } from "@/lib/rbac"
 
-async function checkAdminAccess(userId: string): Promise<boolean> {
-    return isAdminOrDirector(userId)
-}
-
 export interface GenderAttritionData {
     label: string
     count: number
@@ -64,7 +60,7 @@ export async function getAttritionData(): Promise<{
         return { status: false, message: "Not authenticated.", ...empty }
     }
 
-    const hasAccess = await checkAdminAccess(session.user.id)
+    const hasAccess = await isAdminOrDirector(session.user.id)
     if (!hasAccess) {
         return { status: false, message: "Access denied.", ...empty }
     }

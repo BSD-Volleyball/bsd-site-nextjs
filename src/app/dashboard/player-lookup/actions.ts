@@ -115,16 +115,12 @@ export interface PlayerSubHistoryEntry {
     notes?: string | null
 }
 
-async function checkAdminOrCommissionerAccess(): Promise<boolean> {
-    return isCommissionerBySession()
-}
-
 export async function getPlayersForLookup(): Promise<{
     status: boolean
     message?: string
     players: PlayerListItem[]
 }> {
-    const hasAccess = await checkAdminOrCommissionerAccess()
+    const hasAccess = await isCommissionerBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -172,7 +168,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
     viewerRating: PlayerViewerRating | null
     playoffDates: string[]
 }> {
-    const hasAccess = await checkAdminOrCommissionerAccess()
+    const hasAccess = await isCommissionerBySession()
     if (!hasAccess) {
         return {
             status: false,
@@ -384,7 +380,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
 export async function getPlayerSubHistory(
     userId: string
 ): Promise<PlayerSubHistoryEntry[]> {
-    if (!(await checkAdminOrCommissionerAccess())) return []
+    if (!(await isCommissionerBySession())) return []
     if (typeof userId !== "string" || !userId) return []
 
     const counterpart = alias(users, "counterpart")
