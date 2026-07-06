@@ -62,7 +62,7 @@ import {
     getSidebarData,
     type SeasonNavItem,
     type TournamentSidebarInfo
-} from "@/app/dashboard/actions"
+} from "@/app/dashboard/sidebar-actions"
 import {
     PHASE_CONFIG,
     SEASON_PHASES,

@@ -4,7 +4,7 @@ import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditEmailsForm } from "./edit-emails-form"
 import { getEmailTemplates } from "./actions"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

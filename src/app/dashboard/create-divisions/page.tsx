@@ -2,7 +2,10 @@ import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector, getSeasonPhase } from "@/app/dashboard/actions"
+import {
+    getIsAdminOrDirector,
+    getSeasonPhase
+} from "@/app/dashboard/access-actions"
 import { getDivisionsPageData } from "./actions"
 import { CreateDivisionsClient } from "./create-divisions-client"
 import type { Metadata } from "next"

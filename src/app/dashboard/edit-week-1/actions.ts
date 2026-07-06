@@ -29,7 +29,7 @@ import {
     formatEventTime
 } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { site } from "@/config/site"
 

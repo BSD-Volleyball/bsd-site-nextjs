@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { WaiverContent } from "@/components/waiver-content"
-import { expressWaitlistInterest } from "./actions"
+import { expressWaitlistInterest } from "./roster-actions"
 
 interface WaitlistButtonProps {
     seasonId: number

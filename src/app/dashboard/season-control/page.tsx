@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 import { getCurrentSeasonPhaseData } from "./actions"
 import { SeasonPhaseControl } from "./season-phase-control"

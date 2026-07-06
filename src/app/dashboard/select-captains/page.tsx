@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SelectCaptainsForm } from "./select-captains-form"
 import { getCreateTeamsData } from "./actions"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

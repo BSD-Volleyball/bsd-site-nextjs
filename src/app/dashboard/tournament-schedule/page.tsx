@@ -3,7 +3,7 @@ import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { auth } from "@/lib/auth"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getScheduleView } from "./actions"
 import { ScheduleEditor } from "./schedule-editor"
 

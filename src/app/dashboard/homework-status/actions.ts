@@ -12,7 +12,7 @@ import {
     draftHomework
 } from "@/database/schema"
 import { eq, and, notInArray, desc, count, inArray, or } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getCommissionerDivisionScope } from "@/lib/rbac"

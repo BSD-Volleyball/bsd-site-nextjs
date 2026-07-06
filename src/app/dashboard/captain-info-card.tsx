@@ -24,8 +24,8 @@ import {
     resolveSubjectVariables
 } from "@/lib/email-template-variables"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
-import type { CaptainWelcomeData } from "./actions"
-import { logContactDetailsViewed } from "./actions"
+import type { CaptainWelcomeData } from "./roster-actions"
+import { logContactDetailsViewed } from "./roster-actions"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import type { Metadata } from "next"

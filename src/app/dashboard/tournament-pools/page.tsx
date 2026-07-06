@@ -3,7 +3,7 @@ import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { auth } from "@/lib/auth"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getTournamentPoolsView } from "./actions"
 import { TournamentPoolsManager } from "./pools-manager"
 

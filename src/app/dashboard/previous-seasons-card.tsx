@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import type { PreviousSeason } from "./page"
-import type { TeamRosterPlayer } from "./actions"
-import { getTeamRoster } from "./actions"
+import type { TeamRosterPlayer } from "./roster-actions"
+import { getTeamRoster } from "./roster-actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     Dialog,

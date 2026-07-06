@@ -77,7 +77,7 @@ function walk(dir, accumulator = []) {
             walk(fullPath, accumulator)
             continue
         }
-        if (entry.isFile() && entry.name === "actions.ts") {
+        if (entry.isFile() && entry.name.endsWith("actions.ts")) {
             accumulator.push(fullPath)
         }
     }

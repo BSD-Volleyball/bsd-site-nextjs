@@ -19,7 +19,7 @@ import {
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     GROUP_COLORS,

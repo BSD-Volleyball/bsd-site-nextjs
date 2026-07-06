@@ -4,7 +4,7 @@ import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDayForm } from "./draft-day-form"
 import { getDraftDayData } from "./actions"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

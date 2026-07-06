@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import {
     getSeasonConfig,
     getEventsByType,

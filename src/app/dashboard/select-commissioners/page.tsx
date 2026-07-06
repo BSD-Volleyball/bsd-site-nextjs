@@ -4,8 +4,8 @@ import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
 import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
-import { getSeasonPhase } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+import { getSeasonPhase } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

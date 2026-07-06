@@ -13,7 +13,7 @@ import {
     signups
 } from "@/database/schema"
 import { eq, and, sql, inArray } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"

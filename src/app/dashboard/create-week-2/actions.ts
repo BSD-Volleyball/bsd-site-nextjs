@@ -19,7 +19,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import type {
     Week2Candidate,

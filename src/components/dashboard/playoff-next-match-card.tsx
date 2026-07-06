@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { PlayoffNextMatchData } from "@/app/dashboard/actions"
+import type { PlayoffNextMatchData } from "@/app/dashboard/next-match-actions"
 
 function formatShortDate(date: string | null): string {
     if (!date) return "TBD"

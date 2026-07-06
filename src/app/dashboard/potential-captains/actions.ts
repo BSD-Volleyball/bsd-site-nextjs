@@ -13,7 +13,7 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray, notInArray, desc, isNotNull } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,

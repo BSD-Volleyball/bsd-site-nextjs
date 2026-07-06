@@ -17,7 +17,7 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray, asc, ne, isNotNull } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getIsCommissioner } from "@/app/dashboard/actions"
+import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import {
     getCommissionerDivisionAccess,

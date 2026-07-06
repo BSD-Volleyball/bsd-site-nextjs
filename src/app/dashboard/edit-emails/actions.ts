@@ -3,7 +3,7 @@
 import { db } from "@/database/db"
 import { emailTemplates } from "@/database/schema"
 import { eq } from "drizzle-orm"
-import { getIsAdminOrDirector } from "@/app/dashboard/actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { logAuditEntry } from "@/lib/audit-log"
 import { headers } from "next/headers"
