@@ -177,8 +177,8 @@ export type CommissionerDivisionScope =
 /**
  * Returns the division scope for a commissioner in a given season.
  * Admins/directors are always league-wide. Division-specific commissioners
- * are scoped to their one division. Falls back to the legacy commissioners
- * table if no user_roles row is found.
+ * are scoped to their one division. The user_roles table is the sole
+ * authority; no user_roles row means access is denied.
  */
 export async function getCommissionerDivisionScope(
     userId: string,

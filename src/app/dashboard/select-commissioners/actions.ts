@@ -2,14 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
-import {
-    seasons,
-    divisions,
-    commissioners,
-    users,
-    userRoles
-} from "@/database/schema"
-import { eq, desc, inArray, notInArray, and } from "drizzle-orm"
+import { seasons, divisions, users, userRoles } from "@/database/schema"
+import { eq, desc, inArray, notInArray, and, isNotNull } from "drizzle-orm"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
@@ -206,14 +200,20 @@ export async function getCommissionersForSeason(seasonId: number): Promise<{
             }
         }
 
-        // Get all commissioners for this season
+        // Get all division-scoped commissioners for this season
         const seasonCommissioners = await db
             .select({
-                divisionId: commissioners.division,
-                commissionerId: commissioners.commissioner
+                divisionId: userRoles.division_id,
+                commissionerId: userRoles.user_id
             })
-            .from(commissioners)
-            .where(eq(commissioners.season, seasonId))
+            .from(userRoles)
+            .where(
+                and(
+                    eq(userRoles.role, "commissioner"),
+                    eq(userRoles.season_id, seasonId),
+                    isNotNull(userRoles.division_id)
+                )
+            )
 
         // Build assignments for each division
         const assignments: CommissionerAssignment[] =
@@ -255,27 +255,18 @@ export async function saveCommissioners(data: {
     }
 
     try {
-        // Delete existing commissioners for this season
-        await db
-            .delete(commissioners)
-            .where(eq(commissioners.season, data.seasonId))
-
-        // Also remove from user_roles (the new system)
+        // Replace this season's division-scoped commissioner roles.
+        // League-wide commissioner rows (division_id IS NULL) are managed via
+        // /dashboard/manage-roles and deliberately left untouched here.
         await db
             .delete(userRoles)
             .where(
                 and(
                     eq(userRoles.role, "commissioner"),
-                    eq(userRoles.season_id, data.seasonId)
+                    eq(userRoles.season_id, data.seasonId),
+                    isNotNull(userRoles.division_id)
                 )
             )
-
-        // Insert new commissioner assignments
-        const insertValues: Array<{
-            season: number
-            division: number
-            commissioner: string
-        }> = []
 
         const userRoleValues: Array<{
             user_id: string
@@ -286,11 +277,6 @@ export async function saveCommissioners(data: {
 
         for (const assignment of data.assignments) {
             if (assignment.commissioner1) {
-                insertValues.push({
-                    season: data.seasonId,
-                    division: assignment.divisionId,
-                    commissioner: assignment.commissioner1
-                })
                 userRoleValues.push({
                     user_id: assignment.commissioner1,
                     role: "commissioner",
@@ -299,11 +285,6 @@ export async function saveCommissioners(data: {
                 })
             }
             if (assignment.commissioner2) {
-                insertValues.push({
-                    season: data.seasonId,
-                    division: assignment.divisionId,
-                    commissioner: assignment.commissioner2
-                })
                 userRoleValues.push({
                     user_id: assignment.commissioner2,
                     role: "commissioner",
@@ -313,9 +294,6 @@ export async function saveCommissioners(data: {
             }
         }
 
-        if (insertValues.length > 0) {
-            await db.insert(commissioners).values(insertValues)
-        }
         if (userRoleValues.length > 0) {
             await db.insert(userRoles).values(userRoleValues)
         }

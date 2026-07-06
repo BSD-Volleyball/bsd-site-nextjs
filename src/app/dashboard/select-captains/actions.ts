@@ -11,9 +11,9 @@ import {
     teams,
     signups,
     emailTemplates,
-    commissioners
+    userRoles
 } from "@/database/schema"
-import { eq, and, inArray, asc, ne } from "drizzle-orm"
+import { eq, and, inArray, asc, ne, isNotNull } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
@@ -220,14 +220,20 @@ export async function getCreateTeamsData(): Promise<{
                 .orderBy(users.last_name, users.first_name),
             db
                 .select({
-                    divisionId: commissioners.division,
-                    userId: commissioners.commissioner,
+                    divisionId: userRoles.division_id,
+                    userId: userRoles.user_id,
                     firstName: users.first_name,
                     preferredName: users.preferred_name
                 })
-                .from(commissioners)
-                .innerJoin(users, eq(commissioners.commissioner, users.id))
-                .where(eq(commissioners.season, config.seasonId)),
+                .from(userRoles)
+                .innerJoin(users, eq(userRoles.user_id, users.id))
+                .where(
+                    and(
+                        eq(userRoles.role, "commissioner"),
+                        eq(userRoles.season_id, config.seasonId),
+                        isNotNull(userRoles.division_id)
+                    )
+                ),
             db
                 .select({
                     id: teams.id,
@@ -242,8 +248,12 @@ export async function getCreateTeamsData(): Promise<{
                 .orderBy(teams.number)
         ])
 
-        const divisionCommissioners: DivisionCommissioner[] =
-            commissionerRows.map((row) => ({
+        const divisionCommissioners: DivisionCommissioner[] = commissionerRows
+            .filter(
+                (row): row is typeof row & { divisionId: number } =>
+                    row.divisionId !== null
+            )
+            .map((row) => ({
                 divisionId: row.divisionId,
                 userId: row.userId,
                 name: row.preferredName || row.firstName

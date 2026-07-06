@@ -7,8 +7,8 @@ import {
     seasons,
     divisions,
     teams,
-    commissioners,
-    individual_divisions
+    individual_divisions,
+    userRoles
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
@@ -174,22 +174,24 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
 
         const commissionerRows = await db
             .select({
-                divisionId: commissioners.division,
+                divisionId: userRoles.division_id,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preferred_name
             })
-            .from(commissioners)
-            .innerJoin(users, eq(commissioners.commissioner, users.id))
+            .from(userRoles)
+            .innerJoin(users, eq(userRoles.user_id, users.id))
             .where(
                 and(
-                    eq(commissioners.season, seasonId),
-                    inArray(commissioners.division, divisionIds)
+                    eq(userRoles.role, "commissioner"),
+                    eq(userRoles.season_id, seasonId),
+                    inArray(userRoles.division_id, divisionIds)
                 )
             )
 
         const commissionersByDivision = new Map<number, string[]>()
         for (const c of commissionerRows) {
+            if (c.divisionId === null) continue
             const displayName = c.preferredName || c.firstName
             const arr = commissionersByDivision.get(c.divisionId) || []
             arr.push(`${displayName} ${c.lastName}`)

@@ -7,12 +7,12 @@ import {
     users,
     signups,
     drafts,
-    commissioners,
     teams,
     seasons,
     divisions,
     week1Rosters,
-    userUnavailability
+    userUnavailability,
+    userRoles
 } from "@/database/schema"
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
@@ -149,9 +149,14 @@ export async function getCreateWeek1Data(): Promise<{
                     .where(eq(signups.season, config.seasonId))
                     .orderBy(users.last_name, users.first_name),
                 db
-                    .select({ userId: commissioners.commissioner })
-                    .from(commissioners)
-                    .where(eq(commissioners.season, config.seasonId)),
+                    .select({ userId: userRoles.user_id })
+                    .from(userRoles)
+                    .where(
+                        and(
+                            eq(userRoles.role, "commissioner"),
+                            eq(userRoles.season_id, config.seasonId)
+                        )
+                    ),
                 db
                     .selectDistinct({ userId: teams.captain })
                     .from(teams)

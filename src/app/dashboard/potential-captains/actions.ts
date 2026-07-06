@@ -10,9 +10,9 @@ import {
     teams,
     drafts,
     emailTemplates,
-    commissioners
+    userRoles
 } from "@/database/schema"
-import { eq, and, inArray, notInArray, desc } from "drizzle-orm"
+import { eq, and, inArray, notInArray, desc, isNotNull } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/actions"
 import {
     type LexicalEmailTemplateContent,
@@ -632,14 +632,20 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 getSeasonConfig(),
                 db
                     .select({
-                        divisionId: commissioners.division,
-                        userId: commissioners.commissioner,
+                        divisionId: userRoles.division_id,
+                        userId: userRoles.user_id,
                         firstName: users.first_name,
                         preferredName: users.preferred_name
                     })
-                    .from(commissioners)
-                    .innerJoin(users, eq(commissioners.commissioner, users.id))
-                    .where(eq(commissioners.season, targetSeason.id))
+                    .from(userRoles)
+                    .innerJoin(users, eq(userRoles.user_id, users.id))
+                    .where(
+                        and(
+                            eq(userRoles.role, "commissioner"),
+                            eq(userRoles.season_id, targetSeason.id),
+                            isNotNull(userRoles.division_id)
+                        )
+                    )
             ])
 
         if (templateResult.status === "fulfilled" && templateResult.value[0]) {
@@ -663,11 +669,16 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
         }
 
         if (commissionersResult.status === "fulfilled") {
-            divisionCommissioners = commissionersResult.value.map((row) => ({
-                divisionId: row.divisionId,
-                userId: row.userId,
-                name: row.preferredName || row.firstName
-            }))
+            divisionCommissioners = commissionersResult.value
+                .filter(
+                    (row): row is typeof row & { divisionId: number } =>
+                        row.divisionId !== null
+                )
+                .map((row) => ({
+                    divisionId: row.divisionId,
+                    userId: row.userId,
+                    name: row.preferredName || row.firstName
+                }))
         }
 
         return {

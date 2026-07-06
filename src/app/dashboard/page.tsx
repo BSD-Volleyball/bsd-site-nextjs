@@ -15,7 +15,6 @@ import {
     waitlist,
     champions,
     evaluations,
-    commissioners,
     concerns,
     week1Rosters,
     week2Rosters,
@@ -23,7 +22,8 @@ import {
     userUnavailability,
     seasonEvents,
     matchReferees,
-    matches
+    matches,
+    userRoles
 } from "@/database/schema"
 import {
     eq,
@@ -358,23 +358,24 @@ async function getCommissionerCaptainSelectionStatus(
 ): Promise<CaptainSelectionDivisionStatus[]> {
     const commissionerDivisions = await db
         .select({
-            divisionId: commissioners.division,
+            divisionId: divisions.id,
             divisionName: divisions.name,
             requiredTeams: individual_divisions.teams
         })
-        .from(commissioners)
-        .innerJoin(divisions, eq(commissioners.division, divisions.id))
+        .from(userRoles)
+        .innerJoin(divisions, eq(userRoles.division_id, divisions.id))
         .leftJoin(
             individual_divisions,
             and(
                 eq(individual_divisions.season, seasonId),
-                eq(individual_divisions.division, commissioners.division)
+                eq(individual_divisions.division, userRoles.division_id)
             )
         )
         .where(
             and(
-                eq(commissioners.season, seasonId),
-                eq(commissioners.commissioner, userId)
+                eq(userRoles.role, "commissioner"),
+                eq(userRoles.season_id, seasonId),
+                eq(userRoles.user_id, userId)
             )
         )
         .orderBy(divisions.level)

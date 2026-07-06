@@ -13,7 +13,6 @@ import {
     waitlist,
     discounts,
     evaluations,
-    commissioners,
     sessions,
     accounts,
     userRoles
@@ -382,10 +381,6 @@ export async function updateUser(
                     .update(evaluations)
                     .set({ player: newId })
                     .where(eq(evaluations.player, originalId))
-                await tx
-                    .update(commissioners)
-                    .set({ commissioner: newId })
-                    .where(eq(commissioners.commissioner, originalId))
                 await tx
                     .update(userRoles)
                     .set({ user_id: newId })

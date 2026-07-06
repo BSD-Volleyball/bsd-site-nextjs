@@ -13,7 +13,6 @@ import {
     waitlist,
     discounts,
     evaluations,
-    commissioners,
     userRoles,
     playerRatings,
     auditLog,
@@ -240,11 +239,6 @@ export async function mergeUsers(
                 .update(evaluations)
                 .set({ player: newUserId })
                 .where(eq(evaluations.player, oldUserId))
-            await tx
-                .update(commissioners)
-                .set({ commissioner: newUserId })
-                .where(eq(commissioners.commissioner, oldUserId))
-
             // userRoles: user_id CASCADEs on delete, but granted_by does not.
             await tx
                 .update(userRoles)
