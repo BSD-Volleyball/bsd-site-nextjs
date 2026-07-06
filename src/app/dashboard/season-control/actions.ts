@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -22,262 +24,260 @@ import { cleanupSeasonRecipientGroups } from "@/lib/email-recipients"
 import { getDivisionChampions } from "@/lib/playoff-champions"
 import { seedPlayoffs } from "./seed-playoffs"
 
-export async function advanceSeasonPhase(
-    seasonId: number,
-    targetPhase: SeasonPhase
-): Promise<{ status: boolean; message: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    if (!seasonId || seasonId <= 0) {
-        return { status: false, message: "Invalid season ID" }
-    }
-
-    try {
-        const [season] = await db
-            .select({ id: seasons.id, phase: seasons.phase })
-            .from(seasons)
-            .where(eq(seasons.id, seasonId))
-            .limit(1)
-
-        if (!season) {
-            return { status: false, message: "Season not found" }
+export const advanceSeasonPhase = withAction(
+    async (
+        seasonId: number,
+        targetPhase: SeasonPhase
+    ): Promise<ActionResult> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
         }
 
-        const currentPhase = season.phase as SeasonPhase
-        if (!isValidPhaseTransition(currentPhase, targetPhase)) {
-            return {
-                status: false,
-                message: `Cannot advance from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+        if (!seasonId || seasonId <= 0) {
+            return fail("Invalid season ID")
+        }
+
+        try {
+            const [season] = await db
+                .select({ id: seasons.id, phase: seasons.phase })
+                .from(seasons)
+                .where(eq(seasons.id, seasonId))
+                .limit(1)
+
+            if (!season) {
+                return fail("Season not found")
             }
-        }
 
-        let seedingSummary: string | null = null
-        let championsSummary: string | null = null
+            const currentPhase = season.phase as SeasonPhase
+            if (!isValidPhaseTransition(currentPhase, targetPhase)) {
+                return fail(
+                    `Cannot advance from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+                )
+            }
 
-        if (targetPhase === "complete") {
-            const champs = await getDivisionChampions(seasonId)
-            const missing = champs.filter((c) => c.teamId === null)
-            if (missing.length > 0) {
-                return {
-                    status: false,
-                    message: `Cannot advance to Complete: no champion determined for ${missing
-                        .map((m) => m.divisionName)
-                        .join(", ")}. Finish the playoff bracket(s) first.`
+            let seedingSummary: string | null = null
+            let championsSummary: string | null = null
+
+            if (targetPhase === "complete") {
+                const champs = await getDivisionChampions(seasonId)
+                const missing = champs.filter((c) => c.teamId === null)
+                if (missing.length > 0) {
+                    return fail(
+                        `Cannot advance to Complete: no champion determined for ${missing.map((m) => m.divisionName).join(", ")}. Finish the playoff bracket(s) first.`
+                    )
                 }
+
+                const teamIds = champs
+                    .map((c) => c.teamId)
+                    .filter((id): id is number => id !== null)
+
+                const teamRows = teamIds.length
+                    ? await db
+                          .select({
+                              id: teams.id,
+                              pictureUrl: teams.picture_url
+                          })
+                          .from(teams)
+                          .where(inArray(teams.id, teamIds))
+                    : []
+                // teams.picture_url is an R2 object key (e.g.
+                // "teamphotos/123/team45.jpg"). The Hall of Champions renders
+                // champions.picture as an <img src> directly, so we need to
+                // store an absolute URL — matching the historical convention
+                // populated by scripts/archive/import-hoc-champions.ts.
+                const picBase = (process.env.PLAYER_PIC_URL ?? "").replace(
+                    /\/+$/,
+                    ""
+                )
+                const pictureByTeam = new Map(
+                    teamRows.map((t) => {
+                        if (!t.pictureUrl) return [t.id, null] as const
+                        const key = t.pictureUrl.replace(/^\/+/, "")
+                        return [
+                            t.id,
+                            picBase ? `${picBase}/${key}` : `/${key}`
+                        ] as const
+                    })
+                )
+
+                for (const champ of champs) {
+                    if (champ.teamId === null) continue
+                    const picture = pictureByTeam.get(champ.teamId) ?? null
+
+                    const [existing] = await db
+                        .select({ id: champions.id })
+                        .from(champions)
+                        .where(
+                            and(
+                                eq(champions.season, seasonId),
+                                eq(champions.division, champ.divisionId)
+                            )
+                        )
+                        .limit(1)
+
+                    if (existing) {
+                        // Full upsert per user spec: overwrite team and refresh
+                        // picture from teams.picture_url. picture2/caption are
+                        // left in place so admin-curated extras survive re-runs.
+                        await db
+                            .update(champions)
+                            .set({ team: champ.teamId, picture })
+                            .where(eq(champions.id, existing.id))
+                    } else {
+                        await db.insert(champions).values({
+                            season: seasonId,
+                            division: champ.divisionId,
+                            team: champ.teamId,
+                            picture
+                        })
+                    }
+                }
+
+                championsSummary = ` Recorded champions for ${champs.length} division${champs.length === 1 ? "" : "s"}.`
             }
 
-            const teamIds = champs
-                .map((c) => c.teamId)
-                .filter((id): id is number => id !== null)
-
-            const teamRows = teamIds.length
-                ? await db
-                      .select({
-                          id: teams.id,
-                          pictureUrl: teams.picture_url
-                      })
-                      .from(teams)
-                      .where(inArray(teams.id, teamIds))
-                : []
-            // teams.picture_url is an R2 object key (e.g.
-            // "teamphotos/123/team45.jpg"). The Hall of Champions renders
-            // champions.picture as an <img src> directly, so we need to
-            // store an absolute URL — matching the historical convention
-            // populated by scripts/archive/import-hoc-champions.ts.
-            const picBase = (process.env.PLAYER_PIC_URL ?? "").replace(
-                /\/+$/,
-                ""
-            )
-            const pictureByTeam = new Map(
-                teamRows.map((t) => {
-                    if (!t.pictureUrl) return [t.id, null] as const
-                    const key = t.pictureUrl.replace(/^\/+/, "")
-                    return [
-                        t.id,
-                        picBase ? `${picBase}/${key}` : `/${key}`
-                    ] as const
-                })
-            )
-
-            for (const champ of champs) {
-                if (champ.teamId === null) continue
-                const picture = pictureByTeam.get(champ.teamId) ?? null
-
-                const [existing] = await db
-                    .select({ id: champions.id })
-                    .from(champions)
+            if (targetPhase === "playoffs") {
+                const incomplete = await db
+                    .select({
+                        week: matches.week,
+                        divisionName: divisions.name
+                    })
+                    .from(matches)
+                    .innerJoin(divisions, eq(matches.division, divisions.id))
                     .where(
                         and(
-                            eq(champions.season, seasonId),
-                            eq(champions.division, champ.divisionId)
+                            eq(matches.season, seasonId),
+                            eq(matches.playoff, false),
+                            or(
+                                isNull(matches.home_set1_score),
+                                isNull(matches.away_set1_score),
+                                isNull(matches.home_set2_score),
+                                isNull(matches.away_set2_score)
+                            )
                         )
                     )
-                    .limit(1)
+                    .orderBy(asc(divisions.level), asc(matches.week))
 
-                if (existing) {
-                    // Full upsert per user spec: overwrite team and refresh
-                    // picture from teams.picture_url. picture2/caption are
-                    // left in place so admin-curated extras survive re-runs.
-                    await db
-                        .update(champions)
-                        .set({ team: champ.teamId, picture })
-                        .where(eq(champions.id, existing.id))
-                } else {
-                    await db.insert(champions).values({
-                        season: seasonId,
-                        division: champ.divisionId,
-                        team: champ.teamId,
-                        picture
-                    })
-                }
-            }
-
-            championsSummary = ` Recorded champions for ${champs.length} division${champs.length === 1 ? "" : "s"}.`
-        }
-
-        if (targetPhase === "playoffs") {
-            const incomplete = await db
-                .select({
-                    week: matches.week,
-                    divisionName: divisions.name
-                })
-                .from(matches)
-                .innerJoin(divisions, eq(matches.division, divisions.id))
-                .where(
-                    and(
-                        eq(matches.season, seasonId),
-                        eq(matches.playoff, false),
-                        or(
-                            isNull(matches.home_set1_score),
-                            isNull(matches.away_set1_score),
-                            isNull(matches.home_set2_score),
-                            isNull(matches.away_set2_score)
+                if (incomplete.length > 0) {
+                    const grouped = new Map<string, Set<number>>()
+                    for (const row of incomplete) {
+                        const set = grouped.get(row.divisionName) ?? new Set()
+                        set.add(row.week)
+                        grouped.set(row.divisionName, set)
+                    }
+                    const summary = [...grouped.entries()]
+                        .map(
+                            ([div, weeks]) =>
+                                `${div} (week${weeks.size === 1 ? "" : "s"} ${[...weeks].sort((a, b) => a - b).join(", ")})`
                         )
+                        .join("; ")
+                    return fail(
+                        `Cannot advance to Playoffs: ${incomplete.length} regular-season match${incomplete.length === 1 ? "" : "es"} missing scores — ${summary}.`
                     )
-                )
-                .orderBy(asc(divisions.level), asc(matches.week))
+                }
 
-            if (incomplete.length > 0) {
-                const grouped = new Map<string, Set<number>>()
-                for (const row of incomplete) {
-                    const set = grouped.get(row.divisionName) ?? new Set()
-                    set.add(row.week)
-                    grouped.set(row.divisionName, set)
+                const seedResult = await seedPlayoffs(seasonId)
+                if (!seedResult.status) {
+                    return fail(seedResult.message)
                 }
-                const summary = [...grouped.entries()]
-                    .map(
-                        ([div, weeks]) =>
-                            `${div} (week${weeks.size === 1 ? "" : "s"} ${[...weeks].sort((a, b) => a - b).join(", ")})`
-                    )
-                    .join("; ")
-                return {
-                    status: false,
-                    message: `Cannot advance to Playoffs: ${incomplete.length} regular-season match${incomplete.length === 1 ? "" : "es"} missing scores — ${summary}.`
-                }
+                seedingSummary = ` Seeded ${seedResult.divisionsSeeded} division${seedResult.divisionsSeeded === 1 ? "" : "s"}.`
             }
 
-            const seedResult = await seedPlayoffs(seasonId)
-            if (!seedResult.status) {
-                return { status: false, message: seedResult.message }
-            }
-            seedingSummary = ` Seeded ${seedResult.divisionsSeeded} division${seedResult.divisionsSeeded === 1 ? "" : "s"}.`
-        }
+            await db
+                .update(seasons)
+                .set({ phase: targetPhase })
+                .where(eq(seasons.id, seasonId))
 
-        await db
-            .update(seasons)
-            .set({ phase: targetPhase })
-            .where(eq(seasons.id, seasonId))
+            const userId = await getSessionUserId()
+            await logAuditEntry({
+                userId: userId!,
+                action: "advance_season_phase",
+                entityType: "season",
+                entityId: seasonId,
+                summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}${championsSummary ?? ""}`
+            })
 
-        const userId = await getSessionUserId()
-        await logAuditEntry({
-            userId: userId!,
-            action: "advance_season_phase",
-            entityType: "season",
-            entityId: seasonId,
-            summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}${championsSummary ?? ""}`
-        })
-
-        // When season completes, clean up granular recipient groups (fire-and-forget)
-        if (targetPhase === "complete") {
-            cleanupSeasonRecipientGroups(seasonId).catch((err) =>
-                console.error(
-                    "[season-control] Recipient group cleanup failed",
-                    seasonId,
-                    err
+            // When season completes, clean up granular recipient groups (fire-and-forget)
+            if (targetPhase === "complete") {
+                cleanupSeasonRecipientGroups(seasonId).catch((err) =>
+                    console.error(
+                        "[season-control] Recipient group cleanup failed",
+                        seasonId,
+                        err
+                    )
                 )
+            }
+
+            revalidatePath("/dashboard/season-control")
+            return ok(
+                undefined,
+                `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}`
             )
+        } catch (error) {
+            console.error("Failed to advance season phase:", error)
+            return fail("Failed to advance season phase")
+        }
+    }
+)
+
+export const revertSeasonPhase = withAction(
+    async (
+        seasonId: number,
+        targetPhase: SeasonPhase
+    ): Promise<ActionResult> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
         }
 
-        revalidatePath("/dashboard/season-control")
-        return {
-            status: true,
-            message: `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}`
-        }
-    } catch (error) {
-        console.error("Failed to advance season phase:", error)
-        return { status: false, message: "Failed to advance season phase" }
-    }
-}
-
-export async function revertSeasonPhase(
-    seasonId: number,
-    targetPhase: SeasonPhase
-): Promise<{ status: boolean; message: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    if (!seasonId || seasonId <= 0) {
-        return { status: false, message: "Invalid season ID" }
-    }
-
-    try {
-        const [season] = await db
-            .select({ id: seasons.id, phase: seasons.phase })
-            .from(seasons)
-            .where(eq(seasons.id, seasonId))
-            .limit(1)
-
-        if (!season) {
-            return { status: false, message: "Season not found" }
+        if (!seasonId || seasonId <= 0) {
+            return fail("Invalid season ID")
         }
 
-        const currentPhase = season.phase as SeasonPhase
-        if (!isValidPhaseRevert(currentPhase, targetPhase)) {
-            return {
-                status: false,
-                message: `Cannot revert from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+        try {
+            const [season] = await db
+                .select({ id: seasons.id, phase: seasons.phase })
+                .from(seasons)
+                .where(eq(seasons.id, seasonId))
+                .limit(1)
+
+            if (!season) {
+                return fail("Season not found")
             }
+
+            const currentPhase = season.phase as SeasonPhase
+            if (!isValidPhaseRevert(currentPhase, targetPhase)) {
+                return fail(
+                    `Cannot revert from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+                )
+            }
+
+            await db
+                .update(seasons)
+                .set({ phase: targetPhase })
+                .where(eq(seasons.id, seasonId))
+
+            const userId = await getSessionUserId()
+            await logAuditEntry({
+                userId: userId!,
+                action: "revert_season_phase",
+                entityType: "season",
+                entityId: seasonId,
+                summary: `Reverted season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
+            })
+
+            revalidatePath("/dashboard/season-control")
+            return ok(
+                undefined,
+                `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`
+            )
+        } catch (error) {
+            console.error("Failed to revert season phase:", error)
+            return fail("Failed to revert season phase")
         }
-
-        await db
-            .update(seasons)
-            .set({ phase: targetPhase })
-            .where(eq(seasons.id, seasonId))
-
-        const userId = await getSessionUserId()
-        await logAuditEntry({
-            userId: userId!,
-            action: "revert_season_phase",
-            entityType: "season",
-            entityId: seasonId,
-            summary: `Reverted season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"`
-        })
-
-        revalidatePath("/dashboard/season-control")
-        return {
-            status: true,
-            message: `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`
-        }
-    } catch (error) {
-        console.error("Failed to revert season phase:", error)
-        return { status: false, message: "Failed to revert season phase" }
     }
-}
+)
 
 export async function getCurrentSeasonPhaseData(): Promise<{
     status: boolean

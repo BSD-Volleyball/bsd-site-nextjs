@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -507,150 +509,124 @@ export async function getCreateWeek1Data(): Promise<{
     }
 }
 
-export async function saveWeek1Rosters(
-    assignments: Week1RosterAssignment[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
+export const saveWeek1Rosters = withAction(
+    async (assignments: Week1RosterAssignment[]): Promise<ActionResult> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
-    }
 
-    if (assignments.length !== 104) {
-        return {
-            status: false,
-            message:
+        if (assignments.length !== 104) {
+            return fail(
                 "Expected 104 assignments (96 primary + 8 alternates) before saving."
-        }
-    }
-
-    const uniqueUsers = new Set(
-        assignments.map((assignment) => assignment.userId)
-    )
-    if (uniqueUsers.size !== assignments.length) {
-        return {
-            status: false,
-            message: "Duplicate players found in roster assignments."
-        }
-    }
-
-    const validAssignments = assignments.every((assignment) => {
-        return (
-            (assignment.sessionNumber === 1 ||
-                assignment.sessionNumber === 2 ||
-                assignment.sessionNumber === 3) &&
-            assignment.courtNumber >= 1 &&
-            assignment.courtNumber <= 4
-        )
-    })
-
-    if (!validAssignments) {
-        return {
-            status: false,
-            message: "Invalid session or court values in roster assignments."
-        }
-    }
-
-    const primaryAssignments = assignments.filter(
-        (assignment) =>
-            assignment.sessionNumber === 1 || assignment.sessionNumber === 2
-    )
-    const alternateAssignments = assignments.filter(
-        (assignment) => assignment.sessionNumber === 3
-    )
-
-    if (primaryAssignments.length !== 96) {
-        return {
-            status: false,
-            message:
-                "Expected exactly 96 primary assignments (sessions 1 and 2)."
-        }
-    }
-
-    if (alternateAssignments.length !== 8) {
-        return {
-            status: false,
-            message: "Expected exactly 8 alternates (session 3)."
-        }
-    }
-
-    for (let court = 1; court <= 4; court++) {
-        const courtAlternates = alternateAssignments.filter(
-            (assignment) => assignment.courtNumber === court
-        )
-        if (courtAlternates.length !== 2) {
-            return {
-                status: false,
-                message: `Expected 2 alternates for court ${court}.`
-            }
-        }
-    }
-
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return {
-            status: false,
-            message: "No current season found."
-        }
-    }
-
-    const signedUpRows = await db
-        .select({ userId: signups.player })
-        .from(signups)
-        .where(
-            and(
-                eq(signups.season, config.seasonId),
-                inArray(signups.player, [...uniqueUsers])
             )
-        )
-
-    if (signedUpRows.length !== assignments.length) {
-        return {
-            status: false,
-            message:
-                "All selected players must be signed up for the current season."
         }
-    }
 
-    try {
-        await db.transaction(async (tx) => {
-            await tx
-                .delete(week1Rosters)
-                .where(eq(week1Rosters.season, config.seasonId))
+        const uniqueUsers = new Set(
+            assignments.map((assignment) => assignment.userId)
+        )
+        if (uniqueUsers.size !== assignments.length) {
+            return fail("Duplicate players found in roster assignments.")
+        }
 
-            await tx.insert(week1Rosters).values(
-                assignments.map((assignment) => ({
-                    season: config.seasonId,
-                    user: assignment.userId,
-                    session_number: assignment.sessionNumber,
-                    court_number: assignment.courtNumber
-                }))
+        const validAssignments = assignments.every((assignment) => {
+            return (
+                (assignment.sessionNumber === 1 ||
+                    assignment.sessionNumber === 2 ||
+                    assignment.sessionNumber === 3) &&
+                assignment.courtNumber >= 1 &&
+                assignment.courtNumber <= 4
             )
         })
 
-        const session = await auth.api.getSession({ headers: await headers() })
+        if (!validAssignments) {
+            return fail(
+                "Invalid session or court values in roster assignments."
+            )
+        }
 
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: "week1_rosters",
-                summary: `Created week 1 rosters for season ${config.seasonId}`
+        const primaryAssignments = assignments.filter(
+            (assignment) =>
+                assignment.sessionNumber === 1 || assignment.sessionNumber === 2
+        )
+        const alternateAssignments = assignments.filter(
+            (assignment) => assignment.sessionNumber === 3
+        )
+
+        if (primaryAssignments.length !== 96) {
+            return fail(
+                "Expected exactly 96 primary assignments (sessions 1 and 2)."
+            )
+        }
+
+        if (alternateAssignments.length !== 8) {
+            return fail("Expected exactly 8 alternates (session 3).")
+        }
+
+        for (let court = 1; court <= 4; court++) {
+            const courtAlternates = alternateAssignments.filter(
+                (assignment) => assignment.courtNumber === court
+            )
+            if (courtAlternates.length !== 2) {
+                return fail(`Expected 2 alternates for court ${court}.`)
+            }
+        }
+
+        const config = await getSeasonConfig()
+
+        if (!config.seasonId) {
+            return fail("No current season found.")
+        }
+
+        const signedUpRows = await db
+            .select({ userId: signups.player })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    inArray(signups.player, [...uniqueUsers])
+                )
+            )
+
+        if (signedUpRows.length !== assignments.length) {
+            return fail(
+                "All selected players must be signed up for the current season."
+            )
+        }
+
+        try {
+            await db.transaction(async (tx) => {
+                await tx
+                    .delete(week1Rosters)
+                    .where(eq(week1Rosters.season, config.seasonId))
+
+                await tx.insert(week1Rosters).values(
+                    assignments.map((assignment) => ({
+                        season: config.seasonId,
+                        user: assignment.userId,
+                        session_number: assignment.sessionNumber,
+                        court_number: assignment.courtNumber
+                    }))
+                )
             })
-        }
 
-        return {
-            status: true,
-            message: "Week 1 rosters saved successfully."
-        }
-    } catch (error) {
-        console.error("Error saving week 1 rosters:", error)
-        return {
-            status: false,
-            message: "Something went wrong while saving week 1 rosters."
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+
+            if (session?.user) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "week1_rosters",
+                    summary: `Created week 1 rosters for season ${config.seasonId}`
+                })
+            }
+
+            return ok(undefined, "Week 1 rosters saved successfully.")
+        } catch (error) {
+            console.error("Error saving week 1 rosters:", error)
+            return fail("Something went wrong while saving week 1 rosters.")
         }
     }
-}
+)

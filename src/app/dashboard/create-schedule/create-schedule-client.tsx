@@ -210,7 +210,7 @@ export function CreateScheduleClient({
             const result = await writeRegularSeasonSchedule(seasonId)
             setRegularStatus({
                 type: result.status ? "success" : "error",
-                message: result.message
+                message: result.message ?? ""
             })
             if (result.status) {
                 router.refresh()
@@ -232,7 +232,7 @@ export function CreateScheduleClient({
             const result = await writePlayoffSchedule(seasonId)
             setPlayoffStatus({
                 type: result.status ? "success" : "error",
-                message: result.message
+                message: result.message ?? ""
             })
             if (result.status) {
                 router.refresh()

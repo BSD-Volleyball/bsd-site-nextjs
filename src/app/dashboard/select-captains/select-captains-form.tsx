@@ -603,7 +603,7 @@ export function SelectCaptainsForm({
         )
 
         if (result.status) {
-            setSuccess(result.message)
+            setSuccess(result.message ?? null)
         } else {
             setError(result.message)
         }

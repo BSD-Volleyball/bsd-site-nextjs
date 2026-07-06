@@ -80,11 +80,11 @@ export function PairsList({
     }
 
     const runAction = (
-        action: () => Promise<{ status: boolean; message: string }>
+        action: () => Promise<{ status: boolean; message?: string }>
     ) => {
         startTransition(async () => {
             const result = await action()
-            setActionMessage(result.message)
+            setActionMessage(result.message ?? "")
             setActionError(!result.status)
             if (result.status) {
                 router.refresh()

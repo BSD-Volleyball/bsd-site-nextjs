@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -969,121 +971,129 @@ export async function getPrepareForDraftData(
     }
 }
 
-export async function setCaptainRound(input: {
-    captainId: string
-    round: number
-    divisionId: number
-}): Promise<{ status: boolean; message: string }> {
-    if (!(await isCommissionerBySession())) {
-        return { status: false, message: "Not authorized" }
-    }
-    if (!Number.isInteger(input.round) || input.round < 1 || input.round > 8) {
-        return { status: false, message: "Invalid round (must be 1–8)" }
-    }
-    if (!Number.isInteger(input.divisionId) || input.divisionId <= 0) {
-        return { status: false, message: "Invalid divisionId" }
-    }
+export const setCaptainRound = withAction(
+    async (input: {
+        captainId: string
+        round: number
+        divisionId: number
+    }): Promise<ActionResult> => {
+        if (!(await isCommissionerBySession())) {
+            return fail("Not authorized")
+        }
+        if (
+            !Number.isInteger(input.round) ||
+            input.round < 1 ||
+            input.round > 8
+        ) {
+            return fail("Invalid round (must be 1–8)")
+        }
+        if (!Number.isInteger(input.divisionId) || input.divisionId <= 0) {
+            return fail("Invalid divisionId")
+        }
 
-    const session = await auth.api.getSession({ headers: await headers() })
-    const userId = session!.user.id
+        const session = await auth.api.getSession({ headers: await headers() })
+        const userId = session!.user.id
 
-    const config = await getSeasonConfig()
-    const seasonId = config.seasonId!
+        const config = await getSeasonConfig()
+        const seasonId = config.seasonId!
 
-    await db
-        .insert(draftCaptRounds)
-        .values({
-            season: seasonId,
-            division: input.divisionId,
-            saved_by: userId,
-            captain: input.captainId,
-            round: input.round,
-            updated_at: new Date()
-        })
-        .onConflictDoUpdate({
-            target: [
-                draftCaptRounds.season,
-                draftCaptRounds.division,
-                draftCaptRounds.captain
-            ],
-            set: {
-                round: input.round,
+        await db
+            .insert(draftCaptRounds)
+            .values({
+                season: seasonId,
+                division: input.divisionId,
                 saved_by: userId,
+                captain: input.captainId,
+                round: input.round,
                 updated_at: new Date()
-            }
+            })
+            .onConflictDoUpdate({
+                target: [
+                    draftCaptRounds.season,
+                    draftCaptRounds.division,
+                    draftCaptRounds.captain
+                ],
+                set: {
+                    round: input.round,
+                    saved_by: userId,
+                    updated_at: new Date()
+                }
+            })
+
+        await logAuditEntry({
+            userId,
+            action: "set_captain_round",
+            entityType: "draft_captain_round",
+            entityId: input.captainId,
+            summary: `Set captain draft round to ${input.round} (division ${input.divisionId}, season ${seasonId})`
         })
 
-    await logAuditEntry({
-        userId,
-        action: "set_captain_round",
-        entityType: "draft_captain_round",
-        entityId: input.captainId,
-        summary: `Set captain draft round to ${input.round} (division ${input.divisionId}, season ${seasonId})`
-    })
-
-    return { status: true, message: "Saved" }
-}
-
-export async function setPairDiff(input: {
-    player1Id: string
-    player2Id: string
-    diff: number
-    divisionId: number
-}): Promise<{ status: boolean; message: string }> {
-    if (!(await isCommissionerBySession())) {
-        return { status: false, message: "Not authorized" }
+        return ok(undefined, "Saved")
     }
-    if (!Number.isInteger(input.diff) || input.diff < 1 || input.diff > 8) {
-        return { status: false, message: "Invalid diff (must be 1–8)" }
-    }
-    if (!Number.isInteger(input.divisionId) || input.divisionId <= 0) {
-        return { status: false, message: "Invalid divisionId" }
-    }
+)
 
-    const session = await auth.api.getSession({ headers: await headers() })
-    const userId = session!.user.id
+export const setPairDiff = withAction(
+    async (input: {
+        player1Id: string
+        player2Id: string
+        diff: number
+        divisionId: number
+    }): Promise<ActionResult> => {
+        if (!(await isCommissionerBySession())) {
+            return fail("Not authorized")
+        }
+        if (!Number.isInteger(input.diff) || input.diff < 1 || input.diff > 8) {
+            return fail("Invalid diff (must be 1–8)")
+        }
+        if (!Number.isInteger(input.divisionId) || input.divisionId <= 0) {
+            return fail("Invalid divisionId")
+        }
 
-    const config = await getSeasonConfig()
-    const seasonId = config.seasonId!
+        const session = await auth.api.getSession({ headers: await headers() })
+        const userId = session!.user.id
 
-    // Delete both possible orderings to handle rating-order changes from prior saves
-    await db
-        .delete(draftPairDiffs)
-        .where(
-            and(
-                eq(draftPairDiffs.season, seasonId),
-                eq(draftPairDiffs.division, input.divisionId),
-                or(
-                    and(
-                        eq(draftPairDiffs.player1, input.player1Id),
-                        eq(draftPairDiffs.player2, input.player2Id)
-                    ),
-                    and(
-                        eq(draftPairDiffs.player1, input.player2Id),
-                        eq(draftPairDiffs.player2, input.player1Id)
+        const config = await getSeasonConfig()
+        const seasonId = config.seasonId!
+
+        // Delete both possible orderings to handle rating-order changes from prior saves
+        await db
+            .delete(draftPairDiffs)
+            .where(
+                and(
+                    eq(draftPairDiffs.season, seasonId),
+                    eq(draftPairDiffs.division, input.divisionId),
+                    or(
+                        and(
+                            eq(draftPairDiffs.player1, input.player1Id),
+                            eq(draftPairDiffs.player2, input.player2Id)
+                        ),
+                        and(
+                            eq(draftPairDiffs.player1, input.player2Id),
+                            eq(draftPairDiffs.player2, input.player1Id)
+                        )
                     )
                 )
             )
-        )
 
-    // Insert with player1 = higher-rated, player2 = lower-rated
-    await db.insert(draftPairDiffs).values({
-        season: seasonId,
-        division: input.divisionId,
-        saved_by: userId,
-        player1: input.player1Id,
-        player2: input.player2Id,
-        diff: input.diff,
-        updated_at: new Date()
-    })
+        // Insert with player1 = higher-rated, player2 = lower-rated
+        await db.insert(draftPairDiffs).values({
+            season: seasonId,
+            division: input.divisionId,
+            saved_by: userId,
+            player1: input.player1Id,
+            player2: input.player2Id,
+            diff: input.diff,
+            updated_at: new Date()
+        })
 
-    await logAuditEntry({
-        userId,
-        action: "set_pair_diff",
-        entityType: "draft_pair_diff",
-        entityId: input.player1Id,
-        summary: `Set draft pair diff to ${input.diff} (division ${input.divisionId}, season ${seasonId})`
-    })
+        await logAuditEntry({
+            userId,
+            action: "set_pair_diff",
+            entityType: "draft_pair_diff",
+            entityId: input.player1Id,
+            summary: `Set draft pair diff to ${input.diff} (division ${input.divisionId}, season ${seasonId})`
+        })
 
-    return { status: true, message: "Saved" }
-}
+        return ok(undefined, "Saved")
+    }
+)

@@ -156,7 +156,7 @@ export function GoogleMembershipTable({
                 ...current,
                 [user.id]: {
                     type: result.status ? "success" : "error",
-                    text: result.message
+                    text: result.message ?? ""
                 }
             }))
         })

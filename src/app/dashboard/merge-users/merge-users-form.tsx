@@ -148,7 +148,10 @@ export function MergeUsersForm({
         setResult(null)
 
         const response = await mergeUsers(oldUserId, newUserId)
-        setResult(response)
+        setResult({
+            status: response.status,
+            message: response.message ?? ""
+        })
         setIsSubmitting(false)
         setShowConfirm(false)
 

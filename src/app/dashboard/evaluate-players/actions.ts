@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -228,88 +230,83 @@ export async function getNewPlayers(): Promise<{
     }
 }
 
-export async function saveEvaluations(
-    data: { playerId: string; division: number }[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+export const saveEvaluations = withAction(
+    async (
+        data: { playerId: string; division: number }[]
+    ): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
 
-    try {
-        // Validate division IDs exist
-        const divisionIds = [...new Set(data.map((d) => d.division))]
-        const validDivisions = await db
-            .select({ id: divisions.id })
-            .from(divisions)
-            .where(inArray(divisions.id, divisionIds))
+        try {
+            // Validate division IDs exist
+            const divisionIds = [...new Set(data.map((d) => d.division))]
+            const validDivisions = await db
+                .select({ id: divisions.id })
+                .from(divisions)
+                .where(inArray(divisions.id, divisionIds))
 
-        const validIds = new Set(validDivisions.map((d) => d.id))
-        for (const entry of data) {
-            if (!validIds.has(entry.division)) {
-                return {
-                    status: false,
-                    message: `Invalid division ID: ${entry.division}`
+            const validIds = new Set(validDivisions.map((d) => d.id))
+            for (const entry of data) {
+                if (!validIds.has(entry.division)) {
+                    return fail(`Invalid division ID: ${entry.division}`)
                 }
             }
-        }
 
-        const config = await getSeasonConfig()
+            const config = await getSeasonConfig()
 
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
+            if (!config.seasonId) {
+                return fail("No current season found.")
+            }
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session) {
-            return { status: false, message: "Unauthorized - no session" }
-        }
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (!session) {
+                return fail("Unauthorized - no session")
+            }
 
-        const currentUserId = session.user.id
-        const playerIds = data.map((d) => d.playerId)
+            const currentUserId = session.user.id
+            const playerIds = data.map((d) => d.playerId)
 
-        // Delete existing evaluations by this user for these players this season
-        if (playerIds.length > 0) {
-            await db
-                .delete(evaluations)
-                .where(
-                    and(
-                        eq(evaluations.season, config.seasonId),
-                        inArray(evaluations.player, playerIds),
-                        eq(evaluations.evaluator, currentUserId)
+            // Delete existing evaluations by this user for these players this season
+            if (playerIds.length > 0) {
+                await db
+                    .delete(evaluations)
+                    .where(
+                        and(
+                            eq(evaluations.season, config.seasonId),
+                            inArray(evaluations.player, playerIds),
+                            eq(evaluations.evaluator, currentUserId)
+                        )
                     )
+            }
+
+            // Insert new evaluations with evaluator
+            if (data.length > 0) {
+                await db.insert(evaluations).values(
+                    data.map((entry) => ({
+                        season: config.seasonId,
+                        player: entry.playerId,
+                        division: entry.division,
+                        evaluator: currentUserId
+                    }))
                 )
-        }
+            }
 
-        // Insert new evaluations with evaluator
-        if (data.length > 0) {
-            await db.insert(evaluations).values(
-                data.map((entry) => ({
-                    season: config.seasonId,
-                    player: entry.playerId,
-                    division: entry.division,
-                    evaluator: currentUserId
-                }))
-            )
-        }
+            await logAuditEntry({
+                userId: currentUserId,
+                action: "upsert",
+                entityType: "evaluations",
+                summary: `Saved ${data.length} player evaluations for current season`
+            })
 
-        await logAuditEntry({
-            userId: currentUserId,
-            action: "upsert",
-            entityType: "evaluations",
-            summary: `Saved ${data.length} player evaluations for current season`
-        })
-
-        revalidatePath("/dashboard/evaluate-players")
-        return {
-            status: true,
-            message: "Evaluations saved successfully."
-        }
-    } catch (error) {
-        console.error("Error saving evaluations:", error)
-        return {
-            status: false,
-            message: "Failed to save evaluations."
+            revalidatePath("/dashboard/evaluate-players")
+            return ok(undefined, "Evaluations saved successfully.")
+        } catch (error) {
+            console.error("Error saving evaluations:", error)
+            return fail("Failed to save evaluations.")
         }
     }
-}
+)

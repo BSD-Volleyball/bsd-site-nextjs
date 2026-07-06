@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
@@ -206,230 +208,220 @@ export async function getEditWeek1Data(): Promise<{
     }
 }
 
-export async function updateWeek1Rosters(
-    slots: Array<Week1RosterEntry>
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
+export const updateWeek1Rosters = withAction(
+    async (slots: Array<Week1RosterEntry>): Promise<ActionResult> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
-    }
 
-    const config = await getSeasonConfig()
-    if (!config.seasonId) {
-        return {
-            status: false,
-            message: "No current season found."
+        const config = await getSeasonConfig()
+        if (!config.seasonId) {
+            return fail("No current season found.")
         }
-    }
 
-    const filledSlots = slots.filter((s) => s.userId)
-    const userIds = filledSlots.map((s) => s.userId)
-    const uniqueUserIds = new Set(userIds)
+        const filledSlots = slots.filter((s) => s.userId)
+        const userIds = filledSlots.map((s) => s.userId)
+        const uniqueUserIds = new Set(userIds)
 
-    if (uniqueUserIds.size !== userIds.length) {
-        return {
-            status: false,
-            message: "A player cannot be assigned to multiple week 1 slots."
+        if (uniqueUserIds.size !== userIds.length) {
+            return fail("A player cannot be assigned to multiple week 1 slots.")
         }
-    }
 
-    if (uniqueUserIds.size > 0) {
-        const signedUpRows = await db
-            .select({ playerId: signups.player })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    inArray(signups.player, [...uniqueUserIds])
+        if (uniqueUserIds.size > 0) {
+            const signedUpRows = await db
+                .select({ playerId: signups.player })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        inArray(signups.player, [...uniqueUserIds])
+                    )
                 )
-            )
 
-        if (signedUpRows.length !== uniqueUserIds.size) {
-            return {
-                status: false,
-                message:
+            if (signedUpRows.length !== uniqueUserIds.size) {
+                return fail(
                     "All selected players must be signed up for the current season."
-            }
-        }
-    }
-
-    try {
-        await db.transaction(async (tx) => {
-            await tx
-                .delete(week1Rosters)
-                .where(eq(week1Rosters.season, config.seasonId))
-
-            if (filledSlots.length > 0) {
-                await tx.insert(week1Rosters).values(
-                    filledSlots.map((slot) => ({
-                        season: config.seasonId,
-                        user: slot.userId,
-                        session_number: slot.sessionNumber,
-                        court_number: slot.courtNumber
-                    }))
                 )
             }
-        })
+        }
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "week1_rosters",
-                summary: `Replaced week 1 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
+        try {
+            await db.transaction(async (tx) => {
+                await tx
+                    .delete(week1Rosters)
+                    .where(eq(week1Rosters.season, config.seasonId))
+
+                if (filledSlots.length > 0) {
+                    await tx.insert(week1Rosters).values(
+                        filledSlots.map((slot) => ({
+                            season: config.seasonId,
+                            user: slot.userId,
+                            session_number: slot.sessionNumber,
+                            court_number: slot.courtNumber
+                        }))
+                    )
+                }
             })
-        }
 
-        return {
-            status: true,
-            message: "Week 1 rosters saved successfully."
-        }
-    } catch (error) {
-        console.error("Error saving week 1 rosters:", error)
-        return {
-            status: false,
-            message: "Something went wrong while saving week 1 rosters."
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (session?.user) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "week1_rosters",
+                    summary: `Replaced week 1 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
+                })
+            }
+
+            return ok(undefined, "Week 1 rosters saved successfully.")
+        } catch (error) {
+            console.error("Error saving week 1 rosters:", error)
+            return fail("Something went wrong while saving week 1 rosters.")
         }
     }
-}
+)
 
-export async function sendWeek1RosterNotifications(
-    assignments: Array<{
-        userId: string
-        sessionNumber: number
-        courtNumber: number
-    }>,
-    removedUserIds: string[],
-    seasonLabel: string
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
+export const sendWeek1RosterNotifications = withAction(
+    async (
+        assignments: Array<{
+            userId: string
+            sessionNumber: number
+            courtNumber: number
+        }>,
+        removedUserIds: string[],
+        seasonLabel: string
+    ): Promise<ActionResult> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
-    }
 
-    const allUserIds = [...assignments.map((a) => a.userId), ...removedUserIds]
-    if (allUserIds.length === 0) {
-        return { status: true, message: "No notifications to send." }
-    }
+        const allUserIds = [
+            ...assignments.map((a) => a.userId),
+            ...removedUserIds
+        ]
+        if (allUserIds.length === 0) {
+            return ok(undefined, "No notifications to send.")
+        }
 
-    const [config, userRows] = await Promise.all([
-        getSeasonConfig(),
-        db
-            .select({
-                id: users.id,
-                firstName: users.first_name,
-                preferredName: users.preferred_name,
-                email: users.email
-            })
-            .from(users)
-            .where(inArray(users.id, allUserIds))
-    ])
+        const [config, userRows] = await Promise.all([
+            getSeasonConfig(),
+            db
+                .select({
+                    id: users.id,
+                    firstName: users.first_name,
+                    preferredName: users.preferred_name,
+                    email: users.email
+                })
+                .from(users)
+                .where(inArray(users.id, allUserIds))
+        ])
 
-    const tryouts = getEventsByType(config, "tryout")
-    const tryout1Event = tryouts[0] ?? null
-    const tryoutDate = tryout1Event
-        ? formatEventDate(tryout1Event.eventDate)
-        : null
-    const sessionTimes = [
-        tryout1Event?.timeSlots[0]?.startTime
-            ? formatEventTime(tryout1Event.timeSlots[0].startTime)
-            : "TBD",
-        tryout1Event?.timeSlots[1]?.startTime
-            ? formatEventTime(tryout1Event.timeSlots[1].startTime)
-            : "TBD"
-    ]
+        const tryouts = getEventsByType(config, "tryout")
+        const tryout1Event = tryouts[0] ?? null
+        const tryoutDate = tryout1Event
+            ? formatEventDate(tryout1Event.eventDate)
+            : null
+        const sessionTimes = [
+            tryout1Event?.timeSlots[0]?.startTime
+                ? formatEventTime(tryout1Event.timeSlots[0].startTime)
+                : "TBD",
+            tryout1Event?.timeSlots[1]?.startTime
+                ? formatEventTime(tryout1Event.timeSlots[1].startTime)
+                : "TBD"
+        ]
 
-    const userById = new Map(userRows.map((u) => [u.id, u]))
-    const assignmentByUserId = new Map(assignments.map((a) => [a.userId, a]))
-    const removedSet = new Set(removedUserIds)
+        const userById = new Map(userRows.map((u) => [u.id, u]))
+        const assignmentByUserId = new Map(
+            assignments.map((a) => [a.userId, a])
+        )
+        const removedSet = new Set(removedUserIds)
 
-    const emailResults = await Promise.allSettled(
-        allUserIds
-            .filter((userId) => {
-                const user = userById.get(userId)
-                if (!user?.email) return false
-                return (
-                    removedSet.has(userId) || !!assignmentByUserId.get(userId)
-                )
-            })
-            .map((userId) => {
-                const user = userById.get(userId)!
-                const firstName =
-                    user.preferredName ||
-                    user.firstName ||
-                    user.email!.split("@")[0]
-                const isRemoved = removedSet.has(userId)
+        const emailResults = await Promise.allSettled(
+            allUserIds
+                .filter((userId) => {
+                    const user = userById.get(userId)
+                    if (!user?.email) return false
+                    return (
+                        removedSet.has(userId) ||
+                        !!assignmentByUserId.get(userId)
+                    )
+                })
+                .map((userId) => {
+                    const user = userById.get(userId)!
+                    const firstName =
+                        user.preferredName ||
+                        user.firstName ||
+                        user.email!.split("@")[0]
+                    const isRemoved = removedSet.has(userId)
 
-                if (isRemoved) {
+                    if (isRemoved) {
+                        return sendEmail({
+                            from: site.mailFrom,
+                            to: user.email!,
+                            subject: `BSD Volleyball: Week 1 Roster Update — ${seasonLabel}`,
+                            htmlBody: buildRosterRemovalHtml({
+                                firstName,
+                                weekLabel: "Week 1",
+                                seasonLabel
+                            }),
+                            stream: STREAM_OUTBOUND,
+                            tag: "roster-update"
+                        })
+                    }
+
+                    const assignment = assignmentByUserId.get(userId)!
+
+                    const isAlternate = assignment.sessionNumber === 3
+                    const sessionLabel = isAlternate
+                        ? "Alternate"
+                        : `Session ${assignment.sessionNumber}`
+                    const sessionTime = isAlternate
+                        ? "TBD"
+                        : sessionTimes[assignment.sessionNumber - 1] || "TBD"
+
+                    const detailRows = [
+                        tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
+                        renderDetailRow("Session:", sessionLabel),
+                        renderDetailRow("Time:", sessionTime),
+                        !isAlternate
+                            ? renderDetailRow(
+                                  "Court:",
+                                  `Court ${assignment.courtNumber}`
+                              )
+                            : ""
+                    ].filter(Boolean)
+
                     return sendEmail({
                         from: site.mailFrom,
                         to: user.email!,
-                        subject: `BSD Volleyball: Week 1 Roster Update — ${seasonLabel}`,
-                        htmlBody: buildRosterRemovalHtml({
+                        subject: `BSD Volleyball: Your Week 1 Assignment — ${seasonLabel}`,
+                        htmlBody: buildRosterAssignmentHtml({
                             firstName,
                             weekLabel: "Week 1",
-                            seasonLabel
+                            seasonLabel,
+                            introText: `You've been assigned to the Week 1 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
+                            detailBlocks: [renderDetailsBlock(detailRows)],
+                            footnote: "Please plan to arrive 10 minutes early."
                         }),
                         stream: STREAM_OUTBOUND,
-                        tag: "roster-update"
+                        tag: "roster-assignment"
                     })
-                }
-
-                const assignment = assignmentByUserId.get(userId)!
-
-                const isAlternate = assignment.sessionNumber === 3
-                const sessionLabel = isAlternate
-                    ? "Alternate"
-                    : `Session ${assignment.sessionNumber}`
-                const sessionTime = isAlternate
-                    ? "TBD"
-                    : sessionTimes[assignment.sessionNumber - 1] || "TBD"
-
-                const detailRows = [
-                    tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
-                    renderDetailRow("Session:", sessionLabel),
-                    renderDetailRow("Time:", sessionTime),
-                    !isAlternate
-                        ? renderDetailRow(
-                              "Court:",
-                              `Court ${assignment.courtNumber}`
-                          )
-                        : ""
-                ].filter(Boolean)
-
-                return sendEmail({
-                    from: site.mailFrom,
-                    to: user.email!,
-                    subject: `BSD Volleyball: Your Week 1 Assignment — ${seasonLabel}`,
-                    htmlBody: buildRosterAssignmentHtml({
-                        firstName,
-                        weekLabel: "Week 1",
-                        seasonLabel,
-                        introText: `You've been assigned to the Week 1 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
-                        detailBlocks: [renderDetailsBlock(detailRows)],
-                        footnote: "Please plan to arrive 10 minutes early."
-                    }),
-                    stream: STREAM_OUTBOUND,
-                    tag: "roster-assignment"
                 })
+        )
+        const sent = emailResults.filter((r) => r.status === "fulfilled").length
+        emailResults
+            .filter((r) => r.status === "rejected")
+            .forEach((r, i) => {
+                console.error(
+                    `Failed to send week 1 email (index ${i}):`,
+                    (r as PromiseRejectedResult).reason
+                )
             })
-    )
-    const sent = emailResults.filter((r) => r.status === "fulfilled").length
-    emailResults
-        .filter((r) => r.status === "rejected")
-        .forEach((r, i) => {
-            console.error(
-                `Failed to send week 1 email (index ${i}):`,
-                (r as PromiseRejectedResult).reason
-            )
-        })
 
-    return { status: true, message: `${sent} notification(s) sent.` }
-}
+        return ok(undefined, `${sent} notification(s) sent.`)
+    }
+)

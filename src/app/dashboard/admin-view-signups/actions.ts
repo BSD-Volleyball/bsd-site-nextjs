@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -323,143 +325,115 @@ export async function getSeasonSignups(): Promise<{
     }
 }
 
-export async function deleteSignupEntry(
-    signupId: number,
-    reason: string
-): Promise<{
-    status: boolean
-    message: string
-}> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized"
+export const deleteSignupEntry = withAction(
+    async (signupId: number, reason: string): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    if (!Number.isInteger(signupId) || signupId <= 0) {
-        return {
-            status: false,
-            message: "Invalid signup id."
+        if (!Number.isInteger(signupId) || signupId <= 0) {
+            return fail("Invalid signup id.")
         }
-    }
 
-    const trimmedReason = reason?.trim() ?? ""
-    if (!trimmedReason) {
-        return {
-            status: false,
-            message: "A reason for deletion is required."
+        const trimmedReason = reason?.trim() ?? ""
+        if (!trimmedReason) {
+            return fail("A reason for deletion is required.")
         }
-    }
 
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return {
-            status: false,
-            message: "Not authenticated."
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return fail("Not authenticated.")
         }
-    }
 
-    try {
-        const config = await getSeasonConfig()
+        try {
+            const config = await getSeasonConfig()
 
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found."
+            if (!config.seasonId) {
+                return fail("No current season found.")
             }
-        }
 
-        const [signupRecord] = await db
-            .select({
-                id: signups.id,
-                season: signups.season,
-                player: signups.player,
-                age: signups.age,
-                captain: signups.captain,
-                pair: signups.pair,
-                pairPick: signups.pair_pick,
-                pairReason: signups.pair_reason,
-                orderId: signups.order_id,
-                amountPaid: signups.amount_paid,
-                createdAt: signups.created_at
+            const [signupRecord] = await db
+                .select({
+                    id: signups.id,
+                    season: signups.season,
+                    player: signups.player,
+                    age: signups.age,
+                    captain: signups.captain,
+                    pair: signups.pair,
+                    pairPick: signups.pair_pick,
+                    pairReason: signups.pair_reason,
+                    orderId: signups.order_id,
+                    amountPaid: signups.amount_paid,
+                    createdAt: signups.created_at
+                })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.id, signupId),
+                        eq(signups.season, config.seasonId)
+                    )
+                )
+                .limit(1)
+
+            if (!signupRecord) {
+                return fail("Signup entry not found for the current season.")
+            }
+
+            // Archive the signup record before deletion
+            await db.insert(deletedSignups).values({
+                id: signupRecord.id,
+                season: signupRecord.season,
+                player: signupRecord.player,
+                age: signupRecord.age,
+                captain: signupRecord.captain,
+                pair: signupRecord.pair,
+                pair_pick: signupRecord.pairPick,
+                pair_reason: signupRecord.pairReason,
+                order_id: signupRecord.orderId,
+                amount_paid: signupRecord.amountPaid,
+                created_at: signupRecord.createdAt,
+                deleted_at: new Date(),
+                deleted_by: session.user.id,
+                reason: trimmedReason
             })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.id, signupId),
-                    eq(signups.season, config.seasonId)
+
+            // Delete the signup (cascades to userUnavailability)
+            await db
+                .delete(signups)
+                .where(
+                    and(
+                        eq(signups.id, signupId),
+                        eq(signups.season, config.seasonId)
+                    )
                 )
-            )
-            .limit(1)
 
-        if (!signupRecord) {
-            return {
-                status: false,
-                message: "Signup entry not found for the current season."
-            }
-        }
-
-        // Archive the signup record before deletion
-        await db.insert(deletedSignups).values({
-            id: signupRecord.id,
-            season: signupRecord.season,
-            player: signupRecord.player,
-            age: signupRecord.age,
-            captain: signupRecord.captain,
-            pair: signupRecord.pair,
-            pair_pick: signupRecord.pairPick,
-            pair_reason: signupRecord.pairReason,
-            order_id: signupRecord.orderId,
-            amount_paid: signupRecord.amountPaid,
-            created_at: signupRecord.createdAt,
-            deleted_at: new Date(),
-            deleted_by: session.user.id,
-            reason: trimmedReason
-        })
-
-        // Delete the signup (cascades to userUnavailability)
-        await db
-            .delete(signups)
-            .where(
-                and(
-                    eq(signups.id, signupId),
-                    eq(signups.season, config.seasonId)
+            // Remove this player from any captain's draft homework for the season
+            await db
+                .delete(draftHomework)
+                .where(
+                    and(
+                        eq(draftHomework.season, config.seasonId),
+                        eq(draftHomework.player, signupRecord.player)
+                    )
                 )
-            )
 
-        // Remove this player from any captain's draft homework for the season
-        await db
-            .delete(draftHomework)
-            .where(
-                and(
-                    eq(draftHomework.season, config.seasonId),
-                    eq(draftHomework.player, signupRecord.player)
-                )
-            )
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "delete",
+                entityType: "signups",
+                entityId: signupId,
+                summary: `Deleted signup entry. Reason: ${trimmedReason}. Full deleted signup record: ${JSON.stringify(signupRecord)}`
+            })
 
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "delete",
-            entityType: "signups",
-            entityId: signupId,
-            summary: `Deleted signup entry. Reason: ${trimmedReason}. Full deleted signup record: ${JSON.stringify(signupRecord)}`
-        })
-
-        revalidatePath("/dashboard/admin-view-signups")
-        return {
-            status: true,
-            message: "Signup entry deleted."
-        }
-    } catch (error) {
-        console.error("Error deleting signup entry:", error)
-        return {
-            status: false,
-            message: "Something went wrong."
+            revalidatePath("/dashboard/admin-view-signups")
+            return ok(undefined, "Signup entry deleted.")
+        } catch (error) {
+            console.error("Error deleting signup entry:", error)
+            return fail("Something went wrong.")
         }
     }
-}
+)
 
 export async function logAdminCsvDownload(): Promise<void> {
     const session = await auth.api.getSession({ headers: await headers() })

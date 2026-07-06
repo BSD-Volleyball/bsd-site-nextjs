@@ -119,7 +119,7 @@ export function DraftDayForm({
 
         const result = await saveDraftOrder(assignments)
 
-        setMessage(result.message)
+        setMessage(result.message ?? null)
         setIsError(!result.status)
         setIsSaving(false)
 

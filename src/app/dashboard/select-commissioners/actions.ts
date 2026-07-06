@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, users, userRoles } from "@/database/schema"
@@ -240,79 +242,83 @@ export async function getCommissionersForSeason(seasonId: number): Promise<{
     }
 }
 
-export async function saveCommissioners(data: {
-    seasonId: number
-    assignments: Array<{
-        divisionId: number
-        divisionName: string
-        commissioner1: string | null
-        commissioner2: string | null
-    }>
-}): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+export const saveCommissioners = withAction(
+    async (data: {
+        seasonId: number
+        assignments: Array<{
+            divisionId: number
+            divisionName: string
+            commissioner1: string | null
+            commissioner2: string | null
+        }>
+    }): Promise<ActionResult> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
 
-    try {
-        // Replace this season's division-scoped commissioner roles.
-        // League-wide commissioner rows (division_id IS NULL) are managed via
-        // /dashboard/manage-roles and deliberately left untouched here.
-        await db
-            .delete(userRoles)
-            .where(
-                and(
-                    eq(userRoles.role, "commissioner"),
-                    eq(userRoles.season_id, data.seasonId),
-                    isNotNull(userRoles.division_id)
+        try {
+            // Replace this season's division-scoped commissioner roles.
+            // League-wide commissioner rows (division_id IS NULL) are managed via
+            // /dashboard/manage-roles and deliberately left untouched here.
+            await db
+                .delete(userRoles)
+                .where(
+                    and(
+                        eq(userRoles.role, "commissioner"),
+                        eq(userRoles.season_id, data.seasonId),
+                        isNotNull(userRoles.division_id)
+                    )
                 )
-            )
 
-        const userRoleValues: Array<{
-            user_id: string
-            role: string
-            season_id: number
-            division_id: number
-        }> = []
+            const userRoleValues: Array<{
+                user_id: string
+                role: string
+                season_id: number
+                division_id: number
+            }> = []
 
-        for (const assignment of data.assignments) {
-            if (assignment.commissioner1) {
-                userRoleValues.push({
-                    user_id: assignment.commissioner1,
-                    role: "commissioner",
-                    season_id: data.seasonId,
-                    division_id: assignment.divisionId
-                })
+            for (const assignment of data.assignments) {
+                if (assignment.commissioner1) {
+                    userRoleValues.push({
+                        user_id: assignment.commissioner1,
+                        role: "commissioner",
+                        season_id: data.seasonId,
+                        division_id: assignment.divisionId
+                    })
+                }
+                if (assignment.commissioner2) {
+                    userRoleValues.push({
+                        user_id: assignment.commissioner2,
+                        role: "commissioner",
+                        season_id: data.seasonId,
+                        division_id: assignment.divisionId
+                    })
+                }
             }
-            if (assignment.commissioner2) {
-                userRoleValues.push({
-                    user_id: assignment.commissioner2,
-                    role: "commissioner",
-                    season_id: data.seasonId,
-                    division_id: assignment.divisionId
-                })
+
+            if (userRoleValues.length > 0) {
+                await db.insert(userRoles).values(userRoleValues)
             }
-        }
 
-        if (userRoleValues.length > 0) {
-            await db.insert(userRoles).values(userRoleValues)
-        }
-
-        // Log the action
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "commissioners",
-                summary: `Updated commissioners for season ${data.seasonId}`
+            // Log the action
+            const session = await auth.api.getSession({
+                headers: await headers()
             })
-        }
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "commissioners",
+                    summary: `Updated commissioners for season ${data.seasonId}`
+                })
+            }
 
-        revalidatePath("/dashboard/select-commissioners")
-        return { status: true, message: "Commissioners updated successfully." }
-    } catch (error) {
-        console.error("Error saving commissioners:", error)
-        return { status: false, message: "Failed to save commissioners." }
+            revalidatePath("/dashboard/select-commissioners")
+            return ok(undefined, "Commissioners updated successfully.")
+        } catch (error) {
+            console.error("Error saving commissioners:", error)
+            return fail("Failed to save commissioners.")
+        }
     }
-}
+)

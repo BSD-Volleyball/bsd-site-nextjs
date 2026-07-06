@@ -339,7 +339,10 @@ export function SignupsList({
             signupToDelete.signupId,
             deleteReason
         )
-        setDeleteResult(result)
+        setDeleteResult({
+            status: result.status,
+            message: result.message ?? ""
+        })
         setIsDeleting(false)
 
         if (result.status) {
@@ -375,7 +378,10 @@ export function SignupsList({
             reason: discountReason || null,
             scope: "season"
         })
-        setDiscountCreateResult(result)
+        setDiscountCreateResult({
+            status: result.status,
+            message: result.message ?? ""
+        })
         setIsCreatingDiscount(false)
         if (result.status) {
             setPostDeleteUser(null)

@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { checkSignupEligibility } from "@/lib/site-config"
@@ -991,81 +993,73 @@ export async function getPlayerTeamAssignment(
     }
 }
 
-export async function expressWaitlistInterest(
-    seasonId: number,
-    waiverId: number,
-    waiverAgreed: boolean
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
+export const expressWaitlistInterest = withAction(
+    async (
+        seasonId: number,
+        waiverId: number,
+        waiverAgreed: boolean
+    ): Promise<ActionResult> => {
+        const session = await auth.api.getSession({ headers: await headers() })
 
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    if (!waiverAgreed) {
-        return {
-            status: false,
-            message: "You must agree to the waiver to join the waitlist."
+        if (!session?.user) {
+            return fail("Not authenticated.")
         }
-    }
 
-    const activeWaiver = await getActiveWaiver()
-    if (!activeWaiver || activeWaiver.id !== waiverId) {
-        return {
-            status: false,
-            message:
+        if (!waiverAgreed) {
+            return fail("You must agree to the waiver to join the waitlist.")
+        }
+
+        const activeWaiver = await getActiveWaiver()
+        if (!activeWaiver || activeWaiver.id !== waiverId) {
+            return fail(
                 "The waiver was updated while you were submitting. Please reload and re-confirm the current waiver."
-        }
-    }
-
-    try {
-        // Check if user is already on the waitlist for this season
-        const [existing] = await db
-            .select({ id: waitlist.id })
-            .from(waitlist)
-            .where(
-                and(
-                    eq(waitlist.season, seasonId),
-                    eq(waitlist.user, session.user.id)
-                )
             )
-            .limit(1)
+        }
 
-        if (existing) {
-            return {
-                status: false,
-                message: "You've already expressed interest for this season."
+        try {
+            // Check if user is already on the waitlist for this season
+            const [existing] = await db
+                .select({ id: waitlist.id })
+                .from(waitlist)
+                .where(
+                    and(
+                        eq(waitlist.season, seasonId),
+                        eq(waitlist.user, session.user.id)
+                    )
+                )
+                .limit(1)
+
+            if (existing) {
+                return fail(
+                    "You've already expressed interest for this season."
+                )
             }
-        }
 
-        await recordWaiverAcceptance(session.user.id, activeWaiver.id)
+            await recordWaiverAcceptance(session.user.id, activeWaiver.id)
 
-        await db.insert(waitlist).values({
-            season: seasonId,
-            user: session.user.id,
-            created_at: new Date()
-        })
+            await db.insert(waitlist).values({
+                season: seasonId,
+                user: session.user.id,
+                created_at: new Date()
+            })
 
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "create",
-            entityType: "waitlist",
-            summary: `Expressed waitlist interest for season ${seasonId}`
-        })
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "create",
+                entityType: "waitlist",
+                summary: `Expressed waitlist interest for season ${seasonId}`
+            })
 
-        return {
-            status: true,
-            message:
+            return ok(
+                undefined,
                 "Your interest has been recorded. We'll reach out if a spot opens up!"
-        }
-    } catch (error) {
-        console.error("Failed to express waitlist interest:", error)
-        return {
-            status: false,
-            message: "Something went wrong. Please try again."
+            )
+        } catch (error) {
+            console.error("Failed to express waitlist interest:", error)
+            return fail("Something went wrong. Please try again.")
         }
     }
-}
+)
 
 export interface NextMatch {
     date: string

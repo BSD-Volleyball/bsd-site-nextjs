@@ -433,7 +433,7 @@ export function EditWeek1Form({
         )
 
         if (result.status) {
-            setSuccess(result.message)
+            setSuccess(result.message ?? null)
             const changes = computeWeek1Diff(
                 lastSavedSlots.current.filter((s) => s.userId),
                 filledSlots,

@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -108,142 +110,148 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
     })
 }
 
-export async function createDiscount(data: {
-    userId: string
-    percentage: string
-    expiration: string | null
-    reason: string | null
-    scope: DiscountScope
-}): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+export const createDiscount = withAction(
+    async (data: {
+        userId: string
+        percentage: string
+        expiration: string | null
+        reason: string | null
+        scope: DiscountScope
+    }): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
 
-    try {
-        const percentageNum = parseFloat(data.percentage)
-        if (
-            Number.isNaN(percentageNum) ||
-            percentageNum <= 0 ||
-            percentageNum > 100
-        ) {
-            return {
-                status: false,
-                message: "Percentage must be between 1 and 100."
+        try {
+            const percentageNum = parseFloat(data.percentage)
+            if (
+                Number.isNaN(percentageNum) ||
+                percentageNum <= 0 ||
+                percentageNum > 100
+            ) {
+                return fail("Percentage must be between 1 and 100.")
             }
-        }
 
-        if (data.scope !== "season" && data.scope !== "tournament") {
-            return { status: false, message: "Invalid discount scope." }
-        }
-
-        await db.insert(discounts).values({
-            user: data.userId,
-            percentage: data.percentage,
-            expiration: data.expiration ? new Date(data.expiration) : null,
-            reason: data.reason || null,
-            used: false,
-            scope: data.scope,
-            created_at: new Date()
-        })
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: "discounts",
-                summary: `Created ${data.percentage}% ${data.scope} discount for user ${data.userId}${data.reason ? ` (reason: ${data.reason})` : ""}`
-            })
-        }
-
-        revalidatePath("/dashboard/manage-discounts")
-        return { status: true, message: "Discount created successfully." }
-    } catch (error) {
-        console.error("Error creating discount:", error)
-        return { status: false, message: "Failed to create discount." }
-    }
-}
-
-export async function updateDiscount(data: {
-    id: number
-    percentage: string
-    expiration: string | null
-    reason: string | null
-}): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const percentageNum = parseFloat(data.percentage)
-        if (
-            Number.isNaN(percentageNum) ||
-            percentageNum <= 0 ||
-            percentageNum > 100
-        ) {
-            return {
-                status: false,
-                message: "Percentage must be between 1 and 100."
+            if (data.scope !== "season" && data.scope !== "tournament") {
+                return fail("Invalid discount scope.")
             }
-        }
 
-        await db
-            .update(discounts)
-            .set({
+            await db.insert(discounts).values({
+                user: data.userId,
                 percentage: data.percentage,
                 expiration: data.expiration ? new Date(data.expiration) : null,
                 reason: data.reason || null,
-                used: false
+                used: false,
+                scope: data.scope,
+                created_at: new Date()
             })
-            .where(eq(discounts.id, data.id))
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "discounts",
-                entityId: data.id,
-                summary: `Updated discount #${data.id} to ${data.percentage}%`
+            const session = await auth.api.getSession({
+                headers: await headers()
             })
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "discounts",
+                    summary: `Created ${data.percentage}% ${data.scope} discount for user ${data.userId}${data.reason ? ` (reason: ${data.reason})` : ""}`
+                })
+            }
+
+            revalidatePath("/dashboard/manage-discounts")
+            return ok(undefined, "Discount created successfully.")
+        } catch (error) {
+            console.error("Error creating discount:", error)
+            return fail("Failed to create discount.")
+        }
+    }
+)
+
+export const updateDiscount = withAction(
+    async (data: {
+        id: number
+        percentage: string
+        expiration: string | null
+        reason: string | null
+    }): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        revalidatePath("/dashboard/manage-discounts")
-        return { status: true, message: "Discount updated successfully." }
-    } catch (error) {
-        console.error("Error updating discount:", error)
-        return { status: false, message: "Failed to update discount." }
-    }
-}
+        try {
+            const percentageNum = parseFloat(data.percentage)
+            if (
+                Number.isNaN(percentageNum) ||
+                percentageNum <= 0 ||
+                percentageNum > 100
+            ) {
+                return fail("Percentage must be between 1 and 100.")
+            }
 
-export async function deleteDiscount(
-    id: number
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+            await db
+                .update(discounts)
+                .set({
+                    percentage: data.percentage,
+                    expiration: data.expiration
+                        ? new Date(data.expiration)
+                        : null,
+                    reason: data.reason || null,
+                    used: false
+                })
+                .where(eq(discounts.id, data.id))
 
-    try {
-        await db.delete(discounts).where(eq(discounts.id, id))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "delete",
-                entityType: "discounts",
-                entityId: id,
-                summary: `Deleted discount #${id}`
+            const session = await auth.api.getSession({
+                headers: await headers()
             })
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "discounts",
+                    entityId: data.id,
+                    summary: `Updated discount #${data.id} to ${data.percentage}%`
+                })
+            }
+
+            revalidatePath("/dashboard/manage-discounts")
+            return ok(undefined, "Discount updated successfully.")
+        } catch (error) {
+            console.error("Error updating discount:", error)
+            return fail("Failed to update discount.")
+        }
+    }
+)
+
+export const deleteDiscount = withAction(
+    async (id: number): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        revalidatePath("/dashboard/manage-discounts")
-        return { status: true, message: "Discount deleted successfully." }
-    } catch (error) {
-        console.error("Error deleting discount:", error)
-        return { status: false, message: "Failed to delete discount." }
+        try {
+            await db.delete(discounts).where(eq(discounts.id, id))
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "delete",
+                    entityType: "discounts",
+                    entityId: id,
+                    summary: `Deleted discount #${id}`
+                })
+            }
+
+            revalidatePath("/dashboard/manage-discounts")
+            return ok(undefined, "Discount deleted successfully.")
+        } catch (error) {
+            console.error("Error deleting discount:", error)
+            return fail("Failed to delete discount.")
+        }
     }
-}
+)

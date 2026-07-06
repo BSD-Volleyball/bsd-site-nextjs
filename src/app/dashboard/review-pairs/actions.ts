@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
@@ -226,218 +228,210 @@ function isValidUserId(value: string): boolean {
     return typeof value === "string" && value.trim().length > 0
 }
 
-export async function bustMatchedPair(
-    userAId: string,
-    userBId: string
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    if (
-        !isValidUserId(userAId) ||
-        !isValidUserId(userBId) ||
-        userAId === userBId
-    ) {
-        return { status: false, message: "Invalid pair selection." }
-    }
-
-    try {
-        const actorId = await getSessionUserId()
-        if (!actorId) {
-            return { status: false, message: "Not authenticated." }
-        }
-
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
-
-        await db
-            .update(signups)
-            .set({
-                pair: false,
-                pair_pick: null
-            })
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    inArray(signups.player, [userAId, userBId])
-                )
-            )
-
-        await logAuditEntry({
-            userId: actorId,
-            action: "update",
-            entityType: "signups",
-            summary: `Split matched pair (${userAId}, ${userBId}) for season ${config.seasonId}`
-        })
-
-        revalidatePath("/dashboard/review-pairs")
-        return { status: true, message: "Pair has been split." }
-    } catch (error) {
-        console.error("Error busting matched pair:", error)
-        return { status: false, message: "Failed to split pair." }
-    }
-}
-
-export async function bustUnmatchedPair(
-    requesterId: string
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    if (!isValidUserId(requesterId)) {
-        return { status: false, message: "Invalid requester." }
-    }
-
-    try {
-        const actorId = await getSessionUserId()
-        if (!actorId) {
-            return { status: false, message: "Not authenticated." }
-        }
-
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
-
-        await db
-            .update(signups)
-            .set({
-                pair: false,
-                pair_pick: null
-            })
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    eq(signups.player, requesterId)
-                )
-            )
-
-        await logAuditEntry({
-            userId: actorId,
-            action: "update",
-            entityType: "signups",
-            summary: `Removed unmatched pair request by ${requesterId} for season ${config.seasonId}`
-        })
-
-        revalidatePath("/dashboard/review-pairs")
-        return { status: true, message: "Pair request has been removed." }
-    } catch (error) {
-        console.error("Error busting unmatched pair:", error)
-        return { status: false, message: "Failed to remove pair request." }
-    }
-}
-
-export async function completeUnmatchedPair(
-    requesterId: string,
-    requestedId: string
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    if (
-        !isValidUserId(requesterId) ||
-        !isValidUserId(requestedId) ||
-        requesterId === requestedId
-    ) {
-        return { status: false, message: "Invalid pair selection." }
-    }
-
-    try {
-        const actorId = await getSessionUserId()
-        if (!actorId) {
-            return { status: false, message: "Not authenticated." }
-        }
-
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
-
-        const [requesterSignup] = await db
-            .select({
-                pairPickId: signups.pair_pick
-            })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    eq(signups.player, requesterId)
-                )
-            )
-            .limit(1)
-
-        const [requestedSignup] = await db
-            .select({
-                pairPickId: signups.pair_pick
-            })
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    eq(signups.player, requestedId)
-                )
-            )
-            .limit(1)
-
-        if (!requesterSignup || !requestedSignup) {
-            return {
-                status: false,
-                message:
-                    "Both players must have signup records for the current season."
-            }
-        }
-
-        if (requesterSignup.pairPickId !== requestedId) {
-            return {
-                status: false,
-                message:
-                    "Requester no longer points to this player. Refresh and try again."
-            }
+export const bustMatchedPair = withAction(
+    async (userAId: string, userBId: string): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
         if (
-            requestedSignup.pairPickId !== null &&
-            requestedSignup.pairPickId !== requesterId
+            !isValidUserId(userAId) ||
+            !isValidUserId(userBId) ||
+            userAId === userBId
         ) {
-            return {
-                status: false,
-                message:
-                    "Requested player already has a different pair request."
-            }
+            return fail("Invalid pair selection.")
         }
 
-        await db
-            .update(signups)
-            .set({
-                pair: true,
-                pair_pick: requesterId
-            })
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    eq(signups.player, requestedId)
+        try {
+            const actorId = await getSessionUserId()
+            if (!actorId) {
+                return fail("Not authenticated.")
+            }
+
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No current season found.")
+            }
+
+            await db
+                .update(signups)
+                .set({
+                    pair: false,
+                    pair_pick: null
+                })
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        inArray(signups.player, [userAId, userBId])
+                    )
                 )
-            )
 
-        await logAuditEntry({
-            userId: actorId,
-            action: "update",
-            entityType: "signups",
-            summary: `Completed unmatched pair request (${requesterId} -> ${requestedId}) for season ${config.seasonId}`
-        })
+            await logAuditEntry({
+                userId: actorId,
+                action: "update",
+                entityType: "signups",
+                summary: `Split matched pair (${userAId}, ${userBId}) for season ${config.seasonId}`
+            })
 
-        revalidatePath("/dashboard/review-pairs")
-        return { status: true, message: "Pair has been completed." }
-    } catch (error) {
-        console.error("Error completing unmatched pair:", error)
-        return { status: false, message: "Failed to complete pair." }
+            revalidatePath("/dashboard/review-pairs")
+            return ok(undefined, "Pair has been split.")
+        } catch (error) {
+            console.error("Error busting matched pair:", error)
+            return fail("Failed to split pair.")
+        }
     }
-}
+)
+
+export const bustUnmatchedPair = withAction(
+    async (requesterId: string): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
+
+        if (!isValidUserId(requesterId)) {
+            return fail("Invalid requester.")
+        }
+
+        try {
+            const actorId = await getSessionUserId()
+            if (!actorId) {
+                return fail("Not authenticated.")
+            }
+
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No current season found.")
+            }
+
+            await db
+                .update(signups)
+                .set({
+                    pair: false,
+                    pair_pick: null
+                })
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requesterId)
+                    )
+                )
+
+            await logAuditEntry({
+                userId: actorId,
+                action: "update",
+                entityType: "signups",
+                summary: `Removed unmatched pair request by ${requesterId} for season ${config.seasonId}`
+            })
+
+            revalidatePath("/dashboard/review-pairs")
+            return ok(undefined, "Pair request has been removed.")
+        } catch (error) {
+            console.error("Error busting unmatched pair:", error)
+            return fail("Failed to remove pair request.")
+        }
+    }
+)
+
+export const completeUnmatchedPair = withAction(
+    async (requesterId: string, requestedId: string): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
+
+        if (
+            !isValidUserId(requesterId) ||
+            !isValidUserId(requestedId) ||
+            requesterId === requestedId
+        ) {
+            return fail("Invalid pair selection.")
+        }
+
+        try {
+            const actorId = await getSessionUserId()
+            if (!actorId) {
+                return fail("Not authenticated.")
+            }
+
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No current season found.")
+            }
+
+            const [requesterSignup] = await db
+                .select({
+                    pairPickId: signups.pair_pick
+                })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requesterId)
+                    )
+                )
+                .limit(1)
+
+            const [requestedSignup] = await db
+                .select({
+                    pairPickId: signups.pair_pick
+                })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requestedId)
+                    )
+                )
+                .limit(1)
+
+            if (!requesterSignup || !requestedSignup) {
+                return fail(
+                    "Both players must have signup records for the current season."
+                )
+            }
+
+            if (requesterSignup.pairPickId !== requestedId) {
+                return fail(
+                    "Requester no longer points to this player. Refresh and try again."
+                )
+            }
+
+            if (
+                requestedSignup.pairPickId !== null &&
+                requestedSignup.pairPickId !== requesterId
+            ) {
+                return fail(
+                    "Requested player already has a different pair request."
+                )
+            }
+
+            await db
+                .update(signups)
+                .set({
+                    pair: true,
+                    pair_pick: requesterId
+                })
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requestedId)
+                    )
+                )
+
+            await logAuditEntry({
+                userId: actorId,
+                action: "update",
+                entityType: "signups",
+                summary: `Completed unmatched pair request (${requesterId} -> ${requestedId}) for season ${config.seasonId}`
+            })
+
+            revalidatePath("/dashboard/review-pairs")
+            return ok(undefined, "Pair has been completed.")
+        } catch (error) {
+            console.error("Error completing unmatched pair:", error)
+            return fail("Failed to complete pair.")
+        }
+    }
+)

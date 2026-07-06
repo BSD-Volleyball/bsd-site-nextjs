@@ -1919,7 +1919,7 @@ export function CreateWeek2Form({
         const result = await saveWeek2Rosters(savePayload)
 
         if (result.status) {
-            setMessage(result.message)
+            setMessage(result.message ?? null)
         } else {
             setError(result.message)
         }

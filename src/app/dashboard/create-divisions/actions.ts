@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -284,72 +286,69 @@ export interface SavePayload {
     selections: DivisionSelection[]
 }
 
-export async function saveDivisionSelections(
-    payload: SavePayload
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    const { seasonId, selections } = payload
-
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return { status: false, message: "Invalid season." }
-    }
-
-    const enabledSelections = selections.filter((s) => s.enabled)
-
-    for (const sel of enabledSelections) {
-        if (!Number.isInteger(sel.divisionId) || sel.divisionId <= 0) {
-            return { status: false, message: "Invalid division id." }
+export const saveDivisionSelections = withAction(
+    async (payload: SavePayload): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-        if (sel.teams !== 4 && sel.teams !== 6) {
-            return { status: false, message: "Teams must be 4 or 6." }
-        }
-        if (!["6-2", "5-3", "4-4"].includes(sel.genderSplit)) {
-            return { status: false, message: "Invalid gender split." }
-        }
-    }
 
-    try {
-        await db
-            .delete(individual_divisions)
-            .where(eq(individual_divisions.season, seasonId))
+        const { seasonId, selections } = payload
 
-        if (enabledSelections.length > 0) {
-            await db.insert(individual_divisions).values(
-                enabledSelections.map((sel) => ({
-                    season: seasonId,
-                    division: sel.divisionId,
-                    coaches: sel.coaches,
-                    gender_split: sel.genderSplit,
-                    teams: sel.teams
-                }))
+        if (!Number.isInteger(seasonId) || seasonId <= 0) {
+            return fail("Invalid season.")
+        }
+
+        const enabledSelections = selections.filter((s) => s.enabled)
+
+        for (const sel of enabledSelections) {
+            if (!Number.isInteger(sel.divisionId) || sel.divisionId <= 0) {
+                return fail("Invalid division id.")
+            }
+            if (sel.teams !== 4 && sel.teams !== 6) {
+                return fail("Teams must be 4 or 6.")
+            }
+            if (!["6-2", "5-3", "4-4"].includes(sel.genderSplit)) {
+                return fail("Invalid gender split.")
+            }
+        }
+
+        try {
+            await db
+                .delete(individual_divisions)
+                .where(eq(individual_divisions.season, seasonId))
+
+            if (enabledSelections.length > 0) {
+                await db.insert(individual_divisions).values(
+                    enabledSelections.map((sel) => ({
+                        season: seasonId,
+                        division: sel.divisionId,
+                        coaches: sel.coaches,
+                        gender_split: sel.genderSplit,
+                        teams: sel.teams
+                    }))
+                )
+            }
+
+            const userId = await getSessionUserId()
+            if (userId) {
+                await logAuditEntry({
+                    userId,
+                    action: "update",
+                    entityType: "individual_divisions",
+                    entityId: seasonId,
+                    summary: `Saved division selections for season ${seasonId}: ${enabledSelections.length} division(s) enabled`
+                })
+            }
+
+            revalidatePath("/dashboard/create-divisions")
+            return ok(
+                undefined,
+                `Division configuration saved — ${enabledSelections.length} division(s) configured.`
             )
-        }
-
-        const userId = await getSessionUserId()
-        if (userId) {
-            await logAuditEntry({
-                userId,
-                action: "update",
-                entityType: "individual_divisions",
-                entityId: seasonId,
-                summary: `Saved division selections for season ${seasonId}: ${enabledSelections.length} division(s) enabled`
-            })
-        }
-
-        revalidatePath("/dashboard/create-divisions")
-        return {
-            status: true,
-            message: `Division configuration saved — ${enabledSelections.length} division(s) configured.`
-        }
-    } catch (error) {
-        console.error("Error saving division selections:", error)
-        return {
-            status: false,
-            message: "Something went wrong. Please try again."
+        } catch (error) {
+            console.error("Error saving division selections:", error)
+            return fail("Something went wrong. Please try again.")
         }
     }
-}
+)

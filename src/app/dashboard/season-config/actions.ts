@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, seasonEvents, eventTimeSlots } from "@/database/schema"
@@ -151,84 +153,84 @@ export async function getSeasonConfigData(): Promise<{
     }
 }
 
-export async function saveSeasonConfig(
-    seasonId: number,
-    metadata: SeasonMetadata,
-    events: EventData[]
-): Promise<{ status: boolean; message: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        return { status: false, message: "Unauthorized" }
-    }
+export const saveSeasonConfig = withAction(
+    async (
+        seasonId: number,
+        metadata: SeasonMetadata,
+        events: EventData[]
+    ): Promise<ActionResult> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
+        }
 
-    if (!seasonId || seasonId <= 0) {
-        return { status: false, message: "Invalid season ID" }
-    }
+        if (!seasonId || seasonId <= 0) {
+            return fail("Invalid season ID")
+        }
 
-    try {
-        await db.transaction(async (tx) => {
-            // Update season metadata
-            await tx
-                .update(seasons)
-                .set({
-                    season_amount: metadata.season_amount || null,
-                    late_amount: metadata.late_amount || null,
-                    max_players: metadata.max_players,
-                    certified_ref_rate: metadata.certified_ref_rate || null,
-                    uncertified_ref_rate: metadata.uncertified_ref_rate || null
-                })
-                .where(eq(seasons.id, seasonId))
-
-            // Delete existing events (cascades to time slots)
-            await tx
-                .delete(seasonEvents)
-                .where(eq(seasonEvents.season_id, seasonId))
-
-            // Insert new events and their time slots
-            for (const event of events) {
-                const [inserted] = await tx
-                    .insert(seasonEvents)
-                    .values({
-                        season_id: seasonId,
-                        event_type: event.event_type,
-                        event_date: event.event_date,
-                        sort_order: event.sort_order,
-                        label: event.label || null
+        try {
+            await db.transaction(async (tx) => {
+                // Update season metadata
+                await tx
+                    .update(seasons)
+                    .set({
+                        season_amount: metadata.season_amount || null,
+                        late_amount: metadata.late_amount || null,
+                        max_players: metadata.max_players,
+                        certified_ref_rate: metadata.certified_ref_rate || null,
+                        uncertified_ref_rate:
+                            metadata.uncertified_ref_rate || null
                     })
-                    .returning({ id: seasonEvents.id })
+                    .where(eq(seasons.id, seasonId))
 
-                if (event.time_slots.length > 0) {
-                    await tx.insert(eventTimeSlots).values(
-                        event.time_slots.map((slot) => ({
-                            event_id: inserted.id,
-                            start_time: slot.start_time,
-                            slot_label: slot.slot_label || null,
-                            sort_order: slot.sort_order
-                        }))
-                    )
+                // Delete existing events (cascades to time slots)
+                await tx
+                    .delete(seasonEvents)
+                    .where(eq(seasonEvents.season_id, seasonId))
+
+                // Insert new events and their time slots
+                for (const event of events) {
+                    const [inserted] = await tx
+                        .insert(seasonEvents)
+                        .values({
+                            season_id: seasonId,
+                            event_type: event.event_type,
+                            event_date: event.event_date,
+                            sort_order: event.sort_order,
+                            label: event.label || null
+                        })
+                        .returning({ id: seasonEvents.id })
+
+                    if (event.time_slots.length > 0) {
+                        await tx.insert(eventTimeSlots).values(
+                            event.time_slots.map((slot) => ({
+                                event_id: inserted.id,
+                                start_time: slot.start_time,
+                                slot_label: slot.slot_label || null,
+                                sort_order: slot.sort_order
+                            }))
+                        )
+                    }
                 }
-            }
-        })
-
-        const userId = await getSessionUserId()
-        if (userId) {
-            await logAuditEntry({
-                userId,
-                action: "update_season_config",
-                entityType: "season",
-                entityId: seasonId,
-                summary: `Updated season configuration: ${events.length} events`
             })
-        }
 
-        revalidatePath("/dashboard/season-config")
-        revalidatePath("/dashboard")
-        return {
-            status: true,
-            message: "Season configuration saved successfully"
+            const userId = await getSessionUserId()
+            if (userId) {
+                await logAuditEntry({
+                    userId,
+                    action: "update_season_config",
+                    entityType: "season",
+                    entityId: seasonId,
+                    summary: `Updated season configuration: ${events.length} events`
+                })
+            }
+
+            revalidatePath("/dashboard/season-config")
+            revalidatePath("/dashboard")
+            return ok(undefined, "Season configuration saved successfully")
+        } catch (error) {
+            console.error("Failed to save season config:", error)
+            return fail("Failed to save season configuration")
         }
-    } catch (error) {
-        console.error("Failed to save season config:", error)
-        return { status: false, message: "Failed to save season configuration" }
     }
-}
+)

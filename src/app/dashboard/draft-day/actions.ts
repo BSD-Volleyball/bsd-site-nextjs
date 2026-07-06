@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { db } from "@/database/db"
 import {
     users,
@@ -215,86 +217,90 @@ export async function getDraftDayData(
     }
 }
 
-export async function saveDraftOrder(
-    assignments: { teamId: number; number: number }[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsCommissioner()
+export const saveDraftOrder = withAction(
+    async (
+        assignments: { teamId: number; number: number }[]
+    ): Promise<ActionResult> => {
+        const hasAccess = await getIsCommissioner()
 
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return { status: false, message: "No active season found." }
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        const seasonId = config.seasonId
+        try {
+            const config = await getSeasonConfig()
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return { status: false, message: "Unauthorized" }
-        }
+            if (!config.seasonId) {
+                return fail("No active season found.")
+            }
 
-        const divisionAccess = await getCommissionerDivisionScope(
-            session.user.id,
-            seasonId
-        )
+            const seasonId = config.seasonId
 
-        if (divisionAccess.type === "denied") {
-            return { status: false, message: "Unauthorized" }
-        }
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (!session?.user) {
+                return fail("Unauthorized")
+            }
 
-        // Security: validate all teamIds belong to accessible divisions for this season
-        const teamIds = assignments.map((a) => a.teamId)
-
-        const validTeams = await db
-            .select({ id: teams.id })
-            .from(teams)
-            .where(
-                and(
-                    eq(teams.season, seasonId),
-                    inArray(teams.id, teamIds),
-                    divisionAccess.type === "division_specific"
-                        ? inArray(teams.division, divisionAccess.divisionIds)
-                        : undefined
-                )
+            const divisionAccess = await getCommissionerDivisionScope(
+                session.user.id,
+                seasonId
             )
 
-        const validTeamIds = new Set(validTeams.map((t) => t.id))
+            if (divisionAccess.type === "denied") {
+                return fail("Unauthorized")
+            }
 
-        for (const assignment of assignments) {
-            if (!validTeamIds.has(assignment.teamId)) {
-                return {
-                    status: false,
-                    message: "One or more teams are not accessible."
+            // Security: validate all teamIds belong to accessible divisions for this season
+            const teamIds = assignments.map((a) => a.teamId)
+
+            const validTeams = await db
+                .select({ id: teams.id })
+                .from(teams)
+                .where(
+                    and(
+                        eq(teams.season, seasonId),
+                        inArray(teams.id, teamIds),
+                        divisionAccess.type === "division_specific"
+                            ? inArray(
+                                  teams.division,
+                                  divisionAccess.divisionIds
+                              )
+                            : undefined
+                    )
+                )
+
+            const validTeamIds = new Set(validTeams.map((t) => t.id))
+
+            for (const assignment of assignments) {
+                if (!validTeamIds.has(assignment.teamId)) {
+                    return fail("One or more teams are not accessible.")
                 }
             }
+
+            // Update each team's draft number
+            for (const assignment of assignments) {
+                await db
+                    .update(teams)
+                    .set({ number: assignment.number })
+                    .where(eq(teams.id, assignment.teamId))
+            }
+
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "teams",
+                summary: `Saved draft order for ${assignments.length} teams in season ${seasonId}`
+            })
+
+            return ok(undefined, "Draft order saved successfully.")
+        } catch (error) {
+            console.error("Error saving draft order:", error)
+            return fail("Something went wrong.")
         }
-
-        // Update each team's draft number
-        for (const assignment of assignments) {
-            await db
-                .update(teams)
-                .set({ number: assignment.number })
-                .where(eq(teams.id, assignment.teamId))
-        }
-
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "update",
-            entityType: "teams",
-            summary: `Saved draft order for ${assignments.length} teams in season ${seasonId}`
-        })
-
-        return { status: true, message: "Draft order saved successfully." }
-    } catch (error) {
-        console.error("Error saving draft order:", error)
-        return { status: false, message: "Something went wrong." }
     }
-}
+)
 
 export interface PickEntry {
     round: number

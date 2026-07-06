@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -270,185 +272,183 @@ export async function finalizePlayerPictureUpload(
     }
 }
 
-export async function updateUser(
-    originalId: string,
-    data: {
-        id?: string
-        name?: string | null
-        first_name?: string
-        last_name?: string
-        preferred_name?: string | null
-        email?: string
-        emailVerified?: boolean
-        image?: string | null
-        avatar?: string | null
-        avatarUrl?: string | null
-        old_id?: number
-        picture?: string | null
-        phone?: string | null
-        experience?: string | null
-        assessment?: string | null
-        height?: number | null
-        skill_setter?: boolean | null
-        skill_hitter?: boolean | null
-        skill_passer?: boolean | null
-        skill_other?: boolean | null
-        emergency_contact?: string | null
-        referred_by?: string | null
-        pronouns?: string | null
-        male?: boolean | null
-        onboarding_completed?: boolean | null
-        seasons_list?: string
-        notification_list?: string
-        captain_eligible?: boolean
-    }
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    const isIdChanging = data.id !== undefined && data.id !== originalId
-
-    try {
-        const [existingUser] = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.id, originalId))
-            .limit(1)
-
-        if (!existingUser) {
-            return { status: false, message: "User not found." }
+export const updateUser = withAction(
+    async (
+        originalId: string,
+        data: {
+            id?: string
+            name?: string | null
+            first_name?: string
+            last_name?: string
+            preferred_name?: string | null
+            email?: string
+            emailVerified?: boolean
+            image?: string | null
+            avatar?: string | null
+            avatarUrl?: string | null
+            old_id?: number
+            picture?: string | null
+            phone?: string | null
+            experience?: string | null
+            assessment?: string | null
+            height?: number | null
+            skill_setter?: boolean | null
+            skill_hitter?: boolean | null
+            skill_passer?: boolean | null
+            skill_other?: boolean | null
+            emergency_contact?: string | null
+            referred_by?: string | null
+            pronouns?: string | null
+            male?: boolean | null
+            onboarding_completed?: boolean | null
+            seasons_list?: string
+            notification_list?: string
+            captain_eligible?: boolean
+        }
+    ): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        if (isIdChanging) {
-            const newId = data.id as string
+        const isIdChanging = data.id !== undefined && data.id !== originalId
 
-            if (!newId.trim()) {
-                return { status: false, message: "ID cannot be empty." }
-            }
-
-            // Check if new ID already exists
-            const [existing] = await db
+        try {
+            const [existingUser] = await db
                 .select({ id: users.id })
                 .from(users)
-                .where(eq(users.id, newId))
+                .where(eq(users.id, originalId))
                 .limit(1)
 
-            if (existing) {
-                return {
-                    status: false,
-                    message: "A user with that ID already exists."
-                }
+            if (!existingUser) {
+                return fail("User not found.")
             }
 
-            // Update within a transaction to cascade ID changes
-            await db.transaction(async (tx) => {
-                // Update all referencing tables first
-                await tx
-                    .update(sessions)
-                    .set({ userId: newId })
-                    .where(eq(sessions.userId, originalId))
-                await tx
-                    .update(accounts)
-                    .set({ userId: newId })
-                    .where(eq(accounts.userId, originalId))
-                await tx
-                    .update(signups)
-                    .set({ player: newId })
-                    .where(eq(signups.player, originalId))
-                await tx
-                    .update(signups)
-                    .set({ pair_pick: newId })
-                    .where(eq(signups.pair_pick, originalId))
-                await tx
-                    .update(teams)
-                    .set({ captain: newId })
-                    .where(eq(teams.captain, originalId))
-                await tx
-                    .update(drafts)
-                    .set({ user: newId })
-                    .where(eq(drafts.user, originalId))
-                await tx
-                    .update(waitlist)
-                    .set({ user: newId })
-                    .where(eq(waitlist.user, originalId))
-                await tx
-                    .update(discounts)
-                    .set({ user: newId })
-                    .where(eq(discounts.user, originalId))
-                await tx
-                    .update(evaluations)
-                    .set({ player: newId })
-                    .where(eq(evaluations.player, originalId))
-                await tx
-                    .update(userRoles)
-                    .set({ user_id: newId })
-                    .where(eq(userRoles.user_id, originalId))
+            if (isIdChanging) {
+                const newId = data.id as string
 
-                // Now update the user record itself (including ID and other fields)
-                const { id: _newId, ...otherFields } = data
-                await tx
+                if (!newId.trim()) {
+                    return fail("ID cannot be empty.")
+                }
+
+                // Check if new ID already exists
+                const [existing] = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(eq(users.id, newId))
+                    .limit(1)
+
+                if (existing) {
+                    return fail("A user with that ID already exists.")
+                }
+
+                // Update within a transaction to cascade ID changes
+                await db.transaction(async (tx) => {
+                    // Update all referencing tables first
+                    await tx
+                        .update(sessions)
+                        .set({ userId: newId })
+                        .where(eq(sessions.userId, originalId))
+                    await tx
+                        .update(accounts)
+                        .set({ userId: newId })
+                        .where(eq(accounts.userId, originalId))
+                    await tx
+                        .update(signups)
+                        .set({ player: newId })
+                        .where(eq(signups.player, originalId))
+                    await tx
+                        .update(signups)
+                        .set({ pair_pick: newId })
+                        .where(eq(signups.pair_pick, originalId))
+                    await tx
+                        .update(teams)
+                        .set({ captain: newId })
+                        .where(eq(teams.captain, originalId))
+                    await tx
+                        .update(drafts)
+                        .set({ user: newId })
+                        .where(eq(drafts.user, originalId))
+                    await tx
+                        .update(waitlist)
+                        .set({ user: newId })
+                        .where(eq(waitlist.user, originalId))
+                    await tx
+                        .update(discounts)
+                        .set({ user: newId })
+                        .where(eq(discounts.user, originalId))
+                    await tx
+                        .update(evaluations)
+                        .set({ player: newId })
+                        .where(eq(evaluations.player, originalId))
+                    await tx
+                        .update(userRoles)
+                        .set({ user_id: newId })
+                        .where(eq(userRoles.user_id, originalId))
+
+                    // Now update the user record itself (including ID and other fields)
+                    const { id: _newId, ...otherFields } = data
+                    await tx
+                        .update(users)
+                        .set({
+                            ...otherFields,
+                            id: newId,
+                            updatedAt: new Date()
+                        })
+                        .where(eq(users.id, originalId))
+                })
+            } else {
+                // Normal update without ID change
+                const { id: _id, ...updateFields } = data
+                await db
                     .update(users)
                     .set({
-                        ...otherFields,
-                        id: newId,
+                        ...updateFields,
                         updatedAt: new Date()
                     })
                     .where(eq(users.id, originalId))
+            }
+
+            const effectiveId = isIdChanging ? data.id! : originalId
+
+            // An account-ID change migrates live sessions to the new ID; force a
+            // clean re-login so no stale tokens survive the switch.
+            if (isIdChanging) {
+                await invalidateAllSessionsForUser(effectiveId)
+            }
+
+            const session = await auth.api.getSession({
+                headers: await headers()
             })
-        } else {
-            // Normal update without ID change
-            const { id: _id, ...updateFields } = data
-            await db
-                .update(users)
-                .set({
-                    ...updateFields,
-                    updatedAt: new Date()
+            if (session) {
+                const [updatedUser] = await db
+                    .select({
+                        first_name: users.first_name,
+                        last_name: users.last_name
+                    })
+                    .from(users)
+                    .where(eq(users.id, effectiveId))
+                    .limit(1)
+                const userName = updatedUser
+                    ? `${updatedUser.first_name} ${updatedUser.last_name}`
+                    : originalId
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "users",
+                    entityId: effectiveId,
+                    summary: `Admin updated user ${userName} (${originalId})${isIdChanging ? ` (ID changed to ${data.id})` : ""}`
                 })
-                .where(eq(users.id, originalId))
-        }
+            }
 
-        const effectiveId = isIdChanging ? data.id! : originalId
-
-        // An account-ID change migrates live sessions to the new ID; force a
-        // clean re-login so no stale tokens survive the switch.
-        if (isIdChanging) {
-            await invalidateAllSessionsForUser(effectiveId)
+            revalidatePath("/dashboard/edit-player")
+            return ok(undefined, "User updated successfully.")
+        } catch (error) {
+            console.error("Error updating user:", error)
+            return fail("Failed to update user.")
         }
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            const [updatedUser] = await db
-                .select({
-                    first_name: users.first_name,
-                    last_name: users.last_name
-                })
-                .from(users)
-                .where(eq(users.id, effectiveId))
-                .limit(1)
-            const userName = updatedUser
-                ? `${updatedUser.first_name} ${updatedUser.last_name}`
-                : originalId
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "users",
-                entityId: effectiveId,
-                summary: `Admin updated user ${userName} (${originalId})${isIdChanging ? ` (ID changed to ${data.id})` : ""}`
-            })
-        }
-
-        revalidatePath("/dashboard/edit-player")
-        return {
-            status: true,
-            message: "User updated successfully."
-        }
-    } catch (error) {
-        console.error("Error updating user:", error)
-        return { status: false, message: "Failed to update user." }
     }
-}
+)
 
 export interface SignupDetails {
     id: number
@@ -518,59 +518,63 @@ export async function getSignupForCurrentSeason(
     }
 }
 
-export async function updateSignup(
-    signupId: number,
-    data: {
-        age?: string | null
-        captain?: string | null
-        pair?: boolean | null
-        pair_pick?: string | null
-        pair_reason?: string | null
-        amount_paid?: string | null
-    }
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        await db.update(signups).set(data).where(eq(signups.id, signupId))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            const [signup] = await db
-                .select({ player: signups.player })
-                .from(signups)
-                .where(eq(signups.id, signupId))
-                .limit(1)
-            let playerName = `signup #${signupId}`
-            if (signup) {
-                const [player] = await db
-                    .select({
-                        first_name: users.first_name,
-                        last_name: users.last_name
-                    })
-                    .from(users)
-                    .where(eq(users.id, signup.player))
-                    .limit(1)
-                if (player) {
-                    playerName = `${player.first_name} ${player.last_name}`
-                }
-            }
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "signups",
-                entityId: signupId,
-                summary: `Admin updated signup #${signupId} for ${playerName}`
-            })
+export const updateSignup = withAction(
+    async (
+        signupId: number,
+        data: {
+            age?: string | null
+            captain?: string | null
+            pair?: boolean | null
+            pair_pick?: string | null
+            pair_reason?: string | null
+            amount_paid?: string | null
+        }
+    ): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        revalidatePath("/dashboard/edit-player")
-        return { status: true, message: "Signup updated successfully." }
-    } catch (error) {
-        console.error("Error updating signup:", error)
-        return { status: false, message: "Failed to update signup." }
+        try {
+            await db.update(signups).set(data).where(eq(signups.id, signupId))
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (session) {
+                const [signup] = await db
+                    .select({ player: signups.player })
+                    .from(signups)
+                    .where(eq(signups.id, signupId))
+                    .limit(1)
+                let playerName = `signup #${signupId}`
+                if (signup) {
+                    const [player] = await db
+                        .select({
+                            first_name: users.first_name,
+                            last_name: users.last_name
+                        })
+                        .from(users)
+                        .where(eq(users.id, signup.player))
+                        .limit(1)
+                    if (player) {
+                        playerName = `${player.first_name} ${player.last_name}`
+                    }
+                }
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "signups",
+                    entityId: signupId,
+                    summary: `Admin updated signup #${signupId} for ${playerName}`
+                })
+            }
+
+            revalidatePath("/dashboard/edit-player")
+            return ok(undefined, "Signup updated successfully.")
+        } catch (error) {
+            console.error("Error updating signup:", error)
+            return fail("Failed to update signup.")
+        }
     }
-}
+)

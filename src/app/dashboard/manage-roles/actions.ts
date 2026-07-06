@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
@@ -159,71 +161,79 @@ export async function getUserRoleAssignments(
     }))
 }
 
-export async function addUserRole(data: {
-    userId: string
-    role: Role
-    seasonId?: number
-    divisionId?: number
-}): Promise<{ status: boolean; message: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return { status: false, message: "Unauthorized" }
+export const addUserRole = withAction(
+    async (data: {
+        userId: string
+        role: Role
+        seasonId?: number
+        divisionId?: number
+    }): Promise<ActionResult> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) return fail("Unauthorized")
 
-    try {
-        const session = await auth.api.getSession({ headers: await headers() })
-        await grantRole(data.userId, data.role, {
-            seasonId: data.seasonId,
-            divisionId: data.divisionId,
-            grantedBy: session?.user?.id
-        })
+        try {
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            await grantRole(data.userId, data.role, {
+                seasonId: data.seasonId,
+                divisionId: data.divisionId,
+                grantedBy: session?.user?.id
+            })
 
-        await logAuditEntry({
-            userId: session?.user?.id ?? "unknown",
-            action: "create",
-            entityType: "user_roles",
-            entityId: data.userId,
-            summary: `Granted role "${data.role}" to user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
-        })
+            await logAuditEntry({
+                userId: session?.user?.id ?? "unknown",
+                action: "create",
+                entityType: "user_roles",
+                entityId: data.userId,
+                summary: `Granted role "${data.role}" to user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
+            })
 
-        revalidatePath("/dashboard/manage-roles")
-        return { status: true, message: "Role granted successfully." }
-    } catch (error) {
-        console.error("Error granting role:", error)
-        return { status: false, message: "Failed to grant role." }
-    }
-}
-
-export async function removeUserRole(data: {
-    userId: string
-    roleRowId: number
-    role: Role
-    seasonId?: number
-    divisionId?: number
-}): Promise<{ status: boolean; message: string }> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return { status: false, message: "Unauthorized" }
-
-    try {
-        // Delete by row ID for precision
-        await db.delete(userRoles).where(eq(userRoles.id, data.roleRowId))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        await logAuditEntry({
-            userId: session?.user?.id ?? "unknown",
-            action: "delete",
-            entityType: "user_roles",
-            entityId: data.userId,
-            summary: `Revoked role "${data.role}" from user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
-        })
-
-        // Invalidate sessions if an admin role was removed
-        if (data.role === "admin") {
-            await invalidateAllSessionsForUser(data.userId)
+            revalidatePath("/dashboard/manage-roles")
+            return ok(undefined, "Role granted successfully.")
+        } catch (error) {
+            console.error("Error granting role:", error)
+            return fail("Failed to grant role.")
         }
-
-        revalidatePath("/dashboard/manage-roles")
-        return { status: true, message: "Role removed successfully." }
-    } catch (error) {
-        console.error("Error removing role:", error)
-        return { status: false, message: "Failed to remove role." }
     }
-}
+)
+
+export const removeUserRole = withAction(
+    async (data: {
+        userId: string
+        roleRowId: number
+        role: Role
+        seasonId?: number
+        divisionId?: number
+    }): Promise<ActionResult> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) return fail("Unauthorized")
+
+        try {
+            // Delete by row ID for precision
+            await db.delete(userRoles).where(eq(userRoles.id, data.roleRowId))
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            await logAuditEntry({
+                userId: session?.user?.id ?? "unknown",
+                action: "delete",
+                entityType: "user_roles",
+                entityId: data.userId,
+                summary: `Revoked role "${data.role}" from user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
+            })
+
+            // Invalidate sessions if an admin role was removed
+            if (data.role === "admin") {
+                await invalidateAllSessionsForUser(data.userId)
+            }
+
+            revalidatePath("/dashboard/manage-roles")
+            return ok(undefined, "Role removed successfully.")
+        } catch (error) {
+            console.error("Error removing role:", error)
+            return fail("Failed to remove role.")
+        }
+    }
+)

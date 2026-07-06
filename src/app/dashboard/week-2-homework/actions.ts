@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { and, asc, count, eq, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { headers } from "next/headers"
@@ -520,358 +522,345 @@ export interface SubmitWeek2HomeworkInput {
     recommendedMoveDown: string[]
 }
 
-export async function submitWeek2Homework(
-    input: SubmitWeek2HomeworkInput
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
+export const submitWeek2Homework = withAction(
+    async (input: SubmitWeek2HomeworkInput): Promise<ActionResult> => {
+        const session = await auth.api.getSession({ headers: await headers() })
 
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated" }
-    }
-
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return { status: false, message: "No active season found" }
-    }
-
-    const [captainEntry] = await db
-        .select({
-            divisionId: week2Rosters.division,
-            teamNumber: week2Rosters.team_number
-        })
-        .from(week2Rosters)
-        .where(
-            and(
-                eq(week2Rosters.season, config.seasonId),
-                eq(week2Rosters.user, session.user.id),
-                eq(week2Rosters.is_captain, true)
-            )
-        )
-        .limit(1)
-
-    if (!captainEntry) {
-        return {
-            status: false,
-            message: "You were not a captain in Week 2 for this season"
+        if (!session?.user) {
+            return fail("Not authenticated")
         }
-    }
 
-    const [divisionInfo] = await db
-        .select({ level: divisions.level })
-        .from(divisions)
-        .where(eq(divisions.id, captainEntry.divisionId))
-        .limit(1)
+        const config = await getSeasonConfig()
 
-    const allActiveDivisions = await db
-        .select({ level: divisions.level })
-        .from(divisions)
-        .where(eq(divisions.active, true))
-
-    const levels = allActiveDivisions.map((d) => d.level)
-    const minLevel = Math.min(...levels)
-    const maxLevel = Math.max(...levels)
-
-    const isTopDivision = divisionInfo?.level === minLevel
-    const isBottomDivision = divisionInfo?.level === maxLevel
-
-    const teamNonCaptainRows = await db
-        .select({ male: users.male })
-        .from(week2Rosters)
-        .innerJoin(users, eq(week2Rosters.user, users.id))
-        .where(
-            and(
-                eq(week2Rosters.season, config.seasonId),
-                eq(week2Rosters.division, captainEntry.divisionId),
-                eq(week2Rosters.team_number, captainEntry.teamNumber),
-                eq(week2Rosters.is_captain, false)
-            )
-        )
-
-    const nonMaleCount = teamNonCaptainRows.filter(
-        (r) => r.male !== true
-    ).length
-    // When a team has exactly 1 non-male and both directions apply, that
-    // player only needs to be assigned to one direction.
-    const canShareNonMale =
-        nonMaleCount === 1 && !isTopDivision && !isBottomDivision
-
-    if (!isTopDivision) {
-        if (!input.forcedMoveUpMale) {
-            return {
-                status: false,
-                message: "Please select a male player to move up"
-            }
+        if (!config.seasonId) {
+            return fail("No active season found")
         }
-        if (
-            nonMaleCount > 0 &&
-            !canShareNonMale &&
-            !input.forcedMoveUpNonMale
-        ) {
-            return {
-                status: false,
-                message: "Please select a non-male player to move up"
-            }
-        }
-    }
 
-    if (!isBottomDivision) {
-        if (!input.forcedMoveDownMale) {
-            return {
-                status: false,
-                message: "Please select a male player to move down"
-            }
-        }
-        if (
-            nonMaleCount > 0 &&
-            !canShareNonMale &&
-            !input.forcedMoveDownNonMale
-        ) {
-            return {
-                status: false,
-                message: "Please select a non-male player to move down"
-            }
-        }
-    }
-
-    if (
-        canShareNonMale &&
-        !input.forcedMoveUpNonMale &&
-        !input.forcedMoveDownNonMale
-    ) {
-        return {
-            status: false,
-            message:
-                "Please select your non-male player to move either up or down"
-        }
-    }
-
-    type Entry = {
-        player: string
-        direction: "up" | "down"
-        is_forced: boolean
-    }
-
-    const entries: Entry[] = []
-
-    if (!isTopDivision && input.forcedMoveUpMale) {
-        entries.push({
-            player: input.forcedMoveUpMale,
-            direction: "up",
-            is_forced: true
-        })
-    }
-    if (!isTopDivision && input.forcedMoveUpNonMale) {
-        entries.push({
-            player: input.forcedMoveUpNonMale,
-            direction: "up",
-            is_forced: true
-        })
-    }
-    if (!isBottomDivision && input.forcedMoveDownMale) {
-        entries.push({
-            player: input.forcedMoveDownMale,
-            direction: "down",
-            is_forced: true
-        })
-    }
-    if (!isBottomDivision && input.forcedMoveDownNonMale) {
-        entries.push({
-            player: input.forcedMoveDownNonMale,
-            direction: "down",
-            is_forced: true
-        })
-    }
-
-    for (const userId of input.recommendedMoveUp) {
-        if (userId) {
-            entries.push({ player: userId, direction: "up", is_forced: false })
-        }
-    }
-
-    for (const userId of input.recommendedMoveDown) {
-        if (userId) {
-            entries.push({
-                player: userId,
-                direction: "down",
-                is_forced: false
+        const [captainEntry] = await db
+            .select({
+                divisionId: week2Rosters.division,
+                teamNumber: week2Rosters.team_number
             })
-        }
-    }
-
-    await db
-        .delete(movingDay)
-        .where(
-            and(
-                eq(movingDay.season, config.seasonId),
-                eq(movingDay.submitted_by, session.user.id)
-            )
-        )
-
-    if (entries.length > 0) {
-        await db.insert(movingDay).values(
-            entries.map((e) => ({
-                season: config.seasonId as number,
-                submitted_by: session.user.id,
-                player: e.player,
-                direction: e.direction,
-                is_forced: e.is_forced
-            }))
-        )
-    }
-
-    return { status: true, message: "Homework submitted successfully!" }
-}
-
-export async function submitCoachWeek2Homework(
-    input: SubmitCoachWeek2HomeworkInput
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated" }
-    }
-
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return { status: false, message: "No active season found" }
-    }
-
-    const [coachTeamEntry] = await db
-        .select({ divisionId: teams.division })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, config.seasonId),
-                or(
-                    eq(teams.captain, session.user.id),
-                    eq(teams.captain2, session.user.id)
-                )
-            )
-        )
-        .limit(1)
-
-    if (!coachTeamEntry) {
-        return { status: false, message: "You are not a coach for this season" }
-    }
-
-    const [indivDiv] = await db
-        .select({ coaches: individual_divisions.coaches })
-        .from(individual_divisions)
-        .where(
-            and(
-                eq(individual_divisions.season, config.seasonId),
-                eq(individual_divisions.division, coachTeamEntry.divisionId)
-            )
-        )
-        .limit(1)
-
-    if (!indivDiv?.coaches) {
-        return {
-            status: false,
-            message: "Your division does not use coaches mode"
-        }
-    }
-
-    const [divisionInfo] = await db
-        .select({ level: divisions.level })
-        .from(divisions)
-        .where(eq(divisions.id, coachTeamEntry.divisionId))
-        .limit(1)
-
-    const allActiveDivisions = await db
-        .select({ level: divisions.level })
-        .from(divisions)
-        .where(eq(divisions.active, true))
-
-    const levels = allActiveDivisions.map((d) => d.level)
-    const minLevel = Math.min(...levels)
-    const isTopDivision = divisionInfo?.level === minLevel
-
-    if (!isTopDivision) {
-        const divisionTeamNumbers = await db
-            .selectDistinct({ teamNumber: week2Rosters.team_number })
             .from(week2Rosters)
             .where(
                 and(
                     eq(week2Rosters.season, config.seasonId),
-                    eq(week2Rosters.division, coachTeamEntry.divisionId)
+                    eq(week2Rosters.user, session.user.id),
+                    eq(week2Rosters.is_captain, true)
+                )
+            )
+            .limit(1)
+
+        if (!captainEntry) {
+            return fail("You were not a captain in Week 2 for this season")
+        }
+
+        const [divisionInfo] = await db
+            .select({ level: divisions.level })
+            .from(divisions)
+            .where(eq(divisions.id, captainEntry.divisionId))
+            .limit(1)
+
+        const allActiveDivisions = await db
+            .select({ level: divisions.level })
+            .from(divisions)
+            .where(eq(divisions.active, true))
+
+        const levels = allActiveDivisions.map((d) => d.level)
+        const minLevel = Math.min(...levels)
+        const maxLevel = Math.max(...levels)
+
+        const isTopDivision = divisionInfo?.level === minLevel
+        const isBottomDivision = divisionInfo?.level === maxLevel
+
+        const teamNonCaptainRows = await db
+            .select({ male: users.male })
+            .from(week2Rosters)
+            .innerJoin(users, eq(week2Rosters.user, users.id))
+            .where(
+                and(
+                    eq(week2Rosters.season, config.seasonId),
+                    eq(week2Rosters.division, captainEntry.divisionId),
+                    eq(week2Rosters.team_number, captainEntry.teamNumber),
+                    eq(week2Rosters.is_captain, false)
                 )
             )
 
-        const providedTeamNumbers = new Set(
-            input.forcedMoveUpByTeam
-                .filter((f) => f.playerId)
-                .map((f) => f.teamNumber)
-        )
+        const nonMaleCount = teamNonCaptainRows.filter(
+            (r) => r.male !== true
+        ).length
+        // When a team has exactly 1 non-male and both directions apply, that
+        // player only needs to be assigned to one direction.
+        const canShareNonMale =
+            nonMaleCount === 1 && !isTopDivision && !isBottomDivision
 
-        for (const { teamNumber } of divisionTeamNumbers) {
-            if (!providedTeamNumbers.has(teamNumber)) {
-                return {
-                    status: false,
-                    message: `Please select a player to move up from Team ${teamNumber}`
-                }
+        if (!isTopDivision) {
+            if (!input.forcedMoveUpMale) {
+                return fail("Please select a male player to move up")
+            }
+            if (
+                nonMaleCount > 0 &&
+                !canShareNonMale &&
+                !input.forcedMoveUpNonMale
+            ) {
+                return fail("Please select a non-male player to move up")
             }
         }
-    }
 
-    type Entry = {
-        player: string
-        direction: "up" | "down"
-        is_forced: boolean
-    }
+        if (!isBottomDivision) {
+            if (!input.forcedMoveDownMale) {
+                return fail("Please select a male player to move down")
+            }
+            if (
+                nonMaleCount > 0 &&
+                !canShareNonMale &&
+                !input.forcedMoveDownNonMale
+            ) {
+                return fail("Please select a non-male player to move down")
+            }
+        }
 
-    const entries: Entry[] = []
+        if (
+            canShareNonMale &&
+            !input.forcedMoveUpNonMale &&
+            !input.forcedMoveDownNonMale
+        ) {
+            return fail(
+                "Please select your non-male player to move either up or down"
+            )
+        }
 
-    if (!isTopDivision) {
-        for (const { playerId } of input.forcedMoveUpByTeam) {
-            if (playerId) {
+        type Entry = {
+            player: string
+            direction: "up" | "down"
+            is_forced: boolean
+        }
+
+        const entries: Entry[] = []
+
+        if (!isTopDivision && input.forcedMoveUpMale) {
+            entries.push({
+                player: input.forcedMoveUpMale,
+                direction: "up",
+                is_forced: true
+            })
+        }
+        if (!isTopDivision && input.forcedMoveUpNonMale) {
+            entries.push({
+                player: input.forcedMoveUpNonMale,
+                direction: "up",
+                is_forced: true
+            })
+        }
+        if (!isBottomDivision && input.forcedMoveDownMale) {
+            entries.push({
+                player: input.forcedMoveDownMale,
+                direction: "down",
+                is_forced: true
+            })
+        }
+        if (!isBottomDivision && input.forcedMoveDownNonMale) {
+            entries.push({
+                player: input.forcedMoveDownNonMale,
+                direction: "down",
+                is_forced: true
+            })
+        }
+
+        for (const userId of input.recommendedMoveUp) {
+            if (userId) {
                 entries.push({
-                    player: playerId,
+                    player: userId,
                     direction: "up",
-                    is_forced: true
+                    is_forced: false
                 })
             }
         }
-    }
 
-    for (const userId of input.recommendedMoveUp) {
-        if (userId) {
-            entries.push({ player: userId, direction: "up", is_forced: false })
+        for (const userId of input.recommendedMoveDown) {
+            if (userId) {
+                entries.push({
+                    player: userId,
+                    direction: "down",
+                    is_forced: false
+                })
+            }
         }
-    }
 
-    for (const userId of input.recommendedMoveDown) {
-        if (userId) {
-            entries.push({
-                player: userId,
-                direction: "down",
-                is_forced: false
-            })
-        }
-    }
-
-    await db
-        .delete(movingDay)
-        .where(
-            and(
-                eq(movingDay.season, config.seasonId),
-                eq(movingDay.submitted_by, session.user.id)
+        await db
+            .delete(movingDay)
+            .where(
+                and(
+                    eq(movingDay.season, config.seasonId),
+                    eq(movingDay.submitted_by, session.user.id)
+                )
             )
-        )
 
-    if (entries.length > 0) {
-        await db.insert(movingDay).values(
-            entries.map((e) => ({
-                season: config.seasonId as number,
-                submitted_by: session.user.id,
-                player: e.player,
-                direction: e.direction,
-                is_forced: e.is_forced
-            }))
-        )
+        if (entries.length > 0) {
+            await db.insert(movingDay).values(
+                entries.map((e) => ({
+                    season: config.seasonId as number,
+                    submitted_by: session.user.id,
+                    player: e.player,
+                    direction: e.direction,
+                    is_forced: e.is_forced
+                }))
+            )
+        }
+
+        return ok(undefined, "Homework submitted successfully!")
     }
+)
 
-    return { status: true, message: "Homework submitted successfully!" }
-}
+export const submitCoachWeek2Homework = withAction(
+    async (input: SubmitCoachWeek2HomeworkInput): Promise<ActionResult> => {
+        const session = await auth.api.getSession({ headers: await headers() })
+
+        if (!session?.user) {
+            return fail("Not authenticated")
+        }
+
+        const config = await getSeasonConfig()
+
+        if (!config.seasonId) {
+            return fail("No active season found")
+        }
+
+        const [coachTeamEntry] = await db
+            .select({ divisionId: teams.division })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, config.seasonId),
+                    or(
+                        eq(teams.captain, session.user.id),
+                        eq(teams.captain2, session.user.id)
+                    )
+                )
+            )
+            .limit(1)
+
+        if (!coachTeamEntry) {
+            return fail("You are not a coach for this season")
+        }
+
+        const [indivDiv] = await db
+            .select({ coaches: individual_divisions.coaches })
+            .from(individual_divisions)
+            .where(
+                and(
+                    eq(individual_divisions.season, config.seasonId),
+                    eq(individual_divisions.division, coachTeamEntry.divisionId)
+                )
+            )
+            .limit(1)
+
+        if (!indivDiv?.coaches) {
+            return fail("Your division does not use coaches mode")
+        }
+
+        const [divisionInfo] = await db
+            .select({ level: divisions.level })
+            .from(divisions)
+            .where(eq(divisions.id, coachTeamEntry.divisionId))
+            .limit(1)
+
+        const allActiveDivisions = await db
+            .select({ level: divisions.level })
+            .from(divisions)
+            .where(eq(divisions.active, true))
+
+        const levels = allActiveDivisions.map((d) => d.level)
+        const minLevel = Math.min(...levels)
+        const isTopDivision = divisionInfo?.level === minLevel
+
+        if (!isTopDivision) {
+            const divisionTeamNumbers = await db
+                .selectDistinct({ teamNumber: week2Rosters.team_number })
+                .from(week2Rosters)
+                .where(
+                    and(
+                        eq(week2Rosters.season, config.seasonId),
+                        eq(week2Rosters.division, coachTeamEntry.divisionId)
+                    )
+                )
+
+            const providedTeamNumbers = new Set(
+                input.forcedMoveUpByTeam
+                    .filter((f) => f.playerId)
+                    .map((f) => f.teamNumber)
+            )
+
+            for (const { teamNumber } of divisionTeamNumbers) {
+                if (!providedTeamNumbers.has(teamNumber)) {
+                    return fail(
+                        `Please select a player to move up from Team ${teamNumber}`
+                    )
+                }
+            }
+        }
+
+        type Entry = {
+            player: string
+            direction: "up" | "down"
+            is_forced: boolean
+        }
+
+        const entries: Entry[] = []
+
+        if (!isTopDivision) {
+            for (const { playerId } of input.forcedMoveUpByTeam) {
+                if (playerId) {
+                    entries.push({
+                        player: playerId,
+                        direction: "up",
+                        is_forced: true
+                    })
+                }
+            }
+        }
+
+        for (const userId of input.recommendedMoveUp) {
+            if (userId) {
+                entries.push({
+                    player: userId,
+                    direction: "up",
+                    is_forced: false
+                })
+            }
+        }
+
+        for (const userId of input.recommendedMoveDown) {
+            if (userId) {
+                entries.push({
+                    player: userId,
+                    direction: "down",
+                    is_forced: false
+                })
+            }
+        }
+
+        await db
+            .delete(movingDay)
+            .where(
+                and(
+                    eq(movingDay.season, config.seasonId),
+                    eq(movingDay.submitted_by, session.user.id)
+                )
+            )
+
+        if (entries.length > 0) {
+            await db.insert(movingDay).values(
+                entries.map((e) => ({
+                    season: config.seasonId as number,
+                    submitted_by: session.user.id,
+                    player: e.player,
+                    direction: e.direction,
+                    is_forced: e.is_forced
+                }))
+            )
+        }
+
+        return ok(undefined, "Homework submitted successfully!")
+    }
+)

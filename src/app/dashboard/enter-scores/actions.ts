@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -1022,58 +1024,58 @@ export async function finalizeScoreSheetUpload(
     }
 }
 
-export async function deleteScoreSheet(
-    scoreSheetId: number
-): Promise<{ status: boolean; message: string }> {
-    const seasonId = await getEnterScoresSeasonId()
-    const hasAccess = seasonId
-        ? await hasPermissionBySession("scores:enter", { seasonId })
-        : false
-    if (!hasAccess || !seasonId) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const [row] = await db
-            .select({
-                id: scoreSheets.id,
-                seasonId: scoreSheets.season_id,
-                imagePath: scoreSheets.image_path
-            })
-            .from(scoreSheets)
-            .where(eq(scoreSheets.id, scoreSheetId))
-            .limit(1)
-
-        if (!row || row.seasonId !== seasonId) {
-            return { status: false, message: "Score sheet not found." }
+export const deleteScoreSheet = withAction(
+    async (scoreSheetId: number): Promise<ActionResult> => {
+        const seasonId = await getEnterScoresSeasonId()
+        const hasAccess = seasonId
+            ? await hasPermissionBySession("scores:enter", { seasonId })
+            : false
+        if (!hasAccess || !seasonId) {
+            return fail("Unauthorized")
         }
 
-        // Delete from R2 storage first
         try {
-            await deleteR2Object(row.imagePath)
-        } catch (r2Error) {
-            console.error("Failed to delete R2 object:", r2Error)
-        }
+            const [row] = await db
+                .select({
+                    id: scoreSheets.id,
+                    seasonId: scoreSheets.season_id,
+                    imagePath: scoreSheets.image_path
+                })
+                .from(scoreSheets)
+                .where(eq(scoreSheets.id, scoreSheetId))
+                .limit(1)
 
-        await db.delete(scoreSheets).where(eq(scoreSheets.id, scoreSheetId))
+            if (!row || row.seasonId !== seasonId) {
+                return fail("Score sheet not found.")
+            }
 
-        const session = await auth.api.getSession({
-            headers: await headers()
-        })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "delete",
-                entityType: "score_sheets",
-                entityId: String(scoreSheetId),
-                summary: `Deleted score sheet ${scoreSheetId}`
+            // Delete from R2 storage first
+            try {
+                await deleteR2Object(row.imagePath)
+            } catch (r2Error) {
+                console.error("Failed to delete R2 object:", r2Error)
+            }
+
+            await db.delete(scoreSheets).where(eq(scoreSheets.id, scoreSheetId))
+
+            const session = await auth.api.getSession({
+                headers: await headers()
             })
-        }
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "delete",
+                    entityType: "score_sheets",
+                    entityId: String(scoreSheetId),
+                    summary: `Deleted score sheet ${scoreSheetId}`
+                })
+            }
 
-        revalidatePath("/dashboard/enter-scores")
-        return { status: true, message: "Score sheet deleted." }
-    } catch (error) {
-        console.error("Error deleting score sheet:", error)
-        return { status: false, message: "Failed to delete score sheet." }
+            revalidatePath("/dashboard/enter-scores")
+            return ok(undefined, "Score sheet deleted.")
+        } catch (error) {
+            console.error("Error deleting score sheet:", error)
+            return fail("Failed to delete score sheet.")
+        }
     }
-}
+)

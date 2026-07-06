@@ -296,7 +296,7 @@ export function CreateTeamsForm({
         )
 
         if (result.status) {
-            setSuccess(result.message)
+            setSuccess(result.message ?? null)
             // Reset form
             setCaptains(
                 Array(6)

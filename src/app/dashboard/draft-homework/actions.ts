@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { splitByGender } from "@/lib/utils"
 import { and, asc, eq, inArray, or } from "drizzle-orm"
 import { headers } from "next/headers"
@@ -311,76 +313,76 @@ export interface SaveDraftHomeworkInput {
     }[]
 }
 
-export async function saveDraftHomework(
-    input: SaveDraftHomeworkInput
-): Promise<{ status: boolean; message: string }> {
-    const session = await auth.api.getSession({ headers: await headers() })
+export const saveDraftHomework = withAction(
+    async (input: SaveDraftHomeworkInput): Promise<ActionResult> => {
+        const session = await auth.api.getSession({ headers: await headers() })
 
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated" }
-    }
+        if (!session?.user) {
+            return fail("Not authenticated")
+        }
 
-    const config = await getSeasonConfig()
+        const config = await getSeasonConfig()
 
-    if (!config.seasonId) {
-        return { status: false, message: "No active season found" }
-    }
+        if (!config.seasonId) {
+            return fail("No active season found")
+        }
 
-    const [captainTeam] = await db
-        .select({ divisionId: teams.division })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, config.seasonId),
-                or(
-                    eq(teams.captain, session.user.id),
-                    eq(teams.captain2, session.user.id)
+        const [captainTeam] = await db
+            .select({ divisionId: teams.division })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, config.seasonId),
+                    or(
+                        eq(teams.captain, session.user.id),
+                        eq(teams.captain2, session.user.id)
+                    )
                 )
             )
-        )
-        .limit(1)
+            .limit(1)
 
-    if (!captainTeam) {
-        return { status: false, message: "You are not a captain this season" }
-    }
+        if (!captainTeam) {
+            return fail("You are not a captain this season")
+        }
 
-    await db
-        .delete(draftHomework)
-        .where(
-            and(
-                eq(draftHomework.season, config.seasonId),
-                eq(draftHomework.captain, session.user.id)
+        await db
+            .delete(draftHomework)
+            .where(
+                and(
+                    eq(draftHomework.season, config.seasonId),
+                    eq(draftHomework.captain, session.user.id)
+                )
             )
-        )
 
-    const nonEmpty = input.selections.filter((s) => s.playerId)
+        const nonEmpty = input.selections.filter((s) => s.playerId)
 
-    if (nonEmpty.length > 0) {
-        const now = new Date()
-        await db.insert(draftHomework).values(
-            nonEmpty.map((s) => ({
-                season: config.seasonId as number,
-                captain: session.user.id,
-                division: captainTeam.divisionId,
-                round: s.round,
-                slot: s.slot,
-                player: s.playerId,
-                is_male_tab: s.isMaleTab,
-                updated_at: now
-            }))
-        )
+        if (nonEmpty.length > 0) {
+            const now = new Date()
+            await db.insert(draftHomework).values(
+                nonEmpty.map((s) => ({
+                    season: config.seasonId as number,
+                    captain: session.user.id,
+                    division: captainTeam.divisionId,
+                    round: s.round,
+                    slot: s.slot,
+                    player: s.playerId,
+                    is_male_tab: s.isMaleTab,
+                    updated_at: now
+                }))
+            )
+        }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "save_draft_homework",
+            entityType: "draft_homework",
+            entityId: config.seasonId,
+            summary: `Saved draft homework with ${nonEmpty.length} selections (season ${config.seasonId})`
+        })
+
+        return ok(undefined, "Draft homework saved successfully!")
     }
-
-    await logAuditEntry({
-        userId: session.user.id,
-        action: "save_draft_homework",
-        entityType: "draft_homework",
-        entityId: config.seasonId,
-        summary: `Saved draft homework with ${nonEmpty.length} selections (season ${config.seasonId})`
-    })
-
-    return { status: true, message: "Draft homework saved successfully!" }
-}
+)
 
 // --- Last season's draft data ---
 

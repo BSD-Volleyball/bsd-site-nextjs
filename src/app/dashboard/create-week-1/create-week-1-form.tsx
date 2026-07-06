@@ -764,7 +764,7 @@ export function CreateWeek1Form({
         const result = await saveWeek1Rosters(saveAssignments)
 
         if (result.status) {
-            setMessage(result.message)
+            setMessage(result.message ?? null)
         } else {
             setError(result.message)
         }

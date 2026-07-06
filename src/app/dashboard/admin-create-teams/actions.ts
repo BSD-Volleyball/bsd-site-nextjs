@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -103,105 +105,91 @@ interface TeamToCreate {
     teamName: string
 }
 
-export async function createTeams(
-    seasonId: number,
-    divisionId: number,
-    teamsToCreate: TeamToCreate[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
+export const createTeams = withAction(
+    async (
+        seasonId: number,
+        divisionId: number,
+        teamsToCreate: TeamToCreate[]
+    ): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
-    }
 
-    if (!seasonId || !divisionId) {
-        return {
-            status: false,
-            message: "Please select a season and division."
+        if (!seasonId || !divisionId) {
+            return fail("Please select a season and division.")
         }
-    }
 
-    if (teamsToCreate.length === 0) {
-        return {
-            status: false,
-            message: "Please select at least one captain."
+        if (teamsToCreate.length === 0) {
+            return fail("Please select at least one captain.")
         }
-    }
 
-    // Validate all teams have captains and names
-    for (let i = 0; i < teamsToCreate.length; i++) {
-        const team = teamsToCreate[i]
-        if (!team.captainId) {
-            return {
-                status: false,
-                message: `Please select a captain for team ${i + 1}.`
+        // Validate all teams have captains and names
+        for (let i = 0; i < teamsToCreate.length; i++) {
+            const team = teamsToCreate[i]
+            if (!team.captainId) {
+                return fail(`Please select a captain for team ${i + 1}.`)
+            }
+            if (!team.teamName.trim()) {
+                return fail(`Please enter a name for team ${i + 1}.`)
             }
         }
-        if (!team.teamName.trim()) {
-            return {
-                status: false,
-                message: `Please enter a name for team ${i + 1}.`
-            }
-        }
-    }
 
-    try {
-        // Create all teams
-        await db.insert(teams).values(
-            teamsToCreate.map((team, index) => ({
-                season: seasonId,
-                captain: team.captainId,
-                captain2: team.captain2Id || null,
-                division: divisionId,
-                name: team.teamName.trim(),
-                number: index + 1
-            }))
-        )
+        try {
+            // Create all teams
+            await db.insert(teams).values(
+                teamsToCreate.map((team, index) => ({
+                    season: seasonId,
+                    captain: team.captainId,
+                    captain2: team.captain2Id || null,
+                    division: divisionId,
+                    name: team.teamName.trim(),
+                    number: index + 1
+                }))
+            )
 
-        // Sync captain roles to user_roles (new RBAC system)
-        const roleInserts = teamsToCreate.flatMap((team) => {
-            const roles = [
-                {
-                    user_id: team.captainId,
-                    role: "captain",
-                    season_id: seasonId,
-                    division_id: divisionId
+            // Sync captain roles to user_roles (new RBAC system)
+            const roleInserts = teamsToCreate.flatMap((team) => {
+                const roles = [
+                    {
+                        user_id: team.captainId,
+                        role: "captain",
+                        season_id: seasonId,
+                        division_id: divisionId
+                    }
+                ]
+                if (team.captain2Id) {
+                    roles.push({
+                        user_id: team.captain2Id,
+                        role: "captain",
+                        season_id: seasonId,
+                        division_id: divisionId
+                    })
                 }
-            ]
-            if (team.captain2Id) {
-                roles.push({
-                    user_id: team.captain2Id,
-                    role: "captain",
-                    season_id: seasonId,
-                    division_id: divisionId
+                return roles
+            })
+            await db.insert(userRoles).values(roleInserts).onConflictDoNothing()
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "teams",
+                    summary: `Created ${teamsToCreate.length} teams for season ${seasonId}, division ${divisionId}`
                 })
             }
-            return roles
-        })
-        await db.insert(userRoles).values(roleInserts).onConflictDoNothing()
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: "teams",
-                summary: `Created ${teamsToCreate.length} teams for season ${seasonId}, division ${divisionId}`
-            })
-        }
-
-        revalidatePath("/dashboard/admin-create-teams")
-        return {
-            status: true,
-            message: `Successfully created ${teamsToCreate.length} teams!`
-        }
-    } catch (error) {
-        console.error("Error creating teams:", error)
-        return {
-            status: false,
-            message: "Something went wrong while creating teams."
+            revalidatePath("/dashboard/admin-create-teams")
+            return ok(
+                undefined,
+                `Successfully created ${teamsToCreate.length} teams!`
+            )
+        } catch (error) {
+            console.error("Error creating teams:", error)
+            return fail("Something went wrong while creating teams.")
         }
     }
-}
+)

@@ -2296,7 +2296,7 @@ export function CreateWeek3Form({
         const result = await saveWeek3Rosters(savePayload)
 
         if (result.status) {
-            setMessage(result.message)
+            setMessage(result.message ?? null)
         } else {
             setError(result.message)
         }

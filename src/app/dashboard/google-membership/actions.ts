@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
@@ -191,44 +193,48 @@ export async function getGoogleMembershipUsers(params?: {
     }
 }
 
-export async function updateGoogleMembership(
-    userId: string,
-    values: {
-        seasonsList: string
-        notificationList: string
-    }
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        await db
-            .update(users)
-            .set({
-                seasons_list: values.seasonsList,
-                notification_list: values.notificationList,
-                updatedAt: new Date()
-            })
-            .where(eq(users.id, userId))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "users",
-                entityId: userId,
-                summary: `Admin updated Google membership flags for ${userId} (seasons_list=${values.seasonsList}, notification_list=${values.notificationList})`
-            })
+export const updateGoogleMembership = withAction(
+    async (
+        userId: string,
+        values: {
+            seasonsList: string
+            notificationList: string
+        }
+    ): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        revalidatePath("/dashboard/google-membership")
-        return { status: true, message: "Membership fields updated." }
-    } catch (error) {
-        console.error("Error updating Google Membership fields:", error)
-        return { status: false, message: "Failed to update membership fields." }
+        try {
+            await db
+                .update(users)
+                .set({
+                    seasons_list: values.seasonsList,
+                    notification_list: values.notificationList,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, userId))
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "update",
+                    entityType: "users",
+                    entityId: userId,
+                    summary: `Admin updated Google membership flags for ${userId} (seasons_list=${values.seasonsList}, notification_list=${values.notificationList})`
+                })
+            }
+
+            revalidatePath("/dashboard/google-membership")
+            return ok(undefined, "Membership fields updated.")
+        } catch (error) {
+            console.error("Error updating Google Membership fields:", error)
+            return fail("Failed to update membership fields.")
+        }
     }
-}
+)

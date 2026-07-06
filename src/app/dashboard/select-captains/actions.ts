@@ -1,5 +1,7 @@
 "use server"
 
+import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -343,300 +345,277 @@ interface TeamToCreate {
     teamName: string
 }
 
-export async function createTeams(
-    divisionId: number,
-    teamsToCreate: TeamToCreate[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await getIsCommissioner()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
-        }
-    }
-
-    if (!divisionId) {
-        return {
-            status: false,
-            message: "Please select a division."
-        }
-    }
-
-    if (teamsToCreate.length === 0) {
-        return {
-            status: false,
-            message: "Please select at least one captain."
-        }
-    }
-
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return {
-            status: false,
-            message: "No current season found."
-        }
-    }
-
-    const [selectedDivision] = await db
-        .select({ id: divisions.id, name: divisions.name })
-        .from(divisions)
-        .where(eq(divisions.id, divisionId))
-        .limit(1)
-
-    if (!selectedDivision) {
-        return {
-            status: false,
-            message: "Invalid division selected."
-        }
-    }
-
-    const numTeams = selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
-
-    // Look up whether this division uses coaches mode
-    const [indivDiv] = await db
-        .select({ coaches: individual_divisions.coaches })
-        .from(individual_divisions)
-        .where(
-            and(
-                eq(individual_divisions.season, config.seasonId),
-                eq(individual_divisions.division, divisionId)
-            )
-        )
-        .limit(1)
-
-    const isCoachesDiv = indivDiv?.coaches ?? false
-
-    if (!isCoachesDiv) {
-        // Strict validation for standard captain mode
-        if (teamsToCreate.length !== numTeams) {
-            return {
-                status: false,
-                message: `Division ${selectedDivision.name} requires ${numTeams} teams.`
-            }
+export const createTeams = withAction(
+    async (
+        divisionId: number,
+        teamsToCreate: TeamToCreate[]
+    ): Promise<ActionResult> => {
+        const hasAccess = await getIsCommissioner()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
 
-        for (let i = 0; i < teamsToCreate.length; i++) {
-            const team = teamsToCreate[i]
-            if (!team.teamName.trim()) {
-                return {
-                    status: false,
-                    message: `Please enter a name for team ${i + 1}.`
-                }
-            }
+        if (!divisionId) {
+            return fail("Please select a division.")
         }
 
-        // Only enforce uniqueness and signup checks for real (non-ghost) captains
-        const allCaptainIds = teamsToCreate
-            .flatMap((t) => [t.captainId || GHOST_CAPTAIN_ID, t.coach2Id ?? ""])
-            .filter((id) => id && !isGhostCaptain(id))
-        const uniqueAllCaptainIds = new Set(allCaptainIds)
-
-        if (uniqueAllCaptainIds.size !== allCaptainIds.length) {
-            return {
-                status: false,
-                message: "Each captain must be unique across all teams."
-            }
+        if (teamsToCreate.length === 0) {
+            return fail("Please select at least one captain.")
         }
 
-        const realPrimaryCaptainIds = teamsToCreate
-            .map((team) => team.captainId || GHOST_CAPTAIN_ID)
-            .filter((id) => !isGhostCaptain(id))
-        const uniqueRealPrimaryCaptainIds = new Set(realPrimaryCaptainIds)
+        const config = await getSeasonConfig()
 
-        if (uniqueRealPrimaryCaptainIds.size > 0) {
-            const signedUpCaptains = await db
-                .select({ playerId: signups.player })
-                .from(signups)
-                .where(
-                    and(
-                        eq(signups.season, config.seasonId),
-                        inArray(signups.player, [
-                            ...uniqueRealPrimaryCaptainIds
-                        ])
-                    )
-                )
-
-            if (signedUpCaptains.length !== uniqueRealPrimaryCaptainIds.size) {
-                return {
-                    status: false,
-                    message:
-                        "All selected primary captains must be signed up for the current season."
-                }
-            }
-        }
-    } else {
-        // Lenient validation for coaches mode — partial saves are allowed
-        for (let i = 0; i < teamsToCreate.length; i++) {
-            const team = teamsToCreate[i]
-            const hasAnyCoach = team.captainId || team.coach2Id
-            if (hasAnyCoach && !team.teamName.trim()) {
-                return {
-                    status: false,
-                    message: `Please enter a name for team ${i + 1}.`
-                }
-            }
+        if (!config.seasonId) {
+            return fail("No current season found.")
         }
 
-        const allCoachIds = teamsToCreate.flatMap((t) =>
-            [t.captainId, t.coach2Id ?? ""].filter(Boolean)
-        )
-        const uniqueCoachIds = new Set(allCoachIds)
+        const [selectedDivision] = await db
+            .select({ id: divisions.id, name: divisions.name })
+            .from(divisions)
+            .where(eq(divisions.id, divisionId))
+            .limit(1)
 
-        if (uniqueCoachIds.size !== allCoachIds.length) {
-            return {
-                status: false,
-                message: "Each coach must be unique across all teams."
-            }
+        if (!selectedDivision) {
+            return fail("Invalid division selected.")
         }
 
-        // Coaches are drawn from the full user population — no sign-up check needed
-    }
+        const numTeams =
+            selectedDivision.name.trim().toUpperCase() === "BB" ? 4 : 6
 
-    try {
-        // Fetch existing teams for this division+season to support upsert
-        const existingTeams = await db
-            .select({
-                id: teams.id,
-                number: teams.number,
-                captain: teams.captain,
-                captain2: teams.captain2
-            })
-            .from(teams)
+        // Look up whether this division uses coaches mode
+        const [indivDiv] = await db
+            .select({ coaches: individual_divisions.coaches })
+            .from(individual_divisions)
             .where(
                 and(
-                    eq(teams.season, config.seasonId),
-                    eq(teams.division, divisionId)
+                    eq(individual_divisions.season, config.seasonId),
+                    eq(individual_divisions.division, divisionId)
                 )
             )
-            .orderBy(asc(teams.number))
+            .limit(1)
 
-        const oldCaptainIds = new Set<string>(
-            existingTeams
-                .flatMap((t) => [t.captain, t.captain2 ?? ""])
-                .filter((id): id is string => !!id && !isGhostCaptain(id))
-        )
+        const isCoachesDiv = indivDiv?.coaches ?? false
 
-        const existingByNumber = new Map<number, number>()
-        for (const team of existingTeams) {
-            if (team.number !== null) {
-                existingByNumber.set(team.number, team.id)
+        if (!isCoachesDiv) {
+            // Strict validation for standard captain mode
+            if (teamsToCreate.length !== numTeams) {
+                return fail(
+                    `Division ${selectedDivision.name} requires ${numTeams} teams.`
+                )
             }
+
+            for (let i = 0; i < teamsToCreate.length; i++) {
+                const team = teamsToCreate[i]
+                if (!team.teamName.trim()) {
+                    return fail(`Please enter a name for team ${i + 1}.`)
+                }
+            }
+
+            // Only enforce uniqueness and signup checks for real (non-ghost) captains
+            const allCaptainIds = teamsToCreate
+                .flatMap((t) => [
+                    t.captainId || GHOST_CAPTAIN_ID,
+                    t.coach2Id ?? ""
+                ])
+                .filter((id) => id && !isGhostCaptain(id))
+            const uniqueAllCaptainIds = new Set(allCaptainIds)
+
+            if (uniqueAllCaptainIds.size !== allCaptainIds.length) {
+                return fail("Each captain must be unique across all teams.")
+            }
+
+            const realPrimaryCaptainIds = teamsToCreate
+                .map((team) => team.captainId || GHOST_CAPTAIN_ID)
+                .filter((id) => !isGhostCaptain(id))
+            const uniqueRealPrimaryCaptainIds = new Set(realPrimaryCaptainIds)
+
+            if (uniqueRealPrimaryCaptainIds.size > 0) {
+                const signedUpCaptains = await db
+                    .select({ playerId: signups.player })
+                    .from(signups)
+                    .where(
+                        and(
+                            eq(signups.season, config.seasonId),
+                            inArray(signups.player, [
+                                ...uniqueRealPrimaryCaptainIds
+                            ])
+                        )
+                    )
+
+                if (
+                    signedUpCaptains.length !== uniqueRealPrimaryCaptainIds.size
+                ) {
+                    return fail(
+                        "All selected primary captains must be signed up for the current season."
+                    )
+                }
+            }
+        } else {
+            // Lenient validation for coaches mode — partial saves are allowed
+            for (let i = 0; i < teamsToCreate.length; i++) {
+                const team = teamsToCreate[i]
+                const hasAnyCoach = team.captainId || team.coach2Id
+                if (hasAnyCoach && !team.teamName.trim()) {
+                    return fail(`Please enter a name for team ${i + 1}.`)
+                }
+            }
+
+            const allCoachIds = teamsToCreate.flatMap((t) =>
+                [t.captainId, t.coach2Id ?? ""].filter(Boolean)
+            )
+            const uniqueCoachIds = new Set(allCoachIds)
+
+            if (uniqueCoachIds.size !== allCoachIds.length) {
+                return fail("Each coach must be unique across all teams.")
+            }
+
+            // Coaches are drawn from the full user population — no sign-up check needed
         }
 
-        // Unified storage: all divisions use captain2 column instead of duplicate rows
-        for (let i = 0; i < teamsToCreate.length; i++) {
-            const team = teamsToCreate[i]
-            const number = i + 1
+        try {
+            // Fetch existing teams for this division+season to support upsert
+            const existingTeams = await db
+                .select({
+                    id: teams.id,
+                    number: teams.number,
+                    captain: teams.captain,
+                    captain2: teams.captain2
+                })
+                .from(teams)
+                .where(
+                    and(
+                        eq(teams.season, config.seasonId),
+                        eq(teams.division, divisionId)
+                    )
+                )
+                .orderBy(asc(teams.number))
 
-            if (isCoachesDiv) {
-                // Coaches mode: both coaches optional, skip team if neither is set
-                const hasAnyCoach = team.captainId || team.coach2Id
-                if (!hasAnyCoach) continue
+            const oldCaptainIds = new Set<string>(
+                existingTeams
+                    .flatMap((t) => [t.captain, t.captain2 ?? ""])
+                    .filter((id): id is string => !!id && !isGhostCaptain(id))
+            )
 
-                const existingId = existingByNumber.get(number)
-                if (existingId !== undefined) {
-                    await db
-                        .update(teams)
-                        .set({
+            const existingByNumber = new Map<number, number>()
+            for (const team of existingTeams) {
+                if (team.number !== null) {
+                    existingByNumber.set(team.number, team.id)
+                }
+            }
+
+            // Unified storage: all divisions use captain2 column instead of duplicate rows
+            for (let i = 0; i < teamsToCreate.length; i++) {
+                const team = teamsToCreate[i]
+                const number = i + 1
+
+                if (isCoachesDiv) {
+                    // Coaches mode: both coaches optional, skip team if neither is set
+                    const hasAnyCoach = team.captainId || team.coach2Id
+                    if (!hasAnyCoach) continue
+
+                    const existingId = existingByNumber.get(number)
+                    if (existingId !== undefined) {
+                        await db
+                            .update(teams)
+                            .set({
+                                captain: team.captainId || GHOST_CAPTAIN_ID,
+                                captain2: team.coach2Id || null,
+                                name: team.teamName.trim()
+                            })
+                            .where(eq(teams.id, existingId))
+                        existingByNumber.delete(number)
+                    } else {
+                        await db.insert(teams).values({
+                            season: config.seasonId,
                             captain: team.captainId || GHOST_CAPTAIN_ID,
                             captain2: team.coach2Id || null,
-                            name: team.teamName.trim()
+                            division: divisionId,
+                            name: team.teamName.trim(),
+                            number
                         })
-                        .where(eq(teams.id, existingId))
-                    existingByNumber.delete(number)
+                    }
                 } else {
-                    await db.insert(teams).values({
-                        season: config.seasonId,
-                        captain: team.captainId || GHOST_CAPTAIN_ID,
-                        captain2: team.coach2Id || null,
-                        division: divisionId,
-                        name: team.teamName.trim(),
-                        number
-                    })
-                }
-            } else {
-                // Standard captain mode
-                const existingId = existingByNumber.get(number)
-                const captainId = team.captainId || GHOST_CAPTAIN_ID
+                    // Standard captain mode
+                    const existingId = existingByNumber.get(number)
+                    const captainId = team.captainId || GHOST_CAPTAIN_ID
 
-                if (existingId !== undefined) {
-                    await db
-                        .update(teams)
-                        .set({
+                    if (existingId !== undefined) {
+                        await db
+                            .update(teams)
+                            .set({
+                                captain: captainId,
+                                captain2: team.coach2Id || null,
+                                name: team.teamName.trim()
+                            })
+                            .where(eq(teams.id, existingId))
+                        existingByNumber.delete(number)
+                    } else {
+                        await db.insert(teams).values({
+                            season: config.seasonId,
                             captain: captainId,
                             captain2: team.coach2Id || null,
-                            name: team.teamName.trim()
+                            division: divisionId,
+                            name: team.teamName.trim(),
+                            number
                         })
-                        .where(eq(teams.id, existingId))
-                    existingByNumber.delete(number)
-                } else {
-                    await db.insert(teams).values({
-                        season: config.seasonId,
-                        captain: captainId,
-                        captain2: team.coach2Id || null,
-                        division: divisionId,
-                        name: team.teamName.trim(),
-                        number
+                    }
+                }
+            }
+
+            // Delete any stale teams (slots no longer filled)
+            const staleIds = [...existingByNumber.values()]
+            if (staleIds.length > 0) {
+                await db.delete(teams).where(inArray(teams.id, staleIds))
+            }
+
+            // Sync RBAC captain roles: grant for new captains, revoke for removed captains
+            const newCaptainIds = new Set<string>(
+                teamsToCreate
+                    .flatMap((t) => [t.captainId, t.coach2Id ?? ""])
+                    .filter((id): id is string => !!id && !isGhostCaptain(id))
+            )
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+
+            for (const captainId of newCaptainIds) {
+                if (!oldCaptainIds.has(captainId)) {
+                    await grantRole(captainId, "captain", {
+                        seasonId: config.seasonId,
+                        divisionId,
+                        grantedBy: session?.user?.id
                     })
                 }
             }
-        }
 
-        // Delete any stale teams (slots no longer filled)
-        const staleIds = [...existingByNumber.values()]
-        if (staleIds.length > 0) {
-            await db.delete(teams).where(inArray(teams.id, staleIds))
-        }
+            for (const captainId of oldCaptainIds) {
+                if (!newCaptainIds.has(captainId)) {
+                    await revokeRole(captainId, "captain", {
+                        seasonId: config.seasonId,
+                        divisionId
+                    })
+                }
+            }
 
-        // Sync RBAC captain roles: grant for new captains, revoke for removed captains
-        const newCaptainIds = new Set<string>(
-            teamsToCreate
-                .flatMap((t) => [t.captainId, t.coach2Id ?? ""])
-                .filter((id): id is string => !!id && !isGhostCaptain(id))
-        )
-
-        const session = await auth.api.getSession({ headers: await headers() })
-
-        for (const captainId of newCaptainIds) {
-            if (!oldCaptainIds.has(captainId)) {
-                await grantRole(captainId, "captain", {
-                    seasonId: config.seasonId,
-                    divisionId,
-                    grantedBy: session?.user?.id
+            const isUpdate = existingTeams.length > 0
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: isUpdate ? "update" : "create",
+                    entityType: "teams",
+                    summary: `${isUpdate ? "Updated" : "Created"} teams for current season ${config.seasonId}, division ${divisionId}${isCoachesDiv ? " (coaches mode)" : ""}`
                 })
             }
-        }
 
-        for (const captainId of oldCaptainIds) {
-            if (!newCaptainIds.has(captainId)) {
-                await revokeRole(captainId, "captain", {
-                    seasonId: config.seasonId,
-                    divisionId
-                })
-            }
-        }
-
-        const isUpdate = existingTeams.length > 0
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: isUpdate ? "update" : "create",
-                entityType: "teams",
-                summary: `${isUpdate ? "Updated" : "Created"} teams for current season ${config.seasonId}, division ${divisionId}${isCoachesDiv ? " (coaches mode)" : ""}`
-            })
-        }
-
-        revalidatePath("/dashboard/select-captains")
-        return {
-            status: true,
-            message: `Successfully ${isUpdate ? "updated" : "created"} teams!`
-        }
-    } catch (error) {
-        console.error("Error saving teams:", error)
-        return {
-            status: false,
-            message: "Something went wrong while saving teams."
+            revalidatePath("/dashboard/select-captains")
+            return ok(
+                undefined,
+                `Successfully ${isUpdate ? "updated" : "created"} teams!`
+            )
+        } catch (error) {
+            console.error("Error saving teams:", error)
+            return fail("Something went wrong while saving teams.")
         }
     }
-}
+)
