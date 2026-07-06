@@ -1,0 +1,731 @@
+"use client"
+
+import { useMemo, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import {
+    RiAddLine,
+    RiArrowDownSLine,
+    RiCloseLine,
+    RiDeleteBinLine,
+    RiUserLine
+} from "@remixicon/react"
+
+import {
+    usePlayerDetailModal,
+    AdminPlayerDetailPopup
+} from "@/components/player-detail"
+import {
+    RosterNotificationDialog,
+    type RosterChangeEntry
+} from "@/components/roster-notification"
+
+export interface EditWeekPlayer {
+    id: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    male: boolean | null
+    hasPairPick: boolean
+    placementScore: number
+    ratingScore: number | null
+    lastDivisionName: string | null
+    seasonsPlayedCount: number
+}
+
+export interface EditWeekSlot {
+    id: number
+    divisionId: number
+    divisionName: string
+    teamNumber: number
+    userId: string
+    isCaptain: boolean
+}
+
+export interface EditWeekRosterEntry {
+    divisionId: number
+    teamNumber: number
+    userId: string
+    isCaptain: boolean
+}
+
+export interface EditWeekAssignment {
+    userId: string
+    divisionId: number
+    divisionName: string
+    teamNumber: number
+}
+
+interface EditWeekRosterFormProps {
+    weekNumber: 2 | 3
+    /**
+     * "locked": captain slots are fixed (week 2 — captains come from teams).
+     * "editable": any filled slot can be toggled as captain (week 3).
+     */
+    captainMode: "locked" | "editable"
+    players: EditWeekPlayer[]
+    slots: EditWeekSlot[]
+    playerPicUrl: string
+    seasonLabel: string
+    updateRosters: (
+        entries: EditWeekRosterEntry[]
+    ) => Promise<{ status: boolean; message?: string }>
+    sendNotifications: (
+        assignments: EditWeekAssignment[],
+        removedUserIds: string[],
+        seasonLabel: string
+    ) => Promise<unknown>
+}
+
+interface LocalSlot {
+    localKey: string
+    divisionId: number
+    divisionName: string
+    teamNumber: number
+    userId: string
+    isCaptain: boolean
+}
+
+function getPlayerLabel(player: EditWeekPlayer) {
+    const name = player.preferredName
+        ? `${player.preferredName} ${player.lastName}`
+        : `${player.firstName} ${player.lastName}`
+    return player.hasPairPick ? `${name} [PP]` : name
+}
+
+function getGenderClass(male: boolean | null) {
+    if (male === true) return "bg-blue-50 dark:bg-blue-950/40"
+    if (male === false) return "bg-pink-50 dark:bg-pink-950/40"
+    return ""
+}
+
+function PlayerCombobox({
+    players,
+    value,
+    onChange,
+    excludeIds = [],
+    disabled = false
+}: {
+    players: EditWeekPlayer[]
+    value: string
+    onChange: (userId: string) => void
+    excludeIds?: string[]
+    disabled?: boolean
+}) {
+    const [open, setOpen] = useState(false)
+    const [search, setSearch] = useState("")
+
+    const selectedPlayer = useMemo(
+        () => players.find((player) => player.id === value) || null,
+        [players, value]
+    )
+
+    const filteredPlayers = useMemo(() => {
+        const available = players.filter(
+            (player) => !excludeIds.includes(player.id) || player.id === value
+        )
+        if (!search) {
+            return available
+        }
+
+        const lower = search.toLowerCase()
+        return available.filter((player) => {
+            return getPlayerLabel(player).toLowerCase().includes(lower)
+        })
+    }, [players, search, excludeIds, value])
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className={cn(
+                        "w-full justify-between font-normal",
+                        selectedPlayer && getGenderClass(selectedPlayer.male)
+                    )}
+                    disabled={disabled}
+                >
+                    {selectedPlayer ? (
+                        <span className="flex min-w-0 flex-1 items-baseline gap-2 truncate">
+                            <span className="truncate">
+                                {getPlayerLabel(selectedPlayer)}
+                            </span>
+                            <span className="shrink-0 text-muted-foreground text-xs">
+                                {selectedPlayer.seasonsPlayedCount === 0 ? (
+                                    <span className="font-semibold text-green-600 dark:text-green-400">
+                                        NEW
+                                    </span>
+                                ) : selectedPlayer.lastDivisionName ? (
+                                    <span>
+                                        {selectedPlayer.lastDivisionName}
+                                    </span>
+                                ) : null}
+                                <span className="ml-1">
+                                    {Math.round(selectedPlayer.placementScore)}
+                                </span>
+                                {selectedPlayer.seasonsPlayedCount > 0 &&
+                                    selectedPlayer.ratingScore !== null && (
+                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                            R
+                                            {Math.round(
+                                                selectedPlayer.ratingScore
+                                            )}
+                                        </span>
+                                    )}
+                            </span>
+                        </span>
+                    ) : (
+                        <span className="truncate text-muted-foreground">
+                            Select player...
+                        </span>
+                    )}
+                    <div className="flex items-center gap-1">
+                        {selectedPlayer && !disabled && (
+                            <span
+                                role="button"
+                                tabIndex={0}
+                                className="rounded-sm p-0.5 hover:bg-accent"
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setOpen(false)
+                                    onChange("")
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.stopPropagation()
+                                        setOpen(false)
+                                        onChange("")
+                                    }
+                                }}
+                            >
+                                <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                            </span>
+                        )}
+                        <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent
+                className="w-(--radix-popover-trigger-width) p-2"
+                align="start"
+            >
+                <Input
+                    placeholder="Search players..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    className="mb-2"
+                />
+                <div className="max-h-60 overflow-y-auto">
+                    {filteredPlayers.length === 0 ? (
+                        <p className="py-2 text-center text-muted-foreground text-sm">
+                            No players found
+                        </p>
+                    ) : (
+                        filteredPlayers.map((player) => (
+                            <button
+                                key={player.id}
+                                type="button"
+                                className={cn(
+                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm",
+                                    value === player.id
+                                        ? "bg-accent"
+                                        : player.male === true
+                                          ? "bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-950/60"
+                                          : player.male === false
+                                            ? "bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/40 dark:hover:bg-pink-950/60"
+                                            : "hover:bg-accent"
+                                )}
+                                onClick={() => {
+                                    onChange(player.id)
+                                    setOpen(false)
+                                    setSearch("")
+                                }}
+                            >
+                                <span className="flex items-baseline justify-between gap-2">
+                                    <span>{getPlayerLabel(player)}</span>
+                                    <span className="shrink-0 text-muted-foreground text-xs">
+                                        {player.seasonsPlayedCount === 0 ? (
+                                            <span className="font-semibold text-green-600 dark:text-green-400">
+                                                NEW
+                                            </span>
+                                        ) : player.lastDivisionName ? (
+                                            <span>
+                                                {player.lastDivisionName}
+                                            </span>
+                                        ) : null}
+                                        <span className="ml-1">
+                                            {Math.round(player.placementScore)}
+                                        </span>
+                                        {player.seasonsPlayedCount > 0 &&
+                                            player.ratingScore !== null && (
+                                                <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                                    R
+                                                    {Math.round(
+                                                        player.ratingScore
+                                                    )}
+                                                </span>
+                                            )}
+                                    </span>
+                                </span>
+                            </button>
+                        ))
+                    )}
+                </div>
+            </PopoverContent>
+        </Popover>
+    )
+}
+
+function computeRosterDiff(
+    oldSlots: LocalSlot[],
+    newSlots: LocalSlot[],
+    players: EditWeekPlayer[]
+): RosterChangeEntry[] {
+    const playerName = (userId: string) => {
+        const p = players.find((pl) => pl.id === userId)
+        if (!p) return userId
+        return p.preferredName
+            ? `${p.preferredName} ${p.lastName}`
+            : `${p.firstName} ${p.lastName}`
+    }
+
+    type DivEntry = {
+        divisionId: number
+        divisionName: string
+        teamNumber: number
+    }
+    const buildUserMap = (slots: LocalSlot[]) => {
+        const m = new Map<string, DivEntry[]>()
+        for (const s of slots) {
+            if (!s.userId) continue
+            const list = m.get(s.userId) || []
+            list.push({
+                divisionId: s.divisionId,
+                divisionName: s.divisionName,
+                teamNumber: s.teamNumber
+            })
+            m.set(s.userId, list)
+        }
+        return m
+    }
+    const serialize = (entries: DivEntry[]) =>
+        entries
+            .map((e) => `${e.divisionId}-${e.teamNumber}`)
+            .sort()
+            .join(",")
+
+    const oldByUser = buildUserMap(oldSlots)
+    const newByUser = buildUserMap(newSlots)
+    const changes: RosterChangeEntry[] = []
+
+    for (const [userId, newEntries] of newByUser) {
+        const oldEntries = oldByUser.get(userId)
+        if (!oldEntries) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "added",
+                week1Assignment: null,
+                divisionAssignments: newEntries.map((e) => ({
+                    divisionId: e.divisionId,
+                    divisionName: e.divisionName,
+                    teamNumber: e.teamNumber
+                }))
+            })
+        } else if (serialize(oldEntries) !== serialize(newEntries)) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "changed",
+                week1Assignment: null,
+                divisionAssignments: newEntries.map((e) => ({
+                    divisionId: e.divisionId,
+                    divisionName: e.divisionName,
+                    teamNumber: e.teamNumber
+                }))
+            })
+        }
+    }
+
+    for (const [userId] of oldByUser) {
+        if (!newByUser.has(userId)) {
+            changes.push({
+                userId,
+                displayName: playerName(userId),
+                changeKind: "removed",
+                week1Assignment: null,
+                divisionAssignments: null
+            })
+        }
+    }
+
+    return changes
+}
+
+export function EditWeekRosterForm({
+    weekNumber,
+    captainMode,
+    players,
+    slots,
+    playerPicUrl,
+    seasonLabel,
+    updateRosters,
+    sendNotifications
+}: EditWeekRosterFormProps) {
+    const modal = usePlayerDetailModal()
+    const [isSaving, setIsSaving] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [success, setSuccess] = useState<string | null>(null)
+    const [notifyDialogOpen, setNotifyDialogOpen] = useState(false)
+    const [pendingChanges, setPendingChanges] = useState<RosterChangeEntry[]>(
+        []
+    )
+    const [isSendingNotifications, setIsSendingNotifications] = useState(false)
+    const nextKey = useRef(0)
+
+    const toLocalSlots = (rawSlots: typeof slots): LocalSlot[] =>
+        rawSlots.map((slot) => ({
+            localKey: `db-${slot.id}`,
+            divisionId: slot.divisionId,
+            divisionName: slot.divisionName,
+            teamNumber: slot.teamNumber,
+            userId: slot.userId,
+            isCaptain: slot.isCaptain
+        }))
+
+    const [slotAssignments, setSlotAssignments] = useState<LocalSlot[]>(() =>
+        toLocalSlots(slots)
+    )
+
+    // Tracks the last successfully saved state for diff computation
+    const lastSavedSlots = useRef<LocalSlot[]>(toLocalSlots(slots))
+
+    const duplicateUserIds = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const slot of slotAssignments) {
+            if (slot.userId) {
+                counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
+            }
+        }
+        return new Set(
+            [...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id)
+        )
+    }, [slotAssignments])
+
+    const groupedSlots = useMemo(() => {
+        const divisionMap = new Map<
+            number,
+            {
+                divisionName: string
+                teams: Map<number, LocalSlot[]>
+            }
+        >()
+
+        for (const slot of slotAssignments) {
+            const current = divisionMap.get(slot.divisionId) || {
+                divisionName: slot.divisionName,
+                teams: new Map<number, LocalSlot[]>()
+            }
+
+            const teamSlots = current.teams.get(slot.teamNumber) || []
+            teamSlots.push(slot)
+            current.teams.set(slot.teamNumber, teamSlots)
+            divisionMap.set(slot.divisionId, current)
+        }
+
+        return [...divisionMap.entries()].sort((a, b) => a[0] - b[0])
+    }, [slotAssignments])
+
+    const addSlot = (
+        divisionId: number,
+        divisionName: string,
+        teamNumber: number
+    ) => {
+        const key = `new-${nextKey.current++}`
+        setSlotAssignments((prev) => [
+            ...prev,
+            {
+                localKey: key,
+                divisionId,
+                divisionName,
+                teamNumber,
+                userId: "",
+                isCaptain: false
+            }
+        ])
+    }
+
+    const removeSlot = (localKey: string) => {
+        setSlotAssignments((prev) =>
+            prev.filter((slot) => slot.localKey !== localKey)
+        )
+    }
+
+    const onChangeSlot = (localKey: string, userId: string) => {
+        setSlotAssignments((prev) =>
+            prev.map((slot) =>
+                slot.localKey === localKey ? { ...slot, userId } : slot
+            )
+        )
+    }
+
+    const toggleCaptain = (localKey: string) => {
+        setSlotAssignments((prev) =>
+            prev.map((slot) =>
+                slot.localKey === localKey
+                    ? { ...slot, isCaptain: !slot.isCaptain }
+                    : slot
+            )
+        )
+    }
+
+    const handleSubmit = async () => {
+        setError(null)
+        setSuccess(null)
+
+        const filledSlots = slotAssignments.filter((slot) => slot.userId)
+        setIsSaving(true)
+
+        const result = await updateRosters(
+            filledSlots.map((slot) => ({
+                divisionId: slot.divisionId,
+                teamNumber: slot.teamNumber,
+                userId: slot.userId,
+                isCaptain: slot.isCaptain
+            }))
+        )
+
+        if (result.status) {
+            setSuccess(result.message ?? null)
+            const changes = computeRosterDiff(
+                lastSavedSlots.current.filter((s) => s.userId),
+                filledSlots,
+                players
+            )
+            lastSavedSlots.current = filledSlots
+            if (changes.length > 0) {
+                setPendingChanges(changes)
+                setNotifyDialogOpen(true)
+            }
+        } else {
+            setError(result.message ?? "Failed to save rosters.")
+        }
+
+        setIsSaving(false)
+    }
+
+    const handleSendNotifications = async (selectedUserIds: string[]) => {
+        setIsSendingNotifications(true)
+        const toNotify = pendingChanges.filter((c) =>
+            selectedUserIds.includes(c.userId)
+        )
+        const assignments = toNotify
+            .filter((c) => c.changeKind !== "removed" && c.divisionAssignments)
+            .flatMap((c) =>
+                (c.divisionAssignments || []).map((a) => ({
+                    userId: c.userId,
+                    divisionId: a.divisionId,
+                    divisionName: a.divisionName,
+                    teamNumber: a.teamNumber
+                }))
+            )
+        const removedIds = toNotify
+            .filter((c) => c.changeKind === "removed")
+            .map((c) => c.userId)
+        await sendNotifications(assignments, removedIds, seasonLabel)
+        setIsSendingNotifications(false)
+        setNotifyDialogOpen(false)
+    }
+
+    return (
+        <div className="space-y-6">
+            {groupedSlots.map(([divisionId, divisionData]) => (
+                <Card key={`division-${divisionId}`}>
+                    <CardHeader>
+                        <CardTitle>{divisionData.divisionName}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {Array.from(divisionData.teams.entries()).map(
+                                ([teamNumber, teamSlots]) => (
+                                    <div
+                                        key={`division-${divisionId}-team-${teamNumber}`}
+                                        className="space-y-2 rounded-md border p-3"
+                                    >
+                                        <h3 className="font-semibold text-sm">
+                                            Team {teamNumber}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {teamSlots.map((slot, idx) => (
+                                                <div
+                                                    key={slot.localKey}
+                                                    className="flex items-end gap-1"
+                                                >
+                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                        <p className="text-muted-foreground text-xs">
+                                                            Slot {idx + 1}
+                                                            {captainMode ===
+                                                                "locked" &&
+                                                                slot.isCaptain && (
+                                                                    <span className="ml-2 font-semibold text-primary">
+                                                                        Captain
+                                                                        slot
+                                                                    </span>
+                                                                )}
+                                                        </p>
+                                                        <PlayerCombobox
+                                                            players={players}
+                                                            value={slot.userId}
+                                                            onChange={(
+                                                                userId
+                                                            ) =>
+                                                                onChangeSlot(
+                                                                    slot.localKey,
+                                                                    userId
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                captainMode ===
+                                                                    "locked" &&
+                                                                slot.isCaptain
+                                                            }
+                                                        />
+                                                        {slot.userId &&
+                                                            duplicateUserIds.has(
+                                                                slot.userId
+                                                            ) && (
+                                                                <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                                    Playing
+                                                                    twice
+                                                                </p>
+                                                            )}
+                                                        {captainMode ===
+                                                            "editable" &&
+                                                            slot.userId && (
+                                                                <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                                                    <Checkbox
+                                                                        checked={
+                                                                            slot.isCaptain
+                                                                        }
+                                                                        onCheckedChange={() =>
+                                                                            toggleCaptain(
+                                                                                slot.localKey
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    Captain
+                                                                </label>
+                                                            )}
+                                                    </div>
+                                                    {slot.userId && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="shrink-0"
+                                                            onClick={() =>
+                                                                modal.openPlayerDetail(
+                                                                    slot.userId
+                                                                )
+                                                            }
+                                                        >
+                                                            <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="shrink-0"
+                                                        onClick={() =>
+                                                            removeSlot(
+                                                                slot.localKey
+                                                            )
+                                                        }
+                                                    >
+                                                        <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full"
+                                            onClick={() =>
+                                                addSlot(
+                                                    divisionId,
+                                                    divisionData.divisionName,
+                                                    teamNumber
+                                                )
+                                            }
+                                        >
+                                            <RiAddLine className="mr-1 h-4 w-4" />
+                                            Add Player
+                                        </Button>
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            ))}
+
+            <div className="flex flex-wrap items-center gap-3">
+                <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSaving}
+                >
+                    {isSaving ? "Saving..." : `Save Week ${weekNumber}`}
+                </Button>
+                {success && (
+                    <span className="text-green-700 text-sm dark:text-green-300">
+                        {success}
+                    </span>
+                )}
+                {error && (
+                    <span className="text-red-700 text-sm dark:text-red-300">
+                        {error}
+                    </span>
+                )}
+            </div>
+
+            <AdminPlayerDetailPopup
+                open={!!modal.selectedUserId}
+                onClose={modal.closePlayerDetail}
+                playerDetails={modal.playerDetails}
+                draftHistory={modal.draftHistory}
+                signupHistory={modal.signupHistory}
+                playerPicUrl={playerPicUrl}
+                isLoading={modal.isLoading}
+                ratingAverages={modal.ratingAverages}
+                sharedRatingNotes={modal.sharedRatingNotes}
+                privateRatingNotes={modal.privateRatingNotes}
+                viewerRating={modal.viewerRating}
+            />
+
+            <RosterNotificationDialog
+                open={notifyDialogOpen}
+                weekNumber={weekNumber}
+                seasonLabel={seasonLabel}
+                changes={pendingChanges}
+                isSending={isSendingNotifications}
+                onConfirm={handleSendNotifications}
+                onClose={() => setNotifyDialogOpen(false)}
+            />
+        </div>
+    )
+}
