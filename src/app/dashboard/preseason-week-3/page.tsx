@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import {
@@ -41,15 +42,6 @@ interface DivisionGroup {
     divisionName: string
     divisionLevel: number
     teams: DivisionTeam[]
-}
-
-const LEGACY_COURT_BY_DIVISION: Record<string, number> = {
-    AA: 1,
-    A: 2,
-    ABA: 3,
-    ABB: 4,
-    BB: 7,
-    BBB: 8
 }
 
 function buildDivisionSchedule(
