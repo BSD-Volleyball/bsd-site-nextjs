@@ -179,7 +179,7 @@ function EmailCard({
         startTransition(async () => {
             const result = await getEmailThread(email.id)
             if (result.status) {
-                setThreadItems(result.items)
+                setThreadItems(result.data)
                 setThreadLoaded(true)
             }
         })
@@ -188,7 +188,7 @@ function EmailCard({
     function refreshThread() {
         startTransition(async () => {
             const result = await getEmailThread(email.id)
-            if (result.status) setThreadItems(result.items)
+            if (result.status) setThreadItems(result.data)
         })
     }
 
@@ -710,7 +710,7 @@ export function ManageEmailsClient({
             const { getInboundEmails } = await import("./actions")
             const result = await getInboundEmails()
             if (result.status) {
-                setEmails(result.emails)
+                setEmails(result.data)
             }
         })
     }

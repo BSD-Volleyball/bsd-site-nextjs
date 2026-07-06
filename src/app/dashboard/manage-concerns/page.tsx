@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { hasPermissionBySession } from "@/lib/rbac"
+import { requirePermissionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageConcernsClient } from "./manage-concerns-client"
@@ -15,21 +12,10 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function ManageConcernsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
-
     const config = await getSeasonConfig()
-    const canView =
-        !!config.seasonId &&
-        (await hasPermissionBySession("concerns:view", {
-            seasonId: config.seasonId
-        }))
-    if (!canView) {
-        redirect("/dashboard")
-    }
+    await requirePermissionOrRedirect("concerns:view", {
+        seasonId: config.seasonId
+    })
 
     const [concernsResult, assignableUsers] = await Promise.all([
         getConcerns(),
@@ -48,7 +34,7 @@ export default async function ManageConcernsPage() {
                 </div>
             ) : (
                 <ManageConcernsClient
-                    initialConcerns={concernsResult.concerns}
+                    initialConcerns={concernsResult.data}
                     assignableUsers={assignableUsers}
                     playerPicUrl={process.env.PLAYER_PIC_URL ?? ""}
                 />

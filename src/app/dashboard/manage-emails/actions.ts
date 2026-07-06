@@ -11,18 +11,34 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, desc, or, asc } from "drizzle-orm"
-import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
-import { logAuditEntry } from "@/lib/audit-log"
+import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
+import {
+    withAction,
+    ok,
+    fail,
+    requireSession,
+    requireSeasonConfig,
+    requirePermission,
+    requireNonEmptyString,
+    ActionError
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
-async function hasAdminEmailPermission(
-    permission: "admin_emails:view" | "admin_emails:manage"
-): Promise<boolean> {
-    const config = await getSeasonConfig()
-    if (!config.seasonId) return false
-    return hasPermissionBySession(permission, { seasonId: config.seasonId })
+// Repliers/commenters may hold either permission; status changes need manage.
+async function requireEmailViewOrManage(): Promise<void> {
+    const config = await requireSeasonConfig()
+    const canView = await hasPermissionBySession("admin_emails:view", {
+        seasonId: config.seasonId
+    })
+    if (canView) return
+    const canManage = await hasPermissionBySession("admin_emails:manage", {
+        seasonId: config.seasonId
+    })
+    if (!canManage) throw new ActionError("Unauthorized.")
 }
 
 export interface InboundEmailRow {
@@ -83,17 +99,13 @@ export interface AssignableAdmin {
     name: string
 }
 
-export async function getInboundEmails(): Promise<{
-    status: boolean
-    message?: string
-    emails: InboundEmailRow[]
-}> {
-    const canView = await hasAdminEmailPermission("admin_emails:view")
-    if (!canView) {
-        return { status: false, message: "Unauthorized.", emails: [] }
-    }
+export const getInboundEmails = withAction(
+    async (): Promise<ActionResult<InboundEmailRow[]>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("admin_emails:view", {
+            seasonId: config.seasonId
+        })
 
-    try {
         const rows = await db
             .select({
                 id: inboundEmails.id,
@@ -152,24 +164,17 @@ export async function getInboundEmails(): Promise<{
             updated_at: r.updated_at
         }))
 
-        return { status: true, emails: result }
-    } catch (error) {
-        console.error("Error fetching inbound emails:", error)
-        return {
-            status: false,
-            message: "Failed to load emails.",
-            emails: []
-        }
+        return ok(result)
     }
-}
+)
 
-export async function getEmailThread(
-    emailId: number
-): Promise<{ status: boolean; items: ThreadItem[] }> {
-    const canView = await hasAdminEmailPermission("admin_emails:view")
-    if (!canView) return { status: false, items: [] }
+export const getEmailThread = withAction(
+    async (emailId: number): Promise<ActionResult<ThreadItem[]>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("admin_emails:view", {
+            seasonId: config.seasonId
+        })
 
-    try {
         const [commentRows, replyRows, receivedRows] = await Promise.all([
             db
                 .select({
@@ -266,50 +271,40 @@ export async function getEmailThread(
             return aTime - bTime
         })
 
-        return { status: true, items }
-    } catch (error) {
-        console.error("Error fetching email thread:", error)
-        return { status: false, items: [] }
+        return ok(items)
     }
-}
+)
 
-export async function sendEmailReply(
-    emailId: number,
-    body: string
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    const canView = await hasAdminEmailPermission("admin_emails:view")
-    if (!canManage && !canView)
-        return { status: false, message: "Unauthorized." }
+export const sendEmailReply = withAction(
+    async (emailId: number, body: string): Promise<ActionResult> => {
+        const session = await requireSession()
+        await requireEmailViewOrManage()
+        const userId = session.user.id
 
-    const userId = await getSessionUserId()
-    if (!userId) return { status: false, message: "Not authenticated." }
+        requireNonEmptyString(body, "Reply")
 
-    if (!body?.trim())
-        return { status: false, message: "Reply cannot be empty." }
+        // Load the original email
+        const [email] = await db
+            .select({
+                email_id: inboundEmails.email_id,
+                from_address: inboundEmails.from_address,
+                subject: inboundEmails.subject,
+                status: inboundEmails.status
+            })
+            .from(inboundEmails)
+            .where(eq(inboundEmails.id, emailId))
+            .limit(1)
 
-    // Load the original email
-    const [email] = await db
-        .select({
-            email_id: inboundEmails.email_id,
-            from_address: inboundEmails.from_address,
-            subject: inboundEmails.subject,
-            status: inboundEmails.status
-        })
-        .from(inboundEmails)
-        .where(eq(inboundEmails.id, emailId))
-        .limit(1)
+        if (!email) return fail("Email not found.")
+        if (email.status !== "active") {
+            return fail("Can only reply to active emails.")
+        }
 
-    if (!email) return { status: false, message: "Email not found." }
-    if (email.status !== "active")
-        return { status: false, message: "Can only reply to active emails." }
+        const cleanSubject = email.subject.replace(/^(Re:\s*)+/i, "").trim()
+        const replySubject = `Re: Email #${emailId}: ${cleanSubject}`
 
-    const cleanSubject = email.subject.replace(/^(Re:\s*)+/i, "").trim()
-    const replySubject = `Re: Email #${emailId}: ${cleanSubject}`
+        const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
 
-    const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
-
-    try {
         const postmarkMessageId = await sendEmail({
             from: site.mailFrom,
             to: email.from_address,
@@ -338,33 +333,18 @@ export async function sendEmailReply(
         })
 
         revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Reply sent." }
-    } catch (error) {
-        console.error("Error sending reply:", error)
-        return { status: false, message: "Failed to send reply." }
+        return ok(undefined, "Reply sent.")
     }
-}
+)
 
-export async function addInboundEmailComment(
-    emailId: number,
-    content: string
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    const canView = await hasAdminEmailPermission("admin_emails:view")
-    if (!canManage && !canView) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const addInboundEmailComment = withAction(
+    async (emailId: number, content: string): Promise<ActionResult> => {
+        const session = await requireSession()
+        await requireEmailViewOrManage()
+        const userId = session.user.id
 
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return { status: false, message: "Not authenticated." }
-    }
+        requireNonEmptyString(content, "Comment")
 
-    if (!content?.trim()) {
-        return { status: false, message: "Comment cannot be empty." }
-    }
-
-    try {
         await db.insert(inboundEmailComments).values({
             email_id: emailId,
             author_id: userId,
@@ -378,28 +358,22 @@ export async function addInboundEmailComment(
             summary: `Added a comment on inbound email #${emailId}`
         })
         revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Comment added." }
-    } catch (error) {
-        console.error("Error adding email comment:", error)
-        return { status: false, message: "Failed to add comment." }
+        return ok(undefined, "Comment added.")
     }
-}
+)
 
-export async function assignInboundEmail(
-    emailId: number,
-    assigneeId: string | null
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const assignInboundEmail = withAction(
+    async (
+        emailId: number,
+        assigneeId: string | null
+    ): Promise<ActionResult> => {
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+        await requirePermission("admin_emails:manage", {
+            seasonId: config.seasonId
+        })
+        const actorUserId = session.user.id
 
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
         const [actor] = await db
             .select({ name: users.name })
             .from(users)
@@ -419,7 +393,7 @@ export async function assignInboundEmail(
             .limit(1)
 
         if (!existing) {
-            return { status: false, message: "Email not found." }
+            return fail("Email not found.")
         }
 
         let assigneeName: string | null = null
@@ -516,207 +490,120 @@ export async function assignInboundEmail(
         }
 
         revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Email assigned." }
-    } catch (error) {
-        console.error("Error assigning email:", error)
-        return { status: false, message: "Failed to assign email." }
+        return ok(undefined, "Email assigned.")
     }
+)
+
+async function setInboundEmailStatus(
+    emailId: number,
+    status: "closed" | "active" | "new" | "spam",
+    commentText: (actorName: string) => string,
+    auditAction: string,
+    auditSummary: string,
+    successMessage: string
+): Promise<ActionResult> {
+    const session = await requireSession()
+    const config = await requireSeasonConfig()
+    await requirePermission("admin_emails:manage", {
+        seasonId: config.seasonId
+    })
+    const actorUserId = session.user.id
+
+    const [actor] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, actorUserId))
+        .limit(1)
+    const actorName = actor?.name ?? actorUserId
+
+    await db
+        .update(inboundEmails)
+        .set({ status, updated_at: new Date() })
+        .where(eq(inboundEmails.id, emailId))
+
+    await db.insert(inboundEmailComments).values({
+        email_id: emailId,
+        author_id: actorUserId,
+        content: commentText(actorName)
+    })
+
+    await logAuditEntry({
+        userId: actorUserId,
+        action: auditAction,
+        entityType: "inbound_email",
+        entityId: emailId,
+        summary: auditSummary
+    })
+
+    revalidatePath("/dashboard/manage-emails")
+    return ok(undefined, successMessage)
 }
 
-export async function closeInboundEmail(
-    emailId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
+export const closeInboundEmail = withAction(
+    async (emailId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setInboundEmailStatus(
+            emailId,
+            "closed",
+            (actorName) => `${actorName} closed this email.`,
+            "close_inbound_email",
+            `Closed inbound email #${emailId}`,
+            "Email closed."
+        )
     }
+)
 
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
+export const reopenInboundEmail = withAction(
+    async (emailId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setInboundEmailStatus(
+            emailId,
+            "active",
+            (actorName) =>
+                `${actorName} reopened this email and changed status to active.`,
+            "reopen_inbound_email",
+            `Reopened inbound email #${emailId}`,
+            "Email reopened."
+        )
     }
+)
 
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(inboundEmails)
-            .set({ status: "closed", updated_at: new Date() })
-            .where(eq(inboundEmails.id, emailId))
-
-        await db.insert(inboundEmailComments).values({
-            email_id: emailId,
-            author_id: actorUserId,
-            content: `${actorName} closed this email.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "close_inbound_email",
-            entityType: "inbound_email",
-            entityId: emailId,
-            summary: `Closed inbound email #${emailId}`
-        })
-
-        revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Email closed." }
-    } catch (error) {
-        console.error("Error closing email:", error)
-        return { status: false, message: "Failed to close email." }
+export const markInboundEmailAsSpam = withAction(
+    async (emailId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setInboundEmailStatus(
+            emailId,
+            "spam",
+            (actorName) => `${actorName} marked this email as spam.`,
+            "mark_inbound_email_spam",
+            `Marked inbound email #${emailId} as spam`,
+            "Email marked as spam."
+        )
     }
-}
+)
 
-export async function reopenInboundEmail(
-    emailId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
+export const unmarkInboundEmailAsSpam = withAction(
+    async (emailId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setInboundEmailStatus(
+            emailId,
+            "new",
+            (actorName) =>
+                `${actorName} removed the spam mark and returned this email to new.`,
+            "unmark_inbound_email_spam",
+            `Removed spam mark from inbound email #${emailId}`,
+            "Email returned to new."
+        )
     }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(inboundEmails)
-            .set({ status: "active", updated_at: new Date() })
-            .where(eq(inboundEmails.id, emailId))
-
-        await db.insert(inboundEmailComments).values({
-            email_id: emailId,
-            author_id: actorUserId,
-            content: `${actorName} reopened this email and changed status to active.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "reopen_inbound_email",
-            entityType: "inbound_email",
-            entityId: emailId,
-            summary: `Reopened inbound email #${emailId}`
-        })
-
-        revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Email reopened." }
-    } catch (error) {
-        console.error("Error reopening email:", error)
-        return { status: false, message: "Failed to reopen email." }
-    }
-}
-
-export async function markInboundEmailAsSpam(
-    emailId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(inboundEmails)
-            .set({ status: "spam", updated_at: new Date() })
-            .where(eq(inboundEmails.id, emailId))
-
-        await db.insert(inboundEmailComments).values({
-            email_id: emailId,
-            author_id: actorUserId,
-            content: `${actorName} marked this email as spam.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "mark_inbound_email_spam",
-            entityType: "inbound_email",
-            entityId: emailId,
-            summary: `Marked inbound email #${emailId} as spam`
-        })
-
-        revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Email marked as spam." }
-    } catch (error) {
-        console.error("Error marking email as spam:", error)
-        return { status: false, message: "Failed to mark email as spam." }
-    }
-}
-
-export async function unmarkInboundEmailAsSpam(
-    emailId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasAdminEmailPermission("admin_emails:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(inboundEmails)
-            .set({ status: "new", updated_at: new Date() })
-            .where(eq(inboundEmails.id, emailId))
-
-        await db.insert(inboundEmailComments).values({
-            email_id: emailId,
-            author_id: actorUserId,
-            content: `${actorName} removed the spam mark and returned this email to new.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "unmark_inbound_email_spam",
-            entityType: "inbound_email",
-            entityId: emailId,
-            summary: `Removed spam mark from inbound email #${emailId}`
-        })
-
-        revalidatePath("/dashboard/manage-emails")
-        return { status: true, message: "Email returned to new." }
-    } catch (error) {
-        console.error("Error unmarking email as spam:", error)
-        return { status: false, message: "Failed to unmark email as spam." }
-    }
-}
+)
 
 export async function getAssignableAdmins(): Promise<AssignableAdmin[]> {
-    const canView = await hasAdminEmailPermission("admin_emails:view")
+    const config = await getSeasonConfig()
+    const canView = config.seasonId
+        ? await hasPermissionBySession("admin_emails:view", {
+              seasonId: config.seasonId
+          })
+        : false
     if (!canView) return []
 
     try {

@@ -11,18 +11,34 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
-import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
-import { logAuditEntry } from "@/lib/audit-log"
+import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
+import { logAuditEntry } from "@/lib/audit-log"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
+import {
+    withAction,
+    ok,
+    fail,
+    requireSession,
+    requireSeasonConfig,
+    requirePermission,
+    requireNonEmptyString,
+    ActionError
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 
-async function hasConcernPermission(
-    permission: "concerns:view" | "concerns:manage"
-): Promise<boolean> {
-    const config = await getSeasonConfig()
-    if (!config.seasonId) return false
-    return hasPermissionBySession(permission, { seasonId: config.seasonId })
+// Repliers/commenters may hold either permission; status changes need manage.
+async function requireConcernViewOrManage(): Promise<void> {
+    const config = await requireSeasonConfig()
+    const canView = await hasPermissionBySession("concerns:view", {
+        seasonId: config.seasonId
+    })
+    if (canView) return
+    const canManage = await hasPermissionBySession("concerns:manage", {
+        seasonId: config.seasonId
+    })
+    if (!canManage) throw new ActionError("Unauthorized.")
 }
 
 export interface ConcernRow {
@@ -91,17 +107,13 @@ export interface AssignableUser {
     role: string
 }
 
-export async function getConcerns(): Promise<{
-    status: boolean
-    message?: string
-    concerns: ConcernRow[]
-}> {
-    const canView = await hasConcernPermission("concerns:view")
-    if (!canView) {
-        return { status: false, message: "Unauthorized.", concerns: [] }
-    }
+export const getConcerns = withAction(
+    async (): Promise<ActionResult<ConcernRow[]>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("concerns:view", {
+            seasonId: config.seasonId
+        })
 
-    try {
         const rows = await db
             .select({
                 id: concerns.id,
@@ -174,26 +186,17 @@ export async function getConcerns(): Promise<{
             updated_at: r.updated_at
         }))
 
-        return { status: true, concerns: result }
-    } catch (error) {
-        console.error("Error fetching concerns:", error)
-        return {
-            status: false,
-            message: "Failed to load concerns.",
-            concerns: []
-        }
+        return ok(result)
     }
-}
+)
 
-export async function getConcernComments(
-    concernId: number
-): Promise<{ status: boolean; comments: ConcernComment[] }> {
-    const canView = await hasConcernPermission("concerns:view")
-    if (!canView) {
-        return { status: false, comments: [] }
-    }
+export const getConcernComments = withAction(
+    async (concernId: number): Promise<ActionResult<ConcernComment[]>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("concerns:view", {
+            seasonId: config.seasonId
+        })
 
-    try {
         const rows = await db
             .select({
                 id: concernComments.id,
@@ -208,9 +211,8 @@ export async function getConcernComments(
             .where(eq(concernComments.concern_id, concernId))
             .orderBy(desc(concernComments.created_at))
 
-        return {
-            status: true,
-            comments: rows.map((r) => ({
+        return ok(
+            rows.map((r) => ({
                 id: r.id,
                 concern_id: r.concern_id,
                 author_id: r.author_id,
@@ -218,22 +220,17 @@ export async function getConcernComments(
                 content: r.content,
                 created_at: r.created_at
             }))
-        }
-    } catch (error) {
-        console.error("Error fetching concern comments:", error)
-        return { status: false, comments: [] }
+        )
     }
-}
+)
 
-export async function getConcernThread(
-    concernId: number
-): Promise<{ status: boolean; items: ConcernThreadItem[] }> {
-    const canView = await hasConcernPermission("concerns:view")
-    if (!canView) {
-        return { status: false, items: [] }
-    }
+export const getConcernThread = withAction(
+    async (concernId: number): Promise<ActionResult<ConcernThreadItem[]>> => {
+        const config = await requireSeasonConfig()
+        await requirePermission("concerns:view", {
+            seasonId: config.seasonId
+        })
 
-    try {
         const [commentRows, replyRows, receivedRows] = await Promise.all([
             db
                 .select({
@@ -326,97 +323,80 @@ export async function getConcernThread(
             return aTime - bTime
         })
 
-        return { status: true, items }
-    } catch (error) {
-        console.error("Error fetching concern thread:", error)
-        return { status: false, items: [] }
+        return ok(items)
     }
-}
+)
 
-export async function sendConcernReply(
-    concernId: number,
-    body: string
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    const canView = await hasConcernPermission("concerns:view")
-    if (!canManage && !canView) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const sendConcernReply = withAction(
+    async (concernId: number, body: string): Promise<ActionResult> => {
+        const session = await requireSession()
+        await requireConcernViewOrManage()
+        const userId = session.user.id
 
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return { status: false, message: "Not authenticated." }
-    }
+        requireNonEmptyString(body, "Reply")
 
-    if (!body?.trim()) {
-        return { status: false, message: "Reply cannot be empty." }
-    }
-
-    const fromAddress = process.env.INBOUND_CONCERN_ADDRESS
-    const fromName = process.env.INBOUND_CONCERN_FROM_NAME
-    if (!fromAddress) {
-        return {
-            status: false,
-            message: "Concern reply address is not configured."
+        const fromAddress = process.env.INBOUND_CONCERN_ADDRESS
+        const fromName = process.env.INBOUND_CONCERN_FROM_NAME
+        if (!fromAddress) {
+            return fail("Concern reply address is not configured.")
         }
-    }
 
-    const [concern] = await db
-        .select()
-        .from(concerns)
-        .where(eq(concerns.id, concernId))
-        .limit(1)
-
-    if (!concern) {
-        return { status: false, message: "Concern not found." }
-    }
-    if (concern.status !== "active") {
-        return { status: false, message: "Can only reply to active concerns." }
-    }
-
-    let replyTo: string | null = null
-
-    if (concern.source === "email") {
-        replyTo = concern.contact_email ?? null
-    } else if (!concern.anonymous && concern.user_id) {
-        const [userRow] = await db
-            .select({ email: users.email })
-            .from(users)
-            .where(eq(users.id, concern.user_id))
+        const [concern] = await db
+            .select()
+            .from(concerns)
+            .where(eq(concerns.id, concernId))
             .limit(1)
-        replyTo = userRow?.email ?? null
-    } else if (concern.contact_email) {
-        replyTo = concern.contact_email
-    }
 
-    if (!replyTo) {
-        return {
-            status: false,
-            message: "No reply address available for this concern."
+        if (!concern) {
+            return fail("Concern not found.")
         }
-    }
+        if (concern.status !== "active") {
+            return fail("Can only reply to active concerns.")
+        }
 
-    // Find the most recent reply's postmark_message_id to chain the email
-    // thread. Fall back to the original inbound email's ID if no replies exist.
-    const [lastReply] = await db
-        .select({ postmark_message_id: concernReplies.postmark_message_id })
-        .from(concernReplies)
-        .where(eq(concernReplies.concern_id, concernId))
-        .orderBy(desc(concernReplies.sent_at))
-        .limit(1)
+        let replyTo: string | null = null
 
-    const inReplyTo =
-        lastReply?.postmark_message_id ?? concern.source_email_id ?? undefined
+        if (concern.source === "email") {
+            replyTo = concern.contact_email ?? null
+        } else if (!concern.anonymous && concern.user_id) {
+            const [userRow] = await db
+                .select({ email: users.email })
+                .from(users)
+                .where(eq(users.id, concern.user_id))
+                .limit(1)
+            replyTo = userRow?.email ?? null
+        } else if (concern.contact_email) {
+            replyTo = concern.contact_email
+        }
 
-    // Use the original inbound email's subject when the concern came from email;
-    // fall back to the generic "Re: Concern #N" for web-submitted concerns.
-    const baseSubject =
-        concern.source === "email" && concern.person_involved
-            ? concern.person_involved.replace(/^(Re:\s*)+/i, "").trim()
-            : `Concern #${concernId}`
-    const subject = `Re: ${baseSubject}`
+        if (!replyTo) {
+            return fail("No reply address available for this concern.")
+        }
 
-    try {
+        // Find the most recent reply's postmark_message_id to chain the email
+        // thread. Fall back to the original inbound email's ID if no replies exist.
+        const [lastReply] = await db
+            .select({
+                postmark_message_id: concernReplies.postmark_message_id
+            })
+            .from(concernReplies)
+            .where(eq(concernReplies.concern_id, concernId))
+            .orderBy(desc(concernReplies.sent_at))
+            .limit(1)
+
+        const inReplyTo =
+            lastReply?.postmark_message_id ??
+            concern.source_email_id ??
+            undefined
+
+        // Use the original inbound email's subject when the concern came from email;
+        // fall back to the generic "Re: Concern #N" for web-submitted concerns.
+        const baseSubject =
+            concern.source === "email" && concern.person_involved
+                ? concern.person_involved.replace(/^(Re:\s*)+/i, "").trim()
+                : `Concern #${concernId}`
+        const subject = `Re: ${baseSubject}`
+
         const postmarkMessageId = await sendEmail({
             from: fromAddress,
             fromName: fromName || undefined,
@@ -449,33 +429,18 @@ export async function sendConcernReply(
         })
 
         revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Reply sent." }
-    } catch (error) {
-        console.error("Error sending concern reply:", error)
-        return { status: false, message: "Failed to send reply." }
+        return ok(undefined, "Reply sent.")
     }
-}
+)
 
-export async function addConcernComment(
-    concernId: number,
-    content: string
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    const canView = await hasConcernPermission("concerns:view")
-    if (!canManage && !canView) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const addConcernComment = withAction(
+    async (concernId: number, content: string): Promise<ActionResult> => {
+        const session = await requireSession()
+        await requireConcernViewOrManage()
+        const userId = session.user.id
 
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return { status: false, message: "Not authenticated." }
-    }
+        requireNonEmptyString(content, "Comment")
 
-    if (!content?.trim()) {
-        return { status: false, message: "Comment cannot be empty." }
-    }
-
-    try {
         await db.insert(concernComments).values({
             concern_id: concernId,
             author_id: userId,
@@ -489,62 +454,49 @@ export async function addConcernComment(
             summary: `Added a comment on concern #${concernId}`
         })
         revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Comment added." }
-    } catch (error) {
-        console.error("Error adding comment:", error)
-        return { status: false, message: "Failed to add comment." }
+        return ok(undefined, "Comment added.")
     }
-}
+)
 
-export async function updateConcernStatus(
-    concernId: number,
-    status: "new" | "active" | "closed" | "spam"
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const updateConcernStatus = withAction(
+    async (
+        concernId: number,
+        status: "new" | "active" | "closed" | "spam"
+    ): Promise<ActionResult> => {
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+        await requirePermission("concerns:manage", {
+            seasonId: config.seasonId
+        })
 
-    const userId = await getSessionUserId()
-    if (!userId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
         await db
             .update(concerns)
             .set({ status, updated_at: new Date() })
             .where(eq(concerns.id, concernId))
         await logAuditEntry({
-            userId,
+            userId: session.user.id,
             action: "update_concern_status",
             entityType: "concern",
             entityId: concernId,
             summary: `Set concern #${concernId} status to ${status}`
         })
         revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Status updated." }
-    } catch (error) {
-        console.error("Error updating concern status:", error)
-        return { status: false, message: "Failed to update status." }
+        return ok(undefined, "Status updated.")
     }
-}
+)
 
-export async function assignConcern(
-    concernId: number,
-    assigneeId: string | null
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
+export const assignConcern = withAction(
+    async (
+        concernId: number,
+        assigneeId: string | null
+    ): Promise<ActionResult> => {
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+        await requirePermission("concerns:manage", {
+            seasonId: config.seasonId
+        })
+        const actorUserId = session.user.id
 
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
         const [actor] = await db
             .select({ name: users.name })
             .from(users)
@@ -568,7 +520,7 @@ export async function assignConcern(
             .limit(1)
 
         if (!existingConcern) {
-            return { status: false, message: "Concern not found." }
+            return fail("Concern not found.")
         }
 
         let assigneeName: string | null = null
@@ -674,207 +626,120 @@ export async function assignConcern(
         }
 
         revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Concern assigned." }
-    } catch (error) {
-        console.error("Error assigning concern:", error)
-        return { status: false, message: "Failed to assign concern." }
+        return ok(undefined, "Concern assigned.")
     }
+)
+
+async function setConcernStatus(
+    concernId: number,
+    status: "closed" | "active" | "new" | "spam",
+    commentText: (actorName: string) => string,
+    auditAction: string,
+    auditSummary: string,
+    successMessage: string
+): Promise<ActionResult> {
+    const session = await requireSession()
+    const config = await requireSeasonConfig()
+    await requirePermission("concerns:manage", {
+        seasonId: config.seasonId
+    })
+    const actorUserId = session.user.id
+
+    const [actor] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, actorUserId))
+        .limit(1)
+    const actorName = actor?.name ?? actorUserId
+
+    await db
+        .update(concerns)
+        .set({ status, updated_at: new Date() })
+        .where(eq(concerns.id, concernId))
+
+    await db.insert(concernComments).values({
+        concern_id: concernId,
+        author_id: actorUserId,
+        content: commentText(actorName)
+    })
+
+    await logAuditEntry({
+        userId: actorUserId,
+        action: auditAction,
+        entityType: "concern",
+        entityId: concernId,
+        summary: auditSummary
+    })
+
+    revalidatePath("/dashboard/manage-concerns")
+    return ok(undefined, successMessage)
 }
 
-export async function closeConcern(
-    concernId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
+export const closeConcern = withAction(
+    async (concernId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setConcernStatus(
+            concernId,
+            "closed",
+            (actorName) => `${actorName} closed this concern.`,
+            "close_concern",
+            `Closed concern #${concernId}`,
+            "Concern closed."
+        )
     }
+)
 
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
+export const reopenConcern = withAction(
+    async (concernId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setConcernStatus(
+            concernId,
+            "active",
+            (actorName) =>
+                `${actorName} reopened this concern and changed status to active.`,
+            "reopen_concern",
+            `Reopened concern #${concernId}`,
+            "Concern reopened."
+        )
     }
+)
 
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(concerns)
-            .set({ status: "closed", updated_at: new Date() })
-            .where(eq(concerns.id, concernId))
-
-        await db.insert(concernComments).values({
-            concern_id: concernId,
-            author_id: actorUserId,
-            content: `${actorName} closed this concern.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "close_concern",
-            entityType: "concern",
-            entityId: concernId,
-            summary: `Closed concern #${concernId}`
-        })
-
-        revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Concern closed." }
-    } catch (error) {
-        console.error("Error closing concern:", error)
-        return { status: false, message: "Failed to close concern." }
+export const markConcernAsSpam = withAction(
+    async (concernId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setConcernStatus(
+            concernId,
+            "spam",
+            (actorName) => `${actorName} marked this concern as spam.`,
+            "mark_concern_spam",
+            `Marked concern #${concernId} as spam`,
+            "Concern marked as spam."
+        )
     }
-}
+)
 
-export async function reopenConcern(
-    concernId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
+export const unmarkConcernAsSpam = withAction(
+    async (concernId: number): Promise<ActionResult> => {
+        await requireSession()
+        return setConcernStatus(
+            concernId,
+            "new",
+            (actorName) =>
+                `${actorName} removed the spam mark and returned this concern to new.`,
+            "unmark_concern_spam",
+            `Removed spam mark from concern #${concernId}`,
+            "Concern returned to new."
+        )
     }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(concerns)
-            .set({ status: "active", updated_at: new Date() })
-            .where(eq(concerns.id, concernId))
-
-        await db.insert(concernComments).values({
-            concern_id: concernId,
-            author_id: actorUserId,
-            content: `${actorName} reopened this concern and changed status to active.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "reopen_concern",
-            entityType: "concern",
-            entityId: concernId,
-            summary: `Reopened concern #${concernId}`
-        })
-
-        revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Concern reopened." }
-    } catch (error) {
-        console.error("Error reopening concern:", error)
-        return { status: false, message: "Failed to reopen concern." }
-    }
-}
-
-export async function markConcernAsSpam(
-    concernId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(concerns)
-            .set({ status: "spam", updated_at: new Date() })
-            .where(eq(concerns.id, concernId))
-
-        await db.insert(concernComments).values({
-            concern_id: concernId,
-            author_id: actorUserId,
-            content: `${actorName} marked this concern as spam.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "mark_concern_spam",
-            entityType: "concern",
-            entityId: concernId,
-            summary: `Marked concern #${concernId} as spam`
-        })
-
-        revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Concern marked as spam." }
-    } catch (error) {
-        console.error("Error marking concern as spam:", error)
-        return { status: false, message: "Failed to mark concern as spam." }
-    }
-}
-
-export async function unmarkConcernAsSpam(
-    concernId: number
-): Promise<{ status: boolean; message: string }> {
-    const canManage = await hasConcernPermission("concerns:manage")
-    if (!canManage) {
-        return { status: false, message: "Unauthorized." }
-    }
-
-    const actorUserId = await getSessionUserId()
-    if (!actorUserId) {
-        return { status: false, message: "Not authenticated." }
-    }
-
-    try {
-        const [actor] = await db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, actorUserId))
-            .limit(1)
-        const actorName = actor?.name ?? actorUserId
-
-        await db
-            .update(concerns)
-            .set({ status: "new", updated_at: new Date() })
-            .where(eq(concerns.id, concernId))
-
-        await db.insert(concernComments).values({
-            concern_id: concernId,
-            author_id: actorUserId,
-            content: `${actorName} removed the spam mark and returned this concern to new.`
-        })
-
-        await logAuditEntry({
-            userId: actorUserId,
-            action: "unmark_concern_spam",
-            entityType: "concern",
-            entityId: concernId,
-            summary: `Removed spam mark from concern #${concernId}`
-        })
-
-        revalidatePath("/dashboard/manage-concerns")
-        return { status: true, message: "Concern returned to new." }
-    } catch (error) {
-        console.error("Error unmarking concern as spam:", error)
-        return { status: false, message: "Failed to unmark concern as spam." }
-    }
-}
+)
 
 export async function getAssignableUsers(): Promise<AssignableUser[]> {
-    const canView = await hasConcernPermission("concerns:view")
+    const config = await getSeasonConfig()
+    const canView = config.seasonId
+        ? await hasPermissionBySession("concerns:view", {
+              seasonId: config.seasonId
+          })
+        : false
     if (!canView) return []
 
     try {
@@ -904,8 +769,4 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
         console.error("Error fetching assignable users:", error)
         return []
     }
-}
-
-export async function getHasConcernsAccess(): Promise<boolean> {
-    return hasConcernPermission("concerns:view")
 }

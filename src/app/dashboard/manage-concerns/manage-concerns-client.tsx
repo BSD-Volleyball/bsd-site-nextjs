@@ -138,7 +138,7 @@ function ConcernCard({
         startTransition(async () => {
             const result = await getConcernThread(concern.id)
             if (result.status) {
-                setThread(result.items)
+                setThread(result.data)
                 setThreadLoaded(true)
             }
         })
@@ -195,7 +195,7 @@ function ConcernCard({
             if (result.status) {
                 setNewComment("")
                 const updated = await getConcernThread(concern.id)
-                if (updated.status) setThread(updated.items)
+                if (updated.status) setThread(updated.data)
                 setCommentMsg(null)
             } else {
                 setCommentMsg(result.message)
@@ -211,7 +211,7 @@ function ConcernCard({
             if (result.status) {
                 setReplyBody("")
                 const updated = await getConcernThread(concern.id)
-                if (updated.status) setThread(updated.items)
+                if (updated.status) setThread(updated.data)
                 setReplyMsg(null)
             } else {
                 setReplyMsg(result.message)
@@ -751,7 +751,7 @@ export function ManageConcernsClient({
             const { getConcerns } = await import("./actions")
             const result = await getConcerns()
             if (result.status) {
-                setConcerns(result.concerns)
+                setConcerns(result.data)
             }
         })
     }

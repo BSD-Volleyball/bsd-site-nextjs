@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageEmailsClient } from "./manage-emails-client"
 import { getInboundEmails, getAssignableAdmins } from "./actions"
@@ -14,16 +11,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function ManageEmailsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
-
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const [emailsResult, assignableAdmins] = await Promise.all([
         getInboundEmails(),
@@ -42,7 +30,7 @@ export default async function ManageEmailsPage() {
                 </div>
             ) : (
                 <ManageEmailsClient
-                    initialEmails={emailsResult.emails}
+                    initialEmails={emailsResult.data}
                     assignableAdmins={assignableAdmins}
                     playerPicUrl={process.env.PLAYER_PIC_URL ?? ""}
                 />
