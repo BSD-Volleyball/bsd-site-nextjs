@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -53,13 +54,16 @@ export async function getDiscounts(): Promise<{
             .orderBy(desc(discounts.created_at))
 
         const entries: DiscountEntry[] = rows.map((row) => {
-            const preferred = row.preferredName ? ` (${row.preferredName})` : ""
             const scope: DiscountScope =
                 row.scope === "tournament" ? "tournament" : "season"
             return {
                 id: row.id,
                 userId: row.userId,
-                userName: `${row.firstName}${preferred} ${row.lastName}`,
+                userName: formatPlayerName(
+                    row.firstName,
+                    row.lastName,
+                    row.preferredName
+                ),
                 percentage: row.percentage || "0",
                 expiration: row.expiration,
                 reason: row.reason,
@@ -97,10 +101,9 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
-            name: `${u.first_name}${preferredPart} ${u.last_name}`
+            name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
         }
     })
 }

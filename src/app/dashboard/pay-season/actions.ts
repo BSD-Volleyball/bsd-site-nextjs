@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
 import { auth } from "@/lib/auth"
@@ -162,10 +163,9 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
-            name: `${u.first_name}${preferredPart} ${u.last_name}`
+            name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
         }
     })
 }

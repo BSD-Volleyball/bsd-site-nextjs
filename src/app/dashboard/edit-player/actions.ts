@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -51,10 +52,9 @@ export async function getUsers(): Promise<{ id: string; name: string }[]> {
         .orderBy(users.last_name, users.first_name)
 
     return allUsers.map((u) => {
-        const preferredPart = u.preferred_name ? ` (${u.preferred_name})` : ""
         return {
             id: u.id,
-            name: `${u.first_name}${preferredPart} ${u.last_name}`
+            name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
         }
     })
 }

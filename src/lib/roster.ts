@@ -2,14 +2,16 @@ import "server-only"
 
 import { db } from "@/database/db"
 import {
+    divisions,
     drafts,
     matchSubstitutions,
     matches,
+    seasons,
     substitutions,
     teams,
     users
 } from "@/database/schema"
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { and, asc, desc, eq, inArray } from "drizzle-orm"
 
 export type PlayerSummary = {
     id: string
@@ -390,4 +392,97 @@ export function formatPlayerSummaryName(p: PlayerSummary): string {
     return p.preferredName
         ? `${p.preferredName} ${p.lastName}`
         : `${p.firstName} ${p.lastName}`
+}
+
+// ---------------------------------------------------------------------------
+// Draft-history lookups shared by the signups views
+// ---------------------------------------------------------------------------
+
+export type LastDraftInfo = {
+    seasonLabel: string
+    seasonYear: number
+    divisionName: string
+    divisionLevel: number
+    captainName: string
+    overall: number
+}
+
+/**
+ * Most recent draft placement per user across all seasons: season label,
+ * division (with level for ordering), captain display name, and overall pick.
+ */
+export async function getLastDraftInfoByUser(
+    userIds: string[]
+): Promise<Map<string, LastDraftInfo>> {
+    const map = new Map<string, LastDraftInfo>()
+    if (userIds.length === 0) return map
+
+    const draftData = await db
+        .select({
+            userId: drafts.user,
+            overall: drafts.overall,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            divisionName: divisions.name,
+            divisionLevel: divisions.level,
+            captainFirstName: users.first_name,
+            captainLastName: users.last_name,
+            captainPreferredName: users.preferred_name
+        })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .innerJoin(users, eq(teams.captain, users.id))
+        .where(inArray(drafts.user, userIds))
+        .orderBy(desc(seasons.year), desc(seasons.id))
+
+    for (const draft of draftData) {
+        if (map.has(draft.userId)) continue
+        const captainPreferred = draft.captainPreferredName
+            ? ` (${draft.captainPreferredName})`
+            : ""
+        map.set(draft.userId, {
+            seasonLabel: `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`,
+            seasonYear: draft.seasonYear,
+            divisionName: draft.divisionName,
+            divisionLevel: draft.divisionLevel,
+            captainName: `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`,
+            overall: draft.overall
+        })
+    }
+    return map
+}
+
+/**
+ * Division each user is drafted into for the given season (name + level).
+ */
+export async function getCurrentDraftDivisions(
+    seasonId: number,
+    userIds: string[]
+): Promise<Map<string, { divisionName: string; divisionLevel: number }>> {
+    const map = new Map<
+        string,
+        { divisionName: string; divisionLevel: number }
+    >()
+    if (userIds.length === 0) return map
+
+    const rows = await db
+        .select({
+            userId: drafts.user,
+            divisionName: divisions.name,
+            divisionLevel: divisions.level
+        })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .where(and(eq(teams.season, seasonId), inArray(drafts.user, userIds)))
+
+    for (const row of rows) {
+        map.set(row.userId, {
+            divisionName: row.divisionName,
+            divisionLevel: row.divisionLevel
+        })
+    }
+    return map
 }

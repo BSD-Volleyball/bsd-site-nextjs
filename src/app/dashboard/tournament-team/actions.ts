@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -114,7 +115,7 @@ export const getCaptainTeamView = withAction(
 
         const roster: TeamRosterEntry[] = rosterRows.map((r) => ({
             userId: r.userId,
-            name: `${r.first_name}${r.preferred_name ? ` (${r.preferred_name})` : ""} ${r.last_name}`,
+            name: formatPlayerName(r.first_name, r.last_name, r.preferred_name),
             male: r.male,
             addedByCaptain:
                 r.addedBy === session.user.id && r.userId !== session.user.id,
@@ -141,7 +142,11 @@ export const getCaptainTeamView = withAction(
             .filter((u) => !exclude.has(u.id))
             .map((u) => ({
                 id: u.id,
-                name: `${u.first_name}${u.preferred_name ? ` (${u.preferred_name})` : ""} ${u.last_name}`,
+                name: formatPlayerName(
+                    u.first_name,
+                    u.last_name,
+                    u.preferred_name
+                ),
                 male: u.male
             }))
 

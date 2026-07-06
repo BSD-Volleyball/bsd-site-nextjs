@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
 import { db } from "@/database/db"
@@ -97,7 +98,11 @@ export const getEligibleTournamentPlayers = withAction(
         return ok(
             rows.map((u) => ({
                 id: u.id,
-                name: `${u.first_name}${u.preferred_name ? ` (${u.preferred_name})` : ""} ${u.last_name}`,
+                name: formatPlayerName(
+                    u.first_name,
+                    u.last_name,
+                    u.preferred_name
+                ),
                 male: u.male
             }))
         )

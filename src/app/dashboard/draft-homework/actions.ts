@@ -1,5 +1,6 @@
 "use server"
 
+import { splitByGender } from "@/lib/utils"
 import { and, asc, eq, inArray, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -168,13 +169,12 @@ export async function getDraftHomeworkData(): Promise<{
         return lastCmp !== 0 ? lastCmp : a.firstName.localeCompare(b.firstName)
     }
 
-    const malePlayers: DraftHomeworkPlayer[] = playerRows
-        .filter((p) => p.male === true)
+    const { males, nonMales } = splitByGender(playerRows)
+    const malePlayers: DraftHomeworkPlayer[] = males
         .map((p) => ({ ...p, oldId: p.oldId ?? 0 }))
         .sort(sortByLastName)
 
-    const nonMalePlayers: DraftHomeworkPlayer[] = playerRows
-        .filter((p) => p.male !== true)
+    const nonMalePlayers: DraftHomeworkPlayer[] = nonMales
         .map((p) => ({ ...p, oldId: p.oldId ?? 0 }))
         .sort(sortByLastName)
 

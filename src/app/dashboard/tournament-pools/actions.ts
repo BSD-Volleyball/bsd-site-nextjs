@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -84,7 +85,11 @@ export const getTournamentPoolsView = withAction(
             for (const c of captainRows) {
                 captainNames.set(
                     c.id,
-                    `${c.first_name}${c.preferred_name ? ` (${c.preferred_name})` : ""} ${c.last_name}`
+                    formatPlayerName(
+                        c.first_name,
+                        c.last_name,
+                        c.preferred_name
+                    )
                 )
             }
         }

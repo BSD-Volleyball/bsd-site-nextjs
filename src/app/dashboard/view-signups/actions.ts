@@ -30,6 +30,7 @@ import {
     type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
+import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
 import type {
     PlayerDetails as AdminPlayerDetails,
     PlayerDraftHistory,
@@ -206,70 +207,9 @@ export async function getSignupsCsvData(): Promise<{
                 return map
             })(),
             // Last draft info (season label, division, captain name)
-            (async () => {
-                const map = new Map<
-                    string,
-                    { season: string; division: string; captain: string }
-                >()
-                if (userIds.length === 0) return map
-                const draftData = await db
-                    .select({
-                        userId: drafts.user,
-                        seasonYear: seasons.year,
-                        seasonName: seasons.season,
-                        divisionName: divisions.name,
-                        captainFirstName: users.first_name,
-                        captainLastName: users.last_name,
-                        captainPreferredName: users.preferred_name
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(seasons, eq(teams.season, seasons.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .innerJoin(users, eq(teams.captain, users.id))
-                    .where(inArray(drafts.user, userIds))
-                    .orderBy(desc(seasons.year), desc(seasons.id))
-
-                for (const draft of draftData) {
-                    if (!map.has(draft.userId)) {
-                        const captainPreferred = draft.captainPreferredName
-                            ? ` (${draft.captainPreferredName})`
-                            : ""
-                        const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
-                        const draftSeasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
-                        map.set(draft.userId, {
-                            season: draftSeasonLabel,
-                            division: draft.divisionName,
-                            captain: captainName
-                        })
-                    }
-                }
-                return map
-            })(),
+            getLastDraftInfoByUser(userIds),
             // Current-season draft assignments
-            (async () => {
-                const map = new Map<string, string>()
-                if (userIds.length === 0) return map
-                const draftedRows = await db
-                    .select({
-                        userId: drafts.user,
-                        divisionName: divisions.name
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(
-                        and(
-                            eq(teams.season, config.seasonId),
-                            inArray(drafts.user, userIds)
-                        )
-                    )
-
-                for (const draft of draftedRows) {
-                    map.set(draft.userId, draft.divisionName)
-                }
-                return map
-            })(),
+            getCurrentDraftDivisions(config.seasonId, userIds),
             // The viewer's own ratings for these players
             (async () => {
                 const map = new Map<
@@ -365,11 +305,11 @@ export async function getSignupsCsvData(): Promise<{
                 skillHitter: row.skillHitter,
                 skillOther: row.skillOther,
                 unavailableDates: unavailabilityMap.get(row.signupId) ?? null,
-                lastDraftSeason: lastDraft?.season ?? null,
-                lastDraftDivision: lastDraft?.division ?? null,
-                lastDraftCaptain: lastDraft?.captain ?? null,
+                lastDraftSeason: lastDraft?.seasonLabel ?? null,
+                lastDraftDivision: lastDraft?.divisionName ?? null,
+                lastDraftCaptain: lastDraft?.captainName ?? null,
                 captainIn: captainDivisionMap.get(row.userId) ?? null,
-                draftedIn: draftedInMap.get(row.userId) ?? null,
+                draftedIn: draftedInMap.get(row.userId)?.divisionName ?? null,
                 viewerOverallRating: viewerRating?.overall ?? null,
                 viewerPassingRating: viewerRating?.passing ?? null,
                 viewerSettingRating: viewerRating?.setting ?? null,
@@ -478,23 +418,10 @@ export async function getSignupsData(): Promise<{
             .map((r) => r.pairPickId)
             .filter((id): id is string => id !== null)
 
-        const [draftData, pairPickUsers, currentDraftRows, allSeasonRows] =
+        const [lastDraftMap, pairPickUsers, draftedInMap, allSeasonRows] =
             await Promise.all([
                 // Last draft information for each user
-                db
-                    .select({
-                        userId: drafts.user,
-                        seasonId: seasons.id,
-                        seasonYear: seasons.year,
-                        divisionName: divisions.name,
-                        divisionLevel: divisions.level
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(seasons, eq(teams.season, seasons.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(inArray(drafts.user, userIds))
-                    .orderBy(desc(seasons.year), desc(seasons.id)),
+                getLastDraftInfoByUser(userIds),
                 // Pair pick names
                 pairPickIds.length > 0
                     ? db
@@ -508,21 +435,7 @@ export async function getSignupsData(): Promise<{
                           .where(inArray(users.id, pairPickIds))
                     : Promise.resolve([]),
                 // Current-season draft assignments with division level
-                db
-                    .select({
-                        userId: drafts.user,
-                        divisionName: divisions.name,
-                        divisionLevel: divisions.level
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(
-                        and(
-                            eq(teams.season, config.seasonId),
-                            inArray(drafts.user, userIds)
-                        )
-                    ),
+                getCurrentDraftDivisions(config.seasonId, userIds),
                 // All seasons for chart gap detection
                 db
                     .select({
@@ -535,37 +448,12 @@ export async function getSignupsData(): Promise<{
                     .limit(11)
             ])
 
-        // Keep only the most recent draft for each user
-        const lastDraftMap = new Map<
-            string,
-            { divisionName: string; divisionLevel: number }
-        >()
-        for (const draft of draftData) {
-            if (!lastDraftMap.has(draft.userId)) {
-                lastDraftMap.set(draft.userId, {
-                    divisionName: draft.divisionName,
-                    divisionLevel: draft.divisionLevel
-                })
-            }
-        }
-
         const pairPickNames = new Map<string, string>()
         for (const u of pairPickUsers) {
             const displayName = u.preferredName
                 ? `${u.preferredName} ${u.lastName}`
                 : `${u.firstName} ${u.lastName}`
             pairPickNames.set(u.id, displayName)
-        }
-
-        const draftedInMap = new Map<
-            string,
-            { divisionName: string; divisionLevel: number }
-        >()
-        for (const draft of currentDraftRows) {
-            draftedInMap.set(draft.userId, {
-                divisionName: draft.divisionName,
-                divisionLevel: draft.divisionLevel
-            })
         }
 
         // Group undrafted players by their last drafted division,

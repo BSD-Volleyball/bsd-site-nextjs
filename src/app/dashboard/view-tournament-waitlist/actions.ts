@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -188,7 +189,7 @@ export const getTournamentWaitlist = withAction(
         const waitlist: WaitlistEntry[] = rows.map((r) => ({
             waitlistId: r.waitlistId,
             userId: r.userId,
-            name: `${r.first_name}${r.preferred_name ? ` (${r.preferred_name})` : ""} ${r.last_name}`,
+            name: formatPlayerName(r.first_name, r.last_name, r.preferred_name),
             email: r.email,
             male: r.male,
             preferredDivisionName: r.preferredDivisionName,
@@ -226,7 +227,11 @@ export const getTournamentWaitlist = withAction(
             for (const c of captainRows) {
                 captainNames.set(
                     c.id,
-                    `${c.first_name}${c.preferred_name ? ` (${c.preferred_name})` : ""} ${c.last_name}`
+                    formatPlayerName(
+                        c.first_name,
+                        c.last_name,
+                        c.preferred_name
+                    )
                 )
             }
         }

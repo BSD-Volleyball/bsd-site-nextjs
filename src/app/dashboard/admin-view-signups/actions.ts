@@ -10,7 +10,6 @@ import {
     drafts,
     teams,
     divisions,
-    seasons,
     discounts,
     userUnavailability,
     seasonEvents
@@ -20,6 +19,7 @@ import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 
@@ -235,81 +235,9 @@ export async function getSeasonSignups(): Promise<{
                 )
             })(),
             // Last draft information for each user
-            (async () => {
-                const map = new Map<
-                    string,
-                    {
-                        season: string
-                        division: string
-                        captain: string
-                        overall: number
-                    }
-                >()
-                if (userIds.length === 0) return map
-                const draftData = await db
-                    .select({
-                        userId: drafts.user,
-                        teamId: drafts.team,
-                        overall: drafts.overall,
-                        seasonYear: seasons.year,
-                        seasonName: seasons.season,
-                        divisionName: divisions.name,
-                        captainId: teams.captain,
-                        captainFirstName: users.first_name,
-                        captainLastName: users.last_name,
-                        captainPreferredName: users.preferred_name
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(seasons, eq(teams.season, seasons.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .innerJoin(users, eq(teams.captain, users.id))
-                    .where(inArray(drafts.user, userIds))
-                    .orderBy(desc(seasons.year), desc(seasons.id))
-
-                // Keep only the most recent draft for each user
-                for (const draft of draftData) {
-                    if (!map.has(draft.userId)) {
-                        const captainPreferred = draft.captainPreferredName
-                            ? ` (${draft.captainPreferredName})`
-                            : ""
-                        const captainName = `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`
-                        const seasonLabel = `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`
-
-                        map.set(draft.userId, {
-                            season: seasonLabel,
-                            division: draft.divisionName,
-                            captain: captainName,
-                            overall: draft.overall
-                        })
-                    }
-                }
-                return map
-            })(),
+            getLastDraftInfoByUser(userIds),
             // Current-season draft assignments
-            (async () => {
-                const map = new Map<string, string>()
-                if (userIds.length === 0) return map
-                const draftedRows = await db
-                    .select({
-                        userId: drafts.user,
-                        divisionName: divisions.name
-                    })
-                    .from(drafts)
-                    .innerJoin(teams, eq(drafts.team, teams.id))
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(
-                        and(
-                            eq(teams.season, config.seasonId),
-                            inArray(drafts.user, userIds)
-                        )
-                    )
-
-                for (const draft of draftedRows) {
-                    map.set(draft.userId, draft.divisionName)
-                }
-                return map
-            })(),
+            getCurrentDraftDivisions(config.seasonId, userIds),
             // Current-season captain roles
             (async () => {
                 const map = new Map<string, string>()
@@ -365,13 +293,13 @@ export async function getSeasonSignups(): Promise<{
                 skillHitter: row.skillHitter,
                 skillOther: row.skillOther,
                 unavailableDates: unavailabilityMap.get(row.signupId) ?? null,
-                lastDraftSeason: lastDraft?.season ?? null,
-                lastDraftDivision: lastDraft?.division ?? null,
-                lastDraftCaptain: lastDraft?.captain ?? null,
+                lastDraftSeason: lastDraft?.seasonLabel ?? null,
+                lastDraftDivision: lastDraft?.divisionName ?? null,
+                lastDraftCaptain: lastDraft?.captainName ?? null,
                 lastDraftOverall: lastDraft?.overall ?? null,
                 discountCodeName: usedDiscountByUserId.get(row.userId) ?? null,
                 captainIn: captainDivisionMap.get(row.userId) ?? null,
-                draftedIn: draftedInMap.get(row.userId) ?? null,
+                draftedIn: draftedInMap.get(row.userId)?.divisionName ?? null,
                 seasonsList: row.seasonsList,
                 notificationList: row.notificationList
             }

@@ -1,5 +1,6 @@
 "use server"
 
+import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
 import { eq, and, isNotNull, inArray } from "drizzle-orm"
@@ -28,15 +29,6 @@ export interface UnmatchedPair {
         email: string
         hasDifferentPairRequest: boolean
     }
-}
-
-function buildDisplayName(
-    firstName: string,
-    lastName: string,
-    preferredName: string | null
-): string {
-    const preferred = preferredName ? ` (${preferredName})` : ""
-    return `${firstName}${preferred} ${lastName}`
 }
 
 export async function getSeasonPairs(): Promise<{
@@ -111,7 +103,7 @@ export async function getSeasonPairs(): Promise<{
                 pairPickId: pickId,
                 pairReason: row.pairReason,
                 email: row.email,
-                name: buildDisplayName(
+                name: formatPlayerName(
                     row.firstName,
                     row.lastName,
                     row.preferredName
@@ -154,7 +146,7 @@ export async function getSeasonPairs(): Promise<{
             for (const u of missingUsers) {
                 pairPickNameMap.set(
                     u.id,
-                    buildDisplayName(u.firstName, u.lastName, u.preferredName)
+                    formatPlayerName(u.firstName, u.lastName, u.preferredName)
                 )
                 pairPickEmailMap.set(u.id, u.email)
             }
