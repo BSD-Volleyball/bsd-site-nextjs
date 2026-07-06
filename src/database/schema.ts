@@ -659,19 +659,6 @@ export const playerRatings = pgTable(
     })
 )
 
-export const commissioners = pgTable("commissioners", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    commissioner: text("commissioner")
-        .notNull()
-        .references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id)
-})
-
 export const auditLog = pgTable("audit_log", {
     id: serial("id").primaryKey(),
     user: text("user")
