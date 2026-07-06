@@ -29,6 +29,7 @@ import {
     isCommissionerBySession
 } from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
+import { logAuditEntry } from "@/lib/audit-log"
 
 // Maps homework round number → actual draft round number
 const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
@@ -1002,6 +1003,14 @@ export async function setCaptainRound(input: {
             }
         })
 
+    await logAuditEntry({
+        userId,
+        action: "set_captain_round",
+        entityType: "draft_captain_round",
+        entityId: input.captainId,
+        summary: `Set captain draft round to ${input.round} (division ${input.divisionId}, season ${seasonId})`
+    })
+
     return { status: true, message: "Saved" }
 }
 
@@ -1056,6 +1065,14 @@ export async function setPairDiff(input: {
         player2: input.player2Id,
         diff: input.diff,
         updated_at: new Date()
+    })
+
+    await logAuditEntry({
+        userId,
+        action: "set_pair_diff",
+        entityType: "draft_pair_diff",
+        entityId: input.player1Id,
+        summary: `Set draft pair diff to ${input.diff} (division ${input.divisionId}, season ${seasonId})`
     })
 
     return { status: true, message: "Saved" }

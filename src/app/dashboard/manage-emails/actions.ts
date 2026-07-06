@@ -12,6 +12,7 @@ import {
 } from "@/database/schema"
 import { eq, desc, or, asc } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
+import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
@@ -328,6 +329,14 @@ export async function sendEmailReply(
             postmark_message_id: postmarkMessageId
         })
 
+        await logAuditEntry({
+            userId,
+            action: "send_email_reply",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Sent a reply on inbound email #${emailId}`
+        })
+
         revalidatePath("/dashboard/manage-emails")
         return { status: true, message: "Reply sent." }
     } catch (error) {
@@ -360,6 +369,13 @@ export async function addInboundEmailComment(
             email_id: emailId,
             author_id: userId,
             content: content.trim()
+        })
+        await logAuditEntry({
+            userId,
+            action: "add_email_comment",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Added a comment on inbound email #${emailId}`
         })
         revalidatePath("/dashboard/manage-emails")
         return { status: true, message: "Comment added." }
@@ -443,6 +459,16 @@ export async function assignInboundEmail(
             email_id: emailId,
             author_id: actorUserId,
             content: assignmentComment
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "assign_inbound_email",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: assigneeId
+                ? `Assigned inbound email #${emailId} to ${assigneeName}`
+                : `Unassigned inbound email #${emailId}`
         })
 
         if (assigneeId && assigneeId !== actorUserId && assigneeEmail) {
@@ -529,6 +555,14 @@ export async function closeInboundEmail(
             content: `${actorName} closed this email.`
         })
 
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "close_inbound_email",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Closed inbound email #${emailId}`
+        })
+
         revalidatePath("/dashboard/manage-emails")
         return { status: true, message: "Email closed." }
     } catch (error) {
@@ -567,6 +601,14 @@ export async function reopenInboundEmail(
             email_id: emailId,
             author_id: actorUserId,
             content: `${actorName} reopened this email and changed status to active.`
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "reopen_inbound_email",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Reopened inbound email #${emailId}`
         })
 
         revalidatePath("/dashboard/manage-emails")
@@ -609,6 +651,14 @@ export async function markInboundEmailAsSpam(
             content: `${actorName} marked this email as spam.`
         })
 
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "mark_inbound_email_spam",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Marked inbound email #${emailId} as spam`
+        })
+
         revalidatePath("/dashboard/manage-emails")
         return { status: true, message: "Email marked as spam." }
     } catch (error) {
@@ -647,6 +697,14 @@ export async function unmarkInboundEmailAsSpam(
             email_id: emailId,
             author_id: actorUserId,
             content: `${actorName} removed the spam mark and returned this email to new.`
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "unmark_inbound_email_spam",
+            entityType: "inbound_email",
+            entityId: emailId,
+            summary: `Removed spam mark from inbound email #${emailId}`
         })
 
         revalidatePath("/dashboard/manage-emails")

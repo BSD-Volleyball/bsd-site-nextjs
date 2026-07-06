@@ -16,6 +16,7 @@ import {
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
+import { logAuditEntry } from "@/lib/audit-log"
 
 export interface DraftHomeworkPlayer {
     userId: string
@@ -369,6 +370,14 @@ export async function saveDraftHomework(
             }))
         )
     }
+
+    await logAuditEntry({
+        userId: session.user.id,
+        action: "save_draft_homework",
+        entityType: "draft_homework",
+        entityId: config.seasonId,
+        summary: `Saved draft homework with ${nonEmpty.length} selections (season ${config.seasonId})`
+    })
 
     return { status: true, message: "Draft homework saved successfully!" }
 }

@@ -13,6 +13,14 @@ import {
 } from "@/database/schema"
 import { and, asc, eq, inArray } from "drizzle-orm"
 import {
+    withAction,
+    ok,
+    fail,
+    requireSession,
+    requirePositiveInt
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
+import {
     computeStandings,
     getSetScores,
     type StandingTeam
@@ -53,8 +61,6 @@ export interface CurrentSeasonScheduleDivision {
 }
 
 interface CurrentSeasonScheduleData {
-    status: boolean
-    message?: string
     seasonLabel: string
     divisions: CurrentSeasonScheduleDivision[]
     userTeamId: number | null
@@ -73,23 +79,14 @@ function parseTimeForSort(time: string | null): number {
     return hour * 60 + minute
 }
 
-export async function getCurrentSeasonScheduleData(
-    seasonId: number,
-    userId: string
-): Promise<CurrentSeasonScheduleData> {
-    const empty: CurrentSeasonScheduleData = {
-        status: true,
-        seasonLabel: "",
-        divisions: [],
-        userTeamId: null,
-        userDivisionId: null
-    }
+export const getCurrentSeasonScheduleData = withAction(
+    async (
+        seasonId: number
+    ): Promise<ActionResult<CurrentSeasonScheduleData>> => {
+        const session = await requireSession()
+        const userId = session.user.id
+        requirePositiveInt(seasonId, "Season")
 
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return { ...empty, status: false, message: "Invalid season." }
-    }
-
-    try {
         const [seasonRow] = await db
             .select({ year: seasons.year, season: seasons.season })
             .from(seasons)
@@ -97,7 +94,7 @@ export async function getCurrentSeasonScheduleData(
             .limit(1)
 
         if (!seasonRow) {
-            return { ...empty, status: false, message: "Season not found." }
+            return fail("Season not found.")
         }
 
         const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
@@ -125,7 +122,12 @@ export async function getCurrentSeasonScheduleData(
         const userDivisionId = userDraftRow[0]?.divisionId ?? null
 
         if (teamRows.length === 0) {
-            return { ...empty, seasonLabel }
+            return ok({
+                seasonLabel,
+                divisions: [],
+                userTeamId,
+                userDivisionId
+            })
         }
 
         const divisionIds = [...new Set(teamRows.map((t) => t.divisionId))]
@@ -383,22 +385,11 @@ export async function getCurrentSeasonScheduleData(
             }
         )
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             divisions: divisionData,
             userTeamId,
             userDivisionId
-        }
-    } catch (error) {
-        console.error("Error fetching current season schedule data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            divisions: [],
-            userTeamId: null,
-            userDivisionId: null
-        }
+        })
     }
-}
+)

@@ -12,6 +12,7 @@ import {
 } from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession, getSessionUserId } from "@/lib/rbac"
+import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
@@ -439,6 +440,14 @@ export async function sendConcernReply(
             postmark_message_id: postmarkMessageId
         })
 
+        await logAuditEntry({
+            userId,
+            action: "send_concern_reply",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Sent a reply on concern #${concernId}`
+        })
+
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Reply sent." }
     } catch (error) {
@@ -472,6 +481,13 @@ export async function addConcernComment(
             author_id: userId,
             content: content.trim()
         })
+        await logAuditEntry({
+            userId,
+            action: "add_concern_comment",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Added a comment on concern #${concernId}`
+        })
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Comment added." }
     } catch (error) {
@@ -489,11 +505,23 @@ export async function updateConcernStatus(
         return { status: false, message: "Unauthorized." }
     }
 
+    const userId = await getSessionUserId()
+    if (!userId) {
+        return { status: false, message: "Not authenticated." }
+    }
+
     try {
         await db
             .update(concerns)
             .set({ status, updated_at: new Date() })
             .where(eq(concerns.id, concernId))
+        await logAuditEntry({
+            userId,
+            action: "update_concern_status",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Set concern #${concernId} status to ${status}`
+        })
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Status updated." }
     } catch (error) {
@@ -580,6 +608,16 @@ export async function assignConcern(
             concern_id: concernId,
             author_id: actorUserId,
             content: assignmentComment
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "assign_concern",
+            entityType: "concern",
+            entityId: concernId,
+            summary: assigneeId
+                ? `Assigned concern #${concernId} to ${assigneeName}`
+                : `Unassigned concern #${concernId}`
         })
 
         if (assigneeId && assigneeId !== actorUserId && assigneeEmail) {
@@ -675,6 +713,14 @@ export async function closeConcern(
             content: `${actorName} closed this concern.`
         })
 
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "close_concern",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Closed concern #${concernId}`
+        })
+
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern closed." }
     } catch (error) {
@@ -713,6 +759,14 @@ export async function reopenConcern(
             concern_id: concernId,
             author_id: actorUserId,
             content: `${actorName} reopened this concern and changed status to active.`
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "reopen_concern",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Reopened concern #${concernId}`
         })
 
         revalidatePath("/dashboard/manage-concerns")
@@ -755,6 +809,14 @@ export async function markConcernAsSpam(
             content: `${actorName} marked this concern as spam.`
         })
 
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "mark_concern_spam",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Marked concern #${concernId} as spam`
+        })
+
         revalidatePath("/dashboard/manage-concerns")
         return { status: true, message: "Concern marked as spam." }
     } catch (error) {
@@ -793,6 +855,14 @@ export async function unmarkConcernAsSpam(
             concern_id: concernId,
             author_id: actorUserId,
             content: `${actorName} removed the spam mark and returned this concern to new.`
+        })
+
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "unmark_concern_spam",
+            entityType: "concern",
+            entityId: concernId,
+            summary: `Removed spam mark from concern #${concernId}`
         })
 
         revalidatePath("/dashboard/manage-concerns")

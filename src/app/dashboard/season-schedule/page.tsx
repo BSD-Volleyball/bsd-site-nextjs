@@ -39,10 +39,7 @@ export default async function SeasonSchedulePage() {
         redirect("/dashboard")
     }
 
-    const result = await getCurrentSeasonScheduleData(
-        config.seasonId,
-        session.user.id
-    )
+    const result = await getCurrentSeasonScheduleData(config.seasonId)
 
     if (!result.status) {
         return (
@@ -58,28 +55,30 @@ export default async function SeasonSchedulePage() {
         )
     }
 
+    const { seasonLabel, divisions, userTeamId, userDivisionId } = result.data
+
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <PageHeader
-                    title={`${result.seasonLabel} Season`}
+                    title={`${seasonLabel} Season`}
                     description="Standings, schedule, and results by division."
                 />
-                {result.userTeamId !== null && <AddToCalendarButton />}
+                {userTeamId !== null && <AddToCalendarButton />}
             </div>
-            {result.divisions.length === 0 ? (
+            {divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No season schedule data found for this season.
                 </div>
             ) : (
-                result.divisions.map((division) => (
+                divisions.map((division) => (
                     <SeasonDivisionSection
                         key={division.id}
                         division={division}
-                        userTeamId={result.userTeamId}
+                        userTeamId={userTeamId}
                         defaultOpen={
-                            result.userDivisionId !== null &&
-                            division.id === result.userDivisionId
+                            userDivisionId !== null &&
+                            division.id === userDivisionId
                         }
                     />
                 ))
