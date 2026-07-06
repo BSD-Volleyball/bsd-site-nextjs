@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDayForm } from "./draft-day-form"
 import { getDraftDayData } from "./actions"
 import { getIsCommissioner } from "@/app/dashboard/actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,11 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function DraftDayPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const hasAccess = await getIsCommissioner()
 

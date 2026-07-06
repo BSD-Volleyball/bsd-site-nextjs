@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { getSeasonConfigData } from "./actions"
 import { SeasonConfigForm } from "./season-config-form"
@@ -12,11 +11,7 @@ export const metadata: Metadata = {
 }
 
 export default async function SeasonConfigPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const hasAccess = await getIsAdminOrDirector()
 

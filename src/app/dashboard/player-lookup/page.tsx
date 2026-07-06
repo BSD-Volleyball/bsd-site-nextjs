@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerLookupForm } from "./player-lookup-form"
@@ -25,11 +24,7 @@ async function checkAdminOrCommissionerAccess(
 }
 
 export default async function PlayerLookupPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     const hasAccess = await checkAdminOrCommissionerAccess(session.user.id)
 

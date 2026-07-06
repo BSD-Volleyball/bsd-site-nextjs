@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { PotentialCaptainsList } from "./potential-captains-list"
 import { getPotentialCaptainsData } from "./actions"
 import { getIsCommissioner } from "@/app/dashboard/actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,11 +13,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function PotentialCaptainsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     const hasAccess = await getIsCommissioner()
 

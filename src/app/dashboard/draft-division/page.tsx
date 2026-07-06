@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDivisionForm } from "./draft-division-form"
@@ -13,11 +12,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function DraftDivisionPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const access = await hasDraftPageAccess()
 

@@ -1,6 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { ReportConcernForm } from "./report-concern-form"
 import type { Metadata } from "next"
@@ -10,11 +8,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ReportConcernPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     return (
         <div className="space-y-6">

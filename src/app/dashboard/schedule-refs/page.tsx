@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { isAdminOrDirectorBySession, hasPermissionBySession } from "@/lib/rbac"
@@ -14,10 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function ScheduleRefsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const [hasPermission, isAdmin] = await Promise.all([
         hasPermissionBySession("schedule:manage"),

@@ -1,17 +1,12 @@
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/lib/rbac"
 import { getMatchDatesForSeason, getMatchesForDate } from "./actions"
 import { EnterScoresClient } from "./enter-scores-client"
 
 export default async function EnterScoresPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
     const hasAccess =

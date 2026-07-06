@@ -1,11 +1,10 @@
 import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
 import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
 import { getIsAdminOrDirector } from "@/app/dashboard/actions"
 import { getSeasonPhase } from "@/app/dashboard/actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -15,11 +14,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function SelectCommissionersPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const hasAccess = await getIsAdminOrDirector()
 

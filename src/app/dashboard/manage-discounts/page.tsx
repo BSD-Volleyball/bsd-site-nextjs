@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { DiscountsManager } from "./discounts-manager"
 import { getDiscounts, getUsers } from "./actions"
@@ -14,17 +11,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function ManageDiscountsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await isAdminOrDirectorBySession()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const [discountsResult, usersData] = await Promise.all([
         getDiscounts(),

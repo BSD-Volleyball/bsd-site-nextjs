@@ -1,6 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getTeamAvailabilityData } from "./actions"
 import { AvailabilityMatrix } from "./availability-matrix"
@@ -13,13 +11,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function TeamAvailabilityPage() {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const result = await getTeamAvailabilityData()
 

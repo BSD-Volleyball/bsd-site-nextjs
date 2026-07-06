@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getIsAdminOrDirector, getSeasonPhase } from "@/app/dashboard/actions"
 import { getDivisionsPageData } from "./actions"
@@ -14,11 +13,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function CreateDivisionsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {

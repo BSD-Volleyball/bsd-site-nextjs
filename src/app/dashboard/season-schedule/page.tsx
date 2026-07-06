@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -19,11 +18,7 @@ const SCHEDULE_START_PHASE = "draft"
 const SCHEDULE_END_PHASE = "complete"
 
 export default async function SeasonSchedulePage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
 

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 import { asc } from "drizzle-orm"
-import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import { seasons } from "@/database/schema"
 import { getIsCommissioner } from "@/app/dashboard/actions"
@@ -19,11 +18,7 @@ export default async function PrepareForDraftPage({
 }: {
     searchParams: Promise<{ divisionId?: string }>
 }) {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const hasAccess = await getIsCommissioner()
 

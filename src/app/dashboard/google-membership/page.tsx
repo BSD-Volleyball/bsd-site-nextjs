@@ -1,7 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getGoogleMembershipUsers } from "./actions"
 import { GoogleMembershipTable } from "./google-membership-table"
@@ -32,17 +29,7 @@ export default async function GoogleMembershipPage({
     const filter =
         filterRaw === "notification" || filterRaw === "season" ? filterRaw : ""
 
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await isAdminOrDirectorBySession()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getGoogleMembershipUsers({
         query,

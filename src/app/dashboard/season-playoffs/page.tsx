@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -18,11 +17,7 @@ const PLAYOFFS_START_PHASE: SeasonPhase = "playoffs"
 const PLAYOFFS_END_PHASE: SeasonPhase = "complete"
 
 export default async function SeasonPlayoffsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
+    await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
 

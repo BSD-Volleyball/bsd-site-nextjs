@@ -1,9 +1,7 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { isAdminOrDirector } from "@/lib/rbac"
-import { hasPermission } from "@/lib/rbac"
+import { hasPermission, isAdminOrDirector } from "@/lib/rbac"
 import { getRefCompensationData } from "./actions"
 import { RefCompensationClient } from "./ref-compensation-client"
 import type { Metadata } from "next"
@@ -13,11 +11,7 @@ export const metadata: Metadata = {
 }
 
 export default async function RefCompensationPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session?.user) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     const [canManage, isAdmin] = await Promise.all([
         hasPermission(session.user.id, "schedule:manage"),

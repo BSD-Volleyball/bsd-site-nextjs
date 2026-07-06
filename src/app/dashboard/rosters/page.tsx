@@ -1,9 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header"
-import { auth } from "@/lib/auth"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { getRosterData } from "./[seasonId]/actions"
 import { DivisionSection } from "./[seasonId]/division-section"
@@ -18,11 +16,7 @@ const rosterVisibleFromPhase = "draft"
 const rosterVisibleThroughPhase = "complete"
 
 export default async function CurrentRosterPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
 

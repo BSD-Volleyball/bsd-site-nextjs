@@ -1,5 +1,4 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { redirect } from "next/navigation"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
@@ -12,11 +11,7 @@ export const metadata: Metadata = {
 }
 
 export default async function OnboardingVolleyballProfilePage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     // Check if already completed onboarding
     const [user] = await db

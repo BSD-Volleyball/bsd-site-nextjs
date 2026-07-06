@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import {
     getSeasonConfig,
@@ -81,11 +79,7 @@ function buildDivisionSchedule(
 }
 
 export default async function PreseasonWeek2Page() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
+    const session = await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
 
