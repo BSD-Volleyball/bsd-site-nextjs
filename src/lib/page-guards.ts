@@ -3,7 +3,11 @@ import "server-only"
 import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
-import { isAdminOrDirectorBySession, hasPermissionBySession } from "@/lib/rbac"
+import {
+    isAdminOrDirectorBySession,
+    hasPermissionBySession,
+    hasCaptainPagesAccessBySession
+} from "@/lib/rbac"
 import type { Permission } from "@/lib/permissions"
 
 // ---------------------------------------------------------------------------
@@ -23,6 +27,15 @@ export async function requireSessionOrRedirect(to = "/auth/sign-in") {
 export async function requireAdminOrRedirect(to = "/dashboard") {
     const session = await requireSessionOrRedirect()
     const allowed = await isAdminOrDirectorBySession()
+    if (!allowed) {
+        redirect(to)
+    }
+    return session
+}
+
+export async function requireCaptainAccessOrRedirect(to = "/dashboard") {
+    const session = await requireSessionOrRedirect()
+    const allowed = await hasCaptainPagesAccessBySession()
     if (!allowed) {
         redirect(to)
     }

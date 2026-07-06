@@ -12,19 +12,24 @@ import {
     seasonEvents
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import { checkCaptainPagesAccess } from "@/app/dashboard/view-signups/actions"
 import { getSessionUserId } from "@/lib/rbac"
+import {
+    withAction,
+    ok,
+    fail,
+    requireCaptainAccess
+} from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 import {
     getSeasonConfig,
     getEventsByType,
     formatEventDate
 } from "@/lib/site-config"
-import {
-    getEmptyPlayerRatingAverages,
-    type PlayerRatingAverages,
-    type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote,
-    type PlayerViewerRating
+import type {
+    PlayerRatingAverages,
+    PlayerRatingPrivateNote,
+    PlayerRatingSharedNote,
+    PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 
@@ -42,31 +47,15 @@ export interface SeasonInfo {
     name: string
 }
 
-export async function getSignedUpPlayers(): Promise<{
-    status: boolean
-    message?: string
-    players: PlayerListItem[]
-    allSeasons: SeasonInfo[]
-}> {
-    const hasAccess = await checkCaptainPagesAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            players: [],
-            allSeasons: []
-        }
-    }
+export const getSignedUpPlayers = withAction(
+    async (): Promise<
+        ActionResult<{ players: PlayerListItem[]; allSeasons: SeasonInfo[] }>
+    > => {
+        await requireCaptainAccess()
 
-    try {
         const config = await getSeasonConfig()
         if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                players: [],
-                allSeasons: []
-            }
+            return fail("No current season found.")
         }
 
         const signupRows = await db
@@ -92,25 +81,16 @@ export async function getSignedUpPlayers(): Promise<{
             .orderBy(desc(seasons.id))
             .limit(11)
 
-        return {
-            status: true,
+        return ok({
             players: signupRows,
             allSeasons: allSeasonRows.map((s) => ({
                 id: s.id,
                 year: s.year,
                 name: s.name
             }))
-        }
-    } catch (error) {
-        console.error("Error fetching signed up players:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            players: [],
-            allSeasons: []
-        }
+        })
     }
-}
+)
 
 export interface PlayerDetails {
     id: string
@@ -139,10 +119,8 @@ export interface PlayerDraftHistory {
     overall: number
 }
 
-export async function getPlayerDetailsForSignups(playerId: string): Promise<{
-    status: boolean
-    message?: string
-    player: PlayerDetails | null
+export interface PlayerDetailsForSignups {
+    player: PlayerDetails
     pairPickName: string | null
     pairReason: string | null
     unavailableDates: string | null
@@ -152,26 +130,14 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
     sharedRatingNotes: PlayerRatingSharedNote[]
     privateRatingNotes: PlayerRatingPrivateNote[]
     viewerRating: PlayerViewerRating | null
-}> {
-    const hasAccess = await checkCaptainPagesAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            player: null,
-            pairPickName: null,
-            pairReason: null,
-            unavailableDates: null,
-            playoffDates: [],
-            draftHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null
-        }
-    }
+}
 
-    try {
+export const getPlayerDetailsForSignups = withAction(
+    async (
+        playerId: string
+    ): Promise<ActionResult<PlayerDetailsForSignups>> => {
+        await requireCaptainAccess()
+
         const [player] = await db
             .select({
                 id: users.id,
@@ -194,20 +160,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             .limit(1)
 
         if (!player) {
-            return {
-                status: false,
-                message: "Player not found.",
-                player: null,
-                pairPickName: null,
-                pairReason: null,
-                unavailableDates: null,
-                playoffDates: [],
-                draftHistory: [],
-                ratingAverages: getEmptyPlayerRatingAverages(),
-                sharedRatingNotes: [],
-                privateRatingNotes: [],
-                viewerRating: null
-            }
+            return fail("Player not found.")
         }
 
         const config = await getSeasonConfig()
@@ -295,8 +248,7 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             formatEventDate(e.eventDate)
         )
 
-        return {
-            status: true,
+        return ok({
             player,
             pairPickName,
             pairReason,
@@ -307,22 +259,6 @@ export async function getPlayerDetailsForSignups(playerId: string): Promise<{
             sharedRatingNotes: ratingsSection.sharedNotes,
             privateRatingNotes: ratingsSection.privateNotes,
             viewerRating: ratingsSection.viewerRating
-        }
-    } catch (error) {
-        console.error("Error fetching player details:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            player: null,
-            pairPickName: null,
-            pairReason: null,
-            unavailableDates: null,
-            playoffDates: [],
-            draftHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null
-        }
+        })
     }
-}
+)

@@ -1,10 +1,7 @@
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerLookupSignupsForm } from "./player-lookup-form"
 import { getSignedUpPlayers } from "./actions"
-import { checkCaptainPagesAccess } from "@/app/dashboard/view-signups/actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireCaptainAccessOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,17 +11,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function PlayerLookupSignupsPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    if (!session) {
-        redirect("/auth/sign-in")
-    }
-
-    const hasAccess = await checkCaptainPagesAccess()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireCaptainAccessOrRedirect()
 
     const result = await getSignedUpPlayers()
 
@@ -49,8 +36,8 @@ export default async function PlayerLookupSignupsPage() {
                 description="Search and view details of players signed up for the current season."
             />
             <PlayerLookupSignupsForm
-                players={result.players}
-                allSeasons={result.allSeasons}
+                players={result.data.players}
+                allSeasons={result.data.allSeasons}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>

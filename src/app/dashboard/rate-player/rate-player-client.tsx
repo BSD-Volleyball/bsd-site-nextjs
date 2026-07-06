@@ -310,7 +310,7 @@ export function RatePlayerClient({
             setHasPendingSkillSave(false)
             setModalMessage({
                 type: result.status ? "success" : "error",
-                text: result.message
+                text: result.message ?? ""
             })
         }, 3000)
 

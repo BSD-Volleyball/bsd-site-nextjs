@@ -71,26 +71,28 @@ export function PlayerSlotColumn({
 
         const result = await getPlayerDetailsForSignups(playerId)
 
-        if (result.status && result.player) {
+        if (result.status && result.data.player) {
             dispatch({
                 type: "LOAD_SUCCESS",
                 slotId: slot.id,
-                playerDetails: result.player,
-                draftHistory: result.draftHistory,
-                ratingAverages: result.ratingAverages,
-                sharedRatingNotes: result.sharedRatingNotes,
-                privateRatingNotes: result.privateRatingNotes,
-                viewerRating: result.viewerRating,
-                pairPickName: result.pairPickName,
-                pairReason: result.pairReason,
-                datesMissing: result.unavailableDates,
-                playoffDates: result.playoffDates
+                playerDetails: result.data.player,
+                draftHistory: result.data.draftHistory,
+                ratingAverages: result.data.ratingAverages,
+                sharedRatingNotes: result.data.sharedRatingNotes,
+                privateRatingNotes: result.data.privateRatingNotes,
+                viewerRating: result.data.viewerRating,
+                pairPickName: result.data.pairPickName,
+                pairReason: result.data.pairReason,
+                datesMissing: result.data.unavailableDates,
+                playoffDates: result.data.playoffDates
             })
         } else {
             dispatch({
                 type: "LOAD_ERROR",
                 slotId: slot.id,
-                error: result.message || "Failed to load player details"
+                error: !result.status
+                    ? result.message || "Failed to load player details"
+                    : "Failed to load player details"
             })
         }
     }
