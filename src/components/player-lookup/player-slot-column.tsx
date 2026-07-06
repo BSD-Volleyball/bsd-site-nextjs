@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, type Dispatch } from "react"
+import { useMemo, type ReactNode } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,15 +10,13 @@ import {
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import {
-    getPlayerDetailsForSignups,
-    type PlayerListItem,
-    type SeasonInfo
-} from "./actions"
-import { PlayerDetailPopup } from "@/components/player-detail"
-import type { PlayerSlot, SlotAction } from "./use-player-slots"
+import type {
+    LookupPlayerItem,
+    PlayerSlot,
+    SlotDispatch
+} from "./use-player-slots"
 
-export function getDisplayName(player: PlayerListItem): string {
+export function getLookupDisplayName(player: LookupPlayerItem): string {
     const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
     const preferredPart = player.preferred_name
         ? ` (${player.preferred_name})`
@@ -26,25 +24,31 @@ export function getDisplayName(player: PlayerListItem): string {
     return `${oldIdPart}${player.first_name}${preferredPart} ${player.last_name}`
 }
 
-interface PlayerSlotColumnProps {
-    slot: PlayerSlot
-    players: PlayerListItem[]
-    allSeasons: SeasonInfo[]
-    playerPicUrl: string
-    dispatch: Dispatch<SlotAction>
+export type LoadDetailResult<TDetail> =
+    | { ok: true; detail: TDetail }
+    | { ok: false; error: string }
+
+interface PlayerSlotColumnProps<TDetail> {
+    slot: PlayerSlot<TDetail>
+    players: LookupPlayerItem[]
+    dispatch: SlotDispatch<TDetail>
     showRemoveButton: boolean
     excludedPlayerIds: Set<string>
+    loadDetails: (playerId: string) => Promise<LoadDetailResult<TDetail>>
+    renderDetail: (slot: PlayerSlot<TDetail>) => ReactNode
+    widthClassName: string
 }
 
-export function PlayerSlotColumn({
+export function PlayerSlotColumn<TDetail>({
     slot,
     players,
-    allSeasons,
-    playerPicUrl,
     dispatch,
     showRemoveButton,
-    excludedPlayerIds
-}: PlayerSlotColumnProps) {
+    excludedPlayerIds,
+    loadDetails,
+    renderDetail,
+    widthClassName
+}: PlayerSlotColumnProps<TDetail>) {
     const selectedPlayer = useMemo(
         () => players.find((p) => p.id === slot.selectedPlayerId) ?? null,
         [players, slot.selectedPlayerId]
@@ -69,30 +73,18 @@ export function PlayerSlotColumn({
     const handleSelect = async (playerId: string) => {
         dispatch({ type: "SELECT_PLAYER", slotId: slot.id, playerId })
 
-        const result = await getPlayerDetailsForSignups(playerId)
-
-        if (result.status && result.data.player) {
+        const result = await loadDetails(playerId)
+        if (result.ok) {
             dispatch({
                 type: "LOAD_SUCCESS",
                 slotId: slot.id,
-                playerDetails: result.data.player,
-                draftHistory: result.data.draftHistory,
-                ratingAverages: result.data.ratingAverages,
-                sharedRatingNotes: result.data.sharedRatingNotes,
-                privateRatingNotes: result.data.privateRatingNotes,
-                viewerRating: result.data.viewerRating,
-                pairPickName: result.data.pairPickName,
-                pairReason: result.data.pairReason,
-                datesMissing: result.data.unavailableDates,
-                playoffDates: result.data.playoffDates
+                detail: result.detail
             })
         } else {
             dispatch({
                 type: "LOAD_ERROR",
                 slotId: slot.id,
-                error: !result.status
-                    ? result.message || "Failed to load player details"
-                    : "Failed to load player details"
+                error: result.error
             })
         }
     }
@@ -102,7 +94,7 @@ export function PlayerSlotColumn({
     }
 
     return (
-        <div className="min-w-[36rem] shrink-0 space-y-4">
+        <div className={cn("shrink-0 space-y-4", widthClassName)}>
             <div className="flex items-center gap-2">
                 <Popover
                     open={slot.open}
@@ -123,7 +115,7 @@ export function PlayerSlotColumn({
                                 )}
                             >
                                 {selectedPlayer
-                                    ? getDisplayName(selectedPlayer)
+                                    ? getLookupDisplayName(selectedPlayer)
                                     : "Search for a player..."}
                             </span>
                             <div className="flex items-center gap-1">
@@ -187,7 +179,7 @@ export function PlayerSlotColumn({
                                         )}
                                         onClick={() => handleSelect(player.id)}
                                     >
-                                        {getDisplayName(player)}
+                                        {getLookupDisplayName(player)}
                                     </button>
                                 ))
                             )}
@@ -216,23 +208,7 @@ export function PlayerSlotColumn({
                 </div>
             )}
 
-            <PlayerDetailPopup
-                open={!!slot.selectedPlayerId}
-                playerDetails={slot.playerDetails}
-                draftHistory={slot.draftHistory}
-                allSeasons={allSeasons}
-                playerPicUrl={playerPicUrl}
-                isLoading={slot.isLoading}
-                pairPickName={slot.pairPickName}
-                pairReason={slot.pairReason}
-                datesMissing={slot.datesMissing}
-                playoffDates={slot.playoffDates}
-                ratingAverages={slot.ratingAverages}
-                sharedRatingNotes={slot.sharedRatingNotes}
-                privateRatingNotes={slot.privateRatingNotes}
-                viewerRating={slot.viewerRating}
-                inline
-            />
+            {renderDetail(slot)}
         </div>
     )
 }

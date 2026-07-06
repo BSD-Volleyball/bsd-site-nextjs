@@ -1,11 +1,13 @@
 "use client"
 
-import { useMemo } from "react"
-import { Button } from "@/components/ui/button"
-import { RiAddLine } from "@remixicon/react"
-import type { PlayerListItem, SeasonInfo } from "./actions"
-import { usePlayerSlots } from "./use-player-slots"
-import { PlayerSlotColumn } from "./player-slot-column"
+import { PlayerLookupColumns } from "@/components/player-lookup/player-lookup-columns"
+import { PlayerDetailPopup } from "@/components/player-detail"
+import {
+    getPlayerDetailsForSignups,
+    type PlayerDetailsForSignups,
+    type PlayerListItem,
+    type SeasonInfo
+} from "./actions"
 
 interface PlayerLookupSignupsFormProps {
     players: PlayerListItem[]
@@ -18,52 +20,42 @@ export function PlayerLookupSignupsForm({
     allSeasons,
     playerPicUrl
 }: PlayerLookupSignupsFormProps) {
-    const { slots, dispatch } = usePlayerSlots()
-
-    const hasAnySelection = slots.some((s) => s.selectedPlayerId !== null)
-
-    const excludedIdsBySlot = useMemo(() => {
-        const allSelected = new Set(
-            slots
-                .map((s) => s.selectedPlayerId)
-                .filter((id): id is string => id !== null)
-        )
-        return slots.map((slot) => {
-            const excluded = new Set(allSelected)
-            if (slot.selectedPlayerId) {
-                excluded.delete(slot.selectedPlayerId)
-            }
-            return excluded
-        })
-    }, [slots])
-
     return (
-        <div className="flex gap-6 overflow-x-auto pb-4">
-            {slots.map((slot, index) => (
-                <PlayerSlotColumn
-                    key={slot.id}
-                    slot={slot}
-                    players={players}
-                    allSeasons={allSeasons}
-                    playerPicUrl={playerPicUrl}
-                    dispatch={dispatch}
-                    showRemoveButton={slots.length > 1}
-                    excludedPlayerIds={excludedIdsBySlot[index]}
-                />
-            ))}
-
-            {hasAnySelection && (
-                <div className="flex shrink-0 items-start pt-0.5">
-                    <Button
-                        variant="outline"
-                        className="gap-2"
-                        onClick={() => dispatch({ type: "ADD_SLOT" })}
-                    >
-                        <RiAddLine className="h-4 w-4" />
-                        Add Player to Compare
-                    </Button>
-                </div>
-            )}
-        </div>
+        <PlayerLookupColumns<PlayerDetailsForSignups>
+            players={players}
+            widthClassName="min-w-[36rem]"
+            loadDetails={async (playerId) => {
+                const result = await getPlayerDetailsForSignups(playerId)
+                if (result.status) {
+                    return { ok: true, detail: result.data }
+                }
+                return {
+                    ok: false,
+                    error: result.message || "Failed to load player details"
+                }
+            }}
+            renderDetail={(slot) => {
+                const detail = slot.detail
+                return (
+                    <PlayerDetailPopup
+                        open={!!slot.selectedPlayerId}
+                        playerDetails={detail?.player ?? null}
+                        draftHistory={detail?.draftHistory ?? []}
+                        allSeasons={allSeasons}
+                        playerPicUrl={playerPicUrl}
+                        isLoading={slot.isLoading}
+                        pairPickName={detail?.pairPickName ?? null}
+                        pairReason={detail?.pairReason ?? null}
+                        datesMissing={detail?.unavailableDates ?? null}
+                        playoffDates={detail?.playoffDates ?? []}
+                        ratingAverages={detail?.ratingAverages}
+                        sharedRatingNotes={detail?.sharedRatingNotes}
+                        privateRatingNotes={detail?.privateRatingNotes}
+                        viewerRating={detail?.viewerRating ?? null}
+                        inline
+                    />
+                )
+            }}
+        />
     )
 }

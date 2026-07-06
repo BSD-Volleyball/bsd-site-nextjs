@@ -1,5 +1,7 @@
 "use server"
 
+import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-helpers"
 import { db } from "@/database/db"
 import {
     users,
@@ -27,12 +29,11 @@ import {
     formatEventDate
 } from "@/lib/site-config"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
-import {
-    getEmptyPlayerRatingAverages,
-    type PlayerRatingAverages,
-    type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote,
-    type PlayerViewerRating
+import type {
+    PlayerRatingAverages,
+    PlayerRatingPrivateNote,
+    PlayerRatingSharedNote,
+    PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 
@@ -115,21 +116,13 @@ export interface PlayerSubHistoryEntry {
     notes?: string | null
 }
 
-export async function getPlayersForLookup(): Promise<{
-    status: boolean
-    message?: string
-    players: PlayerListItem[]
-}> {
-    const hasAccess = await isCommissionerBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            players: []
+export const getPlayersForLookup = withAction(
+    async (): Promise<ActionResult<PlayerListItem[]>> => {
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    try {
         const allUsers = await db
             .select({
                 id: users.id,
@@ -142,24 +135,12 @@ export async function getPlayersForLookup(): Promise<{
             .where(ne(users.id, GHOST_CAPTAIN_ID))
             .orderBy(users.last_name, users.first_name)
 
-        return {
-            status: true,
-            players: allUsers
-        }
-    } catch (error) {
-        console.error("Error fetching players:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            players: []
-        }
+        return ok(allUsers)
     }
-}
+)
 
-export async function getPlayerDetails(playerId: string): Promise<{
-    status: boolean
-    message?: string
-    player: PlayerDetails | null
+export interface PlayerDetailsResult {
+    player: PlayerDetails
     signupHistory: PlayerSignup[]
     draftHistory: PlayerDraftHistory[]
     ratingAverages: PlayerRatingAverages
@@ -167,24 +148,15 @@ export async function getPlayerDetails(playerId: string): Promise<{
     privateRatingNotes: PlayerRatingPrivateNote[]
     viewerRating: PlayerViewerRating | null
     playoffDates: string[]
-}> {
-    const hasAccess = await isCommissionerBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            player: null,
-            signupHistory: [],
-            draftHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null,
-            playoffDates: []
-        }
-    }
+}
 
-    try {
+export const getPlayerDetails = withAction(
+    async (playerId: string): Promise<ActionResult<PlayerDetailsResult>> => {
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
+        }
+
         const [player] = await db
             .select({
                 id: users.id,
@@ -219,18 +191,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
             .limit(1)
 
         if (!player) {
-            return {
-                status: false,
-                message: "Player not found.",
-                player: null,
-                signupHistory: [],
-                draftHistory: [],
-                ratingAverages: getEmptyPlayerRatingAverages(),
-                sharedRatingNotes: [],
-                privateRatingNotes: [],
-                viewerRating: null,
-                playoffDates: []
-            }
+            return fail("Player not found.")
         }
 
         const config = await getSeasonConfig()
@@ -344,8 +305,7 @@ export async function getPlayerDetails(playerId: string): Promise<{
                   updatedAt: new Date(0)
               }
 
-        return {
-            status: true,
+        return ok({
             player: sanitizedPlayer,
             signupHistory,
             draftHistory: draftData,
@@ -354,23 +314,9 @@ export async function getPlayerDetails(playerId: string): Promise<{
             privateRatingNotes: ratingsSection.privateNotes,
             viewerRating: ratingsSection.viewerRating,
             playoffDates
-        }
-    } catch (error) {
-        console.error("Error fetching player details:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            player: null,
-            signupHistory: [],
-            draftHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null,
-            playoffDates: []
-        }
+        })
     }
-}
+)
 
 /**
  * Returns this player's substitution history — both permanent (substitutions)

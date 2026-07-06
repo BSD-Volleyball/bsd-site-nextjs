@@ -56,29 +56,44 @@ export interface PlayerDetailModalState {
 
 const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
     const result = await getPlayerDetails(playerId)
+    if (!result.status) {
+        return {
+            status: false,
+            player: null,
+            draftHistory: [],
+            signupHistory: [],
+            ratingAverages: getEmptyPlayerRatingAverages(),
+            sharedRatingNotes: [],
+            privateRatingNotes: [],
+            pairPickName: null,
+            pairReason: null,
+            unavailableDates: null,
+            playoffDates: []
+        }
+    }
+
     let pairPickName: string | null = null
     let pairReason: string | null = null
-
     let unavailableDates: string | null = null
-    if (result.status && result.signupHistory.length > 0) {
-        const mostRecentSignup = result.signupHistory[0]
+    if (result.data.signupHistory.length > 0) {
+        const mostRecentSignup = result.data.signupHistory[0]
         pairPickName = mostRecentSignup.pairPickName
         pairReason = mostRecentSignup.pairReason
         unavailableDates = mostRecentSignup.unavailableDates
     }
 
     return {
-        status: result.status,
-        player: result.player,
-        draftHistory: result.draftHistory,
-        signupHistory: result.signupHistory,
-        ratingAverages: result.ratingAverages,
-        sharedRatingNotes: result.sharedRatingNotes,
-        privateRatingNotes: result.privateRatingNotes,
+        status: true,
+        player: result.data.player,
+        draftHistory: result.data.draftHistory,
+        signupHistory: result.data.signupHistory,
+        ratingAverages: result.data.ratingAverages,
+        sharedRatingNotes: result.data.sharedRatingNotes,
+        privateRatingNotes: result.data.privateRatingNotes,
         pairPickName,
         pairReason,
         unavailableDates,
-        playoffDates: result.playoffDates ?? []
+        playoffDates: result.data.playoffDates ?? []
     }
 }
 
