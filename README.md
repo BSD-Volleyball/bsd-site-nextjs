@@ -71,6 +71,46 @@ pnpm lint         # Run Biome linter
 pnpm check-types  # TypeScript type checking
 ```
 
+### Testing
+
+```bash
+pnpm test              # Unit + integration tests (Vitest)
+pnpm test:watch        # Watch mode
+pnpm test:unit         # Unit tests only (no database needed)
+pnpm test:integration  # Integration tests only (needs local Postgres)
+pnpm test:coverage     # Full run with V8 coverage report
+pnpm test:e2e          # Playwright end-to-end tests (local only)
+```
+
+Layout:
+
+- **Unit tests** (`src/**/*.test.ts`, colocated) cover pure logic. The db
+  singleton is aliased to a guard that throws, so unit tests can never touch
+  a database.
+- **Integration tests** (`src/**/*.integration.test.ts`, colocated) run real
+  server actions against a local Postgres. A template database
+  (`bsd_test_template`) is built once from `migrations/` and cloned per
+  Vitest worker; `better-auth` sessions are fabricated (see
+  `src/test/session.ts`) while role checks stay real. Shared harness lives
+  in `src/test/`.
+- **E2E tests** (`e2e/*.spec.ts`) drive the real app with Playwright against
+  a dedicated `bsd_e2e` database. Local-only; not run in CI.
+
+One-time local Postgres setup (integration + e2e tests):
+
+```bash
+sudo apt-get install -y postgresql-common
+sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+sudo apt-get install -y postgresql-17
+sudo pg_ctlcluster 17 main start
+sudo -u postgres psql -c "CREATE USER bsd_test WITH PASSWORD 'bsd_test' CREATEDB;"
+```
+
+The harness connects to `postgres://bsd_test:bsd_test@localhost:5432` by
+default (override with `TEST_PG_URL`; localhost is enforced). CI runs lint,
+typecheck, check-authz, and the Vitest suites on every push and PR via
+`.github/workflows/ci.yml` with a Postgres 17 service container.
+
 ### Database
 
 ```bash

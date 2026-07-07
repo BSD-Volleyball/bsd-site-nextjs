@@ -8,6 +8,16 @@
         "check-types": {
             "dependsOn": ["^check-types"]
         },
+        "test": {
+            "outputs": [],
+            "inputs": [
+                "src/**",
+                "migrations/**",
+                "vitest.config.ts",
+                "package.json"
+            ],
+            "env": ["TEST_PG_URL"]
+        },
         "dev": {
             "persistent": true,
             "cache": false

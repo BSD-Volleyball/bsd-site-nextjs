@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: bsd_test
+          POSTGRES_PASSWORD: bsd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bsd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm check-types
+
+      - name: Authorization regression check
+        run: pnpm check-authz
+
+      - name: Unit and integration tests
+        run: pnpm test
+        env:
+          TEST_PG_URL: postgres://bsd_test:bsd_test@localhost:5432
