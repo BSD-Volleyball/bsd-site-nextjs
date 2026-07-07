@@ -47,3 +47,9 @@ yarn-error.log*
 .vscode
 
 # drizzle migrations are tracked in git.worktrees
+
+# testing (Playwright)
+/test-results
+/playwright-report
+/e2e/.auth
+.env.test.local
