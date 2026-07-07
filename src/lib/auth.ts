@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { renderToStaticMarkup } from "react-dom/server.edge"
+import { render } from "@react-email/render"
 import { EmailTemplate } from "@daveyplate/better-auth-ui/server"
 import React from "react"
 import { db } from "@/database/db"
@@ -95,7 +95,7 @@ export const auth = betterAuth({
                 (user as { first_name?: string }).first_name ||
                 user.email.split("@")[0]
 
-            const htmlBody = renderToStaticMarkup(
+            const htmlBody = await render(
                 EmailTemplate({
                     heading: "Reset your password",
                     content: React.createElement(
@@ -118,7 +118,7 @@ export const auth = betterAuth({
                     url,
                     siteName: site.name,
                     baseUrl: site.url,
-                    imageUrl: `${site.url}/logo.png`
+                    imageUrl: "cid:logo"
                 })
             )
 
