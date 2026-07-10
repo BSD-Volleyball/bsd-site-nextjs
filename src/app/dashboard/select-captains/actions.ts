@@ -20,7 +20,9 @@ import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import {
+    commissionerCanWriteDivision,
     getCommissionerDivisionAccess,
+    getSessionUserId,
     grantRole,
     revokeRole
 } from "@/lib/rbac"
@@ -377,6 +379,18 @@ export const createTeams = withAction(
 
         if (!selectedDivision) {
             return fail("Invalid division selected.")
+        }
+
+        const callerId = await getSessionUserId()
+        if (
+            !callerId ||
+            !(await commissionerCanWriteDivision(
+                callerId,
+                config.seasonId,
+                divisionId
+            ))
+        ) {
+            return fail("You don't have permission for this division.")
         }
 
         const numTeams =

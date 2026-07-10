@@ -27,6 +27,7 @@ import {
 } from "@/lib/email-template-content"
 import { fetchPlayerScores } from "@/lib/player-score"
 import {
+    commissionerCanWriteDivision,
     getCommissionerDivisionScope,
     isCommissionerBySession
 } from "@/lib/rbac"
@@ -997,6 +998,16 @@ export const setCaptainRound = withAction(
         const config = await getSeasonConfig()
         const seasonId = config.seasonId!
 
+        if (
+            !(await commissionerCanWriteDivision(
+                userId,
+                seasonId,
+                input.divisionId
+            ))
+        ) {
+            return fail("You don't have permission for this division.")
+        }
+
         await db
             .insert(draftCaptRounds)
             .values({
@@ -1054,6 +1065,16 @@ export const setPairDiff = withAction(
 
         const config = await getSeasonConfig()
         const seasonId = config.seasonId!
+
+        if (
+            !(await commissionerCanWriteDivision(
+                userId,
+                seasonId,
+                input.divisionId
+            ))
+        ) {
+            return fail("You don't have permission for this division.")
+        }
 
         // Delete both possible orderings to handle rating-order changes from prior saves
         await db

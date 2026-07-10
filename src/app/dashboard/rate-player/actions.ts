@@ -638,8 +638,8 @@ export const savePlayerSkillRating = withAction(
         }
 
         const session = await requireSession()
-        await requirePermission("players:rate")
         const config = await requireSeasonConfig()
+        await requirePermission("players:rate", { seasonId: config.seasonId })
         const context = {
             seasonId: config.seasonId,
             evaluatorId: session.user.id
@@ -713,8 +713,8 @@ export const savePlayerSkillRatings = withAction(
         }
 
         const session = await requireSession()
-        await requirePermission("players:rate")
         const config = await requireSeasonConfig()
+        await requirePermission("players:rate", { seasonId: config.seasonId })
         const context = {
             seasonId: config.seasonId,
             evaluatorId: session.user.id
@@ -812,8 +812,8 @@ export const savePlayerRatingNote = withAction(
         }
 
         const session = await requireSession()
-        await requirePermission("players:rate")
         const config = await requireSeasonConfig()
+        await requirePermission("players:rate", { seasonId: config.seasonId })
         const context = {
             seasonId: config.seasonId,
             evaluatorId: session.user.id

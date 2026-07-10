@@ -208,6 +208,20 @@ export async function getCommissionerDivisionScope(
     }
 }
 
+// Returns true if the user may perform a write scoped to `divisionId` in `seasonId`:
+// admins + league-wide commissioners always; division-specific commissioners only for
+// divisions they hold. Returns false for non-commissioners.
+export async function commissionerCanWriteDivision(
+    userId: string,
+    seasonId: number,
+    divisionId: number
+): Promise<boolean> {
+    const scope = await getCommissionerDivisionScope(userId, seasonId)
+    if (scope.type === "denied") return false
+    if (scope.type === "league_wide") return true
+    return scope.divisionIds.includes(divisionId)
+}
+
 export async function getCommissionerDivisionAccess(
     userId: string,
     seasonId: number
