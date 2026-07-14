@@ -22,6 +22,7 @@ import {
 } from "@/lib/action-helpers"
 import {
     getTournamentConfig,
+    isPlayerSignupOpen,
     isUserOnTournamentRoster
 } from "@/lib/tournament-config"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
@@ -63,7 +64,7 @@ export const expressTournamentInterest = withAction(
 
         const config = await getTournamentConfig()
         if (!config) return fail("No active tournament.")
-        if (config.phase !== "registration_open") {
+        if (!isPlayerSignupOpen(config)) {
             return fail("Tournament is not accepting interest right now.")
         }
         if (

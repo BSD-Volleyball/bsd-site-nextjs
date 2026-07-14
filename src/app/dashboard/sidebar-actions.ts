@@ -115,6 +115,9 @@ export interface TournamentSidebarInfo {
     name: string
     phase: string
     canSignUp: boolean
+    // Player signup (waiver acceptance) stays open through tournament day
+    // even after team registration closes.
+    canPlayerSignUp: boolean
     isCaptain: boolean
     isRostered: boolean
     showPoolTools: boolean
@@ -266,6 +269,7 @@ async function getTournamentSidebarInfo(
     const {
         getTournamentAvailability,
         getTournamentConfig,
+        isPlayerSignupOpen,
         isRegistrationClosed
     } = await import("@/lib/tournament-config")
     const { TOURNAMENT_PHASE_CONFIG } = await import("@/lib/tournament-phases")
@@ -308,12 +312,14 @@ async function getTournamentSidebarInfo(
         ? (await getTournamentAvailability(config)).allDivisionsFull
         : false
     const canSignUp = registrationOpen && !isRostered && !allDivisionsFull
+    const canPlayerSignUp = isPlayerSignupOpen(config) && !isRostered
 
     return {
         tournamentId: config.tournamentId,
         name: config.name,
         phase: config.phase,
         canSignUp,
+        canPlayerSignUp,
         isCaptain,
         isRostered,
         showPoolTools: phaseCfg?.showPoolTools === true,

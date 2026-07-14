@@ -152,6 +152,16 @@ export function isRegistrationClosed(config: TournamentConfig): boolean {
     return false
 }
 
+/**
+ * Player signup (interest list + waiver acceptance) stays open after team
+ * registration closes: individuals can still sign the waiver through the end
+ * of tournament day (ET) so captains/admins can add them to rosters.
+ */
+export function isPlayerSignupOpen(config: TournamentConfig): boolean {
+    if (config.phase === "complete") return false
+    return !isPastDateET(config.tournamentDate)
+}
+
 export function isRosterLocked(config: TournamentConfig): boolean {
     if (!config.rosterLockDate) return false
     return isPastDateET(config.rosterLockDate)

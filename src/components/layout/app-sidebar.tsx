@@ -953,10 +953,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                 icon: RiTrophyLine
                                             })
                                         }
-                                        if (
-                                            tournament.canSignUp &&
-                                            !tournament.isRostered
-                                        ) {
+                                        if (tournament.canPlayerSignUp) {
                                             items.push({
                                                 title: "Sign Up as a Player",
                                                 url: "/dashboard/tournament-waitlist",

@@ -264,6 +264,35 @@ export function TournamentDashboardCard({ data }: Props) {
         )
     }
 
-    // Registration closed and not on a team — nothing actionable to show.
+    // Team registration is closed, but individuals can still sign up as a
+    // player (accepting the waiver) through tournament day so captains can
+    // add them to rosters.
+    if (data.playerSignupOpen) {
+        return (
+            <Card className="min-w-[280px] flex-1 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950">
+                <CardHeader className="pb-2">
+                    <div className="flex items-center gap-2">
+                        <RiTrophyLine className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        <CardTitle className="text-indigo-700 text-lg dark:text-indigo-300">
+                            {data.tournamentName}
+                        </CardTitle>
+                    </div>
+                    <TournamentMeta data={data} />
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                    <p>
+                        Team registration is closed, but you can still sign up
+                        as a player and accept the waiver so a captain can add
+                        you to their roster.
+                    </p>
+                    <Link href="/dashboard/tournament-waitlist">
+                        <Button size="sm">Sign Up as a Player</Button>
+                    </Link>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    // Tournament day has passed and not on a team — nothing actionable.
     return null
 }

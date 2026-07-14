@@ -15,6 +15,7 @@ import { formatPlayerName } from "@/lib/utils"
 import {
     getTournamentAvailability,
     getTournamentConfig,
+    isPlayerSignupOpen,
     isRegistrationClosed
 } from "@/lib/tournament-config"
 import type { TournamentPhase } from "@/lib/tournament-phases"
@@ -44,6 +45,10 @@ export interface TournamentDashboardCardData {
     tournamentType: "coed" | "reverse_coed"
     phase: TournamentPhase
     registrationOpen: boolean
+    // Player signup (waiver acceptance) outlives team registration — stays
+    // true through the end of tournament day so captains can still add
+    // waiver-cleared players.
+    playerSignupOpen: boolean
     // True when every division has hit its team_count cap. When this is true
     // the dashboard card hides the "Sign Up a Team" CTA even if registration
     // is otherwise open.
@@ -187,6 +192,7 @@ export async function getTournamentDashboardCard(
         tournamentType: config.tournamentType,
         phase: config.phase,
         registrationOpen,
+        playerSignupOpen: isPlayerSignupOpen(config),
         allDivisionsFull,
         showSchedule,
         team,

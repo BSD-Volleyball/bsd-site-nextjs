@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm"
 import { getActiveWaiver } from "@/lib/waivers"
 import {
     getTournamentConfig,
+    isPlayerSignupOpen,
     isUserOnTournamentRoster
 } from "@/lib/tournament-config"
 import { TournamentWaitlistButton } from "@/components/dashboard/tournament-waitlist-button"
@@ -23,7 +24,7 @@ export default async function TournamentWaitlistPage() {
     if (!session) redirect("/auth/sign-in")
 
     const config = await getTournamentConfig()
-    if (!config || config.phase !== "registration_open") {
+    if (!config || !isPlayerSignupOpen(config)) {
         redirect("/dashboard")
     }
     if (await isUserOnTournamentRoster(config.tournamentId, session.user.id)) {
