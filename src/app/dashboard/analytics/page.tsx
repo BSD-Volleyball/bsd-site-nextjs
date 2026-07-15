@@ -4,7 +4,13 @@ import { db } from "@/database/db"
 import { drafts, teams, seasons, divisions } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
 import type { Metadata } from "next"
+import { getEloLeaderboard, getPersonalAnalytics } from "@/lib/player-elo-data"
+import { CareerStatsCards } from "./career-stats-cards"
 import { DivisionHistoryChart } from "./division-history-chart"
+import { EloLeaderboard } from "./elo-leaderboard"
+import { EloTrendChart } from "./elo-trend-chart"
+
+const LEADERBOARD_MIN_MATCHES = 10
 
 export const metadata: Metadata = {
     title: "Analytics"
@@ -61,21 +67,39 @@ async function getAllSeasons(): Promise<SeasonInfo[]> {
 export default async function AnalyticsPage() {
     const session = await requireSessionOrRedirect()
 
-    const [divisionHistory, allSeasons] = await Promise.all([
-        getDivisionHistory(session.user.id),
-        getAllSeasons()
-    ])
+    const [divisionHistory, allSeasons, personal, leaderboard] =
+        await Promise.all([
+            getDivisionHistory(session.user.id),
+            getAllSeasons(),
+            getPersonalAnalytics(session.user.id),
+            getEloLeaderboard(25, LEADERBOARD_MIN_MATCHES)
+        ])
 
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Analytics"
-                description="Your historical division placement by season."
+                description="Your career stats, skill rating, and league leaderboard."
             />
-            <DivisionHistoryChart
-                divisionHistory={divisionHistory}
-                allSeasons={allSeasons}
-            />
+            <div className="grid gap-6 lg:grid-cols-2">
+                <DivisionHistoryChart
+                    divisionHistory={divisionHistory}
+                    allSeasons={allSeasons}
+                />
+                <EloTrendChart
+                    eloHistory={personal.eloHistory}
+                    allSeasons={allSeasons}
+                />
+            </div>
+            <CareerStatsCards personal={personal} />
+            <div>
+                <h2 className="mb-3 font-semibold text-lg">League</h2>
+                <EloLeaderboard
+                    rows={leaderboard}
+                    currentUserId={session.user.id}
+                    minMatches={LEADERBOARD_MIN_MATCHES}
+                />
+            </div>
         </div>
     )
 }
