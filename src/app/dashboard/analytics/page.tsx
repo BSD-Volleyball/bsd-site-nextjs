@@ -12,6 +12,9 @@ import { EloTrendChart } from "./elo-trend-chart"
 
 const LEADERBOARD_MIN_MATCHES = 10
 
+// League-wide leaderboard is built but not launched yet; flip to re-enable.
+const SHOW_LEAGUE_SECTION = false
+
 export const metadata: Metadata = {
     title: "Analytics"
 }
@@ -72,14 +75,16 @@ export default async function AnalyticsPage() {
             getDivisionHistory(session.user.id),
             getAllSeasons(),
             getPersonalAnalytics(session.user.id),
-            getEloLeaderboard(25, LEADERBOARD_MIN_MATCHES)
+            SHOW_LEAGUE_SECTION
+                ? getEloLeaderboard(25, LEADERBOARD_MIN_MATCHES)
+                : Promise.resolve([])
         ])
 
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Analytics"
-                description="Your career stats, skill rating, and league leaderboard."
+                description="Your career stats and skill rating."
             />
             <div className="grid gap-6 lg:grid-cols-2">
                 <DivisionHistoryChart
@@ -92,14 +97,16 @@ export default async function AnalyticsPage() {
                 />
             </div>
             <CareerStatsCards personal={personal} />
-            <div>
-                <h2 className="mb-3 font-semibold text-lg">League</h2>
-                <EloLeaderboard
-                    rows={leaderboard}
-                    currentUserId={session.user.id}
-                    minMatches={LEADERBOARD_MIN_MATCHES}
-                />
-            </div>
+            {SHOW_LEAGUE_SECTION && (
+                <div>
+                    <h2 className="mb-3 font-semibold text-lg">League</h2>
+                    <EloLeaderboard
+                        rows={leaderboard}
+                        currentUserId={session.user.id}
+                        minMatches={LEADERBOARD_MIN_MATCHES}
+                    />
+                </div>
+            )}
         </div>
     )
 }
