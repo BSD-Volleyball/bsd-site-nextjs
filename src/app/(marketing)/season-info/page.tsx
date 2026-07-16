@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import {
     getSeasonConfig,
     formatSeasonLabel,
-    formatShortDate,
     getEventsByType
 } from "@/lib/site-config"
 
@@ -23,6 +22,14 @@ export async function generateMetadata(): Promise<Metadata> {
 interface DetailRow {
     term: string
     description: string
+}
+
+/** Format a YYYY-MM-DD date as "Mar 26" (no weekday, no year). */
+function formatMonthDay(dateStr: string): string {
+    return new Date(`${dateStr}T12:00:00`).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric"
+    })
 }
 
 /** Add days to a YYYY-MM-DD date string, returning YYYY-MM-DD (TZ-safe). */
@@ -47,7 +54,7 @@ function buildDetailRows(
                 : ` ($${config.seasonAmount})`
         }
         rows.push({
-            term: formatShortDate(lateDate.eventDate),
+            term: formatMonthDay(lateDate.eventDate),
             description: `Registration closes${priceNote}`
         })
     }
@@ -55,7 +62,7 @@ function buildDetailRows(
     const tryouts = getEventsByType(config, "tryout")
     if (tryouts.length > 0) {
         rows.push({
-            term: tryouts.map((e) => formatShortDate(e.eventDate)).join(", "),
+            term: tryouts.map((e) => formatMonthDay(e.eventDate)).join(", "),
             description:
                 "Preseason tryouts (the first tryouts are focused mostly on NEW players)"
         })
@@ -77,7 +84,7 @@ function buildDetailRows(
         const noPlayDate = addDays(lastTryout, 7)
         if (noPlayDate < firstRegular) {
             rows.push({
-                term: formatShortDate(noPlayDate),
+                term: formatMonthDay(noPlayDate),
                 description:
                     "NO PLAY (division drafts take place during this time)"
             })
@@ -85,8 +92,8 @@ function buildDetailRows(
     }
 
     if (regular.length > 0) {
-        const first = formatShortDate(regular[0].eventDate)
-        const last = formatShortDate(regular[regular.length - 1].eventDate)
+        const first = formatMonthDay(regular[0].eventDate)
+        const last = formatMonthDay(regular[regular.length - 1].eventDate)
         rows.push({
             term: regular.length > 1 ? `${first} thru ${last}` : first,
             description: "Regular Season"
@@ -96,7 +103,7 @@ function buildDetailRows(
     const playoffs = getEventsByType(config, "playoff")
     if (playoffs.length > 0) {
         rows.push({
-            term: playoffs.map((e) => formatShortDate(e.eventDate)).join(", "),
+            term: playoffs.map((e) => formatMonthDay(e.eventDate)).join(", "),
             description: "PLAYOFFS!"
         })
     }
