@@ -81,6 +81,10 @@ export async function getCurrentSeason(): Promise<{
             .select({ id: seasons.id })
             .from(seasons)
             .where(notInArray(seasons.phase, ["off_season", "complete"]))
+            // Deterministic when more than one season exists: prefer the
+            // newest in-progress season (matches the max-id "current season"
+            // convention used elsewhere).
+            .orderBy(desc(seasons.year), desc(seasons.id))
             .limit(1)
 
         if (currentSeason) {

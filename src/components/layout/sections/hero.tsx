@@ -4,7 +4,11 @@ import { ArrowRight, MapPin, Users, Trophy } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
-export const HeroSection = () => {
+interface HeroSectionProps {
+    seasonLabel?: string
+}
+
+export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
     return (
         <section className="container mx-auto w-full px-4">
             <div className="py-24 xl:py-32">
@@ -46,8 +50,10 @@ export const HeroSection = () => {
                             size="lg"
                             className="rounded-full bg-amber-600 hover:bg-amber-700"
                         >
-                            <Link href="/spring-2026-season-info">
-                                Spring 2026 Season Info
+                            <Link href="/season-info">
+                                {seasonLabel
+                                    ? `${seasonLabel} Season Info`
+                                    : "Season Info"}
                             </Link>
                         </Button>
 

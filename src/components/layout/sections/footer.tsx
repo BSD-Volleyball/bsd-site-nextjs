@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { site } from "@/config/site"
+import { getSeasonConfig, formatSeasonLabel } from "@/lib/site-config"
 
 interface FooterLinkProps {
     href: string
@@ -22,7 +23,6 @@ const footerSections: FooterSectionProps[] = [
     {
         title: "League Info",
         links: [
-            { href: "/spring-2026-season-info", label: "Spring 2026 Season" },
             { href: "/faq", label: "FAQ" },
             { href: "/history", label: "League History" },
             { href: "/player-experience", label: "Skill Levels" },
@@ -65,7 +65,19 @@ const socialLinks: FooterLinkProps[] = [
     }
 ]
 
-export const FooterSection = () => {
+export const FooterSection = async () => {
+    const config = await getSeasonConfig()
+    const seasonLabel = formatSeasonLabel(config)
+    const seasonLink: FooterLinkProps = {
+        href: "/season-info",
+        label: seasonLabel ? `${seasonLabel} Season` : "Season Info"
+    }
+    const sections = footerSections.map((section) =>
+        section.title === "League Info"
+            ? { ...section, links: [seasonLink, ...section.links] }
+            : section
+    )
+
     return (
         <footer id="footer">
             <div className="mx-auto max-w-7xl pt-16 pb-0 lg:pb-12">
@@ -142,7 +154,7 @@ export const FooterSection = () => {
                                 </div>
 
                                 {/* Footer Links Desktop */}
-                                {footerSections.map((section) => (
+                                {sections.map((section) => (
                                     <div
                                         key={section.title}
                                         className="flex flex-col"
@@ -236,7 +248,7 @@ export const FooterSection = () => {
 
                                 {/* Footer Links Mobile - Grid */}
                                 <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
-                                    {footerSections.map((section) => (
+                                    {sections.map((section) => (
                                         <div
                                             key={section.title}
                                             className="flex flex-col"

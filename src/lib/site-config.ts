@@ -26,6 +26,7 @@ export type {
 // Re-export utility functions from season-utils.ts (client-safe)
 export {
     getEventsByType,
+    formatSeasonLabel,
     formatEventDate,
     formatShortDate,
     formatEventTime,

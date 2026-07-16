@@ -2,6 +2,7 @@ import { HeroSection } from "@/components/layout/sections/hero"
 import { site } from "@/config/site"
 import { auth } from "@/lib/auth"
 import { getTournamentConfig } from "@/lib/tournament-config"
+import { getSeasonConfig, formatSeasonLabel } from "@/lib/site-config"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
@@ -86,6 +87,7 @@ const quickLinks = [
 export default async function Home() {
     const session = await auth.api.getSession({ headers: await headers() })
     const tournament = await getTournamentConfig()
+    const seasonLabel = formatSeasonLabel(await getSeasonConfig())
 
     return (
         <>
@@ -138,7 +140,7 @@ export default async function Home() {
                 </section>
             )}
 
-            <HeroSection />
+            <HeroSection seasonLabel={seasonLabel} />
 
             {/* Quick Links Section */}
             <section className="container mx-auto px-4 pb-24">

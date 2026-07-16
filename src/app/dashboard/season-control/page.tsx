@@ -5,6 +5,8 @@ import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 import { getCurrentSeasonPhaseData } from "./actions"
 import { SeasonPhaseControl } from "./season-phase-control"
+import { CreateSeasonCard } from "./create-season-card"
+import { PHASE_CONFIG } from "@/lib/season-phases"
 
 export const metadata: Metadata = {
     title: "Season Control"
@@ -33,9 +35,12 @@ export default async function SeasonControlPage() {
                 <p className="text-muted-foreground">
                     {result.message || "No season data available."}
                 </p>
+                <CreateSeasonCard />
             </div>
         )
     }
+
+    const currentPhase = result.data.phase
 
     return (
         <div className="space-y-6">
@@ -46,7 +51,12 @@ export default async function SeasonControlPage() {
             <SeasonPhaseControl
                 seasonId={result.data.seasonId}
                 seasonLabel={result.data.seasonLabel}
-                initialPhase={result.data.phase}
+                initialPhase={currentPhase}
+            />
+            <CreateSeasonCard
+                currentSeasonLabel={result.data.seasonLabel}
+                currentPhaseLabel={PHASE_CONFIG[currentPhase].label}
+                currentPhaseIsComplete={currentPhase === "complete"}
             />
         </div>
     )

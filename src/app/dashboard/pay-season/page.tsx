@@ -2,7 +2,11 @@ import { PageHeader } from "@/components/layout/page-header"
 import { WizardForm } from "./wizard-form"
 import { getUsers } from "./actions"
 import type { Metadata } from "next"
-import { getSeasonConfig, getCurrentSeasonAmount } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getCurrentSeasonAmount,
+    formatSeasonLabel
+} from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -18,6 +22,7 @@ export const dynamic = "force-dynamic"
 
 export default async function PaySeasonPage() {
     const config = await getSeasonConfig()
+    const seasonLabel = formatSeasonLabel(config)
     const users = await getUsers()
     const activeWaiver = await getActiveWaiver()
 
@@ -37,8 +42,10 @@ export default async function PaySeasonPage() {
                     className="mb-2"
                 />
                 <Button asChild size="sm">
-                    <Link href="/spring-2026-season-info">
-                        View Spring 2026 Season Info
+                    <Link href="/season-info">
+                        {seasonLabel
+                            ? `View ${seasonLabel} Season Info`
+                            : "View Season Info"}
                     </Link>
                 </Button>
             </div>

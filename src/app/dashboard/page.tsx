@@ -710,7 +710,7 @@ function SignupCTA({
                     Sign-up Now
                 </Link>
                 <Link
-                    href="/spring-2026-season-info"
+                    href="/season-info"
                     className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 font-medium text-sm hover:bg-accent hover:text-accent-foreground"
                 >
                     More Info

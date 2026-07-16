@@ -1,18 +1,98 @@
 import Link from "next/link"
+import type { Metadata } from "next"
 import { Button } from "@/components/ui/button"
+import {
+    getSeasonConfig,
+    formatSeasonLabel,
+    formatShortDate,
+    getEventsByType
+} from "@/lib/site-config"
 
-export const metadata = {
-    title: "Spring 2026 Season Info - Bump Set Drink Volleyball",
-    description:
-        "Information about the BSD Volleyball League Spring 2026 season including registration, schedule, and format"
+export async function generateMetadata(): Promise<Metadata> {
+    const config = await getSeasonConfig()
+    const label = formatSeasonLabel(config)
+    const title = label ? `${label} Season Info` : "Season Info"
+    return {
+        title: `${title} - Bump Set Drink Volleyball`,
+        description: `Information about the BSD Volleyball League ${
+            label || "current"
+        } season including registration, schedule, and format`
+    }
 }
 
-export default function Spring2026SeasonInfoPage() {
+interface DetailRow {
+    term: string
+    description: string
+}
+
+function buildDetailRows(
+    config: Awaited<ReturnType<typeof getSeasonConfig>>
+): DetailRow[] {
+    const rows: DetailRow[] = []
+
+    const lateDate = getEventsByType(config, "late_date")[0]
+    if (lateDate) {
+        let priceNote = ""
+        if (config.seasonAmount) {
+            priceNote = config.lateAmount
+                ? ` ($${config.seasonAmount} all players thru this date; $${config.lateAmount} afterward)`
+                : ` ($${config.seasonAmount})`
+        }
+        rows.push({
+            term: formatShortDate(lateDate.eventDate),
+            description: `Registration closes${priceNote}`
+        })
+    }
+
+    const tryouts = getEventsByType(config, "tryout")
+    if (tryouts.length > 0) {
+        rows.push({
+            term: tryouts.map((e) => formatShortDate(e.eventDate)).join(", "),
+            description:
+                "Preseason tryouts (the first tryouts are focused mostly on NEW players)"
+        })
+    }
+
+    const drafts = getEventsByType(config, "draft")
+    if (drafts.length > 0) {
+        rows.push({
+            term: drafts.map((e) => formatShortDate(e.eventDate)).join(", "),
+            description: "NO PLAY (division drafts take place during this time)"
+        })
+    }
+
+    const regular = getEventsByType(config, "regular_season")
+    if (regular.length > 0) {
+        const first = formatShortDate(regular[0].eventDate)
+        const last = formatShortDate(regular[regular.length - 1].eventDate)
+        rows.push({
+            term: regular.length > 1 ? `${first} thru ${last}` : first,
+            description: "Regular Season"
+        })
+    }
+
+    const playoffs = getEventsByType(config, "playoff")
+    if (playoffs.length > 0) {
+        rows.push({
+            term: playoffs.map((e) => formatShortDate(e.eventDate)).join(", "),
+            description: "PLAYOFFS!"
+        })
+    }
+
+    return rows
+}
+
+export default async function SeasonInfoPage() {
+    const config = await getSeasonConfig()
+    const label = formatSeasonLabel(config)
+    const heading = label ? `${label} Season Info` : "Season Info"
+    const detailRows = buildDetailRows(config)
+
     return (
         <div className="container mx-auto max-w-4xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
-                    Spring 2026 Season Info
+                    {heading}
                 </h1>
                 <p className="text-lg text-muted-foreground">
                     Everything you need to know about the upcoming season
@@ -82,50 +162,29 @@ export default function Spring2026SeasonInfoPage() {
 
                 <section className="mb-10">
                     <h2 className="mb-4 font-semibold text-2xl">
-                        Spring 2026 Season Details
+                        {label ? `${label} Season Details` : "Season Details"}
                     </h2>
                     <div className="rounded-lg border border-border bg-card p-6">
-                        <ul className="space-y-3 text-muted-foreground">
-                            <li className="flex gap-3">
-                                <span className="font-semibold text-foreground">
-                                    Mon Feb 23
-                                </span>
-                                <span>
-                                    — Registration closes ($90 all players thru
-                                    this date; $100 afterward)
-                                </span>
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="font-semibold text-foreground">
-                                    Mar 05, Mar 12, Mar 19
-                                </span>
-                                <span>
-                                    — Preseason tryouts (the first tryouts are
-                                    focused mostly on NEW players)
-                                </span>
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="font-semibold text-foreground">
-                                    Mar 26
-                                </span>
-                                <span>
-                                    — NO PLAY (division drafts take place during
-                                    this time)
-                                </span>
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="font-semibold text-foreground">
-                                    Apr 02 thru May 07
-                                </span>
-                                <span>— Regular Season</span>
-                            </li>
-                            <li className="flex gap-3">
-                                <span className="font-semibold text-foreground">
-                                    May 14, May 21, May 28
-                                </span>
-                                <span>— PLAYOFFS!</span>
-                            </li>
-                        </ul>
+                        {detailRows.length > 0 ? (
+                            <ul className="space-y-3 text-muted-foreground">
+                                {detailRows.map((row) => (
+                                    <li
+                                        key={`${row.term}-${row.description}`}
+                                        className="flex gap-3"
+                                    >
+                                        <span className="font-semibold text-foreground">
+                                            {row.term}
+                                        </span>
+                                        <span>— {row.description}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground">
+                                Season dates will be announced soon. Check back
+                                for the full schedule.
+                            </p>
+                        )}
                     </div>
                 </section>
 

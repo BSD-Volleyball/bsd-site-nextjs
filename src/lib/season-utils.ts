@@ -5,6 +5,20 @@
 
 import type { SeasonConfig, SeasonEvent, EventType } from "@/lib/season-types"
 
+/**
+ * Human-readable label for the current season, e.g. "Fall 2026".
+ * Returns "" when the season is unknown (EMPTY_CONFIG), so callers can
+ * fall back to generic copy.
+ */
+export function formatSeasonLabel(
+    config: Pick<SeasonConfig, "seasonName" | "seasonYear">
+): string {
+    if (!config.seasonName || !config.seasonYear) return ""
+    const name =
+        config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)
+    return `${name} ${config.seasonYear}`
+}
+
 /** Get events filtered by type, sorted by sort_order */
 export function getEventsByType(
     config: SeasonConfig,

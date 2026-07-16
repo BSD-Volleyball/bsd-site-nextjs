@@ -12,7 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
             priority: 1
         },
         {
-            url: `${baseUrl}/spring-2026-season-info`,
+            url: `${baseUrl}/season-info`,
             lastModified: new Date(),
             changeFrequency: "weekly",
             priority: 0.8

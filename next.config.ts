@@ -58,6 +58,16 @@ const nextConfig: NextConfig = {
                 headers: [...securityHeaders]
             }
         ]
+    },
+    async redirects() {
+        return [
+            {
+                // Legacy season-specific URL; the page is now season-agnostic.
+                source: "/spring-2026-season-info",
+                destination: "/season-info",
+                permanent: true
+            }
+        ]
     }
 }
 

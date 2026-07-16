@@ -70,11 +70,6 @@ const routeList: RouteProps[] = [
 
 const infoPages: InfoPageProps[] = [
     {
-        title: "Spring 2026 Season Info",
-        href: "/spring-2026-season-info",
-        description: "Registration, schedule, and format details"
-    },
-    {
         title: "Captain Expectations",
         href: "/captain-expectations",
         description: "Guidelines for team captains"
@@ -107,8 +102,19 @@ const resourceLinks: RouteProps[] = [
     }
 ]
 
-export const Navbar = () => {
+interface NavbarProps {
+    seasonLabel?: string
+}
+
+export const Navbar = ({ seasonLabel }: NavbarProps) => {
     const [isOpen, setIsOpen] = React.useState(false)
+
+    const seasonInfoPage: InfoPageProps = {
+        title: seasonLabel ? `${seasonLabel} Season Info` : "Season Info",
+        href: "/season-info",
+        description: "Registration, schedule, and format details"
+    }
+    const infoPagesWithSeason: InfoPageProps[] = [seasonInfoPage, ...infoPages]
 
     return (
         <div className="sticky top-2 z-50 mx-auto w-[98%] max-w-7xl px-4">
@@ -143,7 +149,7 @@ export const Navbar = () => {
                                     </NavigationMenuTrigger>
                                     <NavigationMenuContent>
                                         <ul className="grid w-[400px] gap-3 p-4">
-                                            {infoPages.map(
+                                            {infoPagesWithSeason.map(
                                                 ({
                                                     title,
                                                     href,
@@ -309,7 +315,7 @@ export const Navbar = () => {
                                             League Info
                                         </p>
                                         <div className="space-y-1">
-                                            {infoPages.map(
+                                            {infoPagesWithSeason.map(
                                                 ({ href, title }) => (
                                                     <Button
                                                         key={href}

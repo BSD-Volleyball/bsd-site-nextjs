@@ -7,7 +7,10 @@ import { db } from "@/database/db"
 import {
     champions,
     divisions,
+    eventTimeSlots,
+    individual_divisions,
     matches,
+    seasonEvents,
     seasons,
     teams
 } from "@/database/schema"
@@ -275,6 +278,164 @@ export const revertSeasonPhase = withAction(
         } catch (error) {
             console.error("Failed to revert season phase:", error)
             return fail("Failed to revert season phase")
+        }
+    }
+)
+
+const seasonLabel = (season: string, year: number) =>
+    `${season.charAt(0).toUpperCase() + season.slice(1)} ${year}`
+
+export const createSeason = withAction(
+    async (input: {
+        season: string
+        year: number
+        code: string
+    }): Promise<ActionResult<{ seasonId: number }>> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
+        }
+
+        const season = (input?.season ?? "").trim().toLowerCase()
+        const code = (input?.code ?? "").trim()
+        const year = input?.year
+
+        if (!season) {
+            return fail("Season name is required")
+        }
+        if (!code) {
+            return fail("Season code is required")
+        }
+        if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+            return fail("Enter a valid year")
+        }
+
+        const label = seasonLabel(season, year)
+
+        try {
+            // Reject a duplicate of the same year + season name
+            const [dup] = await db
+                .select({ id: seasons.id })
+                .from(seasons)
+                .where(and(eq(seasons.year, year), eq(seasons.season, season)))
+                .limit(1)
+
+            if (dup) {
+                return fail(`A ${label} season already exists`)
+            }
+
+            // Clone source = the current latest season (highest id)
+            const [source] = await db
+                .select()
+                .from(seasons)
+                .orderBy(desc(seasons.id))
+                .limit(1)
+
+            const newSeasonId = await db.transaction(async (tx) => {
+                // phase omitted -> schema $defaultFn sets "off_season"
+                const [created] = await tx
+                    .insert(seasons)
+                    .values({
+                        code,
+                        year,
+                        season,
+                        season_amount: source?.season_amount ?? null,
+                        late_amount: source?.late_amount ?? null,
+                        max_players: source?.max_players ?? null,
+                        certified_ref_rate: source?.certified_ref_rate ?? null,
+                        uncertified_ref_rate:
+                            source?.uncertified_ref_rate ?? null
+                    })
+                    .returning({ id: seasons.id })
+
+                const newId = created.id
+
+                if (source) {
+                    // Clone per-season division configuration
+                    const sourceDivisions = await tx
+                        .select()
+                        .from(individual_divisions)
+                        .where(eq(individual_divisions.season, source.id))
+
+                    if (sourceDivisions.length > 0) {
+                        await tx.insert(individual_divisions).values(
+                            sourceDivisions.map((d) => ({
+                                season: newId,
+                                division: d.division,
+                                coaches: d.coaches,
+                                gender_split: d.gender_split,
+                                teams: d.teams
+                            }))
+                        )
+                    }
+
+                    // Clone season events + their time slots (dates copied
+                    // verbatim; admin edits them in Season Configuration)
+                    const sourceEvents = await tx
+                        .select()
+                        .from(seasonEvents)
+                        .where(eq(seasonEvents.season_id, source.id))
+                        .orderBy(asc(seasonEvents.sort_order))
+
+                    for (const event of sourceEvents) {
+                        const [insertedEvent] = await tx
+                            .insert(seasonEvents)
+                            .values({
+                                season_id: newId,
+                                event_type: event.event_type,
+                                event_date: event.event_date,
+                                sort_order: event.sort_order,
+                                label: event.label
+                            })
+                            .returning({ id: seasonEvents.id })
+
+                        const sourceSlots = await tx
+                            .select()
+                            .from(eventTimeSlots)
+                            .where(eq(eventTimeSlots.event_id, event.id))
+                            .orderBy(asc(eventTimeSlots.sort_order))
+
+                        if (sourceSlots.length > 0) {
+                            await tx.insert(eventTimeSlots).values(
+                                sourceSlots.map((s) => ({
+                                    event_id: insertedEvent.id,
+                                    start_time: s.start_time,
+                                    slot_label: s.slot_label,
+                                    sort_order: s.sort_order
+                                }))
+                            )
+                        }
+                    }
+                }
+
+                return newId
+            })
+
+            const userId = await getSessionUserId()
+            await logAuditEntry({
+                userId: userId!,
+                action: "create_season",
+                entityType: "season",
+                entityId: newSeasonId,
+                summary: source
+                    ? `Created ${label} season (cloned config from ${seasonLabel(source.season, source.year)})`
+                    : `Created ${label} season`
+            })
+
+            revalidatePath("/dashboard/season-control")
+            revalidatePath("/dashboard/season-config")
+            revalidatePath("/dashboard")
+            // Public season surfaces that display the current season
+            revalidatePath("/season-info")
+            revalidatePath("/")
+
+            return ok(
+                { seasonId: newSeasonId },
+                `${label} season created. Edit dates and pricing in Season Configuration.`
+            )
+        } catch (error) {
+            console.error("Failed to create season:", error)
+            return fail("Failed to create season")
         }
     }
 )

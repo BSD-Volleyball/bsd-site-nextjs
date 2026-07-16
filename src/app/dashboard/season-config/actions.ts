@@ -227,6 +227,8 @@ export const saveSeasonConfig = withAction(
 
             revalidatePath("/dashboard/season-config")
             revalidatePath("/dashboard")
+            // Public season-info page renders these dates/pricing
+            revalidatePath("/season-info")
             return ok(undefined, "Season configuration saved successfully")
         } catch (error) {
             console.error("Failed to save season config:", error)
