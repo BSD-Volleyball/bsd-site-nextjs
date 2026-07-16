@@ -25,6 +25,14 @@ interface DetailRow {
     description: string
 }
 
+/** Add days to a YYYY-MM-DD date string, returning YYYY-MM-DD (TZ-safe). */
+function addDays(dateStr: string, days: number): string {
+    const [year, month, day] = dateStr.split("-").map(Number)
+    const dt = new Date(Date.UTC(year, month - 1, day))
+    dt.setUTCDate(dt.getUTCDate() + days)
+    return dt.toISOString().slice(0, 10)
+}
+
 function buildDetailRows(
     config: Awaited<ReturnType<typeof getSeasonConfig>>
 ): DetailRow[] {
@@ -53,15 +61,29 @@ function buildDetailRows(
         })
     }
 
-    const drafts = getEventsByType(config, "draft")
-    if (drafts.length > 0) {
-        rows.push({
-            term: drafts.map((e) => formatShortDate(e.eventDate)).join(", "),
-            description: "NO PLAY (division drafts take place during this time)"
-        })
+    const regular = getEventsByType(config, "regular_season")
+
+    // The off Thursday between the last tryout and the first regular-season
+    // match: play is weekly, but one Thursday is skipped for drafting. Call it
+    // out so players don't show up by accident. Adding 7 days to the last
+    // tryout preserves the weekday and lands on that off week.
+    if (tryouts.length > 0 && regular.length > 0) {
+        const lastTryout = tryouts
+            .map((e) => e.eventDate)
+            .reduce((a, b) => (a > b ? a : b))
+        const firstRegular = regular
+            .map((e) => e.eventDate)
+            .reduce((a, b) => (a < b ? a : b))
+        const noPlayDate = addDays(lastTryout, 7)
+        if (noPlayDate < firstRegular) {
+            rows.push({
+                term: formatShortDate(noPlayDate),
+                description:
+                    "NO PLAY (division drafts take place during this time)"
+            })
+        }
     }
 
-    const regular = getEventsByType(config, "regular_season")
     if (regular.length > 0) {
         const first = formatShortDate(regular[0].eventDate)
         const last = formatShortDate(regular[regular.length - 1].eventDate)
