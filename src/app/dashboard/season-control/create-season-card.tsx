@@ -76,7 +76,10 @@ export function CreateSeasonCard({
                 toast.success(result.message ?? "Season created")
                 setConfirmOpen(false)
                 setCode("")
-                router.refresh()
+                // The new season is now the current one, so Season
+                // Configuration loads it — send the admin there to edit the
+                // cloned dates and pricing.
+                router.push("/dashboard/season-config")
             } else {
                 toast.error(result.message)
             }
