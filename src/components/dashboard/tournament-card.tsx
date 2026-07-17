@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { RiTrophyLine } from "@remixicon/react"
 import type { TournamentDashboardCardData } from "@/lib/tournament-dashboard"
+import { TournamentWithdrawButton } from "@/components/dashboard/tournament-withdraw-button"
 
 interface Props {
     data: TournamentDashboardCardData
@@ -187,13 +188,22 @@ export function TournamentDashboardCard({ data }: Props) {
                             below.
                         </p>
                     )}
-                    {data.registrationOpen && !data.allDivisionsFull && (
-                        <Link href="/dashboard/tournament-signup">
-                            <Button variant="outline" size="sm">
-                                Sign Up a Team
-                            </Button>
-                        </Link>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                        {data.registrationOpen && !data.allDivisionsFull && (
+                            <Link href="/dashboard/tournament-signup">
+                                <Button variant="outline" size="sm">
+                                    Sign Up a Team
+                                </Button>
+                            </Link>
+                        )}
+                        <TournamentWithdrawButton
+                            tournamentName={data.tournamentName}
+                        />
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                        Changed your mind? You can withdraw any time before a
+                        captain adds you to a team.
+                    </p>
                 </CardContent>
             </Card>
         )

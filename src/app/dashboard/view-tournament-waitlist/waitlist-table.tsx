@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
     placeWaitlistPlayerOnTeam,
+    removeWaitlistPlayer,
     type PlacementTarget,
     type WaitlistEntry
 } from "./actions"
@@ -24,6 +25,7 @@ export function TournamentWaitlistTable({
 }: Props) {
     const router = useRouter()
     const [busy, setBusy] = useState<number | null>(null)
+    const [removing, setRemoving] = useState<number | null>(null)
     const [selection, setSelection] = useState<Record<number, number>>({})
 
     async function handlePlace(waitlistId: number) {
@@ -40,6 +42,18 @@ export function TournamentWaitlistTable({
             return
         }
         toast.success("Player placed.")
+        router.refresh()
+    }
+
+    async function handleRemove(waitlistId: number) {
+        setRemoving(waitlistId)
+        const result = await removeWaitlistPlayer(waitlistId)
+        setRemoving(null)
+        if (!result.status) {
+            toast.error(result.message)
+            return
+        }
+        toast.success("Player removed.")
         router.refresh()
     }
 
@@ -129,6 +143,17 @@ export function TournamentWaitlistTable({
                                 onClick={() => handlePlace(w.waitlistId)}
                             >
                                 {busy === w.waitlistId ? "Placing..." : "Place"}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                disabled={removing === w.waitlistId}
+                                onClick={() => handleRemove(w.waitlistId)}
+                            >
+                                {removing === w.waitlistId
+                                    ? "Removing..."
+                                    : "Remove"}
                             </Button>
                         </div>
                     )

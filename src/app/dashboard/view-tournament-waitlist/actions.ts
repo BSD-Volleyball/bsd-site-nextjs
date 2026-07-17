@@ -137,6 +137,89 @@ export const expressTournamentInterest = withAction(
     }
 )
 
+export const withdrawTournamentInterest = withAction(
+    async (): Promise<ActionResult<void>> => {
+        const session = await requireSession()
+
+        const config = await getTournamentConfig()
+        if (!config) return fail("No active tournament.")
+
+        const [entry] = await db
+            .select()
+            .from(tournamentWaitlist)
+            .where(
+                and(
+                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
+                    eq(tournamentWaitlist.user_id, session.user.id)
+                )
+            )
+            .limit(1)
+        if (!entry) {
+            return fail("You're not signed up as a player for this tournament.")
+        }
+        // Once placed on a roster the player can no longer self-withdraw — a
+        // captain/admin has committed them to a team, so removal has to go
+        // through the admin flow to keep rosters consistent.
+        if (entry.placed_team_id !== null) {
+            return fail(
+                "You're already on a team. Ask an admin or your captain to remove you."
+            )
+        }
+
+        await db
+            .delete(tournamentWaitlist)
+            .where(eq(tournamentWaitlist.id, entry.id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "withdraw_tournament_player_signup",
+            entityType: "tournament",
+            entityId: config.tournamentId,
+            summary: `Withdrew player signup for ${config.name}`
+        })
+        revalidatePath("/dashboard")
+        return ok(undefined, "Your interest has been withdrawn.")
+    }
+)
+
+export const removeWaitlistPlayer = withAction(
+    async (waitlistId: number): Promise<ActionResult<void>> => {
+        const session = await requireSession()
+        await requireAdmin()
+
+        const [entry] = await db
+            .select()
+            .from(tournamentWaitlist)
+            .where(eq(tournamentWaitlist.id, waitlistId))
+            .limit(1)
+        if (!entry) return fail("Player is no longer on the list.")
+        // Guard against removing someone who has since been placed on a team;
+        // the Place page only lists unplaced players, but a concurrent
+        // placement could have happened between page load and this click.
+        if (entry.placed_team_id !== null) {
+            return fail(
+                "This player has already been placed on a team and can't be removed here."
+            )
+        }
+
+        await db
+            .delete(tournamentWaitlist)
+            .where(eq(tournamentWaitlist.id, waitlistId))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "remove_tournament_waitlist",
+            entityType: "tournament",
+            entityId: entry.tournament_id,
+            summary: `Removed user ${entry.user_id} from the tournament player list`
+        })
+
+        revalidatePath("/dashboard/view-tournament-waitlist")
+        revalidatePath("/dashboard")
+        return ok(undefined, "Player removed.")
+    }
+)
+
 export const getTournamentWaitlist = withAction(
     async (): Promise<
         ActionResult<{
