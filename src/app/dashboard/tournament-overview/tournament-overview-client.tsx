@@ -1,11 +1,28 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
 import { AdminPlayerDetailPopup } from "@/components/player-detail/admin-player-detail-popup"
-import type { OverviewTeam, TournamentOverviewData } from "./actions"
+import {
+    withdrawTournamentTeam,
+    type OverviewTeam,
+    type TournamentOverviewData
+} from "./actions"
 
 interface Props {
     data: TournamentOverviewData
@@ -44,35 +61,98 @@ function TeamRow({
     team: OverviewTeam
     onPlayerClick: (userId: string) => void
 }) {
+    const router = useRouter()
     const [open, setOpen] = useState(false)
+    const [confirmOpen, setConfirmOpen] = useState(false)
+    const [busy, setBusy] = useState(false)
     const males = team.roster.filter((p) => p.male === true).length
     const nonMales = team.roster.filter((p) => p.male === false).length
 
+    async function handleWithdraw() {
+        setBusy(true)
+        const result = await withdrawTournamentTeam(team.id)
+        setBusy(false)
+        if (!result.status) {
+            toast.error(result.message)
+            return
+        }
+        toast.success(result.message ?? "Team withdrawn.")
+        setConfirmOpen(false)
+        router.refresh()
+    }
+
     return (
         <div className="rounded-md border">
-            <button
-                type="button"
-                onClick={() => setOpen((v) => !v)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-accent/50"
-            >
-                <div className="flex items-center gap-2">
-                    {open ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="font-medium">{team.name}</span>
-                    <span className="text-muted-foreground text-sm">
-                        — captain {team.captainName}
-                    </span>
+            <div className="flex items-center">
+                <button
+                    type="button"
+                    onClick={() => setOpen((v) => !v)}
+                    className="flex flex-1 items-center justify-between gap-2 px-3 py-2 text-left hover:bg-accent/50"
+                >
+                    <div className="flex items-center gap-2">
+                        {open ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="font-medium">{team.name}</span>
+                        <span className="text-muted-foreground text-sm">
+                            — captain {team.captainName}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-muted-foreground text-xs">
+                        <span>
+                            {team.roster.length} players ({males}M / {nonMales}
+                            NM)
+                        </span>
+                        {team.amountPaid && (
+                            <span>${team.amountPaid} paid</span>
+                        )}
+                    </div>
+                </button>
+                <div className="pr-2 pl-1">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setConfirmOpen(true)}
+                    >
+                        Withdraw
+                    </Button>
                 </div>
-                <div className="flex items-center gap-3 text-muted-foreground text-xs">
-                    <span>
-                        {team.roster.length} players ({males}M / {nonMales}NM)
-                    </span>
-                    {team.amountPaid && <span>${team.amountPaid} paid</span>}
-                </div>
-            </button>
+            </div>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Withdraw {team.name}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This removes the team and its entire roster from the
+                            tournament. It does <strong>not</strong> refund any
+                            payment — refunds must be handled separately. This
+                            can't be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={busy}>
+                            Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                // Keep the dialog open until the action resolves
+                                // so the user sees the busy state / any error.
+                                e.preventDefault()
+                                handleWithdraw()
+                            }}
+                            disabled={busy}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {busy ? "Withdrawing..." : "Withdraw Team"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             {open && (
                 <div className="divide-y border-t">
                     {team.roster.length === 0 ? (
