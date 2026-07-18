@@ -970,6 +970,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                                 icon: RiTeamLine
                                             })
                                         }
+                                        // Player-facing schedule + bracket:
+                                        // visible to participants and admins
+                                        // once matches exist.
+                                        if (
+                                            (tournament.showPoolTools ||
+                                                tournament.showBracketTools) &&
+                                            (tournament.isRostered || isAdmin)
+                                        ) {
+                                            items.push({
+                                                title: "Schedule & Bracket",
+                                                url: "/dashboard/tournament-schedule-view",
+                                                icon: RiCalendarLine
+                                            })
+                                        }
                                         if (tournament.showPoolTools) {
                                             items.push({
                                                 title: "Tournament Schedule",
@@ -983,11 +997,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                             })
                                         }
                                         if (tournament.showBracketTools) {
-                                            items.push({
-                                                title: "Tournament Bracket",
-                                                url: "/dashboard/tournament-bracket",
-                                                icon: RiTrophyLine
-                                            })
                                             items.push({
                                                 title: "Enter Tournament Scores",
                                                 url: "/dashboard/tournament-scores",
