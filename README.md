@@ -92,9 +92,19 @@ Layout:
   (`bsd_test_template`) is built once from `migrations/` and cloned per
   Vitest worker; `better-auth` sessions are fabricated (see
   `src/test/session.ts`) while role checks stay real. Shared harness lives
-  in `src/test/`.
+  in `src/test/`. To exercise an admin-gated action, open the test with
+  `createUserWithRoles([{ role: "admin" }])` (from `@/test/session`) — it
+  creates a user, inserts the `user_roles` rows, and logs the fabricated
+  session in as that admin so `requireAdmin()`/`requirePermission()` pass for
+  real. Non-admin and unauthenticated cases are just `createUserWithRoles([{ role: "captain" }])` or no login at all.
 - **E2E tests** (`e2e/*.spec.ts`) drive the real app with Playwright against
-  a dedicated `bsd_e2e` database. Local-only; not run in CI.
+  a dedicated `bsd_e2e` database. Local-only; not run in CI. The setup project
+  (`e2e/setup/auth.setup.ts`) creates three **email/password personas** —
+  `admin`, `captain`, and `player` (see `e2e/helpers.ts`) — through the real
+  better-auth signup endpoint and saves each one's signed-in storage state.
+  Admin accounts authenticate with email/password (not only Google OAuth), so
+  a spec covering an admin-only flow runs pre-authenticated via
+  `test.use({ storageState: PERSONAS.admin.storageState })`.
 
 One-time local Postgres setup (integration + e2e tests):
 

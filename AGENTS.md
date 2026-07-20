@@ -20,6 +20,10 @@ pnpm build
 pnpm lint
 pnpm check-types
 pnpm check-authz
+pnpm test              # unit + integration (Vitest)
+pnpm test:unit         # pure logic, no database
+pnpm test:integration  # real server actions against local Postgres
+pnpm test:e2e          # Playwright end-to-end (local only)
 ```
 
 Database and auth schema workflows:
@@ -128,6 +132,13 @@ npx @better-auth/cli generate
 - Run before finalizing substantial changes:
   - `pnpm lint`
   - `pnpm check-types`
+
+## Testing
+
+- **Unit** (`*.test.ts`): pure logic; the db singleton is aliased to a guard that throws, so unit tests never touch a database.
+- **Integration** (`*.integration.test.ts`, colocated): run the real server action against a per-worker clone of a migrated Postgres template. `better-auth` is mocked so `auth.api.getSession()` returns the session set by `loginAs()`, but **role checks stay real** (they query the `user_roles` rows the helpers insert).
+- **Admin-gated actions:** open the test with `createUserWithRoles([{ role: "admin" }])` from `src/test/session.ts` — it creates a user, inserts the role rows, and logs the fabricated session in as that admin, so `requireAdmin()`/`requirePermission()` pass genuinely. Cover the negative cases with `createUserWithRoles([{ role: "captain" }])` (authenticated non-admin) and no login at all (unauthenticated); both should return `{ status: false, message: "Unauthorized." }`. See `src/app/dashboard/tournament-pools/actions.integration.test.ts` for a full example (admin loads/saves/reverts the playoff bracket editor).
+- **E2E** (`e2e/*.spec.ts`, Playwright, local-only): `e2e/setup/auth.setup.ts` seeds the `bsd_e2e` database and creates **email/password personas** — `admin`, `captain`, `player` (`e2e/helpers.ts`) — via the real signup endpoint, saving each one's storage state. Admin accounts sign in with email/password (not only Google OAuth), so an admin-only flow runs pre-authenticated via `test.use({ storageState: PERSONAS.admin.storageState })`.
 
 ## Environment Notes
 
