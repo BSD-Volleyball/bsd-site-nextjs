@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
+    divisions,
+    tournamentDivisions,
     tournamentMatches,
+    tournamentPlacements,
     tournamentPoolTeams,
     tournamentPools,
     tournamentTeams,
@@ -27,6 +30,7 @@ import {
     type TournamentPhase
 } from "@/lib/tournament-phases"
 import { seedTournamentBracket } from "@/lib/tournament-brackets"
+import { finalizeTournamentResults } from "@/lib/tournament-final-standings"
 
 export interface TournamentPhaseData {
     tournamentId: number
@@ -238,6 +242,11 @@ export const advanceTournamentPhase = withAction(
             sideEffectSummary = ` Seeded ${seedResult.divisionsSeeded} division(s).`
         }
 
+        if (targetPhase === "complete") {
+            const { divisionsPlaced } = await finalizeTournamentResults(id)
+            sideEffectSummary = ` Recorded final placements for ${divisionsPlaced} division(s).`
+        }
+
         await db
             .update(tournaments)
             .set({ phase: targetPhase })
@@ -276,6 +285,55 @@ export const revertTournamentPhase = withAction(
         if (!t) return fail("Tournament not found.")
 
         const currentPhase = t.phase as TournamentPhase
+
+        // Reverting out of "complete" undoes the finalization: drop recorded
+        // placements and return to the phase the tournament was actually in. That
+        // is "playoffs" if a bracket was ever seeded, otherwise "pool_play" (an
+        // early end straight from pool play never created bracket matches).
+        if (currentPhase === "complete") {
+            const [bracketMatch] = await db
+                .select({ id: tournamentMatches.id })
+                .from(tournamentMatches)
+                .where(
+                    and(
+                        eq(tournamentMatches.tournament_id, id),
+                        or(
+                            eq(tournamentMatches.bracket, "winners"),
+                            eq(tournamentMatches.bracket, "losers"),
+                            eq(tournamentMatches.bracket, "final")
+                        )
+                    )
+                )
+                .limit(1)
+            const priorPhase: TournamentPhase = bracketMatch
+                ? "playoffs"
+                : "pool_play"
+
+            await db.transaction(async (tx) => {
+                await tx
+                    .delete(tournamentPlacements)
+                    .where(eq(tournamentPlacements.tournament_id, id))
+                await tx
+                    .update(tournaments)
+                    .set({ phase: priorPhase })
+                    .where(eq(tournaments.id, id))
+            })
+
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "revert_tournament_phase",
+                entityType: "tournament",
+                entityId: id,
+                summary: `Reverted tournament from "Complete" to "${TOURNAMENT_PHASE_CONFIG[priorPhase].label}" and cleared recorded placements.`
+            })
+
+            revalidatePath("/dashboard/tournament-control")
+            revalidatePath("/dashboard")
+            return ok({
+                message: `Tournament reverted to "${TOURNAMENT_PHASE_CONFIG[priorPhase].label}"; recorded placements cleared.`
+            })
+        }
+
         if (!isValidTournamentPhaseRevert(currentPhase, targetPhase)) {
             return fail(
                 `Cannot revert from "${TOURNAMENT_PHASE_CONFIG[currentPhase].label}" to "${TOURNAMENT_PHASE_CONFIG[targetPhase].label}".`
@@ -299,5 +357,119 @@ export const revertTournamentPhase = withAction(
         return ok({
             message: `Tournament reverted to "${TOURNAMENT_PHASE_CONFIG[targetPhase].label}".`
         })
+    }
+)
+
+/**
+ * End a tournament early (e.g. weather cancellation). Jumps straight to "complete"
+ * from pool play or playoffs — a transition the normal linear phase machine
+ * deliberately disallows — recording final placements from whatever data exists.
+ */
+export const endTournamentEarly = withAction(
+    async (
+        tournamentId: number
+    ): Promise<ActionResult<{ message: string }>> => {
+        await requireAdmin()
+        const session = await requireSession()
+        const id = requirePositiveInt(tournamentId, "tournament ID")
+
+        const [t] = await db
+            .select({ id: tournaments.id, phase: tournaments.phase })
+            .from(tournaments)
+            .where(eq(tournaments.id, id))
+            .limit(1)
+        if (!t) return fail("Tournament not found.")
+
+        const currentPhase = t.phase as TournamentPhase
+        if (currentPhase !== "pool_play" && currentPhase !== "playoffs") {
+            return fail(
+                `Can only end a tournament early during Pool Play or Playoffs (currently "${TOURNAMENT_PHASE_CONFIG[currentPhase].label}").`
+            )
+        }
+
+        const { divisionsPlaced } = await finalizeTournamentResults(id)
+
+        await db
+            .update(tournaments)
+            .set({ phase: "complete" })
+            .where(eq(tournaments.id, id))
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "end_tournament_early",
+            entityType: "tournament",
+            entityId: id,
+            summary: `Ended tournament early from "${TOURNAMENT_PHASE_CONFIG[currentPhase].label}"; recorded final placements for ${divisionsPlaced} division(s).`
+        })
+
+        revalidatePath("/dashboard/tournament-control")
+        revalidatePath("/dashboard")
+        return ok({
+            message: `Tournament ended early. Recorded final placements for ${divisionsPlaced} division(s).`
+        })
+    }
+)
+
+export interface DivisionPlacements {
+    divisionId: number
+    divisionName: string
+    teams: Array<{ teamId: number; teamName: string; place: number }>
+}
+
+/**
+ * Read recorded final placements for a tournament, grouped by division and ordered
+ * by division level then finishing place. Admin-gated.
+ */
+export const getTournamentPlacements = withAction(
+    async (
+        tournamentId: number
+    ): Promise<ActionResult<DivisionPlacements[]>> => {
+        await requireAdmin()
+        const id = requirePositiveInt(tournamentId, "tournament ID")
+
+        const rows = await db
+            .select({
+                divisionId: tournamentPlacements.division_id,
+                divisionName: divisions.name,
+                divisionLevel: divisions.level,
+                teamId: tournamentPlacements.team_id,
+                teamName: tournamentTeams.name,
+                place: tournamentPlacements.place
+            })
+            .from(tournamentPlacements)
+            .innerJoin(
+                tournamentTeams,
+                eq(tournamentTeams.id, tournamentPlacements.team_id)
+            )
+            .innerJoin(
+                tournamentDivisions,
+                eq(tournamentDivisions.id, tournamentPlacements.division_id)
+            )
+            .innerJoin(
+                divisions,
+                eq(divisions.id, tournamentDivisions.division_id)
+            )
+            .where(eq(tournamentPlacements.tournament_id, id))
+            .orderBy(asc(divisions.level), asc(tournamentPlacements.place))
+
+        const byDivision = new Map<number, DivisionPlacements>()
+        for (const r of rows) {
+            let group = byDivision.get(r.divisionId)
+            if (!group) {
+                group = {
+                    divisionId: r.divisionId,
+                    divisionName: r.divisionName,
+                    teams: []
+                }
+                byDivision.set(r.divisionId, group)
+            }
+            group.teams.push({
+                teamId: r.teamId,
+                teamName: r.teamName,
+                place: r.place
+            })
+        }
+
+        return ok([...byDivision.values()])
     }
 )

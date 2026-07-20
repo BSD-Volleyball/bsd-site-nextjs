@@ -1508,3 +1508,41 @@ export const tournamentMatches = pgTable(
         ).on(table.tournament_id, table.court, table.start_time)
     })
 )
+
+// Final placements per division, recorded when a tournament completes (normally
+// or via "end early"). Unlike the season `champions` table (1st place only), this
+// stores a full ordinal ranking so 1st/2nd (and beyond) are all persisted.
+export const tournamentPlacements = pgTable(
+    "tournament_placements",
+    {
+        id: serial("id").primaryKey(),
+        tournament_id: integer("tournament_id")
+            .notNull()
+            .references(() => tournaments.id, { onDelete: "cascade" }),
+        // Per-tournament division (matches how tournament_matches/_teams reference it).
+        division_id: integer("division_id")
+            .notNull()
+            .references(() => tournamentDivisions.id, { onDelete: "cascade" }),
+        team_id: integer("team_id")
+            .notNull()
+            .references(() => tournamentTeams.id),
+        // 1-based ordinal finish within the division (1 = champion).
+        place: integer("place").notNull(),
+        created_at: timestamp("created_at")
+            .$defaultFn(() => new Date())
+            .notNull()
+    },
+    (table) => ({
+        tournamentPlacementsTournamentIdx: index(
+            "tournament_placements_tournament_idx"
+        ).on(table.tournament_id),
+        // One team gets exactly one placement per tournament.
+        tournamentPlacementsTeamUniq: uniqueIndex(
+            "tournament_placements_tournament_team_uniq"
+        ).on(table.tournament_id, table.team_id),
+        // Each place is used once per division.
+        tournamentPlacementsPlaceUniq: uniqueIndex(
+            "tournament_placements_division_place_uniq"
+        ).on(table.tournament_id, table.division_id, table.place)
+    })
+)
