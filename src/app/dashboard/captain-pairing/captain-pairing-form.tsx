@@ -161,8 +161,9 @@ export function CaptainPairingForm({
                                 relative, and in rare circumstances carpooling).
                                 If requesting to pair, specify with whom to pair
                                 and the reason for pairing. If you can not find
-                                your pair below, have them register on the site
-                                before either of you sign up for the season.
+                                your pair below, they likely haven&apos;t
+                                registered yet — you can check back and select
+                                them here once they&apos;ve registered.
                             </p>
                         </div>
 

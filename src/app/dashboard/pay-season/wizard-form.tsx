@@ -324,9 +324,10 @@ export function WizardForm({
                                 relative, and in rare circumstances carpooling).
                                 If requesting to pair, specify with whom to pair
                                 and the reason for pairing. If you can not find
-                                your pair below, have them to register on the
-                                site before either of you sign up for the
-                                season.{" "}
+                                your pair below, they likely haven&apos;t
+                                registered yet — you can come back and select
+                                them from your Captain &amp; Pairing page after
+                                signing up, once they&apos;ve registered.{" "}
                             </p>
                         </div>
 
