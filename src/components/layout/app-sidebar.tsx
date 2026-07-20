@@ -75,6 +75,12 @@ const myAvailabilityNavItem = {
     icon: RiCheckboxLine
 }
 
+const captainPairingNavItem = {
+    title: "Captain & Pairing",
+    url: "/dashboard/captain-pairing",
+    icon: RiStarLine
+}
+
 const baseNavItems = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
     {
@@ -739,6 +745,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ]
     }
 
+    // Insert Captain & Pairing after Dashboard for players signed up this season,
+    // but only before drafting starts — once the draft begins these choices lock.
+    const showCaptainPairing =
+        hasCurrentSeasonSignup &&
+        phaseIdx >= 0 &&
+        phaseIdx < SEASON_PHASES.indexOf("draft")
+    if (showCaptainPairing) {
+        const dashboardIdx = navItems.findIndex((i) => i.url === "/dashboard")
+        navItems = [
+            ...navItems.slice(0, dashboardIdx + 1),
+            captainPairingNavItem,
+            ...navItems.slice(dashboardIdx + 1)
+        ]
+    }
+
     // Admin hidden section — collect all currently-suppressed items by group
     type NavItem = { title: string; url: string; icon: typeof RiSpeedUpLine }
     const hiddenGroups: { label: string; items: NavItem[] }[] = []
@@ -758,6 +779,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     ? "My Availability (season complete)"
                     : "My Availability (no signup)",
                 items: [myAvailabilityNavItem]
+            })
+        }
+
+        // Captain & Pairing — hidden when the user has no current-season signup,
+        // or once drafting has started (the choices are locked).
+        if (!showCaptainPairing) {
+            hiddenGroups.push({
+                label: hasCurrentSeasonSignup
+                    ? "Captain & Pairing (locked)"
+                    : "Captain & Pairing (no signup)",
+                items: [captainPairingNavItem]
             })
         }
 

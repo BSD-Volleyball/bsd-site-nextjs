@@ -84,6 +84,7 @@ import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
 import { buildPlayerPictureUrl, cn } from "@/lib/utils"
+import { canEditPreferences } from "./captain-pairing/utils"
 
 export const metadata: Metadata = {
     title: "Dashboard"
@@ -536,6 +537,23 @@ function RegistrationConfirmation({
                     </div>
                 )}
             </div>
+
+            {canEditPreferences(signupStatus.config.phase) && (
+                <div className="flex flex-wrap gap-2 border-t pt-4">
+                    <Link
+                        href="/dashboard/captain-pairing"
+                        className="inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-medium text-sm hover:bg-accent"
+                    >
+                        Edit captain & pairing
+                    </Link>
+                    <Link
+                        href="/dashboard/my-availability"
+                        className="inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-medium text-sm hover:bg-accent"
+                    >
+                        Edit availability
+                    </Link>
+                </div>
+            )}
         </div>
     )
 }
