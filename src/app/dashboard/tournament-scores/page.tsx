@@ -15,22 +15,22 @@ export default async function TournamentScoresPage() {
     if (!session) redirect("/auth/sign-in")
 
     const result = await getScoreEntryRows()
-    const data = result.status ? result.data : null
+    const view = result.status ? result.data : null
 
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Enter Tournament Scores"
-                description="Your work-team assignments are listed here. Enter the final set scores for each match."
+                description="Your work-team assignments are grouped by pool play and playoffs. Enter the final set scores for each match."
             />
-            {!data ? (
+            {!view ? (
                 <p className="text-muted-foreground">No active tournament.</p>
-            ) : data.rows.length === 0 ? (
+            ) : view.divisions.length === 0 ? (
                 <p className="text-muted-foreground">
                     You have no matches to score right now.
                 </p>
             ) : (
-                <ScoreEntryList rows={data.rows} />
+                <ScoreEntryList view={view} />
             )}
         </div>
     )

@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
     tournamentMatches,
+    tournamentPools,
     tournamentRoster,
     tournamentTeams
 } from "@/database/schema"
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import {
     fail,
     ok,
@@ -20,33 +21,28 @@ import { getTournamentConfig } from "@/lib/tournament-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { progressTournamentMatch } from "@/lib/tournament-brackets"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    buildTournamentScheduleView,
+    type TournamentScheduleView
+} from "@/lib/tournament-schedule"
 
-export interface ScoreEntryRow {
-    matchId: number
-    bracket: string
-    court: number | null
-    startTime: string | null
-    homeTeamId: number
-    homeTeamName: string
-    awayTeamId: number
-    awayTeamName: string
-    homeSet1: number | null
-    awaySet1: number | null
-    homeSet2: number | null
-    awaySet2: number | null
-    homeSet3: number | null
-    awaySet3: number | null
-    winnerTeamId: number | null
-}
+export type {
+    ScheduleTeam,
+    ScheduleMatch,
+    SchedulePool,
+    ScheduleBracketGroup,
+    ScheduleDivision,
+    TournamentScheduleView
+} from "@/lib/tournament-schedule"
 
+/**
+ * Matches the current viewer may enter scores for, shaped into the same
+ * division → pools + bracket-groups structure the read-only schedule view uses.
+ * Admins/directors see every playable match; other users see only matches whose
+ * work team they are rostered on. Returns null when there is no active tournament.
+ */
 export const getScoreEntryRows = withAction(
-    async (): Promise<
-        ActionResult<{
-            tournamentId: number
-            tournamentName: string
-            rows: ScoreEntryRow[]
-        } | null>
-    > => {
+    async (): Promise<ActionResult<TournamentScheduleView | null>> => {
         const session = await requireSession()
         const config = await getTournamentConfig()
         if (!config) return ok(null)
@@ -64,31 +60,27 @@ export const getScoreEntryRows = withAction(
                 )
             )
         const myTeamIds = new Set(myTeamRows.map((r) => r.teamId))
+        const myTeamId = myTeamRows[0]?.teamId ?? null
 
-        // Pull matches that have both teams assigned (so they're playable).
-        const matches = await db
-            .select()
-            .from(tournamentMatches)
-            .where(
-                and(
-                    eq(tournamentMatches.tournament_id, config.tournamentId),
-                    // home and away both set
-                    // (use isNotNull via NOT isNull)
-                    or(
-                        // we want both NOT NULL — Drizzle has no direct NOT,
-                        // so we fetch all and filter in JS for clarity
-                        eq(tournamentMatches.bracket, "pool"),
-                        eq(tournamentMatches.bracket, "winners"),
-                        eq(tournamentMatches.bracket, "losers"),
-                        eq(tournamentMatches.bracket, "final")
-                    )
-                )
-            )
-            .orderBy(
-                asc(tournamentMatches.start_time),
-                asc(tournamentMatches.court)
-            )
+        const [matches, teams, pools] = await Promise.all([
+            db
+                .select()
+                .from(tournamentMatches)
+                .where(
+                    eq(tournamentMatches.tournament_id, config.tournamentId)
+                ),
+            db
+                .select({ id: tournamentTeams.id, name: tournamentTeams.name })
+                .from(tournamentTeams)
+                .where(eq(tournamentTeams.tournament_id, config.tournamentId)),
+            db
+                .select()
+                .from(tournamentPools)
+                .where(eq(tournamentPools.tournament_id, config.tournamentId))
+                .orderBy(asc(tournamentPools.name))
+        ])
 
+        // Only matches with both teams assigned can actually be scored.
         const playable = matches.filter(
             (m) => m.home_team_id !== null && m.away_team_id !== null
         )
@@ -102,47 +94,17 @@ export const getScoreEntryRows = withAction(
                       m.work_team_id !== null && myTeamIds.has(m.work_team_id)
               )
 
-        // Resolve team names.
-        const allTeamIds = new Set<number>()
-        for (const m of visible) {
-            if (m.home_team_id !== null) allTeamIds.add(m.home_team_id)
-            if (m.away_team_id !== null) allTeamIds.add(m.away_team_id)
-        }
-        const teams =
-            allTeamIds.size === 0
-                ? []
-                : await db
-                      .select({
-                          id: tournamentTeams.id,
-                          name: tournamentTeams.name
-                      })
-                      .from(tournamentTeams)
-                      .where(inArray(tournamentTeams.id, [...allTeamIds]))
-        const teamName = new Map(teams.map((t) => [t.id, t.name]))
-
-        const rows: ScoreEntryRow[] = visible.map((m) => ({
-            matchId: m.id,
-            bracket: m.bracket,
-            court: m.court,
-            startTime: m.start_time,
-            homeTeamId: m.home_team_id as number,
-            homeTeamName: teamName.get(m.home_team_id as number) ?? "—",
-            awayTeamId: m.away_team_id as number,
-            awayTeamName: teamName.get(m.away_team_id as number) ?? "—",
-            homeSet1: m.home_set1_score,
-            awaySet1: m.away_set1_score,
-            homeSet2: m.home_set2_score,
-            awaySet2: m.away_set2_score,
-            homeSet3: m.home_set3_score,
-            awaySet3: m.away_set3_score,
-            winnerTeamId: m.winner_team_id
-        }))
-
-        return ok({
-            tournamentId: config.tournamentId,
-            tournamentName: config.name,
-            rows
-        })
+        return ok(
+            buildTournamentScheduleView({
+                tournamentName: config.name,
+                eliminationFormat: config.eliminationFormat,
+                myTeamId,
+                divisions: config.divisions,
+                matches: visible,
+                teams,
+                pools
+            })
+        )
     }
 )
 
@@ -253,5 +215,3 @@ export const saveTournamentMatchScore = withAction(
         return ok()
     }
 )
-
-void isNull
