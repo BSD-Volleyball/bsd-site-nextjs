@@ -2,7 +2,11 @@ import { HeroSection } from "@/components/layout/sections/hero"
 import { site } from "@/config/site"
 import { auth } from "@/lib/auth"
 import { getTournamentConfig } from "@/lib/tournament-config"
-import { getSeasonConfig, formatSeasonLabel } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    formatSeasonLabel,
+    getEventsByType
+} from "@/lib/site-config"
 import Link from "next/link"
 import { headers } from "next/headers"
 import { Button } from "@/components/ui/button"
@@ -12,12 +16,30 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import { Calendar, FileText, Users, Gavel, Shield, Trophy } from "lucide-react"
+import {
+    Calendar,
+    ClipboardList,
+    FileText,
+    Users,
+    Gavel,
+    Shield,
+    Trophy
+} from "lucide-react"
 
 function fmtTournamentDate(iso: string): string {
     const d = new Date(`${iso}T00:00:00`)
     return d.toLocaleDateString("en-US", {
         weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+    })
+}
+
+function fmtSeasonDate(iso: string): string {
+    // Noon avoids the date shifting a day under negative UTC offsets.
+    const d = new Date(`${iso}T12:00:00`)
+    return d.toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
         day: "numeric"
@@ -87,7 +109,20 @@ const quickLinks = [
 export default async function Home() {
     const session = await auth.api.getSession({ headers: await headers() })
     const tournament = await getTournamentConfig()
-    const seasonLabel = formatSeasonLabel(await getSeasonConfig())
+    const seasonConfig = await getSeasonConfig()
+    const seasonLabel = formatSeasonLabel(seasonConfig)
+
+    // Registration banner: show only while the season is accepting signups.
+    // The key-date line degrades gracefully if a partially-configured season
+    // is opened before every event date has been entered.
+    const registrationOpen = seasonConfig.phase === "registration_open"
+    const registrationDeadline = getEventsByType(seasonConfig, "late_date")[0]
+    const firstTryout = getEventsByType(seasonConfig, "tryout")[0]
+    const registrationDateLine = registrationDeadline
+        ? `Register by ${fmtSeasonDate(registrationDeadline.eventDate)}`
+        : firstTryout
+          ? `Season starts ${fmtSeasonDate(firstTryout.eventDate)}`
+          : null
 
     return (
         <>
@@ -133,6 +168,50 @@ export default async function Home() {
                                     className="shrink-0 group-hover:bg-primary/90"
                                 >
                                     Tournament Details →
+                                </Button>
+                            </div>
+                        </div>
+                    </Link>
+                </section>
+            )}
+
+            {/* Registration Open Callout — renders only while the current
+                season's phase is registration_open. Mirrors the tournament
+                callout above so the two read as the same component family;
+                if both are active they stack, tournament first. */}
+            {registrationOpen && (
+                <section className="container mx-auto px-4 pt-8 pb-4">
+                    <Link href="/auth/sign-up" className="group block">
+                        <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-gradient-to-br from-primary/10 via-background to-primary/5 p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-4">
+                                    <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                                        <ClipboardList className="size-7" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-semibold text-primary text-sm uppercase tracking-wider">
+                                            Registration Open
+                                        </p>
+                                        <h3 className="font-bold text-2xl sm:text-3xl">
+                                            {seasonLabel
+                                                ? `${seasonLabel} Season`
+                                                : "New Season"}
+                                        </h3>
+                                        {registrationDateLine && (
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-sm">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Calendar className="size-4" />
+                                                    {registrationDateLine}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <Button
+                                    size="lg"
+                                    className="shrink-0 group-hover:bg-primary/90"
+                                >
+                                    Register Now →
                                 </Button>
                             </div>
                         </div>
