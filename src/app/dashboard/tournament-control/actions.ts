@@ -31,6 +31,7 @@ import {
 } from "@/lib/tournament-phases"
 import { seedTournamentBracket } from "@/lib/tournament-brackets"
 import { finalizeTournamentResults } from "@/lib/tournament-final-standings"
+import type { DivisionPlacements } from "@/components/tournament/tournament-placements-card"
 
 export interface TournamentPhaseData {
     tournamentId: number
@@ -409,12 +410,6 @@ export const endTournamentEarly = withAction(
         })
     }
 )
-
-export interface DivisionPlacements {
-    divisionId: number
-    divisionName: string
-    teams: Array<{ teamId: number; teamName: string; place: number }>
-}
 
 /**
  * Read recorded final placements for a tournament, grouped by division and ordered

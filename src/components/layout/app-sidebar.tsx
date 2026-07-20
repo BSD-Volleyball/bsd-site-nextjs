@@ -30,7 +30,8 @@ import {
     RiCheckboxLine,
     RiClipboardLine,
     RiInboxLine,
-    RiImageLine
+    RiImageLine,
+    RiMedalLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -61,6 +62,7 @@ import { site } from "@/config/site"
 import {
     getSidebarData,
     type SeasonNavItem,
+    type TournamentNavItem,
     type TournamentSidebarInfo
 } from "@/app/dashboard/sidebar-actions"
 import {
@@ -599,6 +601,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const [isReferee, setIsReferee] = useState(false)
     const [isRefCoordinator, setIsRefCoordinator] = useState(false)
     const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
+    const [tournamentNav, setTournamentNav] = useState<TournamentNavItem[]>([])
     const [phase, setPhase] = useState<SeasonPhase | null>(null)
     const [tournament, setTournament] = useState<TournamentSidebarInfo | null>(
         null
@@ -618,6 +621,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             setIsReferee(data.isReferee)
             setIsRefCoordinator(data.isRefCoordinator)
             setSeasonNav(data.seasonNav)
+            setTournamentNav(data.tournamentNav)
             setPhase(data.phase)
             setTournament(data.tournament)
         })
@@ -1171,7 +1175,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <NavItems
-                                items={[hallOfChampionsNavItem]}
+                                items={[
+                                    hallOfChampionsNavItem,
+                                    ...tournamentNav.map((t) => ({
+                                        title: `${t.name} (${t.year})`,
+                                        url: `/dashboard/tournament-results/${t.id}`,
+                                        icon: RiMedalLine
+                                    }))
+                                ]}
                                 pathname={pathname}
                             />
                             {seasonNav.map((season) => (

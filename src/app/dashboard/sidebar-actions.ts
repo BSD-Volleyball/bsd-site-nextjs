@@ -10,7 +10,8 @@ import {
     drafts,
     divisions,
     individual_divisions,
-    signups
+    signups,
+    tournaments
 } from "@/database/schema"
 import { eq, and, lt, lte, desc, inArray, or } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -110,6 +111,39 @@ export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     }
 }
 
+export interface TournamentNavItem {
+    id: number
+    name: string
+    year: number
+}
+
+/**
+ * The most recent completed tournaments, for the Historical section. Each links
+ * to its read-only results page. Returns [] for anonymous users.
+ */
+export async function getRecentTournamentsNav(): Promise<TournamentNavItem[]> {
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session?.user) {
+        return []
+    }
+
+    try {
+        return await db
+            .select({
+                id: tournaments.id,
+                name: tournaments.name,
+                year: tournaments.year
+            })
+            .from(tournaments)
+            .where(eq(tournaments.phase, "complete"))
+            .orderBy(desc(tournaments.id))
+            .limit(2)
+    } catch (error) {
+        console.error("Error fetching recent tournaments nav:", error)
+        return []
+    }
+}
+
 export interface TournamentSidebarInfo {
     tournamentId: number
     name: string
@@ -137,6 +171,7 @@ export interface SidebarData {
     isReferee: boolean
     isRefCoordinator: boolean
     seasonNav: SeasonNavItem[]
+    tournamentNav: TournamentNavItem[]
     phase: SeasonPhase | null
     tournament: TournamentSidebarInfo | null
 }
@@ -158,6 +193,7 @@ export async function getSidebarData(): Promise<SidebarData> {
             isReferee: false,
             isRefCoordinator: false,
             seasonNav: [],
+            tournamentNav: [],
             phase: null,
             tournament: null
         }
@@ -178,6 +214,7 @@ export async function getSidebarData(): Promise<SidebarData> {
         isReferee,
         isRefCoordinator,
         seasonNav,
+        tournamentNav,
         isCoach
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
@@ -215,6 +252,7 @@ export async function getSidebarData(): Promise<SidebarData> {
             ? hasPermissionBySession("schedule:manage", { seasonId })
             : Promise.resolve(false),
         getRecentSeasonsNav(),
+        getRecentTournamentsNav(),
         seasonId
             ? (async () => {
                   const [coachEntry] = await db
@@ -258,6 +296,7 @@ export async function getSidebarData(): Promise<SidebarData> {
         isReferee,
         isRefCoordinator,
         seasonNav,
+        tournamentNav,
         phase: seasonId ? config.phase : null,
         tournament
     }

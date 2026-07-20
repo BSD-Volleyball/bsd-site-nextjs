@@ -10,7 +10,7 @@ import {
 } from "./actions"
 import { TournamentPhaseControl } from "./tournament-phase-control"
 import { EndTournamentEarlyCard } from "./end-tournament-early-card"
-import { TournamentPlacementsCard } from "./tournament-placements-card"
+import { TournamentPlacementsCard } from "@/components/tournament/tournament-placements-card"
 
 export const metadata: Metadata = {
     title: "Tournament Control"

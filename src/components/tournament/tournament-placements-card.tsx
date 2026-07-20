@@ -5,7 +5,12 @@ import {
     CardHeader,
     CardTitle
 } from "@/components/ui/card"
-import type { DivisionPlacements } from "./actions"
+
+export interface DivisionPlacements {
+    divisionId: number
+    divisionName: string
+    teams: Array<{ teamId: number; teamName: string; place: number }>
+}
 
 function ordinal(n: number): string {
     const s = ["th", "st", "nd", "rd"]

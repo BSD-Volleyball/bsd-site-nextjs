@@ -9,7 +9,7 @@ import type {
     ScheduleDivision,
     ScheduleMatch,
     TournamentScheduleView
-} from "./actions"
+} from "@/lib/tournament-schedule"
 
 const BRACKET_LABELS: Record<string, string> = {
     winners: "Winners",
@@ -101,7 +101,7 @@ function TeamRow({
     )
 }
 
-function MatchBlock({
+export function MatchBlock({
     match,
     myTeamId
 }: {
@@ -196,7 +196,7 @@ function DivisionRoundRobin({
     )
 }
 
-function DivisionBracket({
+export function DivisionBracket({
     groups,
     myTeamId
 }: {
@@ -232,7 +232,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
     return <h2 className="font-semibold text-lg tracking-tight">{children}</h2>
 }
 
-function DivisionLabel({ name }: { name: string }) {
+export function DivisionLabel({ name }: { name: string }) {
     return (
         <div className="flex items-center gap-2">
             <span className="text-muted-foreground/70 text-xs uppercase tracking-wider">
