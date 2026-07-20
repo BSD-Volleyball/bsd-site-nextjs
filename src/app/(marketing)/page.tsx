@@ -123,9 +123,6 @@ export default async function Home() {
         : firstTryout
           ? `Season starts ${fmtSeasonDate(firstTryout.eventDate)}`
           : null
-    // Logged-in players go straight to the season signup/payment flow;
-    // visitors first need an account.
-    const registrationHref = session ? "/dashboard/pay-season" : "/auth/sign-up"
 
     return (
         <>
@@ -184,7 +181,7 @@ export default async function Home() {
                 if both are active they stack, tournament first. */}
             {registrationOpen && (
                 <section className="container mx-auto px-4 pt-8 pb-4">
-                    <Link href={registrationHref} className="group block">
+                    <Link href="/dashboard/pay-season" className="group block">
                         <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-gradient-to-br from-primary/10 via-background to-primary/5 p-6 shadow-md transition-shadow hover:shadow-xl sm:p-8">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-start gap-4">
@@ -214,7 +211,7 @@ export default async function Home() {
                                     size="lg"
                                     className="shrink-0 group-hover:bg-primary/90"
                                 >
-                                    Register Now →
+                                    Sign Up Now →
                                 </Button>
                             </div>
                         </div>
