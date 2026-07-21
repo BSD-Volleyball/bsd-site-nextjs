@@ -229,6 +229,11 @@ const adminNavItems = [
         title: "Place Tournament Players",
         url: "/dashboard/view-tournament-waitlist",
         icon: RiGroupLine
+    },
+    {
+        title: "Insurance Report",
+        url: "/dashboard/insurance-report",
+        icon: RiShieldLine
     }
 ]
 

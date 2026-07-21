@@ -38,6 +38,7 @@ import {
     RiErrorWarningLine,
     RiArrowRightLine
 } from "@remixicon/react"
+import { AGE_GROUPS } from "@/lib/age-groups"
 import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 import Link from "next/link"
@@ -233,12 +234,14 @@ export function WizardForm({
                                     <SelectValue placeholder="Select your age range" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="20+">
-                                        20 or older
-                                    </SelectItem>
-                                    <SelectItem value="19-18">19-18</SelectItem>
-                                    <SelectItem value="17-16">17-16</SelectItem>
-                                    <SelectItem value="15-14">15-14</SelectItem>
+                                    {[...AGE_GROUPS].reverse().map((group) => (
+                                        <SelectItem
+                                            key={group.value}
+                                            value={group.value}
+                                        >
+                                            {group.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                             {formData.age === "17-16" && (
