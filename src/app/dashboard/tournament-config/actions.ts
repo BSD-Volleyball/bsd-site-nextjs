@@ -15,6 +15,7 @@ import {
     withAction,
     type ActionResult
 } from "@/lib/action-helpers"
+import { isValidSetsFormat, type SetsMode } from "@/lib/tournament-sets"
 
 export interface TournamentDivisionInput {
     // tournament_divisions.id (omitted for newly-added rows)
@@ -44,7 +45,31 @@ export interface TournamentMetadataInput {
     tournamentType: "coed" | "reverse_coed"
     poolSize: number
     eliminationFormat: "single" | "double"
+    poolSetsMode: SetsMode
+    poolSetsCount: number
+    playoffSetsMode: SetsMode
+    playoffSetsCount: number
     additionalInfo: string | null
+}
+
+/**
+ * Validate the pool/playoff sets formats on a metadata payload. Playoffs must
+ * be decisive so a bracket match can't tie and stall progression. Returns an
+ * error message, or null when valid.
+ */
+function validateSetsMetadata(m: TournamentMetadataInput): string | null {
+    if (!isValidSetsFormat({ mode: m.poolSetsMode, count: m.poolSetsCount })) {
+        return "Invalid pool play sets format."
+    }
+    if (
+        !isValidSetsFormat(
+            { mode: m.playoffSetsMode, count: m.playoffSetsCount },
+            { requireDecisive: true }
+        )
+    ) {
+        return "Invalid playoff sets format — playoffs must produce a winner."
+    }
+    return null
 }
 
 export interface TournamentConfigDivisionRow {
@@ -77,6 +102,10 @@ export interface TournamentConfigData {
     tournament_type: string
     pool_size: number
     elimination_format: string
+    pool_sets_mode: string
+    pool_sets_count: number
+    playoff_sets_mode: string
+    playoff_sets_count: number
     additional_info: string | null
     divisions: TournamentConfigDivisionRow[]
 }
@@ -159,6 +188,10 @@ export const getTournamentConfigData = withAction(
             tournament_type: t.tournament_type,
             pool_size: t.pool_size,
             elimination_format: t.elimination_format,
+            pool_sets_mode: t.pool_sets_mode,
+            pool_sets_count: t.pool_sets_count,
+            playoff_sets_mode: t.playoff_sets_mode,
+            playoff_sets_count: t.playoff_sets_count,
             additional_info: t.additional_info,
             divisions: divs
         })
@@ -192,6 +225,8 @@ export const createTournament = withAction(
         ) {
             return fail("Invalid elimination format.")
         }
+        const setsError = validateSetsMetadata(metadata)
+        if (setsError) return fail(setsError)
 
         const poolSize = requirePositiveInt(metadata.poolSize, "pool size")
 
@@ -221,6 +256,10 @@ export const createTournament = withAction(
                 tournament_type: metadata.tournamentType,
                 pool_size: poolSize,
                 elimination_format: metadata.eliminationFormat,
+                pool_sets_mode: metadata.poolSetsMode,
+                pool_sets_count: metadata.poolSetsCount,
+                playoff_sets_mode: metadata.playoffSetsMode,
+                playoff_sets_count: metadata.playoffSetsCount,
                 additional_info: metadata.additionalInfo || null
             })
             .returning({ id: tournaments.id })
@@ -261,6 +300,8 @@ export const saveTournamentConfig = withAction(
         ) {
             return fail("Invalid elimination format.")
         }
+        const setsError = validateSetsMetadata(metadata)
+        if (setsError) return fail(setsError)
         if (divisionsInput.length === 0) {
             return fail("At least one division is required.")
         }
@@ -302,6 +343,10 @@ export const saveTournamentConfig = withAction(
                     tournament_type: metadata.tournamentType,
                     pool_size: metadata.poolSize,
                     elimination_format: metadata.eliminationFormat,
+                    pool_sets_mode: metadata.poolSetsMode,
+                    pool_sets_count: metadata.poolSetsCount,
+                    playoff_sets_mode: metadata.playoffSetsMode,
+                    playoff_sets_count: metadata.playoffSetsCount,
                     additional_info: metadata.additionalInfo || null
                 })
                 .where(eq(tournaments.id, id))

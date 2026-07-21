@@ -15,6 +15,7 @@ import {
     TOURNAMENT_PHASES,
     type TournamentPhase
 } from "@/lib/tournament-phases"
+import type { SetsFormat, SetsMode } from "@/lib/tournament-sets"
 
 export interface TournamentDivisionConfig {
     // tournament_divisions.id
@@ -50,6 +51,9 @@ export interface TournamentConfig {
     tournamentType: "coed" | "reverse_coed"
     poolSize: number
     eliminationFormat: "single" | "double"
+    // Sets-per-match format for pool play and playoffs respectively.
+    poolSets: SetsFormat
+    playoffSets: SetsFormat
     divisions: TournamentDivisionConfig[]
 }
 
@@ -81,6 +85,14 @@ function rowToConfig(
         tournamentType: t.tournament_type as "coed" | "reverse_coed",
         poolSize: t.pool_size,
         eliminationFormat: t.elimination_format as "single" | "double",
+        poolSets: {
+            mode: t.pool_sets_mode as SetsMode,
+            count: t.pool_sets_count
+        },
+        playoffSets: {
+            mode: t.playoff_sets_mode as SetsMode,
+            count: t.playoff_sets_count
+        },
         divisions
     }
 }

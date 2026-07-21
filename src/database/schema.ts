@@ -1247,6 +1247,15 @@ export const tournaments = pgTable("tournaments", {
     pool_size: integer("pool_size").notNull(),
     // 'single' | 'double'
     elimination_format: text("elimination_format").notNull(),
+    // Sets-per-match format, configured separately for pool play and playoffs.
+    // mode: 'exact' (play all N sets, ties allowed) | 'best_of' (first to
+    // majority of N set wins). count is the number of sets (1-3, bounded by the
+    // three physical set-score columns). Defaults preserve the common setup:
+    // pool play is two straight sets; playoffs are best of three.
+    pool_sets_mode: text("pool_sets_mode").notNull().default("exact"),
+    pool_sets_count: integer("pool_sets_count").notNull().default(2),
+    playoff_sets_mode: text("playoff_sets_mode").notNull().default("best_of"),
+    playoff_sets_count: integer("playoff_sets_count").notNull().default(3),
     // Free-form notes shown on the public marketing page (formats, prizes,
     // raffles, where to park, etc.). Plain text — newlines preserved.
     additional_info: text("additional_info"),

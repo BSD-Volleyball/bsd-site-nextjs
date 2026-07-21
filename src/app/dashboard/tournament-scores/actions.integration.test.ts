@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import {
@@ -11,7 +12,24 @@ import {
 } from "@/database/schema"
 import { createDivision } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import { getScoreEntryRows } from "./actions"
+import { getScoreEntryRows, saveTournamentMatchScore } from "./actions"
+
+async function winnerOf(matchId: number): Promise<number | null> {
+    const [m] = await db
+        .select({ w: tournamentMatches.winner_team_id })
+        .from(tournamentMatches)
+        .where(eq(tournamentMatches.id, matchId))
+    return m?.w ?? null
+}
+
+const NO_SCORE = {
+    homeSet1: null,
+    awaySet1: null,
+    homeSet2: null,
+    awaySet2: null,
+    homeSet3: null,
+    awaySet3: null
+}
 
 // One division "A", one "Pool A" of four teams, plus two pool matches and one
 // seeded winners-bracket match — enough to exercise both the pool-play and
@@ -107,19 +125,27 @@ async function seedScorableTournament() {
     })
 
     // One playoff match with both seats filled; A2 works it.
-    await db.insert(tournamentMatches).values({
-        tournament_id: t.id,
-        division_id: tdA.id,
-        bracket: "winners",
-        bracket_round: 1,
-        court: 1,
-        start_time: "11:00:00",
-        home_team_id: teamIds.A1,
-        away_team_id: teamIds.A4,
-        work_team_id: teamIds.A2
-    })
+    const [b1] = await db
+        .insert(tournamentMatches)
+        .values({
+            tournament_id: t.id,
+            division_id: tdA.id,
+            bracket: "winners",
+            bracket_round: 1,
+            court: 1,
+            start_time: "11:00:00",
+            home_team_id: teamIds.A1,
+            away_team_id: teamIds.A4,
+            work_team_id: teamIds.A2
+        })
+        .returning({ id: tournamentMatches.id })
 
-    return { tId: t.id, teamIds, poolMatch1Id: m1.id }
+    return {
+        tId: t.id,
+        teamIds,
+        poolMatch1Id: m1.id,
+        bracketMatchId: b1.id
+    }
 }
 
 describe("getScoreEntryRows", () => {
@@ -136,7 +162,11 @@ describe("getScoreEntryRows", () => {
         const result = await getScoreEntryRows()
         expect(result.status).toBe(true)
         if (!result.status || !result.data) throw new Error("expected view")
-        const view = result.data
+        const { view, poolSetsCount, playoffSetsCount } = result.data
+
+        // Default sets config: pool exact-2, playoffs best-of-3.
+        expect(poolSetsCount).toBe(2)
+        expect(playoffSetsCount).toBe(3)
 
         expect(view.hasPoolMatches).toBe(true)
         expect(view.hasBracketMatches).toBe(true)
@@ -168,7 +198,7 @@ describe("getScoreEntryRows", () => {
         const result = await getScoreEntryRows()
         expect(result.status).toBe(true)
         if (!result.status || !result.data) throw new Error("expected view")
-        const view = result.data
+        const { view } = result.data
 
         expect(view.hasPoolMatches).toBe(true)
         expect(view.hasBracketMatches).toBe(false)
@@ -179,5 +209,63 @@ describe("getScoreEntryRows", () => {
         const only = view.divisions[0].pools[0].matches[0]
         expect(only.home?.id).toBe(teamIds.A1)
         expect(only.away?.id).toBe(teamIds.A2)
+    })
+})
+
+describe("saveTournamentMatchScore — format-aware winner", () => {
+    it("pool (exact-2): a 1-1 split records no winner", async () => {
+        const { poolMatch1Id } = await seedScorableTournament()
+        await createUserWithRoles([{ role: "admin" }])
+
+        // A1 (home) takes set 1, A2 (away) takes set 2 — a split.
+        const result = await saveTournamentMatchScore(poolMatch1Id, {
+            ...NO_SCORE,
+            homeSet1: 25,
+            awaySet1: 20,
+            homeSet2: 20,
+            awaySet2: 25
+        })
+        expect(result.status).toBe(true)
+        expect(await winnerOf(poolMatch1Id)).toBeNull()
+    })
+
+    it("pool (exact-2): a 2-0 records the winner", async () => {
+        const { poolMatch1Id, teamIds } = await seedScorableTournament()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await saveTournamentMatchScore(poolMatch1Id, {
+            ...NO_SCORE,
+            homeSet1: 25,
+            awaySet1: 20,
+            homeSet2: 25,
+            awaySet2: 20
+        })
+        expect(result.status).toBe(true)
+        expect(await winnerOf(poolMatch1Id)).toBe(teamIds.A1)
+    })
+
+    it("playoff (best-of-3): not decided until a side clinches two sets", async () => {
+        const { bracketMatchId, teamIds } = await seedScorableTournament()
+        await createUserWithRoles([{ role: "admin" }])
+
+        // Only one set entered — best-of-3 is not yet decided.
+        const partial = await saveTournamentMatchScore(bracketMatchId, {
+            ...NO_SCORE,
+            homeSet1: 25,
+            awaySet1: 18
+        })
+        expect(partial.status).toBe(true)
+        expect(await winnerOf(bracketMatchId)).toBeNull()
+
+        // Second set clinches it 2-0 for the home seat (A1).
+        const clinched = await saveTournamentMatchScore(bracketMatchId, {
+            ...NO_SCORE,
+            homeSet1: 25,
+            awaySet1: 18,
+            homeSet2: 25,
+            awaySet2: 18
+        })
+        expect(clinched.status).toBe(true)
+        expect(await winnerOf(bracketMatchId)).toBe(teamIds.A1)
     })
 })

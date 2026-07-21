@@ -25,6 +25,11 @@ import {
     buildTournamentScheduleView,
     type TournamentScheduleView
 } from "@/lib/tournament-schedule"
+import {
+    matchWinnerSide,
+    tallySetWins,
+    type SetsFormat
+} from "@/lib/tournament-sets"
 
 export type {
     ScheduleTeam,
@@ -35,6 +40,13 @@ export type {
     TournamentScheduleView
 } from "@/lib/tournament-schedule"
 
+export interface ScoreEntryData {
+    view: TournamentScheduleView
+    // Sets per match by phase — drives how many set inputs to render.
+    poolSetsCount: number
+    playoffSetsCount: number
+}
+
 /**
  * Matches the current viewer may enter scores for, shaped into the same
  * division → pools + bracket-groups structure the read-only schedule view uses.
@@ -42,7 +54,7 @@ export type {
  * work team they are rostered on. Returns null when there is no active tournament.
  */
 export const getScoreEntryRows = withAction(
-    async (): Promise<ActionResult<TournamentScheduleView | null>> => {
+    async (): Promise<ActionResult<ScoreEntryData | null>> => {
         const session = await requireSession()
         const config = await getTournamentConfig()
         if (!config) return ok(null)
@@ -94,17 +106,21 @@ export const getScoreEntryRows = withAction(
                       m.work_team_id !== null && myTeamIds.has(m.work_team_id)
               )
 
-        return ok(
-            buildTournamentScheduleView({
-                tournamentName: config.name,
-                eliminationFormat: config.eliminationFormat,
-                myTeamId,
-                divisions: config.divisions,
-                matches: visible,
-                teams,
-                pools
-            })
-        )
+        const view = buildTournamentScheduleView({
+            tournamentName: config.name,
+            eliminationFormat: config.eliminationFormat,
+            myTeamId,
+            divisions: config.divisions,
+            matches: visible,
+            teams,
+            pools
+        })
+
+        return ok({
+            view,
+            poolSetsCount: config.poolSets.count,
+            playoffSetsCount: config.playoffSets.count
+        })
     }
 )
 
@@ -117,26 +133,22 @@ export interface ScorePayload {
     awaySet3: number | null
 }
 
+// Resolve the winning team for a match under the given sets format. Delegates
+// the semantics to tournament-sets so pool play and playoffs (and each mode)
+// stay consistent with the standings and the score-entry UI.
 function computeWinner(
     payload: ScorePayload,
     homeTeamId: number,
-    awayTeamId: number
+    awayTeamId: number,
+    format: SetsFormat
 ): number | null {
-    function setWinner(h: number | null, a: number | null): number | null {
-        if (h === null || a === null) return null
-        if (h === a) return null
-        return h > a ? homeTeamId : awayTeamId
-    }
-    const setWinners = [
-        setWinner(payload.homeSet1, payload.awaySet1),
-        setWinner(payload.homeSet2, payload.awaySet2),
-        setWinner(payload.homeSet3, payload.awaySet3)
-    ].filter((w): w is number => w !== null)
-    if (setWinners.length < 2) return null
-    const homeSets = setWinners.filter((w) => w === homeTeamId).length
-    const awaySets = setWinners.filter((w) => w === awayTeamId).length
-    if (homeSets >= 2) return homeTeamId
-    if (awaySets >= 2) return awayTeamId
+    const tally = tallySetWins(
+        [payload.homeSet1, payload.homeSet2, payload.homeSet3],
+        [payload.awaySet1, payload.awaySet2, payload.awaySet3]
+    )
+    const side = matchWinnerSide(format, tally)
+    if (side === "home") return homeTeamId
+    if (side === "away") return awayTeamId
     return null
 }
 
@@ -179,10 +191,20 @@ export const saveTournamentMatchScore = withAction(
             return fail("Match teams not assigned yet.")
         }
 
+        // Winner is computed under the tournament's configured sets format for
+        // this match's phase (pool play vs. playoffs).
+        const config = await getTournamentConfig()
+        const fallback: SetsFormat = { mode: "best_of", count: 3 }
+        const format =
+            match.bracket === "pool"
+                ? (config?.poolSets ?? fallback)
+                : (config?.playoffSets ?? fallback)
+
         const winner = computeWinner(
             payload,
             match.home_team_id,
-            match.away_team_id
+            match.away_team_id,
+            format
         )
 
         await db

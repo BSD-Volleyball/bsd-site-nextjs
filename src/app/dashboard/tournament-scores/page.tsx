@@ -15,7 +15,7 @@ export default async function TournamentScoresPage() {
     if (!session) redirect("/auth/sign-in")
 
     const result = await getScoreEntryRows()
-    const view = result.status ? result.data : null
+    const data = result.status ? result.data : null
 
     return (
         <div className="space-y-6">
@@ -23,14 +23,18 @@ export default async function TournamentScoresPage() {
                 title="Enter Tournament Scores"
                 description="Your work-team assignments are grouped by pool play and playoffs. Enter the final set scores for each match."
             />
-            {!view ? (
+            {!data ? (
                 <p className="text-muted-foreground">No active tournament.</p>
-            ) : view.divisions.length === 0 ? (
+            ) : data.view.divisions.length === 0 ? (
                 <p className="text-muted-foreground">
                     You have no matches to score right now.
                 </p>
             ) : (
-                <ScoreEntryList view={view} />
+                <ScoreEntryList
+                    view={data.view}
+                    poolSetsCount={data.poolSetsCount}
+                    playoffSetsCount={data.playoffSetsCount}
+                />
             )}
         </div>
     )

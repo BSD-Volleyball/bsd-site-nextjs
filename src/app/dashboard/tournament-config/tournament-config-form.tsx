@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import type { SetsMode } from "@/lib/tournament-sets"
 import {
     type AvailableDivision,
     createTournament,
@@ -36,6 +37,69 @@ interface DivisionState {
 
 function makeKey() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+// Count + mode controls for a sets-per-match format. When `decisiveOnly` is set
+// (playoffs) the count is constrained to odd values so a match can't tie; the
+// same applies to `best_of`, which needs an odd count for a clean majority. On
+// mode change we snap an invalid count back to a valid option.
+function SetsFormatFields({
+    label,
+    idPrefix,
+    mode,
+    count,
+    decisiveOnly,
+    onChange
+}: {
+    label: string
+    idPrefix: string
+    mode: SetsMode
+    count: number
+    decisiveOnly?: boolean
+    onChange: (mode: SetsMode, count: number) => void
+}) {
+    const optionsFor = (m: SetsMode): number[] =>
+        decisiveOnly || m === "best_of" ? [1, 3] : [1, 2, 3]
+    const countOptions = optionsFor(mode)
+    const selectClass =
+        "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-count`}>{label}</Label>
+            <div className="flex gap-2">
+                <select
+                    id={`${idPrefix}-count`}
+                    className={selectClass}
+                    value={count}
+                    onChange={(e) => onChange(mode, Number(e.target.value))}
+                >
+                    {countOptions.map((n) => (
+                        <option key={n} value={n}>
+                            {n} {n === 1 ? "set" : "sets"}
+                        </option>
+                    ))}
+                </select>
+                <select
+                    id={`${idPrefix}-mode`}
+                    className={selectClass}
+                    value={mode}
+                    onChange={(e) => {
+                        const nextMode = e.target.value as SetsMode
+                        const opts = optionsFor(nextMode)
+                        const nextCount = opts.includes(count)
+                            ? count
+                            : opts.includes(3)
+                              ? 3
+                              : opts[0]
+                        onChange(nextMode, nextCount)
+                    }}
+                >
+                    <option value="exact">Play all</option>
+                    <option value="best_of">Best of</option>
+                </select>
+            </div>
+        </div>
+    )
 }
 
 function blankDivision(sortOrder: number): DivisionState {
@@ -91,6 +155,18 @@ export function TournamentConfigForm({
     const [eliminationFormat, setEliminationFormat] = useState<
         "single" | "double"
     >((initialData?.elimination_format as "single" | "double") ?? "single")
+    const [poolSetsMode, setPoolSetsMode] = useState<SetsMode>(
+        (initialData?.pool_sets_mode as SetsMode) ?? "exact"
+    )
+    const [poolSetsCount, setPoolSetsCount] = useState<number>(
+        initialData?.pool_sets_count ?? 2
+    )
+    const [playoffSetsMode, setPlayoffSetsMode] = useState<SetsMode>(
+        (initialData?.playoff_sets_mode as SetsMode) ?? "best_of"
+    )
+    const [playoffSetsCount, setPlayoffSetsCount] = useState<number>(
+        initialData?.playoff_sets_count ?? 3
+    )
     const [additionalInfo, setAdditionalInfo] = useState(
         initialData?.additional_info ?? ""
     )
@@ -146,6 +222,10 @@ export function TournamentConfigForm({
             tournamentType,
             poolSize,
             eliminationFormat,
+            poolSetsMode,
+            poolSetsCount,
+            playoffSetsMode,
+            playoffSetsCount,
             additionalInfo: additionalInfo.trim() || null
         }
     }
@@ -414,6 +494,27 @@ export function TournamentConfigForm({
                                 </option>
                             </select>
                         </div>
+                        <SetsFormatFields
+                            label="Pool Play Sets"
+                            idPrefix="t-pool-sets"
+                            mode={poolSetsMode}
+                            count={poolSetsCount}
+                            onChange={(mode, count) => {
+                                setPoolSetsMode(mode)
+                                setPoolSetsCount(count)
+                            }}
+                        />
+                        <SetsFormatFields
+                            label="Playoff Sets"
+                            idPrefix="t-playoff-sets"
+                            mode={playoffSetsMode}
+                            count={playoffSetsCount}
+                            decisiveOnly
+                            onChange={(mode, count) => {
+                                setPlayoffSetsMode(mode)
+                                setPlayoffSetsCount(count)
+                            }}
+                        />
                     </div>
 
                     <Separator />

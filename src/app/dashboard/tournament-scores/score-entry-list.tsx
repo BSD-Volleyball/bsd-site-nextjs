@@ -79,7 +79,15 @@ function countScored(matches: ScheduleMatch[]): number {
     return matches.filter((m) => m.winnerTeamId !== null).length
 }
 
-export function ScoreEntryList({ view }: { view: TournamentScheduleView }) {
+export function ScoreEntryList({
+    view,
+    poolSetsCount,
+    playoffSetsCount
+}: {
+    view: TournamentScheduleView
+    poolSetsCount: number
+    playoffSetsCount: number
+}) {
     const router = useRouter()
 
     const allMatches = useMemo(() => {
@@ -164,10 +172,11 @@ export function ScoreEntryList({ view }: { view: TournamentScheduleView }) {
 
     const showDivisionLabel = view.divisions.length > 1
 
-    const renderMatch = (match: ScheduleMatch) => (
+    const renderMatch = (match: ScheduleMatch, setsCount: number) => (
         <MatchScoreCard
             key={match.id}
             match={match}
+            setsCount={setsCount}
             state={state[match.id] ?? EMPTY}
             busy={busy === match.id}
             onChange={update}
@@ -212,8 +221,11 @@ export function ScoreEntryList({ view }: { view: TournamentScheduleView }) {
                                                     </CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="space-y-3">
-                                                    {pool.matches.map(
-                                                        renderMatch
+                                                    {pool.matches.map((m) =>
+                                                        renderMatch(
+                                                            m,
+                                                            poolSetsCount
+                                                        )
                                                     )}
                                                 </CardContent>
                                             </Card>
@@ -265,7 +277,12 @@ export function ScoreEntryList({ view }: { view: TournamentScheduleView }) {
                                                     ] ?? group.bracket}{" "}
                                                     · Round {group.round}
                                                 </div>
-                                                {group.matches.map(renderMatch)}
+                                                {group.matches.map((m) =>
+                                                    renderMatch(
+                                                        m,
+                                                        playoffSetsCount
+                                                    )
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -354,14 +371,19 @@ function DivisionLabel({ name }: { name: string }) {
     )
 }
 
+const HOME_FIELDS: Array<keyof RowState> = ["homeSet1", "homeSet2", "homeSet3"]
+const AWAY_FIELDS: Array<keyof RowState> = ["awaySet1", "awaySet2", "awaySet3"]
+
 function MatchScoreCard({
     match,
+    setsCount,
     state,
     busy,
     onChange,
     onSave
 }: {
     match: ScheduleMatch
+    setsCount: number
     state: RowState
     busy: boolean
     onChange: (id: number, field: keyof RowState, v: string) => void
@@ -374,6 +396,11 @@ function MatchScoreCard({
     if (match.court !== null) meta.push(`Court ${match.court}`)
     const homeWin = decided && match.winnerTeamId === match.home?.id
     const awayWin = decided && match.winnerTeamId === match.away?.id
+    // Runtime set count → inline grid columns (Tailwind can't JIT a dynamic
+    // repeat()). One label column plus one narrow column per set.
+    const gridStyle = {
+        gridTemplateColumns: `1fr repeat(${setsCount}, 2.5rem)`
+    }
 
     return (
         <div
@@ -390,34 +417,37 @@ function MatchScoreCard({
                     <span className="truncate">Work: {match.workTeamName}</span>
                 )}
             </div>
-            <div className="grid grid-cols-[1fr_repeat(3,2.5rem)] items-center gap-2">
+            <div className="grid items-center gap-2" style={gridStyle}>
                 <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
                     Set
                 </span>
-                <span className="text-center text-[11px] text-muted-foreground">
-                    1
-                </span>
-                <span className="text-center text-[11px] text-muted-foreground">
-                    2
-                </span>
-                <span className="text-center text-[11px] text-muted-foreground">
-                    3
-                </span>
+                {Array.from({ length: setsCount }, (_, i) => i + 1).map((n) => (
+                    <span
+                        key={n}
+                        className="text-center text-[11px] text-muted-foreground"
+                    >
+                        {n}
+                    </span>
+                ))}
             </div>
             <ScoreInputRow
                 label={match.home?.name ?? "TBD"}
                 isWinner={homeWin}
                 decided={decided}
+                setsCount={setsCount}
+                gridStyle={gridStyle}
                 values={[state.homeSet1, state.homeSet2, state.homeSet3]}
-                fields={["homeSet1", "homeSet2", "homeSet3"]}
+                fields={HOME_FIELDS}
                 onChange={(field, v) => onChange(match.id, field, v)}
             />
             <ScoreInputRow
                 label={match.away?.name ?? "TBD"}
                 isWinner={awayWin}
                 decided={decided}
+                setsCount={setsCount}
+                gridStyle={gridStyle}
                 values={[state.awaySet1, state.awaySet2, state.awaySet3]}
-                fields={["awaySet1", "awaySet2", "awaySet3"]}
+                fields={AWAY_FIELDS}
                 onChange={(field, v) => onChange(match.id, field, v)}
             />
             <div className="mt-2 flex justify-end">
@@ -433,6 +463,8 @@ function ScoreInputRow({
     label,
     isWinner,
     decided,
+    setsCount,
+    gridStyle,
     values,
     fields,
     onChange
@@ -440,12 +472,14 @@ function ScoreInputRow({
     label: string
     isWinner: boolean
     decided: boolean
-    values: [string, string, string]
-    fields: [keyof RowState, keyof RowState, keyof RowState]
+    setsCount: number
+    gridStyle: React.CSSProperties
+    values: string[]
+    fields: Array<keyof RowState>
     onChange: (field: keyof RowState, v: string) => void
 }) {
     return (
-        <div className="grid grid-cols-[1fr_repeat(3,2.5rem)] items-center gap-2 py-1">
+        <div className="grid items-center gap-2 py-1" style={gridStyle}>
             <span
                 className={cn(
                     "truncate text-sm",
@@ -458,7 +492,7 @@ function ScoreInputRow({
             >
                 {label}
             </span>
-            {fields.map((field, i) => (
+            {fields.slice(0, setsCount).map((field, i) => (
                 <Input
                     key={field}
                     type="number"

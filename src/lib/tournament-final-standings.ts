@@ -5,6 +5,7 @@ import {
     tournamentDivisions,
     tournamentMatches,
     tournamentPlacements,
+    tournaments,
     tournamentTeams
 } from "@/database/schema"
 import { eq } from "drizzle-orm"
@@ -14,6 +15,7 @@ import {
     type UsavMatch,
     type UsavTeam
 } from "@/lib/usav-ranking"
+import type { SetsFormat, SetsMode } from "@/lib/tournament-sets"
 
 export interface FinalMatch extends UsavMatch {
     bracket: string
@@ -41,8 +43,15 @@ function isBracket(m: FinalMatch): boolean {
  */
 export function rankDivisionFinal(
     teams: UsavTeam[],
-    matches: FinalMatch[]
+    matches: FinalMatch[],
+    poolFormat: SetsFormat,
+    playoffFormat: SetsFormat
 ): FinalStandingRow[] {
+    // Pool matches judge completion by the pool format; bracket matches by the
+    // playoff format.
+    const formatFor = (m: UsavMatch): SetsFormat =>
+        m.bracket && m.bracket !== "pool" ? playoffFormat : poolFormat
+
     const bracketMatches = matches.filter(isBracket)
     const hasLosers = bracketMatches.some((m) => m.bracket === "losers")
 
@@ -50,7 +59,7 @@ export function rankDivisionFinal(
     const finalMatch = bracketMatches.find(
         (m) =>
             m.bracket === "final" &&
-            matchHasFinalScore(m) &&
+            matchHasFinalScore(m, playoffFormat) &&
             m.winner_team_id !== null
     )
     let championId: number | null = null
@@ -85,7 +94,11 @@ export function rankDivisionFinal(
             if (m.bracket_round !== null) {
                 furthestRound = Math.max(furthestRound, m.bracket_round)
             }
-            if (!matchHasFinalScore(m) || m.winner_team_id === null) continue
+            if (
+                !matchHasFinalScore(m, playoffFormat) ||
+                m.winner_team_id === null
+            )
+                continue
             const lost = m.winner_team_id !== teamId
             if (!lost) continue
             // Single-elim: any bracket loss eliminates. Double-elim: only a loss
@@ -139,7 +152,7 @@ export function rankDivisionFinal(
         }
         // Break ties within a tier by full-record USAV ranking.
         const tierTeams = withKey.slice(i, j).map((x) => x.team)
-        const ranked = usavRankTeams(tierTeams, matches)
+        const ranked = usavRankTeams(tierTeams, matches, formatFor)
         for (const r of ranked) {
             result.push({
                 teamId: r.teamId,
@@ -164,6 +177,23 @@ export async function computeTournamentPlacements(
         .from(tournamentDivisions)
         .where(eq(tournamentDivisions.tournament_id, tournamentId))
 
+    const [t] = await db
+        .select({
+            poolMode: tournaments.pool_sets_mode,
+            poolCount: tournaments.pool_sets_count,
+            playoffMode: tournaments.playoff_sets_mode,
+            playoffCount: tournaments.playoff_sets_count
+        })
+        .from(tournaments)
+        .where(eq(tournaments.id, tournamentId))
+        .limit(1)
+    const poolFormat: SetsFormat = t
+        ? { mode: t.poolMode as SetsMode, count: t.poolCount }
+        : { mode: "exact", count: 2 }
+    const playoffFormat: SetsFormat = t
+        ? { mode: t.playoffMode as SetsMode, count: t.playoffCount }
+        : { mode: "best_of", count: 3 }
+
     const byDivision = new Map<number, FinalStandingRow[]>()
     for (const division of divisions) {
         const teams = await db
@@ -180,7 +210,12 @@ export async function computeTournamentPlacements(
 
         byDivision.set(
             division.id,
-            rankDivisionFinal(teams, matches as FinalMatch[])
+            rankDivisionFinal(
+                teams,
+                matches as FinalMatch[],
+                poolFormat,
+                playoffFormat
+            )
         )
     }
     return byDivision

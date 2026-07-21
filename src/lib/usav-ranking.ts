@@ -1,4 +1,9 @@
 import { getSetScores } from "@/lib/team-ranking"
+import {
+    isMatchFinal,
+    tallySetWins,
+    type SetsFormat
+} from "@/lib/tournament-sets"
 
 /**
  * USA Volleyball pool-finish tie-break logic.
@@ -33,6 +38,21 @@ export interface UsavMatch {
     away_set2_score: number | null
     home_set3_score: number | null
     away_set3_score: number | null
+    // Optional phase marker. When present and not "pool", the playoff format is
+    // used to decide match completion; absent/"pool" uses the pool format. Lets
+    // a mixed pool+bracket ranking apply the right sets format per match.
+    bracket?: string
+}
+
+/**
+ * The sets format used to gauge match completion. Either a single format (pool
+ * standings — all matches are pool play) or a per-match resolver (mixed
+ * pool+bracket ranking, which picks pool vs. playoff by `bracket`).
+ */
+export type SetsFormatResolver = SetsFormat | ((m: UsavMatch) => SetsFormat)
+
+function resolveFormat(f: SetsFormatResolver, m: UsavMatch): SetsFormat {
+    return typeof f === "function" ? f(m) : f
 }
 
 export interface UsavTally {
@@ -53,16 +73,16 @@ export interface RankedTeam extends UsavTally {
 }
 
 /**
- * A match counts once both of the first two sets have scores on both sides
- * (2-of-3 sets played). Mirrors the existing tournament standings convention.
+ * Whether a match is complete for standings purposes under the given sets
+ * format. `exact(N)` needs N sets entered; `best_of(N)` needs a side to reach
+ * the clinching majority. See {@link isMatchFinal}.
  */
-export function matchHasFinalScore(m: UsavMatch): boolean {
-    return (
-        m.home_set1_score !== null &&
-        m.away_set1_score !== null &&
-        m.home_set2_score !== null &&
-        m.away_set2_score !== null
+export function matchHasFinalScore(m: UsavMatch, format: SetsFormat): boolean {
+    const tally = tallySetWins(
+        [m.home_set1_score, m.home_set2_score, m.home_set3_score],
+        [m.away_set1_score, m.away_set2_score, m.away_set3_score]
     )
+    return isMatchFinal(format, tally)
 }
 
 /** Total points across all played sets, per side. */
@@ -103,7 +123,8 @@ function pct(num: number, den: number): number {
 
 export function computeUsavTallies(
     teams: UsavTeam[],
-    matches: UsavMatch[]
+    matches: UsavMatch[],
+    format: SetsFormatResolver
 ): Map<number, UsavTally> {
     const tallies = new Map<number, UsavTally>()
     for (const t of teams) {
@@ -122,7 +143,7 @@ export function computeUsavTallies(
     }
 
     for (const m of matches) {
-        if (!matchHasFinalScore(m)) continue
+        if (!matchHasFinalScore(m, resolveFormat(format, m))) continue
         if (m.home_team_id === null || m.away_team_id === null) continue
         // Each side is tallied independently so a team's record still counts a
         // match against an opponent that is not in `teams` (e.g. when ranking a
@@ -170,11 +191,12 @@ export function computeUsavTallies(
  * Returns 1 if team A won more of their mutual matches, -1 if team B did,
  * 0 if they split or never played.
  */
+// `matches` here is already filtered to completed matches by usavRankTeams, so
+// there is no completion gate to re-apply.
 function headToHead(matches: UsavMatch[], aId: number, bId: number): number {
     let aWins = 0
     let bWins = 0
     for (const m of matches) {
-        if (!matchHasFinalScore(m)) continue
         const involvesBoth =
             (m.home_team_id === aId && m.away_team_id === bId) ||
             (m.home_team_id === bId && m.away_team_id === aId)
@@ -325,10 +347,17 @@ function partition(
  */
 export function usavRankTeams(
     teams: UsavTeam[],
-    matches: UsavMatch[]
+    matches: UsavMatch[],
+    format: SetsFormatResolver
 ): RankedTeam[] {
-    const tallyMap = computeUsavTallies(teams, matches)
+    const tallyMap = computeUsavTallies(teams, matches, format)
     const all = [...tallyMap.values()]
+
+    // Head-to-head resolution only ever looks at completed matches; filter once
+    // here so the recursion below doesn't need the format threaded through it.
+    const finalMatches = matches.filter((m) =>
+        matchHasFinalScore(m, resolveFormat(format, m))
+    )
 
     // Split by match wins (descending); equal-record teams form a tied group.
     const byWinsDesc = [...all].sort((a, b) => b.matchWins - a.matchWins)
@@ -342,7 +371,9 @@ export function usavRankTeams(
         ) {
             j++
         }
-        ordered.push(...resolveTied(byWinsDesc.slice(i, j), "h2h", matches))
+        ordered.push(
+            ...resolveTied(byWinsDesc.slice(i, j), "h2h", finalMatches)
+        )
         i = j
     }
 

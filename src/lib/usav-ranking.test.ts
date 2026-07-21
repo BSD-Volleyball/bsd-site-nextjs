@@ -5,6 +5,11 @@ import {
     type UsavMatch,
     type UsavTeam
 } from "@/lib/usav-ranking"
+import type { SetsFormat } from "@/lib/tournament-sets"
+
+// These fixtures use 2-set decisive matches; exact-2 (the pool default) matches
+// the original "two sets entered = final" convention exactly.
+const POOL: SetsFormat = { mode: "exact", count: 2 }
 
 function t(id: number, name = `Team ${id}`): UsavTeam {
     return { id, name }
@@ -45,7 +50,7 @@ function win(winner: number, loser: number): UsavMatch {
 }
 
 function ids(teams: UsavTeam[], matches: UsavMatch[]): number[] {
-    return usavRankTeams(teams, matches).map((r) => r.teamId)
+    return usavRankTeams(teams, matches, POOL).map((r) => r.teamId)
 }
 
 describe("usavRankTeams — primary match record", () => {
@@ -59,7 +64,7 @@ describe("usavRankTeams — primary match record", () => {
         const teams = [t(1), t(2), t(3)]
         const matches = [win(1, 2)]
         // T3 never played; T1 (1 win) then T2 (0, but played) then T3 (0).
-        const ranked = usavRankTeams(teams, matches)
+        const ranked = usavRankTeams(teams, matches, POOL)
         expect(ranked[0].teamId).toBe(1)
     })
 })
@@ -86,7 +91,7 @@ describe("usavRankTeams — two-team ties always head-to-head", () => {
         ]
         // T1 and T2 both have 2 wins; T2 has the better set % and point %,
         // but T1 beat T2 head-to-head, so T1 must finish ahead.
-        const tallies = computeUsavTallies(teams, matches)
+        const tallies = computeUsavTallies(teams, matches, POOL)
         expect(tallies.get(1)!.matchWins).toBe(2)
         expect(tallies.get(2)!.matchWins).toBe(2)
         expect(tallies.get(2)!.setPct).toBeGreaterThan(tallies.get(1)!.setPct)
@@ -114,7 +119,7 @@ describe("usavRankTeams — three-or-more-team ties", () => {
             win(3, 5),
             win(5, 4)
         ]
-        const tallies = computeUsavTallies(teams, matches)
+        const tallies = computeUsavTallies(teams, matches, POOL)
         expect(tallies.get(1)!.matchWins).toBe(2)
         expect(tallies.get(2)!.matchWins).toBe(2)
         expect(tallies.get(3)!.matchWins).toBe(2)

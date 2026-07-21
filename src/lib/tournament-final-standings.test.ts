@@ -4,6 +4,10 @@ import {
     type FinalMatch
 } from "@/lib/tournament-final-standings"
 import type { UsavTeam } from "@/lib/usav-ranking"
+import type { SetsFormat } from "@/lib/tournament-sets"
+
+const POOL: SetsFormat = { mode: "exact", count: 2 }
+const PLAYOFF: SetsFormat = { mode: "best_of", count: 3 }
 
 function t(id: number, name = `Team ${id}`): UsavTeam {
     return { id, name }
@@ -49,7 +53,7 @@ function bracketMatch(
 }
 
 function places(teams: UsavTeam[], matches: FinalMatch[]): number[] {
-    return rankDivisionFinal(teams, matches).map((r) => r.teamId)
+    return rankDivisionFinal(teams, matches, POOL, PLAYOFF).map((r) => r.teamId)
 }
 
 describe("rankDivisionFinal — stopped during pool play (no bracket)", () => {
@@ -81,7 +85,7 @@ describe("rankDivisionFinal — decided final pins 1st and 2nd", () => {
             bracketMatch("winners", 1, 2, 3, 3), // T3 beats T2 (semi)
             bracketMatch("final", 2, 3, 4, 4) // T4 beats T3 in the final
         ]
-        const ranked = rankDivisionFinal(teams, matches)
+        const ranked = rankDivisionFinal(teams, matches, POOL, PLAYOFF)
         expect(ranked[0].teamId).toBe(4) // champion
         expect(ranked[1].teamId).toBe(3) // runner-up, despite best pool record
         // Semifinal losers T1 & T2 fill the remaining places.

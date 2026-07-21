@@ -3,11 +3,14 @@ import "server-only"
 import { db } from "@/database/db"
 import {
     tournamentMatches,
+    tournamentPools,
     tournamentPoolTeams,
+    tournaments,
     tournamentTeams
 } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
 import { usavRankTeams, type UsavMatch } from "@/lib/usav-ranking"
+import type { SetsFormat, SetsMode } from "@/lib/tournament-sets"
 
 export interface PoolStandingRow {
     teamId: number
@@ -48,7 +51,25 @@ export async function getPoolStandings(
         .from(tournamentMatches)
         .where(eq(tournamentMatches.pool_id, poolId))
 
-    const ranked = usavRankTeams(teams, matches as UsavMatch[])
+    // Resolve the tournament's pool-play sets format so completion is judged the
+    // same way scores are entered.
+    const [fmt] = await db
+        .select({
+            mode: tournaments.pool_sets_mode,
+            count: tournaments.pool_sets_count
+        })
+        .from(tournamentPools)
+        .innerJoin(
+            tournaments,
+            eq(tournaments.id, tournamentPools.tournament_id)
+        )
+        .where(eq(tournamentPools.id, poolId))
+        .limit(1)
+    const poolFormat: SetsFormat = fmt
+        ? { mode: fmt.mode as SetsMode, count: fmt.count }
+        : { mode: "exact", count: 2 }
+
+    const ranked = usavRankTeams(teams, matches as UsavMatch[], poolFormat)
 
     return ranked.map((r) => ({
         teamId: r.teamId,
