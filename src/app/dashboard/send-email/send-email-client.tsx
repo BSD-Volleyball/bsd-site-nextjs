@@ -62,6 +62,7 @@ function sendToLabel(
     divisions: DivisionOption[],
     teams: TeamOption[]
 ): string {
+    if (groupType === "self") return "Just Me"
     if (groupType === "all_users") return "Everyone"
     if (groupType === "season_signups") return "Current Season Players"
     if (groupType === "season_captains") return "Current Season Captains"
@@ -76,6 +77,28 @@ function sendToLabel(
         return team ? `Team: ${team.name}` : "Team"
     }
     return "Unknown"
+}
+
+/** Maps a stored recipient group_type back to the compose form's SendToType. */
+function sendToTypeFromGroupType(groupType: string | null): SendToType | null {
+    switch (groupType) {
+        case "self":
+            return "just_me"
+        case "all_users":
+            return "everyone"
+        case "season_signups":
+            return "season"
+        case "season_captains":
+            return "season_captains"
+        case "season_commissioners":
+            return "season_commissioners"
+        case "season_division":
+            return "division"
+        case "season_team":
+            return "team"
+        default:
+            return null
+    }
 }
 
 export function SendEmailClient({
@@ -143,7 +166,7 @@ export function SendEmailClient({
             setEditorKey((k) => k + 1)
             setSendMessage(null)
 
-            const type = item.groupType as SendToType | null
+            const type = sendToTypeFromGroupType(item.groupType)
             if (type) {
                 setSendToType(type)
                 if (type === "division" && item.divisionId) {
@@ -283,6 +306,9 @@ export function SendEmailClient({
                                     <SelectValue placeholder="Select recipients…" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="just_me">
+                                        Just Me (test send to yourself)
+                                    </SelectItem>
                                     {canSendToAll && (
                                         <>
                                             <SelectItem value="everyone">

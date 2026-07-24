@@ -91,6 +91,7 @@ export interface BroadcastHistoryItem {
 }
 
 export type SendToType =
+    | "just_me"
     | "everyone"
     | "season"
     | "division"
@@ -273,6 +274,13 @@ async function resolveGroup(
     divisionId?: number,
     teamId?: number
 ): Promise<{ groupId: number; groupName: string; stream: BroadcastStream }> {
+    // A shared bookkeeping group so test sends appear in broadcast history;
+    // recipients for it come from the caller's session, never from the group.
+    if (sendToType === "just_me") {
+        const groupId = await ensureRecipientGroup("self", { name: "Just Me" })
+        return { groupId, groupName: "Just Me", stream: STREAM_BROADCAST }
+    }
+
     if (sendToType === "everyone") {
         const groupId = await ensureRecipientGroup("all_users", {
             name: "All Users"
@@ -515,8 +523,15 @@ export const createAndSendBroadcast = withAction(
             .returning({ id: emailBroadcasts.id })
 
         try {
-            const allRecipients = await getRecipientsForGroup(groupId)
-            const recipients = await filterSuppressed(allRecipients, stream)
+            // just_me is a test send to the composer only; it bypasses the
+            // group query and the suppression filter so it always arrives.
+            const recipients =
+                sendToType === "just_me"
+                    ? [{ email: session.user.email }]
+                    : await filterSuppressed(
+                          await getRecipientsForGroup(groupId),
+                          stream
+                      )
 
             if (recipients.length === 0) {
                 await db
@@ -638,14 +653,21 @@ export const previewBroadcast = withAction(
             )
         }
 
-        const allRecipients = await getRecipientsForGroup(group.groupId)
-        const recipients = await filterSuppressed(allRecipients, group.stream)
+        const recipientCount =
+            sendToType === "just_me"
+                ? 1
+                : (
+                      await filterSuppressed(
+                          await getRecipientsForGroup(group.groupId),
+                          group.stream
+                      )
+                  ).length
 
         return ok({
             subject: resolved.subject,
             html: resolved.html,
             groupName: group.groupName,
-            recipientCount: recipients.length
+            recipientCount
         })
     }
 )

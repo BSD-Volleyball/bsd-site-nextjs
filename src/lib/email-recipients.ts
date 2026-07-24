@@ -25,6 +25,7 @@ import { eq, and, inArray, isNotNull } from "drizzle-orm"
 // ---------------------------------------------------------------------------
 
 export type RecipientGroupType =
+    | "self"
     | "all_users"
     | "season_signups"
     | "season_division"

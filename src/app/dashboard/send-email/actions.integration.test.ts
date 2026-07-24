@@ -160,6 +160,48 @@ describe("createAndSendBroadcast", () => {
         expect(await broadcastRows()).toHaveLength(0)
     })
 
+    it("sends only to the signed-in user for just_me", async () => {
+        const season = await createSeason()
+        await createSeasonEvent(season.id)
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        await createUser() // bystander who must NOT receive the test email
+        await createUser()
+
+        const result = await createAndSendBroadcast({
+            sendToType: "just_me",
+            subject: "Test: BSD [season_name] Registration is Open!!",
+            lexicalContent: bodyWith("Welcome to ", "season_name")
+        })
+
+        expect(result.status).toBe(true)
+        expect(sendBroadcastEmails).toHaveBeenCalledOnce()
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: admin.email }])
+        expect(call.subject).toBe("Test: BSD Fall 2026 Registration is Open!!")
+
+        const [row] = await broadcastRows()
+        expect(row.sent_count).toBe(1)
+    })
+
+    it("allows commissioners to send just_me", async () => {
+        const season = await createSeason()
+        const commissioner = await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+        await createUser()
+
+        const result = await createAndSendBroadcast({
+            sendToType: "just_me",
+            subject: "Testing [season_name]",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        expect(sendBroadcastEmails).toHaveBeenCalledOnce()
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: commissioner.email }])
+    })
+
     it("returns Unauthorized for an authenticated non-admin", async () => {
         await createSeason()
         await createUserWithRoles([{ role: "captain" }])
@@ -214,6 +256,25 @@ describe("previewBroadcast", () => {
 
         expect(sendBroadcastEmails).not.toHaveBeenCalled()
         expect(await broadcastRows()).toHaveLength(0)
+    })
+
+    it("previews a just_me send as one recipient", async () => {
+        await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        await createUser()
+
+        const result = await previewBroadcast({
+            sendToType: "just_me",
+            subject: "Test: [season_name]",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected success")
+        expect(result.data.subject).toBe("Test: Fall 2026")
+        expect(result.data.groupName).toBe("Just Me")
+        expect(result.data.recipientCount).toBe(1)
+        expect(sendBroadcastEmails).not.toHaveBeenCalled()
     })
 
     it("reports unresolved variables instead of previewing", async () => {
