@@ -21,14 +21,23 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
-import { RiArrowDownSLine, RiSendPlaneLine } from "@remixicon/react"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
+import { RiArrowDownSLine, RiEyeLine, RiSendPlaneLine } from "@remixicon/react"
 import { LexicalEmailEditor } from "@/components/email-template/lexical-email-editor"
 import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
-import { createAndSendBroadcast } from "./actions"
+import { createAndSendBroadcast, previewBroadcast } from "./actions"
 import type {
+    BroadcastPreview,
     DivisionOption,
     TeamOption,
     TemplateOption,
@@ -96,6 +105,11 @@ export function SendEmailClient({
     const [sending, setSending] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
 
+    // Preview dialog state
+    const [preview, setPreview] = useState<BroadcastPreview | null>(null)
+    const [previewOpen, setPreviewOpen] = useState(false)
+    const [previewing, setPreviewing] = useState(false)
+
     // Group teams by division for the team dropdown
     const teamsByDivision = divisions
         .map((div) => ({
@@ -149,45 +163,55 @@ export function SendEmailClient({
         [teams]
     )
 
-    const handleSend = async () => {
+    const validate = (): string | null => {
+        if (!sendToType) return "Please select who to send this email to."
+        if (sendToType === "division" && !selectedDivisionId)
+            return "Please select a division."
+        if (sendToType === "team" && !selectedTeamId)
+            return "Please select a team."
+        if (!subject.trim()) return "Subject is required."
+        return null
+    }
+
+    const broadcastInput = () => ({
+        sendToType: sendToType as SendToType,
+        divisionId: selectedDivisionId ? Number(selectedDivisionId) : undefined,
+        teamId: selectedTeamId ? Number(selectedTeamId) : undefined,
+        subject,
+        lexicalContent: content
+    })
+
+    const handlePreview = async () => {
         setSendMessage(null)
 
-        if (!sendToType) {
-            setSendMessage({
-                type: "error",
-                text: "Please select who to send this email to."
-            })
-            return
-        }
-        if (sendToType === "division" && !selectedDivisionId) {
-            setSendMessage({
-                type: "error",
-                text: "Please select a division."
-            })
-            return
-        }
-        if (sendToType === "team" && !selectedTeamId) {
-            setSendMessage({ type: "error", text: "Please select a team." })
-            return
-        }
-        if (!subject.trim()) {
-            setSendMessage({ type: "error", text: "Subject is required." })
+        const error = validate()
+        if (error) {
+            setSendMessage({ type: "error", text: error })
             return
         }
 
+        setPreviewing(true)
+        try {
+            const result = await previewBroadcast(broadcastInput())
+            if (result.status) {
+                setPreview(result.data)
+                setPreviewOpen(true)
+            } else {
+                setSendMessage({ type: "error", text: result.message })
+            }
+        } finally {
+            setPreviewing(false)
+        }
+    }
+
+    const handleSend = async () => {
         setSending(true)
         try {
-            const result = await createAndSendBroadcast({
-                sendToType,
-                divisionId: selectedDivisionId
-                    ? Number(selectedDivisionId)
-                    : undefined,
-                teamId: selectedTeamId ? Number(selectedTeamId) : undefined,
-                subject,
-                lexicalContent: content
-            })
+            const result = await createAndSendBroadcast(broadcastInput())
 
             if (result.status) {
+                setPreviewOpen(false)
+                setPreview(null)
                 setSendMessage({
                     type: "success",
                     text: "Email sent successfully!"
@@ -200,6 +224,7 @@ export function SendEmailClient({
                 setEditorKey((k) => k + 1)
                 router.refresh()
             } else {
+                setPreviewOpen(false)
                 setSendMessage({ type: "error", text: result.message })
             }
         } finally {
@@ -386,15 +411,70 @@ export function SendEmailClient({
 
                     <div className="flex justify-end">
                         <Button
-                            onClick={handleSend}
-                            disabled={sending || !canSend}
+                            onClick={handlePreview}
+                            disabled={previewing || !canSend}
                         >
-                            <RiSendPlaneLine className="mr-2 size-4" />
-                            {sending ? "Sending…" : "Send Email"}
+                            <RiEyeLine className="mr-2 size-4" />
+                            {previewing ? "Preparing preview…" : "Preview"}
                         </Button>
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Preview dialog — final resolved email before anything is sent */}
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Preview Email</DialogTitle>
+                        <DialogDescription>
+                            {preview
+                                ? `This is what will be sent to ${preview.groupName} (${preview.recipientCount} ${preview.recipientCount === 1 ? "recipient" : "recipients"}).`
+                                : ""}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {preview && (
+                        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                                    Subject
+                                </p>
+                                <p className="font-medium text-sm">
+                                    {preview.subject}
+                                </p>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                                    Body
+                                </p>
+                                <div
+                                    className="rounded-md border p-4 text-sm"
+                                    // biome-ignore lint/security/noDangerouslySetInnerHtml: server-rendered preview of the admin's own composed email
+                                    dangerouslySetInnerHTML={{
+                                        __html: preview.html
+                                    }}
+                                />
+                                <p className="text-muted-foreground text-xs">
+                                    An unsubscribe link is automatically
+                                    appended below the body.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setPreviewOpen(false)}
+                            disabled={sending}
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSend} disabled={sending}>
+                            <RiSendPlaneLine className="mr-2 size-4" />
+                            {sending ? "Sending…" : "Send Email"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Broadcast history */}
             {initialHistory.length > 0 && (

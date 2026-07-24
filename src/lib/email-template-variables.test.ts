@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import {
     buildEventVariableValues,
+    findUnresolvedVariableKeys,
     getTemplateVariable,
     getTemplateVariablesByCategory,
     resolveSubjectVariables,
@@ -147,6 +148,114 @@ describe("resolveTemplateVariablesInContent", () => {
             type: "text",
             text: "[nope]"
         })
+    })
+})
+
+describe("findUnresolvedVariableKeys", () => {
+    const emptyContent: LexicalEmailTemplateContent = {
+        root: {
+            type: "root",
+            direction: null,
+            format: "",
+            indent: 0,
+            version: 1,
+            children: []
+        }
+    }
+
+    function contentWithVariables(keys: string[]): LexicalEmailTemplateContent {
+        return {
+            root: {
+                type: "root",
+                direction: null,
+                format: "",
+                indent: 0,
+                version: 1,
+                children: [
+                    {
+                        type: "paragraph",
+                        direction: null,
+                        format: "",
+                        indent: 0,
+                        version: 1,
+                        children: keys.map((variableKey) => ({
+                            type: "template-variable" as const,
+                            variableKey,
+                            version: 1
+                        }))
+                    }
+                ]
+            }
+        }
+    }
+
+    it("flags known subject variables missing from values", () => {
+        expect(
+            findUnresolvedVariableKeys(
+                "[season_name] kickoff, brought to you by [captain_names]",
+                emptyContent,
+                { season_name: "Fall 2026" },
+                config
+            )
+        ).toEqual(["captain_names"])
+    })
+
+    it("flags season-derived date variables in the subject", () => {
+        expect(
+            findUnresolvedVariableKeys(
+                "Tryouts on [tryout_1_date]",
+                emptyContent,
+                {},
+                config
+            )
+        ).toEqual(["tryout_1_date"])
+    })
+
+    it("ignores bracketed text that is not a known variable", () => {
+        expect(
+            findUnresolvedVariableKeys(
+                "[fun] stuff [really]",
+                emptyContent,
+                {},
+                config
+            )
+        ).toEqual([])
+    })
+
+    it("treats the legacy [division] key as division_name", () => {
+        expect(
+            findUnresolvedVariableKeys("[division]", emptyContent, {}, config)
+        ).toEqual(["division"])
+        expect(
+            findUnresolvedVariableKeys(
+                "[division]",
+                emptyContent,
+                { division_name: "AA" },
+                config
+            )
+        ).toEqual([])
+    })
+
+    it("flags unresolved template-variable nodes in the content", () => {
+        expect(
+            findUnresolvedVariableKeys(
+                "No variables here",
+                contentWithVariables(["division_name", "season_name"]),
+                { season_name: "Fall 2026" },
+                config
+            )
+        ).toEqual(["division_name"])
+    })
+
+    it("dedupes keys repeated across subject and content", () => {
+        expect(
+            findUnresolvedVariableKeys(
+                "[captain_names] and again [captain_names]",
+                contentWithVariables(["captain_names"]),
+                {},
+                config
+            )
+        ).toEqual(["captain_names"])
     })
 })
 

@@ -28,6 +28,15 @@ import {
     convertEmailTemplateContentToHtml
 } from "@/lib/email-template-content"
 import {
+    type TemplateVariableValues,
+    buildEventVariableValues,
+    findUnresolvedVariableKeys,
+    resolveSubjectVariables,
+    resolveTemplateVariablesInContent
+} from "@/lib/email-template-variables"
+import { formatSeasonLabel } from "@/lib/season-utils"
+import type { SeasonConfig } from "@/lib/season-types"
+import {
     sendBroadcastEmails,
     STREAM_BROADCAST,
     STREAM_IN_SEASON_UPDATES
@@ -359,6 +368,79 @@ async function resolveGroup(
     }
 }
 
+/**
+ * Resolve template variables in the subject and body using the values a
+ * broadcast context can supply: season name/year, event dates/times, and the
+ * selected division or team. Variables needing per-person context (captain
+ * lists, draft rounds, the composer's name, …) are not available here, so a
+ * subject or body that references one refuses to resolve rather than sending
+ * literal "[key]" text to the whole list.
+ */
+async function resolveBroadcastTemplate(
+    config: SeasonConfig,
+    input: SendBroadcastInput
+): Promise<
+    | { error: string }
+    | { subject: string; html: string; content: LexicalEmailTemplateContent }
+> {
+    const values: TemplateVariableValues = {}
+    let divisionLevel: number | null = null
+
+    if (config.seasonId) {
+        values.season_name = formatSeasonLabel(config)
+        values.season_year = String(config.seasonYear)
+    }
+
+    if (input.sendToType === "division" && input.divisionId) {
+        const [divRow] = await db
+            .select({ name: divisions.name, level: divisions.level })
+            .from(divisions)
+            .where(eq(divisions.id, input.divisionId))
+            .limit(1)
+        if (divRow) {
+            values.division_name = divRow.name
+            divisionLevel = divRow.level
+        }
+    }
+
+    if (input.sendToType === "team" && input.teamId) {
+        const [teamRow] = await db
+            .select({ name: teams.name })
+            .from(teams)
+            .where(eq(teams.id, input.teamId))
+            .limit(1)
+        if (teamRow?.name) values.team_name = teamRow.name
+    }
+
+    if (config.seasonId) {
+        Object.assign(values, buildEventVariableValues(config, divisionLevel))
+    }
+
+    const unresolved = findUnresolvedVariableKeys(
+        input.subject,
+        input.lexicalContent,
+        values,
+        config
+    )
+    if (unresolved.length > 0) {
+        return {
+            error: `These template variables are not available for this recipient selection: ${unresolved
+                .map((k) => `[${k}]`)
+                .join(", ")}. Remove them or pick a different recipient group.`
+        }
+    }
+
+    const content = resolveTemplateVariablesInContent(
+        input.lexicalContent,
+        values
+    )
+    return {
+        subject: resolveSubjectVariables(input.subject.trim(), values),
+        html: convertEmailTemplateContentToHtml(content),
+        content
+    }
+}
+
 export const createAndSendBroadcast = withAction(
     async (
         input: SendBroadcastInput
@@ -368,8 +450,7 @@ export const createAndSendBroadcast = withAction(
         const isCommissioner = await isCommissionerBySession()
         if (!isAdmin && !isCommissioner) return fail("Unauthorized.")
 
-        const { sendToType, divisionId, teamId, subject, lexicalContent } =
-            input
+        const { sendToType, divisionId, teamId, subject } = input
 
         if (!subject.trim()) return fail("Subject is required.")
         if (!sendToType) return fail("Recipient selection is required.")
@@ -388,6 +469,9 @@ export const createAndSendBroadcast = withAction(
         }
 
         const config = await getSeasonConfig()
+
+        const resolved = await resolveBroadcastTemplate(config, input)
+        if ("error" in resolved) return fail(resolved.error)
 
         let group: {
             groupId: number
@@ -410,18 +494,18 @@ export const createAndSendBroadcast = withAction(
         const { groupId, groupName, stream } = group
 
         // Render HTML
-        const bodyHtml = convertEmailTemplateContentToHtml(lexicalContent)
-        const htmlWithFooter = `${bodyHtml}<p style="margin-top:2rem;font-size:12px;color:#666;"><a href="{{{pm:unsubscribe}}}">Unsubscribe</a></p>`
+        const htmlWithFooter = `${resolved.html}<p style="margin-top:2rem;font-size:12px;color:#666;"><a href="{{{pm:unsubscribe}}}">Unsubscribe</a></p>`
 
-        // Insert broadcast record (draft status)
+        // Insert broadcast record (draft status). The resolved subject and
+        // content are stored so the record reflects what recipients received.
         const [broadcast] = await db
             .insert(emailBroadcasts)
             .values({
                 recipient_group_id: groupId,
                 stream_id: stream,
-                subject: subject.trim(),
+                subject: resolved.subject,
                 html_content: htmlWithFooter,
-                lexical_content: lexicalContent as unknown as Record<
+                lexical_content: resolved.content as unknown as Record<
                     string,
                     unknown
                 >,
@@ -450,7 +534,7 @@ export const createAndSendBroadcast = withAction(
 
             const result = await sendBroadcastEmails({
                 from: site.mailFrom,
-                subject: subject.trim(),
+                subject: resolved.subject,
                 htmlBody: htmlWithFooter,
                 recipients: recipients.map((r) => ({ email: r.email })),
                 stream,
@@ -473,7 +557,7 @@ export const createAndSendBroadcast = withAction(
                 action: "create",
                 entityType: "email_broadcast",
                 entityId: broadcast.id,
-                summary: `Sent broadcast "${subject.trim()}" to "${groupName}" via ${stream} (${result.sent} sent, ${result.failed} failed)`
+                summary: `Sent broadcast "${resolved.subject}" to "${groupName}" via ${stream} (${result.sent} sent, ${result.failed} failed)`
             })
 
             return ok({ broadcastId: broadcast.id })
@@ -485,5 +569,83 @@ export const createAndSendBroadcast = withAction(
             console.error("[send-email] broadcast failed", err)
             return fail("Failed to send emails. Please try again.")
         }
+    }
+)
+
+// ---------------------------------------------------------------------------
+// previewBroadcast
+// ---------------------------------------------------------------------------
+
+export interface BroadcastPreview {
+    subject: string
+    html: string
+    groupName: string
+    recipientCount: number
+}
+
+/**
+ * Resolves the broadcast exactly as createAndSendBroadcast would — same
+ * variable values, same guard — and returns the final subject/body plus the
+ * recipient group summary, without sending or recording anything.
+ */
+export const previewBroadcast = withAction(
+    async (
+        input: SendBroadcastInput
+    ): Promise<ActionResult<BroadcastPreview>> => {
+        await requireSession()
+        const isAdmin = await isAdminOrDirectorBySession()
+        const isCommissioner = await isCommissionerBySession()
+        if (!isAdmin && !isCommissioner) return fail("Unauthorized.")
+
+        const { sendToType, divisionId, teamId, subject } = input
+
+        if (!subject.trim()) return fail("Subject is required.")
+        if (!sendToType) return fail("Recipient selection is required.")
+
+        // Only admins can send to everyone, all season players, captains, or commissioners
+        if (
+            !isAdmin &&
+            (sendToType === "everyone" ||
+                sendToType === "season" ||
+                sendToType === "season_captains" ||
+                sendToType === "season_commissioners")
+        ) {
+            return fail(
+                "Unauthorized: only admins can send league-wide emails."
+            )
+        }
+
+        const config = await getSeasonConfig()
+
+        const resolved = await resolveBroadcastTemplate(config, input)
+        if ("error" in resolved) return fail(resolved.error)
+
+        let group: {
+            groupId: number
+            groupName: string
+            stream: BroadcastStream
+        }
+        try {
+            group = await resolveGroup(
+                sendToType,
+                config.seasonId ?? null,
+                divisionId,
+                teamId
+            )
+        } catch (err) {
+            return fail(
+                err instanceof Error ? err.message : "Failed to resolve group."
+            )
+        }
+
+        const allRecipients = await getRecipientsForGroup(group.groupId)
+        const recipients = await filterSuppressed(allRecipients, group.stream)
+
+        return ok({
+            subject: resolved.subject,
+            html: resolved.html,
+            groupName: group.groupName,
+            recipientCount: recipients.length
+        })
     }
 )

@@ -385,6 +385,57 @@ export function resolveTemplateVariablesInContent(
     }
 }
 
+/**
+ * Return the variable keys referenced by the subject or content that have no
+ * value in `values`. Bracketed subject text that is not a known template
+ * variable (e.g. "[BSD]") is treated as literal text and ignored; the legacy
+ * [division] subject key counts as resolved when division_name has a value.
+ */
+export function findUnresolvedVariableKeys(
+    subject: string,
+    content: LexicalEmailTemplateContent,
+    values: TemplateVariableValues,
+    config?: SeasonConfig
+): string[] {
+    const unresolved: string[] = []
+    const seen = new Set<string>()
+    const add = (key: string) => {
+        if (!seen.has(key)) {
+            seen.add(key)
+            unresolved.push(key)
+        }
+    }
+
+    for (const match of subject.matchAll(/\[([a-z0-9_]+)\]/g)) {
+        const key = match[1]
+        if (key in values) continue
+        if (key === "division") {
+            if (!values.division_name) add(key)
+            continue
+        }
+        if (getTemplateVariable(key, config)) add(key)
+    }
+
+    for (const child of content.root.children) {
+        const inlineNodes: LexicalInlineNode[] =
+            child.type === "paragraph"
+                ? child.children
+                : child.type === "list"
+                  ? child.children.flatMap((item) => item.children)
+                  : []
+        for (const node of inlineNodes) {
+            if (
+                node.type === "template-variable" &&
+                !(node.variableKey in values)
+            ) {
+                add(node.variableKey)
+            }
+        }
+    }
+
+    return unresolved
+}
+
 export function resolveSubjectVariables(
     subject: string,
     values: TemplateVariableValues
