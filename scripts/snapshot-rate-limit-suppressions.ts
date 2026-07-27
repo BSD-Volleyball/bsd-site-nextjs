@@ -81,7 +81,9 @@ async function main() {
     console.log(`matched SpamNotification rows in window: ${rows.length}`)
     console.log(`  eligible for reinstatement:            ${eligible.length}`)
     console.log(`  held back (other permanent reason):    ${held.length}`)
-    console.log(`streams: ${[...new Set(rows.map((r) => r.stream_id))].join(", ")}`)
+    console.log(
+        `streams: ${[...new Set(rows.map((r) => r.stream_id))].join(", ")}`
+    )
     console.log(`wrote ${OUT}`)
 
     await c.end()
