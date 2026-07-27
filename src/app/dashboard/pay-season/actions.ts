@@ -172,6 +172,55 @@ async function validateSignupFormData(
     return null
 }
 
+// Retries a database operation on transient failures: deadlocks (e.g. a
+// concurrent migration holding exclusive locks), serialization conflicts,
+// and dropped pooler connections — the failure modes that can strand a
+// player who has already been charged. Non-transient errors rethrow
+// immediately.
+const TRANSIENT_PG_CODES = new Set([
+    "40001",
+    "40P01",
+    "57P01",
+    "08003",
+    "08006"
+])
+
+function isTransientDbError(error: unknown): boolean {
+    if (!error || typeof error !== "object") return false
+    const e = error as { code?: string; message?: string; cause?: unknown }
+    if (e.code && TRANSIENT_PG_CODES.has(e.code)) return true
+    if (
+        typeof e.message === "string" &&
+        (e.message.includes("Connection terminated") ||
+            e.message.includes("ECONNRESET"))
+    ) {
+        return true
+    }
+    return e.cause ? isTransientDbError(e.cause) : false
+}
+
+async function withTransientRetry<T>(
+    fn: () => Promise<T>,
+    attempts = 3
+): Promise<T> {
+    let lastError: unknown
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            return await fn()
+        } catch (error) {
+            lastError = error
+            if (attempt === attempts || !isTransientDbError(error)) {
+                throw error
+            }
+            logger.warn("Transient DB error — retrying transaction", {
+                attempt
+            })
+            await new Promise((resolve) => setTimeout(resolve, attempt * 300))
+        }
+    }
+    throw lastError
+}
+
 export async function submitSeasonPayment(
     sourceId: string,
     formData: SignupFormData,
@@ -270,68 +319,76 @@ export async function submitSeasonPayment(
                 const seasonId = config.seasonId
                 // The card is already charged (unrecoverable from here), so
                 // every follow-up write happens in one transaction: a player
-                // must never end up charged with half a registration.
+                // must never end up charged with half a registration. The
+                // whole transaction retries on transient failures (deadlock,
+                // dropped pooler connection) — safe because a failed attempt
+                // rolls back completely and signups (season, player) is
+                // unique, so even a lost-commit-ack edge cannot double-insert.
                 try {
-                    await db.transaction(async (tx) => {
-                        await recordWaiverAcceptance(
-                            sessionUser.id,
-                            activeWaiver.id,
-                            undefined,
-                            tx
-                        )
-
-                        const [newSignup] = await tx
-                            .insert(signups)
-                            .values({
-                                season: seasonId,
-                                player: sessionUser.id,
-                                order_id: payment.id,
-                                amount_paid: finalAmount,
-                                age: formData.age,
-                                captain: formData.captain,
-                                pair: formData.pair,
-                                pair_pick: formData.pairPick,
-                                pair_reason: formData.pairReason,
-                                created_at: new Date()
-                            })
-                            .returning({ id: signups.id })
-
-                        if (
-                            formData.unavailableEventIds.length > 0 &&
-                            newSignup
-                        ) {
-                            await tx.insert(userUnavailability).values(
-                                formData.unavailableEventIds.map((eventId) => ({
-                                    user_id: sessionUser.id,
-                                    signup_id: newSignup.id,
-                                    event_id: eventId
-                                }))
+                    await withTransientRetry(() =>
+                        db.transaction(async (tx) => {
+                            await recordWaiverAcceptance(
+                                sessionUser.id,
+                                activeWaiver.id,
+                                undefined,
+                                tx
                             )
-                        }
 
-                        await tx
-                            .delete(waitlist)
-                            .where(
-                                and(
-                                    eq(waitlist.season, seasonId),
-                                    eq(waitlist.user, sessionUser.id)
+                            const [newSignup] = await tx
+                                .insert(signups)
+                                .values({
+                                    season: seasonId,
+                                    player: sessionUser.id,
+                                    order_id: payment.id,
+                                    amount_paid: finalAmount,
+                                    age: formData.age,
+                                    captain: formData.captain,
+                                    pair: formData.pair,
+                                    pair_pick: formData.pairPick,
+                                    pair_reason: formData.pairReason,
+                                    created_at: new Date()
+                                })
+                                .returning({ id: signups.id })
+
+                            if (
+                                formData.unavailableEventIds.length > 0 &&
+                                newSignup
+                            ) {
+                                await tx.insert(userUnavailability).values(
+                                    formData.unavailableEventIds.map(
+                                        (eventId) => ({
+                                            user_id: sessionUser.id,
+                                            signup_id: newSignup.id,
+                                            event_id: eventId
+                                        })
+                                    )
                                 )
+                            }
+
+                            await tx
+                                .delete(waitlist)
+                                .where(
+                                    and(
+                                        eq(waitlist.season, seasonId),
+                                        eq(waitlist.user, sessionUser.id)
+                                    )
+                                )
+
+                            if (discountId && discountInfo) {
+                                await markDiscountAsUsed(discountId, tx)
+                            }
+
+                            await logAuditEntry(
+                                {
+                                    userId: sessionUser.id,
+                                    action: "create",
+                                    entityType: "signups",
+                                    summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
+                                },
+                                tx
                             )
-
-                        if (discountId && discountInfo) {
-                            await markDiscountAsUsed(discountId, tx)
-                        }
-
-                        await logAuditEntry(
-                            {
-                                userId: sessionUser.id,
-                                action: "create",
-                                entityType: "signups",
-                                summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
-                            },
-                            tx
-                        )
-                    })
+                        })
+                    )
                 } catch (dbError) {
                     logger.error(
                         "CRITICAL: Square payment succeeded but the signup transaction failed — manual reconciliation required.",
