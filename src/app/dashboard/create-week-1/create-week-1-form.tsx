@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -48,8 +49,6 @@ export function CreateWeek1Form({
     )
     const [step, setStep] = useState<1 | 2>(1)
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-    const [message, setMessage] = useState<string | null>(null)
-    const [error, setError] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
 
     const modal = usePlayerDetailModal()
@@ -239,15 +238,12 @@ export function CreateWeek1Form({
     }
 
     const handleSave = async () => {
-        setError(null)
-        setMessage(null)
-
         if (assignments.length !== CUTOFF_COUNT) {
-            setError("You need exactly 96 players above the cutoff line.")
+            toast.error("You need exactly 96 players above the cutoff line.")
             return
         }
         if (!hasFullAlternates) {
-            setError(
+            toast.error(
                 "Need exactly 2 alternates per court (8 total) before saving."
             )
             return
@@ -258,9 +254,9 @@ export function CreateWeek1Form({
         const result = await saveWeek1Rosters(saveAssignments)
 
         if (result.status) {
-            setMessage(result.message ?? null)
+            toast.success(result.message ?? "Week 1 rosters saved.")
         } else {
-            setError(result.message)
+            toast.error(result.message)
         }
 
         setIsSaving(false)
@@ -551,16 +547,6 @@ export function CreateWeek1Form({
                             >
                                 {isSaving ? "Saving..." : "Save Week 1 Rosters"}
                             </Button>
-                            {message && (
-                                <span className="text-green-700 text-sm dark:text-green-300">
-                                    {message}
-                                </span>
-                            )}
-                            {error && (
-                                <span className="text-red-700 text-sm dark:text-red-300">
-                                    {error}
-                                </span>
-                            )}
                         </div>
                     </CardContent>
                 </Card>

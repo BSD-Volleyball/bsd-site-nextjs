@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -385,8 +386,6 @@ export function EditWeekRosterForm({
 }: EditWeekRosterFormProps) {
     const modal = usePlayerDetailModal()
     const [isSaving, setIsSaving] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
     const [notifyDialogOpen, setNotifyDialogOpen] = useState(false)
     const [pendingChanges, setPendingChanges] = useState<RosterChangeEntry[]>(
         []
@@ -491,9 +490,6 @@ export function EditWeekRosterForm({
     }
 
     const handleSubmit = async () => {
-        setError(null)
-        setSuccess(null)
-
         const filledSlots = slotAssignments.filter((slot) => slot.userId)
         setIsSaving(true)
 
@@ -507,7 +503,7 @@ export function EditWeekRosterForm({
         )
 
         if (result.status) {
-            setSuccess(result.message ?? null)
+            toast.success(result.message ?? `Week ${weekNumber} rosters saved.`)
             const changes = computeRosterDiff(
                 lastSavedSlots.current.filter((s) => s.userId),
                 filledSlots,
@@ -519,7 +515,7 @@ export function EditWeekRosterForm({
                 setNotifyDialogOpen(true)
             }
         } else {
-            setError(result.message ?? "Failed to save rosters.")
+            toast.error(result.message ?? "Failed to save rosters.")
         }
 
         setIsSaving(false)
@@ -693,16 +689,6 @@ export function EditWeekRosterForm({
                 >
                     {isSaving ? "Saving..." : `Save Week ${weekNumber}`}
                 </Button>
-                {success && (
-                    <span className="text-green-700 text-sm dark:text-green-300">
-                        {success}
-                    </span>
-                )}
-                {error && (
-                    <span className="text-red-700 text-sm dark:text-red-300">
-                        {error}
-                    </span>
-                )}
             </div>
 
             <AdminPlayerDetailPopup

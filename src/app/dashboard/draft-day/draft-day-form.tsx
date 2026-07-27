@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -64,18 +65,14 @@ export function DraftDayForm({
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
     const [isAnimating, setIsAnimating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
-    const [message, setMessage] = useState<string | null>(null)
-    const [isError, setIsError] = useState(false)
     const [isGenerating, setIsGenerating] = useState<
         "blank" | "prefilled" | null
     >(null)
-    const [sheetError, setSheetError] = useState<string | null>(null)
 
     const handleDivisionChange = (divId: number) => {
         setSelectedDivisionId(divId)
         const div = divisions.find((d) => d.divisionId === divId)
         setCaptains(div?.captains ?? [])
-        setMessage(null)
     }
 
     const handleDrop = (dropIndex: number) => {
@@ -87,7 +84,6 @@ export function DraftDayForm({
     const handleRandomize = () => {
         if (isAnimating) return
         setIsAnimating(true)
-        setMessage(null)
 
         const SCRAMBLES = 5
         const INTERVAL = 120
@@ -109,8 +105,6 @@ export function DraftDayForm({
 
     const handleSave = async () => {
         setIsSaving(true)
-        setMessage(null)
-        setIsError(false)
 
         const assignments = captains.map((c, i) => ({
             teamId: c.teamId,
@@ -119,12 +113,13 @@ export function DraftDayForm({
 
         const result = await saveDraftOrder(assignments)
 
-        setMessage(result.message ?? null)
-        setIsError(!result.status)
         setIsSaving(false)
 
         if (result.status) {
+            toast.success(result.message ?? "Draft order saved.")
             router.refresh()
+        } else {
+            toast.error(result.message ?? "Failed to save draft order.")
         }
     }
 
@@ -142,10 +137,9 @@ export function DraftDayForm({
 
     const handleBlankSheet = async () => {
         setIsGenerating("blank")
-        setSheetError(null)
         const result = await getDraftSheetData(selectedDivisionId ?? undefined)
         if (!result.status) {
-            setSheetError(result.message ?? "Failed to load sheet data.")
+            toast.error(result.message ?? "Failed to load sheet data.")
             setIsGenerating(null)
             return
         }
@@ -156,10 +150,9 @@ export function DraftDayForm({
 
     const handlePrefilledSheet = async () => {
         setIsGenerating("prefilled")
-        setSheetError(null)
         const result = await getDraftSheetData(selectedDivisionId ?? undefined)
         if (!result.status) {
-            setSheetError(result.message ?? "Failed to load sheet data.")
+            toast.error(result.message ?? "Failed to load sheet data.")
             setIsGenerating(null)
             return
         }
@@ -294,19 +287,6 @@ export function DraftDayForm({
                             ))}
                         </div>
                     )}
-
-                    {message && (
-                        <div
-                            className={cn(
-                                "mt-4 rounded-md p-3 text-sm",
-                                isError
-                                    ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                                    : "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                            )}
-                        >
-                            {message}
-                        </div>
-                    )}
                 </CardContent>
             </Card>
 
@@ -341,11 +321,6 @@ export function DraftDayForm({
                                 : "Pre-filled Draft Sheets"}
                         </Button>
                     </div>
-                    {sheetError && (
-                        <p className="mt-2 text-red-600 text-sm dark:text-red-400">
-                            {sheetError}
-                        </p>
-                    )}
                 </CardContent>
             </Card>
         </div>

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -97,7 +98,7 @@ export function OnboardingAccountForm({
         if (result.status) {
             router.push("/onboarding/volleyball-profile")
         } else {
-            setError(result.message)
+            toast.error(result.message)
             setIsLoading(false)
         }
     }

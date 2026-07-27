@@ -2,6 +2,7 @@
 
 import { RiDeleteBinLine, RiFileCopyLine } from "@remixicon/react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -48,8 +49,6 @@ export function CreateWeek3Form({
 }: CreateWeek3FormProps) {
     const [step, setStep] = useState<1 | 2>(1)
     const [isSaving, setIsSaving] = useState(false)
-    const [message, setMessage] = useState<string | null>(null)
-    const [error, setError] = useState<string | null>(null)
     const modal = usePlayerDetailModal()
 
     const aaDivision = divisions[0] ?? null
@@ -150,8 +149,6 @@ export function CreateWeek3Form({
 
     const handleResetStepOne = () => {
         setEditableDivisionPlayers(initialDivisionPlayers)
-        setError(null)
-        setMessage(null)
     }
 
     const duplicateCountBySourceUserId = useMemo(() => {
@@ -205,9 +202,6 @@ export function CreateWeek3Form({
         entryId: string,
         direction: -1 | 1
     ) => {
-        setError(null)
-        setMessage(null)
-
         const targetDivisionIndex = divisionIndex + direction
         if (
             targetDivisionIndex < 0 ||
@@ -233,7 +227,7 @@ export function CreateWeek3Form({
         }
 
         if (lockedPlayerIds.has(selectedPlayer.sourceUserId)) {
-            setError("Locked players cannot be moved between divisions.")
+            toast.error("Locked players cannot be moved between divisions.")
             return
         }
 
@@ -249,13 +243,13 @@ export function CreateWeek3Form({
                 !partner ||
                 partner.pairUserId !== selectedPlayer.sourceUserId
             ) {
-                setError(
+                toast.error(
                     "Paired player move requires both pair members in the same division."
                 )
                 return
             }
             if (lockedPlayerIds.has(partner.sourceUserId)) {
-                setError("Locked players cannot be moved between divisions.")
+                toast.error("Locked players cannot be moved between divisions.")
                 return
             }
             movingPlayers.push(partner)
@@ -281,9 +275,6 @@ export function CreateWeek3Form({
     }
 
     const handleDuplicatePlayer = (divisionIndex: number, entryId: string) => {
-        setError(null)
-        setMessage(null)
-
         const sourceDivision = divisions[divisionIndex]
         if (!sourceDivision) {
             return
@@ -300,14 +291,14 @@ export function CreateWeek3Form({
         }
 
         if (lockedPlayerIds.has(selectedPlayer.sourceUserId)) {
-            setError("Locked players cannot be duplicated.")
+            toast.error("Locked players cannot be duplicated.")
             return
         }
 
         const existingCount =
             duplicateCountBySourceUserId.get(selectedPlayer.sourceUserId) ?? 1
         if (existingCount >= 2) {
-            setError("A player can only appear twice.")
+            toast.error("A player can only appear twice.")
             return
         }
 
@@ -315,7 +306,7 @@ export function CreateWeek3Form({
         const belowDivision = divisions[divisionIndex + 1] ?? null
 
         if (!aboveDivision && !belowDivision) {
-            setError("No adjacent division is available for duplication.")
+            toast.error("No adjacent division is available for duplication.")
             return
         }
 
@@ -362,9 +353,6 @@ export function CreateWeek3Form({
     }
 
     const handleRemoveDuplicate = (entryId: string) => {
-        setError(null)
-        setMessage(null)
-
         const nextMap = new Map(editableDivisionPlayers)
         for (const division of divisions) {
             const players = nextMap.get(division.id) || []
@@ -476,11 +464,8 @@ export function CreateWeek3Form({
     }, [teamAssignments])
 
     const handleSave = async () => {
-        setError(null)
-        setMessage(null)
-
         if (savePayload.length === 0) {
-            setError("No assignments available to save.")
+            toast.error("No assignments available to save.")
             return
         }
 
@@ -489,9 +474,9 @@ export function CreateWeek3Form({
         const result = await saveWeek3Rosters(savePayload)
 
         if (result.status) {
-            setMessage(result.message ?? null)
+            toast.success(result.message ?? "Week 3 rosters saved.")
         } else {
-            setError(result.message)
+            toast.error(result.message)
         }
 
         setIsSaving(false)
@@ -567,11 +552,6 @@ export function CreateWeek3Form({
                             Reset Step 1
                         </Button>
                     </div>
-                    {error && (
-                        <p className="text-red-700 text-sm dark:text-red-300">
-                            {error}
-                        </p>
-                    )}
                 </CardContent>
             </Card>
 
@@ -957,16 +937,6 @@ export function CreateWeek3Form({
                         >
                             {isSaving ? "Saving..." : "Save Week 3 Rosters"}
                         </Button>
-                        {message && (
-                            <span className="text-green-700 text-sm dark:text-green-300">
-                                {message}
-                            </span>
-                        )}
-                        {error && (
-                            <span className="text-red-700 text-sm dark:text-red-300">
-                                {error}
-                            </span>
-                        )}
                     </div>
                 </div>
             )}

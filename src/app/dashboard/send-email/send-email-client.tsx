@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -119,12 +120,6 @@ export function SendEmailClient({
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
     const [editorKey, setEditorKey] = useState(0)
 
-    // Status messages
-    const [sendMessage, setSendMessage] = useState<{
-        type: "success" | "error"
-        text: string
-    } | null>(null)
-
     const [sending, setSending] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -145,7 +140,6 @@ export function SendEmailClient({
         setSendToType(value as SendToType)
         setSelectedDivisionId("")
         setSelectedTeamId("")
-        setSendMessage(null)
     }, [])
 
     const handleTemplateSelect = useCallback(
@@ -164,7 +158,6 @@ export function SendEmailClient({
             setSubject(item.subject)
             setContent(item.lexicalContent)
             setEditorKey((k) => k + 1)
-            setSendMessage(null)
 
             const type = sendToTypeFromGroupType(item.groupType)
             if (type) {
@@ -205,11 +198,9 @@ export function SendEmailClient({
     })
 
     const handlePreview = async () => {
-        setSendMessage(null)
-
         const error = validate()
         if (error) {
-            setSendMessage({ type: "error", text: error })
+            toast.error(error)
             return
         }
 
@@ -220,7 +211,7 @@ export function SendEmailClient({
                 setPreview(result.data)
                 setPreviewOpen(true)
             } else {
-                setSendMessage({ type: "error", text: result.message })
+                toast.error(result.message)
             }
         } finally {
             setPreviewing(false)
@@ -235,10 +226,7 @@ export function SendEmailClient({
             if (result.status) {
                 setPreviewOpen(false)
                 setPreview(null)
-                setSendMessage({
-                    type: "success",
-                    text: "Email sent successfully!"
-                })
+                toast.success("Email sent successfully!")
                 setSubject("")
                 setContent(EMPTY_CONTENT)
                 setSendToType("")
@@ -248,7 +236,7 @@ export function SendEmailClient({
                 router.refresh()
             } else {
                 setPreviewOpen(false)
-                setSendMessage({ type: "error", text: result.message })
+                toast.error(result.message)
             }
         } finally {
             setSending(false)
@@ -425,15 +413,6 @@ export function SendEmailClient({
                             broadcast emails.
                         </p>
                     </div>
-
-                    {/* Send status */}
-                    {sendMessage && (
-                        <p
-                            className={`font-medium text-sm ${sendMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
-                        >
-                            {sendMessage.text}
-                        </p>
-                    )}
 
                     <div className="flex justify-end">
                         <Button

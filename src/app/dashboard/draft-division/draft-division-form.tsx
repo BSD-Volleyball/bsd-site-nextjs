@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef } from "react"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -62,8 +63,6 @@ export function DraftDivisionForm({
 }: DraftDivisionFormProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [isLoadingTeams, setIsLoadingTeams] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
     const [isExpanded, setIsExpanded] = useState(false)
 
     const [divisionId, setDivisionId] = useState<string>(
@@ -121,8 +120,6 @@ export function DraftDivisionForm({
         setInitialPicks({})
         setPairMap([])
         setWatchlistData(null)
-        setError(null)
-        setSuccess(null)
         picksRef.current = {}
 
         if (value) {
@@ -141,7 +138,7 @@ export function DraftDivisionForm({
             setInitialPicks(result.data.initialPicks)
             setPairMap(result.data.pairMap)
         } else {
-            setError(result.message || "Failed to load teams.")
+            toast.error(result.message || "Failed to load teams.")
         }
         if (watchlistResult.status) {
             setWatchlistData(watchlistResult.data)
@@ -158,16 +155,14 @@ export function DraftDivisionForm({
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setError(null)
-        setSuccess(null)
 
         if (!divisionId || !selectedDivision) {
-            setError("Please select a division.")
+            toast.error("Please select a division.")
             return
         }
 
         if (teamsList.length === 0) {
-            setError("No teams found for the selected division.")
+            toast.error("No teams found for the selected division.")
             return
         }
 
@@ -187,7 +182,7 @@ export function DraftDivisionForm({
         }
 
         if (picks.length === 0) {
-            setError("Please select at least one player.")
+            toast.error("Please select at least one player.")
             return
         }
 
@@ -196,9 +191,9 @@ export function DraftDivisionForm({
         const result = await submitDraft(selectedDivision.level, picks)
 
         if (result.status) {
-            setSuccess(result.message ?? null)
+            toast.success(result.message ?? "Draft submitted.")
         } else {
-            setError(result.message)
+            toast.error(result.message)
         }
 
         setIsLoading(false)
@@ -369,18 +364,6 @@ export function DraftDivisionForm({
                                     No teams found for the selected division.
                                 </p>
                             )}
-
-                        {error && (
-                            <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                                {error}
-                            </div>
-                        )}
-
-                        {success && (
-                            <div className="rounded-md bg-green-50 p-3 text-green-800 text-sm dark:bg-green-950 dark:text-green-200">
-                                {success}
-                            </div>
-                        )}
                     </CardContent>
                     {currentRole === "commissioner" && (
                         <CardFooter className="border-t pt-6">

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { RiArrowDownSLine, RiAddLine } from "@remixicon/react"
 import {
     Collapsible,
@@ -63,9 +64,6 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         }, {})
     )
     const [loading, setLoading] = useState<Record<number, boolean>>({})
-    const [messages, setMessages] = useState<
-        Record<number, { type: "success" | "error"; text: string }>
-    >({})
     useEffect(() => {
         setFormData((prev) => {
             const updated = { ...prev }
@@ -89,11 +87,6 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
 
     const handleUpdate = async (templateId: number) => {
         setLoading((prev) => ({ ...prev, [templateId]: true }))
-        setMessages((prev) => {
-            const newMessages = { ...prev }
-            delete newMessages[templateId]
-            return newMessages
-        })
 
         const data = formData[templateId]
         const result = await updateEmailTemplate(
@@ -106,20 +99,12 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         setLoading((prev) => ({ ...prev, [templateId]: false }))
 
         if (result.status) {
-            setMessages((prev) => ({
-                ...prev,
-                [templateId]: {
-                    type: "success",
-                    text:
-                        result.message ?? "Email template updated successfully."
-                }
-            }))
+            toast.success(
+                result.message ?? "Email template updated successfully."
+            )
             router.refresh()
         } else {
-            setMessages((prev) => ({
-                ...prev,
-                [templateId]: { type: "error", text: result.message }
-            }))
+            toast.error(result.message)
         }
     }
 
@@ -344,19 +329,6 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                                         />
                                     </div>
                                 </div>
-
-                                {messages[template.id] && (
-                                    <div
-                                        className={`rounded-md p-3 text-sm ${
-                                            messages[template.id].type ===
-                                            "success"
-                                                ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                                : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                                        }`}
-                                    >
-                                        {messages[template.id].text}
-                                    </div>
-                                )}
 
                                 <div className="flex justify-end">
                                     <Button

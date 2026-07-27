@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -221,8 +222,6 @@ export function SelectCaptainsForm({
     existingTeamsByDivision
 }: SelectCaptainsFormProps) {
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
     const [copyReminder, setCopyReminder] = useState(false)
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
@@ -269,8 +268,6 @@ export function SelectCaptainsForm({
 
         const byNumber = new Map(existing.map((t) => [t.number, t]))
 
-        setSuccess(null)
-        setError(null)
         setCopyReminder(false)
 
         setCaptains(() => {
@@ -560,12 +557,10 @@ export function SelectCaptainsForm({
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setError(null)
-        setSuccess(null)
         setCopyReminder(false)
 
         if (!divisionId) {
-            setError("Please select a division.")
+            toast.error("Please select a division.")
             return
         }
 
@@ -581,7 +576,7 @@ export function SelectCaptainsForm({
                 const hasAnyCoach =
                     teamsToCreate[i].captainId || teamsToCreate[i].coach2Id
                 if (hasAnyCoach && !teamsToCreate[i].teamName.trim()) {
-                    setError(`Please enter a name for Team ${i + 1}.`)
+                    toast.error(`Please enter a name for Team ${i + 1}.`)
                     return
                 }
             }
@@ -589,7 +584,7 @@ export function SelectCaptainsForm({
             // Captain is optional (ghost captain fills empty slots server-side)
             for (let i = 0; i < numTeams; i++) {
                 if (!teamsToCreate[i].teamName.trim()) {
-                    setError(`Please enter a name for Team ${i + 1}.`)
+                    toast.error(`Please enter a name for Team ${i + 1}.`)
                     return
                 }
             }
@@ -603,9 +598,9 @@ export function SelectCaptainsForm({
         )
 
         if (result.status) {
-            setSuccess(result.message ?? null)
+            toast.success(result.message ?? "Teams saved.")
         } else {
-            setError(result.message)
+            toast.error(result.message)
         }
 
         setIsLoading(false)
@@ -841,21 +836,9 @@ export function SelectCaptainsForm({
                         </div>
                     </div>
 
-                    {error && (
-                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                            {error}
-                        </div>
-                    )}
-
-                    {copyReminder && !success && (
+                    {copyReminder && (
                         <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
                             Remember to click Create to save your teams
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="rounded-md bg-green-50 p-3 text-green-800 text-sm dark:bg-green-950 dark:text-green-200">
-                            {success}
                         </div>
                     )}
                 </CardContent>

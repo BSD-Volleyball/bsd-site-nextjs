@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -32,7 +33,6 @@ export function OnboardingVolleyballForm({
 }: OnboardingVolleyballFormProps) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
 
     const [formData, setFormData] = useState<VolleyballProfileData>({
         experience: initialData?.experience ?? null,
@@ -46,7 +46,6 @@ export function OnboardingVolleyballForm({
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setError(null)
         setIsLoading(true)
 
         const result = await completeOnboarding(formData)
@@ -54,7 +53,7 @@ export function OnboardingVolleyballForm({
         if (result.status) {
             router.push("/dashboard")
         } else {
-            setError(result.message)
+            toast.error(result.message)
             setIsLoading(false)
         }
     }
@@ -221,12 +220,6 @@ export function OnboardingVolleyballForm({
                             </div>
                         </div>
                     </div>
-
-                    {error && (
-                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                            {error}
-                        </div>
-                    )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
                     <Button
