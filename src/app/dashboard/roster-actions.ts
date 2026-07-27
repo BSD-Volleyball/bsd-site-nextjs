@@ -2,7 +2,7 @@
 
 import type { ActionResult } from "@/lib/action-helpers"
 import { playerPicBaseUrl } from "@/config/env"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSession } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -24,6 +24,7 @@ import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import {
+    getSessionUser,
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasCaptainPagesAccessBySession
@@ -206,8 +207,8 @@ export interface CaptainWelcomeData {
 }
 
 export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return null
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return null
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return null
@@ -223,7 +224,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             .where(
                 and(
                     eq(teams.season, config.seasonId),
-                    eq(teams.captain, session.user.id)
+                    eq(teams.captain, sessionUser.id)
                 )
             )
             .limit(1)
@@ -250,7 +251,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 .where(
                     and(
                         eq(teams.season, config.seasonId),
-                        eq(teams.captain2, session.user.id)
+                        eq(teams.captain2, sessionUser.id)
                     )
                 )
                 .limit(1)
@@ -275,7 +276,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 preferredName: users.preferred_name
             })
             .from(users)
-            .where(eq(users.id, session.user.id))
+            .where(eq(users.id, sessionUser.id))
             .limit(1)
 
         const [seasonRow] = await db
@@ -532,8 +533,8 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
 }
 
 export async function logContactDetailsViewed(): Promise<void> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return
@@ -544,13 +545,13 @@ export async function logContactDetailsViewed(): Promise<void> {
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                eq(teams.captain, session.user.id)
+                eq(teams.captain, sessionUser.id)
             )
         )
         .limit(1)
 
     await logAuditEntry({
-        userId: session.user.id,
+        userId: sessionUser.id,
         action: "view",
         entityType: "teams",
         entityId: teamRow?.id,
@@ -657,11 +658,7 @@ export const expressWaitlistInterest = withAction(
         waiverId: number,
         waiverAgreed: boolean
     ): Promise<ActionResult> => {
-        const session = await auth.api.getSession({ headers: await headers() })
-
-        if (!session?.user) {
-            return fail("Not authenticated.")
-        }
+        const session = await requireSession()
 
         if (!waiverAgreed) {
             return fail("You must agree to the waiver to join the waitlist.")

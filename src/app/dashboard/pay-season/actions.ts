@@ -2,8 +2,7 @@
 
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import { signups, users, waitlist, userUnavailability } from "@/database/schema"
 import { eq, and, count } from "drizzle-orm"
@@ -18,6 +17,7 @@ import { logAuditEntry } from "@/lib/audit-log"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
+import { logger } from "@/lib/logger"
 
 export interface SignupFormData {
     age: string
@@ -178,8 +178,8 @@ export async function submitSeasonPayment(
     waiverId: number,
     discountId?: number
 ): Promise<PaymentResult> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) {
         return {
             status: false,
             message: "You need to be logged in to make a payment."
@@ -212,7 +212,7 @@ export async function submitSeasonPayment(
         // Apply discount if provided and valid
         if (discountId) {
             const discount = await getActiveDiscountForUser(
-                session.user.id,
+                sessionUser.id,
                 "season"
             )
             if (discount && discount.id === discountId) {
@@ -237,7 +237,7 @@ export async function submitSeasonPayment(
         }
 
         const availabilityCheck = await validateFinalSignupAvailability(
-            session.user.id,
+            sessionUser.id,
             config.seasonId,
             config.maxPlayers
         )
@@ -260,8 +260,8 @@ export async function submitSeasonPayment(
                 currency: "USD",
                 amount: amountCents
             },
-            buyerEmailAddress: session.user.email,
-            note: `Volleyball ${config.seasonName} ${config.seasonYear} Season Payment - ${session.user.name || session.user.email}`
+            buyerEmailAddress: sessionUser.email,
+            note: `Volleyball ${config.seasonName} ${config.seasonYear} Season Payment - ${sessionUser.name || sessionUser.email}`
         })
 
         if (response.payment) {
@@ -274,7 +274,7 @@ export async function submitSeasonPayment(
                 try {
                     await db.transaction(async (tx) => {
                         await recordWaiverAcceptance(
-                            session.user.id,
+                            sessionUser.id,
                             activeWaiver.id,
                             undefined,
                             tx
@@ -284,7 +284,7 @@ export async function submitSeasonPayment(
                             .insert(signups)
                             .values({
                                 season: seasonId,
-                                player: session.user.id,
+                                player: sessionUser.id,
                                 order_id: payment.id,
                                 amount_paid: finalAmount,
                                 age: formData.age,
@@ -302,7 +302,7 @@ export async function submitSeasonPayment(
                         ) {
                             await tx.insert(userUnavailability).values(
                                 formData.unavailableEventIds.map((eventId) => ({
-                                    user_id: session.user.id,
+                                    user_id: sessionUser.id,
                                     signup_id: newSignup.id,
                                     event_id: eventId
                                 }))
@@ -314,7 +314,7 @@ export async function submitSeasonPayment(
                             .where(
                                 and(
                                     eq(waitlist.season, seasonId),
-                                    eq(waitlist.user, session.user.id)
+                                    eq(waitlist.user, sessionUser.id)
                                 )
                             )
 
@@ -324,7 +324,7 @@ export async function submitSeasonPayment(
 
                         await logAuditEntry(
                             {
-                                userId: session.user.id,
+                                userId: sessionUser.id,
                                 action: "create",
                                 entityType: "signups",
                                 summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
@@ -333,10 +333,14 @@ export async function submitSeasonPayment(
                         )
                     })
                 } catch (dbError) {
-                    console.error(
-                        `CRITICAL: Square payment ${payment.id} succeeded for user ` +
-                            `${session.user.id} (season ${seasonId}, $${finalAmount}) ` +
-                            "but the signup transaction failed — manual reconciliation required.",
+                    logger.error(
+                        "CRITICAL: Square payment succeeded but the signup transaction failed — manual reconciliation required.",
+                        {
+                            paymentId: payment.id,
+                            userId: sessionUser.id,
+                            seasonId,
+                            amount: finalAmount
+                        },
                         dbError
                     )
                     return {
@@ -355,17 +359,17 @@ export async function submitSeasonPayment(
                         preferredName: users.preferred_name
                     })
                     .from(users)
-                    .where(eq(users.id, session.user.id))
+                    .where(eq(users.id, sessionUser.id))
                     .limit(1)
 
                 const firstName =
                     user?.preferredName ||
                     user?.firstName ||
-                    session.user.email.split("@")[0]
+                    sessionUser.email.split("@")[0]
 
                 // Send confirmation email (don't await to not block response)
                 sendSignupConfirmationEmail(
-                    session.user.email,
+                    sessionUser.email,
                     firstName,
                     config.seasonName,
                     config.seasonYear,
@@ -403,8 +407,8 @@ export async function submitFreeSignup(
     discountId: number,
     waiverId: number
 ): Promise<PaymentResult> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) {
         return {
             status: false,
             message: "You need to be logged in to register."
@@ -428,7 +432,7 @@ export async function submitFreeSignup(
     try {
         // Validate the discount is 100% and belongs to this user
         const discount = await getActiveDiscountForUser(
-            session.user.id,
+            sessionUser.id,
             "season"
         )
         if (!discount || discount.id !== discountId) {
@@ -458,7 +462,7 @@ export async function submitFreeSignup(
         }
 
         const availabilityCheck = await validateFinalSignupAvailability(
-            session.user.id,
+            sessionUser.id,
             config.seasonId,
             config.maxPlayers
         )
@@ -476,7 +480,7 @@ export async function submitFreeSignup(
         const seasonId = config.seasonId
         await db.transaction(async (tx) => {
             await recordWaiverAcceptance(
-                session.user.id,
+                sessionUser.id,
                 activeWaiver.id,
                 undefined,
                 tx
@@ -487,7 +491,7 @@ export async function submitFreeSignup(
                 .insert(signups)
                 .values({
                     season: seasonId,
-                    player: session.user.id,
+                    player: sessionUser.id,
                     order_id: `FREE-${discountId}`,
                     amount_paid: "0",
                     age: formData.age,
@@ -503,7 +507,7 @@ export async function submitFreeSignup(
             if (formData.unavailableEventIds.length > 0 && newSignup) {
                 await tx.insert(userUnavailability).values(
                     formData.unavailableEventIds.map((eventId) => ({
-                        user_id: session.user.id,
+                        user_id: sessionUser.id,
                         signup_id: newSignup.id,
                         event_id: eventId
                     }))
@@ -515,7 +519,7 @@ export async function submitFreeSignup(
                 .where(
                     and(
                         eq(waitlist.season, seasonId),
-                        eq(waitlist.user, session.user.id)
+                        eq(waitlist.user, sessionUser.id)
                     )
                 )
 
@@ -523,7 +527,7 @@ export async function submitFreeSignup(
 
             await logAuditEntry(
                 {
-                    userId: session.user.id,
+                    userId: sessionUser.id,
                     action: "create",
                     entityType: "signups",
                     summary: `Free signup for ${config.seasonName} ${config.seasonYear} (100% discount #${discountId})`
@@ -539,17 +543,17 @@ export async function submitFreeSignup(
                 preferredName: users.preferred_name
             })
             .from(users)
-            .where(eq(users.id, session.user.id))
+            .where(eq(users.id, sessionUser.id))
             .limit(1)
 
         const firstName =
             user?.preferredName ||
             user?.firstName ||
-            session.user.email.split("@")[0]
+            sessionUser.email.split("@")[0]
 
         // Send confirmation email with discount info
         sendSignupConfirmationEmail(
-            session.user.email,
+            sessionUser.email,
             firstName,
             config.seasonName,
             config.seasonYear,

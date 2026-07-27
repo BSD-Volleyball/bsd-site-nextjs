@@ -4,8 +4,7 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail } from "@/lib/action-helpers"
 import { and, asc, count, eq, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -100,9 +99,9 @@ export async function getWeek2HomeworkData(): Promise<{
     mode?: "captain" | "coach"
     data?: Week2HomeworkData | CoachWeek2HomeworkData
 }> {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const sessionUser = await getSessionUser()
 
-    if (!session?.user) {
+    if (!sessionUser) {
         return { status: false, message: "Not authenticated" }
     }
 
@@ -135,7 +134,7 @@ export async function getWeek2HomeworkData(): Promise<{
         .where(
             and(
                 eq(week2Rosters.season, config.seasonId),
-                eq(week2Rosters.user, session.user.id),
+                eq(week2Rosters.user, sessionUser.id),
                 eq(week2Rosters.is_captain, true)
             )
         )
@@ -150,8 +149,8 @@ export async function getWeek2HomeworkData(): Promise<{
                 and(
                     eq(teams.season, config.seasonId),
                     or(
-                        eq(teams.captain, session.user.id),
-                        eq(teams.captain2, session.user.id)
+                        eq(teams.captain, sessionUser.id),
+                        eq(teams.captain2, sessionUser.id)
                     )
                 )
             )
@@ -311,7 +310,7 @@ export async function getWeek2HomeworkData(): Promise<{
             .where(
                 and(
                     eq(movingDay.season, config.seasonId),
-                    eq(movingDay.submitted_by, session.user.id)
+                    eq(movingDay.submitted_by, sessionUser.id)
                 )
             )
 
@@ -333,7 +332,7 @@ export async function getWeek2HomeworkData(): Promise<{
                 divisionId: coachTeamEntry.divisionId,
                 divisionName: coachDivisionInfo.name,
                 divisionLevel: coachDivisionInfo.level,
-                coachUserId: session.user.id,
+                coachUserId: sessionUser.id,
                 isTopDivision: coachDivisionInfo.level === coachMinLevel,
                 isBottomDivision: coachDivisionInfo.level === coachMaxLevel,
                 divisionTeams,
@@ -474,7 +473,7 @@ export async function getWeek2HomeworkData(): Promise<{
         .where(
             and(
                 eq(movingDay.season, config.seasonId),
-                eq(movingDay.submitted_by, session.user.id)
+                eq(movingDay.submitted_by, sessionUser.id)
             )
         )
 
@@ -493,7 +492,7 @@ export async function getWeek2HomeworkData(): Promise<{
             divisionName: divisionInfo.name,
             divisionLevel: divisionInfo.level,
             teamNumber: captainEntry.teamNumber,
-            captainUserId: session.user.id,
+            captainUserId: sessionUser.id,
             teamRoster: mappedTeamRoster,
             allTryoutPlayers: dedupedAllTryoutPlayers,
             isTopDivision: divisionInfo.level === minLevel,
@@ -524,9 +523,9 @@ export interface SubmitWeek2HomeworkInput {
 
 export const submitWeek2Homework = withAction(
     async (input: SubmitWeek2HomeworkInput): Promise<ActionResult> => {
-        const session = await auth.api.getSession({ headers: await headers() })
+        const sessionUser = await getSessionUser()
 
-        if (!session?.user) {
+        if (!sessionUser) {
             return fail("Not authenticated")
         }
 
@@ -545,7 +544,7 @@ export const submitWeek2Homework = withAction(
             .where(
                 and(
                     eq(week2Rosters.season, config.seasonId),
-                    eq(week2Rosters.user, session.user.id),
+                    eq(week2Rosters.user, sessionUser.id),
                     eq(week2Rosters.is_captain, true)
                 )
             )
@@ -692,7 +691,7 @@ export const submitWeek2Homework = withAction(
             .where(
                 and(
                     eq(movingDay.season, config.seasonId),
-                    eq(movingDay.submitted_by, session.user.id)
+                    eq(movingDay.submitted_by, sessionUser.id)
                 )
             )
 
@@ -700,7 +699,7 @@ export const submitWeek2Homework = withAction(
             await db.insert(movingDay).values(
                 entries.map((e) => ({
                     season: config.seasonId as number,
-                    submitted_by: session.user.id,
+                    submitted_by: sessionUser.id,
                     player: e.player,
                     direction: e.direction,
                     is_forced: e.is_forced
@@ -714,9 +713,9 @@ export const submitWeek2Homework = withAction(
 
 export const submitCoachWeek2Homework = withAction(
     async (input: SubmitCoachWeek2HomeworkInput): Promise<ActionResult> => {
-        const session = await auth.api.getSession({ headers: await headers() })
+        const sessionUser = await getSessionUser()
 
-        if (!session?.user) {
+        if (!sessionUser) {
             return fail("Not authenticated")
         }
 
@@ -733,8 +732,8 @@ export const submitCoachWeek2Homework = withAction(
                 and(
                     eq(teams.season, config.seasonId),
                     or(
-                        eq(teams.captain, session.user.id),
-                        eq(teams.captain2, session.user.id)
+                        eq(teams.captain, sessionUser.id),
+                        eq(teams.captain2, sessionUser.id)
                     )
                 )
             )
@@ -845,7 +844,7 @@ export const submitCoachWeek2Homework = withAction(
             .where(
                 and(
                     eq(movingDay.season, config.seasonId),
-                    eq(movingDay.submitted_by, session.user.id)
+                    eq(movingDay.submitted_by, sessionUser.id)
                 )
             )
 
@@ -853,7 +852,7 @@ export const submitCoachWeek2Homework = withAction(
             await db.insert(movingDay).values(
                 entries.map((e) => ({
                     season: config.seasonId as number,
-                    submitted_by: session.user.id,
+                    submitted_by: sessionUser.id,
                     player: e.player,
                     direction: e.direction,
                     is_forced: e.is_forced

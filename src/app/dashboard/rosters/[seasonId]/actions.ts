@@ -1,7 +1,6 @@
 "use server"
 
 import { db } from "@/database/db"
-import { auth } from "@/lib/auth"
 import {
     users,
     seasons,
@@ -11,12 +10,12 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
-import { headers } from "next/headers"
 import {
     type ActionResult,
     fail,
     ok,
     requirePositiveInt,
+    requireSession,
     withAction
 } from "@/lib/action-helpers"
 import { getTeamRosterWithSubs } from "@/lib/roster"
@@ -62,10 +61,7 @@ interface RosterData {
 
 export const getRosterData = withAction(
     async (seasonId: number): Promise<ActionResult<RosterData>> => {
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return fail("Not authenticated.")
-        }
+        await requireSession()
 
         requirePositiveInt(seasonId, "season")
 

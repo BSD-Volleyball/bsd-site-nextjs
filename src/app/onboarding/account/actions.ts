@@ -1,7 +1,6 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
@@ -19,8 +18,8 @@ export interface OnboardingAccountData {
 }
 
 export async function getOnboardingAccountData(): Promise<OnboardingAccountData | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
+    const user = await getSessionUser()
+    if (!user) {
         return null
     }
 
@@ -34,7 +33,7 @@ export async function getOnboardingAccountData(): Promise<OnboardingAccountData 
             referred_by: users.referred_by
         })
         .from(users)
-        .where(eq(users.id, session.user.id))
+        .where(eq(users.id, user.id))
         .limit(1)
 
     return profile ?? null

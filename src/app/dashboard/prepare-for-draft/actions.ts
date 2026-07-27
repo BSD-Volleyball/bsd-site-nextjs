@@ -29,6 +29,7 @@ import { fetchPlayerScores } from "@/lib/player-score"
 import {
     commissionerCanWriteDivision,
     getCommissionerDivisionScope,
+    getSessionUser,
     isCommissionerBySession
 } from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
@@ -175,8 +176,8 @@ export async function getPrepareForDraftData(
     data?: PrepareForDraftData
 }> {
     // 1. Auth check
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
+    const user = await getSessionUser()
+    if (!user) {
         return { status: false, message: "Not authenticated" }
     }
 
@@ -188,10 +189,7 @@ export async function getPrepareForDraftData(
     const seasonId = config.seasonId
 
     // 3. Resolve access
-    const access = await resolveCommissionerDivisionAccess(
-        session.user.id,
-        seasonId
-    )
+    const access = await resolveCommissionerDivisionAccess(user.id, seasonId)
     if (access.type === "denied") {
         return {
             status: false,

@@ -19,6 +19,7 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray, isNotNull } from "drizzle-orm"
+import { logger } from "@/lib/logger"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -509,9 +510,9 @@ export async function ensureTeamRecipientGroup(
             name: `${seasonLabel} - Team ${teamRow.name}`
         })
     } catch (err) {
-        console.error(
+        logger.error(
             "[email-recipients] ensureTeamRecipientGroup error",
-            teamId,
+            { teamId, seasonId },
             err
         )
     }
@@ -536,13 +537,13 @@ export async function cleanupSeasonRecipientGroups(
                     ])
                 )
             )
-        console.log(
-            `[email-recipients] Cleaned up division/team groups for season ${seasonId}`
-        )
+        logger.info("[email-recipients] Cleaned up division/team groups", {
+            seasonId
+        })
     } catch (err) {
-        console.error(
+        logger.error(
             "[email-recipients] cleanupSeasonRecipientGroups error",
-            seasonId,
+            { seasonId },
             err
         )
     }

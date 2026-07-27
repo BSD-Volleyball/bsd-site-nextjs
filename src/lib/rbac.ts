@@ -17,6 +17,17 @@ export async function getSessionUserId(): Promise<string | null> {
     return session?.user?.id ?? null
 }
 
+/**
+ * Returns the authenticated session user, or null when unauthenticated.
+ * Recognized by the authz regression checker as a session guard — use this
+ * (with an early return on null) in actions that keep legacy response shapes
+ * instead of a bare auth.api.getSession() fetch.
+ */
+export async function getSessionUser() {
+    const session = await auth.api.getSession({ headers: await headers() })
+    return session?.user ?? null
+}
+
 // ---------------------------------------------------------------------------
 // Core: load all role assignments for a user (cached per request)
 // ---------------------------------------------------------------------------

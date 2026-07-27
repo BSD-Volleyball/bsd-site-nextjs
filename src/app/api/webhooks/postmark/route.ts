@@ -15,6 +15,7 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
+import { logger } from "@/lib/logger"
 import { isPermanentBounceType, sendBatchEmails } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
@@ -325,15 +326,23 @@ async function detectExistingThread(
     if (ticketId) {
         const emailMatch = ticketId.match(/^email-(\d+)$/)
         if (emailMatch) {
-            console.log(
-                `[postmark-webhook] Thread detected via X-BSD-Ticket-ID: email-${emailMatch[1]}`
+            logger.info(
+                "[postmark-webhook] Thread detected via X-BSD-Ticket-ID",
+                {
+                    threadType: "email",
+                    ticketId: parseInt(emailMatch[1], 10)
+                }
             )
             return { type: "email", id: parseInt(emailMatch[1], 10) }
         }
         const concernMatch = ticketId.match(/^concern-(\d+)$/)
         if (concernMatch) {
-            console.log(
-                `[postmark-webhook] Thread detected via X-BSD-Ticket-ID: concern-${concernMatch[1]}`
+            logger.info(
+                "[postmark-webhook] Thread detected via X-BSD-Ticket-ID",
+                {
+                    threadType: "concern",
+                    ticketId: parseInt(concernMatch[1], 10)
+                }
             )
             return { type: "concern", id: parseInt(concernMatch[1], 10) }
         }
@@ -342,9 +351,10 @@ async function detectExistingThread(
     // 2. In-Reply-To / References header matching
     const inReplyTo = getHeader(headers, "In-Reply-To")
     const references = getHeader(headers, "References")
-    console.log(
-        `[postmark-webhook] In-Reply-To: ${inReplyTo ?? "(none)"}, References: ${references ?? "(none)"}`
-    )
+    logger.info("[postmark-webhook] Reply headers", {
+        inReplyTo: inReplyTo ?? "(none)",
+        references: references ?? "(none)"
+    })
 
     const rawMessageIds = [
         ...parseMessageIds(inReplyTo),
@@ -374,8 +384,9 @@ async function detectExistingThread(
             .where(inArray(inboundEmailReplies.postmark_message_id, messageIds))
             .limit(1)
         if (emailReplyMatch.length > 0) {
-            console.log(
-                `[postmark-webhook] Thread detected via email reply message-id: email #${emailReplyMatch[0].email_id}`
+            logger.info(
+                "[postmark-webhook] Thread detected via email reply message-id",
+                { threadType: "email", ticketId: emailReplyMatch[0].email_id }
             )
             return { type: "email", id: emailReplyMatch[0].email_id }
         }
@@ -387,8 +398,12 @@ async function detectExistingThread(
             .where(inArray(concernReplies.postmark_message_id, messageIds))
             .limit(1)
         if (concernReplyMatch.length > 0) {
-            console.log(
-                `[postmark-webhook] Thread detected via concern reply message-id: concern #${concernReplyMatch[0].concern_id}`
+            logger.info(
+                "[postmark-webhook] Thread detected via concern reply message-id",
+                {
+                    threadType: "concern",
+                    ticketId: concernReplyMatch[0].concern_id
+                }
             )
             return { type: "concern", id: concernReplyMatch[0].concern_id }
         }
@@ -400,8 +415,9 @@ async function detectExistingThread(
             .where(inArray(inboundEmails.email_id, messageIds))
             .limit(1)
         if (emailOrigMatch.length > 0) {
-            console.log(
-                `[postmark-webhook] Thread detected via original email message-id: email #${emailOrigMatch[0].id}`
+            logger.info(
+                "[postmark-webhook] Thread detected via original email message-id",
+                { threadType: "email", ticketId: emailOrigMatch[0].id }
             )
             return { type: "email", id: emailOrigMatch[0].id }
         }
@@ -413,8 +429,9 @@ async function detectExistingThread(
             .where(inArray(concerns.source_email_id, messageIds))
             .limit(1)
         if (concernOrigMatch.length > 0) {
-            console.log(
-                `[postmark-webhook] Thread detected via original concern message-id: concern #${concernOrigMatch[0].id}`
+            logger.info(
+                "[postmark-webhook] Thread detected via original concern message-id",
+                { threadType: "concern", ticketId: concernOrigMatch[0].id }
             )
             return { type: "concern", id: concernOrigMatch[0].id }
         }
@@ -435,9 +452,10 @@ async function detectExistingThread(
                 .where(eq(concerns.id, id))
                 .limit(1)
             if (ticket) {
-                console.log(
-                    `[postmark-webhook] Thread detected via subject: concern #${id}`
-                )
+                logger.info("[postmark-webhook] Thread detected via subject", {
+                    threadType: "concern",
+                    ticketId: id
+                })
                 return { type: "concern", id }
             }
         }
@@ -451,17 +469,18 @@ async function detectExistingThread(
                 .where(eq(inboundEmails.id, id))
                 .limit(1)
             if (ticket) {
-                console.log(
-                    `[postmark-webhook] Thread detected via subject: email #${id}`
-                )
+                logger.info("[postmark-webhook] Thread detected via subject", {
+                    threadType: "email",
+                    ticketId: id
+                })
                 return { type: "email", id }
             }
         }
     }
 
-    console.log(
-        `[postmark-webhook] No existing thread found (subject length: ${subject?.length ?? 0})`
-    )
+    logger.info("[postmark-webhook] No existing thread found", {
+        subjectLength: subject?.length ?? 0
+    })
     return null
 }
 
@@ -482,8 +501,12 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const rawHeaders = parseRawEmailHeaders(payload.RawEmail)
     const headers = mergeHeaders(jsonHeaders, rawHeaders)
     if (rawHeaders.length > 0) {
-        console.log(
-            `[postmark-webhook] Supplemented ${jsonHeaders.length} JSON headers with ${rawHeaders.length} raw email headers`
+        logger.info(
+            "[postmark-webhook] Supplemented JSON headers with raw email headers",
+            {
+                jsonHeaderCount: jsonHeaders.length,
+                rawHeaderCount: rawHeaders.length
+            }
         )
     }
 
@@ -528,9 +551,10 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 ticketId: existingThread.id
             })
 
-            console.log(
-                `[postmark-webhook] Routed reply to email thread #${existingThread.id}`
-            )
+            logger.info("[postmark-webhook] Routed reply to email thread", {
+                threadType: "email",
+                ticketId: existingThread.id
+            })
         } else {
             const [ticket] = await db
                 .select({ assigned_to: concerns.assigned_to })
@@ -555,9 +579,10 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 ticketId: existingThread.id
             })
 
-            console.log(
-                `[postmark-webhook] Routed reply to concern thread #${existingThread.id}`
-            )
+            logger.info("[postmark-webhook] Routed reply to concern thread", {
+                threadType: "concern",
+                ticketId: existingThread.id
+            })
         }
         return
     }
@@ -686,9 +711,11 @@ async function handleSubscriptionChange(
         }
     }
 
-    console.log(
-        `[postmark-webhook] Subscription change: ${maskEmail(email)} stream=${streamId} suppressed=${payload.SuppressSending}`
-    )
+    logger.info("[postmark-webhook] Subscription change", {
+        maskedEmail: maskEmail(email),
+        stream: streamId,
+        suppressed: payload.SuppressSending
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -708,9 +735,11 @@ async function handleBounce(payload: PostmarkBouncePayload) {
     // silently removes a valid recipient from every future broadcast. Postmark
     // retains the full bounce history for diagnostics either way.
     if (!isPermanentBounceType(payload.Type)) {
-        console.log(
-            `[postmark-webhook] Transient bounce (not suppressing): ${maskEmail(email)} type=${payload.Type} stream=${streamId}`
-        )
+        logger.info("[postmark-webhook] Transient bounce (not suppressing)", {
+            maskedEmail: maskEmail(email),
+            bounceType: payload.Type,
+            stream: streamId
+        })
         return
     }
 
@@ -754,9 +783,11 @@ async function handleBounce(payload: PostmarkBouncePayload) {
             .where(eq(users.email, email))
     }
 
-    console.log(
-        `[postmark-webhook] Bounce: ${maskEmail(email)} type=${payload.Type} stream=${streamId}`
-    )
+    logger.info("[postmark-webhook] Bounce", {
+        maskedEmail: maskEmail(email),
+        bounceType: payload.Type,
+        stream: streamId
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -810,9 +841,10 @@ async function handleSpamComplaint(payload: PostmarkSpamComplaintPayload) {
             and(eq(users.email, email), eq(users.email_status, "unsubscribed"))
         )
 
-    console.log(
-        `[postmark-webhook] Spam complaint: ${maskEmail(email)} stream=${streamId}`
-    )
+    logger.info("[postmark-webhook] Spam complaint", {
+        maskedEmail: maskEmail(email),
+        stream: streamId
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -823,7 +855,7 @@ function verifyWebhookAuth(request: NextRequest): boolean {
     const user = process.env.POSTMARK_WEBHOOK_USER
     const password = process.env.POSTMARK_WEBHOOK_PASSWORD
     if (!user || !password) {
-        console.error(
+        logger.error(
             "[postmark-webhook] POSTMARK_WEBHOOK_USER/PASSWORD not configured; rejecting request"
         )
         return false
@@ -881,12 +913,16 @@ export async function POST(request: NextRequest) {
         }
 
         // Other webhook types (bounces, opens, etc.) — acknowledge but ignore
-        console.log(
-            `[postmark-webhook] Unhandled RecordType: ${payload.RecordType ?? "unknown"}`
-        )
+        logger.info("[postmark-webhook] Unhandled RecordType", {
+            recordType: payload.RecordType ?? "unknown"
+        })
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("[postmark-webhook] Error:", error)
+        logger.error(
+            "[postmark-webhook] Webhook processing failed",
+            undefined,
+            error
+        )
         return NextResponse.json(
             { error: "Webhook processing failed" },
             { status: 400 }

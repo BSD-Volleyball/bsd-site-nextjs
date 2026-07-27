@@ -1,10 +1,9 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { checkSignupEligibility } from "@/lib/site-config"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
+    getSessionUser,
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasCaptainPagesAccessBySession,
@@ -13,13 +12,13 @@ import {
 import type { SeasonPhase } from "@/lib/season-phases"
 
 export async function getSignupEligibility(): Promise<boolean> {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const user = await getSessionUser()
 
-    if (!session?.user) {
+    if (!user) {
         return false
     }
 
-    return checkSignupEligibility(session.user.id)
+    return checkSignupEligibility(user.id)
 }
 
 export async function getIsAdminOrDirector(): Promise<boolean> {
@@ -51,8 +50,8 @@ export async function getHasConcernsAccess(): Promise<boolean> {
 }
 
 export async function getSeasonPhase(): Promise<SeasonPhase | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return null
+    const user = await getSessionUser()
+    if (!user) return null
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return null

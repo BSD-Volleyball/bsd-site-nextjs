@@ -1,7 +1,6 @@
 "use server"
 
 import { db } from "@/database/db"
-import { auth } from "@/lib/auth"
 import {
     users,
     teams,
@@ -17,10 +16,13 @@ import {
     matchSubstitutions
 } from "@/database/schema"
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
-import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirector, getCommissionerDivisionScope } from "@/lib/rbac"
+import {
+    getSessionUser,
+    isAdminOrDirector,
+    getCommissionerDivisionScope
+} from "@/lib/rbac"
 import {
     getTeamRosterWithSubs,
     resolveActiveUserForSlot,
@@ -111,13 +113,13 @@ export async function getRegularSubCandidates(
       }
     | { status: false; message: string }
 > {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return { status: false, message: "Not authenticated." }
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return { status: false, message: "Not authenticated." }
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return { status: false, message: "No active season." }
 
-    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+    if (!(await canAccessTeam(sessionUser.id, teamId, config.seasonId))) {
         return { status: false, message: "Not authorized." }
     }
 
@@ -487,13 +489,13 @@ export async function getPermanentSubCandidates(
       }
     | { status: false; message: string }
 > {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return { status: false, message: "Not authenticated." }
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return { status: false, message: "Not authenticated." }
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return { status: false, message: "No active season." }
 
-    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+    if (!(await canAccessTeam(sessionUser.id, teamId, config.seasonId))) {
         return { status: false, message: "Not authorized." }
     }
 
@@ -666,13 +668,13 @@ export async function getSubContactDetails(
     | { status: true; contact: SubContactDetails }
     | { status: false; error: string }
 > {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return { status: false, error: "Not authenticated" }
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return { status: false, error: "Not authenticated" }
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return { status: false, error: "No active season." }
 
-    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+    if (!(await canAccessTeam(sessionUser.id, teamId, config.seasonId))) {
         return { status: false, error: "Not authorized." }
     }
 
@@ -743,15 +745,15 @@ export type WaitlistOption = {
 export async function getWaitlistOptions(
     teamId: number
 ): Promise<ActionResult<WaitlistOption[]>> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return fail("Not authenticated.")
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return fail("Not authenticated.")
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return fail("No active season.")
 
     if (
         !(await canManageTeamAsElevated(
-            session.user.id,
+            sessionUser.id,
             teamId,
             config.seasonId
         ))
@@ -844,8 +846,8 @@ export async function lockInPermanentSub(input: {
     reason?: string
     notes?: string
 }): Promise<ActionResult<{ substitutionId: number }>> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return fail("Not authenticated.")
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return fail("Not authenticated.")
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return fail("No active season.")
@@ -861,7 +863,7 @@ export async function lockInPermanentSub(input: {
 
     if (
         !(await canManageTeamAsElevated(
-            session.user.id,
+            sessionUser.id,
             teamId,
             config.seasonId
         ))
@@ -935,7 +937,7 @@ export async function lockInPermanentSub(input: {
                     original_draft: slot.draftId,
                     original_user: slot.activeUser.id,
                     sub_user: subUserId,
-                    performed_by: session.user.id,
+                    performed_by: sessionUser.id,
                     reason: reason?.trim() || null,
                     notes: notes?.trim() || null
                 })
@@ -949,11 +951,11 @@ export async function lockInPermanentSub(input: {
     }
 
     await logAuditEntry({
-        userId: session.user.id,
+        userId: sessionUser.id,
         action: "create",
         entityType: "substitutions",
         entityId: insertedId,
-        summary: `Locked in permanent sub: ${subName} replaces ${originalName} on ${teamRow.name}${teamRow.number != null ? ` (#${teamRow.number})` : ""} for season ${config.seasonId} (performed by ${session.user.name ?? session.user.id})`
+        summary: `Locked in permanent sub: ${subName} replaces ${originalName} on ${teamRow.name}${teamRow.number != null ? ` (#${teamRow.number})` : ""} for season ${config.seasonId} (performed by ${sessionUser.name ?? sessionUser.id})`
     })
 
     return ok({ substitutionId: insertedId })
@@ -970,8 +972,8 @@ export async function lockInRegularSub(input: {
     subUserId: string
     notes?: string
 }): Promise<ActionResult<{ matchSubstitutionId: number }>> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return fail("Not authenticated.")
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return fail("Not authenticated.")
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return fail("No active season.")
@@ -987,7 +989,7 @@ export async function lockInRegularSub(input: {
     if (originalUserId === subUserId)
         return fail("Original and sub user must differ.")
 
-    if (!(await canAccessTeam(session.user.id, teamId, config.seasonId))) {
+    if (!(await canAccessTeam(sessionUser.id, teamId, config.seasonId))) {
         return fail("Not authorized.")
     }
 
@@ -1072,7 +1074,7 @@ export async function lockInRegularSub(input: {
                 season: config.seasonId,
                 original_user: activeOriginal,
                 sub_user: subUserId,
-                performed_by: session.user.id,
+                performed_by: sessionUser.id,
                 notes: notes?.trim() || null
             })
             .returning({ id: matchSubstitutions.id })
@@ -1083,11 +1085,11 @@ export async function lockInRegularSub(input: {
     }
 
     await logAuditEntry({
-        userId: session.user.id,
+        userId: sessionUser.id,
         action: "create",
         entityType: "match_substitutions",
         entityId: insertedId,
-        summary: `Locked in regular sub: ${subName} subs for ${originalName} on team ${teamId} for match ${matchId}${matchRow.date ? ` (${matchRow.date})` : ""} (performed by ${session.user.name ?? session.user.id})`
+        summary: `Locked in regular sub: ${subName} subs for ${originalName} on team ${teamId} for match ${matchId}${matchRow.date ? ` (${matchRow.date})` : ""} (performed by ${sessionUser.name ?? sessionUser.id})`
     })
 
     return ok({ matchSubstitutionId: insertedId })
@@ -1098,20 +1100,20 @@ export async function logSubContactViewed(
     targetUserId: string,
     targetName: string
 ): Promise<void> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return
+    const sessionUser = await getSessionUser()
+    if (!sessionUser) return
 
     const config = await getSeasonConfig()
     if (!config.seasonId) return
 
-    if (!(await canAccessTeam(session.user.id, captainTeamId, config.seasonId)))
+    if (!(await canAccessTeam(sessionUser.id, captainTeamId, config.seasonId)))
         return
 
     await logAuditEntry({
-        userId: session.user.id,
+        userId: sessionUser.id,
         action: "view",
         entityType: "users",
         entityId: targetUserId,
-        summary: `Captain (${session.user.name ?? session.user.id}) viewed sub contact details for "${targetName}" while finding a sub for team ${captainTeamId}`
+        summary: `Captain (${sessionUser.name ?? sessionUser.id}) viewed sub contact details for "${targetName}" while finding a sub for team ${captainTeamId}`
     })
 }

@@ -1,5 +1,6 @@
 import "server-only"
 import { ServerClient } from "postmark"
+import { logger } from "@/lib/logger"
 
 // ---------------------------------------------------------------------------
 // Postmark Message Stream IDs
@@ -205,9 +206,11 @@ export async function sendBatchEmails(
                 sent++
             } else {
                 failed++
-                console.error(
-                    `[postmark] Batch send error for ${r.To}: ${r.Message}`
-                )
+                logger.error("[postmark] Batch send error", {
+                    to: r.To,
+                    errorCode: r.ErrorCode,
+                    postmarkMessage: r.Message
+                })
             }
         }
 

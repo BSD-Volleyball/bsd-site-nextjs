@@ -3,7 +3,6 @@
 import { parseTimeForSort } from "@/lib/season-utils"
 import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
-import { auth } from "@/lib/auth"
 import {
     divisions,
     drafts,
@@ -15,12 +14,12 @@ import {
     teams,
     users
 } from "@/database/schema"
-import { headers } from "next/headers"
 import {
     type ActionResult,
     fail,
     ok,
     requirePositiveInt,
+    requireSession,
     withAction
 } from "@/lib/action-helpers"
 import {
@@ -838,10 +837,7 @@ function buildBracketData(
 
 export const getPlayoffData = withAction(
     async (seasonId: number): Promise<ActionResult<PlayoffData>> => {
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return fail("Not authenticated.")
-        }
+        const session = await requireSession()
 
         requirePositiveInt(seasonId, "season")
 

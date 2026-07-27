@@ -11,13 +11,12 @@ import {
     users
 } from "@/database/schema"
 import { and, eq, inArray } from "drizzle-orm"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import {
     type ActionResult,
     fail,
     ok,
     requirePositiveInt,
+    requireSession,
     withAction
 } from "@/lib/action-helpers"
 import {
@@ -60,10 +59,7 @@ interface ScheduleData {
 
 export const getSeasonScheduleData = withAction(
     async (seasonId: number): Promise<ActionResult<ScheduleData>> => {
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return fail("Not authenticated.")
-        }
+        await requireSession()
 
         requirePositiveInt(seasonId, "season")
 

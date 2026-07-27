@@ -4,8 +4,7 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail } from "@/lib/action-helpers"
 import { splitByGender } from "@/lib/utils"
 import { and, asc, eq, inArray, or } from "drizzle-orm"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
+import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -72,9 +71,9 @@ export async function getDraftHomeworkData(): Promise<{
     message: string
     data?: DraftHomeworkData
 }> {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const user = await getSessionUser()
 
-    if (!session?.user) {
+    if (!user) {
         return { status: false, message: "Not authenticated" }
     }
 
@@ -92,10 +91,7 @@ export async function getDraftHomeworkData(): Promise<{
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                or(
-                    eq(teams.captain, session.user.id),
-                    eq(teams.captain2, session.user.id)
-                )
+                or(eq(teams.captain, user.id), eq(teams.captain2, user.id))
             )
         )
         .limit(1)
@@ -265,7 +261,7 @@ export async function getDraftHomeworkData(): Promise<{
         .where(
             and(
                 eq(draftHomework.season, config.seasonId),
-                eq(draftHomework.captain, session.user.id)
+                eq(draftHomework.captain, user.id)
             )
         )
 
@@ -283,7 +279,7 @@ export async function getDraftHomeworkData(): Promise<{
         message: "Success",
         data: {
             seasonId: config.seasonId,
-            captainUserId: session.user.id,
+            captainUserId: user.id,
             divisionId: captainTeam.divisionId,
             divisionName: divisionInfo.name,
             numTeams: indivDiv.numTeams,
@@ -315,9 +311,9 @@ export interface SaveDraftHomeworkInput {
 
 export const saveDraftHomework = withAction(
     async (input: SaveDraftHomeworkInput): Promise<ActionResult> => {
-        const session = await auth.api.getSession({ headers: await headers() })
+        const user = await getSessionUser()
 
-        if (!session?.user) {
+        if (!user) {
             return fail("Not authenticated")
         }
 
@@ -333,10 +329,7 @@ export const saveDraftHomework = withAction(
             .where(
                 and(
                     eq(teams.season, config.seasonId),
-                    or(
-                        eq(teams.captain, session.user.id),
-                        eq(teams.captain2, session.user.id)
-                    )
+                    or(eq(teams.captain, user.id), eq(teams.captain2, user.id))
                 )
             )
             .limit(1)
@@ -350,7 +343,7 @@ export const saveDraftHomework = withAction(
             .where(
                 and(
                     eq(draftHomework.season, config.seasonId),
-                    eq(draftHomework.captain, session.user.id)
+                    eq(draftHomework.captain, user.id)
                 )
             )
 
@@ -361,7 +354,7 @@ export const saveDraftHomework = withAction(
             await db.insert(draftHomework).values(
                 nonEmpty.map((s) => ({
                     season: config.seasonId as number,
-                    captain: session.user.id,
+                    captain: user.id,
                     division: captainTeam.divisionId,
                     round: s.round,
                     slot: s.slot,
@@ -373,7 +366,7 @@ export const saveDraftHomework = withAction(
         }
 
         await logAuditEntry({
-            userId: session.user.id,
+            userId: user.id,
             action: "save_draft_homework",
             entityType: "draft_homework",
             entityId: config.seasonId,
@@ -417,8 +410,8 @@ export async function getLastSeasonDraft(): Promise<{
     message: string
     data?: LastSeasonDraftData
 }> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
+    const user = await getSessionUser()
+    if (!user) {
         return { status: false, message: "Not authenticated" }
     }
 
@@ -434,10 +427,7 @@ export async function getLastSeasonDraft(): Promise<{
         .where(
             and(
                 eq(teams.season, config.seasonId),
-                or(
-                    eq(teams.captain, session.user.id),
-                    eq(teams.captain2, session.user.id)
-                )
+                or(eq(teams.captain, user.id), eq(teams.captain2, user.id))
             )
         )
         .limit(1)

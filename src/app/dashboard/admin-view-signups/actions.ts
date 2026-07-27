@@ -19,7 +19,7 @@ import {
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { getSessionUser, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatPlayerName } from "@/lib/utils"
 import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
@@ -432,13 +432,13 @@ export const deleteSignupEntry = withAction(
 )
 
 export async function logAdminCsvDownload(): Promise<void> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return
+    const user = await getSessionUser()
+    if (!user) return
 
     const config = await getSeasonConfig()
 
     await logAuditEntry({
-        userId: session.user.id,
+        userId: user.id,
         action: "read",
         entityType: "signups",
         summary: `Downloaded admin signups CSV for season ${config.seasonId ?? "unknown"}`

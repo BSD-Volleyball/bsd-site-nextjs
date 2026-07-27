@@ -1,5 +1,6 @@
 import { db, type DbExecutor } from "@/database/db"
 import { auditLog } from "@/database/schema"
+import { logger } from "@/lib/logger"
 
 export async function logAuditEntry(
     params: {
@@ -21,6 +22,10 @@ export async function logAuditEntry(
             created_at: new Date()
         })
     } catch (error) {
-        console.error("Failed to write audit log:", error)
+        logger.error(
+            "Failed to write audit log",
+            { action: params.action, userId: params.userId },
+            error
+        )
     }
 }

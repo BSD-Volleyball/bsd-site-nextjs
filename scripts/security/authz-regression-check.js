@@ -7,7 +7,7 @@ const repoRoot = process.cwd()
 const appRoot = path.join(repoRoot, "src", "app")
 
 const guardPatterns = [
-    /auth\.api\.getSession\s*\(/,
+    /getSessionUser\s*\(/,
     /checkAdminAccess\s*\(/,
     /checkViewSignupsAccess\s*\(/,
     /checkAdminOrCommissionerAccess\s*\(/,
@@ -22,7 +22,8 @@ const guardPatterns = [
     /requireAdmin\s*\(/,
     /requireSession\s*\(/,
     /requireCaptainAccess\s*\(/,
-    /requirePermission\s*\(/
+    /requirePermission\s*\(/,
+    /requireAnyPermission\s*\(/
 ]
 
 // Server actions intentionally callable without authorization. Empty today —
@@ -47,18 +48,18 @@ const strictExpectations = [
     },
     {
         key: "src/app/dashboard/rosters/[seasonId]/actions.ts:getRosterData",
-        pattern: /auth\.api\.getSession\s*\(/,
-        description: "must require an authenticated session"
+        pattern: /requireSession\s*\(/,
+        description: "must require an authenticated session via requireSession"
     },
     {
         key: "src/app/dashboard/schedule/[seasonId]/actions.ts:getSeasonScheduleData",
-        pattern: /auth\.api\.getSession\s*\(/,
-        description: "must require an authenticated session"
+        pattern: /requireSession\s*\(/,
+        description: "must require an authenticated session via requireSession"
     },
     {
         key: "src/app/dashboard/playoffs/[seasonId]/actions.ts:getPlayoffData",
-        pattern: /auth\.api\.getSession\s*\(/,
-        description: "must require an authenticated session"
+        pattern: /requireSession\s*\(/,
+        description: "must require an authenticated session via requireSession"
     },
     {
         key: "src/app/dashboard/edit-player/actions.ts:updateUser",
@@ -66,6 +67,15 @@ const strictExpectations = [
         description: "must invalidate sessions when privilege changes occur"
     }
 ]
+
+// A file is scanned when it is named *actions.ts OR when its content starts
+// with a "use server" directive (server actions can live in any filename).
+function isServerActionFile(fullPath, name) {
+    if (name.endsWith("actions.ts")) return true
+    if (!name.endsWith(".ts")) return false
+    const content = fs.readFileSync(fullPath, "utf8")
+    return /^["']use server["']/.test(content.trimStart())
+}
 
 function walk(dir, accumulator = []) {
     const entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -75,7 +85,7 @@ function walk(dir, accumulator = []) {
             walk(fullPath, accumulator)
             continue
         }
-        if (entry.isFile() && entry.name.endsWith("actions.ts")) {
+        if (entry.isFile() && isServerActionFile(fullPath, entry.name)) {
             accumulator.push(fullPath)
         }
     }

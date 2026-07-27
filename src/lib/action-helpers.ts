@@ -7,6 +7,7 @@ import {
     hasPermissionBySession
 } from "@/lib/rbac"
 import type { Permission } from "@/lib/permissions"
+import { logger } from "@/lib/logger"
 
 // ---------------------------------------------------------------------------
 // Standardised server-action result type
@@ -121,7 +122,7 @@ export class ActionError extends Error {
 
 /**
  * Wraps an async server action body, converting ActionError into fail()
- * and logging unexpected errors to console.
+ * and logging unexpected errors through the structured logger.
  *
  * Usage:
  *   export const myAction = withAction(async () => {
@@ -141,7 +142,7 @@ export function withAction<T, A extends unknown[]>(
             if (error instanceof ActionError) {
                 return fail(error.message)
             }
-            console.error("Unexpected action error:", error)
+            logger.error("Unexpected action error", undefined, error)
             return fail("Something went wrong.")
         }
     }

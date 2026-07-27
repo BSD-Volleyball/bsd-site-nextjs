@@ -1,10 +1,8 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSession } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -43,7 +41,7 @@ import {
 } from "@/database/schema"
 import { eq, lt, gt, and, ne, or, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirector } from "@/lib/rbac"
+import { getSessionUser, isAdminOrDirector } from "@/lib/rbac"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import { formatDisplayName } from "@/lib/utils"
 
@@ -59,12 +57,12 @@ export interface UserOption {
 }
 
 export async function getOldUsers(): Promise<UserOption[]> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
+    const user = await getSessionUser()
+    if (!user) {
         return []
     }
 
-    const hasAccess = await isAdminOrDirector(session.user.id)
+    const hasAccess = await isAdminOrDirector(user.id)
     if (!hasAccess) {
         return []
     }
@@ -98,12 +96,12 @@ export async function getOldUsers(): Promise<UserOption[]> {
 }
 
 export async function getNewUsers(): Promise<UserOption[]> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
+    const user = await getSessionUser()
+    if (!user) {
         return []
     }
 
-    const hasAccess = await isAdminOrDirector(session.user.id)
+    const hasAccess = await isAdminOrDirector(user.id)
     if (!hasAccess) {
         return []
     }
@@ -138,10 +136,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
 
 export const mergeUsers = withAction(
     async (oldUserId: string, newUserId: string): Promise<ActionResult> => {
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return fail("Not authenticated.")
-        }
+        const session = await requireSession()
 
         const hasAccess = await isAdminOrDirector(session.user.id)
         if (!hasAccess) {

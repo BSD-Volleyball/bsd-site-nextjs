@@ -34,15 +34,15 @@ function TemplateVariableChip({ variableKey }: { variableKey: string }) {
 export class TemplateVariableNode extends DecoratorNode<React.ReactElement> {
     __variableKey: string
 
-    static getType(): string {
+    static override getType(): string {
         return "template-variable"
     }
 
-    static clone(node: TemplateVariableNode): TemplateVariableNode {
+    static override clone(node: TemplateVariableNode): TemplateVariableNode {
         return new TemplateVariableNode(node.__variableKey, node.__key)
     }
 
-    static importJSON(
+    static override importJSON(
         serializedNode: SerializedTemplateVariableNode
     ): TemplateVariableNode {
         return $createTemplateVariableNode(serializedNode.variableKey)
@@ -53,7 +53,7 @@ export class TemplateVariableNode extends DecoratorNode<React.ReactElement> {
         this.__variableKey = variableKey
     }
 
-    exportJSON(): SerializedTemplateVariableNode {
+    override exportJSON(): SerializedTemplateVariableNode {
         return {
             type: "template-variable",
             variableKey: this.__variableKey,
@@ -61,23 +61,23 @@ export class TemplateVariableNode extends DecoratorNode<React.ReactElement> {
         }
     }
 
-    createDOM(): HTMLElement {
+    override createDOM(): HTMLElement {
         return document.createElement("span")
     }
 
-    updateDOM(): false {
+    override updateDOM(): false {
         return false
     }
 
-    isInline(): true {
+    override isInline(): true {
         return true
     }
 
-    isKeyboardSelectable(): true {
+    override isKeyboardSelectable(): true {
         return true
     }
 
-    decorate(): React.ReactElement {
+    override decorate(): React.ReactElement {
         return <TemplateVariableChip variableKey={this.__variableKey} />
     }
 }

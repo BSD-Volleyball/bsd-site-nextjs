@@ -1,7 +1,6 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
@@ -26,8 +25,8 @@ export interface VolleyballProfileData {
 }
 
 export async function getOnboardingVolleyballData(): Promise<VolleyballProfileData | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
+    const user = await getSessionUser()
+    if (!user) {
         return null
     }
 
@@ -42,7 +41,7 @@ export async function getOnboardingVolleyballData(): Promise<VolleyballProfileDa
             skill_other: users.skill_other
         })
         .from(users)
-        .where(eq(users.id, session.user.id))
+        .where(eq(users.id, user.id))
         .limit(1)
 
     if (!profile) return null
