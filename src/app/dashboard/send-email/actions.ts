@@ -85,6 +85,8 @@ export interface BroadcastHistoryItem {
     lexicalContent: LexicalEmailTemplateContent
     sentByName: string
     status: string
+    /** Group size before suppression filtering; null for pre-2026-07 sends. */
+    recipientTotal: number | null
     sentCount: number | null
     sentAt: Date | null
     createdAt: Date
@@ -218,6 +220,7 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
             teamId: emailRecipientGroups.team_id,
             streamId: emailBroadcasts.stream_id,
             lexicalContent: emailBroadcasts.lexical_content,
+            recipientTotal: emailBroadcasts.recipient_total,
             sentByFirstName: users.first_name,
             sentByLastName: users.last_name,
             sentByPreferredName: users.preferred_name,
@@ -249,6 +252,7 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
             ? `${r.sentByPreferredName} ${r.sentByLastName}`
             : `${r.sentByFirstName} ${r.sentByLastName}`,
         status: r.status,
+        recipientTotal: r.recipientTotal,
         sentCount: r.sentCount,
         sentAt: r.sentAt,
         createdAt: r.createdAt
@@ -525,19 +529,26 @@ export const createAndSendBroadcast = withAction(
         try {
             // just_me is a test send to the composer only; it bypasses the
             // group query and the suppression filter so it always arrives.
-            const recipients =
-                sendToType === "just_me"
-                    ? [{ email: session.user.email }]
-                    : await filterSuppressed(
-                          await getRecipientsForGroup(groupId),
-                          stream
-                      )
+            const isTestSend = sendToType === "just_me"
+
+            const groupRecipients = isTestSend
+                ? []
+                : await getRecipientsForGroup(groupId)
+
+            const recipients = isTestSend
+                ? [{ email: session.user.email }]
+                : await filterSuppressed(groupRecipients, stream)
+
+            // Captured before the suppression filter so the history view can
+            // show how many of the intended audience were never attempted.
+            const recipientTotal = isTestSend ? 1 : groupRecipients.length
 
             if (recipients.length === 0) {
                 await db
                     .update(emailBroadcasts)
                     .set({
                         status: "sent",
+                        recipient_total: recipientTotal,
                         sent_count: 0,
                         failed_count: 0,
                         sent_at: new Date(),
@@ -560,6 +571,7 @@ export const createAndSendBroadcast = withAction(
                 .update(emailBroadcasts)
                 .set({
                     status: "sent",
+                    recipient_total: recipientTotal,
                     sent_count: result.sent,
                     failed_count: result.failed,
                     sent_at: new Date(),
@@ -572,7 +584,7 @@ export const createAndSendBroadcast = withAction(
                 action: "create",
                 entityType: "email_broadcast",
                 entityId: broadcast.id,
-                summary: `Sent broadcast "${resolved.subject}" to "${groupName}" via ${stream} (${result.sent} sent, ${result.failed} failed)`
+                summary: `Sent broadcast "${resolved.subject}" to "${groupName}" via ${stream} (${result.sent} sent of ${recipientTotal} intended, ${result.failed} failed)`
             })
 
             return ok({ broadcastId: broadcast.id })

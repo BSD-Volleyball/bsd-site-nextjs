@@ -159,7 +159,7 @@ export function SendEmailClient({
         [templates]
     )
 
-    const handleSendAgain = useCallback(
+    const handleLoadIntoComposer = useCallback(
         (item: BroadcastHistoryItem) => {
             setSubject(item.subject)
             setContent(item.lexicalContent)
@@ -553,10 +553,24 @@ export function SendEmailClient({
                                                 </Badge>
                                                 {item.sentCount != null && (
                                                     <span>
-                                                        {item.sentCount}{" "}
+                                                        {item.sentCount}
+                                                        {item.recipientTotal !=
+                                                            null &&
+                                                            ` of ${item.recipientTotal}`}{" "}
                                                         recipients
                                                     </span>
                                                 )}
+                                                {item.recipientTotal != null &&
+                                                    item.sentCount != null &&
+                                                    item.recipientTotal >
+                                                        item.sentCount && (
+                                                        <span className="text-amber-600 dark:text-amber-500">
+                                                            {item.recipientTotal -
+                                                                item.sentCount}{" "}
+                                                            not sent
+                                                            (suppressed)
+                                                        </span>
+                                                    )}
                                                 <span>
                                                     by {item.sentByName}
                                                 </span>
@@ -574,11 +588,11 @@ export function SendEmailClient({
                                             variant="outline"
                                             size="sm"
                                             onClick={() =>
-                                                handleSendAgain(item)
+                                                handleLoadIntoComposer(item)
                                             }
                                             className="shrink-0"
                                         >
-                                            Send Again
+                                            Load Above
                                         </Button>
                                     </CardContent>
                                 </Card>

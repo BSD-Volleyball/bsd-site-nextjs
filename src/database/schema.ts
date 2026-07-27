@@ -1170,6 +1170,11 @@ export const emailBroadcasts = pgTable("email_broadcasts", {
         .$defaultFn(() => "draft")
         .notNull(),
     error_message: text("error_message"),
+    // Size of the recipient group *before* the suppression filter runs, so the
+    // history view can show "sent 932 of 1,999" and make the shortfall visible.
+    // Null on rows sent before this column existed — the figure cannot be
+    // reconstructed after the fact.
+    recipient_total: integer("recipient_total"),
     sent_count: integer("sent_count"),
     failed_count: integer("failed_count"),
     sent_at: timestamp("sent_at"),
