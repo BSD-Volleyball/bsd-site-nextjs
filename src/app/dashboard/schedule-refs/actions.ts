@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { logAuditEntry } from "@/lib/audit-log"
 import {
     matches,
     matchReferees,
@@ -27,6 +28,7 @@ import {
     ActionError
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
+import { getSessionUserId } from "@/lib/rbac"
 import { formatPlayerName } from "@/lib/utils"
 import {
     collectPossibleTeams,
@@ -943,6 +945,14 @@ export const saveRefAssignments = withAction(
                     })
                 }
             }
+        })
+
+        const actorId = await getSessionUserId()
+        await logAuditEntry({
+            userId: actorId ?? "unknown",
+            action: "update",
+            entityType: "match_referees",
+            summary: `Saved referee assignments for ${assignments.length} match${assignments.length === 1 ? "" : "es"} on ${date} (season ${seasonId})`
         })
 
         revalidatePath("/dashboard/schedule-refs")

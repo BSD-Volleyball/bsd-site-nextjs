@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, seasonEvents, eventTimeSlots } from "@/database/schema"
@@ -159,13 +159,10 @@ export const saveSeasonConfig = withAction(
         metadata: SeasonMetadata,
         events: EventData[]
     ): Promise<ActionResult> => {
+        requirePositiveInt(seasonId, "season ID")
         const isAdmin = await isAdminOrDirectorBySession()
         if (!isAdmin) {
             return fail("Unauthorized")
-        }
-
-        if (!seasonId || seasonId <= 0) {
-            return fail("Invalid season ID")
         }
 
         try {

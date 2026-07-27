@@ -517,70 +517,74 @@ export const createTeams = withAction(
                 }
             }
 
-            // Unified storage: all divisions use captain2 column instead of duplicate rows
-            for (let i = 0; i < teamsToCreate.length; i++) {
-                const team = teamsToCreate[i]
-                const number = i + 1
+            // Unified storage: all divisions use captain2 column instead of
+            // duplicate rows. One transaction so a mid-loop failure can't
+            // leave the division with a half-updated team list.
+            await db.transaction(async (tx) => {
+                for (let i = 0; i < teamsToCreate.length; i++) {
+                    const team = teamsToCreate[i]
+                    const number = i + 1
 
-                if (isCoachesDiv) {
-                    // Coaches mode: both coaches optional, skip team if neither is set
-                    const hasAnyCoach = team.captainId || team.coach2Id
-                    if (!hasAnyCoach) continue
+                    if (isCoachesDiv) {
+                        // Coaches mode: both coaches optional, skip team if neither is set
+                        const hasAnyCoach = team.captainId || team.coach2Id
+                        if (!hasAnyCoach) continue
 
-                    const existingId = existingByNumber.get(number)
-                    if (existingId !== undefined) {
-                        await db
-                            .update(teams)
-                            .set({
+                        const existingId = existingByNumber.get(number)
+                        if (existingId !== undefined) {
+                            await tx
+                                .update(teams)
+                                .set({
+                                    captain: team.captainId || GHOST_CAPTAIN_ID,
+                                    captain2: team.coach2Id || null,
+                                    name: team.teamName.trim()
+                                })
+                                .where(eq(teams.id, existingId))
+                            existingByNumber.delete(number)
+                        } else {
+                            await tx.insert(teams).values({
+                                season: config.seasonId,
                                 captain: team.captainId || GHOST_CAPTAIN_ID,
                                 captain2: team.coach2Id || null,
-                                name: team.teamName.trim()
+                                division: divisionId,
+                                name: team.teamName.trim(),
+                                number
                             })
-                            .where(eq(teams.id, existingId))
-                        existingByNumber.delete(number)
+                        }
                     } else {
-                        await db.insert(teams).values({
-                            season: config.seasonId,
-                            captain: team.captainId || GHOST_CAPTAIN_ID,
-                            captain2: team.coach2Id || null,
-                            division: divisionId,
-                            name: team.teamName.trim(),
-                            number
-                        })
-                    }
-                } else {
-                    // Standard captain mode
-                    const existingId = existingByNumber.get(number)
-                    const captainId = team.captainId || GHOST_CAPTAIN_ID
+                        // Standard captain mode
+                        const existingId = existingByNumber.get(number)
+                        const captainId = team.captainId || GHOST_CAPTAIN_ID
 
-                    if (existingId !== undefined) {
-                        await db
-                            .update(teams)
-                            .set({
+                        if (existingId !== undefined) {
+                            await tx
+                                .update(teams)
+                                .set({
+                                    captain: captainId,
+                                    captain2: team.coach2Id || null,
+                                    name: team.teamName.trim()
+                                })
+                                .where(eq(teams.id, existingId))
+                            existingByNumber.delete(number)
+                        } else {
+                            await tx.insert(teams).values({
+                                season: config.seasonId,
                                 captain: captainId,
                                 captain2: team.coach2Id || null,
-                                name: team.teamName.trim()
+                                division: divisionId,
+                                name: team.teamName.trim(),
+                                number
                             })
-                            .where(eq(teams.id, existingId))
-                        existingByNumber.delete(number)
-                    } else {
-                        await db.insert(teams).values({
-                            season: config.seasonId,
-                            captain: captainId,
-                            captain2: team.coach2Id || null,
-                            division: divisionId,
-                            name: team.teamName.trim(),
-                            number
-                        })
+                        }
                     }
                 }
-            }
 
-            // Delete any stale teams (slots no longer filled)
-            const staleIds = [...existingByNumber.values()]
-            if (staleIds.length > 0) {
-                await db.delete(teams).where(inArray(teams.id, staleIds))
-            }
+                // Delete any stale teams (slots no longer filled)
+                const staleIds = [...existingByNumber.values()]
+                if (staleIds.length > 0) {
+                    await tx.delete(teams).where(inArray(teams.id, staleIds))
+                }
+            })
 
             // Sync RBAC captain roles: grant for new captains, revoke for removed captains
             const newCaptainIds = new Set<string>(

@@ -367,6 +367,19 @@ export async function getTeamsForSeasonAndDivision(
     message?: string
     teams: TeamOption[]
 }> {
+    if (
+        !Number.isInteger(seasonId) ||
+        seasonId <= 0 ||
+        !Number.isInteger(divisionId) ||
+        divisionId <= 0
+    ) {
+        return {
+            status: false,
+            message: "Invalid season or division.",
+            teams: []
+        }
+    }
+
     const hasAccess = await checkDraftReadAccess()
     if (!hasAccess) {
         return {

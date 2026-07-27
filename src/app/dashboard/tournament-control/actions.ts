@@ -12,7 +12,7 @@ import {
     tournamentTeams,
     tournaments
 } from "@/database/schema"
-import { and, asc, desc, eq, isNull, or } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     fail,
@@ -151,18 +151,40 @@ async function validateAndGeneratePoolMatches(
         .where(eq(tournamentPools.tournament_id, tournamentId))
         .orderBy(asc(tournamentPools.sort_order))
 
-    let inserted = 0
+    // Batch: one team fetch for all pools, one atomic multi-row insert for
+    // every generated match (previously one query per pool + one insert per
+    // match, with partial-failure risk).
+    const poolTeams =
+        pools.length > 0
+            ? await db
+                  .select({
+                      poolId: tournamentPoolTeams.pool_id,
+                      teamId: tournamentPoolTeams.team_id
+                  })
+                  .from(tournamentPoolTeams)
+                  .where(
+                      inArray(
+                          tournamentPoolTeams.pool_id,
+                          pools.map((p) => p.id)
+                      )
+                  )
+            : []
+
+    const teamIdsByPool = new Map<number, number[]>()
+    for (const row of poolTeams) {
+        teamIdsByPool.set(row.poolId, [
+            ...(teamIdsByPool.get(row.poolId) ?? []),
+            row.teamId
+        ])
+    }
+
+    const rows: (typeof tournamentMatches.$inferInsert)[] = []
     for (const pool of pools) {
-        const teams = await db
-            .select({ id: tournamentPoolTeams.team_id })
-            .from(tournamentPoolTeams)
-            .where(eq(tournamentPoolTeams.pool_id, pool.id))
-        const teamIds = teams.map((t) => t.id)
+        const teamIds = teamIdsByPool.get(pool.id) ?? []
         if (teamIds.length < 2) continue
 
-        const pairs = roundRobinPairs(teamIds.length)
-        for (const [i, j] of pairs) {
-            await db.insert(tournamentMatches).values({
+        for (const [i, j] of roundRobinPairs(teamIds.length)) {
+            rows.push({
                 tournament_id: tournamentId,
                 division_id: pool.division_id,
                 pool_id: pool.id,
@@ -170,11 +192,14 @@ async function validateAndGeneratePoolMatches(
                 home_team_id: teamIds[i],
                 away_team_id: teamIds[j]
             })
-            inserted++
         }
     }
 
-    return { ok: true, matchCount: inserted }
+    if (rows.length > 0) {
+        await db.insert(tournamentMatches).values(rows)
+    }
+
+    return { ok: true, matchCount: rows.length }
 }
 
 async function validateAllPoolScoresEntered(

@@ -60,7 +60,7 @@ describe("saveSeasonConfig", () => {
         await createUserWithRoles([{ role: "admin" }])
 
         const result = await saveSeasonConfig(0, metadata, [])
-        expect(result).toEqual({ status: false, message: "Invalid season ID" })
+        expect(result).toEqual({ status: false, message: "Invalid season ID." })
     })
 
     it("updates metadata and replaces the event list atomically", async () => {

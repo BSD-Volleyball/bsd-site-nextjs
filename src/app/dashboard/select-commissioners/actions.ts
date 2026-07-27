@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, users, userRoles } from "@/database/schema"
@@ -195,6 +195,10 @@ export async function getCommissionersForSeason(seasonId: number): Promise<{
         return { status: false, message: "Unauthorized", assignments: [] }
     }
 
+    if (!Number.isInteger(seasonId) || seasonId <= 0) {
+        return { status: false, message: "Invalid season.", assignments: [] }
+    }
+
     try {
         // Get the divisions first
         const divisionsResult = await getDivisions()
@@ -260,6 +264,8 @@ export const saveCommissioners = withAction(
         if (!hasAccess) {
             return fail("Unauthorized")
         }
+
+        requirePositiveInt(data.seasonId, "season ID")
 
         try {
             // Replace this season's division-scoped commissioner roles.

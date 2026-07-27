@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -299,9 +299,7 @@ export const writeRegularSeasonSchedule = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        if (!seasonId || seasonId <= 0) {
-            return fail("Invalid season ID.")
-        }
+        requirePositiveInt(seasonId, "season ID")
 
         try {
             const data = await getCreateScheduleData()
@@ -401,9 +399,7 @@ export const writePlayoffSchedule = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        if (!seasonId || seasonId <= 0) {
-            return fail("Invalid season ID.")
-        }
+        requirePositiveInt(seasonId, "season ID")
 
         try {
             const data = await getCreateScheduleData()
@@ -424,73 +420,60 @@ export const writePlayoffSchedule = withAction(
             const isSpring = data.seasonName.toLowerCase() === "spring"
             let totalMatchesCreated = 0
 
-            for (const div of data.divisions) {
-                const template: PlayoffMatchTemplate[] =
-                    div.teamCount === 4 ? FOUR_TEAM_PLAYOFF : SIX_TEAM_PLAYOFF
-                const court = div.level
+            // One transaction for the whole bracket: a partial failure must
+            // not leave playoff matches without their meta rows (or some
+            // divisions scheduled and others not). Inserts are batched
+            // per-division instead of row-by-row.
+            await db.transaction(async (tx) => {
+                for (const div of data.divisions) {
+                    const template: PlayoffMatchTemplate[] =
+                        div.teamCount === 4
+                            ? FOUR_TEAM_PLAYOFF
+                            : SIX_TEAM_PLAYOFF
+                    const court = div.level
 
-                // Insert playoff match rows (no team IDs yet - teams determined by seeds)
-                const insertedMatches: {
-                    matchNum: number
-                    matchId: number
-                }[] = []
-
-                for (const pm of template) {
-                    const date =
-                        pm.week <= data.playoffDates.length
-                            ? data.playoffDates[pm.week - 1]
-                            : ""
-                    const matchCourt = pm.useSecondCourt
-                        ? getPairedCourt(court)
-                        : court
-                    const matchTime = getPlayoffMatchTime(pm, court, isSpring)
-
-                    const [inserted] = await db
+                    // Insert playoff match rows (no team IDs yet - teams
+                    // determined by seeds). RETURNING preserves values order,
+                    // so index i maps back to template[i].
+                    const inserted = await tx
                         .insert(matches)
-                        .values({
+                        .values(
+                            template.map((pm) => ({
+                                season: seasonId,
+                                division: div.divisionId,
+                                week: pm.week,
+                                date:
+                                    pm.week <= data.playoffDates.length
+                                        ? data.playoffDates[pm.week - 1]
+                                        : "",
+                                time: getPlayoffMatchTime(pm, court, isSpring),
+                                court: pm.useSecondCourt
+                                    ? getPairedCourt(court)
+                                    : court,
+                                playoff: true
+                            }))
+                        )
+                        .returning({ id: matches.id })
+
+                    totalMatchesCreated += inserted.length
+
+                    await tx.insert(playoffMatchesMeta).values(
+                        template.map((pm, i) => ({
                             season: seasonId,
                             division: div.divisionId,
                             week: pm.week,
-                            date,
-                            time: matchTime,
-                            court: matchCourt,
-                            playoff: true
-                        })
-                        .returning({ id: matches.id })
-
-                    insertedMatches.push({
-                        matchNum: pm.matchNum,
-                        matchId: inserted.id
-                    })
-                    totalMatchesCreated++
+                            match_num: pm.matchNum,
+                            match_id: inserted[i].id,
+                            bracket: pm.bracket,
+                            home_source: pm.homeSeed,
+                            away_source: pm.awaySeed,
+                            next_match_num: pm.nextMatchNum,
+                            next_loser_match_num: pm.nextLoserMatchNum,
+                            work_source: pm.workTeam
+                        }))
+                    )
                 }
-
-                // Build matchNum → matchId lookup
-                const matchIdMap = new Map<number, number>()
-                for (const im of insertedMatches) {
-                    matchIdMap.set(im.matchNum, im.matchId)
-                }
-
-                // Insert playoff_matches_meta rows
-                for (const pm of template) {
-                    const matchId = matchIdMap.get(pm.matchNum)
-                    if (!matchId) continue
-
-                    await db.insert(playoffMatchesMeta).values({
-                        season: seasonId,
-                        division: div.divisionId,
-                        week: pm.week,
-                        match_num: pm.matchNum,
-                        match_id: matchId,
-                        bracket: pm.bracket,
-                        home_source: pm.homeSeed,
-                        away_source: pm.awaySeed,
-                        next_match_num: pm.nextMatchNum,
-                        next_loser_match_num: pm.nextLoserMatchNum,
-                        work_source: pm.workTeam
-                    })
-                }
-            }
+            })
 
             const session = await auth.api.getSession({
                 headers: await headers()

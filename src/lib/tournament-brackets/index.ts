@@ -1,6 +1,6 @@
 import "server-only"
 
-import { db } from "@/database/db"
+import { db, type DbExecutor } from "@/database/db"
 import {
     tournamentDivisions,
     tournamentMatches,
@@ -81,7 +81,10 @@ export async function seedTournamentBracket(
         .where(eq(tournamentDivisions.tournament_id, tournamentId))
         .orderBy(asc(tournamentDivisions.sort_order))
 
-    let divisionsSeeded = 0
+    // Compute every division's seeding first (reads only), then write the
+    // whole bracket in one transaction — a mid-seed failure must not leave
+    // some divisions bracketed and others not.
+    const plans: { divisionId: number; seeded: SeededTeam[] }[] = []
     for (const division of divisions) {
         const pools = await db
             .select()
@@ -113,18 +116,33 @@ export async function seedTournamentBracket(
             return a.poolName.localeCompare(b.poolName)
         })
 
-        if (eliminationFormat === "single") {
-            await seedSingleElim(tournamentId, division.id, seeded)
-        } else {
-            await seedDoubleElim(tournamentId, division.id, seeded)
-        }
-        divisionsSeeded++
+        plans.push({ divisionId: division.id, seeded })
     }
+
+    await db.transaction(async (tx) => {
+        for (const plan of plans) {
+            if (eliminationFormat === "single") {
+                await seedSingleElim(
+                    tournamentId,
+                    plan.divisionId,
+                    plan.seeded,
+                    tx
+                )
+            } else {
+                await seedDoubleElim(
+                    tournamentId,
+                    plan.divisionId,
+                    plan.seeded,
+                    tx
+                )
+            }
+        }
+    })
 
     return {
         status: true,
-        divisionsSeeded,
-        message: `Seeded ${divisionsSeeded} division(s).`
+        divisionsSeeded: plans.length,
+        message: `Seeded ${plans.length} division(s).`
     }
 }
 
@@ -141,7 +159,8 @@ function nextPowerOfTwo(n: number): number {
 async function seedSingleElim(
     tournamentId: number,
     divisionId: number,
-    seeds: SeededTeam[]
+    seeds: SeededTeam[],
+    tx: DbExecutor = db
 ): Promise<void> {
     const bracketSize = nextPowerOfTwo(seeds.length)
     const byeCount = bracketSize - seeds.length
@@ -165,9 +184,10 @@ async function seedSingleElim(
 
     const totalRounds = Math.log2(bracketSize)
 
-    // Insert round 1 — skip slots that are bye-vs-bye (shouldn't happen).
-    for (const m of round1) {
-        await db.insert(tournamentMatches).values({
+    // Round 1 plus empty placeholders for later rounds, in two batched
+    // inserts instead of one insert per match.
+    await tx.insert(tournamentMatches).values(
+        round1.map((m) => ({
             tournament_id: tournamentId,
             division_id: divisionId,
             bracket: "winners",
@@ -183,14 +203,14 @@ async function seedSingleElim(
                     : m.awayTeamId !== null && m.homeTeamId === null
                       ? m.awayTeamId
                       : null
-        })
-    }
+        }))
+    )
 
-    // Insert later rounds as empty placeholders.
+    const placeholders: (typeof tournamentMatches.$inferInsert)[] = []
     for (let round = 2; round <= totalRounds; round++) {
         const slots = bracketSize / 2 ** round
         for (let slot = 1; slot <= slots; slot++) {
-            await db.insert(tournamentMatches).values({
+            placeholders.push({
                 tournament_id: tournamentId,
                 division_id: divisionId,
                 bracket: round === totalRounds ? "final" : "winners",
@@ -198,6 +218,9 @@ async function seedSingleElim(
                 bracket_slot: slot
             })
         }
+    }
+    if (placeholders.length > 0) {
+        await tx.insert(tournamentMatches).values(placeholders)
     }
 
     void byeCount
@@ -216,16 +239,17 @@ async function seedSingleElim(
 async function seedDoubleElim(
     tournamentId: number,
     divisionId: number,
-    seeds: SeededTeam[]
+    seeds: SeededTeam[],
+    tx: DbExecutor = db
 ): Promise<void> {
     // Reuse single-elim for the winners side.
-    await seedSingleElim(tournamentId, divisionId, seeds)
+    await seedSingleElim(tournamentId, divisionId, seeds, tx)
 
     // Convert the previously-inserted final to 'winners' so the bracket-only
     // logic stays uniform; the grand final below is the true 'final'.
     const bracketSize = nextPowerOfTwo(seeds.length)
     const winnersFinalRound = Math.log2(bracketSize)
-    await db
+    await tx
         .update(tournamentMatches)
         .set({ bracket: "winners" })
         .where(
@@ -245,9 +269,10 @@ async function seedDoubleElim(
 
     let slotsThisRound = bracketSize / 4 // L1 takes losers from W1
     if (slotsThisRound < 1) slotsThisRound = 1
+    const losersRows: (typeof tournamentMatches.$inferInsert)[] = []
     for (let lr = 1; lr <= losersRounds; lr++) {
         for (let slot = 1; slot <= slotsThisRound; slot++) {
-            await db.insert(tournamentMatches).values({
+            losersRows.push({
                 tournament_id: tournamentId,
                 division_id: divisionId,
                 bracket: "losers",
@@ -261,9 +286,12 @@ async function seedDoubleElim(
             slotsThisRound = Math.max(1, slotsThisRound / 2)
         }
     }
+    if (losersRows.length > 0) {
+        await tx.insert(tournamentMatches).values(losersRows)
+    }
 
     // Grand final.
-    await db.insert(tournamentMatches).values({
+    await tx.insert(tournamentMatches).values({
         tournament_id: tournamentId,
         division_id: divisionId,
         bracket: "final",

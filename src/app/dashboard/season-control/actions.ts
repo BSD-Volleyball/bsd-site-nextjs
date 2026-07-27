@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -32,13 +32,10 @@ export const advanceSeasonPhase = withAction(
         seasonId: number,
         targetPhase: SeasonPhase
     ): Promise<ActionResult> => {
+        requirePositiveInt(seasonId, "season ID")
         const isAdmin = await isAdminOrDirectorBySession()
         if (!isAdmin) {
             return fail("Unauthorized")
-        }
-
-        if (!seasonId || seasonId <= 0) {
-            return fail("Invalid season ID")
         }
 
         try {
@@ -104,38 +101,42 @@ export const advanceSeasonPhase = withAction(
                     })
                 )
 
-                for (const champ of champs) {
-                    if (champ.teamId === null) continue
-                    const picture = pictureByTeam.get(champ.teamId) ?? null
+                // One transaction so a mid-loop failure can't record champions
+                // for some divisions but not others.
+                await db.transaction(async (tx) => {
+                    for (const champ of champs) {
+                        if (champ.teamId === null) continue
+                        const picture = pictureByTeam.get(champ.teamId) ?? null
 
-                    const [existing] = await db
-                        .select({ id: champions.id })
-                        .from(champions)
-                        .where(
-                            and(
-                                eq(champions.season, seasonId),
-                                eq(champions.division, champ.divisionId)
+                        const [existing] = await tx
+                            .select({ id: champions.id })
+                            .from(champions)
+                            .where(
+                                and(
+                                    eq(champions.season, seasonId),
+                                    eq(champions.division, champ.divisionId)
+                                )
                             )
-                        )
-                        .limit(1)
+                            .limit(1)
 
-                    if (existing) {
-                        // Full upsert per user spec: overwrite team and refresh
-                        // picture from teams.picture_url. picture2/caption are
-                        // left in place so admin-curated extras survive re-runs.
-                        await db
-                            .update(champions)
-                            .set({ team: champ.teamId, picture })
-                            .where(eq(champions.id, existing.id))
-                    } else {
-                        await db.insert(champions).values({
-                            season: seasonId,
-                            division: champ.divisionId,
-                            team: champ.teamId,
-                            picture
-                        })
+                        if (existing) {
+                            // Full upsert per user spec: overwrite team and refresh
+                            // picture from teams.picture_url. picture2/caption are
+                            // left in place so admin-curated extras survive re-runs.
+                            await tx
+                                .update(champions)
+                                .set({ team: champ.teamId, picture })
+                                .where(eq(champions.id, existing.id))
+                        } else {
+                            await tx.insert(champions).values({
+                                season: seasonId,
+                                division: champ.divisionId,
+                                team: champ.teamId,
+                                picture
+                            })
+                        }
                     }
-                }
+                })
 
                 championsSummary = ` Recorded champions for ${champs.length} division${champs.length === 1 ? "" : "s"}.`
             }
@@ -229,13 +230,10 @@ export const revertSeasonPhase = withAction(
         seasonId: number,
         targetPhase: SeasonPhase
     ): Promise<ActionResult> => {
+        requirePositiveInt(seasonId, "season ID")
         const isAdmin = await isAdminOrDirectorBySession()
         if (!isAdmin) {
             return fail("Unauthorized")
-        }
-
-        if (!seasonId || seasonId <= 0) {
-            return fail("Invalid season ID")
         }
 
         try {

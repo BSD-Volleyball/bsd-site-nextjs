@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -111,6 +111,8 @@ export const createTeams = withAction(
         divisionId: number,
         teamsToCreate: TeamToCreate[]
     ): Promise<ActionResult> => {
+        requirePositiveInt(seasonId, "season ID")
+        requirePositiveInt(divisionId, "division ID")
         const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
