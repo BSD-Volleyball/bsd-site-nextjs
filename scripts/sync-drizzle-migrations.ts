@@ -15,14 +15,27 @@ type JournalFile = {
 }
 
 async function syncDrizzleMigrations() {
-    const targetTag = process.argv[2] ?? "0014_playoff-bracket-restructure"
+    const targetTag = process.argv[2]
     const migrationsDir = resolve(process.cwd(), "migrations")
     const journalPath = resolve(migrationsDir, "meta", "_journal.json")
     const journal = JSON.parse(readFileSync(journalPath, "utf8")) as JournalFile
 
+    if (!targetTag) {
+        console.error(
+            "Usage: tsx scripts/sync-drizzle-migrations.ts <target-tag>\n" +
+                "Marks all migrations up to and including <target-tag> as applied\n" +
+                "WITHOUT running their SQL (for DBs where DDL was applied manually).\n" +
+                `Valid tags:\n${journal.entries.map((e) => `  ${e.tag}`).join("\n")}`
+        )
+        process.exit(1)
+    }
+
     const targetIndex = journal.entries.findIndex((e) => e.tag === targetTag)
     if (targetIndex < 0) {
-        throw new Error(`Target tag not found in journal: ${targetTag}`)
+        throw new Error(
+            `Target tag not found in journal: ${targetTag}. Valid tags: ` +
+                journal.entries.map((e) => e.tag).join(", ")
+        )
     }
 
     const entriesToSync = journal.entries.slice(0, targetIndex + 1)

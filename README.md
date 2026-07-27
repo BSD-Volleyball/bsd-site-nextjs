@@ -54,7 +54,7 @@ R2 bucket CORS must allow browser `PUT` from your app origin with
 
 3. Run database migrations:
 ```bash
-npx drizzle-kit migrate
+pnpm db:migrate
 ```
 
 4. Start development server:
@@ -124,9 +124,16 @@ typecheck, check-authz, and the Vitest suites on every push and PR via
 ### Database
 
 ```bash
-npx drizzle-kit generate  # Generate migration from schema changes
-npx drizzle-kit migrate   # Run pending migrations
+pnpm db:generate       # Generate a migration from schema.ts changes
+pnpm db:migrate        # Apply pending migrations (uses .env.local)
+pnpm check-migrations  # Verify journal/snapshot/SQL consistency (also in CI)
 ```
+
+Migration history was flattened to a single `0000_baseline` in July 2026 —
+the baseline reflects the production schema at that date and is never run
+against production (its tracker row was backfilled instead). New migrations
+stack on top as usual. If DDL is ever applied to a database manually, mark it
+applied with `tsx scripts/sync-drizzle-migrations.ts <tag>`.
 
 ## Credits
 

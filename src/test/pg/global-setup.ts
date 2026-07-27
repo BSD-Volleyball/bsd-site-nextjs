@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { getTableName, is } from "drizzle-orm"
 import { drizzle } from "drizzle-orm/node-postgres"
 import { migrate } from "drizzle-orm/node-postgres/migrator"
+import { PgTable } from "drizzle-orm/pg-core"
 import { Client } from "pg"
+import * as schema from "../../database/schema"
 import { TEMPLATE_DB, getTestPgBaseUrl, testDbUrl } from "./config"
 
 // The template database is built once from the repo's real migrations and
@@ -14,10 +17,13 @@ import { TEMPLATE_DB, getTestPgBaseUrl, testDbUrl } from "./config"
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations")
 
-// Tripwire: the schema currently produces this many public tables. If a
-// migration adds/drops tables this needs updating — that is the point; a
-// surprising count means the journal and SQL files have drifted.
-const MIN_EXPECTED_TABLES = 50
+// Tripwire: every table exported from schema.ts must exist in the migrated
+// template by name. A missing name means the migration journal and schema.ts
+// have drifted (this is exactly how a dropped journal entry hid a missing
+// table before the 2026-07 baseline flatten).
+const EXPECTED_TABLES = Object.values(schema as Record<string, unknown>)
+    .filter((value): value is PgTable => is(value, PgTable))
+    .map((table) => getTableName(table))
 
 function migrationsHash(): string {
     const hash = createHash("sha256")
@@ -74,13 +80,15 @@ export default async function globalSetup(): Promise<void> {
                 migrationsFolder: MIGRATIONS_DIR
             })
             const { rows } = await template.query(
-                "SELECT count(*)::int AS n FROM pg_tables WHERE schemaname = 'public'"
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
             )
-            if (rows[0].n < MIN_EXPECTED_TABLES) {
+            const present = new Set(rows.map((r) => r.tablename as string))
+            const missing = EXPECTED_TABLES.filter((t) => !present.has(t))
+            if (missing.length > 0) {
                 throw new Error(
-                    `Template database has only ${rows[0].n} public tables after ` +
-                        `migrating (expected at least ${MIN_EXPECTED_TABLES}) — ` +
-                        "the migration journal may have drifted."
+                    `Template database is missing tables after migrating: ` +
+                        `${missing.join(", ")} — the migration journal has ` +
+                        "drifted from schema.ts."
                 )
             }
         } finally {

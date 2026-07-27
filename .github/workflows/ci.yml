@@ -43,6 +43,9 @@ jobs:
       - name: Authorization regression check
         run: pnpm check-authz
 
+      - name: Migration drift check
+        run: pnpm check-migrations
+
       - name: Unit and integration tests
         run: pnpm test
         env:

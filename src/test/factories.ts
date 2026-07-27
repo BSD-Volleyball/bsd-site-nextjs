@@ -16,13 +16,17 @@ import {
 // and returns the inserted row. getSeasonConfig() resolves the season with
 // the highest id, so the most recently created season is always "current".
 
+// seasons.code has a unique index, so each factory call needs a distinct code
+// unless the test overrides it explicitly.
+let seasonCodeCounter = 0
+
 export async function createSeason(
     overrides: Partial<typeof seasons.$inferInsert> = {}
 ) {
     const [row] = await db
         .insert(seasons)
         .values({
-            code: "TST",
+            code: `TST${++seasonCodeCounter}`,
             year: 2026,
             season: "fall",
             phase: "registration_open",

@@ -1,1 +1,0 @@
-ALTER TABLE "playoff_matches_meta" ADD COLUMN "work_source" text;

@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm"
 import {
     pgTable,
     pgEnum,
@@ -10,6 +11,7 @@ import {
     real,
     date,
     time,
+    unique,
     uniqueIndex,
     jsonb,
     index
@@ -22,18 +24,12 @@ export const users = pgTable("users", {
     last_name: text("last_name").notNull(),
     preferred_name: text("preferred_name"),
     email: text("email").notNull().unique(),
-    emailVerified: boolean("email_verified")
-        .$defaultFn(() => false)
-        .notNull(),
+    emailVerified: boolean("email_verified").default(false).notNull(),
     image: text("image"),
     avatar: text("avatar"),
     avatarUrl: text("avatar_url"),
-    createdAt: timestamp("created_at")
-        .$defaultFn(() => /* @__PURE__ */ new Date())
-        .notNull(),
-    updatedAt: timestamp("updated_at")
-        .$defaultFn(() => /* @__PURE__ */ new Date())
-        .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
     old_id: serial("old_id"),
     picture: text("picture"),
     phone: text("phone"),
@@ -48,83 +44,93 @@ export const users = pgTable("users", {
     referred_by: text("referred_by"),
     pronouns: text("pronouns"),
     male: boolean("male"),
-    onboarding_completed: boolean("onboarding_completed").$defaultFn(
-        () => false
-    ),
-    seasons_list: text("seasons_list")
-        .$defaultFn(() => "false")
-        .notNull(),
-    notification_list: text("notification_list")
-        .$defaultFn(() => "false")
-        .notNull(),
-    captain_eligible: boolean("captain_eligible")
-        .$defaultFn(() => true)
-        .notNull(),
+    onboarding_completed: boolean("onboarding_completed").default(false),
+    seasons_list: text("seasons_list").default("false").notNull(),
+    notification_list: text("notification_list").default("false").notNull(),
+    captain_eligible: boolean("captain_eligible").default(true).notNull(),
     // Email delivery status — updated by Postmark webhooks.
     // Priority (highest wins): bounced > spam_complaint > unsubscribed > valid
-    email_status: text("email_status")
-        .$defaultFn(() => "valid")
-        .notNull()
+    email_status: text("email_status").default("valid").notNull()
 })
 
-export const sessions = pgTable("sessions", {
-    id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
-    userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" })
-})
+export const sessions = pgTable(
+    "sessions",
+    {
+        id: text("id").primaryKey(),
+        expiresAt: timestamp("expires_at").notNull(),
+        token: text("token").notNull().unique(),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull(),
+        ipAddress: text("ip_address"),
+        userAgent: text("user_agent"),
+        userId: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" })
+    },
+    (table) => ({
+        sessionsUserIdx: index("sessions_user_idx").on(table.userId)
+    })
+)
 
-export const accounts = pgTable("accounts", {
-    id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
-    userId: text("user_id")
-        .notNull()
-        .references(() => users.id, { onDelete: "cascade" }),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-    scope: text("scope"),
-    password: text("password"),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull()
-})
+export const accounts = pgTable(
+    "accounts",
+    {
+        id: text("id").primaryKey(),
+        accountId: text("account_id").notNull(),
+        providerId: text("provider_id").notNull(),
+        userId: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        accessToken: text("access_token"),
+        refreshToken: text("refresh_token"),
+        idToken: text("id_token"),
+        accessTokenExpiresAt: timestamp("access_token_expires_at"),
+        refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+        scope: text("scope"),
+        password: text("password"),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        accountsUserIdx: index("accounts_user_idx").on(table.userId)
+    })
+)
 
-export const verifications = pgTable("verifications", {
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").$defaultFn(
-        () => /* @__PURE__ */ new Date()
-    ),
-    updatedAt: timestamp("updated_at").$defaultFn(
-        () => /* @__PURE__ */ new Date()
-    )
-})
+export const verifications = pgTable(
+    "verifications",
+    {
+        id: text("id").primaryKey(),
+        identifier: text("identifier").notNull(),
+        value: text("value").notNull(),
+        expiresAt: timestamp("expires_at").notNull(),
+        createdAt: timestamp("created_at").defaultNow(),
+        updatedAt: timestamp("updated_at").defaultNow()
+    },
+    (table) => ({
+        verificationsIdentifierIdx: index("verifications_identifier_idx").on(
+            table.identifier
+        )
+    })
+)
 
-export const seasons = pgTable("seasons", {
-    id: serial("id").primaryKey(),
-    code: text("code").notNull(),
-    year: integer("year").notNull(),
-    season: text("season").notNull(),
-    phase: text("phase")
-        .$defaultFn(() => "off_season")
-        .notNull(),
-    season_amount: numeric("season_amount"),
-    late_amount: numeric("late_amount"),
-    max_players: integer("max_players"),
-    certified_ref_rate: numeric("certified_ref_rate"),
-    uncertified_ref_rate: numeric("uncertified_ref_rate")
-})
+export const seasons = pgTable(
+    "seasons",
+    {
+        id: serial("id").primaryKey(),
+        code: text("code").notNull(),
+        year: integer("year").notNull(),
+        season: text("season").notNull(),
+        phase: text("phase").default("off_season").notNull(),
+        season_amount: numeric("season_amount"),
+        late_amount: numeric("late_amount"),
+        max_players: integer("max_players"),
+        certified_ref_rate: numeric("certified_ref_rate"),
+        uncertified_ref_rate: numeric("uncertified_ref_rate")
+    },
+    (table) => ({
+        seasonsCodeUniq: uniqueIndex("seasons_code_uniq").on(table.code)
+    })
+)
 
 export const eventTypeEnum = pgEnum("event_type", [
     "tryout",
@@ -180,25 +186,29 @@ export const divisions = pgTable("divisions", {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     level: integer("level").notNull(),
-    active: boolean("active")
-        .$defaultFn(() => true)
-        .notNull()
+    active: boolean("active").default(true).notNull()
 })
 
-export const individual_divisions = pgTable("individual_divisions", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    division: integer("divisions")
-        .notNull()
-        .references(() => divisions.id),
-    coaches: boolean("coaches")
-        .$defaultFn(() => false)
-        .notNull(),
-    gender_split: text("gender_split").notNull(),
-    teams: integer("teams").notNull()
-})
+export const individual_divisions = pgTable(
+    "individual_divisions",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "restrict" }),
+        division: integer("divisions")
+            .notNull()
+            .references(() => divisions.id, { onDelete: "restrict" }),
+        coaches: boolean("coaches").default(false).notNull(),
+        gender_split: text("gender_split").notNull(),
+        teams: integer("teams").notNull()
+    },
+    (table) => ({
+        individualDivisionsSeasonDivisionUniq: uniqueIndex(
+            "individual_divisions_season_division_uniq"
+        ).on(table.season, table.division)
+    })
+)
 
 export const signups = pgTable(
     "signups",
@@ -206,22 +216,28 @@ export const signups = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         player: text("player")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         age: text("age"),
         captain: text("captain"),
         pair: boolean("pair"),
-        pair_pick: text("pair_pick").references(() => users.id),
+        pair_pick: text("pair_pick").references(() => users.id, {
+            onDelete: "set null"
+        }),
         pair_reason: text("pair_reason"),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
-        created_at: timestamp("created_at").notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         signupsSeasonIdx: index("signups_season_idx").on(table.season),
-        signupsPlayerIdx: index("signups_player_idx").on(table.player)
+        signupsPlayerIdx: index("signups_player_idx").on(table.player),
+        signupsSeasonPlayerUniq: uniqueIndex("signups_season_player_uniq").on(
+            table.season,
+            table.player
+        )
     })
 )
 
@@ -231,10 +247,10 @@ export const deletedSignups = pgTable(
         id: integer("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         player: text("player")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         age: text("age"),
         captain: text("captain"),
         pair: boolean("pair"),
@@ -242,13 +258,11 @@ export const deletedSignups = pgTable(
         pair_reason: text("pair_reason"),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
-        created_at: timestamp("created_at").notNull(),
-        deleted_at: timestamp("deleted_at")
-            .$defaultFn(() => new Date())
-            .notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        deleted_at: timestamp("deleted_at").defaultNow().notNull(),
         deleted_by: text("deleted_by")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         reason: text("reason")
     },
     (table) => ({
@@ -274,12 +288,8 @@ export const userUnavailability = pgTable(
         event_id: integer("event_id")
             .notNull()
             .references(() => seasonEvents.id, { onDelete: "cascade" }),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull(),
-        updated_at: timestamp("updated_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
     },
     (table) => ({
         userUnavailabilityUserIdx: index("user_unavailability_user_idx").on(
@@ -300,14 +310,16 @@ export const teams = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         captain: text("captain")
             .notNull()
-            .references(() => users.id),
-        captain2: text("captain2").references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
+        captain2: text("captain2").references(() => users.id, {
+            onDelete: "restrict"
+        }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         name: text("name").notNull(),
         number: integer("number"),
         rank: integer("rank"),
@@ -325,16 +337,20 @@ export const matches = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         week: integer("week").notNull(),
         date: date("date", { mode: "string" }),
         time: time("time"),
         court: integer("court"),
-        home_team: integer("home_team").references(() => teams.id),
-        away_team: integer("away_team").references(() => teams.id),
+        home_team: integer("home_team").references(() => teams.id, {
+            onDelete: "restrict"
+        }),
+        away_team: integer("away_team").references(() => teams.id, {
+            onDelete: "restrict"
+        }),
         home_score: integer("home_score"),
         away_score: integer("away_score"),
         home_set1_score: integer("home_set1_score"),
@@ -343,10 +359,10 @@ export const matches = pgTable(
         away_set2_score: integer("away_set2_score"),
         home_set3_score: integer("home_set3_score"),
         away_set3_score: integer("away_set3_score"),
-        winner: integer("winner").references(() => teams.id),
-        playoff: boolean("playoff")
-            .$defaultFn(() => false)
-            .notNull()
+        winner: integer("winner").references(() => teams.id, {
+            onDelete: "set null"
+        }),
+        playoff: boolean("playoff").default(false).notNull()
     },
     (table) => ({
         matchesSeasonIdx: index("matches_season_idx").on(table.season),
@@ -358,28 +374,41 @@ export const matches = pgTable(
     })
 )
 
-export const playoffMatchesMeta = pgTable("playoff_matches_meta", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    week: integer("week").notNull(),
-    match_num: integer("match_num").notNull(),
-    match_id: integer("match_id").references(() => matches.id),
-    bracket: text("bracket"),
-    home_source: text("home_source").notNull(),
-    away_source: text("away_source").notNull(),
-    next_match_num: integer("next_match_num"),
-    next_loser_match_num: integer("next_loser_match_num"),
-    work_team: integer("work_team").references(() => teams.id),
-    work_source: text("work_source"),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const playoffMatchesMeta = pgTable(
+    "playoff_matches_meta",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "restrict" }),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id, { onDelete: "restrict" }),
+        week: integer("week").notNull(),
+        match_num: integer("match_num").notNull(),
+        match_id: integer("match_id").references(() => matches.id, {
+            onDelete: "set null"
+        }),
+        bracket: text("bracket"),
+        home_source: text("home_source").notNull(),
+        away_source: text("away_source").notNull(),
+        next_match_num: integer("next_match_num"),
+        next_loser_match_num: integer("next_loser_match_num"),
+        work_team: integer("work_team").references(() => teams.id, {
+            onDelete: "set null"
+        }),
+        work_source: text("work_source"),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        playoffMatchesMetaSeasonDivisionIdx: index(
+            "playoff_matches_meta_season_division_idx"
+        ).on(table.season, table.division),
+        playoffMatchesMetaMatchIdx: index("playoff_matches_meta_match_idx").on(
+            table.match_id
+        )
+    })
+)
 
 export const week1Rosters = pgTable(
     "week1_rosters",
@@ -387,17 +416,20 @@ export const week1Rosters = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         user: text("user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         session_number: integer("session_number").notNull(),
         court_number: integer("court_number").notNull()
     },
     (table) => ({
         week1RostersSeasonIdx: index("week1_rosters_season_idx").on(
             table.season
-        )
+        ),
+        week1RostersSeasonUserUniq: uniqueIndex(
+            "week1_rosters_season_user_uniq"
+        ).on(table.season, table.user)
     })
 )
 
@@ -407,17 +439,15 @@ export const week2Rosters = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         user: text("user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         team_number: integer("team_number").notNull(),
-        is_captain: boolean("is_captain")
-            .$defaultFn(() => false)
-            .notNull()
+        is_captain: boolean("is_captain").default(false).notNull()
     },
     (table) => ({
         week2RostersSeasonIdx: index("week2_rosters_season_idx").on(
@@ -432,17 +462,15 @@ export const week3Rosters = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         user: text("user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         team_number: integer("team_number").notNull(),
-        is_captain: boolean("is_captain")
-            .$defaultFn(() => false)
-            .notNull()
+        is_captain: boolean("is_captain").default(false).notNull()
     },
     (table) => ({
         week3RostersSeasonIdx: index("week3_rosters_season_idx").on(
@@ -451,21 +479,30 @@ export const week3Rosters = pgTable(
     })
 )
 
-export const champions = pgTable("champions", {
-    id: serial("id").primaryKey(),
-    team: integer("team")
-        .notNull()
-        .references(() => teams.id),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    picture: text("picture"),
-    picture2: text("picture2"),
-    caption: text("caption")
-})
+export const champions = pgTable(
+    "champions",
+    {
+        id: serial("id").primaryKey(),
+        team: integer("team")
+            .notNull()
+            .references(() => teams.id, { onDelete: "restrict" }),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "restrict" }),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id, { onDelete: "restrict" }),
+        picture: text("picture"),
+        picture2: text("picture2"),
+        caption: text("caption")
+    },
+    (table) => ({
+        championsSeasonDivisionUniq: uniqueIndex(
+            "champions_season_division_uniq"
+        ).on(table.season, table.division),
+        championsTeamIdx: index("champions_team_idx").on(table.team)
+    })
+)
 
 export const drafts = pgTable(
     "drafts",
@@ -473,10 +510,10 @@ export const drafts = pgTable(
         id: serial("id").primaryKey(),
         team: integer("team")
             .notNull()
-            .references(() => teams.id),
+            .references(() => teams.id, { onDelete: "restrict" }),
         user: text("user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         round: integer("round").notNull(),
         overall: integer("overall").notNull()
     },
@@ -486,19 +523,27 @@ export const drafts = pgTable(
     })
 )
 
-export const waitlist = pgTable("waitlist", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    approved: boolean("approved")
-        .$defaultFn(() => false)
-        .notNull(),
-    created_at: timestamp("created_at").notNull()
-})
+export const waitlist = pgTable(
+    "waitlist",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        user: text("user")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        approved: boolean("approved").default(false).notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        waitlistSeasonUserUniq: uniqueIndex("waitlist_season_user_uniq").on(
+            table.season,
+            table.user
+        ),
+        waitlistUserIdx: index("waitlist_user_idx").on(table.user)
+    })
+)
 
 // Permanent sub: replaces a draftee on a team for the rest of the season.
 // drafts rows are never mutated; chained subs share the same original_draft.
@@ -510,25 +555,23 @@ export const substitutions = pgTable(
         id: serial("id").primaryKey(),
         team: integer("team")
             .notNull()
-            .references(() => teams.id),
+            .references(() => teams.id, { onDelete: "restrict" }),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         original_draft: integer("original_draft")
             .notNull()
-            .references(() => drafts.id),
+            .references(() => drafts.id, { onDelete: "restrict" }),
         original_user: text("original_user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         sub_user: text("sub_user")
             .notNull()
-            .references(() => users.id),
-        effective_at: timestamp("effective_at")
-            .$defaultFn(() => new Date())
-            .notNull(),
+            .references(() => users.id, { onDelete: "restrict" }),
+        effective_at: timestamp("effective_at").defaultNow().notNull(),
         performed_by: text("performed_by")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         reason: text("reason"),
         notes: text("notes")
     },
@@ -554,25 +597,23 @@ export const matchSubstitutions = pgTable(
         id: serial("id").primaryKey(),
         match: integer("match")
             .notNull()
-            .references(() => matches.id),
+            .references(() => matches.id, { onDelete: "restrict" }),
         team: integer("team")
             .notNull()
-            .references(() => teams.id),
+            .references(() => teams.id, { onDelete: "restrict" }),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         original_user: text("original_user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         sub_user: text("sub_user")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         performed_by: text("performed_by")
             .notNull()
-            .references(() => users.id),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull(),
+            .references(() => users.id, { onDelete: "restrict" }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
         notes: text("notes")
     },
     (table) => ({
@@ -593,40 +634,55 @@ export const matchSubstitutions = pgTable(
     })
 )
 
-export const discounts = pgTable("discounts", {
-    id: serial("id").primaryKey(),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    percentage: numeric("percentage").notNull(),
-    expiration: timestamp("expiration"),
-    reason: text("reason"),
-    used: boolean("used")
-        .$defaultFn(() => false)
-        .notNull(),
-    scope: text("scope")
-        .$defaultFn(() => "season")
-        .notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const discounts = pgTable(
+    "discounts",
+    {
+        id: serial("id").primaryKey(),
+        user: text("user")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        percentage: numeric("percentage").notNull(),
+        expiration: timestamp("expiration"),
+        reason: text("reason"),
+        used: boolean("used").default(false).notNull(),
+        scope: text("scope").default("season").notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        discountsUserIdx: index("discounts_user_idx").on(table.user)
+    })
+)
 
-export const evaluations = pgTable("evaluations", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    player: text("player")
-        .notNull()
-        .references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    evaluator: text("evaluator")
-        .notNull()
-        .references(() => users.id)
-})
+export const evaluations = pgTable(
+    "evaluations",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        player: text("player")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id, { onDelete: "restrict" }),
+        evaluator: text("evaluator")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" })
+    },
+    (table) => ({
+        evaluationsSeasonPlayerEvaluatorUniq: uniqueIndex(
+            "evaluations_season_player_evaluator_uniq"
+        ).on(table.season, table.player, table.evaluator),
+        evaluationsPlayerIdx: index("evaluations_player_idx").on(table.player),
+        evaluationsEvaluatorIdx: index("evaluations_evaluator_idx").on(
+            table.evaluator
+        ),
+        evaluationsSeasonDivisionIdx: index(
+            "evaluations_season_division_idx"
+        ).on(table.season, table.division)
+    })
+)
 
 export const playerRatings = pgTable(
     "player_ratings",
@@ -634,13 +690,13 @@ export const playerRatings = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         player: text("player")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         evaluator: text("evaluator")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         overall: real("overall"),
         passing: real("passing"),
         setting: real("setting"),
@@ -648,242 +704,306 @@ export const playerRatings = pgTable(
         serving: real("serving"),
         shared_notes: text("shared_notes"),
         private_notes: text("private_notes"),
-        updated_at: timestamp("updated_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        updated_at: timestamp("updated_at").defaultNow().notNull()
     },
     (table) => ({
         seasonPlayerEvaluatorUnique: uniqueIndex(
             "player_ratings_season_player_evaluator_unique"
-        ).on(table.season, table.player, table.evaluator)
+        ).on(table.season, table.player, table.evaluator),
+        playerRatingsPlayerIdx: index("player_ratings_player_idx").on(
+            table.player
+        )
     })
 )
 
-export const auditLog = pgTable("audit_log", {
-    id: serial("id").primaryKey(),
-    user: text("user")
-        .notNull()
-        .references(() => users.id),
-    action: text("action").notNull(),
-    entity_type: text("entity_type"),
-    entity_id: text("entity_id"),
-    summary: text("summary").notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const auditLog = pgTable(
+    "audit_log",
+    {
+        id: serial("id").primaryKey(),
+        user: text("user")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        action: text("action").notNull(),
+        entity_type: text("entity_type"),
+        entity_id: text("entity_id"),
+        summary: text("summary").notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        auditLogUserIdx: index("audit_log_user_idx").on(table.user),
+        auditLogCreatedAtIdx: index("audit_log_created_at_idx").on(
+            table.created_at
+        )
+    })
+)
 
-export const movingDay = pgTable("moving_day", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    submitted_by: text("submitted_by")
-        .notNull()
-        .references(() => users.id),
-    player: text("player")
-        .notNull()
-        .references(() => users.id),
-    direction: text("direction").notNull(), // 'up' | 'down'
-    is_forced: boolean("is_forced")
-        .$defaultFn(() => false)
-        .notNull(),
-    submitted_at: timestamp("submitted_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const movingDay = pgTable(
+    "moving_day",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        submitted_by: text("submitted_by")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        player: text("player")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        direction: text("direction").notNull(), // 'up' | 'down'
+        is_forced: boolean("is_forced").default(false).notNull(),
+        submitted_at: timestamp("submitted_at").defaultNow().notNull()
+    },
+    (table) => ({
+        movingDaySeasonPlayerIdx: index("moving_day_season_player_idx").on(
+            table.season,
+            table.player
+        )
+    })
+)
 
-export const draftHomework = pgTable("draft_homework", {
-    id: serial("id").primaryKey(),
-    season: integer("season")
-        .notNull()
-        .references(() => seasons.id),
-    captain: text("captain")
-        .notNull()
-        .references(() => users.id),
-    division: integer("division")
-        .notNull()
-        .references(() => divisions.id),
-    round: integer("round").notNull(),
-    slot: integer("slot").notNull(),
-    player: text("player")
-        .notNull()
-        .references(() => users.id),
-    is_male_tab: boolean("is_male_tab").notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const draftHomework = pgTable(
+    "draft_homework",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        captain: text("captain")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        division: integer("division")
+            .notNull()
+            .references(() => divisions.id, { onDelete: "restrict" }),
+        round: integer("round").notNull(),
+        slot: integer("slot").notNull(),
+        player: text("player")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        is_male_tab: boolean("is_male_tab").notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        draftHomeworkSeasonCaptainDivisionIdx: index(
+            "draft_homework_season_captain_division_idx"
+        ).on(table.season, table.captain, table.division),
+        draftHomeworkPlayerIdx: index("draft_homework_player_idx").on(
+            table.player
+        )
+    })
+)
 
 export const emailTemplates = pgTable("email_templates", {
     id: serial("id").primaryKey(),
     name: text("name").notNull().unique(),
     subject: text("subject"),
     content: jsonb("content").$type<Record<string, unknown>>().notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull()
 })
 
-export const concerns = pgTable("concerns", {
-    id: serial("id").primaryKey(),
-    // null = submitted anonymously
-    user_id: text("user_id").references(() => users.id, {
-        onDelete: "set null"
-    }),
-    anonymous: boolean("anonymous")
-        .$defaultFn(() => false)
-        .notNull(),
-    // Contact info for non-anonymous or anonymous-with-followup
-    contact_name: text("contact_name"),
-    contact_email: text("contact_email"),
-    contact_phone: text("contact_phone"),
-    want_followup: boolean("want_followup")
-        .$defaultFn(() => false)
-        .notNull(),
-    incident_date: text("incident_date").notNull(),
-    location: text("location").notNull(),
-    person_involved: text("person_involved").notNull(),
-    witnesses: text("witnesses"),
-    team_match: text("team_match"),
-    description: text("description").notNull(),
-    status: text("status")
-        .$defaultFn(() => "new")
-        .notNull(), // 'new' | 'active' | 'closed'
-    assigned_to: text("assigned_to").references(() => users.id),
-    // How the concern was submitted: 'web' (default) or 'email'
-    source: text("source")
-        .$defaultFn(() => "web")
-        .notNull(),
-    // External email_id when source = 'email'
-    source_email_id: text("source_email_id"),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const concerns = pgTable(
+    "concerns",
+    {
+        id: serial("id").primaryKey(),
+        // null = submitted anonymously
+        user_id: text("user_id").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        anonymous: boolean("anonymous").default(false).notNull(),
+        // Contact info for non-anonymous or anonymous-with-followup
+        contact_name: text("contact_name"),
+        contact_email: text("contact_email"),
+        contact_phone: text("contact_phone"),
+        want_followup: boolean("want_followup").default(false).notNull(),
+        incident_date: text("incident_date").notNull(),
+        location: text("location").notNull(),
+        person_involved: text("person_involved").notNull(),
+        witnesses: text("witnesses"),
+        team_match: text("team_match"),
+        description: text("description").notNull(),
+        status: text("status").default("new").notNull(), // 'new' | 'active' | 'closed'
+        assigned_to: text("assigned_to").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        // How the concern was submitted: 'web' (default) or 'email'
+        source: text("source").default("web").notNull(),
+        // External email_id when source = 'email'
+        source_email_id: text("source_email_id"),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        concernsStatusIdx: index("concerns_status_idx").on(table.status),
+        concernsAssignedToIdx: index("concerns_assigned_to_idx").on(
+            table.assigned_to
+        ),
+        concernsUserIdx: index("concerns_user_idx").on(table.user_id)
+    })
+)
 
-export const concernComments = pgTable("concern_comments", {
-    id: serial("id").primaryKey(),
-    concern_id: integer("concern_id")
-        .notNull()
-        .references(() => concerns.id, { onDelete: "cascade" }),
-    author_id: text("author_id")
-        .notNull()
-        .references(() => users.id),
-    content: text("content").notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const concernComments = pgTable(
+    "concern_comments",
+    {
+        id: serial("id").primaryKey(),
+        concern_id: integer("concern_id")
+            .notNull()
+            .references(() => concerns.id, { onDelete: "cascade" }),
+        author_id: text("author_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        content: text("content").notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        concernCommentsConcernIdx: index("concern_comments_concern_idx").on(
+            table.concern_id
+        )
+    })
+)
 
-export const concernReplies = pgTable("concern_replies", {
-    id: serial("id").primaryKey(),
-    concern_id: integer("concern_id")
-        .notNull()
-        .references(() => concerns.id, { onDelete: "cascade" }),
-    sent_by: text("sent_by")
-        .notNull()
-        .references(() => users.id),
-    subject: text("subject").notNull(),
-    body_text: text("body_text").notNull(),
-    sent_to: text("sent_to").notNull(),
-    postmark_message_id: text("postmark_message_id"),
-    sent_at: timestamp("sent_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const concernReplies = pgTable(
+    "concern_replies",
+    {
+        id: serial("id").primaryKey(),
+        concern_id: integer("concern_id")
+            .notNull()
+            .references(() => concerns.id, { onDelete: "cascade" }),
+        sent_by: text("sent_by")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        subject: text("subject").notNull(),
+        body_text: text("body_text").notNull(),
+        sent_to: text("sent_to").notNull(),
+        postmark_message_id: text("postmark_message_id"),
+        sent_at: timestamp("sent_at").defaultNow().notNull()
+    },
+    (table) => ({
+        concernRepliesConcernIdx: index("concern_replies_concern_idx").on(
+            table.concern_id
+        )
+    })
+)
 
-export const concernReceived = pgTable("concern_received", {
-    id: serial("id").primaryKey(),
-    concern_id: integer("concern_id")
-        .notNull()
-        .references(() => concerns.id, { onDelete: "cascade" }),
-    from_address: text("from_address").notNull(),
-    from_name: text("from_name"),
-    subject: text("subject").notNull(),
-    body_text: text("body_text"),
-    body_html: text("body_html"),
-    postmark_message_id: text("postmark_message_id"),
-    received_at: timestamp("received_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const concernReceived = pgTable(
+    "concern_received",
+    {
+        id: serial("id").primaryKey(),
+        concern_id: integer("concern_id")
+            .notNull()
+            .references(() => concerns.id, { onDelete: "cascade" }),
+        from_address: text("from_address").notNull(),
+        from_name: text("from_name"),
+        subject: text("subject").notNull(),
+        body_text: text("body_text"),
+        body_html: text("body_html"),
+        postmark_message_id: text("postmark_message_id"),
+        received_at: timestamp("received_at").defaultNow().notNull()
+    },
+    (table) => ({
+        concernReceivedConcernIdx: index("concern_received_concern_idx").on(
+            table.concern_id
+        )
+    })
+)
 
 // --- Inbound Emails (admin inbox) ---
 
-export const inboundEmails = pgTable("inbound_emails", {
-    id: serial("id").primaryKey(),
-    email_id: text("email_id").notNull(), // Postmark MessageID
-    from_address: text("from_address").notNull(),
-    from_name: text("from_name"),
-    to_address: text("to_address").notNull(),
-    subject: text("subject").notNull(),
-    body_text: text("body_text"),
-    body_html: text("body_html"),
-    status: text("status")
-        .$defaultFn(() => "new")
-        .notNull(), // 'new' | 'active' | 'closed'
-    assigned_to: text("assigned_to").references(() => users.id),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const inboundEmails = pgTable(
+    "inbound_emails",
+    {
+        id: serial("id").primaryKey(),
+        email_id: text("email_id").notNull(), // Postmark MessageID
+        from_address: text("from_address").notNull(),
+        from_name: text("from_name"),
+        to_address: text("to_address").notNull(),
+        subject: text("subject").notNull(),
+        body_text: text("body_text"),
+        body_html: text("body_html"),
+        status: text("status").default("new").notNull(), // 'new' | 'active' | 'closed'
+        assigned_to: text("assigned_to").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        inboundEmailsStatusIdx: index("inbound_emails_status_idx").on(
+            table.status
+        ),
+        inboundEmailsAssignedToIdx: index("inbound_emails_assigned_to_idx").on(
+            table.assigned_to
+        ),
+        inboundEmailsEmailIdIdx: index("inbound_emails_email_id_idx").on(
+            table.email_id
+        )
+    })
+)
 
-export const inboundEmailComments = pgTable("inbound_email_comments", {
-    id: serial("id").primaryKey(),
-    email_id: integer("email_id")
-        .notNull()
-        .references(() => inboundEmails.id, { onDelete: "cascade" }),
-    author_id: text("author_id")
-        .notNull()
-        .references(() => users.id),
-    content: text("content").notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const inboundEmailComments = pgTable(
+    "inbound_email_comments",
+    {
+        id: serial("id").primaryKey(),
+        email_id: integer("email_id")
+            .notNull()
+            .references(() => inboundEmails.id, { onDelete: "cascade" }),
+        author_id: text("author_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        content: text("content").notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        inboundEmailCommentsEmailIdx: index(
+            "inbound_email_comments_email_idx"
+        ).on(table.email_id)
+    })
+)
 
-export const inboundEmailReplies = pgTable("inbound_email_replies", {
-    id: serial("id").primaryKey(),
-    email_id: integer("email_id")
-        .notNull()
-        .references(() => inboundEmails.id, { onDelete: "cascade" }),
-    sent_by: text("sent_by")
-        .notNull()
-        .references(() => users.id),
-    subject: text("subject").notNull(),
-    body_text: text("body_text").notNull(),
-    sent_to: text("sent_to").notNull(),
-    postmark_message_id: text("postmark_message_id"),
-    sent_at: timestamp("sent_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const inboundEmailReplies = pgTable(
+    "inbound_email_replies",
+    {
+        id: serial("id").primaryKey(),
+        email_id: integer("email_id")
+            .notNull()
+            .references(() => inboundEmails.id, { onDelete: "cascade" }),
+        sent_by: text("sent_by")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        subject: text("subject").notNull(),
+        body_text: text("body_text").notNull(),
+        sent_to: text("sent_to").notNull(),
+        postmark_message_id: text("postmark_message_id"),
+        sent_at: timestamp("sent_at").defaultNow().notNull()
+    },
+    (table) => ({
+        inboundEmailRepliesEmailIdx: index(
+            "inbound_email_replies_email_idx"
+        ).on(table.email_id)
+    })
+)
 
-export const inboundEmailReceived = pgTable("inbound_email_received", {
-    id: serial("id").primaryKey(),
-    email_id: integer("email_id")
-        .notNull()
-        .references(() => inboundEmails.id, { onDelete: "cascade" }),
-    from_address: text("from_address").notNull(),
-    from_name: text("from_name"),
-    subject: text("subject").notNull(),
-    body_text: text("body_text"),
-    body_html: text("body_html"),
-    postmark_message_id: text("postmark_message_id"),
-    received_at: timestamp("received_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const inboundEmailReceived = pgTable(
+    "inbound_email_received",
+    {
+        id: serial("id").primaryKey(),
+        email_id: integer("email_id")
+            .notNull()
+            .references(() => inboundEmails.id, { onDelete: "cascade" }),
+        from_address: text("from_address").notNull(),
+        from_name: text("from_name"),
+        subject: text("subject").notNull(),
+        body_text: text("body_text"),
+        body_html: text("body_html"),
+        postmark_message_id: text("postmark_message_id"),
+        received_at: timestamp("received_at").defaultNow().notNull()
+    },
+    (table) => ({
+        inboundEmailReceivedEmailIdx: index(
+            "inbound_email_received_email_idx"
+        ).on(table.email_id)
+    })
+)
 
 export const draftCaptRounds = pgTable(
     "draft_capt_rounds",
@@ -891,27 +1011,26 @@ export const draftCaptRounds = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         saved_by: text("saved_by")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         captain: text("captain")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         round: integer("round").notNull(),
-        updated_at: timestamp("updated_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        updated_at: timestamp("updated_at").defaultNow().notNull()
     },
     (table) => ({
         uniq: uniqueIndex("draft_capt_rounds_season_div_captain_uniq").on(
             table.season,
             table.division,
             table.captain
-        )
+        ),
+        captainIdx: index("draft_capt_rounds_captain_idx").on(table.captain)
     })
 )
 
@@ -921,23 +1040,21 @@ export const draftPairDiffs = pgTable(
         id: serial("id").primaryKey(),
         season: integer("season")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "cascade" }),
         division: integer("division")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         saved_by: text("saved_by")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         player1: text("player1")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         player2: text("player2")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         diff: integer("diff").notNull(),
-        updated_at: timestamp("updated_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        updated_at: timestamp("updated_at").defaultNow().notNull()
     },
     (table) => ({
         uniq: uniqueIndex("draft_pair_diffs_season_div_players_uniq").on(
@@ -945,7 +1062,9 @@ export const draftPairDiffs = pgTable(
             table.division,
             table.player1,
             table.player2
-        )
+        ),
+        player1Idx: index("draft_pair_diffs_player1_idx").on(table.player1),
+        player2Idx: index("draft_pair_diffs_player2_idx").on(table.player2)
     })
 )
 
@@ -955,18 +1074,16 @@ export const scoreSheets = pgTable(
         id: serial("id").primaryKey(),
         season_id: integer("season_id")
             .notNull()
-            .references(() => seasons.id),
+            .references(() => seasons.id, { onDelete: "restrict" }),
         division_id: integer("division_id")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         match_date: date("match_date", { mode: "string" }).notNull(),
         image_path: text("image_path").notNull(),
         uploaded_by: text("uploaded_by")
             .notNull()
-            .references(() => users.id),
-        uploaded_at: timestamp("uploaded_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        uploaded_at: timestamp("uploaded_at").defaultNow().notNull()
     },
     (table) => ({
         scoreSheetsSeasonDivDateIdx: index(
@@ -986,18 +1103,29 @@ export const userRoles = pgTable(
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
         role: text("role").notNull(),
-        // null = global/permanent role (e.g. admin)
-        season_id: integer("season_id").references(() => seasons.id),
+        // null = global/permanent role (e.g. admin). Cascade (not set null!) on
+        // season/division delete — nulling would silently widen a scoped role
+        // into a global one.
+        season_id: integer("season_id").references(() => seasons.id, {
+            onDelete: "cascade"
+        }),
         // null = league-wide access for the season; set to restrict to one division
-        division_id: integer("division_id").references(() => divisions.id),
-        granted_by: text("granted_by").references(() => users.id),
-        granted_at: timestamp("granted_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        division_id: integer("division_id").references(() => divisions.id, {
+            onDelete: "cascade"
+        }),
+        granted_by: text("granted_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        granted_at: timestamp("granted_at").defaultNow().notNull()
     },
     (table) => ({
         userRolesUserIdx: index("user_roles_user_idx").on(table.user_id),
-        userRolesSeasonIdx: index("user_roles_season_idx").on(table.season_id)
+        userRolesSeasonIdx: index("user_roles_season_idx").on(table.season_id),
+        // NULLS NOT DISTINCT so duplicate global-role rows (null season and
+        // division) are blocked too.
+        userRolesIdentityUniq: unique("user_roles_identity_uniq")
+            .on(table.user_id, table.role, table.season_id, table.division_id)
+            .nullsNotDistinct()
     })
 )
 
@@ -1011,22 +1139,12 @@ export const seasonRefs = pgTable(
         user_id: text("user_id")
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
-        is_certified: boolean("is_certified")
-            .$defaultFn(() => false)
-            .notNull(),
-        has_w9: boolean("has_w9")
-            .$defaultFn(() => false)
-            .notNull(),
-        passed_test: boolean("passed_test")
-            .$defaultFn(() => false)
-            .notNull(),
-        is_active: boolean("is_active")
-            .$defaultFn(() => true)
-            .notNull(),
+        is_certified: boolean("is_certified").default(false).notNull(),
+        has_w9: boolean("has_w9").default(false).notNull(),
+        passed_test: boolean("passed_test").default(false).notNull(),
+        is_active: boolean("is_active").default(true).notNull(),
         max_division_level: integer("max_division_level").notNull(),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         seasonRefsSeasonIdx: index("season_refs_season_idx").on(
@@ -1054,9 +1172,7 @@ export const matchReferees = pgTable(
             .notNull()
             .references(() => seasons.id, { onDelete: "cascade" }),
         role: text("role").notNull().default("primary"),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         matchRefereesMatchRoleIdx: uniqueIndex(
@@ -1095,9 +1211,7 @@ export const emailRecipientGroups = pgTable(
         team_id: integer("team_id").references(() => teams.id, {
             onDelete: "set null"
         }),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         recipientGroupTypeUniq: uniqueIndex(
@@ -1107,6 +1221,9 @@ export const emailRecipientGroups = pgTable(
             table.season_id,
             table.division_id,
             table.team_id
+        ),
+        recipientGroupSeasonIdx: index("email_recipient_groups_season_idx").on(
+            table.season_id
         )
     })
 )
@@ -1130,12 +1247,8 @@ export const emailSuppressions = pgTable(
         reason: text("reason").notNull(),
         // 'Recipient' | 'Customer' | 'Admin'
         origin: text("origin").notNull(),
-        suppressed_at: timestamp("suppressed_at")
-            .$defaultFn(() => new Date())
-            .notNull(),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        suppressed_at: timestamp("suppressed_at").defaultNow().notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         suppressionEmailStreamUniq: uniqueIndex(
@@ -1149,42 +1262,50 @@ export const emailSuppressions = pgTable(
  * Stores both rendered HTML and raw Lexical JSON so "Send Again" can
  * reload the editor without lossy HTML-to-Lexical conversion.
  */
-export const emailBroadcasts = pgTable("email_broadcasts", {
-    id: serial("id").primaryKey(),
-    recipient_group_id: integer("recipient_group_id").references(
-        () => emailRecipientGroups.id
-    ),
-    // Postmark stream used: 'broadcast' or 'in-season-updates'
-    stream_id: text("stream_id"),
-    template_id: integer("template_id"),
-    subject: text("subject").notNull(),
-    html_content: text("html_content").notNull(),
-    lexical_content: jsonb("lexical_content")
-        .$type<Record<string, unknown>>()
-        .notNull(),
-    sent_by: text("sent_by")
-        .notNull()
-        .references(() => users.id),
-    // 'draft' | 'sent' | 'failed'
-    status: text("status")
-        .$defaultFn(() => "draft")
-        .notNull(),
-    error_message: text("error_message"),
-    // Size of the recipient group *before* the suppression filter runs, so the
-    // history view can show "sent 932 of 1,999" and make the shortfall visible.
-    // Null on rows sent before this column existed — the figure cannot be
-    // reconstructed after the fact.
-    recipient_total: integer("recipient_total"),
-    sent_count: integer("sent_count"),
-    failed_count: integer("failed_count"),
-    sent_at: timestamp("sent_at"),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull(),
-    updated_at: timestamp("updated_at")
-        .$defaultFn(() => new Date())
-        .notNull()
-})
+export const emailBroadcasts = pgTable(
+    "email_broadcasts",
+    {
+        id: serial("id").primaryKey(),
+        // Groups are routinely deleted at season completion; broadcast history
+        // must survive that cleanup.
+        recipient_group_id: integer("recipient_group_id").references(
+            () => emailRecipientGroups.id,
+            { onDelete: "set null" }
+        ),
+        // Postmark stream used: 'broadcast' or 'in-season-updates'
+        stream_id: text("stream_id"),
+        template_id: integer("template_id"),
+        subject: text("subject").notNull(),
+        html_content: text("html_content").notNull(),
+        lexical_content: jsonb("lexical_content")
+            .$type<Record<string, unknown>>()
+            .notNull(),
+        sent_by: text("sent_by")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        // 'draft' | 'sent' | 'failed'
+        status: text("status").default("draft").notNull(),
+        error_message: text("error_message"),
+        // Size of the recipient group *before* the suppression filter runs, so the
+        // history view can show "sent 932 of 1,999" and make the shortfall visible.
+        // Null on rows sent before this column existed — the figure cannot be
+        // reconstructed after the fact.
+        recipient_total: integer("recipient_total"),
+        sent_count: integer("sent_count"),
+        failed_count: integer("failed_count"),
+        sent_at: timestamp("sent_at"),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        emailBroadcastsGroupIdx: index("email_broadcasts_group_idx").on(
+            table.recipient_group_id
+        ),
+        emailBroadcastsCreatedAtIdx: index(
+            "email_broadcasts_created_at_idx"
+        ).on(table.created_at)
+    })
+)
 
 // Waivers: each row is a published, immutable version of the legal waiver.
 // Never UPDATE content or created_at — a DB trigger enforces this. To revise
@@ -1192,13 +1313,11 @@ export const emailBroadcasts = pgTable("email_broadcasts", {
 export const waivers = pgTable("waivers", {
     id: serial("id").primaryKey(),
     content: text("content").notNull(),
-    active: boolean("active")
-        .$defaultFn(() => false)
-        .notNull(),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull(),
-    created_by: text("created_by").references(() => users.id)
+    active: boolean("active").default(false).notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    created_by: text("created_by").references(() => users.id, {
+        onDelete: "set null"
+    })
 })
 
 // One row per (user, waiver version) the first time that user accepts it.
@@ -1209,18 +1328,19 @@ export const waiverAcceptances = pgTable(
         id: serial("id").primaryKey(),
         user_id: text("user_id")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         waiver_id: integer("waiver_id")
             .notNull()
-            .references(() => waivers.id),
-        accepted_at: timestamp("accepted_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+            .references(() => waivers.id, { onDelete: "restrict" }),
+        accepted_at: timestamp("accepted_at").defaultNow().notNull()
     },
     (table) => ({
         waiverAcceptancesUserWaiverIdx: uniqueIndex(
             "waiver_acceptances_user_waiver_idx"
-        ).on(table.user_id, table.waiver_id)
+        ).on(table.user_id, table.waiver_id),
+        waiverAcceptancesWaiverIdx: index("waiver_acceptances_waiver_idx").on(
+            table.waiver_id
+        )
     })
 )
 
@@ -1233,9 +1353,7 @@ export const tournaments = pgTable("tournaments", {
     code: text("code").notNull().unique(),
     year: integer("year").notNull(),
     name: text("name").notNull(),
-    phase: text("phase")
-        .$defaultFn(() => "registration_open")
-        .notNull(),
+    phase: text("phase").default("registration_open").notNull(),
     tournament_date: date("tournament_date", { mode: "string" }).notNull(),
     checkin_time: time("checkin_time"),
     first_serve_time: time("first_serve_time"),
@@ -1264,9 +1382,7 @@ export const tournaments = pgTable("tournaments", {
     // Free-form notes shown on the public marketing page (formats, prizes,
     // raffles, where to park, etc.). Plain text — newlines preserved.
     additional_info: text("additional_info"),
-    created_at: timestamp("created_at")
-        .$defaultFn(() => new Date())
-        .notNull()
+    created_at: timestamp("created_at").defaultNow().notNull()
 })
 
 export const tournamentDivisions = pgTable(
@@ -1280,13 +1396,13 @@ export const tournamentDivisions = pgTable(
         // Display always uses divisions.name; sorting uses divisions.level.
         division_id: integer("division_id")
             .notNull()
-            .references(() => divisions.id),
+            .references(() => divisions.id, { onDelete: "restrict" }),
         team_count: integer("team_count").notNull(),
         male_per_team: integer("male_per_team").notNull(),
         non_male_per_team: integer("non_male_per_team").notNull(),
         // Number of teams from each pool that advance to bracket play
         teams_advancing_per_pool: integer("teams_advancing_per_pool")
-            .$defaultFn(() => 2)
+            .default(2)
             .notNull(),
         sort_order: integer("sort_order").notNull()
     },
@@ -1305,25 +1421,27 @@ export const tournamentTeams = pgTable(
     "tournament_teams",
     {
         id: serial("id").primaryKey(),
+        // Restrict (not cascade): rows carry payment records (order_id,
+        // amount_paid) — deleting a tournament with paid teams must fail
+        // until those teams are handled explicitly.
         tournament_id: integer("tournament_id")
             .notNull()
-            .references(() => tournaments.id, { onDelete: "cascade" }),
+            .references(() => tournaments.id, { onDelete: "restrict" }),
         // Final division — set by admin during prepare phase; may differ from preferred.
         division_id: integer("division_id").references(
-            () => tournamentDivisions.id
+            () => tournamentDivisions.id,
+            { onDelete: "set null" }
         ),
         preferred_division_id: integer("preferred_division_id")
             .notNull()
             .references(() => tournamentDivisions.id),
         captain_user_id: text("captain_user_id")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         name: text("name").notNull(),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         tournamentTeamsTournamentIdx: index(
@@ -1354,13 +1472,11 @@ export const tournamentRoster = pgTable(
             .references(() => tournamentTeams.id, { onDelete: "cascade" }),
         user_id: text("user_id")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "restrict" }),
         added_by_user_id: text("added_by_user_id")
             .notNull()
-            .references(() => users.id),
-        added_at: timestamp("added_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        added_at: timestamp("added_at").defaultNow().notNull()
     },
     (table) => ({
         tournamentRosterTeamIdx: index("tournament_roster_team_idx").on(
@@ -1386,13 +1502,11 @@ export const tournamentWaitlist = pgTable(
             .references(() => tournaments.id, { onDelete: "cascade" }),
         user_id: text("user_id")
             .notNull()
-            .references(() => users.id),
+            .references(() => users.id, { onDelete: "cascade" }),
         waiver_id: integer("waiver_id")
             .notNull()
-            .references(() => waivers.id),
-        approved: boolean("approved")
-            .$defaultFn(() => false)
-            .notNull(),
+            .references(() => waivers.id, { onDelete: "restrict" }),
+        approved: boolean("approved").default(false).notNull(),
         placed_team_id: integer("placed_team_id").references(
             () => tournamentTeams.id,
             { onDelete: "set null" }
@@ -1404,9 +1518,7 @@ export const tournamentWaitlist = pgTable(
             () => tournamentDivisions.id,
             { onDelete: "set null" }
         ),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         tournamentWaitlistTournamentIdx: index(
@@ -1475,6 +1587,10 @@ export const tournamentMatches = pgTable(
         tournament_id: integer("tournament_id")
             .notNull()
             .references(() => tournaments.id, { onDelete: "cascade" }),
+        // division_id / home_team_id / away_team_id intentionally have no
+        // onDelete: NO ACTION defers the FK check to end-of-statement so a
+        // tournament-level cascade can remove matches and their referenced
+        // divisions/teams in one statement (RESTRICT would fail mid-cascade).
         division_id: integer("division_id")
             .notNull()
             .references(() => tournamentDivisions.id),
@@ -1501,10 +1617,12 @@ export const tournamentMatches = pgTable(
         home_set3_score: integer("home_set3_score"),
         away_set3_score: integer("away_set3_score"),
         winner_team_id: integer("winner_team_id").references(
-            () => tournamentTeams.id
+            () => tournamentTeams.id,
+            { onDelete: "set null" }
         ),
         work_team_id: integer("work_team_id").references(
-            () => tournamentTeams.id
+            () => tournamentTeams.id,
+            { onDelete: "set null" }
         )
     },
     (table) => ({
@@ -1537,14 +1655,14 @@ export const tournamentPlacements = pgTable(
         division_id: integer("division_id")
             .notNull()
             .references(() => tournamentDivisions.id, { onDelete: "cascade" }),
+        // No onDelete (NO ACTION): placement history blocks team deletion
+        // unless the whole tournament is being removed in one statement.
         team_id: integer("team_id")
             .notNull()
             .references(() => tournamentTeams.id),
         // 1-based ordinal finish within the division (1 = champion).
         place: integer("place").notNull(),
-        created_at: timestamp("created_at")
-            .$defaultFn(() => new Date())
-            .notNull()
+        created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
         tournamentPlacementsTournamentIdx: index(
@@ -1560,3 +1678,90 @@ export const tournamentPlacements = pgTable(
         ).on(table.tournament_id, table.division_id, table.place)
     })
 )
+
+// --- Relations (core league graph) ---
+// Code-only metadata: enables `db.query.*.with(...)` relational queries.
+// No DDL is generated from these.
+
+export const usersRelations = relations(users, ({ many }) => ({
+    signups: many(signups),
+    drafts: many(drafts),
+    captainedTeams: many(teams),
+    roles: many(userRoles)
+}))
+
+export const seasonsRelations = relations(seasons, ({ many }) => ({
+    signups: many(signups),
+    teams: many(teams),
+    matches: many(matches),
+    events: many(seasonEvents)
+}))
+
+export const divisionsRelations = relations(divisions, ({ many }) => ({
+    teams: many(teams),
+    matches: many(matches)
+}))
+
+export const teamsRelations = relations(teams, ({ one, many }) => ({
+    season: one(seasons, {
+        fields: [teams.season],
+        references: [seasons.id]
+    }),
+    division: one(divisions, {
+        fields: [teams.division],
+        references: [divisions.id]
+    }),
+    captain: one(users, {
+        fields: [teams.captain],
+        references: [users.id]
+    }),
+    drafts: many(drafts)
+}))
+
+export const signupsRelations = relations(signups, ({ one }) => ({
+    season: one(seasons, {
+        fields: [signups.season],
+        references: [seasons.id]
+    }),
+    player: one(users, {
+        fields: [signups.player],
+        references: [users.id]
+    })
+}))
+
+export const draftsRelations = relations(drafts, ({ one }) => ({
+    team: one(teams, {
+        fields: [drafts.team],
+        references: [teams.id]
+    }),
+    user: one(users, {
+        fields: [drafts.user],
+        references: [users.id]
+    })
+}))
+
+export const matchesRelations = relations(matches, ({ one }) => ({
+    season: one(seasons, {
+        fields: [matches.season],
+        references: [seasons.id]
+    }),
+    division: one(divisions, {
+        fields: [matches.division],
+        references: [divisions.id]
+    }),
+    homeTeam: one(teams, {
+        fields: [matches.home_team],
+        references: [teams.id]
+    }),
+    awayTeam: one(teams, {
+        fields: [matches.away_team],
+        references: [teams.id]
+    })
+}))
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+    user: one(users, {
+        fields: [userRoles.user_id],
+        references: [users.id]
+    })
+}))
