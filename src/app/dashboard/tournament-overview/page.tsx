@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { getTournamentOverview } from "./actions"
@@ -13,7 +14,7 @@ export default async function TournamentOverviewPage() {
 
     const result = await getTournamentOverview()
     const data = result.status ? result.data : null
-    const playerPicUrl = process.env.PLAYER_PIC_URL ?? ""
+    const playerPicUrl = playerPicBaseUrl()
 
     return (
         <div className="space-y-6">

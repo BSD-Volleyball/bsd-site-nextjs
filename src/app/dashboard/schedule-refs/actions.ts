@@ -29,6 +29,7 @@ import {
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import { getSessionUserId } from "@/lib/rbac"
+import { formatEventDate, formatMatchTime } from "@/lib/date-utils"
 import { formatPlayerName } from "@/lib/utils"
 import {
     collectPossibleTeams,
@@ -104,26 +105,6 @@ export interface MatchesAndRefsData {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatDateLabel(dateStr: string): string {
-    const d = new Date(`${dateStr}T00:00:00`)
-    return d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric"
-    })
-}
-
-function formatTime(time: string): string {
-    const [hours, minutes] = time.split(":").map(Number)
-    const period = hours >= 12 ? "PM" : "AM"
-    const displayHour = hours % 12 || 12
-    return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`
-}
-
-// ---------------------------------------------------------------------------
 // 1. getScheduleRefsData — match dates for current season
 // ---------------------------------------------------------------------------
 
@@ -169,7 +150,7 @@ export async function getScheduleRefsData(): Promise<
         for (const [date, count] of dateMap) {
             matchDates.push({
                 date,
-                label: formatDateLabel(date),
+                label: formatEventDate(date),
                 matchCount: count
             })
         }
@@ -730,7 +711,7 @@ export async function getMatchesAndRefsForDate(
                     teamMatch.court != null
                         ? ` on Court ${teamMatch.court}`
                         : ""
-                playingInfo = `Playing at ${formatTime(teamMatch.time)}${courtStr}`
+                playingInfo = `Playing at ${formatMatchTime(teamMatch.time)}${courtStr}`
             }
 
             return {

@@ -6,6 +6,10 @@ export const site = {
     description:
         "A recreational co-ed volleyball league in the Washington DC metro area. Join us for competitive play, meet new people, and have fun!",
     url: site_url,
+    // Absolute origin for user-facing links baked into emails and webhook
+    // replies. Unlike `url` (dev-friendly localhost fallback), this must
+    // never point at localhost, so it falls back to the production domain.
+    publicUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com",
     ogImage: `${site_url}/og.jpg`,
     logo: "/logo.svg",
     mailSupport: "info@bumpsetdrink.com",

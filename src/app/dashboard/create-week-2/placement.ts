@@ -2,6 +2,7 @@
 // Extracted verbatim from create-week-2-form.tsx so the
 // algorithms are separate from the UI (and unit-testable).
 
+import { formatDisplayName } from "@/lib/utils"
 import type { Week2Candidate, Week2Division } from "./week2-types"
 
 export interface Week2PlacedPlayer extends Week2Candidate {
@@ -54,10 +55,11 @@ export interface TeamBucket {
 }
 
 export function getDisplayName(player: Week2Candidate) {
-    if (player.preferredName) {
-        return `${player.preferredName} ${player.lastName}`
-    }
-    return `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 export function compareCandidates(a: Week2Candidate, b: Week2Candidate) {

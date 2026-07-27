@@ -5,14 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react"
-
-function formatTime(time: string): string {
-    if (!time) return "—"
-    const [hours, minutes] = time.split(":").map(Number)
-    const period = hours >= 12 ? "PM" : "AM"
-    const displayHour = hours % 12 || 12
-    return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`
-}
+import { formatMatchTimeOrDash } from "@/lib/date-utils"
 
 type MatchWorked = {
     matchId: number
@@ -230,7 +223,7 @@ export function RefCompensationClient({ data }: { data: CompensationData }) {
                                                                     {m.date}
                                                                 </td>
                                                                 <td className="py-2 pr-4">
-                                                                    {formatTime(
+                                                                    {formatMatchTimeOrDash(
                                                                         m.time
                                                                     )}
                                                                 </td>

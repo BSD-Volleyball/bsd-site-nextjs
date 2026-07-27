@@ -17,10 +17,12 @@ import {
     Cell
 } from "recharts"
 
+// Theme chart tokens (see src/styles/globals.css) so the charts adapt to
+// light/dark mode instead of hardcoding hex values.
 const GENDER_COLORS: Record<string, string> = {
-    Male: "#3b82f6",
-    "Not Male": "#ec4899",
-    Unknown: "#a1a1aa"
+    Male: "var(--chart-4)",
+    "Not Male": "var(--chart-2)",
+    Unknown: "var(--chart-5)"
 }
 
 function CaptainTooltip({
@@ -37,10 +39,10 @@ function CaptainTooltip({
         <div className="rounded-md border bg-popover px-3 py-2 text-popover-foreground shadow-md">
             <p className="font-medium text-sm">{data.captain}</p>
             <p className="text-sm">Players: {data.count}</p>
-            <p className="text-xs" style={{ color: "#3b82f6" }}>
+            <p className="text-xs" style={{ color: GENDER_COLORS.Male }}>
                 Male: {data.male}
             </p>
-            <p className="text-xs" style={{ color: "#ec4899" }}>
+            <p className="text-xs" style={{ color: GENDER_COLORS["Not Male"] }}>
                 Non-Male: {data.nonMale}
             </p>
         </div>
@@ -65,10 +67,10 @@ function CaptainAvgTooltip({
                 {data.total} total over {data.seasons} season
                 {data.seasons !== 1 ? "s" : ""}
             </p>
-            <p className="text-xs" style={{ color: "#3b82f6" }}>
+            <p className="text-xs" style={{ color: GENDER_COLORS.Male }}>
                 Male: {data.male}
             </p>
-            <p className="text-xs" style={{ color: "#ec4899" }}>
+            <p className="text-xs" style={{ color: GENDER_COLORS["Not Male"] }}>
                 Non-Male: {data.nonMale}
             </p>
         </div>
@@ -142,7 +144,7 @@ export function AttritionCharts({
                                             key={entry.label}
                                             fill={
                                                 GENDER_COLORS[entry.label] ||
-                                                "#a1a1aa"
+                                                "var(--chart-5)"
                                             }
                                         />
                                     ))}
@@ -174,14 +176,16 @@ export function AttritionCharts({
                                 <p className="mt-1 text-muted-foreground text-xs">
                                     <span
                                         className="font-medium"
-                                        style={{ color: "#3b82f6" }}
+                                        style={{ color: GENDER_COLORS.Male }}
                                     >
                                         {attritionGenderRatio.male} male
                                     </span>
                                     {" / "}
                                     <span
                                         className="font-medium"
-                                        style={{ color: "#ec4899" }}
+                                        style={{
+                                            color: GENDER_COLORS["Not Male"]
+                                        }}
                                     >
                                         {attritionGenderRatio.nonMale} non-male
                                     </span>
@@ -208,14 +212,16 @@ export function AttritionCharts({
                                 <p className="mt-1 text-muted-foreground text-xs">
                                     <span
                                         className="font-medium"
-                                        style={{ color: "#3b82f6" }}
+                                        style={{ color: GENDER_COLORS.Male }}
                                     >
                                         {overallGenderRatio.male} male
                                     </span>
                                     {" / "}
                                     <span
                                         className="font-medium"
-                                        style={{ color: "#ec4899" }}
+                                        style={{
+                                            color: GENDER_COLORS["Not Male"]
+                                        }}
                                     >
                                         {overallGenderRatio.nonMale} non-male
                                     </span>

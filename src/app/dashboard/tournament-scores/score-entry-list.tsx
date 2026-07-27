@@ -13,6 +13,7 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
+import { formatCompactTime } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import {
     saveTournamentMatchScore,
@@ -60,19 +61,6 @@ function num(s: string): number | null {
     if (s === "") return null
     const n = Number(s)
     return Number.isFinite(n) ? n : null
-}
-
-function formatTime(value: string | null): string | null {
-    if (!value) return null
-    const [hStr, mStr] = value.split(":")
-    const h = Number(hStr)
-    const m = Number(mStr)
-    if (Number.isNaN(h) || Number.isNaN(m)) return value
-    const period = h >= 12 ? "pm" : "am"
-    const hour12 = h % 12 === 0 ? 12 : h % 12
-    return m === 0
-        ? `${hour12}${period}`
-        : `${hour12}:${String(m).padStart(2, "0")}${period}`
 }
 
 function countScored(matches: ScheduleMatch[]): number {
@@ -390,7 +378,7 @@ function MatchScoreCard({
     onSave: () => void
 }) {
     const decided = match.winnerTeamId !== null
-    const time = formatTime(match.startTime)
+    const time = formatCompactTime(match.startTime)
     const meta: string[] = []
     if (time) meta.push(time)
     if (match.court !== null) meta.push(`Court ${match.court}`)

@@ -2,6 +2,7 @@
 // Extracted verbatim from create-week-3-form.tsx so the
 // algorithms are separate from the UI (and unit-testable).
 
+import { formatDisplayName } from "@/lib/utils"
 import type { Week3Candidate, Week3Division } from "./week3-types"
 
 export interface Week3PlacedPlayer extends Week3Candidate {
@@ -100,10 +101,11 @@ export const placementReasonOrder: PlacementReason[] = [
 ]
 
 export function getDisplayName(player: Week3Candidate) {
-    if (player.preferredName) {
-        return `${player.preferredName} ${player.lastName}`
-    }
-    return `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 export function compareCandidates(a: Week3Candidate, b: Week3Candidate) {

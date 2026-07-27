@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
+import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
@@ -86,10 +87,7 @@ export const advanceSeasonPhase = withAction(
                 // champions.picture as an <img src> directly, so we need to
                 // store an absolute URL — matching the historical convention
                 // populated by scripts/archive/import-hoc-champions.ts.
-                const picBase = (process.env.PLAYER_PIC_URL ?? "").replace(
-                    /\/+$/,
-                    ""
-                )
+                const picBase = playerPicBaseUrl().replace(/\/+$/, "")
                 const pictureByTeam = new Map(
                     teamRows.map((t) => {
                         if (!t.pictureUrl) return [t.id, null] as const

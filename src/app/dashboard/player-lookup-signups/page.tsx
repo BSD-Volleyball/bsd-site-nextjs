@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PlayerLookupSignupsForm } from "./player-lookup-form"
 import { getSignedUpPlayers } from "./actions"
@@ -39,7 +40,7 @@ export default async function PlayerLookupSignupsPage() {
             <PlayerLookupSignupsForm
                 players={result.data.players}
                 allSeasons={result.data.allSeasons}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

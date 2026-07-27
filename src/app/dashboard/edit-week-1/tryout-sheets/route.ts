@@ -13,6 +13,7 @@ import {
     users,
     week1Rosters
 } from "@/database/schema"
+import { formatDisplayName } from "@/lib/utils"
 import {
     getSeasonConfig,
     getEventsByType,
@@ -74,7 +75,7 @@ function getDisplayName({
     lastName: string
     preferredName: string | null
 }): string {
-    return `${preferredName || firstName} ${lastName}`
+    return formatDisplayName(firstName, lastName, preferredName)
 }
 
 function getGenderLabel(male: boolean | null): string {

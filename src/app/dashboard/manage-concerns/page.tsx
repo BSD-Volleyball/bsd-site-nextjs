@@ -1,4 +1,5 @@
 import { requirePermissionOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
@@ -37,7 +38,7 @@ export default async function ManageConcernsPage() {
                 <ManageConcernsClient
                     initialConcerns={concernsResult.data}
                     assignableUsers={assignableUsers}
-                    playerPicUrl={process.env.PLAYER_PIC_URL ?? ""}
+                    playerPicUrl={playerPicBaseUrl()}
                 />
             )}
         </div>

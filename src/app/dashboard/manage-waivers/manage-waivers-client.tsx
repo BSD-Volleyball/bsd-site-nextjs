@@ -16,6 +16,7 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { WaiverContent } from "@/components/waiver-content"
+import { formatFullTimestamp } from "@/lib/date-utils"
 import {
     createWaiverVersion,
     publishWaiverVersion,
@@ -24,11 +25,6 @@ import {
 
 interface Props {
     waivers: WaiverRow[]
-}
-
-function formatDate(d: Date | string) {
-    const date = typeof d === "string" ? new Date(d) : d
-    return date.toLocaleString()
 }
 
 export function ManageWaiversClient({ waivers }: Props) {
@@ -135,7 +131,8 @@ export function ManageWaiversClient({ waivers }: Props) {
                                             )}
                                         </CardTitle>
                                         <CardDescription>
-                                            Created {formatDate(w.created_at)}
+                                            Created{" "}
+                                            {formatFullTimestamp(w.created_at)}
                                             {w.created_by_name
                                                 ? ` by ${w.created_by_name}`
                                                 : ""}

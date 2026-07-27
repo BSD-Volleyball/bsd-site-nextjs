@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
+import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -521,7 +522,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 year: s.year,
                 name: s.name
             })),
-            playerPicUrl: process.env.PLAYER_PIC_URL || ""
+            playerPicUrl: playerPicBaseUrl()
         }
     } catch (error) {
         console.error("Error fetching captain welcome data:", error)

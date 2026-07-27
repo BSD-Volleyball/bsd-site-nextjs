@@ -30,6 +30,14 @@ export function formatPlayerName(
     return `${firstName}${preferred} ${lastName}`
 }
 
+export function formatDisplayName(
+    firstName: string,
+    lastName: string,
+    preferredName?: string | null
+): string {
+    return `${preferredName || firstName} ${lastName}`.trim()
+}
+
 // ---------------------------------------------------------------------------
 // Gender split
 // ---------------------------------------------------------------------------

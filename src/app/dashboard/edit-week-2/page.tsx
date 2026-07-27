@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
@@ -52,7 +53,7 @@ export default async function EditWeek2Page() {
                 <EditWeek2Form
                     players={result.players}
                     slots={result.slots}
-                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    playerPicUrl={playerPicBaseUrl()}
                     seasonLabel={result.seasonLabel}
                 />
             )}

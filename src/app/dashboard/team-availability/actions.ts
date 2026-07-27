@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { playerPicBaseUrl } from "@/config/env"
 import {
     type ActionResult,
     fail,
@@ -439,7 +440,7 @@ export const getTeamAvailabilityData = withAction(
             events: events as EventInfo[],
             roster,
             allSeasons,
-            playerPicUrl: process.env.PLAYER_PIC_URL ?? "",
+            playerPicUrl: playerPicBaseUrl(),
             teamMatchTimeByEventDate,
             dateMatchInfo,
             canLockInPermanent,

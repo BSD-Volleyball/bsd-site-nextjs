@@ -31,19 +31,10 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
+import { formatTimestamp } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
 import { AdminPlayerDetailPopup } from "@/components/player-detail/admin-player-detail-popup"
-
-function formatDate(date: Date | string) {
-    return new Date(date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-    })
-}
 
 function splitQuotedText(text: string): {
     main: string
@@ -307,7 +298,7 @@ function EmailCard({
                             </p>
                         </div>
                         <div className="shrink-0 text-right text-muted-foreground text-xs">
-                            <div>{formatDate(email.created_at)}</div>
+                            <div>{formatTimestamp(email.created_at)}</div>
                             {email.assigned_to_name && (
                                 <div className="mt-0.5">
                                     Assigned: {email.assigned_to_name}
@@ -497,7 +488,7 @@ function EmailCard({
                                                 {item.sent_by_name}
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {formatDate(item.sent_at)}
+                                                {formatTimestamp(item.sent_at)}
                                             </span>
                                         </div>
                                         <p className="mb-1 text-muted-foreground text-xs">
@@ -519,7 +510,9 @@ function EmailCard({
                                                     item.from_address}
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {formatDate(item.received_at)}
+                                                {formatTimestamp(
+                                                    item.received_at
+                                                )}
                                             </span>
                                         </div>
                                         <p className="mb-1 text-muted-foreground text-xs">
@@ -542,7 +535,9 @@ function EmailCard({
                                                 </span>
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {formatDate(item.created_at)}
+                                                {formatTimestamp(
+                                                    item.created_at
+                                                )}
                                             </span>
                                         </div>
                                         <p className="whitespace-pre-wrap text-foreground">

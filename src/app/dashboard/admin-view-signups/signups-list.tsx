@@ -14,7 +14,12 @@ import {
     DialogTitle
 } from "@/components/ui/dialog"
 import { RiDownloadLine } from "@remixicon/react"
-import { cn, buildPlayerPictureUrl, serializeCsvField } from "@/lib/utils"
+import {
+    cn,
+    buildPlayerPictureUrl,
+    serializeCsvField,
+    formatPlayerName
+} from "@/lib/utils"
 import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup,
@@ -39,8 +44,11 @@ interface SignupsListProps {
 }
 
 function getDisplayName(entry: SignupEntry): string {
-    const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
-    return `${entry.firstName}${preferred} ${entry.lastName}`
+    return formatPlayerName(
+        entry.firstName,
+        entry.lastName,
+        entry.preferredName
+    )
 }
 
 function generateCsvContent(
@@ -1105,10 +1113,11 @@ export function SignupsList({
                                 </thead>
                                 <tbody>
                                     {deletedSignups.map((entry) => {
-                                        const preferred = entry.preferredName
-                                            ? ` (${entry.preferredName})`
-                                            : ""
-                                        const displayName = `${entry.firstName}${preferred} ${entry.lastName}`
+                                        const displayName = formatPlayerName(
+                                            entry.firstName,
+                                            entry.lastName,
+                                            entry.preferredName
+                                        )
                                         return (
                                             <tr
                                                 key={entry.signupId}

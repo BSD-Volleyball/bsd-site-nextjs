@@ -12,6 +12,7 @@ import {
     users
 } from "@/database/schema"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { formatDisplayName } from "@/lib/utils"
 
 export type PlayerSummary = {
     id: string
@@ -330,9 +331,7 @@ export async function getMatchSubsForTeamSeason(
 }
 
 export function formatPlayerSummaryName(p: PlayerSummary): string {
-    return p.preferredName
-        ? `${p.preferredName} ${p.lastName}`
-        : `${p.firstName} ${p.lastName}`
+    return formatDisplayName(p.firstName, p.lastName, p.preferredName)
 }
 
 // ---------------------------------------------------------------------------

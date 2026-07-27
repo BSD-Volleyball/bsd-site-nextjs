@@ -23,6 +23,7 @@ import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatDisplayName } from "@/lib/utils"
 import type {
     Week3Candidate,
     Week3Division,
@@ -36,10 +37,11 @@ interface DraftSeasonRecord {
 }
 
 function getDisplayName(candidate: Week3Candidate) {
-    if (candidate.preferredName) {
-        return `${candidate.preferredName} ${candidate.lastName}`
-    }
-    return `${candidate.firstName} ${candidate.lastName}`
+    return formatDisplayName(
+        candidate.firstName,
+        candidate.lastName,
+        candidate.preferredName
+    )
 }
 
 export async function getCreateWeek3Data(): Promise<{

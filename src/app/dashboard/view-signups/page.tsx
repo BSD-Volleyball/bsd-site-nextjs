@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { SignupsList } from "./signups-list"
 import { getSignupsData } from "./actions"
@@ -48,7 +49,7 @@ export default async function ViewSignupsPage() {
                     undraftedGroups={data.undraftedGroups}
                     draftedGroups={data.draftedGroups}
                     allSeasons={data.allSeasons}
-                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    playerPicUrl={playerPicBaseUrl()}
                     seasonLabel={data.seasonLabel}
                 />
             )}

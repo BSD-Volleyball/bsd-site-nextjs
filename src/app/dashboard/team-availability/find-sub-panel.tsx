@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { formatDisplayName } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -70,9 +71,11 @@ function displayName(player: {
     lastName: string
     preferredName: string | null
 }) {
-    return player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 function formatDate(dateStr: string): string {

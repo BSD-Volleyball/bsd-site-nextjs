@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { SignupsList } from "./signups-list"
@@ -42,7 +43,7 @@ export default async function ViewSignupsPage() {
             <SignupsList
                 signups={result.signups}
                 deletedSignups={deletedResult.entries}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
                 seasonLabel={result.seasonLabel}
                 lateAmount={result.lateAmount}
             />

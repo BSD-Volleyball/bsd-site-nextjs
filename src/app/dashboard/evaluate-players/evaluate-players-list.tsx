@@ -23,6 +23,7 @@ import {
     type DivisionOption
 } from "./actions"
 import { formatHeight } from "@/components/player-detail"
+import { formatPlayerName } from "@/lib/utils"
 
 interface EvaluatePlayersListProps {
     players: NewPlayerEntry[]
@@ -30,8 +31,11 @@ interface EvaluatePlayersListProps {
 }
 
 function getDisplayName(entry: NewPlayerEntry): string {
-    const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
-    return `${entry.firstName}${preferred} ${entry.lastName}`
+    return formatPlayerName(
+        entry.firstName,
+        entry.lastName,
+        entry.preferredName
+    )
 }
 
 function getAverageRatingDisplay(

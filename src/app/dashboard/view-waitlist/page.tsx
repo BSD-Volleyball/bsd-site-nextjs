@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { WaitlistList } from "./waitlist-list"
@@ -38,7 +39,7 @@ export default async function ViewWaitlistPage() {
             />
             <WaitlistList
                 entries={result.data.entries}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

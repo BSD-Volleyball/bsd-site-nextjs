@@ -30,21 +30,12 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
+import { formatTimestamp } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import {
     AdminPlayerDetailPopup,
     usePlayerDetailModal
 } from "@/components/player-detail"
-
-function formatDate(date: Date | string) {
-    return new Date(date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-    })
-}
 
 function splitQuotedText(text: string): {
     main: string
@@ -283,7 +274,7 @@ function ConcernCard({
                             </p>
                         </div>
                         <div className="shrink-0 text-right text-muted-foreground text-xs">
-                            <div>{formatDate(concern.created_at)}</div>
+                            <div>{formatTimestamp(concern.created_at)}</div>
                             {concern.assigned_to_name && (
                                 <div className="mt-0.5">
                                     Assigned: {concern.assigned_to_name}
@@ -560,7 +551,7 @@ function ConcernCard({
                                                 </span>
                                             </span>
                                             <span className="text-blue-700 text-xs dark:text-blue-300">
-                                                {formatDate(item.sent_at)}
+                                                {formatTimestamp(item.sent_at)}
                                             </span>
                                         </div>
                                         <p className="whitespace-pre-wrap text-blue-900 dark:text-blue-100">
@@ -579,7 +570,9 @@ function ConcernCard({
                                                     item.from_address}
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {formatDate(item.received_at)}
+                                                {formatTimestamp(
+                                                    item.received_at
+                                                )}
                                             </span>
                                         </div>
                                         <p className="mb-1 text-muted-foreground text-xs">
@@ -599,7 +592,9 @@ function ConcernCard({
                                                 {item.author_name}
                                             </span>
                                             <span className="text-muted-foreground text-xs">
-                                                {formatDate(item.created_at)}
+                                                {formatTimestamp(
+                                                    item.created_at
+                                                )}
                                             </span>
                                         </div>
                                         <p className="whitespace-pre-wrap text-foreground">

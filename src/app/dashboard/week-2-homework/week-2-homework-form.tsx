@@ -24,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -52,9 +52,11 @@ interface Week2HomeworkFormProps {
 }
 
 function getDisplayName(player: Week2Player): string {
-    const name = player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    const name = formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
     return `#${player.oldId} – ${name}`
 }
 

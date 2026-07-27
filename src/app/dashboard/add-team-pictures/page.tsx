@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { playerPicBaseUrl } from "@/config/env"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/lib/rbac"
@@ -20,7 +21,7 @@ export default async function AddTeamPicturesPage() {
     }
 
     const result = await getTeamsForPicturePage()
-    const playerPicUrl = process.env.PLAYER_PIC_URL ?? ""
+    const playerPicUrl = playerPicBaseUrl()
 
     return (
         <div className="space-y-6">

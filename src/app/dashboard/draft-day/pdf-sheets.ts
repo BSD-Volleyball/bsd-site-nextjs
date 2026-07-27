@@ -29,7 +29,7 @@ function displayName(t: { teamNumber: number | null }): string {
     return t.teamNumber !== null ? `Team ${t.teamNumber}` : "Team —"
 }
 
-function formatPlayerName(name: string, oldId: number | null): string {
+function formatNameWithOldId(name: string, oldId: number | null): string {
     return oldId != null ? `${name} (${oldId})` : name
 }
 
@@ -149,7 +149,7 @@ function drawTeamCell(
             color: rgb(0.3, 0.3, 0.3)
         })
         if (prefilled && coach.name) {
-            page.drawText(formatPlayerName(coach.name, coach.oldId), {
+            page.drawText(formatNameWithOldId(coach.name, coach.oldId), {
                 x: x + pad + captLabelWidth + NAME_INDENT,
                 y: toY(cursor + 10),
                 size: captLabelSize,
@@ -189,8 +189,8 @@ function drawTeamCell(
             const pick = pickMap.get(round)
             if (pick) {
                 const label = pick.isCaptain
-                    ? formatPlayerName(pick.playerName, pick.oldId)
-                    : `${formatPlayerName(pick.playerName, pick.oldId)} *`
+                    ? formatNameWithOldId(pick.playerName, pick.oldId)
+                    : `${formatNameWithOldId(pick.playerName, pick.oldId)} *`
                 page.drawText(label, {
                     x: lineStartX + NAME_INDENT,
                     y: toY(textBaseY),
@@ -360,7 +360,7 @@ function drawDivisionPage(
                 : displayName(team)
             : `Team ${idx + 1}`
         const captainDisplay = team
-            ? formatPlayerName(team.captainName, team.captainOldId)
+            ? formatNameWithOldId(team.captainName, team.captainOldId)
             : ""
         const prefillNonMaleCount =
             team && !div.isCoaches ? countNonMalePrefills(team) : 0

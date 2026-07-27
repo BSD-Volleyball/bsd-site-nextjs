@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageEmailsClient } from "./manage-emails-client"
@@ -33,7 +34,7 @@ export default async function ManageEmailsPage() {
                 <ManageEmailsClient
                     initialEmails={emailsResult.data}
                     assignableAdmins={assignableAdmins}
-                    playerPicUrl={process.env.PLAYER_PIC_URL ?? ""}
+                    playerPicUrl={playerPicBaseUrl()}
                 />
             )}
         </div>

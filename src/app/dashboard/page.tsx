@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
@@ -243,7 +244,7 @@ async function getPreviousSeasonsPlayed(
         champion: !!r.championId,
         championPicture: r.championPicture,
         teamPhotoUrl: buildPlayerPictureUrl(
-            process.env.PLAYER_PIC_URL ?? "",
+            playerPicBaseUrl(),
             r.teamPictureUrl
         )
     }))

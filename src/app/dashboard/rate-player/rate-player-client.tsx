@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { formatHeight } from "@/components/player-detail"
+import { formatDisplayName } from "@/lib/utils"
 import {
     Dialog,
     DialogContent,
@@ -57,7 +58,11 @@ interface PlayerTableProps {
 }
 
 function getDisplayName(player: RatePlayerEntry): string {
-    return `${player.preferredName || player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 function getOldIdLabel(player: RatePlayerEntry): string {
@@ -382,8 +387,7 @@ export function RatePlayerClient({
 
         return players.filter((player) => {
             const oldIdText = player.oldId?.toString() || ""
-            const nameText =
-                `${player.preferredName || player.firstName} ${player.lastName}`.toLowerCase()
+            const nameText = getDisplayName(player).toLowerCase()
             const fullNameText =
                 `${player.firstName} ${player.lastName}`.toLowerCase()
 

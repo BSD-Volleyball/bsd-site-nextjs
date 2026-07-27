@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/collapsible"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { toast } from "sonner"
+import { formatMatchTimeOrDash } from "@/lib/date-utils"
 import { getMatchesAndRefsForDate, saveRefAssignments } from "./actions"
 import type {
     MatchDate,
@@ -52,14 +53,6 @@ type MatchAssignment = { primary: string | null; backup: string | null }
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatTime(time: string): string {
-    if (!time) return "—"
-    const [hours, minutes] = time.split(":").map(Number)
-    const period = hours >= 12 ? "PM" : "AM"
-    const displayHour = hours % 12 || 12
-    return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`
-}
 
 function divisionLevelLabel(level: number): string {
     const map: Record<number, string> = {
@@ -557,7 +550,7 @@ export function ScheduleRefsClient({
                                                                     className="border-b last:border-0"
                                                                 >
                                                                     <td className="whitespace-nowrap px-3 py-2">
-                                                                        {formatTime(
+                                                                        {formatMatchTimeOrDash(
                                                                             match.time
                                                                         )}
                                                                     </td>
@@ -680,7 +673,7 @@ export function ScheduleRefsClient({
                                                                 className="even:bg-muted/20"
                                                             >
                                                                 <td className="whitespace-nowrap border px-3 py-2 font-medium">
-                                                                    {formatTime(
+                                                                    {formatMatchTimeOrDash(
                                                                         time
                                                                     )}
                                                                 </td>

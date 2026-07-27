@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
@@ -73,7 +74,7 @@ export default async function PrepareForDraftPage({
             <PrepareForDraftTable
                 data={data}
                 allSeasons={allSeasons}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

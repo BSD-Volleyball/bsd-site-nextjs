@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditPlayerForm } from "./edit-player-form"
 import { getUsers } from "./actions"
@@ -23,7 +24,7 @@ export default async function EditPlayerPage() {
             />
             <EditPlayerForm
                 users={usersData}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

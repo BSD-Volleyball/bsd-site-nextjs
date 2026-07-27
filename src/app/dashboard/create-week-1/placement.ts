@@ -2,6 +2,7 @@
 // Extracted verbatim from create-week-1-form.tsx so the
 // algorithms are separate from the UI (and unit-testable).
 
+import { formatDisplayName } from "@/lib/utils"
 import type { Week1Candidate, Week1RosterAssignment } from "./week1-types"
 
 export interface CandidateWithIndex extends Week1Candidate {
@@ -41,10 +42,11 @@ export const CUTOFF_COUNT = 96
 
 export function displayName(player: Week1Candidate | AssignmentView) {
     if ("firstName" in player) {
-        if (player.preferredName) {
-            return `${player.preferredName} ${player.lastName}`
-        }
-        return `${player.firstName} ${player.lastName}`
+        return formatDisplayName(
+            player.firstName,
+            player.lastName,
+            player.preferredName
+        )
     }
     return player.displayName
 }

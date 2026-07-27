@@ -64,8 +64,7 @@ export const submitConcern = withAction(
         ]
 
         if (ombudsmanEmails.length > 0) {
-            const appUrl =
-                process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
+            const appUrl = site.publicUrl
             await sendBatchEmails(
                 ombudsmanEmails.map((to) => ({
                     from: site.mailFrom,

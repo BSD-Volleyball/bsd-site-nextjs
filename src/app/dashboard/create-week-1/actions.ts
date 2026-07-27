@@ -21,6 +21,7 @@ import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatDisplayName } from "@/lib/utils"
 import {
     GROUP_COLORS,
     GROUP_LABELS,
@@ -41,10 +42,11 @@ interface DraftSeasonRecord {
 }
 
 function getDisplayName(candidate: Week1Candidate) {
-    if (candidate.preferredName) {
-        return `${candidate.preferredName} ${candidate.lastName}`
-    }
-    return `${candidate.firstName} ${candidate.lastName}`
+    return formatDisplayName(
+        candidate.firstName,
+        candidate.lastName,
+        candidate.preferredName
+    )
 }
 
 function getGroupForUser({

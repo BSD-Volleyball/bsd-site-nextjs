@@ -1,4 +1,5 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PairsList } from "./pairs-list"
@@ -39,7 +40,7 @@ export default async function ReviewPairsPage() {
             <PairsList
                 matched={result.matched}
                 unmatched={result.unmatched}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

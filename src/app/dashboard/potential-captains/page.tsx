@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
@@ -55,7 +56,7 @@ export default async function PotentialCaptainsPage() {
                 <PotentialCaptainsList
                     divisions={data.divisions}
                     allSeasons={data.allSeasons}
-                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    playerPicUrl={playerPicBaseUrl()}
                     emailTemplate={data.emailTemplate || ""}
                     emailTemplateContent={data.emailTemplateContent}
                     emailSubject={data.emailSubject || ""}

@@ -9,6 +9,7 @@ import {
 } from "@/components/player-detail"
 import { setWaitlistApproval, type WaitlistEntry } from "./actions"
 import { useRouter } from "next/navigation"
+import { formatPlayerName } from "@/lib/utils"
 
 interface WaitlistListProps {
     entries: WaitlistEntry[]
@@ -16,8 +17,11 @@ interface WaitlistListProps {
 }
 
 function getDisplayName(entry: WaitlistEntry): string {
-    const preferred = entry.preferredName ? ` (${entry.preferredName})` : ""
-    return `${entry.firstName}${preferred} ${entry.lastName}`
+    return formatPlayerName(
+        entry.firstName,
+        entry.lastName,
+        entry.preferredName
+    )
 }
 
 export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {

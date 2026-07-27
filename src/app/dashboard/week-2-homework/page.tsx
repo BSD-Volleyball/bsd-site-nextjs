@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import {
     getWeek2HomeworkData,
@@ -91,7 +92,7 @@ export default async function Week2HomeworkPage() {
                     isBottomDivision={data.isBottomDivision}
                     existingSubmissions={data.existingSubmissions}
                     allSeasons={data.allSeasons}
-                    playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                    playerPicUrl={playerPicBaseUrl()}
                 />
             </div>
         )
@@ -164,7 +165,7 @@ export default async function Week2HomeworkPage() {
                 isBottomDivision={data.isBottomDivision}
                 existingSubmissions={data.existingSubmissions}
                 allSeasons={data.allSeasons}
-                playerPicUrl={process.env.PLAYER_PIC_URL || ""}
+                playerPicUrl={playerPicBaseUrl()}
             />
         </div>
     )

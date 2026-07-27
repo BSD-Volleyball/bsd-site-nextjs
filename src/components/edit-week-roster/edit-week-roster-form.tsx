@@ -634,6 +634,7 @@ export function EditWeekRosterForm({
                                                             variant="ghost"
                                                             size="icon"
                                                             className="shrink-0"
+                                                            aria-label="View player details"
                                                             onClick={() =>
                                                                 modal.openPlayerDetail(
                                                                     slot.userId
@@ -648,6 +649,7 @@ export function EditWeekRosterForm({
                                                         variant="ghost"
                                                         size="icon"
                                                         className="shrink-0"
+                                                        aria-label="Remove player from slot"
                                                         onClick={() =>
                                                             removeSlot(
                                                                 slot.localKey

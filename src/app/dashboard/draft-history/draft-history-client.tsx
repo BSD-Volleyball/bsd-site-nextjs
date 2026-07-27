@@ -9,6 +9,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { formatDisplayName } from "@/lib/utils"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
 import { AdminPlayerDetailPopup } from "@/components/player-detail/admin-player-detail-popup"
 import {
@@ -40,15 +41,6 @@ function getRoundColor(round: number): string {
     return ROUND_COLORS[(round - 1) % ROUND_COLORS.length]
 }
 
-function displayName(
-    firstName: string,
-    lastName: string,
-    preferredName: string | null
-): string {
-    const first = preferredName ?? firstName
-    return `${first} ${lastName}`
-}
-
 function DraftPickBubble({ player }: { player: DraftPlayer }) {
     return (
         <span
@@ -66,7 +58,7 @@ function TeamCard({
     team: DraftTeam
     onPlayerClick: (userId: string) => void
 }) {
-    const captainName = displayName(
+    const captainName = formatDisplayName(
         team.captainFirstName,
         team.captainLastName,
         team.captainPreferredName
@@ -110,7 +102,7 @@ function TeamCard({
                                 onClick={() => onPlayerClick(player.userId)}
                                 className="font-medium text-sm hover:underline focus:outline-none"
                             >
-                                {displayName(
+                                {formatDisplayName(
                                     player.firstName,
                                     player.lastName,
                                     player.preferredName

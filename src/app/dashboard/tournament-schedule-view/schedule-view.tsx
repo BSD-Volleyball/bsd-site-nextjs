@@ -3,6 +3,7 @@
 import { RiTrophyLine } from "@remixicon/react"
 import type * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCompactTime } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import type {
     ScheduleBracketGroup,
@@ -15,19 +16,6 @@ const BRACKET_LABELS: Record<string, string> = {
     winners: "Winners",
     losers: "Losers",
     final: "Final"
-}
-
-function formatTime(value: string | null): string | null {
-    if (!value) return null
-    const [hStr, mStr] = value.split(":")
-    const h = Number(hStr)
-    const m = Number(mStr)
-    if (Number.isNaN(h) || Number.isNaN(m)) return value
-    const period = h >= 12 ? "pm" : "am"
-    const hour12 = h % 12 === 0 ? 12 : h % 12
-    return m === 0
-        ? `${hour12}${period}`
-        : `${hour12}:${String(m).padStart(2, "0")}${period}`
 }
 
 // Which set columns to render — any set where either side has a score.
@@ -108,7 +96,7 @@ export function MatchBlock({
     match: ScheduleMatch
     myTeamId: number | null
 }) {
-    const time = formatTime(match.startTime)
+    const time = formatCompactTime(match.startTime)
     const setIndices = scoredSetIndices(match)
     const decided = match.winnerTeamId !== null
     const homeMine = myTeamId !== null && match.home?.id === myTeamId

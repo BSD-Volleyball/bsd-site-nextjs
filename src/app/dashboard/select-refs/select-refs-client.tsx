@@ -495,6 +495,11 @@ function RefsTable({
                                                 ? "Deactivate ref"
                                                 : "Activate ref"
                                         }
+                                        aria-label={
+                                            ref.isActive
+                                                ? "Deactivate ref"
+                                                : "Activate ref"
+                                        }
                                         onClick={() => onToggleActive(ref)}
                                     >
                                         {ref.isActive ? (
@@ -508,6 +513,7 @@ function RefsTable({
                                         size="icon"
                                         className="h-8 w-8 text-destructive hover:text-destructive"
                                         disabled={isPending}
+                                        aria-label="Remove ref"
                                         onClick={() => onRemove(ref)}
                                     >
                                         <RiDeleteBinLine className="h-4 w-4" />

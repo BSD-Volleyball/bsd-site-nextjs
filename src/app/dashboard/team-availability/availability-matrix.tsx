@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
+import { formatDisplayName } from "@/lib/utils"
 import { getTeamAvailabilityData } from "./actions"
 import type { RosterPlayer, TeamAvailabilityData } from "./actions"
 import { FindSubPanel } from "./find-sub-panel"
@@ -25,10 +26,11 @@ function formatDate(dateStr: string): string {
 }
 
 function displayName(player: RosterPlayer): string {
-    if (player.preferredName) {
-        return `${player.preferredName} ${player.lastName}`
-    }
-    return `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 type AvailabilityMatrixProps = {
