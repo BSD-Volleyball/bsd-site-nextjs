@@ -44,10 +44,10 @@ export default async function DraftDivisionPage() {
                 description="Conduct the draft for an authorized division or make picks for your team in the live draft."
             />
             <DraftDivisionForm
-                currentSeasonId={result.currentSeasonId}
-                divisionSplits={result.divisionSplits}
-                divisions={result.divisions}
-                users={result.users}
+                currentSeasonId={result.data.currentSeasonId}
+                divisionSplits={result.data.divisionSplits}
+                divisions={result.data.divisions}
+                users={result.data.users}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
                 divisionRoleById={access.divisionRoleById}
                 captainTeamIdsByDivision={access.captainTeamIdsByDivision}

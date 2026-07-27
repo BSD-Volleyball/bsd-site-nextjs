@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { auth } from "@/lib/auth"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { db } from "@/database/db"
 import { tournamentWaitlist } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
@@ -20,8 +19,7 @@ export const metadata: Metadata = {
 }
 
 export default async function TournamentWaitlistPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
+    const session = await requireSessionOrRedirect()
 
     const config = await getTournamentConfig()
     if (!config || !isPlayerSignupOpen(config)) {

@@ -22,7 +22,7 @@ export default async function TeamAvailabilityPage() {
                 description="View your roster's availability across game dates."
             />
             {result.status ? (
-                <AvailabilityMatrix initialData={result} />
+                <AvailabilityMatrix initialData={result.data} />
             ) : (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     {result.message}

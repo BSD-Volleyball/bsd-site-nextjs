@@ -116,9 +116,12 @@ export function SignupsList({
         setIsExporting(true)
         try {
             const result = await getSignupsCsvData()
-            if (!result.status || !result.entries.length) return
+            if (!result.status || !result.data.entries.length) return
 
-            const csvContent = generateCsvContent(result.entries, playerPicUrl)
+            const csvContent = generateCsvContent(
+                result.data.entries,
+                playerPicUrl
+            )
             const blob = new Blob([`\ufeff${csvContent}`], {
                 type: "text/csv;charset=utf-8;"
             })

@@ -1,8 +1,5 @@
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
 import { getAvailableDivisions, getTournamentConfigData } from "./actions"
 import { TournamentConfigForm } from "./tournament-config-form"
@@ -12,11 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function TournamentConfigPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) redirect("/dashboard")
+    await requireAdminOrRedirect()
 
     const [result, divisionsResult] = await Promise.all([
         getTournamentConfigData(),

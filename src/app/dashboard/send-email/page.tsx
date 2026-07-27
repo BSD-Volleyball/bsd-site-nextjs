@@ -1,7 +1,4 @@
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
-import { isAdminOrDirectorBySession, isCommissionerBySession } from "@/lib/rbac"
+import { requireAdminOrCommissionerOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { SendEmailClient } from "./send-email-client"
 import { getEmailFormData, getBroadcastHistory } from "./actions"
@@ -10,15 +7,7 @@ export const metadata = { title: "Send Email" }
 export const dynamic = "force-dynamic"
 
 export default async function SendEmailPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-
-    const [isAdmin, isCommissioner] = await Promise.all([
-        isAdminOrDirectorBySession(),
-        isCommissionerBySession()
-    ])
-
-    if (!isAdmin && !isCommissioner) redirect("/dashboard")
+    await requireAdminOrCommissionerOrRedirect()
 
     const [{ canSendToAll, divisions, teams, templates }, history] =
         await Promise.all([getEmailFormData(), getBroadcastHistory()])

@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { auth } from "@/lib/auth"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { getTournamentWaitlist } from "./actions"
 import { TournamentWaitlistTable } from "./waitlist-table"
 
@@ -12,10 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function ViewTournamentWaitlistPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-    const access = await getIsAdminOrDirector()
-    if (!access) redirect("/dashboard")
+    await requireAdminOrRedirect()
 
     const result = await getTournamentWaitlist()
     const data = result.status ? result.data : null

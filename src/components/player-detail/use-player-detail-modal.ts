@@ -15,8 +15,7 @@ import {
     type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 
-interface FetchResult {
-    status: boolean
+interface FetchPayload {
     player: PlayerDetails | null
     draftHistory: PlayerDraftHistory[]
     signupHistory: PlayerSignup[]
@@ -29,6 +28,12 @@ interface FetchResult {
     unavailableDates?: string | null
     playoffDates?: string[]
 }
+
+// Mirrors ActionResult<FetchPayload> from src/lib/action-helpers.ts without
+// importing it into this client module.
+type FetchResult =
+    | { status: true; data: FetchPayload; message?: string }
+    | { status: false; message: string }
 
 interface UsePlayerDetailModalOptions {
     fetchFn?: (playerId: string) => Promise<FetchResult>
@@ -57,19 +62,7 @@ export interface PlayerDetailModalState {
 const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
     const result = await getPlayerDetails(playerId)
     if (!result.status) {
-        return {
-            status: false,
-            player: null,
-            draftHistory: [],
-            signupHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            pairPickName: null,
-            pairReason: null,
-            unavailableDates: null,
-            playoffDates: []
-        }
+        return result
     }
 
     let pairPickName: string | null = null
@@ -84,16 +77,18 @@ const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
 
     return {
         status: true,
-        player: result.data.player,
-        draftHistory: result.data.draftHistory,
-        signupHistory: result.data.signupHistory,
-        ratingAverages: result.data.ratingAverages,
-        sharedRatingNotes: result.data.sharedRatingNotes,
-        privateRatingNotes: result.data.privateRatingNotes,
-        pairPickName,
-        pairReason,
-        unavailableDates,
-        playoffDates: result.data.playoffDates ?? []
+        data: {
+            player: result.data.player,
+            draftHistory: result.data.draftHistory,
+            signupHistory: result.data.signupHistory,
+            ratingAverages: result.data.ratingAverages,
+            sharedRatingNotes: result.data.sharedRatingNotes,
+            privateRatingNotes: result.data.privateRatingNotes,
+            pairPickName,
+            pairReason,
+            unavailableDates,
+            playoffDates: result.data.playoffDates ?? []
+        }
     }
 }
 
@@ -147,18 +142,19 @@ export function usePlayerDetailModal(
 
             const result = await fetchFn(playerId)
 
-            if (result.status && result.player) {
-                setPlayerDetails(result.player)
-                setDraftHistory(result.draftHistory)
-                setSignupHistory(result.signupHistory)
-                setRatingAverages(result.ratingAverages)
-                setSharedRatingNotes(result.sharedRatingNotes)
-                setPrivateRatingNotes(result.privateRatingNotes)
-                setViewerRating(result.viewerRating ?? null)
-                setPairPickName(result.pairPickName ?? null)
-                setPairReason(result.pairReason ?? null)
-                setUnavailableDates(result.unavailableDates ?? null)
-                setPlayoffDates(result.playoffDates ?? [])
+            if (result.status && result.data.player) {
+                const data = result.data
+                setPlayerDetails(data.player)
+                setDraftHistory(data.draftHistory)
+                setSignupHistory(data.signupHistory)
+                setRatingAverages(data.ratingAverages)
+                setSharedRatingNotes(data.sharedRatingNotes)
+                setPrivateRatingNotes(data.privateRatingNotes)
+                setViewerRating(data.viewerRating ?? null)
+                setPairPickName(data.pairPickName ?? null)
+                setPairReason(data.pairReason ?? null)
+                setUnavailableDates(data.unavailableDates ?? null)
+                setPlayoffDates(data.playoffDates ?? [])
             }
 
             setIsLoading(false)

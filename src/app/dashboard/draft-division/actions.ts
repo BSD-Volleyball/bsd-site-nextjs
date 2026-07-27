@@ -26,6 +26,14 @@ import {
     isCaptainForSeason,
     getCommissionerDivisionScope
 } from "@/lib/rbac"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePositiveInt,
+    requireSession,
+    withAction
+} from "@/lib/action-helpers"
 
 export interface DivisionSplitConfig {
     divisionId: number
@@ -218,10 +226,6 @@ export async function hasDraftPageAccess(): Promise<{
     }
 }
 
-async function getDraftAccessContext() {
-    return hasDraftPageAccess()
-}
-
 function canReadDraftDivision(
     access: Awaited<ReturnType<typeof hasDraftPageAccess>>,
     divisionId: number
@@ -238,34 +242,27 @@ function canCommissionDraftDivision(
     return access.divisionRoleById[divisionId] === "commissioner"
 }
 
-export async function getDraftDivisionData(): Promise<{
-    status: boolean
-    message?: string
+export interface DraftDivisionData {
     currentSeasonId: number
     divisionSplits: DivisionSplitConfig[]
     divisions: DivisionOption[]
     users: UserOption[]
-}> {
-    // Division scope is derived server-side. This action used to accept the
-    // caller's accessibleDivisionIds, which let a direct request pass
-    // `undefined` and read every division plus the undrafted-player list,
-    // bypassing commissioner division scoping.
-    const access = await hasDraftPageAccess()
-    if (!access.hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            currentSeasonId: 0,
-            divisionSplits: [],
-            divisions: [],
-            users: []
-        }
-    }
-    const accessibleDivisionIds = access.isLeagueWideCommissioner
-        ? undefined
-        : access.accessibleDivisionIds
+}
 
-    try {
+export const getDraftDivisionData = withAction(
+    async (): Promise<ActionResult<DraftDivisionData>> => {
+        // Division scope is derived server-side. This action used to accept
+        // the caller's accessibleDivisionIds, which let a direct request pass
+        // `undefined` and read every division plus the undrafted-player list,
+        // bypassing commissioner division scoping.
+        const access = await hasDraftPageAccess()
+        if (!access.hasAccess) {
+            return fail("You don't have permission to access this page.")
+        }
+        const accessibleDivisionIds = access.isLeagueWideCommissioner
+            ? undefined
+            : access.accessibleDivisionIds
+
         const config = await getSeasonConfig()
         const seasonId = config.seasonId || 0
 
@@ -334,8 +331,7 @@ export async function getDraftDivisionData(): Promise<{
                     accessibleDivisionIds.includes(d.id))
         )
 
-        return {
-            status: true,
+        return ok({
             currentSeasonId: seasonId,
             divisionSplits: splitRows
                 .filter((r) => r.divisionId !== null)
@@ -345,58 +341,26 @@ export async function getDraftDivisionData(): Promise<{
                 })),
             divisions: filteredDivisions,
             users: undraftedUsers
-        }
-    } catch (error) {
-        console.error("Error fetching draft division data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            currentSeasonId: 0,
-            divisionSplits: [],
-            divisions: [],
-            users: []
-        }
+        })
     }
-}
+)
 
-export async function getTeamsForSeasonAndDivision(
-    seasonId: number,
-    divisionId: number
-): Promise<{
-    status: boolean
-    message?: string
-    teams: TeamOption[]
-}> {
-    if (
-        !Number.isInteger(seasonId) ||
-        seasonId <= 0 ||
-        !Number.isInteger(divisionId) ||
-        divisionId <= 0
-    ) {
-        return {
-            status: false,
-            message: "Invalid season or division.",
-            teams: []
+export const getTeamsForSeasonAndDivision = withAction(
+    async (
+        seasonId: number,
+        divisionId: number
+    ): Promise<ActionResult<TeamOption[]>> => {
+        requirePositiveInt(seasonId, "season or division")
+        requirePositiveInt(divisionId, "season or division")
+
+        const hasAccess = await checkDraftReadAccess()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    const hasAccess = await checkDraftReadAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            teams: []
-        }
-    }
-
-    try {
-        const access = await getDraftAccessContext()
+        const access = await hasDraftPageAccess()
         if (!canReadDraftDivision(access, divisionId)) {
-            return {
-                status: false,
-                message: "You don't have permission to access this division.",
-                teams: []
-            }
+            return fail("You don't have permission to access this division.")
         }
 
         const teamsList = await db
@@ -411,66 +375,32 @@ export async function getTeamsForSeasonAndDivision(
             )
             .orderBy(teams.number)
 
-        return {
-            status: true,
-            teams: teamsList
-        }
-    } catch (error) {
-        console.error("Error fetching teams:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            teams: []
-        }
+        return ok(teamsList)
     }
-}
+)
 
-export async function getDraftInitData(
-    seasonId: number,
-    divisionId: number
-): Promise<{
-    status: boolean
-    message?: string
+export interface DraftInitData {
     teams: TeamOption[]
     initialPicks: Record<string, string>
     pairMap: PairEntry[]
-}> {
-    const hasAccess = await checkDraftReadAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            teams: [],
-            initialPicks: {},
-            pairMap: []
-        }
-    }
+}
 
-    if (
-        !Number.isInteger(seasonId) ||
-        seasonId <= 0 ||
-        !Number.isInteger(divisionId) ||
-        divisionId <= 0
-    ) {
-        return {
-            status: false,
-            message: "Invalid season or division ID.",
-            teams: [],
-            initialPicks: {},
-            pairMap: []
+export const getDraftInitData = withAction(
+    async (
+        seasonId: number,
+        divisionId: number
+    ): Promise<ActionResult<DraftInitData>> => {
+        const hasAccess = await checkDraftReadAccess()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    try {
-        const access = await getDraftAccessContext()
+        requirePositiveInt(seasonId, "season or division ID")
+        requirePositiveInt(divisionId, "season or division ID")
+
+        const access = await hasDraftPageAccess()
         if (!canReadDraftDivision(access, divisionId)) {
-            return {
-                status: false,
-                message: "You don't have permission to access this division.",
-                teams: [],
-                initialPicks: {},
-                pairMap: []
-            }
+            return fail("You don't have permission to access this division.")
         }
 
         const [teamsList, captRounds, pairDiffs, signupPairs] =
@@ -621,8 +551,7 @@ export async function getDraftInitData(
             }
         }
 
-        return {
-            status: true,
+        return ok({
             teams: teamsList.map(({ id, name, number }) => ({
                 id,
                 name,
@@ -630,18 +559,9 @@ export async function getDraftInitData(
             })),
             initialPicks,
             pairMap: Array.from(pairMapEntries.values())
-        }
-    } catch (error) {
-        console.error("Error fetching draft init data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            teams: [],
-            initialPicks: {},
-            pairMap: []
-        }
+        })
     }
-}
+)
 
 // Maps homework round number → actual draft round number (same as prepare-for-draft)
 const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
@@ -660,38 +580,25 @@ export interface WatchlistData {
     view: "captain" | "commissioner"
 }
 
-export async function getDraftWatchlistData(
-    seasonId: number,
-    divisionId: number
-): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
-    const hasAccess = await checkDraftReadAccess()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page."
+export const getDraftWatchlistData = withAction(
+    async (
+        seasonId: number,
+        divisionId: number
+    ): Promise<ActionResult<WatchlistData>> => {
+        const hasAccess = await checkDraftReadAccess()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    if (
-        !Number.isInteger(seasonId) ||
-        seasonId <= 0 ||
-        !Number.isInteger(divisionId) ||
-        divisionId <= 0
-    ) {
-        return { status: false, message: "Invalid season or division ID." }
-    }
+        requirePositiveInt(seasonId, "season or division ID")
+        requirePositiveInt(divisionId, "season or division ID")
 
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return { status: false, message: "Not authenticated." }
-    const userId = session.user.id
+        const session = await requireSession()
+        const userId = session.user.id
 
-    try {
-        const access = await getDraftAccessContext()
+        const access = await hasDraftPageAccess()
         if (!canReadDraftDivision(access, divisionId)) {
-            return {
-                status: false,
-                message: "You don't have permission to access this division."
-            }
+            return fail("You don't have permission to access this division.")
         }
 
         // Check if user is a captain in this specific division (captain view takes priority)
@@ -720,26 +627,31 @@ export async function getDraftWatchlistData(
         const draftedUserIds = [...new Set(draftedRows.map((r) => r.userId))]
 
         if (captainTeam) {
-            return buildCaptainWatchlist(
-                userId,
+            return ok(
+                await buildCaptainWatchlist(
+                    userId,
+                    seasonId,
+                    divisionId,
+                    draftedUserIds
+                )
+            )
+        }
+        return ok(
+            await buildCommissionerWatchlist(
                 seasonId,
                 divisionId,
                 draftedUserIds
             )
-        }
-        return buildCommissionerWatchlist(seasonId, divisionId, draftedUserIds)
-    } catch (error) {
-        console.error("Error fetching watchlist data:", error)
-        return { status: false, message: "Something went wrong." }
+        )
     }
-}
+)
 
 async function buildCaptainWatchlist(
     captainId: string,
     seasonId: number,
     divisionId: number,
     draftedUserIds: string[]
-): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
+): Promise<WatchlistData> {
     const homeworkRows = await db
         .select({
             playerId: draftHomework.player,
@@ -802,13 +714,10 @@ async function buildCaptainWatchlist(
         }))
 
     return {
-        status: true,
-        data: {
-            malePlayers,
-            nonMalePlayers,
-            draftedUserIds,
-            view: "captain" as const
-        }
+        malePlayers,
+        nonMalePlayers,
+        draftedUserIds,
+        view: "captain" as const
     }
 }
 
@@ -816,7 +725,7 @@ async function buildCommissionerWatchlist(
     seasonId: number,
     divisionId: number,
     draftedUserIds: string[]
-): Promise<{ status: boolean; data?: WatchlistData; message?: string }> {
+): Promise<WatchlistData> {
     const [homeworkRows, signupRows, priorSeasonRows] = await Promise.all([
         db
             .select({
@@ -971,13 +880,10 @@ async function buildCommissionerWatchlist(
         }))
 
     return {
-        status: true,
-        data: {
-            malePlayers,
-            nonMalePlayers,
-            draftedUserIds,
-            view: "commissioner" as const
-        }
+        malePlayers,
+        nonMalePlayers,
+        draftedUserIds,
+        view: "commissioner" as const
     }
 }
 
@@ -988,112 +894,107 @@ interface DraftPick {
     round: number
 }
 
-export async function submitDraft(
-    divisionLevel: number,
-    picks: DraftPick[]
-): Promise<{ status: boolean; message: string }> {
-    const hasAccess = await isCommissionerBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to perform this action."
-        }
-    }
-
-    if (picks.length === 0) {
-        return {
-            status: false,
-            message: "No draft picks to submit."
-        }
-    }
-
-    // Validate all picks have users selected
-    for (const pick of picks) {
-        if (!pick.userId) {
-            return {
-                status: false,
-                message: `Please select a player for Round ${pick.round}, Team ${pick.teamNumber}.`
-            }
-        }
-    }
-
-    const numTeams = new Set(picks.map((p) => p.teamId)).size
-
-    try {
-        const access = await getDraftAccessContext()
-        const teamIds = [...new Set(picks.map((pick) => pick.teamId))]
-        const teamRows = await db
-            .select({ id: teams.id, divisionId: teams.division })
-            .from(teams)
-            .where(inArray(teams.id, teamIds))
-        const divisionIds = [
-            ...new Set(teamRows.map((team) => team.divisionId))
-        ]
-
-        if (
-            divisionIds.length !== 1 ||
-            !canCommissionDraftDivision(access, divisionIds[0])
-        ) {
-            return {
-                status: false,
-                message:
-                    "You don't have permission to submit this division's draft."
-            }
+export const submitDraft = withAction(
+    async (
+        divisionLevel: number,
+        picks: DraftPick[]
+    ): Promise<ActionResult<void>> => {
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to perform this action.")
         }
 
-        // Calculate overall for each pick and insert
-        // Snake draft: odd rounds go 1-N, even rounds go N-1
-        await db.insert(drafts).values(
-            picks.map((pick) => {
-                const isOddRound = pick.round % 2 === 1
-                const baseValue =
-                    (divisionLevel - 1) * 50 + (pick.round - 1) * numTeams
-                const positionValue = isOddRound
-                    ? pick.teamNumber
-                    : numTeams + 1 - pick.teamNumber
-                return {
-                    team: pick.teamId,
-                    user: pick.userId,
-                    round: pick.round,
-                    overall: baseValue + positionValue
-                }
-            })
-        )
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: "drafts",
-                summary: `Submitted ${picks.length} draft picks for division level ${divisionLevel}`
-            })
+        if (picks.length === 0) {
+            return fail("No draft picks to submit.")
         }
 
-        // Ensure all drafted teams have recipient groups (fire-and-forget)
-        const config = await getSeasonConfig()
-        if (config.seasonId) {
-            const draftedTeamIds = [...new Set(picks.map((p) => p.teamId))]
-            for (const teamId of draftedTeamIds) {
-                ensureTeamRecipientGroup(teamId, config.seasonId).catch((err) =>
-                    console.error(
-                        "[draft] Team recipient group sync failed",
-                        teamId,
-                        err
-                    )
+        // Validate all picks have users selected
+        for (const pick of picks) {
+            if (!pick.userId) {
+                return fail(
+                    `Please select a player for Round ${pick.round}, Team ${pick.teamNumber}.`
                 )
             }
         }
 
-        return {
-            status: true,
-            message: `Successfully submitted ${picks.length} draft picks!`
-        }
-    } catch (error) {
-        console.error("Error submitting draft:", error)
-        return {
-            status: false,
-            message: "Something went wrong while submitting the draft."
+        const numTeams = new Set(picks.map((p) => p.teamId)).size
+
+        try {
+            const access = await hasDraftPageAccess()
+            const teamIds = [...new Set(picks.map((pick) => pick.teamId))]
+            const teamRows = await db
+                .select({ id: teams.id, divisionId: teams.division })
+                .from(teams)
+                .where(inArray(teams.id, teamIds))
+            const divisionIds = [
+                ...new Set(teamRows.map((team) => team.divisionId))
+            ]
+
+            if (
+                divisionIds.length !== 1 ||
+                !canCommissionDraftDivision(access, divisionIds[0])
+            ) {
+                return fail(
+                    "You don't have permission to submit this division's draft."
+                )
+            }
+
+            // Calculate overall for each pick and insert
+            // Snake draft: odd rounds go 1-N, even rounds go N-1
+            await db.insert(drafts).values(
+                picks.map((pick) => {
+                    const isOddRound = pick.round % 2 === 1
+                    const baseValue =
+                        (divisionLevel - 1) * 50 + (pick.round - 1) * numTeams
+                    const positionValue = isOddRound
+                        ? pick.teamNumber
+                        : numTeams + 1 - pick.teamNumber
+                    return {
+                        team: pick.teamId,
+                        user: pick.userId,
+                        round: pick.round,
+                        overall: baseValue + positionValue
+                    }
+                })
+            )
+
+            const session = await auth.api.getSession({
+                headers: await headers()
+            })
+            if (session) {
+                await logAuditEntry({
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "drafts",
+                    summary: `Submitted ${picks.length} draft picks for division level ${divisionLevel}`
+                })
+            }
+
+            // Ensure all drafted teams have recipient groups (fire-and-forget)
+            const config = await getSeasonConfig()
+            if (config.seasonId) {
+                const draftedTeamIds = [...new Set(picks.map((p) => p.teamId))]
+                for (const teamId of draftedTeamIds) {
+                    ensureTeamRecipientGroup(teamId, config.seasonId).catch(
+                        (err) =>
+                            console.error(
+                                "[draft] Team recipient group sync failed",
+                                teamId,
+                                err
+                            )
+                    )
+                }
+            }
+
+            return ok(
+                undefined,
+                `Successfully submitted ${picks.length} draft picks!`
+            )
+        } catch (error) {
+            // Kept (not redundant): preserves this action's distinct
+            // user-facing failure message instead of withAction's generic one.
+            console.error("Error submitting draft:", error)
+            return fail("Something went wrong while submitting the draft.")
         }
     }
-}
+)

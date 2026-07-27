@@ -1,13 +1,18 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { and, eq, isNull, or } from "drizzle-orm"
 import { db } from "@/database/db"
 import { signups, users } from "@/database/schema"
-import { getSeasonConfig } from "@/lib/site-config"
-import { hasPermissionBySession } from "@/lib/rbac"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePermission,
+    requireSeasonConfig,
+    requireSession,
+    withAction
+} from "@/lib/action-helpers"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
@@ -33,36 +38,17 @@ function getSeasonLabel(seasonName: string, seasonYear: number): string {
     return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
 }
 
-export async function getPlayersNeedingPictures(): Promise<{
-    status: boolean
-    message?: string
-    seasonLabel?: string
-    players: MissingPicturePlayer[]
-}> {
-    const accessConfig = await getSeasonConfig()
-    const hasAccess = accessConfig.seasonId
-        ? await hasPermissionBySession("pictures:manage", {
-              seasonId: accessConfig.seasonId
-          })
-        : false
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            players: []
-        }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                players: []
-            }
-        }
+export const getPlayersNeedingPictures = withAction(
+    async (): Promise<
+        ActionResult<{
+            seasonLabel: string
+            players: MissingPicturePlayer[]
+        }>
+    > => {
+        const config = await requireSeasonConfig()
+        await requirePermission("pictures:manage", {
+            seasonId: config.seasonId
+        })
 
         const seasonLabel = getSeasonLabel(config.seasonName, config.seasonYear)
 
@@ -85,8 +71,7 @@ export async function getPlayersNeedingPictures(): Promise<{
             )
             .orderBy(users.last_name, users.first_name)
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             players: rows.map((row) => ({
                 signupId: row.signupId,
@@ -99,52 +84,33 @@ export async function getPlayersNeedingPictures(): Promise<{
                     : `${row.firstName} ${row.lastName}`,
                 oldId: row.oldId
             }))
-        }
-    } catch (error) {
-        console.error("Error fetching players needing pictures:", error)
-        return {
-            status: false,
-            message: "Failed to load players.",
-            players: []
-        }
+        })
     }
-}
+)
 
-export async function createMissingPictureUpload(
-    userId: string,
-    contentLength: number
-): Promise<{
-    status: boolean
-    message?: string
-    uploadUrl?: string
-    pictureFilename?: string
-}> {
-    const accessConfig = await getSeasonConfig()
-    const hasAccess = accessConfig.seasonId
-        ? await hasPermissionBySession("pictures:manage", {
-              seasonId: accessConfig.seasonId
-          })
-        : false
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+export const createMissingPictureUpload = withAction(
+    async (
+        userId: string,
+        contentLength: number
+    ): Promise<
+        ActionResult<{
+            uploadUrl: string
+            pictureFilename: string
+        }>
+    > => {
+        const config = await requireSeasonConfig()
+        await requirePermission("pictures:manage", {
+            seasonId: config.seasonId
+        })
 
-    if (
-        !Number.isInteger(contentLength) ||
-        contentLength <= 0 ||
-        contentLength > PLAYER_PICTURE_MAX_BYTES
-    ) {
-        return {
-            status: false,
-            message: `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
-        }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
+        if (
+            !Number.isInteger(contentLength) ||
+            contentLength <= 0 ||
+            contentLength > PLAYER_PICTURE_MAX_BYTES
+        ) {
+            return fail(
+                `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+            )
         }
 
         const [row] = await db
@@ -166,17 +132,11 @@ export async function createMissingPictureUpload(
             .limit(1)
 
         if (!row) {
-            return {
-                status: false,
-                message: "Player is not signed up for the current season."
-            }
+            return fail("Player is not signed up for the current season.")
         }
 
         if (row.picture?.trim()) {
-            return {
-                status: false,
-                message: "Player already has a picture."
-            }
+            return fail("Player already has a picture.")
         }
 
         const pictureFilename = getExpectedPlayerPictureFilename({
@@ -187,17 +147,13 @@ export async function createMissingPictureUpload(
 
         if (!pictureFilename) {
             if (!row.oldId || row.oldId <= 0) {
-                return {
-                    status: false,
-                    message:
-                        "Player must have a valid old_id before uploading a picture."
-                }
+                return fail(
+                    "Player must have a valid old_id before uploading a picture."
+                )
             }
-            return {
-                status: false,
-                message:
-                    "Player must have first and last name initials before uploading a picture."
-            }
+            return fail(
+                "Player must have first and last name initials before uploading a picture."
+            )
         }
 
         const uploadUrl = await createPlayerPictureUploadPresignedUrl({
@@ -206,40 +162,20 @@ export async function createMissingPictureUpload(
             contentLength
         })
 
-        return {
-            status: true,
-            uploadUrl,
-            pictureFilename
-        }
-    } catch (error) {
-        console.error("Error creating missing picture upload URL:", error)
-        return {
-            status: false,
-            message: "Failed to start picture upload."
-        }
+        return ok({ uploadUrl, pictureFilename })
     }
-}
+)
 
-export async function finalizeMissingPictureUpload(
-    userId: string,
-    pictureFilename: string
-): Promise<{ status: boolean; message: string; picturePath?: string }> {
-    const accessConfig = await getSeasonConfig()
-    const hasAccess = accessConfig.seasonId
-        ? await hasPermissionBySession("pictures:manage", {
-              seasonId: accessConfig.seasonId
-          })
-        : false
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return { status: false, message: "No current season found." }
-        }
+export const finalizeMissingPictureUpload = withAction(
+    async (
+        userId: string,
+        pictureFilename: string
+    ): Promise<ActionResult<{ picturePath: string }>> => {
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+        await requirePermission("pictures:manage", {
+            seasonId: config.seasonId
+        })
 
         const [row] = await db
             .select({
@@ -260,10 +196,7 @@ export async function finalizeMissingPictureUpload(
             .limit(1)
 
         if (!row) {
-            return {
-                status: false,
-                message: "Player is not signed up for the current season."
-            }
+            return fail("Player is not signed up for the current season.")
         }
 
         const expectedFilename = getExpectedPlayerPictureFilename({
@@ -273,30 +206,22 @@ export async function finalizeMissingPictureUpload(
         })
 
         if (!expectedFilename) {
-            return {
-                status: false,
-                message:
-                    "Player must have old_id and valid name initials before finalizing picture upload."
-            }
+            return fail(
+                "Player must have old_id and valid name initials before finalizing picture upload."
+            )
         }
 
         if (pictureFilename !== expectedFilename) {
-            return {
-                status: false,
-                message: "Uploaded filename does not match the expected format."
-            }
+            return fail("Uploaded filename does not match the expected format.")
         }
 
         const picturePath = getPlayerPictureDbPath(pictureFilename)
 
         if (row.picture?.trim()) {
             if (row.picture === picturePath) {
-                return { status: true, message: "Picture already uploaded." }
+                return ok({ picturePath }, "Picture already uploaded.")
             }
-            return {
-                status: false,
-                message: "Player already has a picture."
-            }
+            return fail("Player already has a picture.")
         }
 
         await db
@@ -307,27 +232,17 @@ export async function finalizeMissingPictureUpload(
             })
             .where(eq(users.id, userId))
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "users",
-                entityId: userId,
-                summary: `Uploaded player picture via Add Pictures for ${row.firstName} ${row.lastName} (${userId}) as ${getPlayerPictureObjectKey(
-                    pictureFilename
-                )}`
-            })
-        }
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update",
+            entityType: "users",
+            entityId: userId,
+            summary: `Uploaded player picture via Add Pictures for ${row.firstName} ${row.lastName} (${userId}) as ${getPlayerPictureObjectKey(
+                pictureFilename
+            )}`
+        })
 
         revalidatePath("/dashboard/add-pictures")
-        return {
-            status: true,
-            message: "Player picture uploaded.",
-            picturePath
-        }
-    } catch (error) {
-        console.error("Error finalizing missing picture upload:", error)
-        return { status: false, message: "Failed to finalize picture upload." }
+        return ok({ picturePath }, "Player picture uploaded.")
     }
-}
+)

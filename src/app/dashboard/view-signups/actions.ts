@@ -20,14 +20,20 @@ import {
 } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import {
-    getEmptyPlayerRatingAverages,
-    type PlayerRatingAverages,
-    type PlayerRatingPrivateNote,
-    type PlayerRatingSharedNote,
-    type PlayerViewerRating
+    type ActionResult,
+    fail,
+    ok,
+    requireCaptainAccess,
+    requireSeasonConfig,
+    requireSession,
+    withAction
+} from "@/lib/action-helpers"
+import type {
+    PlayerRatingAverages,
+    PlayerRatingPrivateNote,
+    PlayerRatingSharedNote,
+    PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
@@ -84,33 +90,13 @@ export interface SignupGroup {
     players: SignupPlayer[]
 }
 
-export async function getSignupsCsvData(): Promise<{
-    status: boolean
-    message?: string
-    entries: SignupCsvEntry[]
-    seasonLabel: string
-}> {
-    const hasAccess = await hasCaptainPagesAccessBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            entries: [],
-            seasonLabel: ""
-        }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                entries: [],
-                seasonLabel: ""
-            }
-        }
+export const getSignupsCsvData = withAction(
+    async (): Promise<
+        ActionResult<{ entries: SignupCsvEntry[]; seasonLabel: string }>
+    > => {
+        await requireCaptainAccess()
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
@@ -141,7 +127,7 @@ export async function getSignupsCsvData(): Promise<{
 
         const userIds = signupRows.map((r) => r.userId)
         const signupIds = signupRows.map((r) => r.signupId)
-        const sessionUserId = await getSessionUserId()
+        const sessionUserId = session.user.id
 
         // The per-signup lookups below only depend on signupRows, so they
         // run in parallel instead of as a sequential waterfall.
@@ -320,27 +306,16 @@ export async function getSignupsCsvData(): Promise<{
             }
         })
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "read",
-                entityType: "signups",
-                summary: `Downloaded signups CSV for season ${config.seasonId}`
-            })
-        }
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "read",
+            entityType: "signups",
+            summary: `Downloaded signups CSV for season ${config.seasonId}`
+        })
 
-        return { status: true, entries, seasonLabel }
-    } catch (error) {
-        console.error("Error fetching CSV data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            entries: [],
-            seasonLabel: ""
-        }
+        return ok({ entries, seasonLabel })
     }
-}
+)
 
 export interface SeasonInfo {
     id: number
@@ -348,39 +323,21 @@ export interface SeasonInfo {
     name: string
 }
 
-export async function getSignupsData(): Promise<{
-    status: boolean
-    message?: string
-    undraftedGroups: SignupGroup[]
-    draftedGroups: SignupGroup[]
-    allSeasons: SeasonInfo[]
-    seasonLabel: string
-}> {
-    const hasAccess = await hasCaptainPagesAccessBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            undraftedGroups: [],
-            draftedGroups: [],
-            allSeasons: [],
-            seasonLabel: ""
+export const getSignupsData = withAction(
+    async (): Promise<
+        ActionResult<{
+            undraftedGroups: SignupGroup[]
+            draftedGroups: SignupGroup[]
+            allSeasons: SeasonInfo[]
+            seasonLabel: string
+        }>
+    > => {
+        const hasAccess = await hasCaptainPagesAccessBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                undraftedGroups: [],
-                draftedGroups: [],
-                allSeasons: [],
-                seasonLabel: ""
-            }
-        }
+        const config = await requireSeasonConfig()
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
@@ -402,13 +359,12 @@ export async function getSignupsData(): Promise<{
             .orderBy(users.last_name, users.first_name)
 
         if (signupRows.length === 0) {
-            return {
-                status: true,
+            return ok({
                 undraftedGroups: [],
                 draftedGroups: [],
                 allSeasons: [],
                 seasonLabel
-            }
+            })
         }
 
         const userIds = signupRows.map((r) => r.userId)
@@ -545,8 +501,7 @@ export async function getSignupsData(): Promise<{
         }))
         draftedGroups.sort((a, b) => a.seasonOrder - b.seasonOrder)
 
-        return {
-            status: true,
+        return ok({
             undraftedGroups,
             draftedGroups,
             allSeasons: allSeasonRows.map((s) => ({
@@ -555,55 +510,30 @@ export async function getSignupsData(): Promise<{
                 name: s.name
             })),
             seasonLabel
-        }
-    } catch (error) {
-        console.error("Error fetching signups data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            undraftedGroups: [],
-            draftedGroups: [],
-            allSeasons: [],
-            seasonLabel: ""
-        }
+        })
     }
-}
+)
 
-export async function getPlayerDetailsPublic(playerId: string): Promise<{
-    status: boolean
-    message?: string
-    player: AdminPlayerDetails | null
-    draftHistory: PlayerDraftHistory[]
-    signupHistory: PlayerSignup[]
-    ratingAverages: PlayerRatingAverages
-    sharedRatingNotes: PlayerRatingSharedNote[]
-    privateRatingNotes: PlayerRatingPrivateNote[]
-    viewerRating: PlayerViewerRating | null
-    pairPickName: string | null
-    pairReason: string | null
-    unavailableDates: string | null
-    playoffDates: string[]
-}> {
-    const hasAccess = await hasCaptainPagesAccessBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            player: null,
-            draftHistory: [],
-            signupHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null,
-            pairPickName: null,
-            pairReason: null,
-            unavailableDates: null,
-            playoffDates: []
-        }
-    }
+export const getPlayerDetailsPublic = withAction(
+    async (
+        playerId: string
+    ): Promise<
+        ActionResult<{
+            player: AdminPlayerDetails
+            draftHistory: PlayerDraftHistory[]
+            signupHistory: PlayerSignup[]
+            ratingAverages: PlayerRatingAverages
+            sharedRatingNotes: PlayerRatingSharedNote[]
+            privateRatingNotes: PlayerRatingPrivateNote[]
+            viewerRating: PlayerViewerRating | null
+            pairPickName: string | null
+            pairReason: string | null
+            unavailableDates: string | null
+            playoffDates: string[]
+        }>
+    > => {
+        await requireCaptainAccess()
 
-    try {
         const [userData] = await db
             .select({
                 id: users.id,
@@ -626,21 +556,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             .limit(1)
 
         if (!userData) {
-            return {
-                status: false,
-                message: "Player not found.",
-                player: null,
-                draftHistory: [],
-                signupHistory: [],
-                ratingAverages: getEmptyPlayerRatingAverages(),
-                sharedRatingNotes: [],
-                privateRatingNotes: [],
-                viewerRating: null,
-                pairPickName: null,
-                pairReason: null,
-                unavailableDates: null,
-                playoffDates: []
-            }
+            return fail("Player not found.")
         }
 
         const player: AdminPlayerDetails = {
@@ -742,8 +658,7 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             formatEventDate(e.eventDate)
         )
 
-        return {
-            status: true,
+        return ok({
             player,
             draftHistory: draftData,
             signupHistory: [],
@@ -755,23 +670,6 @@ export async function getPlayerDetailsPublic(playerId: string): Promise<{
             pairReason,
             unavailableDates,
             playoffDates
-        }
-    } catch (error) {
-        console.error("Error fetching player details:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            player: null,
-            draftHistory: [],
-            signupHistory: [],
-            ratingAverages: getEmptyPlayerRatingAverages(),
-            sharedRatingNotes: [],
-            privateRatingNotes: [],
-            viewerRating: null,
-            pairPickName: null,
-            pairReason: null,
-            unavailableDates: null,
-            playoffDates: []
-        }
+        })
     }
-}
+)

@@ -137,13 +137,13 @@ export function DraftDivisionForm({
             getDraftWatchlistData(season, division)
         ])
         if (result.status) {
-            setTeamsList(result.teams)
-            setInitialPicks(result.initialPicks)
-            setPairMap(result.pairMap)
+            setTeamsList(result.data.teams)
+            setInitialPicks(result.data.initialPicks)
+            setPairMap(result.data.pairMap)
         } else {
             setError(result.message || "Failed to load teams.")
         }
-        if (watchlistResult.status && watchlistResult.data) {
+        if (watchlistResult.status) {
             setWatchlistData(watchlistResult.data)
         }
         setIsLoadingTeams(false)
@@ -196,7 +196,7 @@ export function DraftDivisionForm({
         const result = await submitDraft(selectedDivision.level, picks)
 
         if (result.status) {
-            setSuccess(result.message)
+            setSuccess(result.message ?? null)
         } else {
             setError(result.message)
         }

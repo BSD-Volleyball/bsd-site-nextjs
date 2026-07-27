@@ -30,24 +30,26 @@ export default async function ViewSignupsPage() {
         )
     }
 
+    const data = result.data
+
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Signups`}
+                title={`${data.seasonLabel} Signups`}
                 description="Players signed up for the current season, grouped by their last drafted division."
             />
-            {result.undraftedGroups.length === 0 &&
-            result.draftedGroups.length === 0 ? (
+            {data.undraftedGroups.length === 0 &&
+            data.draftedGroups.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No signups found for this season.
                 </div>
             ) : (
                 <SignupsList
-                    undraftedGroups={result.undraftedGroups}
-                    draftedGroups={result.draftedGroups}
-                    allSeasons={result.allSeasons}
+                    undraftedGroups={data.undraftedGroups}
+                    draftedGroups={data.draftedGroups}
+                    allSeasons={data.allSeasons}
                     playerPicUrl={process.env.PLAYER_PIC_URL || ""}
-                    seasonLabel={result.seasonLabel}
+                    seasonLabel={data.seasonLabel}
                 />
             )}
         </div>

@@ -39,28 +39,30 @@ export default async function PotentialCaptainsPage() {
         )
     }
 
+    const data = result.data
+
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Potential Captains`}
+                title={`${data.seasonLabel} Potential Captains`}
                 description="Players interested in being captains, organized by their most recent division."
             />
-            {result.divisions.length === 0 ? (
+            {data.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No potential captains found for this season.
                 </div>
             ) : (
                 <PotentialCaptainsList
-                    divisions={result.divisions}
-                    allSeasons={result.allSeasons}
+                    divisions={data.divisions}
+                    allSeasons={data.allSeasons}
                     playerPicUrl={process.env.PLAYER_PIC_URL || ""}
-                    emailTemplate={result.emailTemplate || ""}
-                    emailTemplateContent={result.emailTemplateContent}
-                    emailSubject={result.emailSubject || ""}
-                    seasonConfig={result.seasonConfig}
+                    emailTemplate={data.emailTemplate || ""}
+                    emailTemplateContent={data.emailTemplateContent}
+                    emailSubject={data.emailSubject || ""}
+                    seasonConfig={data.seasonConfig}
                     commissionerName={session.user.name || ""}
                     currentUserId={session.user.id}
-                    divisionCommissioners={result.divisionCommissioners}
+                    divisionCommissioners={data.divisionCommissioners}
                 />
             )}
         </div>

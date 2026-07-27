@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { auth } from "@/lib/auth"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { getTournamentOverview } from "./actions"
 import { TournamentOverviewClient } from "./tournament-overview-client"
 
@@ -12,9 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function TournamentOverviewPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-    if (!(await isAdminOrDirectorBySession())) redirect("/dashboard")
+    await requireAdminOrRedirect()
 
     const result = await getTournamentOverview()
     const data = result.status ? result.data : null

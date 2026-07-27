@@ -264,13 +264,13 @@ export function HomeworkStatusView({
                             <div className="py-4 text-center text-destructive text-sm">
                                 {rateData.message || "Failed to load data."}
                             </div>
-                        ) : rateData?.players.length === 0 ? (
+                        ) : rateData?.data.players.length === 0 ? (
                             <div className="py-4 text-center text-muted-foreground text-sm">
                                 No ratings found.
                             </div>
                         ) : (
                             <ul className="divide-y rounded-md border">
-                                {rateData?.players.map((p) => (
+                                {rateData?.data.players.map((p) => (
                                     <li
                                         key={p.playerId}
                                         className="px-3 py-2 text-sm"
@@ -319,10 +319,10 @@ export function HomeworkStatusView({
                         ) : (
                             <div className="space-y-3">
                                 {movingData &&
-                                    movingData.forcedUp.length > 0 && (
+                                    movingData.data.forcedUp.length > 0 && (
                                         <MovingDayGroup
                                             label="Force Up"
-                                            players={movingData.forcedUp}
+                                            players={movingData.data.forcedUp}
                                             icon={
                                                 <RiArrowUpLine
                                                     size={14}
@@ -332,10 +332,10 @@ export function HomeworkStatusView({
                                         />
                                     )}
                                 {movingData &&
-                                    movingData.forcedDown.length > 0 && (
+                                    movingData.data.forcedDown.length > 0 && (
                                         <MovingDayGroup
                                             label="Force Down"
-                                            players={movingData.forcedDown}
+                                            players={movingData.data.forcedDown}
                                             icon={
                                                 <RiArrowDownLine
                                                     size={14}
@@ -345,10 +345,13 @@ export function HomeworkStatusView({
                                         />
                                     )}
                                 {movingData &&
-                                    movingData.recommendedUp.length > 0 && (
+                                    movingData.data.recommendedUp.length >
+                                        0 && (
                                         <MovingDayGroup
                                             label="Recommend Up"
-                                            players={movingData.recommendedUp}
+                                            players={
+                                                movingData.data.recommendedUp
+                                            }
                                             icon={
                                                 <RiArrowUpLine
                                                     size={14}
@@ -358,10 +361,13 @@ export function HomeworkStatusView({
                                         />
                                     )}
                                 {movingData &&
-                                    movingData.recommendedDown.length > 0 && (
+                                    movingData.data.recommendedDown.length >
+                                        0 && (
                                         <MovingDayGroup
                                             label="Recommend Down"
-                                            players={movingData.recommendedDown}
+                                            players={
+                                                movingData.data.recommendedDown
+                                            }
                                             icon={
                                                 <RiArrowDownLine
                                                     size={14}
@@ -371,10 +377,12 @@ export function HomeworkStatusView({
                                         />
                                     )}
                                 {movingData &&
-                                    movingData.forcedUp.length === 0 &&
-                                    movingData.forcedDown.length === 0 &&
-                                    movingData.recommendedUp.length === 0 &&
-                                    movingData.recommendedDown.length === 0 && (
+                                    movingData.data.forcedUp.length === 0 &&
+                                    movingData.data.forcedDown.length === 0 &&
+                                    movingData.data.recommendedUp.length ===
+                                        0 &&
+                                    movingData.data.recommendedDown.length ===
+                                        0 && (
                                         <div className="py-4 text-center text-muted-foreground text-sm">
                                             No moving day entries found.
                                         </div>

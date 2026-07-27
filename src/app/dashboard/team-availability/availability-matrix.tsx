@@ -57,7 +57,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
         startTransition(async () => {
             const result = await getTeamAvailabilityData(teamId)
             if (result.status) {
-                setData(result)
+                setData(result.data)
             }
         })
     }

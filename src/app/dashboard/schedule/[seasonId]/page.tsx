@@ -38,15 +38,15 @@ export default async function SchedulePage({
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Season`}
+                title={`${result.data.seasonLabel} Season`}
                 description="Standings, schedule, and results by division."
             />
-            {result.divisions.length === 0 ? (
+            {result.data.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No season schedule data found for this season.
                 </div>
             ) : (
-                result.divisions.map((division) => (
+                result.data.divisions.map((division) => (
                     <DivisionSection key={division.id} division={division} />
                 ))
             )}

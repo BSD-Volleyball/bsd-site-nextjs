@@ -1,11 +1,14 @@
 "use server"
 
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, drafts, teams } from "@/database/schema"
 import { eq, sql, count, max } from "drizzle-orm"
-import { isAdminOrDirector } from "@/lib/rbac"
+import {
+    type ActionResult,
+    ok,
+    requireAdmin,
+    withAction
+} from "@/lib/action-helpers"
 
 export interface GenderAttritionData {
     label: string
@@ -34,9 +37,7 @@ export interface CaptainAttritionAvgData {
     nonMale: number
 }
 
-export async function getAttritionData(): Promise<{
-    status: boolean
-    message?: string
+export interface AttritionData {
     genderData: GenderAttritionData[]
     attritionGenderRatio: GenderRatio | null
     overallGenderRatio: GenderRatio | null
@@ -44,28 +45,22 @@ export async function getAttritionData(): Promise<{
     captainAvgData: CaptainAttritionAvgData[]
     lastSeasonCaptainData: CaptainAttritionData[]
     lastSeasonCaptainAvgData: CaptainAttritionAvgData[]
-}> {
-    const empty = {
-        genderData: [],
-        attritionGenderRatio: null,
-        overallGenderRatio: null,
-        captainData: [],
-        captainAvgData: [],
-        lastSeasonCaptainData: [],
-        lastSeasonCaptainAvgData: []
-    }
+}
 
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return { status: false, message: "Not authenticated.", ...empty }
-    }
+export const getAttritionData = withAction(
+    async (): Promise<ActionResult<AttritionData>> => {
+        await requireAdmin()
 
-    const hasAccess = await isAdminOrDirector(session.user.id)
-    if (!hasAccess) {
-        return { status: false, message: "Access denied.", ...empty }
-    }
+        const empty: AttritionData = {
+            genderData: [],
+            attritionGenderRatio: null,
+            overallGenderRatio: null,
+            captainData: [],
+            captainAvgData: [],
+            lastSeasonCaptainData: [],
+            lastSeasonCaptainAvgData: []
+        }
 
-    try {
         // Find users who have only played one season via drafts
         // Count distinct seasons per user through drafts -> teams -> seasons
         const seasonCountPerUser = db
@@ -89,7 +84,7 @@ export async function getAttritionData(): Promise<{
         const oneSeasonUserIds = oneSeasonUsers.map((r) => r.userId)
 
         if (oneSeasonUserIds.length === 0) {
-            return { status: true, ...empty }
+            return ok(empty)
         }
 
         // Gender attrition: group one-season players by male field
@@ -396,8 +391,7 @@ export async function getAttritionData(): Promise<{
                 .slice(0, 20)
         }
 
-        return {
-            status: true,
+        return ok({
             genderData,
             attritionGenderRatio,
             overallGenderRatio,
@@ -405,9 +399,6 @@ export async function getAttritionData(): Promise<{
             captainAvgData,
             lastSeasonCaptainData,
             lastSeasonCaptainAvgData
-        }
-    } catch (error) {
-        console.error("Error fetching attrition data:", error)
-        return { status: false, message: "Something went wrong.", ...empty }
+        })
     }
-}
+)

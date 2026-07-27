@@ -16,6 +16,13 @@ import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getCommissionerDivisionScope } from "@/lib/rbac"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePositiveInt,
+    withAction
+} from "@/lib/action-helpers"
 
 export interface CaptainStatus {
     captainId: string
@@ -36,8 +43,6 @@ export interface DivisionStatus {
 }
 
 export interface HomeworkStatusData {
-    status: boolean
-    message?: string
     seasonLabel: string
     seasonId: number
     divisions: DivisionStatus[]
@@ -51,45 +56,36 @@ export interface RatedPlayer {
     playerName: string
 }
 
-export interface RatePlayersDetailResult {
-    status: boolean
-    message?: string
+export interface RatePlayersDetailData {
     players: RatedPlayer[]
 }
+
+export type RatePlayersDetailResult = ActionResult<RatePlayersDetailData>
 
 export interface MovingDayPlayer {
     playerId: string
     playerName: string
 }
 
-export interface MovingDayDetailResult {
-    status: boolean
-    message?: string
+export interface MovingDayDetailData {
     forcedUp: MovingDayPlayer[]
     forcedDown: MovingDayPlayer[]
     recommendedUp: MovingDayPlayer[]
     recommendedDown: MovingDayPlayer[]
 }
 
-export async function getHomeworkStatusData(
-    requestedDivisionId?: number
-): Promise<HomeworkStatusData> {
-    const hasAccess = await getIsCommissioner()
+export type MovingDayDetailResult = ActionResult<MovingDayDetailData>
 
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            seasonLabel: "",
-            seasonId: 0,
-            divisions: [],
-            availableDivisions: [],
-            selectedDivisionId: null,
-            canSelectDivision: false
+export const getHomeworkStatusData = withAction(
+    async (
+        requestedDivisionId?: number
+    ): Promise<ActionResult<HomeworkStatusData>> => {
+        const hasAccess = await getIsCommissioner()
+
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    try {
         // 1. Get current season
         const [currentSeason] = await db
             .select({
@@ -116,16 +112,7 @@ export async function getHomeworkStatusData(
         }
 
         if (!targetSeason) {
-            return {
-                status: false,
-                message: "No season found.",
-                seasonLabel: "",
-                seasonId: 0,
-                divisions: [],
-                availableDivisions: [],
-                selectedDivisionId: null,
-                canSelectDivision: false
-            }
+            return fail("No season found.")
         }
 
         const seasonId = targetSeason.id
@@ -134,16 +121,7 @@ export async function getHomeworkStatusData(
         // 2. Auth + division access check
         const session = await auth.api.getSession({ headers: await headers() })
         if (!session?.user) {
-            return {
-                status: false,
-                message: "Unauthorized",
-                seasonLabel: "",
-                seasonId: 0,
-                divisions: [],
-                availableDivisions: [],
-                selectedDivisionId: null,
-                canSelectDivision: false
-            }
+            return fail("Unauthorized")
         }
 
         const divisionAccess = await getCommissionerDivisionScope(
@@ -151,16 +129,7 @@ export async function getHomeworkStatusData(
             seasonId
         )
         if (divisionAccess.type === "denied") {
-            return {
-                status: false,
-                message: "Unauthorized",
-                seasonLabel: "",
-                seasonId: 0,
-                divisions: [],
-                availableDivisions: [],
-                selectedDivisionId: null,
-                canSelectDivision: false
-            }
+            return fail("Unauthorized")
         }
 
         const seasonDivisionRows = await db
@@ -466,40 +435,29 @@ export async function getHomeworkStatusData(
             })
         }
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             seasonId,
             divisions: divisionStatuses,
             availableDivisions,
             selectedDivisionId,
             canSelectDivision: availableDivisions.length > 1
-        }
-    } catch (error) {
-        console.error("Error fetching homework status data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            seasonId: 0,
-            divisions: [],
-            availableDivisions: [],
-            selectedDivisionId: null,
-            canSelectDivision: false
-        }
+        })
     }
-}
+)
 
-export async function getRatePlayersDetail(
-    captainId: string,
-    seasonId: number
-): Promise<RatePlayersDetailResult> {
-    const hasAccess = await getIsCommissioner()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized", players: [] }
-    }
+export const getRatePlayersDetail = withAction(
+    async (
+        captainId: string,
+        seasonId: number
+    ): Promise<ActionResult<RatePlayersDetailData>> => {
+        const hasAccess = await getIsCommissioner()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
 
-    try {
+        requirePositiveInt(seasonId, "season")
+
         const ratings = await db
             .select({ player: playerRatings.player })
             .from(playerRatings)
@@ -512,7 +470,7 @@ export async function getRatePlayersDetail(
 
         const playerIds = ratings.map((r) => r.player)
         if (playerIds.length === 0) {
-            return { status: true, players: [] }
+            return ok({ players: [] })
         }
 
         const playerUsers = await db
@@ -538,34 +496,22 @@ export async function getRatePlayersDetail(
             })
             .sort((a, b) => a.playerName.localeCompare(b.playerName))
 
-        return { status: true, players }
-    } catch (error) {
-        console.error("Error fetching rate players detail:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            players: []
-        }
+        return ok({ players })
     }
-}
+)
 
-export async function getMovingDayDetail(
-    captainId: string,
-    seasonId: number
-): Promise<MovingDayDetailResult> {
-    const hasAccess = await getIsCommissioner()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            forcedUp: [],
-            forcedDown: [],
-            recommendedUp: [],
-            recommendedDown: []
+export const getMovingDayDetail = withAction(
+    async (
+        captainId: string,
+        seasonId: number
+    ): Promise<ActionResult<MovingDayDetailData>> => {
+        const hasAccess = await getIsCommissioner()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    try {
+        requirePositiveInt(seasonId, "season")
+
         const entries = await db
             .select({
                 player: movingDay.player,
@@ -582,13 +528,12 @@ export async function getMovingDayDetail(
 
         const playerIds = [...new Set(entries.map((e) => e.player))]
         if (playerIds.length === 0) {
-            return {
-                status: true,
+            return ok({
                 forcedUp: [],
                 forcedDown: [],
                 recommendedUp: [],
                 recommendedDown: []
-            }
+            })
         }
 
         const playerUsers = await db
@@ -617,8 +562,7 @@ export async function getMovingDayDetail(
         const sortByName = (a: MovingDayPlayer, b: MovingDayPlayer) =>
             a.playerName.localeCompare(b.playerName)
 
-        return {
-            status: true,
+        return ok({
             forcedUp: entries
                 .filter((e) => e.isForced && e.direction === "up")
                 .map(toPlayer)
@@ -635,19 +579,9 @@ export async function getMovingDayDetail(
                 .filter((e) => !e.isForced && e.direction === "down")
                 .map(toPlayer)
                 .sort(sortByName)
-        }
-    } catch (error) {
-        console.error("Error fetching moving day detail:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            forcedUp: [],
-            forcedDown: [],
-            recommendedUp: [],
-            recommendedDown: []
-        }
+        })
     }
-}
+)
 
 // ─── Draft Homework Detail ────────────────────────────────────────────────────
 
@@ -671,9 +605,7 @@ export interface DraftHomeworkDetailRound {
     players: DraftHomeworkDetailPlayer[]
 }
 
-export interface DraftHomeworkDetailResult {
-    status: boolean
-    message?: string
+export interface DraftHomeworkDetailData {
     rounds: DraftHomeworkDetailRound[]
     consideringMalePlayers: DraftHomeworkDetailPlayer[]
     consideringNonMalePlayers: DraftHomeworkDetailPlayer[]
@@ -682,25 +614,20 @@ export interface DraftHomeworkDetailResult {
     divisionName: string
 }
 
-export async function getDraftHomeworkDetail(
-    captainId: string,
-    seasonId: number
-): Promise<DraftHomeworkDetailResult> {
-    const hasAccess = await getIsCommissioner()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            rounds: [],
-            consideringMalePlayers: [],
-            consideringNonMalePlayers: [],
-            numTeams: 0,
-            captainName: "",
-            divisionName: ""
-        }
-    }
+export type DraftHomeworkDetailResult = ActionResult<DraftHomeworkDetailData>
 
-    try {
+export const getDraftHomeworkDetail = withAction(
+    async (
+        captainId: string,
+        seasonId: number
+    ): Promise<ActionResult<DraftHomeworkDetailData>> => {
+        const hasAccess = await getIsCommissioner()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
+
+        requirePositiveInt(seasonId, "season")
+
         // 1. Look up captain's team to find divisionId
         const captainTeams = await db
             .select({
@@ -721,16 +648,7 @@ export async function getDraftHomeworkDetail(
             .limit(1)
 
         if (captainTeams.length === 0) {
-            return {
-                status: false,
-                message: "Captain not found in this season.",
-                rounds: [],
-                consideringMalePlayers: [],
-                consideringNonMalePlayers: [],
-                numTeams: 0,
-                captainName: "",
-                divisionName: ""
-            }
+            return fail("Captain not found in this season.")
         }
 
         const divisionId = captainTeams[0].divisionId
@@ -756,16 +674,7 @@ export async function getDraftHomeworkDetail(
             .limit(1)
 
         if (!divConfig) {
-            return {
-                status: false,
-                message: "Division configuration not found.",
-                rounds: [],
-                consideringMalePlayers: [],
-                consideringNonMalePlayers: [],
-                numTeams: 0,
-                captainName: "",
-                divisionName: ""
-            }
+            return fail("Division configuration not found.")
         }
 
         // 3. Fetch captain user info
@@ -896,26 +805,13 @@ export async function getDraftHomeworkDetail(
             (a, b) => a.draftRound - b.draftRound
         )
 
-        return {
-            status: true,
+        return ok({
             rounds,
             consideringMalePlayers,
             consideringNonMalePlayers,
             numTeams: divConfig.numTeams,
             captainName,
             divisionName: divConfig.divisionName
-        }
-    } catch (error) {
-        console.error("Error fetching draft homework detail:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            rounds: [],
-            consideringMalePlayers: [],
-            consideringNonMalePlayers: [],
-            numTeams: 0,
-            captainName: "",
-            divisionName: ""
-        }
+        })
     }
-}
+)

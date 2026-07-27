@@ -45,7 +45,9 @@ export default async function AddPicturesPage() {
         )
     }
 
-    const seasonPrefix = result.seasonLabel ? `${result.seasonLabel} ` : ""
+    const seasonPrefix = result.data.seasonLabel
+        ? `${result.data.seasonLabel} `
+        : ""
 
     return (
         <div className="space-y-6">
@@ -53,7 +55,7 @@ export default async function AddPicturesPage() {
                 title={`${seasonPrefix}Add Pictures`}
                 description="Use your phone camera to quickly add pictures for players without one."
             />
-            <AddPicturesList initialPlayers={result.players} />
+            <AddPicturesList initialPlayers={result.data.players} />
         </div>
     )
 }

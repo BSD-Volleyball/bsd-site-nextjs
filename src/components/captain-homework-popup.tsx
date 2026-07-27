@@ -135,6 +135,7 @@ export function CaptainHomeworkPopup({
     isLoading,
     playerPicUrl
 }: CaptainHomeworkPopupProps) {
+    const detail = data?.status ? data.data : null
     return (
         <Dialog
             open={open}
@@ -145,13 +146,13 @@ export function CaptainHomeworkPopup({
             <DialogContent className="flex max-h-[90dvh] max-w-4xl flex-col">
                 <DialogHeader>
                     <DialogTitle>
-                        {data?.captainName
-                            ? `${data.captainName}'s Draft Homework`
+                        {detail?.captainName
+                            ? `${detail.captainName}'s Draft Homework`
                             : "Draft Homework"}
                     </DialogTitle>
-                    {data?.divisionName && (
+                    {detail?.divisionName && (
                         <DialogDescription>
-                            {data.divisionName}
+                            {detail.divisionName}
                         </DialogDescription>
                     )}
                 </DialogHeader>
@@ -165,9 +166,9 @@ export function CaptainHomeworkPopup({
                         <div className="py-4 text-center text-destructive text-sm">
                             {data.message || "Failed to load homework."}
                         </div>
-                    ) : data ? (
+                    ) : detail ? (
                         <div className="space-y-5 py-1">
-                            {data.rounds.map((round) => (
+                            {detail.rounds.map((round) => (
                                 <RoundSection
                                     key={round.draftRound}
                                     label={round.label}
@@ -177,14 +178,14 @@ export function CaptainHomeworkPopup({
                             ))}
                             <ConsideringSection
                                 label="Considering — Male"
-                                players={data.consideringMalePlayers}
-                                numTeams={data.numTeams}
+                                players={detail.consideringMalePlayers}
+                                numTeams={detail.numTeams}
                                 playerPicUrl={playerPicUrl}
                             />
                             <ConsideringSection
                                 label="Considering — Non-Male"
-                                players={data.consideringNonMalePlayers}
-                                numTeams={data.numTeams}
+                                players={detail.consideringNonMalePlayers}
+                                numTeams={detail.numTeams}
                                 playerPicUrl={playerPicUrl}
                             />
                         </div>

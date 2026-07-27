@@ -1,9 +1,6 @@
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { auth } from "@/lib/auth"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { getScheduleView } from "./actions"
 import { ScheduleEditor } from "./schedule-editor"
 
@@ -12,9 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function TournamentSchedulePage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-    if (!(await getIsAdminOrDirector())) redirect("/dashboard")
+    await requireAdminOrRedirect()
 
     const result = await getScheduleView()
     const data = result.status ? result.data : null

@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation"
-import { headers } from "next/headers"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { auth } from "@/lib/auth"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getCaptainTeamView } from "./actions"
 import { CaptainTeamEditor } from "./captain-team-editor"
 
@@ -11,8 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function TournamentTeamPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
+    await requireSessionOrRedirect()
 
     const result = await getCaptainTeamView()
     const view = result.status ? result.data : null

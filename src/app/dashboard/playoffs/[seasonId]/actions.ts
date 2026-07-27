@@ -17,6 +17,13 @@ import {
 } from "@/database/schema"
 import { headers } from "next/headers"
 import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePositiveInt,
+    withAction
+} from "@/lib/action-helpers"
+import {
     FOUR_TEAM_PLAYOFF,
     SIX_TEAM_PLAYOFF
 } from "@/app/dashboard/create-schedule/schedule-constants"
@@ -170,8 +177,6 @@ export interface PlayoffDivision {
 }
 
 interface PlayoffData {
-    status: boolean
-    message?: string
     seasonLabel: string
     divisions: PlayoffDivision[]
     userTeamId: number | null
@@ -831,31 +836,15 @@ function buildBracketData(
     return { upper, lower }
 }
 
-export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return {
-            status: false,
-            message: "Not authenticated.",
-            seasonLabel: "",
-            divisions: [],
-            userTeamId: null,
-            userDivisionId: null
+export const getPlayoffData = withAction(
+    async (seasonId: number): Promise<ActionResult<PlayoffData>> => {
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return fail("Not authenticated.")
         }
-    }
 
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return {
-            status: false,
-            message: "Invalid season.",
-            seasonLabel: "",
-            divisions: [],
-            userTeamId: null,
-            userDivisionId: null
-        }
-    }
+        requirePositiveInt(seasonId, "season")
 
-    try {
         const [seasonRow] = await db
             .select({
                 year: seasons.year,
@@ -866,14 +855,7 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             .limit(1)
 
         if (!seasonRow) {
-            return {
-                status: false,
-                message: "Season not found.",
-                seasonLabel: "",
-                divisions: [],
-                userTeamId: null,
-                userDivisionId: null
-            }
+            return fail("Season not found.")
         }
 
         const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
@@ -960,13 +942,12 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
         const userDivisionId = userDraft?.divisionId ?? null
 
         if (divisionIds.length === 0) {
-            return {
-                status: true,
+            return ok({
                 seasonLabel,
                 divisions: [],
                 userTeamId,
                 userDivisionId
-            }
+            })
         }
 
         const [teamRows, divisionRowsFromDb, indivDivRows] = await Promise.all([
@@ -1560,22 +1541,11 @@ export async function getPlayoffData(seasonId: number): Promise<PlayoffData> {
             })
         }
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             divisions: allDivisions,
             userTeamId,
             userDivisionId
-        }
-    } catch (error) {
-        console.error("Error fetching playoff data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            divisions: [],
-            userTeamId: null,
-            userDivisionId: null
-        }
+        })
     }
-}
+)

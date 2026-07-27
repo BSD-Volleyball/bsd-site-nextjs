@@ -14,6 +14,13 @@ import { and, eq, inArray } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePositiveInt,
+    withAction
+} from "@/lib/action-helpers"
+import {
     computeStandings,
     getSetScores,
     type StandingTeam
@@ -47,35 +54,19 @@ export interface ScheduleDivision {
 }
 
 interface ScheduleData {
-    status: boolean
-    message?: string
     seasonLabel: string
     divisions: ScheduleDivision[]
 }
 
-export async function getSeasonScheduleData(
-    seasonId: number
-): Promise<ScheduleData> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return {
-            status: false,
-            message: "Not authenticated.",
-            seasonLabel: "",
-            divisions: []
+export const getSeasonScheduleData = withAction(
+    async (seasonId: number): Promise<ActionResult<ScheduleData>> => {
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return fail("Not authenticated.")
         }
-    }
 
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return {
-            status: false,
-            message: "Invalid season.",
-            seasonLabel: "",
-            divisions: []
-        }
-    }
+        requirePositiveInt(seasonId, "season")
 
-    try {
         const [seasonRow] = await db
             .select({
                 year: seasons.year,
@@ -86,12 +77,7 @@ export async function getSeasonScheduleData(
             .limit(1)
 
         if (!seasonRow) {
-            return {
-                status: false,
-                message: "Season not found.",
-                seasonLabel: "",
-                divisions: []
-            }
+            return fail("Season not found.")
         }
 
         const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
@@ -108,11 +94,10 @@ export async function getSeasonScheduleData(
             .orderBy(teams.division, teams.number)
 
         if (teamRows.length === 0) {
-            return {
-                status: true,
+            return ok({
                 seasonLabel,
                 divisions: []
-            }
+            })
         }
 
         const divisionIds = [...new Set(teamRows.map((t) => t.divisionId))]
@@ -301,18 +286,9 @@ export async function getSeasonScheduleData(
             }
         )
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             divisions: divisionData
-        }
-    } catch (error) {
-        console.error("Error fetching season schedule data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            divisions: []
-        }
+        })
     }
-}
+)

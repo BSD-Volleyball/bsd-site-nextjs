@@ -37,13 +37,13 @@ export default async function AttritionPage() {
                 description="Players who only played for one season."
             />
             <AttritionCharts
-                genderData={result.genderData}
-                attritionGenderRatio={result.attritionGenderRatio}
-                overallGenderRatio={result.overallGenderRatio}
-                captainData={result.captainData}
-                captainAvgData={result.captainAvgData}
-                lastSeasonCaptainData={result.lastSeasonCaptainData}
-                lastSeasonCaptainAvgData={result.lastSeasonCaptainAvgData}
+                genderData={result.data.genderData}
+                attritionGenderRatio={result.data.attritionGenderRatio}
+                overallGenderRatio={result.data.overallGenderRatio}
+                captainData={result.data.captainData}
+                captainAvgData={result.data.captainAvgData}
+                lastSeasonCaptainData={result.data.lastSeasonCaptainData}
+                lastSeasonCaptainAvgData={result.data.lastSeasonCaptainAvgData}
             />
         </div>
     )

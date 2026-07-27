@@ -1,8 +1,5 @@
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { isAdminOrDirector } from "@/lib/rbac"
 import { listWaivers } from "./actions"
 import { ManageWaiversClient } from "./manage-waivers-client"
 import type { Metadata } from "next"
@@ -14,11 +11,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function ManageWaiversPage() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) redirect("/auth/sign-in")
-
-    const hasAccess = await isAdminOrDirector(session.user.id)
-    if (!hasAccess) redirect("/dashboard")
+    await requireAdminOrRedirect()
 
     const waivers = await listWaivers()
 

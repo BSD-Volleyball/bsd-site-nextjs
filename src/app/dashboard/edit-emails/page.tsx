@@ -44,7 +44,7 @@ export default async function EditEmailsPage() {
                 title="Edit Emails"
                 description="Manage email templates for automated communications."
             />
-            <EditEmailsForm templates={result.templates} />
+            <EditEmailsForm templates={result.data} />
         </div>
     )
 }

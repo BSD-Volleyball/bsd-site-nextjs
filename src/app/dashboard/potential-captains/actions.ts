@@ -13,16 +13,23 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray, notInArray, desc, isNotNull } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requireSession,
+    withAction
+} from "@/lib/action-helpers"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { getCommissionerDivisionAccess } from "@/lib/rbac"
+import {
+    getCommissionerDivisionAccess,
+    isCommissionerBySession
+} from "@/lib/rbac"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -87,8 +94,6 @@ export interface DivisionCommissioner {
 }
 
 interface PotentialCaptainsData {
-    status: boolean
-    message?: string
     seasonLabel: string
     divisions: DivisionCaptains[]
     allSeasons: SeasonInfo[]
@@ -99,29 +104,22 @@ interface PotentialCaptainsData {
     divisionCommissioners: DivisionCommissioner[]
 }
 
-export async function getPotentialCaptainPlayerDetails(
-    playerId: string
-): Promise<{
-    status: boolean
-    message?: string
-    player: PotentialCaptainPlayerDetails | null
-    draftHistory: PotentialCaptainDraftHistory[]
-    pairPickName: string | null
-    pairReason: string | null
-}> {
-    const hasAccess = await getIsCommissioner()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            player: null,
-            draftHistory: [],
-            pairPickName: null,
-            pairReason: null
+export const getPotentialCaptainPlayerDetails = withAction(
+    async (
+        playerId: string
+    ): Promise<
+        ActionResult<{
+            player: PotentialCaptainPlayerDetails
+            draftHistory: PotentialCaptainDraftHistory[]
+            pairPickName: string | null
+            pairReason: string | null
+        }>
+    > => {
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    try {
         const [player] = await db
             .select({
                 id: users.id,
@@ -144,14 +142,7 @@ export async function getPotentialCaptainPlayerDetails(
             .limit(1)
 
         if (!player) {
-            return {
-                status: false,
-                message: "Player not found.",
-                player: null,
-                draftHistory: [],
-                pairPickName: null,
-                pairReason: null
-            }
+            return fail("Player not found.")
         }
 
         const draftHistory = await db
@@ -203,41 +194,24 @@ export async function getPotentialCaptainPlayerDetails(
             }
         }
 
-        return {
-            status: true,
+        return ok({
             player,
             draftHistory,
             pairPickName,
             pairReason
-        }
-    } catch (error) {
-        console.error("Error fetching potential captain player details:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            player: null,
-            draftHistory: [],
-            pairPickName: null,
-            pairReason: null
-        }
+        })
     }
-}
+)
 
-export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData> {
-    const hasAccess = await getIsCommissioner()
+export const getPotentialCaptainsData = withAction(
+    async (): Promise<ActionResult<PotentialCaptainsData>> => {
+        const session = await requireSession()
 
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            seasonLabel: "",
-            divisions: [],
-            allSeasons: [],
-            divisionCommissioners: []
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    try {
         // 1. Get current season
         const [currentSeason] = await db
             .select({
@@ -264,14 +238,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
         }
 
         if (!targetSeason) {
-            return {
-                status: false,
-                message: "No season found.",
-                seasonLabel: "",
-                divisions: [],
-                allSeasons: [],
-                divisionCommissioners: []
-            }
+            return fail("No season found.")
         }
 
         const seasonLabel = `${targetSeason.season.charAt(0).toUpperCase() + targetSeason.season.slice(1)} ${targetSeason.year}`
@@ -292,13 +259,12 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             .where(eq(signups.season, targetSeason.id))
 
         if (signupRows.length === 0) {
-            return {
-                status: true,
+            return ok({
                 seasonLabel,
                 divisions: [],
                 allSeasons: [],
                 divisionCommissioners: []
-            }
+            })
         }
 
         // 3. Get all seasons ordered by ID (newest first)
@@ -410,31 +376,12 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
         }
 
         // 7. Get all divisions, filtered by commissioner scope
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user) {
-            return {
-                status: false,
-                message: "Unauthorized",
-                seasonLabel: "",
-                divisions: [],
-                allSeasons: [],
-                divisionCommissioners: []
-            }
-        }
-
         const divisionAccess = await getCommissionerDivisionAccess(
             session.user.id,
             targetSeason.id
         )
         if (divisionAccess.type === "denied") {
-            return {
-                status: false,
-                message: "Unauthorized",
-                seasonLabel: "",
-                divisions: [],
-                allSeasons: [],
-                divisionCommissioners: []
-            }
+            return fail("Unauthorized")
         }
 
         const allDivisions = await db
@@ -681,8 +628,7 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
                 }))
         }
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             divisions: divisionData,
             allSeasons: allSeasons.map((s) => ({
@@ -695,16 +641,6 @@ export async function getPotentialCaptainsData(): Promise<PotentialCaptainsData>
             emailSubject,
             seasonConfig,
             divisionCommissioners
-        }
-    } catch (error) {
-        console.error("Error fetching potential captains data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            divisions: [],
-            allSeasons: [],
-            divisionCommissioners: []
-        }
+        })
     }
-}
+)

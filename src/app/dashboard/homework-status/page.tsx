@@ -54,15 +54,15 @@ export default async function HomeworkStatusPage({
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Homework Status`}
+                title={`${result.data.seasonLabel} Homework Status`}
                 description="Track whether each captain has completed their pre-draft homework tasks."
             />
             <HomeworkStatusView
-                availableDivisions={result.availableDivisions}
-                selectedDivisionId={result.selectedDivisionId}
-                canSelectDivision={result.canSelectDivision}
-                divisions={result.divisions}
-                seasonId={result.seasonId}
+                availableDivisions={result.data.availableDivisions}
+                selectedDivisionId={result.data.selectedDivisionId}
+                canSelectDivision={result.data.canSelectDivision}
+                divisions={result.data.divisions}
+                seasonId={result.data.seasonId}
                 playerPicUrl={process.env.PLAYER_PIC_URL || ""}
             />
         </div>

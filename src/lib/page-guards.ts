@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import {
     isAdminOrDirectorBySession,
+    isCommissionerBySession,
     hasPermissionBySession,
     hasCaptainPagesAccessBySession
 } from "@/lib/rbac"
@@ -28,6 +29,18 @@ export async function requireAdminOrRedirect(to = "/dashboard") {
     const session = await requireSessionOrRedirect()
     const allowed = await isAdminOrDirectorBySession()
     if (!allowed) {
+        redirect(to)
+    }
+    return session
+}
+
+export async function requireAdminOrCommissionerOrRedirect(to = "/dashboard") {
+    const session = await requireSessionOrRedirect()
+    const [isAdmin, isCommissioner] = await Promise.all([
+        isAdminOrDirectorBySession(),
+        isCommissionerBySession()
+    ])
+    if (!isAdmin && !isCommissioner) {
         redirect(to)
     }
     return session

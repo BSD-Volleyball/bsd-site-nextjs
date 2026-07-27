@@ -74,15 +74,15 @@ export default async function CurrentRosterPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Rosters`}
+                title={`${result.data.seasonLabel} Rosters`}
                 description="View team rosters by division."
             />
-            {result.divisions.length === 0 ? (
+            {result.data.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No rosters found for the current season.
                 </div>
             ) : (
-                result.divisions.map((division) => (
+                result.data.divisions.map((division) => (
                     <DivisionSection
                         key={division.id}
                         division={division}

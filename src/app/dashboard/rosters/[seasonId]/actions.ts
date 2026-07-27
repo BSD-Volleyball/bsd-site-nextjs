@@ -12,6 +12,13 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requirePositiveInt,
+    withAction
+} from "@/lib/action-helpers"
 import { getTeamRosterWithSubs } from "@/lib/roster"
 import { getSeasonConfig } from "@/lib/site-config"
 import { SEASON_PHASES } from "@/lib/season-phases"
@@ -48,54 +55,37 @@ interface RosterDivision {
 }
 
 interface RosterData {
-    status: boolean
-    message?: string
     seasonLabel: string
     divisions: RosterDivision[]
 }
 
-export async function getRosterData(seasonId: number): Promise<RosterData> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return {
-            status: false,
-            message: "Not authenticated.",
-            seasonLabel: "",
-            divisions: []
+export const getRosterData = withAction(
+    async (seasonId: number): Promise<ActionResult<RosterData>> => {
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (!session?.user) {
+            return fail("Not authenticated.")
         }
-    }
 
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return {
-            status: false,
-            message: "Invalid season.",
-            seasonLabel: "",
-            divisions: []
-        }
-    }
+        requirePositiveInt(seasonId, "season")
 
-    // Mirror the current-season phase gate that rosters/page.tsx applies in
-    // the UI: before the draft phase, current-season rosters don't exist for
-    // players yet, and a direct action call must not reveal them early.
-    // Historical seasons are league-visible. Admins bypass the gate.
-    const config = await getSeasonConfig()
-    if (config.seasonId === seasonId) {
-        const phaseIndex = SEASON_PHASES.indexOf(config.phase)
-        const visible =
-            phaseIndex >= SEASON_PHASES.indexOf("draft") &&
-            phaseIndex <= SEASON_PHASES.indexOf("complete")
-        if (!visible && !(await isAdminOrDirectorBySession())) {
-            return {
-                status: false,
-                message:
-                    "Current season rosters are available starting in the Draft phase.",
-                seasonLabel: "",
-                divisions: []
+        // Mirror the current-season phase gate that rosters/page.tsx applies
+        // in the UI: before the draft phase, current-season rosters don't
+        // exist for players yet, and a direct action call must not reveal
+        // them early. Historical seasons are league-visible. Admins bypass
+        // the gate.
+        const config = await getSeasonConfig()
+        if (config.seasonId === seasonId) {
+            const phaseIndex = SEASON_PHASES.indexOf(config.phase)
+            const visible =
+                phaseIndex >= SEASON_PHASES.indexOf("draft") &&
+                phaseIndex <= SEASON_PHASES.indexOf("complete")
+            if (!visible && !(await isAdminOrDirectorBySession())) {
+                return fail(
+                    "Current season rosters are available starting in the Draft phase."
+                )
             }
         }
-    }
 
-    try {
         const [seasonRow] = await db
             .select({
                 year: seasons.year,
@@ -106,12 +96,7 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             .limit(1)
 
         if (!seasonRow) {
-            return {
-                status: false,
-                message: "Season not found.",
-                seasonLabel: "",
-                divisions: []
-            }
+            return fail("Season not found.")
         }
 
         const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
@@ -130,11 +115,10 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             .orderBy(teams.number)
 
         if (teamRows.length === 0) {
-            return {
-                status: true,
+            return ok({
                 seasonLabel,
                 divisions: []
-            }
+            })
         }
 
         const divisionIds = [...new Set(teamRows.map((t) => t.divisionId))]
@@ -304,18 +288,9 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             teams: teamsByDivision.get(d.id) || []
         }))
 
-        return {
-            status: true,
+        return ok({
             seasonLabel,
             divisions: rosterDivisions
-        }
-    } catch (error) {
-        console.error("Error fetching roster data:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            seasonLabel: "",
-            divisions: []
-        }
+        })
     }
-}
+)

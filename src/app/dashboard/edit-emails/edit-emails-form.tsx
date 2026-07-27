@@ -108,7 +108,11 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         if (result.status) {
             setMessages((prev) => ({
                 ...prev,
-                [templateId]: { type: "success", text: result.message }
+                [templateId]: {
+                    type: "success",
+                    text:
+                        result.message ?? "Email template updated successfully."
+                }
             }))
             router.refresh()
         } else {

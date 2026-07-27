@@ -110,11 +110,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                 player.userId,
                 processedImage.blob.size
             )
-            if (
-                !uploadStart.status ||
-                !uploadStart.uploadUrl ||
-                !uploadStart.pictureFilename
-            ) {
+            if (!uploadStart.status) {
                 const uploadStartMessage =
                     uploadStart.message || "Failed to start picture upload."
 
@@ -126,7 +122,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
                 return
             }
 
-            const uploadResponse = await fetch(uploadStart.uploadUrl, {
+            const uploadResponse = await fetch(uploadStart.data.uploadUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "image/jpeg",
@@ -142,7 +138,7 @@ export function AddPicturesList({ initialPlayers }: AddPicturesListProps) {
 
             const finalizeResult = await finalizeMissingPictureUpload(
                 player.userId,
-                uploadStart.pictureFilename
+                uploadStart.data.pictureFilename
             )
 
             if (!finalizeResult.status) {

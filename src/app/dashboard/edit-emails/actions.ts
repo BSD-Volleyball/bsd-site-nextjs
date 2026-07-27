@@ -3,10 +3,17 @@
 import { db } from "@/database/db"
 import { emailTemplates } from "@/database/schema"
 import { eq } from "drizzle-orm"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { auth } from "@/lib/auth"
+import {
+    type ActionResult,
+    fail,
+    ok,
+    requireAdmin,
+    requireNonEmptyString,
+    requirePositiveInt,
+    requireSession,
+    withAction
+} from "@/lib/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
-import { headers } from "next/headers"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,
@@ -22,33 +29,9 @@ interface EmailTemplate {
     updated_at: Date
 }
 
-interface GetEmailTemplatesResult {
-    status: boolean
-    message?: string
-    templates: EmailTemplate[]
-}
-
-interface UpdateEmailTemplateResult {
-    status: boolean
-    message: string
-}
-
-interface CreateEmailTemplateResult {
-    status: boolean
-    message: string
-}
-
-export async function getEmailTemplates(): Promise<GetEmailTemplatesResult> {
-    try {
-        const hasAccess = await getIsAdminOrDirector()
-
-        if (!hasAccess) {
-            return {
-                status: false,
-                message: "Unauthorized",
-                templates: []
-            }
-        }
+export const getEmailTemplates = withAction(
+    async (): Promise<ActionResult<EmailTemplate[]>> => {
+        await requireAdmin()
 
         const templates = await db
             .select()
@@ -60,82 +43,47 @@ export async function getEmailTemplates(): Promise<GetEmailTemplatesResult> {
             content: normalizeEmailTemplateContent(template.content)
         }))
 
-        return {
-            status: true,
-            templates: normalizedTemplates
-        }
-    } catch (error) {
-        console.error("Error fetching email templates:", error)
-        return {
-            status: false,
-            message: "Failed to load email templates.",
-            templates: []
-        }
+        return ok(normalizedTemplates)
     }
-}
+)
 
-export async function updateEmailTemplate(
-    id: number,
-    name: string,
-    subject: string | null,
-    content: LexicalEmailTemplateContent
-): Promise<UpdateEmailTemplateResult> {
-    try {
-        const hasAccess = await getIsAdminOrDirector()
+export const updateEmailTemplate = withAction(
+    async (
+        id: number,
+        name: string,
+        subject: string | null,
+        content: LexicalEmailTemplateContent
+    ): Promise<ActionResult<void>> => {
+        await requireAdmin()
+        const session = await requireSession()
 
-        if (!hasAccess) {
-            return {
-                status: false,
-                message: "Unauthorized"
-            }
-        }
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user?.id) {
-            return {
-                status: false,
-                message: "Not authenticated."
-            }
-        }
-
-        // Validate inputs
-        if (!name.trim()) {
-            return {
-                status: false,
-                message: "Template name is required."
-            }
-        }
+        const templateId = requirePositiveInt(id, "template ID")
+        const trimmedName = requireNonEmptyString(name, "Template name")
 
         const normalizedContent = normalizeEmailTemplateContent(content)
 
         if (
             !extractPlainTextFromEmailTemplateContent(normalizedContent).trim()
         ) {
-            return {
-                status: false,
-                message: "Template content is required."
-            }
+            return fail("Template content is required.")
         }
 
         // Check if template exists
         const [existingTemplate] = await db
             .select()
             .from(emailTemplates)
-            .where(eq(emailTemplates.id, id))
+            .where(eq(emailTemplates.id, templateId))
             .limit(1)
 
         if (!existingTemplate) {
-            return {
-                status: false,
-                message: "Email template not found."
-            }
+            return fail("Email template not found.")
         }
 
         // Update the template
         await db
             .update(emailTemplates)
             .set({
-                name: name.trim(),
+                name: trimmedName,
                 subject: subject?.trim() || null,
                 content: normalizedContent as unknown as Record<
                     string,
@@ -143,97 +91,58 @@ export async function updateEmailTemplate(
                 >,
                 updated_at: new Date()
             })
-            .where(eq(emailTemplates.id, id))
+            .where(eq(emailTemplates.id, templateId))
 
         await logAuditEntry({
             userId: session.user.id,
             action: "update",
             entityType: "email_template",
-            entityId: id,
-            summary: `Updated email template "${name.trim()}" (id ${id})`
+            entityId: templateId,
+            summary: `Updated email template "${trimmedName}" (id ${templateId})`
         })
 
-        return {
-            status: true,
-            message: "Email template updated successfully."
-        }
-    } catch (error) {
-        console.error("Error updating email template:", error)
-        return {
-            status: false,
-            message: "Failed to update email template."
-        }
+        return ok(undefined, "Email template updated successfully.")
     }
-}
+)
 
-export async function createEmailTemplate(
-    name: string
-): Promise<CreateEmailTemplateResult> {
-    try {
-        const hasAccess = await getIsAdminOrDirector()
+export const createEmailTemplate = withAction(
+    async (name: string): Promise<ActionResult<void>> => {
+        await requireAdmin()
+        const session = await requireSession()
 
-        if (!hasAccess) {
-            return {
-                status: false,
-                message: "Unauthorized"
-            }
-        }
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session?.user?.id) {
-            return {
-                status: false,
-                message: "Not authenticated."
-            }
-        }
-
-        if (!name.trim()) {
-            return {
-                status: false,
-                message: "Template name is required."
-            }
-        }
-
+        const trimmedName = requireNonEmptyString(name, "Template name")
         const emptyContent = normalizeEmailTemplateContent("")
 
-        const [created] = await db
-            .insert(emailTemplates)
-            .values({
-                name: name.trim(),
-                subject: null,
-                content: emptyContent as unknown as Record<string, unknown>,
-                created_at: new Date(),
-                updated_at: new Date()
+        try {
+            const [created] = await db
+                .insert(emailTemplates)
+                .values({
+                    name: trimmedName,
+                    subject: null,
+                    content: emptyContent as unknown as Record<string, unknown>,
+                    created_at: new Date(),
+                    updated_at: new Date()
+                })
+                .returning({ id: emailTemplates.id })
+
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "create",
+                entityType: "email_template",
+                entityId: created.id,
+                summary: `Created email template "${trimmedName}" (id ${created.id})`
             })
-            .returning({ id: emailTemplates.id })
-
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "create",
-            entityType: "email_template",
-            entityId: created.id,
-            summary: `Created email template "${name.trim()}" (id ${created.id})`
-        })
-
-        return {
-            status: true,
-            message: "Email template created successfully."
-        }
-    } catch (error) {
-        if (
-            error instanceof Error &&
-            "code" in error &&
-            (error as { code: string }).code === "23505"
-        ) {
-            return {
-                status: false,
-                message: "A template with that name already exists."
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                "code" in error &&
+                (error as { code: string }).code === "23505"
+            ) {
+                return fail("A template with that name already exists.")
             }
+            throw error
         }
-        console.error("Error creating email template:", error)
-        return {
-            status: false,
-            message: "Failed to create email template."
-        }
+
+        return ok(undefined, "Email template created successfully.")
     }
-}
+)
