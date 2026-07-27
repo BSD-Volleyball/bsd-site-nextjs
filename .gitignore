@@ -53,3 +53,6 @@ yarn-error.log*
 /playwright-report
 /e2e/.auth
 .env.test.local
+
+# local one-off data snapshots (contains member PII, never commit)
+/scripts/data/
