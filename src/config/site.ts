@@ -9,7 +9,12 @@ export const site = {
     ogImage: `${site_url}/og.jpg`,
     logo: "/logo.svg",
     mailSupport: "info@bumpsetdrink.com",
-    mailFrom: `Bump Set Drink <${process.env.MAIL_FROM || "noreply@mail.bumpsetdrink.com"}>`,
+    // Falls back to the apex domain, which is the only one that authenticates:
+    // it carries the SPF record, Postmark's DKIM signs as bumpsetdrink.com, and
+    // pm-bounces.bumpsetdrink.com provides the aligned Return-Path. The previous
+    // fallback (mail.bumpsetdrink.com) does not resolve at all, so a missing
+    // MAIL_FROM would have sent every email from an unauthenticated domain.
+    mailFrom: `Bump Set Drink <${process.env.MAIL_FROM || "info@bumpsetdrink.com"}>`,
     links: {
         soccerplex: "https://www.mdsoccerplex.org",
         facebook: "https://www.facebook.com/bumpsetdrink"

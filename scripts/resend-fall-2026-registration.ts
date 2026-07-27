@@ -21,7 +21,8 @@
  *
  * Must run with the react-server condition so `server-only` resolves:
  *   DOTENV_CONFIG_PATH=.env.local npx tsx --conditions=react-server \
- *     scripts/resend-fall-2026-registration.ts [--skip 5] [--limit 5] [--apply]
+ *     scripts/resend-fall-2026-registration.ts \
+ *       [--snapshot <path>] [--skip N] [--limit N] [--apply]
  */
 import "dotenv/config"
 import { readFileSync, writeFileSync } from "node:fs"
@@ -29,7 +30,6 @@ import { Client } from "pg"
 import { sendBroadcastEmails, resolveBatchThrottle } from "@/lib/postmark"
 import { site } from "@/config/site"
 
-const SNAPSHOT = "scripts/data/rate-limit-suppressions-2026-07-01.json"
 const RESULT_FALLBACK = "scripts/data/resend-result.json"
 const SOURCE_BROADCAST_ID = 5
 const STREAM = "broadcast"
@@ -52,6 +52,21 @@ function numericArg(flag: string): number | null {
     const n = Number.parseInt(process.argv[i + 1], 10)
     return Number.isFinite(n) ? n : null
 }
+
+function stringArg(flag: string, fallback: string): string {
+    const i = process.argv.indexOf(flag)
+    return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback
+}
+
+/**
+ * Which cohort to mail. Defaults to the 2026-07-01 Gmail rate-limit group; pass
+ * --snapshot to reuse this script for another reinstated set (the file only
+ * needs an `eligible` array of objects carrying an `email`).
+ */
+const SNAPSHOT = stringArg(
+    "--snapshot",
+    "scripts/data/rate-limit-suppressions-2026-07-01.json"
+)
 
 const LIMIT = numericArg("--limit")
 /**
@@ -156,6 +171,7 @@ async function main() {
     const chunks = Math.ceil(recipients.length / throttle.batchSize)
     const pacingSeconds = ((chunks - 1) * throttle.delayMs) / 1000
 
+    console.log(`snapshot:           ${SNAPSHOT}`)
     console.log(`source broadcast:   #${SOURCE_BROADCAST_ID}`)
     console.log(`subject:            ${source.subject}`)
     console.log(`snapshot addresses: ${snapshotEmails.length}`)
