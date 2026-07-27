@@ -24,6 +24,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { compressImageForUpload } from "@/lib/image-compression"
+import { formatFullTimestamp } from "@/lib/date-utils"
 import { googleMembershipOptions } from "@/lib/google-membership"
 
 interface EditPlayerFormProps {
@@ -101,7 +102,7 @@ function signupToFormData(signup: SignupDetails): SignupFormData {
         order_id: signup.order_id ?? "",
         amount_paid: signup.amount_paid ?? "",
         created_at: signup.created_at
-            ? new Date(signup.created_at).toLocaleString()
+            ? formatFullTimestamp(signup.created_at)
             : ""
     }
 }
@@ -145,12 +146,8 @@ function userToFormData(user: UserDetails): FormData {
         seasons_list: normalizeMembershipValue(user.seasons_list),
         notification_list: normalizeMembershipValue(user.notification_list),
         captain_eligible: user.captain_eligible ?? true,
-        createdAt: user.createdAt
-            ? new Date(user.createdAt).toLocaleString()
-            : "",
-        updatedAt: user.updatedAt
-            ? new Date(user.updatedAt).toLocaleString()
-            : ""
+        createdAt: user.createdAt ? formatFullTimestamp(user.createdAt) : "",
+        updatedAt: user.updatedAt ? formatFullTimestamp(user.updatedAt) : ""
     }
 }
 

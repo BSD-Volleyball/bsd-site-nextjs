@@ -1,7 +1,7 @@
 "use client"
 
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
-import { Plus } from "lucide-react"
+import { RiAddLine } from "@remixicon/react"
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -37,7 +37,7 @@ const AccordionTrigger = React.forwardRef<
             {...props}
         >
             {children}
-            <Plus className="h-4 w-4 shrink-0 transition-transform duration-200" />
+            <RiAddLine className="h-4 w-4 shrink-0 transition-transform duration-200" />
         </AccordionPrimitive.Trigger>
     </AccordionPrimitive.Header>
 ))

@@ -1,5 +1,5 @@
 import { Slot } from "@radix-ui/react-slot"
-import { ChevronRight, MoreHorizontal } from "lucide-react"
+import { RiArrowRightSLine, RiMoreLine } from "@remixicon/react"
 import type * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -75,7 +75,7 @@ function BreadcrumbSeparator({
             className={cn("text-muted-foreground/50", className)}
             {...props}
         >
-            {children ?? <ChevronRight size={16} />}
+            {children ?? <RiArrowRightSLine size={16} />}
         </li>
     )
 }
@@ -92,7 +92,7 @@ function BreadcrumbEllipsis({
             className={cn("flex size-9 items-center justify-center", className)}
             {...props}
         >
-            <MoreHorizontal className="size-4" />
+            <RiMoreLine className="size-4" />
             <span className="sr-only">More</span>
         </span>
     )

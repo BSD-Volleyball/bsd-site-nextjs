@@ -11,6 +11,7 @@ import type {
     DraftHomeworkDetailPlayer,
     DraftHomeworkDetailResult
 } from "@/app/dashboard/homework-status/actions"
+import { formatDisplayName } from "@/lib/utils"
 
 interface CaptainHomeworkPopupProps {
     open: boolean
@@ -28,9 +29,11 @@ function PlayerCard({
     playerPicUrl: string
 }) {
     const src = player.picture ? `${playerPicUrl}${player.picture}` : null
-    const displayName = player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    const displayName = formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 
     return (
         <div className="flex w-20 flex-col items-center gap-0.5">

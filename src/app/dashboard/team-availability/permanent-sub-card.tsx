@@ -19,6 +19,7 @@ import type { PermanentSubCandidate, WaitlistOption } from "./find-sub-actions"
 import type { RosterPlayer } from "./actions"
 import { PermanentCandidateRow } from "./find-sub-candidate-rows"
 import { displayName } from "./find-sub-helpers"
+import { formatDisplayName } from "@/lib/utils"
 
 type PermanentSubCardProps = {
     activeRoster: RosterPlayer[]
@@ -117,9 +118,11 @@ export function PermanentSubCard({
                                     onLockIn={() =>
                                         onOpenLock({
                                             userId: c.userId,
-                                            name: c.preferredName
-                                                ? `${c.preferredName} ${c.lastName}`
-                                                : `${c.firstName} ${c.lastName}`
+                                            name: formatDisplayName(
+                                                c.firstName,
+                                                c.lastName,
+                                                c.preferredName
+                                            )
                                         })
                                     }
                                 />
@@ -155,9 +158,11 @@ export function PermanentSubCard({
                                     </SelectTrigger>
                                     <SelectContent>
                                         {waitlistOptions?.map((o) => {
-                                            const name = o.preferredName
-                                                ? `${o.preferredName} ${o.lastName}`
-                                                : `${o.firstName} ${o.lastName}`
+                                            const name = formatDisplayName(
+                                                o.firstName,
+                                                o.lastName,
+                                                o.preferredName
+                                            )
                                             const sub = o.lastDivisionName
                                                 ? `${o.lastDivisionName}${o.lastSeasonLabel ? ` (${o.lastSeasonLabel})` : ""}`
                                                 : "No prior history"
@@ -189,9 +194,11 @@ export function PermanentSubCard({
                                             if (!opt) return
                                             onOpenLock({
                                                 userId: opt.userId,
-                                                name: opt.preferredName
-                                                    ? `${opt.preferredName} ${opt.lastName}`
-                                                    : `${opt.firstName} ${opt.lastName}`
+                                                name: formatDisplayName(
+                                                    opt.firstName,
+                                                    opt.lastName,
+                                                    opt.preferredName
+                                                )
                                             })
                                         }}
                                     >

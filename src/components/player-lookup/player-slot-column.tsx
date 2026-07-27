@@ -9,7 +9,7 @@ import {
     PopoverTrigger
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
+import { cn, formatPlayerName } from "@/lib/utils"
 import type {
     LookupPlayerItem,
     PlayerSlot,
@@ -18,10 +18,7 @@ import type {
 
 export function getLookupDisplayName(player: LookupPlayerItem): string {
     const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
-    const preferredPart = player.preferred_name
-        ? ` (${player.preferred_name})`
-        : ""
-    return `${oldIdPart}${player.first_name}${preferredPart} ${player.last_name}`
+    return `${oldIdPart}${formatPlayerName(player.first_name, player.last_name, player.preferred_name)}`
 }
 
 export type LoadDetailResult<TDetail> =

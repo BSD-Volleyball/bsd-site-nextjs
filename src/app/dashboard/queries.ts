@@ -19,7 +19,7 @@ import {
 } from "@/database/schema"
 import { eq, and, desc, count, inArray, isNotNull } from "drizzle-orm"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
-import { buildPlayerPictureUrl } from "@/lib/utils"
+import { buildPlayerPictureUrl, formatDisplayName } from "@/lib/utils"
 
 export async function getSeasonSignup(userId: string) {
     const config = await getSeasonConfig()
@@ -174,7 +174,11 @@ export async function getPreviousSeasonsPlayed(
         divisionName: r.divisionName,
         teamName: r.teamName,
         teamId: r.teamId,
-        captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`,
+        captainName: formatDisplayName(
+            r.captainFirstName,
+            r.captainLastName,
+            r.captainPreferredName
+        ),
         champion: !!r.championId,
         championPicture: r.championPicture,
         teamPhotoUrl: buildPlayerPictureUrl(

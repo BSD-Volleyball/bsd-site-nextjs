@@ -9,6 +9,7 @@ import {
     requireAdmin,
     withAction
 } from "@/lib/action-helpers"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface GenderAttritionData {
     label: string
@@ -199,7 +200,7 @@ export const getAttritionData = withAction(
         const captainNameMap = new Map(
             captainNameRows.map((r) => [
                 r.id,
-                `${r.preferredName || r.firstName} ${r.lastName}`
+                formatDisplayName(r.firstName, r.lastName, r.preferredName)
             ])
         )
 
@@ -338,7 +339,7 @@ export const getAttritionData = withAction(
             const lapsedNameMap = new Map(
                 lapsedCaptainNameRows.map((r) => [
                     r.id,
-                    `${r.preferredName || r.firstName} ${r.lastName}`
+                    formatDisplayName(r.firstName, r.lastName, r.preferredName)
                 ])
             )
 

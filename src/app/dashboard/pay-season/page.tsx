@@ -16,7 +16,7 @@ import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
 import { signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
-import { CheckCircle2 } from "lucide-react"
+import { RiCheckboxCircleLine } from "@remixicon/react"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -78,7 +78,7 @@ export default async function PaySeasonPage() {
             {existingSignup ? (
                 <div className="rounded-lg border-2 border-green-600/40 bg-green-50 p-6 dark:bg-green-950/30">
                     <div className="flex items-start gap-3">
-                        <CheckCircle2 className="mt-0.5 size-6 shrink-0 text-green-600 dark:text-green-400" />
+                        <RiCheckboxCircleLine className="mt-0.5 size-6 shrink-0 text-green-600 dark:text-green-400" />
                         <div className="space-y-2">
                             <h2 className="font-semibold text-green-800 text-lg dark:text-green-300">
                                 You&apos;re already registered

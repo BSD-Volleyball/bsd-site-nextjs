@@ -24,6 +24,7 @@ import type { RosterPlayer, EventInfo, DateMatchInfo } from "./actions"
 import { RegularCandidateRow } from "./find-sub-candidate-rows"
 import { displayName, formatDate, formatMatchTime } from "./find-sub-helpers"
 import type { RegularLockTarget } from "./find-sub-helpers"
+import { formatDisplayName } from "@/lib/utils"
 
 type RegularSubCardProps = {
     teamId: number
@@ -90,9 +91,11 @@ export function RegularSubCard({
             originalUserId,
             originalName: displayName(originalPlayer),
             subUserId: candidate.userId,
-            subName: candidate.preferredName
-                ? `${candidate.preferredName} ${candidate.lastName}`
-                : `${candidate.firstName} ${candidate.lastName}`
+            subName: formatDisplayName(
+                candidate.firstName,
+                candidate.lastName,
+                candidate.preferredName
+            )
         })
     }
 

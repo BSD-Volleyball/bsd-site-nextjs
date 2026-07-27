@@ -114,7 +114,7 @@ export function UndraftedSignupsTable({
                                 <td className="px-4 py-2">
                                     {new Date(
                                         entry.signupDate
-                                    ).toLocaleDateString()}
+                                    ).toLocaleDateString("en-US")}
                                 </td>
                                 <td className="px-4 py-2">
                                     <Button
@@ -258,7 +258,7 @@ export function DraftedSignupsTable({
                                 <td className="px-4 py-2">
                                     {new Date(
                                         entry.signupDate
-                                    ).toLocaleDateString()}
+                                    ).toLocaleDateString("en-US")}
                                 </td>
                                 <td className="px-4 py-2">
                                     <Button

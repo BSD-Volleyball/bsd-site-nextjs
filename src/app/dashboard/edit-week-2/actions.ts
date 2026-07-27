@@ -37,6 +37,7 @@ import {
     fetchRatingScoresForReturningPlayers
 } from "@/lib/week-rosters"
 import { site } from "@/config/site"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface Week2EditablePlayer {
     id: string
@@ -438,9 +439,11 @@ export const sendWeek2RosterNotifications = withAction(
         // Build captain lookup: `${divisionId}-${teamNumber}` → name
         const captainBySlot = new Map<string, string>()
         for (const row of captainRows) {
-            const name = row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`
+            const name = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
             captainBySlot.set(`${row.divisionId}-${row.teamNumber}`, name)
         }
 

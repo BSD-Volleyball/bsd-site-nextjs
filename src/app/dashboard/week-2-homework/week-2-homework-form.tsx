@@ -24,7 +24,7 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { cn, formatDisplayName } from "@/lib/utils"
+import { cn, formatDisplayName, splitByGender } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -61,9 +61,11 @@ function getDisplayName(player: Week2Player): string {
 }
 
 function getShortName(player: Week2Player): string {
-    return player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 function buildInitialValues(
@@ -184,8 +186,11 @@ function PlayerCombobox({
         if (!search.trim()) return availablePlayers
         const lower = search.toLowerCase()
         return availablePlayers.filter((p) => {
-            const name =
-                `${p.preferredName ?? p.firstName} ${p.lastName}`.toLowerCase()
+            const name = formatDisplayName(
+                p.firstName,
+                p.lastName,
+                p.preferredName
+            ).toLowerCase()
             const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
             const oldId = String(p.oldId)
             return (
@@ -344,10 +349,8 @@ export function Week2HomeworkForm({
     const nonCaptainTeamRoster = teamRoster.filter(
         (p) => p.userId !== captainUserId
     )
-    const maleTeamPlayers = nonCaptainTeamRoster.filter((p) => p.male === true)
-    const nonMaleTeamPlayers = nonCaptainTeamRoster.filter(
-        (p) => p.male !== true
-    )
+    const { males: maleTeamPlayers, nonMales: nonMaleTeamPlayers } =
+        splitByGender(nonCaptainTeamRoster)
     const nonCaptainAllTryoutPlayers = allTryoutPlayers.filter(
         (p) => p.userId !== captainUserId
     )
@@ -473,9 +476,11 @@ export function Week2HomeworkForm({
                                             }
                                             className="text-primary underline underline-offset-2 hover:opacity-80"
                                         >
-                                            {player.preferredName
-                                                ? `${player.preferredName} ${player.lastName}`
-                                                : `${player.firstName} ${player.lastName}`}
+                                            {formatDisplayName(
+                                                player.firstName,
+                                                player.lastName,
+                                                player.preferredName
+                                            )}
                                         </button>
                                     </td>
                                     <td className="px-4 py-2">

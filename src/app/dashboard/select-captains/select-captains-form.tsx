@@ -26,7 +26,7 @@ import {
     PopoverTrigger
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
+import { cn, formatPlayerName } from "@/lib/utils"
 import {
     createTeams,
     type DivisionOption,
@@ -112,10 +112,7 @@ function UserCombobox({
 
     const getDisplayName = (user: UserOption) => {
         const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        const preferredPart = user.preferred_name
-            ? ` (${user.preferred_name})`
-            : ""
-        return `${oldIdPart}${user.first_name}${preferredPart} ${user.last_name}`
+        return `${oldIdPart}${formatPlayerName(user.first_name, user.last_name, user.preferred_name)}`
     }
 
     const handleSelect = (userId: string) => {

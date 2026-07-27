@@ -1,4 +1,4 @@
-import { Mail, MapPin } from "lucide-react"
+import { RiMailLine, RiMapPinLine } from "@remixicon/react"
 
 import Image from "next/image"
 import Link from "next/link"
@@ -61,7 +61,7 @@ const socialLinks: FooterLinkProps[] = [
     {
         href: `mailto:${site.mailSupport}`,
         label: "Email",
-        icon: <Mail className="size-5" />
+        icon: <RiMailLine className="size-5" />
     }
 ]
 
@@ -111,7 +111,7 @@ export const FooterSection = async () => {
                                     </p>
 
                                     <div className="mb-4 flex items-start gap-2 text-muted-foreground text-sm">
-                                        <MapPin className="mt-0.5 size-4 shrink-0" />
+                                        <RiMapPinLine className="mt-0.5 size-4 shrink-0" />
                                         <span>
                                             Maryland SoccerPlex
                                             <br />

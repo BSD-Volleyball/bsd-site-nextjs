@@ -131,9 +131,6 @@ importers:
       lexical:
         specifier: ^0.43.0
         version: 0.43.0
-      lucide-react:
-        specifier: ^1.8.0
-        version: 1.8.0(react@19.2.5)
       motion:
         specifier: ^12.38.0
         version: 12.38.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)

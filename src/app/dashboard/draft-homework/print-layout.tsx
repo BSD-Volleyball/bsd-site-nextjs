@@ -2,6 +2,7 @@
 
 import type { DraftHomeworkPlayer } from "./actions"
 import { CONSIDERING_ROUND, type Selections } from "./homework-selections"
+import { formatDisplayName } from "@/lib/utils"
 
 function getPlayersForRound(
     tabKey: "m" | "f",
@@ -28,9 +29,11 @@ function PrintPlayerCard({
     playerPicUrl: string
 }) {
     const src = player.picture ? `${playerPicUrl}${player.picture}` : null
-    const displayName = player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    const displayName = formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
     return (
         <div style={{ textAlign: "center", width: "1.05in" }}>
             {src ? (

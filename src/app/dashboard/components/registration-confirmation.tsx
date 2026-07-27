@@ -22,7 +22,7 @@ export function RegistrationConfirmation({
                         Paid ${signupStatus.signup!.amount_paid} on{" "}
                         {new Date(
                             signupStatus.signup!.created_at
-                        ).toLocaleDateString()}
+                        ).toLocaleDateString("en-US")}
                     </p>
                 </div>
             </div>

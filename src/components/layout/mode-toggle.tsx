@@ -1,7 +1,7 @@
 "use client"
 
 import { motion } from "motion/react"
-import { MoonIcon, SunIcon } from "lucide-react"
+import { RiMoonLine, RiSunLine } from "@remixicon/react"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 
@@ -40,7 +40,7 @@ export function ModeToggle() {
                 }}
                 className="absolute"
             >
-                <SunIcon className="h-[1.2rem] w-[1.2rem]" />
+                <RiSunLine className="h-[1.2rem] w-[1.2rem]" />
             </motion.div>
             <motion.div
                 initial={false}
@@ -54,7 +54,7 @@ export function ModeToggle() {
                 }}
                 className="absolute"
             >
-                <MoonIcon className="h-[1.2rem] w-[1.2rem]" />
+                <RiMoonLine className="h-[1.2rem] w-[1.2rem]" />
             </motion.div>
             <span className="sr-only">Toggle theme</span>
         </Button>

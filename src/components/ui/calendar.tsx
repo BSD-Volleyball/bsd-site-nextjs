@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { RiArrowLeftSLine, RiArrowRightSLine } from "@remixicon/react"
 import type * as React from "react"
 import { DayPicker } from "react-day-picker"
 import { buttonVariants } from "@/components/ui/button"
@@ -66,10 +66,10 @@ function Calendar({
         }) => {
             if (props.orientation === "left") {
                 return (
-                    <ChevronLeftIcon size={16} {...props} aria-hidden="true" />
+                    <RiArrowLeftSLine size={16} {...props} aria-hidden="true" />
                 )
             }
-            return <ChevronRightIcon size={16} {...props} aria-hidden="true" />
+            return <RiArrowRightSLine size={16} {...props} aria-hidden="true" />
         }
     }
 

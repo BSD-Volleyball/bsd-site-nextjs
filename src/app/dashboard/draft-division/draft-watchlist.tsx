@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useStorage } from "@/lib/liveblocks.config"
-import { cn } from "@/lib/utils"
+import { cn, formatPlayerName } from "@/lib/utils"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -245,9 +245,11 @@ export function DraftWatchlist({
                             </div>
                         )}
                         <p className="mt-3 text-center font-medium">
-                            {enlargedUser.preferred_name
-                                ? `${enlargedUser.first_name} (${enlargedUser.preferred_name}) ${enlargedUser.last_name}`
-                                : `${enlargedUser.first_name} ${enlargedUser.last_name}`}
+                            {formatPlayerName(
+                                enlargedUser.first_name,
+                                enlargedUser.last_name,
+                                enlargedUser.preferred_name
+                            )}
                         </p>
                         {enlargedUser.old_id && (
                             <p className="text-center text-muted-foreground text-sm">

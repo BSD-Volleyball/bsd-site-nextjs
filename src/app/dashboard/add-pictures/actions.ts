@@ -23,6 +23,7 @@ import {
     getPlayerPictureObjectKey
 } from "@/lib/player-picture"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface MissingPicturePlayer {
     userId: string
@@ -79,9 +80,11 @@ export const getPlayersNeedingPictures = withAction(
                 firstName: row.firstName,
                 lastName: row.lastName,
                 preferredName: row.preferredName,
-                displayName: row.preferredName
-                    ? `${row.preferredName} ${row.lastName}`
-                    : `${row.firstName} ${row.lastName}`,
+                displayName: formatDisplayName(
+                    row.firstName,
+                    row.lastName,
+                    row.preferredName
+                ),
                 oldId: row.oldId
             }))
         })

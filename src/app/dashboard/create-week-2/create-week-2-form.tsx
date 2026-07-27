@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
 import { saveWeek2Rosters } from "./actions"
 import {
     usePlayerDetailModal,
@@ -795,9 +795,11 @@ export function CreateWeek2Form({
                                         className="rounded-sm border px-2 py-1 text-xs"
                                     >
                                         <span className="font-medium">
-                                            {player.preferredName
-                                                ? `${player.preferredName} ${player.lastName}`
-                                                : `${player.firstName} ${player.lastName}`}
+                                            {formatDisplayName(
+                                                player.firstName,
+                                                player.lastName,
+                                                player.preferredName
+                                            )}
                                         </span>
                                         {player.oldId !== null && (
                                             <span className="ml-2 text-muted-foreground">

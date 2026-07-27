@@ -7,6 +7,7 @@ import {
     type PlayerRatingsSectionData,
     type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
+import { formatDisplayName } from "@/lib/utils"
 
 function formatSeasonLabel(seasonName: string, seasonYear: number): string {
     return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
@@ -102,7 +103,11 @@ export async function getPlayerRatingsSectionData(
             .where(inArray(users.id, evaluatorIds))
 
         for (const row of evaluatorRows) {
-            const displayName = `${row.preferredName || row.firstName} ${row.lastName}`
+            const displayName = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
             evaluatorNameById.set(row.id, displayName)
         }
     }

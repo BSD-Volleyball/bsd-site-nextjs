@@ -558,7 +558,9 @@ export function SendEmailClient({
                                                         on{" "}
                                                         {new Date(
                                                             item.sentAt
-                                                        ).toLocaleDateString()}
+                                                        ).toLocaleDateString(
+                                                            "en-US"
+                                                        )}
                                                     </span>
                                                 )}
                                             </div>

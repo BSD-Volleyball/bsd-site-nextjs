@@ -61,7 +61,7 @@ import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-c
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
-import { cn } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
 import { site } from "@/config/site"
 import {
     getSeasonSignup,
@@ -489,9 +489,11 @@ export default async function DashboardPage() {
                     const sessionTime = sessionTimes[matchupIndex] || "TBD"
 
                     const captainName = captainRow
-                        ? captainRow.preferredName
-                            ? `${captainRow.preferredName} ${captainRow.lastName}`
-                            : `${captainRow.firstName} ${captainRow.lastName}`
+                        ? formatDisplayName(
+                              captainRow.firstName,
+                              captainRow.lastName,
+                              captainRow.preferredName
+                          )
                         : null
 
                     userWeek2Roster = {
@@ -607,9 +609,11 @@ export default async function DashboardPage() {
                     const sessionTime = sessionTimes[matchupIndex] || "TBD"
 
                     const captainName = captainRow
-                        ? captainRow.preferredName
-                            ? `${captainRow.preferredName} ${captainRow.lastName}`
-                            : `${captainRow.firstName} ${captainRow.lastName}`
+                        ? formatDisplayName(
+                              captainRow.firstName,
+                              captainRow.lastName,
+                              captainRow.preferredName
+                          )
                         : null
 
                     userWeek3Roster = {
@@ -1874,7 +1878,7 @@ export default async function DashboardPage() {
                                         Expires on{" "}
                                         {new Date(
                                             discount.expiration
-                                        ).toLocaleDateString()}
+                                        ).toLocaleDateString("en-US")}
                                     </p>
                                 )}
                                 {signupStatus.config.phase ===

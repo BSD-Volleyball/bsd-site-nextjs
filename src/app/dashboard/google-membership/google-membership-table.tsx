@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { googleMembershipOptions } from "@/lib/google-membership"
 import { updateGoogleMembership, type GoogleMembershipUser } from "./actions"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { formatPlayerName } from "@/lib/utils"
 
 interface GoogleMembershipTableProps {
     users: GoogleMembershipUser[]
@@ -229,10 +230,11 @@ export function GoogleMembershipTable({
                             </thead>
                             <tbody>
                                 {users.map((user) => {
-                                    const preferred = user.preferredName
-                                        ? ` (${user.preferredName})`
-                                        : ""
-                                    const name = `${user.firstName}${preferred} ${user.lastName}`
+                                    const name = formatPlayerName(
+                                        user.firstName,
+                                        user.lastName,
+                                        user.preferredName
+                                    )
                                     const values = rowValues[user.id] ?? {
                                         seasonsList: "",
                                         notificationList: ""

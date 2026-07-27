@@ -131,7 +131,7 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
                                 <td className="px-4 py-2">
                                     {new Date(
                                         entry.createdAt
-                                    ).toLocaleDateString()}
+                                    ).toLocaleDateString("en-US")}
                                 </td>
                                 <td className="px-4 py-2">
                                     <Button

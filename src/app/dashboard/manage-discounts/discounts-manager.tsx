@@ -160,7 +160,7 @@ export function DiscountsManager({
 
     const formatDate = (date: Date | null) => {
         if (!date) return "No expiration"
-        return new Date(date).toLocaleDateString()
+        return new Date(date).toLocaleDateString("en-US")
     }
 
     const isExpired = (date: Date | null) => {
@@ -395,7 +395,7 @@ export function DiscountsManager({
                                 <td className="px-4 py-2 text-muted-foreground">
                                     {new Date(
                                         discount.createdAt
-                                    ).toLocaleDateString()}
+                                    ).toLocaleDateString("en-US")}
                                 </td>
                                 <td className="px-4 py-2">
                                     {editingId === discount.id ? (

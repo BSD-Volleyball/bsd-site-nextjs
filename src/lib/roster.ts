@@ -12,7 +12,7 @@ import {
     users
 } from "@/database/schema"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
-import { formatDisplayName } from "@/lib/utils"
+import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
 export type PlayerSummary = {
     id: string
@@ -379,15 +379,16 @@ export async function getLastDraftInfoByUser(
 
     for (const draft of draftData) {
         if (map.has(draft.userId)) continue
-        const captainPreferred = draft.captainPreferredName
-            ? ` (${draft.captainPreferredName})`
-            : ""
         map.set(draft.userId, {
             seasonLabel: `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`,
             seasonYear: draft.seasonYear,
             divisionName: draft.divisionName,
             divisionLevel: draft.divisionLevel,
-            captainName: `${draft.captainFirstName}${captainPreferred} ${draft.captainLastName}`,
+            captainName: formatPlayerName(
+                draft.captainFirstName,
+                draft.captainLastName,
+                draft.captainPreferredName
+            ),
             overall: draft.overall
         })
     }

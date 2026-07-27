@@ -1,6 +1,11 @@
 "use client"
 import { SignedOut } from "@daveyplate/better-auth-ui"
-import { ArrowRight, MapPin, Users, Trophy } from "lucide-react"
+import {
+    RiArrowRightLine,
+    RiGroupLine,
+    RiMapPinLine,
+    RiTrophyLine
+} from "@remixicon/react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -65,7 +70,7 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
                             >
                                 <Link href="/auth/sign-up">
                                     Register Now
-                                    <ArrowRight className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
+                                    <RiArrowRightLine className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
                                 </Link>
                             </Button>
                         </SignedOut>
@@ -87,7 +92,7 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
                 <div className="mx-auto mt-16 grid max-w-4xl grid-cols-1 gap-8 sm:grid-cols-3">
                     <div className="flex flex-col items-center space-y-2 text-center">
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
-                            <Users className="size-6 text-primary" />
+                            <RiGroupLine className="size-6 text-primary" />
                         </div>
                         <h3 className="font-semibold text-lg">
                             6 Skill Divisions
@@ -99,7 +104,7 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
 
                     <div className="flex flex-col items-center space-y-2 text-center">
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
-                            <Trophy className="size-6 text-primary" />
+                            <RiTrophyLine className="size-6 text-primary" />
                         </div>
                         <h3 className="font-semibold text-lg">Draft System</h3>
                         <p className="text-muted-foreground text-sm">
@@ -110,7 +115,7 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
 
                     <div className="flex flex-col items-center space-y-2 text-center">
                         <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
-                            <MapPin className="size-6 text-primary" />
+                            <RiMapPinLine className="size-6 text-primary" />
                         </div>
                         <h3 className="font-semibold text-lg">
                             Maryland SoccerPlex

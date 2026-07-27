@@ -9,7 +9,7 @@ import {
     PopoverTrigger
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn } from "@/lib/utils"
+import { cn, formatPlayerName } from "@/lib/utils"
 import {
     useStorage,
     useMutation,
@@ -124,10 +124,7 @@ function UserCombobox({
 
     const getDisplayName = (user: UserOption) => {
         const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        const preferredPart = user.preferred_name
-            ? ` (${user.preferred_name})`
-            : ""
-        return `${oldIdPart}${user.first_name}${preferredPart} ${user.last_name}`
+        return `${oldIdPart}${formatPlayerName(user.first_name, user.last_name, user.preferred_name)}`
     }
 
     const handleSelect = (userId: string) => {
@@ -607,9 +604,11 @@ export function DraftBoard({
                                                                       )
                                                                   if (!u)
                                                                       return userId
-                                                                  return u.preferred_name
-                                                                      ? `${u.first_name} (${u.preferred_name}) ${u.last_name}`
-                                                                      : `${u.first_name} ${u.last_name}`
+                                                                  return formatPlayerName(
+                                                                      u.first_name,
+                                                                      u.last_name,
+                                                                      u.preferred_name
+                                                                  )
                                                               })()
                                                             : ""}
                                                     </div>
@@ -779,9 +778,11 @@ export function DraftBoard({
                             </div>
                         )}
                         <p className="mt-3 text-center font-medium">
-                            {enlargedPlayer.preferred_name
-                                ? `${enlargedPlayer.first_name} (${enlargedPlayer.preferred_name}) ${enlargedPlayer.last_name}`
-                                : `${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
+                            {formatPlayerName(
+                                enlargedPlayer.first_name,
+                                enlargedPlayer.last_name,
+                                enlargedPlayer.preferred_name
+                            )}
                         </p>
                         {enlargedPlayer.old_id && (
                             <p className="text-center text-muted-foreground text-sm">

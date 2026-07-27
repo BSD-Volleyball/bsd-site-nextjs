@@ -27,6 +27,7 @@ import {
     formatPlayerSummaryName
 } from "@/lib/roster"
 import { ok, fail, type ActionResult } from "@/lib/action-helpers"
+import { formatDisplayName } from "@/lib/utils"
 
 async function canAccessTeam(
     userId: string,
@@ -222,9 +223,11 @@ export async function getRegularSubCandidates(
             }
             const u = missingUserMap.get(r.userId)
             if (u) {
-                const name = u.preferredName
-                    ? `${u.preferredName} ${u.lastName}`
-                    : `${u.firstName} ${u.lastName}`
+                const name = formatDisplayName(
+                    u.firstName,
+                    u.lastName,
+                    u.preferredName
+                )
                 missingPlayers.push({ name, round: r.round })
             }
         }
@@ -516,9 +519,11 @@ export async function getPermanentSubCandidates(
     if (!playerRow)
         return { status: false, message: "Player not found on team." }
 
-    const replacedPlayerName = playerRow.preferredName
-        ? `${playerRow.preferredName} ${playerRow.lastName}`
-        : `${playerRow.firstName} ${playerRow.lastName}`
+    const replacedPlayerName = formatDisplayName(
+        playerRow.firstName,
+        playerRow.lastName,
+        playerRow.preferredName
+    )
 
     // Get all waitlist entries for this season
     const waitlistRows = await db
@@ -716,9 +721,7 @@ async function findUserName(userId: string): Promise<string> {
         .where(eq(users.id, userId))
         .limit(1)
     if (!u) return userId
-    return u.preferredName
-        ? `${u.preferredName} ${u.lastName}`
-        : `${u.firstName} ${u.lastName}`
+    return formatDisplayName(u.firstName, u.lastName, u.preferredName)
 }
 
 export type WaitlistOption = {

@@ -61,7 +61,7 @@ export function generateCsvContent(
         entry.captainIn || "",
         entry.draftedIn || "",
         entry.amountPaid || "",
-        new Date(entry.signupDate).toLocaleDateString(),
+        new Date(entry.signupDate).toLocaleDateString("en-US"),
         entry.experience || "",
         entry.assessment || "",
         formatHeight(entry.height),

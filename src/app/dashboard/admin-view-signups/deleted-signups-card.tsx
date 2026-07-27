@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPlayerName } from "@/lib/utils"
+import { formatFullTimestamp } from "@/lib/date-utils"
 import type { DeletedSignupEntry } from "./actions"
 
 interface DeletedSignupsCardProps {
@@ -67,9 +68,9 @@ export function DeletedSignupsCard({
                                             {entry.signupId}
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
-                                            {new Date(
+                                            {formatFullTimestamp(
                                                 entry.deletedAt
-                                            ).toLocaleString()}
+                                            )}
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
                                             {entry.deletedByName}

@@ -34,6 +34,7 @@ import {
     type LexicalEmailTemplateContent
 } from "@/lib/email-template-content"
 import { getTeamRosterWithSubs, formatPlayerSummaryName } from "@/lib/roster"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface TeamRosterPlayer {
     id: string
@@ -612,9 +613,11 @@ export async function getPlayerTeamAssignment(
             .limit(1)
 
         const captainName = captainRow
-            ? captainRow.preferredName
-                ? `${captainRow.preferredName} ${captainRow.lastName}`
-                : `${captainRow.firstName} ${captainRow.lastName}`
+            ? formatDisplayName(
+                  captainRow.firstName,
+                  captainRow.lastName,
+                  captainRow.preferredName
+              )
             : ""
 
         const rosterRows = await db

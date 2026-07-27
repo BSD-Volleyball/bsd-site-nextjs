@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { db } from "@/database/db"
 import { champions, divisions, seasons, teams, users } from "@/database/schema"
 import { ChampionsList, type ChampionListRow } from "./champions-list"
+import { formatDisplayName } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -65,7 +66,11 @@ export default async function HallOfChampionsPage() {
         divisionName: row.divisionName,
         divisionLevel: row.divisionLevel,
         teamName: row.teamName,
-        captainName: `${row.captainPreferredName || row.captainFirstName} ${row.captainLastName}`,
+        captainName: formatDisplayName(
+            row.captainFirstName,
+            row.captainLastName,
+            row.captainPreferredName
+        ),
         picture: row.picture,
         picture2: row.picture2,
         caption: row.caption

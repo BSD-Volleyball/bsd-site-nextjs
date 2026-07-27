@@ -35,6 +35,7 @@ import type {
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
 import { getDraftHistoryForUser } from "@/lib/roster"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface PlayerListItem {
     id: string
@@ -402,13 +403,6 @@ export async function getPlayerSubHistory(
         )
         .where(eq(matchSubstitutions.sub_user, userId))
 
-    function makeName(
-        first: string,
-        last: string,
-        preferred: string | null
-    ): string {
-        return preferred ? `${preferred} ${last}` : `${first} ${last}`
-    }
     function seasonLabel(name: string, year: number): string {
         return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}`
     }
@@ -421,7 +415,7 @@ export async function getPlayerSubHistory(
                 seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
-                counterpartName: makeName(
+                counterpartName: formatDisplayName(
                     r.counterFirst,
                     r.counterLast,
                     r.counterPreferred
@@ -438,7 +432,7 @@ export async function getPlayerSubHistory(
                 seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
-                counterpartName: makeName(
+                counterpartName: formatDisplayName(
                     r.counterFirst,
                     r.counterLast,
                     r.counterPreferred
@@ -455,7 +449,7 @@ export async function getPlayerSubHistory(
                 seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
-                counterpartName: makeName(
+                counterpartName: formatDisplayName(
                     r.counterFirst,
                     r.counterLast,
                     r.counterPreferred
@@ -472,7 +466,7 @@ export async function getPlayerSubHistory(
                 seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
-                counterpartName: makeName(
+                counterpartName: formatDisplayName(
                     r.counterFirst,
                     r.counterLast,
                     r.counterPreferred

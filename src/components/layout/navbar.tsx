@@ -1,5 +1,5 @@
 "use client"
-import { Menu, X } from "lucide-react"
+import { RiCloseLine, RiMenuLine } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
 import dynamic from "next/dynamic"
@@ -253,9 +253,9 @@ export const Navbar = ({ seasonLabel }: NavbarProps) => {
                                     aria-label="Toggle menu"
                                 >
                                     {isOpen ? (
-                                        <X className="size-4" />
+                                        <RiCloseLine className="size-4" />
                                     ) : (
-                                        <Menu className="size-4" />
+                                        <RiMenuLine className="size-4" />
                                     )}
                                 </Button>
                             </SheetTrigger>

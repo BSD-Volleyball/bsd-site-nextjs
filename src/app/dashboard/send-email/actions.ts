@@ -48,6 +48,7 @@ import {
     getRecipientsForGroup,
     filterSuppressed
 } from "@/lib/email-recipients"
+import { formatDisplayName } from "@/lib/utils"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -248,9 +249,11 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
         teamId: r.teamId ?? null,
         streamId: r.streamId,
         lexicalContent: normalizeEmailTemplateContent(r.lexicalContent),
-        sentByName: r.sentByPreferredName
-            ? `${r.sentByPreferredName} ${r.sentByLastName}`
-            : `${r.sentByFirstName} ${r.sentByLastName}`,
+        sentByName: formatDisplayName(
+            r.sentByFirstName,
+            r.sentByLastName,
+            r.sentByPreferredName
+        ),
         status: r.status,
         recipientTotal: r.recipientTotal,
         sentCount: r.sentCount,

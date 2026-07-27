@@ -147,16 +147,13 @@ export function DraftHomeworkForm({
                 {data.lastUpdatedAt && (
                     <p className="text-muted-foreground text-sm">
                         Last saved:{" "}
-                        {new Date(data.lastUpdatedAt).toLocaleString(
-                            undefined,
-                            {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit"
-                            }
-                        )}
+                        {new Date(data.lastUpdatedAt).toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit"
+                        })}
                     </p>
                 )}
 
@@ -270,7 +267,7 @@ export function DraftHomeworkForm({
                                                             className={`px-2 py-1.5 ${pick?.playerMale === false ? "text-pink-700 dark:text-pink-400" : ""}`}
                                                         >
                                                             {pick
-                                                                ? `${pick.playerPreferredName ?? pick.playerFirstName} ${pick.playerLastName}`
+                                                                ? formatDisplayName(pick.playerFirstName, pick.playerLastName, pick.playerPreferredName)
                                                                 : "—"}
                                                         </td>
                                                     )

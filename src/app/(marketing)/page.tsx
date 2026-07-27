@@ -17,14 +17,14 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import {
-    Calendar,
-    ClipboardList,
-    FileText,
-    Users,
-    Gavel,
-    Shield,
-    Trophy
-} from "lucide-react"
+    RiAuctionLine,
+    RiCalendarLine,
+    RiClipboardLine,
+    RiFileTextLine,
+    RiGroupLine,
+    RiShieldLine,
+    RiTrophyLine
+} from "@remixicon/react"
 
 function fmtTournamentDate(iso: string): string {
     const d = new Date(`${iso}T00:00:00`)
@@ -84,25 +84,25 @@ const quickLinks = [
         title: "League Rules",
         description: "Official BSD volleyball rules and regulations",
         href: "/rules",
-        icon: FileText
+        icon: RiFileTextLine
     },
     {
         title: "Captain Guidelines",
         description: "Expectations and responsibilities for team captains",
         href: "/captain-expectations",
-        icon: Users
+        icon: RiGroupLine
     },
     {
         title: "Referee Guidelines",
         description: "Standards and procedures for referees",
         href: "/referee-expectations",
-        icon: Gavel
+        icon: RiAuctionLine
     },
     {
         title: "Gender Policy",
         description: "Our commitment to inclusive co-rec play",
         href: "/gender-policy",
-        icon: Shield
+        icon: RiShieldLine
     }
 ]
 
@@ -139,7 +139,7 @@ export default async function Home() {
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-start gap-4">
                                     <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                                        <Trophy className="size-7" />
+                                        <RiTrophyLine className="size-7" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="font-semibold text-primary text-sm uppercase tracking-wider">
@@ -150,7 +150,7 @@ export default async function Home() {
                                         </h3>
                                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-sm">
                                             <span className="flex items-center gap-1.5">
-                                                <Calendar className="size-4" />
+                                                <RiCalendarLine className="size-4" />
                                                 {fmtTournamentDate(
                                                     tournament.tournamentDate
                                                 )}
@@ -186,7 +186,7 @@ export default async function Home() {
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="flex items-start gap-4">
                                     <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                                        <ClipboardList className="size-7" />
+                                        <RiClipboardLine className="size-7" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="font-semibold text-primary text-sm uppercase tracking-wider">
@@ -200,7 +200,7 @@ export default async function Home() {
                                         {registrationDateLine && (
                                             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-sm">
                                                 <span className="flex items-center gap-1.5">
-                                                    <Calendar className="size-4" />
+                                                    <RiCalendarLine className="size-4" />
                                                     {registrationDateLine}
                                                 </span>
                                             </div>

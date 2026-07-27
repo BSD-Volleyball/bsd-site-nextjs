@@ -12,6 +12,7 @@ import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import type { Metadata } from "next"
+import { formatDisplayName } from "@/lib/utils"
 
 export const metadata: Metadata = {
     title: "Pre-Season Week 1"
@@ -121,9 +122,11 @@ export default async function DraftPreseasonWeek1Page() {
     const players: RosterPlayer[] = [...rosterRows, ...session2Rows]
         .map((row) => ({
             userId: row.userId,
-            displayName: row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`,
+            displayName: formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            ),
             lastName: row.lastName,
             sessionNumber: row.sessionNumber,
             courtNumber: row.courtNumber
@@ -141,9 +144,11 @@ export default async function DraftPreseasonWeek1Page() {
     const alternates: RosterPlayer[] = alternateRows
         .map((row) => ({
             userId: row.userId,
-            displayName: row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`,
+            displayName: formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            ),
             lastName: row.lastName,
             sessionNumber: row.sessionNumber,
             courtNumber: row.courtNumber

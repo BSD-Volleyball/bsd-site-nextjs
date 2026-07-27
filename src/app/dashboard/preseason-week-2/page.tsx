@@ -13,6 +13,7 @@ import { week2Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
 import { PrintButton } from "./print-button"
 import type { Metadata } from "next"
+import { formatDisplayName } from "@/lib/utils"
 
 export const metadata: Metadata = {
     title: "Pre-Season Week 2"
@@ -140,9 +141,11 @@ export default async function PreseasonWeek2Page() {
 
     const normalizedRows: Week2RosterRow[] = rosterRows
         .map((row) => {
-            const baseName = row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`
+            const baseName = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
             const needsAsterisk =
                 (userAssignmentCounts.get(row.userId) || 0) > 1
             const captainSuffix = row.isCaptain ? " (Capt)" : ""

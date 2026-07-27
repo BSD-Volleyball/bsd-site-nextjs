@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { cn } from "@/lib/utils"
+import { cn, formatDisplayName, splitByGender } from "@/lib/utils"
 import { saveWeek3Rosters } from "./actions"
 import {
     usePlayerDetailModal,
@@ -98,9 +98,7 @@ export function CreateWeek3Form({
     )
 
     const eligibleMaleCount = useMemo(
-        () =>
-            effectiveCandidates.filter((candidate) => candidate.male === true)
-                .length,
+        () => splitByGender(effectiveCandidates).males.length,
         [effectiveCandidates]
     )
     const eligibleNonMaleCount = useMemo(
@@ -588,9 +586,8 @@ export function CreateWeek3Form({
                             const players =
                                 editableDivisionPlayers.get(division.id) || []
                             const targetLabel = "Week 3 ideal target"
-                            const actualMaleCount = players.filter(
-                                (player) => player.male === true
-                            ).length
+                            const actualMaleCount =
+                                splitByGender(players).males.length
                             const actualNonMaleCount =
                                 players.length - actualMaleCount
 
@@ -963,9 +960,11 @@ export function CreateWeek3Form({
                                         className="rounded-sm border px-2 py-1 text-xs"
                                     >
                                         <span className="font-medium">
-                                            {player.preferredName
-                                                ? `${player.preferredName} ${player.lastName}`
-                                                : `${player.firstName} ${player.lastName}`}
+                                            {formatDisplayName(
+                                                player.firstName,
+                                                player.lastName,
+                                                player.preferredName
+                                            )}
                                         </span>
                                     </div>
                                 ))}

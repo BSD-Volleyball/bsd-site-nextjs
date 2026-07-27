@@ -365,7 +365,7 @@ export function AdminPlayerDetailPopup({
                                     <span className="ml-2 font-medium">
                                         {new Date(
                                             playerDetails.createdAt
-                                        ).toLocaleDateString()}
+                                        ).toLocaleDateString("en-US")}
                                     </span>
                                 </div>
                                 <div>
@@ -375,7 +375,7 @@ export function AdminPlayerDetailPopup({
                                     <span className="ml-2 font-medium">
                                         {new Date(
                                             playerDetails.updatedAt
-                                        ).toLocaleDateString()}
+                                        ).toLocaleDateString("en-US")}
                                     </span>
                                 </div>
                             </div>
@@ -415,7 +415,7 @@ export function AdminPlayerDetailPopup({
                                         <span className="ml-2 font-medium">
                                             {new Date(
                                                 signup.createdAt
-                                            ).toLocaleDateString()}
+                                            ).toLocaleDateString("en-US")}
                                         </span>
                                     </div>
                                     <div>

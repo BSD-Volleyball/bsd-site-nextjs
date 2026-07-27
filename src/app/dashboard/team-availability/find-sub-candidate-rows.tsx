@@ -7,6 +7,7 @@ import type {
     PermanentSubCandidate
 } from "./find-sub-actions"
 import { formatMatchTime, genderLabel } from "./find-sub-helpers"
+import { formatDisplayName } from "@/lib/utils"
 
 export function RegularCandidateRow({
     candidate: c,
@@ -25,9 +26,7 @@ export function RegularCandidateRow({
     onOpenContact: (userId: string, name: string) => void
     onLockIn: () => void
 }) {
-    const name = c.preferredName
-        ? `${c.preferredName} ${c.lastName}`
-        : `${c.firstName} ${c.lastName}`
+    const name = formatDisplayName(c.firstName, c.lastName, c.preferredName)
     return (
         <div className="flex items-start gap-3 rounded-md border p-3">
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-xs">
@@ -130,9 +129,7 @@ export function PermanentCandidateRow({
     onOpenContact: (userId: string, name: string) => void
     onLockIn: () => void
 }) {
-    const name = c.preferredName
-        ? `${c.preferredName} ${c.lastName}`
-        : `${c.firstName} ${c.lastName}`
+    const name = formatDisplayName(c.firstName, c.lastName, c.preferredName)
     return (
         <div className="flex items-start gap-3 rounded-md border p-3">
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-xs">

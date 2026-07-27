@@ -13,15 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-    Calendar,
-    Clock,
-    DollarSign,
-    Flag,
-    Lock,
-    MapPin,
-    Trophy,
-    Users
-} from "lucide-react"
+    RiCalendarLine,
+    RiFlagLine,
+    RiGroupLine,
+    RiLockLine,
+    RiMapPinLine,
+    RiMoneyDollarCircleLine,
+    RiTimeLine,
+    RiTrophyLine
+} from "@remixicon/react"
 import { TOURNAMENT_PHASE_CONFIG } from "@/lib/tournament-phases"
 
 interface PageParams {
@@ -146,18 +146,18 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                                 {t.name}
                             </h1>
                             <p className="flex items-center gap-2 text-lg text-muted-foreground">
-                                <Calendar className="size-5" />
+                                <RiCalendarLine className="size-5" />
                                 {fmtDate(t.tournament_date)}
                             </p>
                             {t.address && (
                                 <p className="flex items-center gap-2 text-muted-foreground">
-                                    <MapPin className="size-4" />
+                                    <RiMapPinLine className="size-4" />
                                     {t.address}
                                 </p>
                             )}
                         </div>
                         <div className="flex size-20 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg sm:size-24">
-                            <Trophy className="size-10 sm:size-12" />
+                            <RiTrophyLine className="size-10 sm:size-12" />
                         </div>
                     </div>
 
@@ -200,17 +200,17 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
             <section className="container mx-auto max-w-5xl px-4 py-12">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <FactCard
-                        icon={<Clock className="size-5" />}
+                        icon={<RiTimeLine className="size-5" />}
                         label="Check-In"
                         value={fmtTime(t.checkin_time)}
                     />
                     <FactCard
-                        icon={<Flag className="size-5" />}
+                        icon={<RiFlagLine className="size-5" />}
                         label="First Serve"
                         value={fmtTime(t.first_serve_time)}
                     />
                     <FactCard
-                        icon={<Trophy className="size-5" />}
+                        icon={<RiTrophyLine className="size-5" />}
                         label="Format"
                         value={`Pools of ${t.pool_size} → ${
                             t.elimination_format === "single"
@@ -219,7 +219,7 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                         } elim`}
                     />
                     <FactCard
-                        icon={<DollarSign className="size-5" />}
+                        icon={<RiMoneyDollarCircleLine className="size-5" />}
                         label={isLate ? "Late Team Fee" : "Team Fee"}
                         value={currentCost ? `$${currentCost}` : "TBA"}
                         hint={
@@ -230,14 +230,14 @@ export default async function TournamentMarketingPage({ params }: PageParams) {
                     />
                     {t.registration_close_date && (
                         <FactCard
-                            icon={<Lock className="size-5" />}
+                            icon={<RiLockLine className="size-5" />}
                             label="Registration Closes"
                             value={fmtShortDate(t.registration_close_date)}
                         />
                     )}
                     {t.roster_lock_date && (
                         <FactCard
-                            icon={<Users className="size-5" />}
+                            icon={<RiGroupLine className="size-5" />}
                             label="Roster Lock"
                             value={fmtShortDate(t.roster_lock_date)}
                         />

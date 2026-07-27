@@ -2,7 +2,7 @@
 // Extracted verbatim from create-week-3-form.tsx so the
 // algorithms are separate from the UI (and unit-testable).
 
-import { formatDisplayName } from "@/lib/utils"
+import { formatDisplayName, splitByGender } from "@/lib/utils"
 import type { Week3Candidate, Week3Division } from "./week3-types"
 
 export interface Week3PlacedPlayer extends Week3Candidate {
@@ -172,10 +172,9 @@ export function buildPlacementUnits(
             )
 
         const players = canPair ? [candidate, partner] : [candidate]
-        const maleCount = players.filter(
-            (player) => player.male === true
-        ).length
-        const nonMaleCount = players.length - maleCount
+        const { males, nonMales } = splitByGender(players)
+        const maleCount = males.length
+        const nonMaleCount = nonMales.length
         const averageScore =
             players.reduce((sum, player) => sum + player.placementScore, 0) /
             players.length
@@ -338,9 +337,7 @@ export function getDivisionTargets(
             division.teamCount * baseTeamSize + extraPerDivision[index]
     )
 
-    const totalNonMale = candidates.filter(
-        (candidate) => candidate.male !== true
-    ).length
+    const totalNonMale = splitByGender(candidates).nonMales.length
     const nonMaleRatio = totalPlayers > 0 ? totalNonMale / totalPlayers : 0
     const nonMaleTargets = sizeTargets.map((size) =>
         Math.min(size, Math.floor(size * nonMaleRatio))
@@ -743,10 +740,9 @@ export function buildTeamUnits(players: TeamPlayer[]): Array<{
                 ? [player, partner]
                 : [player]
 
-        const maleCount = pairPlayers.filter(
-            (entry) => entry.male === true
-        ).length
-        const nonMaleCount = pairPlayers.length - maleCount
+        const { males, nonMales } = splitByGender(pairPlayers)
+        const maleCount = males.length
+        const nonMaleCount = nonMales.length
         const newCount = pairPlayers.filter((entry) => entry.isNew).length
         const averageScore =
             pairPlayers.reduce((sum, entry) => sum + entry.placementScore, 0) /
@@ -869,7 +865,7 @@ export function buildTeamsForDivision(
         const backCourtCapacity =
             teamCapacities[BACK_START] + teamCapacities[BACK_START + 1]
 
-        const totalMaleForBack = players.filter((p) => p.male === true).length
+        const totalMaleForBack = splitByGender(players).males.length
         const nonMaleRatioForBack =
             players.length > 0
                 ? (players.length - totalMaleForBack) / players.length
@@ -1028,7 +1024,7 @@ export function buildTeamsForDivision(
     const units = buildTeamUnits(remaining)
     const snakeOrder = getSnakeOrder(units.length, teamCount)
 
-    const totalMale = players.filter((player) => player.male === true).length
+    const totalMale = splitByGender(players).males.length
     const teamMaleTargets = allocateByWeightWithCapacity(
         totalMale,
         teamCapacities,
@@ -1084,10 +1080,9 @@ export function buildTeamsForDivision(
             (sum, player) => sum + player.placementScore,
             0
         )
-        team.maleCount = team.players.filter(
-            (player) => player.male === true
-        ).length
-        team.nonMaleCount = team.players.length - team.maleCount
+        const { males, nonMales } = splitByGender(team.players)
+        team.maleCount = males.length
+        team.nonMaleCount = nonMales.length
         team.newCount = team.players.filter((player) => player.isNew).length
     }
 

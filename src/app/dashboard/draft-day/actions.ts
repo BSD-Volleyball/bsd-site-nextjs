@@ -20,6 +20,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { getCommissionerDivisionScope } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isGhostCaptain, getGhostDisplayName } from "@/lib/ghost-captain"
+import { formatDisplayName } from "@/lib/utils"
 
 export interface CaptainRow {
     teamId: number
@@ -157,8 +158,11 @@ export async function getDraftDayData(
 
         for (const row of rows) {
             const existing = divisionMap.get(row.divisionId)
-            const captainName =
-                `${row.preferredName || row.firstName} ${row.lastName}`.trim()
+            const captainName = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
             const captainRow: CaptainRow = {
                 teamId: row.teamId,
                 teamName: row.teamName,
@@ -553,7 +557,11 @@ export async function getDraftSheetData(
             pairUserRows.map((u) => [
                 u.id,
                 {
-                    name: `${u.preferredName || u.firstName} ${u.lastName}`.trim(),
+                    name: formatDisplayName(
+                        u.firstName,
+                        u.lastName,
+                        u.preferredName
+                    ),
                     oldId: u.oldId,
                     isMale: u.isMale
                 }
@@ -577,8 +585,11 @@ export async function getDraftSheetData(
         const divisionGhostTeamIndices = new Map<number, number[]>()
 
         for (const row of teamRows) {
-            const captainName =
-                `${row.preferredName || row.firstName} ${row.lastName}`.trim()
+            const captainName = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
 
             const divIsCoaches =
                 indDivMap.get(row.divisionId)?.isCoaches ?? false

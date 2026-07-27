@@ -10,6 +10,7 @@ import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import { formatPlayerName } from "@/lib/utils"
 
 export interface Season {
     id: number
@@ -126,15 +127,10 @@ export async function getUsers(): Promise<{
             .from(users)
             .orderBy(users.last_name, users.first_name)
 
-        const userList: User[] = allUsers.map((u) => {
-            const preferredPart = u.preferred_name
-                ? ` (${u.preferred_name})`
-                : ""
-            return {
-                id: u.id,
-                name: `${u.first_name}${preferredPart} ${u.last_name}`
-            }
-        })
+        const userList: User[] = allUsers.map((u) => ({
+            id: u.id,
+            name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
+        }))
 
         return { status: true, users: userList }
     } catch (error) {

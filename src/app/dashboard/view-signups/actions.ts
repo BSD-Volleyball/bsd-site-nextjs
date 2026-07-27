@@ -45,6 +45,7 @@ import type {
     PlayerDraftHistory,
     PlayerSignup
 } from "@/app/dashboard/player-lookup/actions"
+import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
 export interface SignupCsvEntry {
     oldId: number
@@ -188,10 +189,14 @@ export const getSignupsCsvData = withAction(
                     .where(inArray(users.id, pairPickIds))
 
                 for (const u of pairPickUsers) {
-                    const preferred = u.preferredName
-                        ? ` (${u.preferredName})`
-                        : ""
-                    map.set(u.id, `${u.firstName}${preferred} ${u.lastName}`)
+                    map.set(
+                        u.id,
+                        formatPlayerName(
+                            u.firstName,
+                            u.lastName,
+                            u.preferredName
+                        )
+                    )
                 }
                 return map
             })(),
@@ -409,9 +414,11 @@ export const getSignupsData = withAction(
 
         const pairPickNames = new Map<string, string>()
         for (const u of pairPickUsers) {
-            const displayName = u.preferredName
-                ? `${u.preferredName} ${u.lastName}`
-                : `${u.firstName} ${u.lastName}`
+            const displayName = formatDisplayName(
+                u.firstName,
+                u.lastName,
+                u.preferredName
+            )
             pairPickNames.set(u.id, displayName)
         }
 
@@ -436,9 +443,11 @@ export const getSignupsData = withAction(
         }
 
         for (const row of signupRows) {
-            const displayName = row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`
+            const displayName = formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            )
 
             const gender =
                 row.male === null ? "Unknown" : row.male ? "Male" : "Non-Male"

@@ -401,9 +401,11 @@ export async function getCreateWeek3Data(): Promise<{
             for (const row of pairRows) {
                 pairNameById.set(
                     row.id,
-                    row.preferredName
-                        ? `${row.preferredName} ${row.lastName}`
-                        : `${row.firstName} ${row.lastName}`
+                    formatDisplayName(
+                        row.firstName,
+                        row.lastName,
+                        row.preferredName
+                    )
                 )
             }
         }

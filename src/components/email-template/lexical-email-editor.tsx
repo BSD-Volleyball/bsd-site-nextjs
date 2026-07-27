@@ -27,7 +27,7 @@ import {
 } from "lexical"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { RiArrowGoBackLine, RiArrowGoForwardLine } from "@remixicon/react"
-import { List, ListOrdered } from "lucide-react"
+import { RiListOrdered, RiListUnordered } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import {
     Tooltip,
@@ -220,7 +220,7 @@ function Toolbar() {
                         onClick={toggleBulletList}
                         aria-label="Bullet List"
                     >
-                        <List className="h-4 w-4" />
+                        <RiListUnordered className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>Bullet List</TooltipContent>
@@ -236,7 +236,7 @@ function Toolbar() {
                         onClick={toggleNumberedList}
                         aria-label="Numbered List"
                     >
-                        <ListOrdered className="h-4 w-4" />
+                        <RiListOrdered className="h-4 w-4" />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>Numbered List</TooltipContent>

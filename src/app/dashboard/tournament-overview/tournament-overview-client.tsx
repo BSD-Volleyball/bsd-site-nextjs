@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -91,9 +91,9 @@ function TeamRow({
                 >
                     <div className="flex items-center gap-2">
                         {open ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <RiArrowRightSLine className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span className="font-medium">{team.name}</span>
                         <span className="text-muted-foreground text-sm">

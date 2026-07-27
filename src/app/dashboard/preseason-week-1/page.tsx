@@ -12,6 +12,7 @@ import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { PrintButton } from "./print-button"
 import type { Metadata } from "next"
+import { formatDisplayName } from "@/lib/utils"
 
 export const metadata: Metadata = {
     title: "Pre-Season Week 1"
@@ -123,9 +124,11 @@ export default async function DraftPreseasonWeek1Page() {
         .map((row) => ({
             userId: row.userId,
             oldId: row.oldId,
-            displayName: row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`,
+            displayName: formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            ),
             lastName: row.lastName,
             sessionNumber: row.sessionNumber,
             courtNumber: row.courtNumber
@@ -144,9 +147,11 @@ export default async function DraftPreseasonWeek1Page() {
         .map((row) => ({
             userId: row.userId,
             oldId: row.oldId,
-            displayName: row.preferredName
-                ? `${row.preferredName} ${row.lastName}`
-                : `${row.firstName} ${row.lastName}`,
+            displayName: formatDisplayName(
+                row.firstName,
+                row.lastName,
+                row.preferredName
+            ),
             lastName: row.lastName,
             sessionNumber: row.sessionNumber,
             courtNumber: row.courtNumber

@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { getAuditLogs, type AuditLogEntry } from "./actions"
+import { formatFullTimestamp } from "@/lib/date-utils"
 
 interface AuditLogListProps {
     initialEntries: AuditLogEntry[]
@@ -98,7 +99,7 @@ export function AuditLogList({
                                 className="border-b transition-colors last:border-0 hover:bg-accent/50"
                             >
                                 <td className="whitespace-nowrap px-4 py-2 text-muted-foreground">
-                                    {new Date(entry.createdAt).toLocaleString()}
+                                    {formatFullTimestamp(entry.createdAt)}
                                 </td>
                                 <td className="px-4 py-2 font-medium">
                                     {entry.userName ?? entry.userId}

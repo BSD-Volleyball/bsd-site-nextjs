@@ -45,6 +45,7 @@ import { eq, lt, gt, and, ne, or, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirector } from "@/lib/rbac"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
+import { formatDisplayName } from "@/lib/utils"
 
 const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
 const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
@@ -89,7 +90,7 @@ export async function getOldUsers(): Promise<UserOption[]> {
 
     return results.map((u) => ({
         id: u.id,
-        name: `${u.preferredName || u.firstName} ${u.lastName}`,
+        name: formatDisplayName(u.firstName, u.lastName, u.preferredName),
         email: u.email,
         phone: u.phone,
         createdAt: u.createdAt
@@ -128,7 +129,7 @@ export async function getNewUsers(): Promise<UserOption[]> {
 
     return results.map((u) => ({
         id: u.id,
-        name: `${u.preferredName || u.firstName} ${u.lastName}`,
+        name: formatDisplayName(u.firstName, u.lastName, u.preferredName),
         email: u.email,
         phone: u.phone,
         createdAt: u.createdAt

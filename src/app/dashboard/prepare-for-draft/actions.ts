@@ -33,6 +33,7 @@ import {
 } from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatDisplayName } from "@/lib/utils"
 
 // Maps homework round number → actual draft round number
 const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
@@ -830,7 +831,11 @@ export async function getPrepareForDraftData(
             const playerNameById = new Map(
                 signupRows.map((row) => [
                     row.userId,
-                    `${row.preferredName ?? row.firstName} ${row.lastName}`
+                    formatDisplayName(
+                        row.firstName,
+                        row.lastName,
+                        row.preferredName
+                    )
                 ])
             )
 

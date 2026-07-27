@@ -10,7 +10,7 @@ import {
     PopoverContent,
     PopoverTrigger
 } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
 import {
     RiAddLine,
     RiArrowDownSLine,
@@ -48,9 +48,11 @@ interface LocalSlot {
 }
 
 function getPlayerLabel(player: Week1EditablePlayer) {
-    const name = player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    const name = formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
     return `${name} (${Math.round(player.placementScore)})`
 }
 
@@ -256,9 +258,7 @@ function computeWeek1Diff(
     const playerName = (userId: string) => {
         const p = players.find((pl) => pl.id === userId)
         if (!p) return userId
-        return p.preferredName
-            ? `${p.preferredName} ${p.lastName}`
-            : `${p.firstName} ${p.lastName}`
+        return formatDisplayName(p.firstName, p.lastName, p.preferredName)
     }
 
     const oldByUser = new Map(

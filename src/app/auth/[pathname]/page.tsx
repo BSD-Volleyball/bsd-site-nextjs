@@ -1,6 +1,6 @@
 import { AuthView, AuthLoading } from "@daveyplate/better-auth-ui"
 import { authViewPaths } from "@daveyplate/better-auth-ui/server"
-import { ArrowLeft } from "lucide-react"
+import { RiArrowLeftLine } from "@remixicon/react"
 import Link from "next/link"
 import { WelcomeToast } from "@/components/layout/auth-loading-toast"
 import { Button } from "@/components/ui/button"
@@ -29,7 +29,7 @@ export default async function AuthPage({
                     className="hover:bg-secondary hover:text-secondary-foreground"
                     size="sm"
                 >
-                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    <RiArrowLeftLine className="mr-2 h-4 w-4" />
                     Back
                 </Button>
             </Link>

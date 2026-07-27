@@ -23,6 +23,7 @@ import { getTeamRosterWithSubs } from "@/lib/roster"
 import { getSeasonConfig } from "@/lib/site-config"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { formatDisplayName } from "@/lib/utils"
 
 interface RosterPlayer {
     id: string
@@ -165,7 +166,7 @@ export const getRosterData = withAction(
             for (const u of coachUserRows) {
                 coachNameMap.set(
                     u.id,
-                    `${u.preferredName || u.firstName} ${u.lastName}`
+                    formatDisplayName(u.firstName, u.lastName, u.preferredName)
                 )
             }
         }
@@ -226,9 +227,11 @@ export const getRosterData = withAction(
             }
             if (isSubbed) {
                 const orig = entry.originalUser
-                activePlayer.subForName = orig.preferredName
-                    ? `${orig.preferredName} ${orig.lastName}`
-                    : `${orig.firstName} ${orig.lastName}`
+                activePlayer.subForName = formatDisplayName(
+                    orig.firstName,
+                    orig.lastName,
+                    orig.preferredName
+                )
             }
             const arr = playersByTeam.get(entry.teamId) || []
             arr.push(activePlayer)

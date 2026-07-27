@@ -61,9 +61,11 @@ function getDisplayName(player: Week2Player): string {
 }
 
 function getShortName(player: Week2Player): string {
-    return player.preferredName
-        ? `${player.preferredName} ${player.lastName}`
-        : `${player.firstName} ${player.lastName}`
+    return formatDisplayName(
+        player.firstName,
+        player.lastName,
+        player.preferredName
+    )
 }
 
 interface PlayerSelectProps {
@@ -140,8 +142,11 @@ function PlayerCombobox({
         if (!search.trim()) return players
         const lower = search.toLowerCase()
         return players.filter((p) => {
-            const name =
-                `${p.preferredName ?? p.firstName} ${p.lastName}`.toLowerCase()
+            const name = formatDisplayName(
+                p.firstName,
+                p.lastName,
+                p.preferredName
+            ).toLowerCase()
             const fullName = `${p.firstName} ${p.lastName}`.toLowerCase()
             const oldId = String(p.oldId)
             return (
@@ -428,9 +433,11 @@ export function CoachWeek2HomeworkForm({
                                                             }
                                                             className="text-primary underline underline-offset-2 hover:opacity-80"
                                                         >
-                                                            {player.preferredName
-                                                                ? `${player.preferredName} ${player.lastName}`
-                                                                : `${player.firstName} ${player.lastName}`}
+                                                            {formatDisplayName(
+                                                                player.firstName,
+                                                                player.lastName,
+                                                                player.preferredName
+                                                            )}
                                                         </button>
                                                     </td>
                                                     <td className="px-4 py-2">

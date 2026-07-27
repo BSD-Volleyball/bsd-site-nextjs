@@ -2,6 +2,7 @@
 
 import { PlayerPic } from "./player-pic"
 import type { DraftHomeworkPlayer } from "./actions"
+import { formatDisplayName } from "@/lib/utils"
 
 interface SuggestedPlayerListProps {
     players: DraftHomeworkPlayer[]
@@ -31,9 +32,11 @@ export function SuggestedPlayerList({
     return (
         <div className="flex flex-wrap gap-3">
             {visible.map((player) => {
-                const displayName = player.preferredName
-                    ? `${player.preferredName} ${player.lastName}`
-                    : `${player.firstName} ${player.lastName}`
+                const displayName = formatDisplayName(
+                    player.firstName,
+                    player.lastName,
+                    player.preferredName
+                )
                 return (
                     <div
                         key={player.userId}

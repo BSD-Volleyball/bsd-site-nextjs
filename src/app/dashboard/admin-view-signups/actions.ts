@@ -21,6 +21,7 @@ import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
+import { formatPlayerName } from "@/lib/utils"
 import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -225,15 +226,14 @@ export async function getSeasonSignups(): Promise<{
                     .where(inArray(users.id, pairPickIds))
 
                 return new Map(
-                    pairPickUsers.map((u) => {
-                        const preferred = u.preferredName
-                            ? ` (${u.preferredName})`
-                            : ""
-                        return [
-                            u.id,
-                            `${u.firstName}${preferred} ${u.lastName}`
-                        ]
-                    })
+                    pairPickUsers.map((u) => [
+                        u.id,
+                        formatPlayerName(
+                            u.firstName,
+                            u.lastName,
+                            u.preferredName
+                        )
+                    ])
                 )
             })(),
             // Last draft information for each user
