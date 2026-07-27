@@ -394,6 +394,42 @@ export async function getLastDraftInfoByUser(
     return map
 }
 
+export type UserDraftHistoryEntry = {
+    seasonId: number
+    seasonYear: number
+    seasonName: string
+    divisionName: string
+    teamName: string
+    round: number
+    overall: number
+}
+
+/**
+ * Full draft history for a single user, ordered oldest season first
+ * (season year, then season id): one entry per draft placement with
+ * season/division/team context plus round and overall pick.
+ */
+export async function getDraftHistoryForUser(
+    userId: string
+): Promise<UserDraftHistoryEntry[]> {
+    return db
+        .select({
+            seasonId: seasons.id,
+            seasonYear: seasons.year,
+            seasonName: seasons.season,
+            divisionName: divisions.name,
+            teamName: teams.name,
+            round: drafts.round,
+            overall: drafts.overall
+        })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .innerJoin(seasons, eq(teams.season, seasons.id))
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .where(eq(drafts.user, userId))
+        .orderBy(seasons.year, seasons.id)
+}
+
 /**
  * Division each user is drafted into for the given season (name + level).
  */

@@ -13,12 +13,15 @@ import {
     seasons,
     divisions,
     individual_divisions,
-    week2Rosters,
-    userUnavailability
+    week2Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
-import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
+import { fetchPlayerScores } from "@/lib/player-score"
+import {
+    getUnavailableSignupIdsForEvent,
+    fetchRatingScoresForReturningPlayers
+} from "@/lib/week-rosters"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatDisplayName } from "@/lib/utils"
@@ -164,26 +167,12 @@ export async function getCreateWeek2Data(): Promise<{
 
         const excludedPlayers: Week2ExcludedPlayer[] = []
 
-        const unavailableSignupIds = new Set<number>()
-        if (tryout2Event) {
-            const allSignupIds = signupRowsRaw.map((row) => row.signupId)
-            if (allSignupIds.length > 0) {
-                const unavailRows = await db
-                    .select({
-                        signupId: userUnavailability.signup_id
-                    })
-                    .from(userUnavailability)
-                    .where(
-                        and(
-                            inArray(userUnavailability.signup_id, allSignupIds),
-                            eq(userUnavailability.event_id, tryout2Event.id)
-                        )
-                    )
-                for (const row of unavailRows) {
-                    unavailableSignupIds.add(row.signupId!)
-                }
-            }
-        }
+        const unavailableSignupIds = tryout2Event
+            ? await getUnavailableSignupIdsForEvent(
+                  tryout2Event.id,
+                  signupRowsRaw.map((row) => row.signupId)
+              )
+            : new Set<number>()
 
         const signupRows = signupRowsRaw.filter((row) => {
             if (!tryout2Event) {
@@ -251,14 +240,11 @@ export async function getCreateWeek2Data(): Promise<{
 
         const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
 
-        const existingPlayerIds = userIds.filter((id) => draftsByUser.has(id))
-        const ratingScoreByUser =
-            existingPlayerIds.length > 0
-                ? await fetchRatingBasedScores(
-                      existingPlayerIds,
-                      config.seasonId
-                  )
-                : new Map<string, number>()
+        const ratingScoreByUser = await fetchRatingScoresForReturningPlayers(
+            userIds,
+            (id) => draftsByUser.has(id),
+            config.seasonId
+        )
 
         const mutualPairMap = new Map<string, string>()
         const pairPickMap = new Map(

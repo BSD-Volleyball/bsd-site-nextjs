@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -346,13 +346,9 @@ export const deleteSignupEntry = withAction(
             return fail("Not authenticated.")
         }
 
+        const config = await requireSeasonConfig()
+
         try {
-            const config = await getSeasonConfig()
-
-            if (!config.seasonId) {
-                return fail("No current season found.")
-            }
-
             const [signupRecord] = await db
                 .select({
                     id: signups.id,

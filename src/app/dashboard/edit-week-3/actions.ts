@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
@@ -19,8 +19,7 @@ import {
     teams,
     divisions,
     drafts,
-    seasons,
-    userUnavailability
+    seasons
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import {
@@ -31,7 +30,11 @@ import {
 } from "@/lib/site-config"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
-import { fetchPlayerScores, fetchRatingBasedScores } from "@/lib/player-score"
+import { fetchPlayerScores } from "@/lib/player-score"
+import {
+    getUnavailableSignupIdsForEvent,
+    fetchRatingScoresForReturningPlayers
+} from "@/lib/week-rosters"
 import { site } from "@/config/site"
 
 export interface Week3EditablePlayer {
@@ -134,26 +137,12 @@ export async function getEditWeek3Data(): Promise<{
                 )
         ])
 
-        const unavailableSignupIds = new Set<number>()
-        if (tryout3Event) {
-            const allSignupIds = signupPlayersRaw.map((p) => p.signupId)
-            if (allSignupIds.length > 0) {
-                const unavailRows = await db
-                    .select({
-                        signupId: userUnavailability.signup_id
-                    })
-                    .from(userUnavailability)
-                    .where(
-                        and(
-                            inArray(userUnavailability.signup_id, allSignupIds),
-                            eq(userUnavailability.event_id, tryout3Event.id)
-                        )
-                    )
-                for (const row of unavailRows) {
-                    unavailableSignupIds.add(row.signupId!)
-                }
-            }
-        }
+        const unavailableSignupIds = tryout3Event
+            ? await getUnavailableSignupIdsForEvent(
+                  tryout3Event.id,
+                  signupPlayersRaw.map((p) => p.signupId)
+              )
+            : new Set<number>()
 
         const signupPlayers = signupPlayersRaw.filter((player) => {
             if (!tryout3Event) {
@@ -185,16 +174,11 @@ export async function getEditWeek3Data(): Promise<{
                 : Promise.resolve(new Map<string, number>())
         ])
 
-        const existingPlayerIds = userIds.filter((id) =>
-            draftRows.some((r) => r.userId === id)
+        const ratingScoreByUser = await fetchRatingScoresForReturningPlayers(
+            userIds,
+            (id) => draftRows.some((r) => r.userId === id),
+            config.seasonId
         )
-        const ratingScoreByUser =
-            existingPlayerIds.length > 0
-                ? await fetchRatingBasedScores(
-                      existingPlayerIds,
-                      config.seasonId
-                  )
-                : new Map<string, number>()
 
         const lastDivisionByUser = new Map<string, string>()
         const seasonsCountByUser = new Map<string, Set<number>>()
@@ -245,10 +229,7 @@ export const updateWeek3Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return fail("No current season found.")
-        }
+        const config = await requireSeasonConfig()
 
         const filledSlots = slots.filter((s) => s.userId)
         const uniqueUserIds = new Set(filledSlots.map((s) => s.userId))

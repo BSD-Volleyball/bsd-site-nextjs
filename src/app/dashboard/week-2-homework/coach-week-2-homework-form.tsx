@@ -538,6 +538,7 @@ export function CoachWeek2HomeworkForm({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
+                                    aria-label="Remove recommendation"
                                     onClick={() =>
                                         handleRemoveRecommendedUp(index)
                                     }
@@ -588,6 +589,7 @@ export function CoachWeek2HomeworkForm({
                                     type="button"
                                     variant="ghost"
                                     size="icon"
+                                    aria-label="Remove recommendation"
                                     onClick={() =>
                                         handleRemoveRecommendedDown(index)
                                     }

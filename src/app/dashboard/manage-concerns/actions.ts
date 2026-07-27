@@ -23,22 +23,17 @@ import {
     requireSession,
     requireSeasonConfig,
     requirePermission,
-    requireNonEmptyString,
-    ActionError
+    requireAnyPermission,
+    requireNonEmptyString
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 
 // Repliers/commenters may hold either permission; status changes need manage.
 async function requireConcernViewOrManage(): Promise<void> {
     const config = await requireSeasonConfig()
-    const canView = await hasPermissionBySession("concerns:view", {
+    await requireAnyPermission(["concerns:view", "concerns:manage"], {
         seasonId: config.seasonId
     })
-    if (canView) return
-    const canManage = await hasPermissionBySession("concerns:manage", {
-        seasonId: config.seasonId
-    })
-    if (!canManage) throw new ActionError("Unauthorized.")
 }
 
 export interface ConcernRow {

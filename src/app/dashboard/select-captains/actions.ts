@@ -438,6 +438,20 @@ export const createTeams = withAction(
                 return fail("Each captain must be unique across all teams.")
             }
 
+            // Every referenced user id must exist — otherwise the insert dies
+            // on an FK violation with a generic error message.
+            if (allCaptainIds.length > 0) {
+                const existingUsers = await db
+                    .select({ id: users.id })
+                    .from(users)
+                    .where(inArray(users.id, allCaptainIds))
+                if (existingUsers.length !== uniqueAllCaptainIds.size) {
+                    return fail(
+                        "One or more selected captains could not be found."
+                    )
+                }
+            }
+
             const realPrimaryCaptainIds = teamsToCreate
                 .map((team) => team.captainId || GHOST_CAPTAIN_ID)
                 .filter((id) => !isGhostCaptain(id))

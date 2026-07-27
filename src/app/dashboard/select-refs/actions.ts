@@ -12,7 +12,8 @@ import {
     requireSeasonConfig,
     requirePositiveInt,
     requireNonEmptyString,
-    requirePermission
+    requirePermission,
+    ActionError
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import { grantRole, revokeRole } from "@/lib/rbac"
@@ -328,7 +329,11 @@ export const updateSeasonRef = withAction(
         await requirePermission("schedule:manage")
         const id = requirePositiveInt(seasonRefId, "Season ref ID")
         if (typeof maxDivisionLevel !== "number" || maxDivisionLevel < 0) {
-            throw new Error("Max division level must be a non-negative integer")
+            // ActionError so withAction surfaces this message instead of the
+            // generic "Something went wrong."
+            throw new ActionError(
+                "Max division level must be a non-negative integer"
+            )
         }
         const level = Math.round(maxDivisionLevel)
 

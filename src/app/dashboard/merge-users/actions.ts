@@ -33,9 +33,15 @@ import {
     inboundEmailReplies,
     week1Rosters,
     week2Rosters,
-    week3Rosters
+    week3Rosters,
+    waiverAcceptances,
+    substitutions,
+    matchSubstitutions,
+    tournamentTeams,
+    tournamentRoster,
+    tournamentWaitlist
 } from "@/database/schema"
-import { eq, lt, gt, and, ne } from "drizzle-orm"
+import { eq, lt, gt, and, ne, or, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirector } from "@/lib/rbac"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
@@ -189,7 +195,24 @@ export const mergeUsers = withAction(
                     })
                     .where(eq(users.id, newUserId))
 
-                // signups
+                // signups: (season, player) is unique — where both accounts
+                // hold a signup for the same season (the typical duplicate-
+                // account case), keep the new user's row and drop the old
+                // duplicate (its user_unavailability children cascade away).
+                await tx
+                    .delete(signups)
+                    .where(
+                        and(
+                            eq(signups.player, oldUserId),
+                            inArray(
+                                signups.season,
+                                tx
+                                    .select({ season: signups.season })
+                                    .from(signups)
+                                    .where(eq(signups.player, newUserId))
+                            )
+                        )
+                    )
                 await tx
                     .update(signups)
                     .set({ player: newUserId })
@@ -224,6 +247,21 @@ export const mergeUsers = withAction(
                     .update(drafts)
                     .set({ user: newUserId })
                     .where(eq(drafts.user, oldUserId))
+                // waitlist: (season, user) is unique — same keep-new policy.
+                await tx
+                    .delete(waitlist)
+                    .where(
+                        and(
+                            eq(waitlist.user, oldUserId),
+                            inArray(
+                                waitlist.season,
+                                tx
+                                    .select({ season: waitlist.season })
+                                    .from(waitlist)
+                                    .where(eq(waitlist.user, newUserId))
+                            )
+                        )
+                    )
                 await tx
                     .update(waitlist)
                     .set({ user: newUserId })
@@ -232,11 +270,110 @@ export const mergeUsers = withAction(
                     .update(discounts)
                     .set({ user: newUserId })
                     .where(eq(discounts.user, oldUserId))
+                // evaluations: (season, player, evaluator) is unique — drop old
+                // rows that would collide after repointing either column.
+                const [oldEvalRows, newEvalRows] = await Promise.all([
+                    tx
+                        .select({
+                            id: evaluations.id,
+                            season: evaluations.season,
+                            player: evaluations.player,
+                            evaluator: evaluations.evaluator
+                        })
+                        .from(evaluations)
+                        .where(
+                            or(
+                                eq(evaluations.player, oldUserId),
+                                eq(evaluations.evaluator, oldUserId)
+                            )
+                        ),
+                    tx
+                        .select({
+                            season: evaluations.season,
+                            player: evaluations.player,
+                            evaluator: evaluations.evaluator
+                        })
+                        .from(evaluations)
+                        .where(
+                            or(
+                                eq(evaluations.player, newUserId),
+                                eq(evaluations.evaluator, newUserId)
+                            )
+                        )
+                ])
+                const evalKey = (r: {
+                    season: number
+                    player: string
+                    evaluator: string
+                }) => `${r.season}|${r.player}|${r.evaluator}`
+                const newEvalKeys = new Set(newEvalRows.map(evalKey))
+                const dupEvalIds = oldEvalRows
+                    .filter((r) =>
+                        newEvalKeys.has(
+                            evalKey({
+                                season: r.season,
+                                player:
+                                    r.player === oldUserId
+                                        ? newUserId
+                                        : r.player,
+                                evaluator:
+                                    r.evaluator === oldUserId
+                                        ? newUserId
+                                        : r.evaluator
+                            })
+                        )
+                    )
+                    .map((r) => r.id)
+                if (dupEvalIds.length > 0) {
+                    await tx
+                        .delete(evaluations)
+                        .where(inArray(evaluations.id, dupEvalIds))
+                }
                 await tx
                     .update(evaluations)
                     .set({ player: newUserId })
                     .where(eq(evaluations.player, oldUserId))
-                // userRoles: user_id CASCADEs on delete, but granted_by does not.
+                await tx
+                    .update(evaluations)
+                    .set({ evaluator: newUserId })
+                    .where(eq(evaluations.evaluator, oldUserId))
+                // userRoles: identity is unique (NULLS NOT DISTINCT) — drop old
+                // rows duplicating a role the new user already holds, then
+                // repoint the rest. (user_id CASCADEs on delete, but granted_by
+                // does not, so explicit handling stays.)
+                const [oldRoleRows, newRoleRows] = await Promise.all([
+                    tx
+                        .select({
+                            id: userRoles.id,
+                            role: userRoles.role,
+                            season_id: userRoles.season_id,
+                            division_id: userRoles.division_id
+                        })
+                        .from(userRoles)
+                        .where(eq(userRoles.user_id, oldUserId)),
+                    tx
+                        .select({
+                            role: userRoles.role,
+                            season_id: userRoles.season_id,
+                            division_id: userRoles.division_id
+                        })
+                        .from(userRoles)
+                        .where(eq(userRoles.user_id, newUserId))
+                ])
+                const roleKey = (r: {
+                    role: string
+                    season_id: number | null
+                    division_id: number | null
+                }) => `${r.role}|${r.season_id}|${r.division_id}`
+                const newRoleKeys = new Set(newRoleRows.map(roleKey))
+                const dupRoleIds = oldRoleRows
+                    .filter((r) => newRoleKeys.has(roleKey(r)))
+                    .map((r) => r.id)
+                if (dupRoleIds.length > 0) {
+                    await tx
+                        .delete(userRoles)
+                        .where(inArray(userRoles.id, dupRoleIds))
+                }
                 await tx
                     .update(userRoles)
                     .set({ user_id: newUserId })
@@ -246,7 +383,65 @@ export const mergeUsers = withAction(
                     .set({ granted_by: newUserId })
                     .where(eq(userRoles.granted_by, oldUserId))
 
-                // player_ratings
+                // player_ratings: (season, player, evaluator) unique — same
+                // collision handling as evaluations.
+                const [oldRatingRows, newRatingRows] = await Promise.all([
+                    tx
+                        .select({
+                            id: playerRatings.id,
+                            season: playerRatings.season,
+                            player: playerRatings.player,
+                            evaluator: playerRatings.evaluator
+                        })
+                        .from(playerRatings)
+                        .where(
+                            or(
+                                eq(playerRatings.player, oldUserId),
+                                eq(playerRatings.evaluator, oldUserId)
+                            )
+                        ),
+                    tx
+                        .select({
+                            season: playerRatings.season,
+                            player: playerRatings.player,
+                            evaluator: playerRatings.evaluator
+                        })
+                        .from(playerRatings)
+                        .where(
+                            or(
+                                eq(playerRatings.player, newUserId),
+                                eq(playerRatings.evaluator, newUserId)
+                            )
+                        )
+                ])
+                const ratingKey = (r: {
+                    season: number
+                    player: string
+                    evaluator: string
+                }) => `${r.season}|${r.player}|${r.evaluator}`
+                const newRatingKeys = new Set(newRatingRows.map(ratingKey))
+                const dupRatingIds = oldRatingRows
+                    .filter((r) =>
+                        newRatingKeys.has(
+                            ratingKey({
+                                season: r.season,
+                                player:
+                                    r.player === oldUserId
+                                        ? newUserId
+                                        : r.player,
+                                evaluator:
+                                    r.evaluator === oldUserId
+                                        ? newUserId
+                                        : r.evaluator
+                            })
+                        )
+                    )
+                    .map((r) => r.id)
+                if (dupRatingIds.length > 0) {
+                    await tx
+                        .delete(playerRatings)
+                        .where(inArray(playerRatings.id, dupRatingIds))
+                }
                 await tx
                     .update(playerRatings)
                     .set({ player: newUserId })
@@ -354,7 +549,21 @@ export const mergeUsers = withAction(
                     .set({ sent_by: newUserId })
                     .where(eq(inboundEmailReplies.sent_by, oldUserId))
 
-                // roster tables
+                // roster tables (week1 has a unique (season, user) index)
+                await tx
+                    .delete(week1Rosters)
+                    .where(
+                        and(
+                            eq(week1Rosters.user, oldUserId),
+                            inArray(
+                                week1Rosters.season,
+                                tx
+                                    .select({ season: week1Rosters.season })
+                                    .from(week1Rosters)
+                                    .where(eq(week1Rosters.user, newUserId))
+                            )
+                        )
+                    )
                 await tx
                     .update(week1Rosters)
                     .set({ user: newUserId })
@@ -367,6 +576,109 @@ export const mergeUsers = withAction(
                     .update(week3Rosters)
                     .set({ user: newUserId })
                     .where(eq(week3Rosters.user, oldUserId))
+
+                // waiver_acceptances: restrict FK + unique (user, waiver) —
+                // drop old acceptances of waivers the new user already accepted,
+                // repoint the rest so legal proof survives the merge.
+                await tx.delete(waiverAcceptances).where(
+                    and(
+                        eq(waiverAcceptances.user_id, oldUserId),
+                        inArray(
+                            waiverAcceptances.waiver_id,
+                            tx
+                                .select({
+                                    waiver_id: waiverAcceptances.waiver_id
+                                })
+                                .from(waiverAcceptances)
+                                .where(eq(waiverAcceptances.user_id, newUserId))
+                        )
+                    )
+                )
+                await tx
+                    .update(waiverAcceptances)
+                    .set({ user_id: newUserId })
+                    .where(eq(waiverAcceptances.user_id, oldUserId))
+
+                // substitution history (restrict FKs — must be repointed or the
+                // final delete fails)
+                await tx
+                    .update(substitutions)
+                    .set({ original_user: newUserId })
+                    .where(eq(substitutions.original_user, oldUserId))
+                await tx
+                    .update(substitutions)
+                    .set({ sub_user: newUserId })
+                    .where(eq(substitutions.sub_user, oldUserId))
+                await tx
+                    .update(substitutions)
+                    .set({ performed_by: newUserId })
+                    .where(eq(substitutions.performed_by, oldUserId))
+                await tx
+                    .update(matchSubstitutions)
+                    .set({ original_user: newUserId })
+                    .where(eq(matchSubstitutions.original_user, oldUserId))
+                await tx
+                    .update(matchSubstitutions)
+                    .set({ sub_user: newUserId })
+                    .where(eq(matchSubstitutions.sub_user, oldUserId))
+                await tx
+                    .update(matchSubstitutions)
+                    .set({ performed_by: newUserId })
+                    .where(eq(matchSubstitutions.performed_by, oldUserId))
+
+                // tournament participation. tournament_roster has a unique
+                // (tournament, user) — keep-new policy like signups. If both
+                // accounts CAPTAIN a team in the same tournament the merge
+                // fails loudly (that needs a human decision about which team
+                // survives).
+                await tx.delete(tournamentRoster).where(
+                    and(
+                        eq(tournamentRoster.user_id, oldUserId),
+                        inArray(
+                            tournamentRoster.tournament_id,
+                            tx
+                                .select({
+                                    tournament_id:
+                                        tournamentRoster.tournament_id
+                                })
+                                .from(tournamentRoster)
+                                .where(eq(tournamentRoster.user_id, newUserId))
+                        )
+                    )
+                )
+                await tx
+                    .update(tournamentRoster)
+                    .set({ user_id: newUserId })
+                    .where(eq(tournamentRoster.user_id, oldUserId))
+                await tx
+                    .update(tournamentRoster)
+                    .set({ added_by_user_id: newUserId })
+                    .where(eq(tournamentRoster.added_by_user_id, oldUserId))
+                await tx
+                    .update(tournamentTeams)
+                    .set({ captain_user_id: newUserId })
+                    .where(eq(tournamentTeams.captain_user_id, oldUserId))
+                await tx.delete(tournamentWaitlist).where(
+                    and(
+                        eq(tournamentWaitlist.user_id, oldUserId),
+                        inArray(
+                            tournamentWaitlist.tournament_id,
+                            tx
+                                .select({
+                                    tournament_id:
+                                        tournamentWaitlist.tournament_id
+                                })
+                                .from(tournamentWaitlist)
+                                .where(
+                                    eq(tournamentWaitlist.user_id, newUserId)
+                                )
+                        )
+                    )
+                )
+                await tx
+                    .update(tournamentWaitlist)
+                    .set({ user_id: newUserId })
+                    .where(eq(tournamentWaitlist.user_id, oldUserId))
 
                 // Finally delete the old user. Sessions, accounts,
                 // user_unavailability, season_refs, match_referees, and any

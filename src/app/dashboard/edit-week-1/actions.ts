@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
@@ -215,10 +215,7 @@ export const updateWeek1Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return fail("No current season found.")
-        }
+        const config = await requireSeasonConfig()
 
         const filledSlots = slots.filter((s) => s.userId)
         const userIds = filledSlots.map((s) => s.userId)

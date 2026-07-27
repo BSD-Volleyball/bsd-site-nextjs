@@ -60,6 +60,20 @@ export async function requirePermission(
     if (!allowed) throw new ActionError("Unauthorized.")
 }
 
+/**
+ * Passes when the caller holds ANY of the given permissions (checked in
+ * order). Throws ActionError("Unauthorized.") when none match.
+ */
+export async function requireAnyPermission(
+    permissions: Permission[],
+    context?: { seasonId?: number; divisionId?: number }
+): Promise<void> {
+    for (const permission of permissions) {
+        if (await hasPermissionBySession(permission, context)) return
+    }
+    throw new ActionError("Unauthorized.")
+}
+
 // ---------------------------------------------------------------------------
 // Season config helpers
 // ---------------------------------------------------------------------------

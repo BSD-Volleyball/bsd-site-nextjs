@@ -30,6 +30,7 @@ import {
     getCommissionerDivisionAccess,
     isCommissionerBySession
 } from "@/lib/rbac"
+import { getDraftHistoryForUser } from "@/lib/roster"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -145,22 +146,7 @@ export const getPotentialCaptainPlayerDetails = withAction(
             return fail("Player not found.")
         }
 
-        const draftHistory = await db
-            .select({
-                seasonId: seasons.id,
-                seasonYear: seasons.year,
-                seasonName: seasons.season,
-                divisionName: divisions.name,
-                teamName: teams.name,
-                round: drafts.round,
-                overall: drafts.overall
-            })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .innerJoin(seasons, eq(teams.season, seasons.id))
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(eq(drafts.user, playerId))
-            .orderBy(seasons.year, seasons.id)
+        const draftHistory = await getDraftHistoryForUser(playerId)
 
         let pairPickName: string | null = null
         let pairReason: string | null = null

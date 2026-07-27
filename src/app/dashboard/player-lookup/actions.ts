@@ -7,9 +7,7 @@ import {
     users,
     signups,
     seasons,
-    drafts,
     teams,
-    divisions,
     userUnavailability,
     seasonEvents,
     substitutions,
@@ -36,6 +34,7 @@ import type {
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
+import { getDraftHistoryForUser } from "@/lib/roster"
 
 export interface PlayerListItem {
     id: string
@@ -270,22 +269,7 @@ export const getPlayerDetails = withAction(
         )
 
         // Fetch draft history
-        const draftData = await db
-            .select({
-                seasonId: seasons.id,
-                seasonYear: seasons.year,
-                seasonName: seasons.season,
-                divisionName: divisions.name,
-                teamName: teams.name,
-                round: drafts.round,
-                overall: drafts.overall
-            })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .innerJoin(seasons, eq(teams.season, seasons.id))
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(eq(drafts.user, playerId))
-            .orderBy(seasons.year, seasons.id)
+        const draftData = await getDraftHistoryForUser(playerId)
 
         const playoffDates = getEventsByType(config, "playoff").map((e) =>
             formatEventDate(e.eventDate)
