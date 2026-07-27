@@ -64,7 +64,9 @@ export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
             .select({
                 id: teams.id,
                 name: teams.name,
-                captain: teams.captain
+                captain: teams.captain,
+                captain2: teams.captain2,
+                season: teams.season
             })
             .from(teams)
             .where(eq(teams.id, teamId))
@@ -76,6 +78,38 @@ export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
                 message: "Team not found.",
                 teamName: "",
                 players: []
+            }
+        }
+
+        // Access rule: admins see everything; past-season rosters are
+        // league-visible (they're shown in the Historical section anyway);
+        // current-season rosters are limited to that team's own players.
+        const isElevated = await isAdminOrDirectorBySession()
+        if (!isElevated) {
+            const config = await getSeasonConfig()
+            if (config.seasonId === team.season) {
+                const isCaptain =
+                    team.captain === session.user.id ||
+                    team.captain2 === session.user.id
+                const [membership] = await db
+                    .select({ id: drafts.id })
+                    .from(drafts)
+                    .where(
+                        and(
+                            eq(drafts.team, teamId),
+                            eq(drafts.user, session.user.id)
+                        )
+                    )
+                    .limit(1)
+                if (!isCaptain && !membership) {
+                    return {
+                        status: false,
+                        message:
+                            "Current-season rosters are only visible to that team's players.",
+                        teamName: "",
+                        players: []
+                    }
+                }
             }
         }
 

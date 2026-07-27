@@ -238,9 +238,7 @@ function canCommissionDraftDivision(
     return access.divisionRoleById[divisionId] === "commissioner"
 }
 
-export async function getDraftDivisionData(
-    accessibleDivisionIds?: number[]
-): Promise<{
+export async function getDraftDivisionData(): Promise<{
     status: boolean
     message?: string
     currentSeasonId: number
@@ -248,8 +246,12 @@ export async function getDraftDivisionData(
     divisions: DivisionOption[]
     users: UserOption[]
 }> {
-    const hasAccess = await checkDraftReadAccess()
-    if (!hasAccess) {
+    // Division scope is derived server-side. This action used to accept the
+    // caller's accessibleDivisionIds, which let a direct request pass
+    // `undefined` and read every division plus the undrafted-player list,
+    // bypassing commissioner division scoping.
+    const access = await hasDraftPageAccess()
+    if (!access.hasAccess) {
         return {
             status: false,
             message: "You don't have permission to access this page.",
@@ -259,6 +261,9 @@ export async function getDraftDivisionData(
             users: []
         }
     }
+    const accessibleDivisionIds = access.isLeagueWideCommissioner
+        ? undefined
+        : access.accessibleDivisionIds
 
     try {
         const config = await getSeasonConfig()

@@ -13,6 +13,9 @@ import {
 import { eq, and, inArray } from "drizzle-orm"
 import { headers } from "next/headers"
 import { getTeamRosterWithSubs } from "@/lib/roster"
+import { getSeasonConfig } from "@/lib/site-config"
+import { SEASON_PHASES } from "@/lib/season-phases"
+import { isAdminOrDirectorBySession } from "@/lib/rbac"
 
 interface RosterPlayer {
     id: string
@@ -68,6 +71,27 @@ export async function getRosterData(seasonId: number): Promise<RosterData> {
             message: "Invalid season.",
             seasonLabel: "",
             divisions: []
+        }
+    }
+
+    // Mirror the current-season phase gate that rosters/page.tsx applies in
+    // the UI: before the draft phase, current-season rosters don't exist for
+    // players yet, and a direct action call must not reveal them early.
+    // Historical seasons are league-visible. Admins bypass the gate.
+    const config = await getSeasonConfig()
+    if (config.seasonId === seasonId) {
+        const phaseIndex = SEASON_PHASES.indexOf(config.phase)
+        const visible =
+            phaseIndex >= SEASON_PHASES.indexOf("draft") &&
+            phaseIndex <= SEASON_PHASES.indexOf("complete")
+        if (!visible && !(await isAdminOrDirectorBySession())) {
+            return {
+                status: false,
+                message:
+                    "Current season rosters are available starting in the Draft phase.",
+                seasonLabel: "",
+                divisions: []
+            }
         }
     }
 

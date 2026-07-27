@@ -89,8 +89,7 @@ describe("removeUserRole", () => {
         // target is logged in but not an admin
         const result = await removeUserRole({
             userId: target.id,
-            roleRowId: roleRow.id,
-            role: "captain"
+            roleRowId: roleRow.id
         })
 
         expect(result).toEqual({ status: false, message: "Unauthorized" })
@@ -112,8 +111,7 @@ describe("removeUserRole", () => {
             .where(eq(userRoles.user_id, target.id))
         const result = await removeUserRole({
             userId: target.id,
-            roleRowId: roleRow.id,
-            role: "referee"
+            roleRowId: roleRow.id
         })
 
         expect(result.status).toBe(true)
@@ -145,8 +143,7 @@ describe("removeUserRole", () => {
             .where(eq(userRoles.user_id, target.id))
         const result = await removeUserRole({
             userId: target.id,
-            roleRowId: roleRow.id,
-            role: "admin"
+            roleRowId: roleRow.id
         })
 
         expect(result.status).toBe(true)

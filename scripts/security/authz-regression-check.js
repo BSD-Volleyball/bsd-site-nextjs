@@ -12,6 +12,7 @@ const guardPatterns = [
     /checkViewSignupsAccess\s*\(/,
     /checkAdminOrCommissionerAccess\s*\(/,
     /checkDraftReadAccess\s*\(/,
+    /hasDraftPageAccess\s*\(/,
     /getIsAdminOrDirector\s*\(/,
     /getIsCommissioner\s*\(/,
     /getHasAdministrativeAccess\s*\(/,
@@ -26,10 +27,9 @@ const guardPatterns = [
     /requirePermission\s*\(/
 ]
 
-const publicAllowlist = new Set([
-    "src/app/dashboard/pay-season/actions.ts:fetchSeasonConfig",
-    "src/app/dashboard/pay-season/actions.ts:getUsers"
-])
+// Server actions intentionally callable without authorization. Empty today —
+// keep it that way unless a public endpoint is a deliberate product decision.
+const publicAllowlist = new Set([])
 
 const strictExpectations = [
     {

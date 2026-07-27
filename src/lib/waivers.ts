@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm"
-import { db } from "@/database/db"
+import { db, type DbExecutor } from "@/database/db"
 import { waivers, waiverAcceptances } from "@/database/schema"
 
 export type ActiveWaiver = {
@@ -25,9 +25,10 @@ export async function getActiveWaiver(): Promise<ActiveWaiver | null> {
 export async function recordWaiverAcceptance(
     userId: string,
     waiverId: number,
-    acceptedAt: Date = new Date()
+    acceptedAt: Date = new Date(),
+    executor: DbExecutor = db
 ): Promise<void> {
-    await db
+    await executor
         .insert(waiverAcceptances)
         .values({
             user_id: userId,

@@ -1,4 +1,4 @@
-import { db } from "@/database/db"
+import { db, type DbExecutor } from "@/database/db"
 import { discounts } from "@/database/schema"
 import { eq, and, or, isNull, gt } from "drizzle-orm"
 
@@ -42,8 +42,11 @@ export async function getActiveDiscountForUser(
         : null
 }
 
-export async function markDiscountAsUsed(discountId: number): Promise<void> {
-    await db
+export async function markDiscountAsUsed(
+    discountId: number,
+    executor: DbExecutor = db
+): Promise<void> {
+    await executor
         .update(discounts)
         .set({ used: true })
         .where(eq(discounts.id, discountId))

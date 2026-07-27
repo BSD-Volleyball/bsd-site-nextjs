@@ -1,6 +1,5 @@
 "use server"
 
-import { formatPlayerName } from "@/lib/utils"
 import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
 import { auth } from "@/lib/auth"
@@ -8,11 +7,7 @@ import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { signups, users, waitlist, userUnavailability } from "@/database/schema"
 import { eq, and, count } from "drizzle-orm"
-import {
-    getSeasonConfig,
-    getCurrentSeasonAmount,
-    type SeasonConfig
-} from "@/lib/site-config"
+import { getSeasonConfig, getCurrentSeasonAmount } from "@/lib/site-config"
 import {
     getActiveDiscountForUser,
     markDiscountAsUsed,
@@ -144,30 +139,37 @@ async function validateFinalSignupAvailability(
     return { ok: true }
 }
 
-export async function fetchSeasonConfig(): Promise<SeasonConfig> {
-    return getSeasonConfig()
-}
-
-export async function getUsers(): Promise<{ id: string; name: string }[]> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) return []
-
-    const allUsers = await db
-        .select({
-            id: users.id,
-            first_name: users.first_name,
-            last_name: users.last_name,
-            preferred_name: users.preferred_name
-        })
-        .from(users)
-        .orderBy(users.last_name, users.first_name)
-
-    return allUsers.map((u) => {
-        return {
-            id: u.id,
-            name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
+// Rejects malformed signup payloads before any money moves. Server actions
+// are a network boundary — the wizard enforces these shapes client-side, but
+// a crafted request can send anything.
+async function validateSignupFormData(
+    formData: SignupFormData
+): Promise<string | null> {
+    if (
+        typeof formData.pairReason === "string" &&
+        formData.pairReason.length > 1000
+    ) {
+        return "Pair reason is too long."
+    }
+    if (
+        !Array.isArray(formData.unavailableEventIds) ||
+        formData.unavailableEventIds.some(
+            (id) => !Number.isInteger(id) || id <= 0
+        )
+    ) {
+        return "Invalid unavailability selection."
+    }
+    if (formData.pairPick) {
+        const [pairUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.id, formData.pairPick))
+            .limit(1)
+        if (!pairUser) {
+            return "Selected pair player could not be found."
         }
-    })
+    }
+    return null
 }
 
 export async function submitSeasonPayment(
@@ -191,6 +193,11 @@ export async function submitSeasonPayment(
             message:
                 "The waiver was updated while you were signing up. Please reload and re-confirm the current waiver."
         }
+    }
+
+    const validationError = await validateSignupFormData(formData)
+    if (validationError) {
+        return { status: false, message: validationError }
     }
 
     try {
@@ -258,57 +265,88 @@ export async function submitSeasonPayment(
         })
 
         if (response.payment) {
+            const payment = response.payment
             if (config.seasonId) {
-                await recordWaiverAcceptance(session.user.id, activeWaiver.id)
-
-                // Create signup record
-                const [newSignup] = await db
-                    .insert(signups)
-                    .values({
-                        season: config.seasonId,
-                        player: session.user.id,
-                        order_id: response.payment.id,
-                        amount_paid: finalAmount,
-                        age: formData.age,
-                        captain: formData.captain,
-                        pair: formData.pair,
-                        pair_pick: formData.pairPick,
-                        pair_reason: formData.pairReason,
-                        created_at: new Date()
-                    })
-                    .returning({ id: signups.id })
-
-                // Insert player unavailability rows
-                if (formData.unavailableEventIds.length > 0 && newSignup) {
-                    await db.insert(userUnavailability).values(
-                        formData.unavailableEventIds.map((eventId) => ({
-                            user_id: session.user.id,
-                            signup_id: newSignup.id,
-                            event_id: eventId
-                        }))
-                    )
-                }
-
-                await db
-                    .delete(waitlist)
-                    .where(
-                        and(
-                            eq(waitlist.season, config.seasonId),
-                            eq(waitlist.user, session.user.id)
+                const seasonId = config.seasonId
+                // The card is already charged (unrecoverable from here), so
+                // every follow-up write happens in one transaction: a player
+                // must never end up charged with half a registration.
+                try {
+                    await db.transaction(async (tx) => {
+                        await recordWaiverAcceptance(
+                            session.user.id,
+                            activeWaiver.id,
+                            undefined,
+                            tx
                         )
+
+                        const [newSignup] = await tx
+                            .insert(signups)
+                            .values({
+                                season: seasonId,
+                                player: session.user.id,
+                                order_id: payment.id,
+                                amount_paid: finalAmount,
+                                age: formData.age,
+                                captain: formData.captain,
+                                pair: formData.pair,
+                                pair_pick: formData.pairPick,
+                                pair_reason: formData.pairReason,
+                                created_at: new Date()
+                            })
+                            .returning({ id: signups.id })
+
+                        if (
+                            formData.unavailableEventIds.length > 0 &&
+                            newSignup
+                        ) {
+                            await tx.insert(userUnavailability).values(
+                                formData.unavailableEventIds.map((eventId) => ({
+                                    user_id: session.user.id,
+                                    signup_id: newSignup.id,
+                                    event_id: eventId
+                                }))
+                            )
+                        }
+
+                        await tx
+                            .delete(waitlist)
+                            .where(
+                                and(
+                                    eq(waitlist.season, seasonId),
+                                    eq(waitlist.user, session.user.id)
+                                )
+                            )
+
+                        if (discountId && discountInfo) {
+                            await markDiscountAsUsed(discountId, tx)
+                        }
+
+                        await logAuditEntry(
+                            {
+                                userId: session.user.id,
+                                action: "create",
+                                entityType: "signups",
+                                summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
+                            },
+                            tx
+                        )
+                    })
+                } catch (dbError) {
+                    console.error(
+                        `CRITICAL: Square payment ${payment.id} succeeded for user ` +
+                            `${session.user.id} (season ${seasonId}, $${finalAmount}) ` +
+                            "but the signup transaction failed — manual reconciliation required.",
+                        dbError
                     )
-
-                // Mark discount as used after successful payment
-                if (discountId && discountInfo) {
-                    await markDiscountAsUsed(discountId)
+                    return {
+                        status: false,
+                        message:
+                            "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually.",
+                        paymentId: payment.id,
+                        receiptUrl: payment.receiptUrl
+                    }
                 }
-
-                await logAuditEntry({
-                    userId: session.user.id,
-                    action: "create",
-                    entityType: "signups",
-                    summary: `Paid season signup ($${finalAmount}) for ${config.seasonName} ${config.seasonYear}${discountInfo ? ` (${discountInfo.percentage}% discount)` : ""}`
-                })
 
                 // Get user's first name for the email
                 const [user] = await db
@@ -382,6 +420,11 @@ export async function submitFreeSignup(
         }
     }
 
+    const validationError = await validateSignupFormData(formData)
+    if (validationError) {
+        return { status: false, message: validationError }
+    }
+
     try {
         // Validate the discount is 100% and belongs to this user
         const discount = await getActiveDiscountForUser(
@@ -430,53 +473,63 @@ export async function submitFreeSignup(
             }
         }
 
-        await recordWaiverAcceptance(session.user.id, activeWaiver.id)
-
-        // Create signup record with $0 amount
-        const [newSignup] = await db
-            .insert(signups)
-            .values({
-                season: config.seasonId,
-                player: session.user.id,
-                order_id: `FREE-${discountId}`,
-                amount_paid: "0",
-                age: formData.age,
-                captain: formData.captain,
-                pair: formData.pair,
-                pair_pick: formData.pairPick,
-                pair_reason: formData.pairReason,
-                created_at: new Date()
-            })
-            .returning({ id: signups.id })
-
-        // Insert player unavailability rows
-        if (formData.unavailableEventIds.length > 0 && newSignup) {
-            await db.insert(userUnavailability).values(
-                formData.unavailableEventIds.map((eventId) => ({
-                    user_id: session.user.id,
-                    signup_id: newSignup.id,
-                    event_id: eventId
-                }))
+        const seasonId = config.seasonId
+        await db.transaction(async (tx) => {
+            await recordWaiverAcceptance(
+                session.user.id,
+                activeWaiver.id,
+                undefined,
+                tx
             )
-        }
 
-        await db
-            .delete(waitlist)
-            .where(
-                and(
-                    eq(waitlist.season, config.seasonId),
-                    eq(waitlist.user, session.user.id)
+            // Create signup record with $0 amount
+            const [newSignup] = await tx
+                .insert(signups)
+                .values({
+                    season: seasonId,
+                    player: session.user.id,
+                    order_id: `FREE-${discountId}`,
+                    amount_paid: "0",
+                    age: formData.age,
+                    captain: formData.captain,
+                    pair: formData.pair,
+                    pair_pick: formData.pairPick,
+                    pair_reason: formData.pairReason,
+                    created_at: new Date()
+                })
+                .returning({ id: signups.id })
+
+            // Insert player unavailability rows
+            if (formData.unavailableEventIds.length > 0 && newSignup) {
+                await tx.insert(userUnavailability).values(
+                    formData.unavailableEventIds.map((eventId) => ({
+                        user_id: session.user.id,
+                        signup_id: newSignup.id,
+                        event_id: eventId
+                    }))
                 )
+            }
+
+            await tx
+                .delete(waitlist)
+                .where(
+                    and(
+                        eq(waitlist.season, seasonId),
+                        eq(waitlist.user, session.user.id)
+                    )
+                )
+
+            await markDiscountAsUsed(discountId, tx)
+
+            await logAuditEntry(
+                {
+                    userId: session.user.id,
+                    action: "create",
+                    entityType: "signups",
+                    summary: `Free signup for ${config.seasonName} ${config.seasonYear} (100% discount #${discountId})`
+                },
+                tx
             )
-
-        // Mark discount as used
-        await markDiscountAsUsed(discountId)
-
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "create",
-            entityType: "signups",
-            summary: `Free signup for ${config.seasonName} ${config.seasonYear} (100% discount #${discountId})`
         })
 
         // Get user's first name for the email

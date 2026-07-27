@@ -21,11 +21,7 @@ export default async function DraftDivisionPage() {
         redirect("/dashboard")
     }
 
-    const result = await getDraftDivisionData(
-        access.isLeagueWideCommissioner
-            ? undefined
-            : access.accessibleDivisionIds
-    )
+    const result = await getDraftDivisionData()
 
     if (!result.status) {
         return (

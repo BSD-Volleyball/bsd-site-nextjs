@@ -5,7 +5,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CaptainPairingForm } from "./captain-pairing-form"
-import { getUsers } from "@/app/dashboard/pay-season/actions"
+import { listUserNames } from "@/lib/user-directory"
 import { canEditPreferences } from "./utils"
 import type { Metadata } from "next"
 
@@ -62,7 +62,7 @@ export default async function CaptainPairingPage() {
         )
     }
 
-    const users = await getUsers()
+    const users = await listUserNames()
 
     return (
         <div className="space-y-6">

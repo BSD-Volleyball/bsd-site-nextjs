@@ -1,7 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
@@ -14,7 +14,7 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import type { Role } from "@/lib/permissions"
+import { isValidRole, type Role } from "@/lib/permissions"
 
 export interface UserRoleAssignment {
     id: number
@@ -171,30 +171,37 @@ export const addUserRole = withAction(
         const isAdmin = await isAdminOrDirectorBySession()
         if (!isAdmin) return fail("Unauthorized")
 
-        try {
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            await grantRole(data.userId, data.role, {
-                seasonId: data.seasonId,
-                divisionId: data.divisionId,
-                grantedBy: session?.user?.id
-            })
+        // `data.role` is typed as Role but arrives over the network — a
+        // crafted request can send any string into user_roles.
+        if (!isValidRole(data.role)) return fail("Invalid role.")
+        const seasonId =
+            data.seasonId != null
+                ? requirePositiveInt(data.seasonId, "season ID")
+                : undefined
+        const divisionId =
+            data.divisionId != null
+                ? requirePositiveInt(data.divisionId, "division ID")
+                : undefined
 
-            await logAuditEntry({
-                userId: session?.user?.id ?? "unknown",
-                action: "create",
-                entityType: "user_roles",
-                entityId: data.userId,
-                summary: `Granted role "${data.role}" to user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
-            })
+        const session = await auth.api.getSession({
+            headers: await headers()
+        })
+        await grantRole(data.userId, data.role, {
+            seasonId,
+            divisionId,
+            grantedBy: session?.user?.id
+        })
 
-            revalidatePath("/dashboard/manage-roles")
-            return ok(undefined, "Role granted successfully.")
-        } catch (error) {
-            console.error("Error granting role:", error)
-            return fail("Failed to grant role.")
-        }
+        await logAuditEntry({
+            userId: session?.user?.id ?? "unknown",
+            action: "create",
+            entityType: "user_roles",
+            entityId: data.userId,
+            summary: `Granted role "${data.role}" to user ${data.userId}${seasonId ? ` for season ${seasonId}` : ""}${divisionId ? `, division ${divisionId}` : ""}`
+        })
+
+        revalidatePath("/dashboard/manage-roles")
+        return ok(undefined, "Role granted successfully.")
     }
 )
 
@@ -202,38 +209,50 @@ export const removeUserRole = withAction(
     async (data: {
         userId: string
         roleRowId: number
-        role: Role
-        seasonId?: number
-        divisionId?: number
     }): Promise<ActionResult> => {
         const isAdmin = await isAdminOrDirectorBySession()
         if (!isAdmin) return fail("Unauthorized")
 
-        try {
-            // Delete by row ID for precision
-            await db.delete(userRoles).where(eq(userRoles.id, data.roleRowId))
+        const roleRowId = requirePositiveInt(data.roleRowId, "role row ID")
 
-            const session = await auth.api.getSession({
-                headers: await headers()
+        // Load the row first: the audit entry must reflect what was actually
+        // deleted (not client-supplied labels), and the row must belong to
+        // the user named in the request.
+        const [row] = await db
+            .select({
+                user_id: userRoles.user_id,
+                role: userRoles.role,
+                season_id: userRoles.season_id,
+                division_id: userRoles.division_id
             })
-            await logAuditEntry({
-                userId: session?.user?.id ?? "unknown",
-                action: "delete",
-                entityType: "user_roles",
-                entityId: data.userId,
-                summary: `Revoked role "${data.role}" from user ${data.userId}${data.seasonId ? ` for season ${data.seasonId}` : ""}${data.divisionId ? `, division ${data.divisionId}` : ""}`
-            })
+            .from(userRoles)
+            .where(eq(userRoles.id, roleRowId))
+            .limit(1)
 
-            // Invalidate sessions if an admin role was removed
-            if (data.role === "admin") {
-                await invalidateAllSessionsForUser(data.userId)
-            }
-
-            revalidatePath("/dashboard/manage-roles")
-            return ok(undefined, "Role removed successfully.")
-        } catch (error) {
-            console.error("Error removing role:", error)
-            return fail("Failed to remove role.")
+        if (!row) return fail("Role assignment not found.")
+        if (row.user_id !== data.userId) {
+            return fail("Role assignment does not belong to that user.")
         }
+
+        await db.delete(userRoles).where(eq(userRoles.id, roleRowId))
+
+        const session = await auth.api.getSession({
+            headers: await headers()
+        })
+        await logAuditEntry({
+            userId: session?.user?.id ?? "unknown",
+            action: "delete",
+            entityType: "user_roles",
+            entityId: row.user_id,
+            summary: `Revoked role "${row.role}" from user ${row.user_id}${row.season_id ? ` for season ${row.season_id}` : ""}${row.division_id ? `, division ${row.division_id}` : ""}`
+        })
+
+        // Any revoke through this admin action reduces privilege, so force a
+        // fresh login rather than letting the elevated session ride out its
+        // natural expiry (AGENTS.md security rule; previously admin-only).
+        await invalidateAllSessionsForUser(row.user_id)
+
+        revalidatePath("/dashboard/manage-roles")
+        return ok(undefined, "Role removed successfully.")
     }
 )

@@ -1,4 +1,3 @@
-import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import {
     signups,
@@ -12,8 +11,7 @@ import {
     seasonRefs
 } from "@/database/schema"
 import { eq, and, or } from "drizzle-orm"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
+import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     getEventsByType,
@@ -31,12 +29,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function MyAvailabilityPage() {
-    const session = await auth.api.getSession({
-        headers: await headers()
-    })
-    if (!session) {
-        redirect("/login")
-    }
+    const session = await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
 

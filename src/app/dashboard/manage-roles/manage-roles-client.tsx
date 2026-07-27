@@ -142,10 +142,7 @@ export function ManageRolesClient({
         startTransition(async () => {
             const result = await removeUserRole({
                 userId: selectedUser.id,
-                roleRowId: assignment.id,
-                role: assignment.role as Role,
-                seasonId: assignment.season_id ?? undefined,
-                divisionId: assignment.division_id ?? undefined
+                roleRowId: assignment.id
             })
             if (result.status) {
                 toast.success(result.message)

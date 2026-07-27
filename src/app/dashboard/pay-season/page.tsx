@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { WizardForm } from "./wizard-form"
-import { getUsers } from "./actions"
 import type { Metadata } from "next"
+import { listUserNames } from "@/lib/user-directory"
 import {
     getSeasonConfig,
     getCurrentSeasonAmount,
@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic"
 export default async function PaySeasonPage() {
     const config = await getSeasonConfig()
     const seasonLabel = formatSeasonLabel(config)
-    const users = await getUsers()
+    const users = await listUserNames()
     const activeWaiver = await getActiveWaiver()
 
     // Get user's discount if logged in

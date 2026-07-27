@@ -1,15 +1,18 @@
-import { db } from "@/database/db"
+import { db, type DbExecutor } from "@/database/db"
 import { auditLog } from "@/database/schema"
 
-export async function logAuditEntry(params: {
-    userId: string
-    action: string
-    entityType?: string
-    entityId?: string | number
-    summary: string
-}): Promise<void> {
+export async function logAuditEntry(
+    params: {
+        userId: string
+        action: string
+        entityType?: string
+        entityId?: string | number
+        summary: string
+    },
+    executor: DbExecutor = db
+): Promise<void> {
     try {
-        await db.insert(auditLog).values({
+        await executor.insert(auditLog).values({
             user: params.userId,
             action: params.action,
             entity_type: params.entityType ?? null,
