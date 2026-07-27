@@ -62,7 +62,11 @@ vi.mock("@/lib/postmark", () => ({
     sendBroadcastEmails: vi.fn(async (opts: { recipients: unknown[] }) => ({
         sent: opts.recipients.length,
         failed: 0
-    }))
+    })),
+    // Pure classifier — keep the real behaviour so suppression logic under test
+    // is exercised rather than stubbed away.
+    isPermanentBounceType: (type: string | null | undefined) =>
+        type === "HardBounce" || type === "SpamComplaint"
 }))
 
 vi.mock("@/lib/r2", () => ({

@@ -15,7 +15,7 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
-import { sendBatchEmails } from "@/lib/postmark"
+import { isPermanentBounceType, sendBatchEmails } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
     buildInboundEmailNotificationHtml,
@@ -694,7 +694,19 @@ async function handleBounce(payload: PostmarkBouncePayload) {
 
     const isHardBounce = payload.Type === "HardBounce"
 
-    // Record suppression for all bounce types
+    // Temporary failures (SoftBounce, Transient, and notably Gmail's
+    // rate-limiting SpamNotification) must not create a suppression row —
+    // filterSuppressed() treats any row as permanent, so recording one here
+    // silently removes a valid recipient from every future broadcast. Postmark
+    // retains the full bounce history for diagnostics either way.
+    if (!isPermanentBounceType(payload.Type)) {
+        console.log(
+            `[postmark-webhook] Transient bounce (not suppressing): ${email} type=${payload.Type} stream=${streamId}`
+        )
+        return
+    }
+
+    // Record suppression for permanent bounce types only
     const existing = await db
         .select({ id: emailSuppressions.id })
         .from(emailSuppressions)
@@ -725,7 +737,8 @@ async function handleBounce(payload: PostmarkBouncePayload) {
         })
     }
 
-    // Only update email_status for hard bounces (soft bounces are transient)
+    // Only hard bounces mark the address itself dead; a SpamComplaint reaching
+    // this point gets its email_status from the dedicated SpamComplaint webhook.
     if (isHardBounce) {
         await db
             .update(users)
