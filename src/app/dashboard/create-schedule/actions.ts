@@ -307,6 +307,13 @@ export const writeRegularSeasonSchedule = withAction(
                 return fail(data.message || "Failed to load schedule data.")
             }
 
+            // The schedule is always built from the CURRENT season's teams, so
+            // a stale seasonId from the client must not tag the rows with a
+            // different season.
+            if (seasonId !== data.seasonId) {
+                return fail("Season mismatch — reload the page and try again.")
+            }
+
             // Check that teams exist
             const totalTeams = data.divisions.reduce(
                 (sum, d) => sum + d.teams.length,
@@ -405,6 +412,13 @@ export const writePlayoffSchedule = withAction(
             const data = await getCreateScheduleData()
             if (!data.status) {
                 return fail(data.message || "Failed to load schedule data.")
+            }
+
+            // The schedule is always built from the CURRENT season's teams, so
+            // a stale seasonId from the client must not tag the rows with a
+            // different season.
+            if (seasonId !== data.seasonId) {
+                return fail("Season mismatch — reload the page and try again.")
             }
 
             const totalTeams = data.divisions.reduce(

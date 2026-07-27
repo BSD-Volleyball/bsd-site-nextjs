@@ -68,9 +68,13 @@ test.describe("player signup after team registration closes", () => {
         await expect(
             page.getByText("Team registration is closed, but you can still")
         ).toBeVisible()
-        // Sidebar link is gated on canPlayerSignUp, not team registration
+        // Sidebar link is gated on canPlayerSignUp, not team registration.
+        // Scoped to the sidebar: the server-rendered nav and the page body
+        // both expose this link now, so an unscoped query is ambiguous.
         await expect(
-            page.getByRole("link", { name: "Sign Up as a Player" })
+            page.locator('[data-sidebar="menu-button"]', {
+                hasText: "Sign Up as a Player"
+            })
         ).toBeVisible()
 
         await page.getByRole("button", { name: "Sign Up as a Player" }).click()

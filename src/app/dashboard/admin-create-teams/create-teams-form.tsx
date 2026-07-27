@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
     Card,
     CardContent,
@@ -189,8 +190,6 @@ export function CreateTeamsForm({
 }: CreateTeamsFormProps) {
     const _router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [success, setSuccess] = useState<string | null>(null)
 
     const [seasonId, setSeasonId] = useState<string>("")
     const [divisionId, setDivisionId] = useState<string>("")
@@ -256,16 +255,14 @@ export function CreateTeamsForm({
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setError(null)
-        setSuccess(null)
 
         if (!seasonId) {
-            setError("Please select a season.")
+            toast.error("Please select a season.")
             return
         }
 
         if (!divisionId) {
-            setError("Please select a division.")
+            toast.error("Please select a division.")
             return
         }
 
@@ -278,11 +275,11 @@ export function CreateTeamsForm({
         // Check all captains are selected
         for (let i = 0; i < numTeams; i++) {
             if (!teamsToCreate[i].captainId) {
-                setError(`Please select a captain for Team ${i + 1}.`)
+                toast.error(`Please select a captain for Team ${i + 1}.`)
                 return
             }
             if (!teamsToCreate[i].teamName.trim()) {
-                setError(`Please enter a name for Team ${i + 1}.`)
+                toast.error(`Please enter a name for Team ${i + 1}.`)
                 return
             }
         }
@@ -296,7 +293,7 @@ export function CreateTeamsForm({
         )
 
         if (result.status) {
-            setSuccess(result.message ?? null)
+            toast.success(result.message ?? "Teams created.")
             // Reset form
             setCaptains(
                 Array(6)
@@ -304,7 +301,7 @@ export function CreateTeamsForm({
                     .map(() => ({ captainId: null, teamName: "" }))
             )
         } else {
-            setError(result.message)
+            toast.error(result.message)
         }
 
         setIsLoading(false)
@@ -466,18 +463,6 @@ export function CreateTeamsForm({
                             )}
                         </div>
                     </div>
-
-                    {error && (
-                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                            {error}
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="rounded-md bg-green-50 p-3 text-green-800 text-sm dark:bg-green-950 dark:text-green-200">
-                            {success}
-                        </div>
-                    )}
                 </CardContent>
                 <CardFooter className="border-t pt-6">
                     <Button

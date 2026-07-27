@@ -8,6 +8,10 @@ import {
     seasons,
     signups,
     teams,
+    tournamentDivisions,
+    tournamentRoster,
+    tournamentTeams,
+    tournaments,
     waivers,
     waitlist
 } from "@/database/schema"
@@ -144,6 +148,77 @@ export async function addToWaitlist(
         .insert(waitlist)
         .values({ created_at: new Date(), ...values })
         .returning()
+    return row
+}
+
+// --- Tournaments ---------------------------------------------------------
+// tournaments.code has a unique constraint, so each factory call needs a
+// distinct code unless the test overrides it explicitly.
+let tournamentCodeCounter = 0
+
+export async function createTournament(
+    overrides: Partial<typeof tournaments.$inferInsert> = {}
+) {
+    const [row] = await db
+        .insert(tournaments)
+        .values({
+            code: `TTOUR${++tournamentCodeCounter}`,
+            year: 2026,
+            name: "Test Tournament",
+            phase: "registration_open",
+            tournament_date: "2026-08-01",
+            cost: "50.00",
+            tournament_type: "coed",
+            pool_size: 3,
+            elimination_format: "single",
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createTournamentDivision(
+    values: Pick<
+        typeof tournamentDivisions.$inferInsert,
+        "tournament_id" | "division_id"
+    > &
+        Partial<typeof tournamentDivisions.$inferInsert>
+) {
+    const [row] = await db
+        .insert(tournamentDivisions)
+        .values({
+            team_count: 4,
+            male_per_team: 3,
+            non_male_per_team: 3,
+            sort_order: 0,
+            ...values
+        })
+        .returning()
+    return row
+}
+
+export async function createTournamentTeam(
+    values: Pick<
+        typeof tournamentTeams.$inferInsert,
+        "tournament_id" | "preferred_division_id" | "captain_user_id"
+    > &
+        Partial<typeof tournamentTeams.$inferInsert>
+) {
+    const [row] = await db
+        .insert(tournamentTeams)
+        .values({ name: "Test Tournament Team", ...values })
+        .returning()
+    return row
+}
+
+export async function addToTournamentRoster(
+    values: Pick<
+        typeof tournamentRoster.$inferInsert,
+        "tournament_id" | "team_id" | "user_id" | "added_by_user_id"
+    > &
+        Partial<typeof tournamentRoster.$inferInsert>
+) {
+    const [row] = await db.insert(tournamentRoster).values(values).returning()
     return row
 }
 

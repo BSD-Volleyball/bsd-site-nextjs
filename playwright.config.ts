@@ -27,7 +27,10 @@ export default defineConfig({
     // Mutating flows share one database; keep runs deterministic
     workers: 1,
     forbidOnly: !!process.env.CI,
-    reporter: [["list"]],
+    retries: process.env.CI ? 2 : 0,
+    reporter: process.env.CI
+        ? [["list"], ["html", { open: "never" }]]
+        : [["list"]],
     // Generous ceilings: turbopack cold-compiles routes on first visit
     timeout: 60_000,
     expect: { timeout: 10_000 },

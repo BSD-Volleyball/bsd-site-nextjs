@@ -3,6 +3,7 @@
 import { StatusBanner } from "@/components/ui/status-banner"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { writeRegularSeasonSchedule, writePlayoffSchedule } from "./actions"
 import type { DivisionWithTeams } from "./actions"
@@ -148,14 +149,6 @@ export function CreateScheduleClient({
     playoffDates
 }: Props) {
     const router = useRouter()
-    const [regularStatus, setRegularStatus] = useState<{
-        type: "success" | "error"
-        message: string
-    } | null>(null)
-    const [playoffStatus, setPlayoffStatus] = useState<{
-        type: "success" | "error"
-        message: string
-    } | null>(null)
     const [regularLoading, setRegularLoading] = useState(false)
     const [playoffLoading, setPlayoffLoading] = useState(false)
 
@@ -205,21 +198,18 @@ export function CreateScheduleClient({
 
     async function handleWriteRegularSeason() {
         setRegularLoading(true)
-        setRegularStatus(null)
         try {
             const result = await writeRegularSeasonSchedule(seasonId)
-            setRegularStatus({
-                type: result.status ? "success" : "error",
-                message: result.message ?? ""
-            })
             if (result.status) {
+                toast.success(
+                    result.message ?? "Regular season schedule written."
+                )
                 router.refresh()
+            } else {
+                toast.error(result.message ?? "Failed to write schedule.")
             }
         } catch {
-            setRegularStatus({
-                type: "error",
-                message: "An unexpected error occurred."
-            })
+            toast.error("An unexpected error occurred.")
         } finally {
             setRegularLoading(false)
         }
@@ -227,21 +217,18 @@ export function CreateScheduleClient({
 
     async function handleWritePlayoffSchedule() {
         setPlayoffLoading(true)
-        setPlayoffStatus(null)
         try {
             const result = await writePlayoffSchedule(seasonId)
-            setPlayoffStatus({
-                type: result.status ? "success" : "error",
-                message: result.message ?? ""
-            })
             if (result.status) {
+                toast.success(result.message ?? "Playoff schedule written.")
                 router.refresh()
+            } else {
+                toast.error(
+                    result.message ?? "Failed to write playoff schedule."
+                )
             }
         } catch {
-            setPlayoffStatus({
-                type: "error",
-                message: "An unexpected error occurred."
-            })
+            toast.error("An unexpected error occurred.")
         } finally {
             setPlayoffLoading(false)
         }
@@ -408,18 +395,6 @@ export function CreateScheduleClient({
                     )
                 })}
 
-                {regularStatus && (
-                    <div
-                        className={`rounded-md p-4 ${
-                            regularStatus.type === "success"
-                                ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                        }`}
-                    >
-                        {regularStatus.message}
-                    </div>
-                )}
-
                 <Button
                     onClick={handleWriteRegularSeason}
                     disabled={regularLoading || !hasTeams || !allTeamsReady}
@@ -564,18 +539,6 @@ export function CreateScheduleClient({
                             </div>
                         )
                     }
-                )}
-
-                {playoffStatus && (
-                    <div
-                        className={`rounded-md p-4 ${
-                            playoffStatus.type === "success"
-                                ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                                : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-                        }`}
-                    >
-                        {playoffStatus.message}
-                    </div>
                 )}
 
                 <Button

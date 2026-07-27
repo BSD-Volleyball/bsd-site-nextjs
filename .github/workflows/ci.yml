@@ -54,6 +54,57 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          # Build needs a reachable-looking DATABASE_URL for module init; no
-          # queries run at build time (pages are force-dynamic).
-          DATABASE_URL: postgres://bsd_test:bsd_test@localhost:5432/postgres
+          # The marketing pages statically prerender at build time and query
+          # the DB, so the build needs a migrated database — reuse the test
+          # template built by the integration suite.
+          DATABASE_URL: postgres://bsd_test:bsd_test@localhost:5432/bsd_test_template
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: bsd_test
+          POSTGRES_PASSWORD: bsd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bsd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create e2e database
+        run: PGPASSWORD=bsd_test psql -h localhost -U bsd_test -d postgres -c "CREATE DATABASE bsd_e2e"
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        run: pnpm test:e2e
+        env:
+          E2E_DATABASE_URL: postgres://bsd_test:bsd_test@localhost:5432/bsd_e2e
+          E2E_BASE_URL: http://localhost:3100
+          BETTER_AUTH_SECRET: e2e-ci-secret-not-used-anywhere-real
+          SQUARE_ENVIRONMENT: sandbox
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
