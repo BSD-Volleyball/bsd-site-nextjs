@@ -103,6 +103,7 @@ npx @better-auth/cli generate
   - ~~`users.preffered_name`~~ → migrated to `users.preferred_name`
   - ~~`matchs` table~~ → migrated to `matches` table
 - The `user_roles` table is the authoritative source for role assignments. Schema: `(id, user_id, role, season_id, division_id, granted_by, granted_at)`. `season_id = NULL` means a global/permanent role; `division_id = NULL` means league-wide for that season.
+- **Default conversions are breaking**: moving a column default from app-side (`$defaultFn`) to DB-side (`.default()`/`.defaultNow()`) changes generated inserts to emit `DEFAULT` — code deployed before the migration runs will violate NOT NULL constraints (this stranded three paid signups on 2026-07-27). Apply the migration to prod BEFORE deploying such schema.ts changes, or make the change expand–contract.
 - For schema changes:
   1. Update `src/database/schema.ts`.
   2. Generate migration with `npx drizzle-kit generate`.
