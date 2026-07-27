@@ -6,9 +6,6 @@ export const googleMembershipOptions = [
     { value: "E", label: "error" }
 ] as const
 
-export type GoogleMembershipValue =
-    (typeof googleMembershipOptions)[number]["value"]
-
 export function getGoogleMembershipLabel(value: string | null | undefined) {
     if (!value) {
         return "—"

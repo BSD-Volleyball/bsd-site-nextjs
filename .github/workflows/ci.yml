@@ -50,3 +50,10 @@ jobs:
         run: pnpm test
         env:
           TEST_PG_URL: postgres://bsd_test:bsd_test@localhost:5432
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Build needs a reachable-looking DATABASE_URL for module init; no
+          # queries run at build time (pages are force-dynamic).
+          DATABASE_URL: postgres://bsd_test:bsd_test@localhost:5432/postgres

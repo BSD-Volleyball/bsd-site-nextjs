@@ -94,6 +94,14 @@ interface PostmarkSpamComplaintPayload {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Mask an email address for log output (j***@example.com): enough to
+// correlate a report with a user without writing raw PII into the logs.
+function maskEmail(email: string): string {
+    const [local, domain] = email.split("@")
+    if (!domain) return "***"
+    return `${local.slice(0, 1)}***@${domain}`
+}
+
 function parseFromAddress(from: string): {
     name: string | null
     email: string
@@ -452,7 +460,7 @@ async function detectExistingThread(
     }
 
     console.log(
-        `[postmark-webhook] No existing thread found (subject: ${subject ?? "(none)"})`
+        `[postmark-webhook] No existing thread found (subject length: ${subject?.length ?? 0})`
     )
     return null
 }
@@ -489,7 +497,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
         (toAddresses.includes(concernAddress) ||
             payload.To.toLowerCase().includes(concernAddress))
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bumpsetdrink.com"
+    const appUrl = site.publicUrl
 
     // Check if this is a reply to an existing thread
     const existingThread = await detectExistingThread(headers, subject)
@@ -679,7 +687,7 @@ async function handleSubscriptionChange(
     }
 
     console.log(
-        `[postmark-webhook] Subscription change: ${email} stream=${streamId} suppressed=${payload.SuppressSending}`
+        `[postmark-webhook] Subscription change: ${maskEmail(email)} stream=${streamId} suppressed=${payload.SuppressSending}`
     )
 }
 
@@ -701,7 +709,7 @@ async function handleBounce(payload: PostmarkBouncePayload) {
     // retains the full bounce history for diagnostics either way.
     if (!isPermanentBounceType(payload.Type)) {
         console.log(
-            `[postmark-webhook] Transient bounce (not suppressing): ${email} type=${payload.Type} stream=${streamId}`
+            `[postmark-webhook] Transient bounce (not suppressing): ${maskEmail(email)} type=${payload.Type} stream=${streamId}`
         )
         return
     }
@@ -747,7 +755,7 @@ async function handleBounce(payload: PostmarkBouncePayload) {
     }
 
     console.log(
-        `[postmark-webhook] Bounce: ${email} type=${payload.Type} stream=${streamId}`
+        `[postmark-webhook] Bounce: ${maskEmail(email)} type=${payload.Type} stream=${streamId}`
     )
 }
 
@@ -803,7 +811,7 @@ async function handleSpamComplaint(payload: PostmarkSpamComplaintPayload) {
         )
 
     console.log(
-        `[postmark-webhook] Spam complaint: ${email} stream=${streamId}`
+        `[postmark-webhook] Spam complaint: ${maskEmail(email)} stream=${streamId}`
     )
 }
 

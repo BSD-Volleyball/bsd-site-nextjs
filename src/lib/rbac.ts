@@ -146,10 +146,6 @@ export async function isCommissionerBySession(): Promise<boolean> {
     return isCommissionerForSeason(userId, config.seasonId)
 }
 
-export async function hasAdministrativeAccessBySession(): Promise<boolean> {
-    return hasCaptainPagesAccessBySession()
-}
-
 export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
     const config = await getSeasonConfig()
     if (!config.seasonId) return false

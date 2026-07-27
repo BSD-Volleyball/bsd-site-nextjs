@@ -7,7 +7,6 @@ import { getSeasonConfig } from "@/lib/site-config"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
-    hasAdministrativeAccessBySession,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
 } from "@/lib/rbac"
@@ -29,10 +28,6 @@ export async function getIsAdminOrDirector(): Promise<boolean> {
 
 export async function getIsCommissioner(): Promise<boolean> {
     return isCommissionerBySession()
-}
-
-export async function getHasAdministrativeAccess(): Promise<boolean> {
-    return hasAdministrativeAccessBySession()
 }
 
 export async function getHasCaptainPagesAccess(): Promise<boolean> {

@@ -46,7 +46,11 @@ yarn-error.log*
 .turbo
 .vscode
 
-# drizzle migrations are tracked in git.worktrees
+# drizzle migrations are tracked in git
+
+# local worktrees and tool caches
+.worktrees/
+cache/
 
 # testing (Playwright)
 /test-results
