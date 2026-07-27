@@ -1,7 +1,19 @@
-import { jsx as _jsx } from "react/jsx-runtime"
 import Connectors from "../components/connector"
 import { getCalculatedStyles } from "../settings"
+import type { BracketSnippet, CalculatedStyles } from "../types"
 import { calculatePositionOfMatchLowerBracket } from "./calculate-match-position"
+
+interface ConnectorsLowerProps {
+    bracketSnippet: BracketSnippet
+    rowIndex: number
+    columnIndex: number
+    style: CalculatedStyles
+    offsetY?: number
+    firstRoundMatchCount?: number
+    gameHeight?: number
+    gameWidth?: number
+}
+
 const ConnectorsLower = ({
     bracketSnippet,
     rowIndex,
@@ -9,7 +21,7 @@ const ConnectorsLower = ({
     style,
     offsetY = 0,
     firstRoundMatchCount = 0
-}) => {
+}: ConnectorsLowerProps) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const currentMatchPosition = calculatePositionOfMatchLowerBracket(
         rowIndex,
@@ -49,13 +61,14 @@ const ConnectorsLower = ({
                 firstRoundMatchCount
             }
         )
-    return _jsx(Connectors, {
-        bracketSnippet: bracketSnippet,
-        previousBottomMatchPosition: previousBottomMatchPosition,
-        previousTopMatchPosition: previousTopMatchPosition,
-        currentMatchPosition: currentMatchPosition,
-        style: style
-    })
+    return (
+        <Connectors
+            bracketSnippet={bracketSnippet}
+            previousBottomMatchPosition={previousBottomMatchPosition}
+            previousTopMatchPosition={previousTopMatchPosition}
+            currentMatchPosition={currentMatchPosition}
+            style={style}
+        />
+    )
 }
 export default ConnectorsLower
-//# sourceMappingURL=lower-connectors.js.map

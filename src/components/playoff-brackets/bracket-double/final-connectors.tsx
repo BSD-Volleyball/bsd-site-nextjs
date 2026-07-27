@@ -1,11 +1,27 @@
-import { jsx as _jsx } from "react/jsx-runtime"
 import Connector from "../components/connector"
 import { getCalculatedStyles } from "../settings"
+import type { BracketSnippet, CalculatedStyles } from "../types"
 import {
-    calculatePositionOfMatchUpperBracket,
+    calculatePositionOfFinalGame,
     calculatePositionOfMatchLowerBracket,
-    calculatePositionOfFinalGame
+    calculatePositionOfMatchUpperBracket
 } from "./calculate-match-position"
+
+interface FinalConnectorsProps {
+    rowIndex: number
+    columnIndex: number
+    style: CalculatedStyles
+    bracketSnippet?: BracketSnippet | null
+    offsetY?: number
+    numOfUpperRounds: number
+    numOfLowerRounds: number
+    lowerBracketHeight: number
+    upperBracketHeight: number
+    gameHeight: number
+    gameWidth?: number
+    firstRoundLowerMatchCount?: number
+}
+
 const FinalConnectors = ({
     rowIndex,
     columnIndex,
@@ -18,7 +34,7 @@ const FinalConnectors = ({
     upperBracketHeight,
     gameHeight,
     firstRoundLowerMatchCount = 0
-}) => {
+}: FinalConnectorsProps) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const currentMatchPosition = calculatePositionOfFinalGame(
         rowIndex,
@@ -54,13 +70,14 @@ const FinalConnectors = ({
             firstRoundMatchCount: firstRoundLowerMatchCount
         }
     )
-    return _jsx(Connector, {
-        bracketSnippet: bracketSnippet,
-        previousBottomMatchPosition: previousBottomMatchPosition,
-        previousTopMatchPosition: previousTopMatchPosition,
-        currentMatchPosition: currentMatchPosition,
-        style: style
-    })
+    return (
+        <Connector
+            bracketSnippet={bracketSnippet}
+            previousBottomMatchPosition={previousBottomMatchPosition}
+            previousTopMatchPosition={previousTopMatchPosition}
+            currentMatchPosition={currentMatchPosition}
+            style={style}
+        />
+    )
 }
 export default FinalConnectors
-//# sourceMappingURL=final-connectors.js.map

@@ -1,6 +1,12 @@
 import { useContext } from "react"
 import { matchContext } from "../core/match-context"
-const useMatchHighlightContext = ({ bracketSnippet = null }) => {
+import type { BracketSnippet } from "../types"
+
+const useMatchHighlightContext = ({
+    bracketSnippet = null
+}: {
+    bracketSnippet?: BracketSnippet | null
+}): { topHighlighted: boolean; bottomHighlighted: boolean } => {
     const {
         state: { hoveredPartyId }
     } = useContext(matchContext)
@@ -9,8 +15,12 @@ const useMatchHighlightContext = ({ bracketSnippet = null }) => {
     const currentMatch = bracketSnippet?.currentMatch
 
     const currentParticipants = currentMatch?.participants ?? []
-    const previousTopParticipants = previousTopMatch?.participants ?? []
-    const previousBottomParticipants = previousBottomMatch?.participants ?? []
+    const previousTopParticipants = previousTopMatch
+        ? previousTopMatch.participants
+        : []
+    const previousBottomParticipants = previousBottomMatch
+        ? previousBottomMatch.participants
+        : []
 
     const topHighlighted =
         currentParticipants.some((p) => p.id === hoveredPartyId) &&
@@ -21,4 +31,3 @@ const useMatchHighlightContext = ({ bracketSnippet = null }) => {
     return { topHighlighted, bottomHighlighted }
 }
 export default useMatchHighlightContext
-//# sourceMappingURL=use-match-highlight.js.map

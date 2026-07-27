@@ -1,12 +1,14 @@
+import type { RoundHeaderTheme } from "../types"
+
 export function calculateSVGDimensions(
-    numOfRows,
-    numOfColumns,
-    rowHeight,
-    columnWidth,
-    canvasPadding,
-    roundHeader,
-    currentRound = ""
-) {
+    numOfRows: number,
+    numOfColumns: number,
+    rowHeight: number,
+    columnWidth: number,
+    canvasPadding: number,
+    roundHeader: RoundHeaderTheme,
+    currentRound: string | number = ""
+): { gameWidth: number; gameHeight: number; startPosition: number[] } {
     const bracketHeight = numOfRows * rowHeight
     const bracketWidth = numOfColumns * columnWidth
     const gameHeight =
@@ -18,10 +20,12 @@ export function calculateSVGDimensions(
     const gameWidth = bracketWidth + canvasPadding * 2
     const startPosition = [
         currentRound
-            ? -(parseInt(currentRound, 10) * columnWidth - canvasPadding * 2)
+            ? -(
+                  parseInt(String(currentRound), 10) * columnWidth -
+                  canvasPadding * 2
+              )
             : 0,
         0
     ]
     return { gameWidth, gameHeight, startPosition }
 }
-//# sourceMappingURL=calculate-svg-dimensions.js.map

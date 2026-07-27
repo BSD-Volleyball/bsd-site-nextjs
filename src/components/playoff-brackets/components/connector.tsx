@@ -1,17 +1,22 @@
-import {
-    jsx as _jsx,
-    Fragment as _Fragment,
-    jsxs as _jsxs
-} from "react/jsx-runtime"
 import useMatchHighlightContext from "../hooks/use-match-highlight"
 import { getCalculatedStyles } from "../settings"
+import type { BracketSnippet, CalculatedStyles, Position } from "../types"
+
+interface ConnectorProps {
+    bracketSnippet?: BracketSnippet | null
+    previousBottomMatchPosition?: Position | false | null
+    previousTopMatchPosition?: Position | false | null
+    currentMatchPosition: Position
+    style: CalculatedStyles
+}
+
 const Connector = ({
     bracketSnippet,
     previousBottomMatchPosition = null,
     previousTopMatchPosition = null,
     currentMatchPosition,
     style
-}) => {
+}: ConnectorProps) => {
     const {
         boxHeight,
         connectorColor,
@@ -22,12 +27,17 @@ const Connector = ({
         connectorColorHighlight,
         width
     } = getCalculatedStyles(style)
-    const pathInfo = (multiplier) => {
+    const pathInfo = (multiplier: number): string[] => {
         const middlePointOfMatchComponent = boxHeight / 2
         const previousMatch =
             multiplier > 0
                 ? previousBottomMatchPosition
                 : previousTopMatchPosition
+        // Type guard only: pathInfo is invoked solely for sides whose
+        // position was checked truthy below, so this branch is unreachable.
+        if (!previousMatch) {
+            return []
+        }
         const startPoint = `${currentMatchPosition.x - horizontalOffset - lineInfo.separation} ${
             currentMatchPosition.y +
             lineInfo.homeVisitorSpread * multiplier +
@@ -61,32 +71,35 @@ const Connector = ({
         bracketSnippet
     })
     const { x, y } = currentMatchPosition
-    return _jsxs(_Fragment, {
-        children: [
-            previousTopMatchPosition &&
-                _jsx("path", {
-                    d: pathInfo(-1).join(" "),
-                    id: `connector-${x}-${y}-${-1}`,
-                    fill: "transparent",
-                    stroke: topHighlighted
-                        ? connectorColorHighlight
-                        : connectorColor
-                }),
-            previousBottomMatchPosition &&
-                _jsx("path", {
-                    d: pathInfo(1).join(" "),
-                    id: `connector-${x}-${y}-${1}`,
-                    fill: "transparent",
-                    stroke: bottomHighlighted
-                        ? connectorColorHighlight
-                        : connectorColor
-                }),
-            topHighlighted &&
-                _jsx("use", { href: `connector-${x}-${y}-${-1}` }),
-            bottomHighlighted &&
-                _jsx("use", { href: `connector-${x}-${y}-${1}` })
-        ]
-    })
+    return (
+        <>
+            {previousTopMatchPosition && (
+                <path
+                    d={pathInfo(-1).join(" ")}
+                    id={`connector-${x}-${y}-${-1}`}
+                    fill="transparent"
+                    stroke={
+                        topHighlighted
+                            ? connectorColorHighlight
+                            : connectorColor
+                    }
+                />
+            )}
+            {previousBottomMatchPosition && (
+                <path
+                    d={pathInfo(1).join(" ")}
+                    id={`connector-${x}-${y}-${1}`}
+                    fill="transparent"
+                    stroke={
+                        bottomHighlighted
+                            ? connectorColorHighlight
+                            : connectorColor
+                    }
+                />
+            )}
+            {topHighlighted && <use href={`connector-${x}-${y}-${-1}`} />}
+            {bottomHighlighted && <use href={`connector-${x}-${y}-${1}`} />}
+        </>
+    )
 }
 export default Connector
-//# sourceMappingURL=connector.js.map

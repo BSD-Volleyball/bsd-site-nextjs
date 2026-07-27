@@ -1,10 +1,22 @@
-import { jsx as _jsx } from "react/jsx-runtime"
 import Connectors from "../components/connector"
 import { getCalculatedStyles } from "../settings"
+import type { BracketSnippet, CalculatedStyles } from "../types"
 import {
-    calculatePositionOfMatchUpperBracket,
-    calculatePositionOfMatchLowerBracket
+    calculatePositionOfMatchLowerBracket,
+    calculatePositionOfMatchUpperBracket
 } from "./calculate-match-position"
+
+interface ConnectorsUpperProps {
+    bracketSnippet: BracketSnippet
+    rowIndex: number
+    columnIndex: number
+    style: CalculatedStyles
+    offsetY?: number
+    isLowerBracket?: boolean
+    gameHeight?: number
+    gameWidth?: number
+}
+
 const ConnectorsUpper = ({
     bracketSnippet,
     rowIndex,
@@ -12,7 +24,7 @@ const ConnectorsUpper = ({
     style,
     offsetY = 0,
     isLowerBracket = false
-}) => {
+}: ConnectorsUpperProps) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const isUpperSeedingRound = isLowerBracket && columnIndex % 2 !== 0
     const positioningFunction = isLowerBracket
@@ -45,13 +57,14 @@ const ConnectorsUpper = ({
             offsetY
         }
     )
-    return _jsx(Connectors, {
-        bracketSnippet: bracketSnippet,
-        previousBottomMatchPosition: previousBottomMatchPosition,
-        previousTopMatchPosition: previousTopMatchPosition,
-        currentMatchPosition: currentMatchPosition,
-        style: style
-    })
+    return (
+        <Connectors
+            bracketSnippet={bracketSnippet}
+            previousBottomMatchPosition={previousBottomMatchPosition}
+            previousTopMatchPosition={previousTopMatchPosition}
+            currentMatchPosition={currentMatchPosition}
+            style={style}
+        />
+    )
 }
 export default ConnectorsUpper
-//# sourceMappingURL=upper-connectors.js.map

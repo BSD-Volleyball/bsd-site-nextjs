@@ -1,4 +1,6 @@
-export const defaultStyle = {
+import type { BracketTheme, CalculatedStyles } from "./types"
+
+export const defaultStyle: BracketTheme = {
     width: 300,
     boxHeight: 110,
     canvasPadding: 25,
@@ -25,10 +27,11 @@ export const defaultStyle = {
     wonBywalkOverText: "WO",
     lostByNoShowText: "NS"
 }
-export const getCalculatedStyles = (style = defaultStyle) => {
+export const getCalculatedStyles = (
+    style: BracketTheme = defaultStyle
+): CalculatedStyles => {
     const { boxHeight, width, spaceBetweenColumns, spaceBetweenRows } = style
     const columnWidth = width + spaceBetweenColumns
     const rowHeight = boxHeight + spaceBetweenRows
     return Object.assign(Object.assign({}, style), { rowHeight, columnWidth })
 }
-//# sourceMappingURL=settings.js.map

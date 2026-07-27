@@ -1,7 +1,22 @@
-import { jsx as _jsx } from "react/jsx-runtime"
 import Connector from "../components/connector"
 import { getCalculatedStyles } from "../settings"
+import type { BracketSnippet, CalculatedStyles } from "../types"
 import { calculatePositionOfFinalGame } from "./calculate-match-position"
+
+interface ExtraFinalConnectorsProps {
+    rowIndex: number
+    columnIndex: number
+    style: CalculatedStyles
+    bracketSnippet?: BracketSnippet | null
+    offsetY?: number
+    numOfUpperRounds?: number
+    numOfLowerRounds: number
+    lowerBracketHeight: number
+    upperBracketHeight: number
+    gameHeight: number
+    gameWidth?: number
+}
+
 const FinalConnectors = ({
     rowIndex,
     columnIndex,
@@ -12,7 +27,7 @@ const FinalConnectors = ({
     lowerBracketHeight,
     upperBracketHeight,
     gameHeight
-}) => {
+}: ExtraFinalConnectorsProps) => {
     const { columnWidth, rowHeight, canvasPadding } = getCalculatedStyles(style)
     const currentMatchPosition = calculatePositionOfFinalGame(
         rowIndex,
@@ -40,12 +55,13 @@ const FinalConnectors = ({
             gameHeight
         }
     )
-    return _jsx(Connector, {
-        bracketSnippet: bracketSnippet,
-        previousBottomMatchPosition: previousBottomMatchPosition,
-        currentMatchPosition: currentMatchPosition,
-        style: style
-    })
+    return (
+        <Connector
+            bracketSnippet={bracketSnippet}
+            previousBottomMatchPosition={previousBottomMatchPosition}
+            currentMatchPosition={currentMatchPosition}
+            style={style}
+        />
+    )
 }
 export default FinalConnectors
-//# sourceMappingURL=extra-final-connectors.js.map

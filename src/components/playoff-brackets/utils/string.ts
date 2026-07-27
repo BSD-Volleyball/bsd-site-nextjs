@@ -1,8 +1,7 @@
-export const sortAlphanumerically = (a, b) => {
+export const sortAlphanumerically = (a: string, b: string): number => {
     const collator = new Intl.Collator(undefined, {
         numeric: true,
         sensitivity: "base"
     })
     return collator.compare(a, b)
 }
-//# sourceMappingURL=string.js.map

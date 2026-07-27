@@ -5,5 +5,6 @@ export const MATCH_STATES = {
     NO_PARTY: "NO_PARTY",
     DONE: "DONE",
     SCORE_DONE: "SCORE_DONE"
-}
-//# sourceMappingURL=match-states.js.map
+} as const
+
+export type MatchState = (typeof MATCH_STATES)[keyof typeof MATCH_STATES]

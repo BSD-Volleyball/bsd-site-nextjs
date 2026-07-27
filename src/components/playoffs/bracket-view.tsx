@@ -9,12 +9,15 @@ import {
 import dynamic from "next/dynamic"
 import { formatMatchTime } from "@/lib/season-utils"
 import type {
+    DoubleEliminationBracketProps,
     MatchComponentProps,
     SvgWrapperProps
 } from "@/components/playoff-brackets"
 import type { BracketMatch } from "@/app/dashboard/playoffs/[seasonId]/actions"
 
-const DoubleEliminationBracket = dynamic(
+const DoubleEliminationBracket = dynamic<
+    DoubleEliminationBracketProps<BracketMatch>
+>(
     () =>
         import("@/components/playoff-brackets").then(
             (mod) => mod.DoubleEliminationBracket
@@ -71,7 +74,7 @@ function makeCustomMatch(
     anchorMatchNum: number | null,
     anchorWeek: number | null
 ) {
-    return function CustomMatch(props: MatchComponentProps) {
+    return function CustomMatch(props: MatchComponentProps<BracketMatch>) {
         const {
             match,
             topParty,
@@ -85,7 +88,7 @@ function makeCustomMatch(
             onMouseEnter,
             onMouseLeave
         } = props
-        const bm = match as unknown as BracketMatch
+        const bm = match
         const isBye = bm.matchNum < 0
         const isUserHome =
             !isBye && userTeamId !== null && bm.homeTeamId === userTeamId
@@ -265,7 +268,7 @@ function PartyRow({
     onMouseEnter,
     onMouseLeave
 }: {
-    name: string
+    name: string | undefined
     resultText: string | null | undefined
     won: boolean
     hovered: boolean
@@ -404,8 +407,7 @@ export function BracketView({
     return (
         <div className="w-full rounded-lg border bg-muted/20">
             <DoubleEliminationBracket
-                // biome-ignore lint: library types don't match our extended BracketMatch
-                matches={matches as any}
+                matches={matches}
                 matchComponent={matchComponent}
                 svgWrapper={svgWrapper}
                 options={{ style: BRACKET_STYLE }}
