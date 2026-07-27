@@ -46,6 +46,7 @@ export function ScoreInputRow({
                     type="number"
                     min={0}
                     disabled={disabled}
+                    aria-label={`${label} home`}
                     className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${inputClassFor(homeValue)}`}
                     value={homeValue}
                     onChange={(e) => onHomeChange(e.target.value)}
@@ -60,6 +61,7 @@ export function ScoreInputRow({
                     type="number"
                     min={0}
                     disabled={disabled}
+                    aria-label={`${label} away`}
                     className={`h-8 w-20 rounded-md border px-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${inputClassFor(awayValue)}`}
                     value={awayValue}
                     onChange={(e) => onAwayChange(e.target.value)}
