@@ -1,4 +1,7 @@
-"use server"
+// Server-only data loaders for the dashboard sidebar. These are plain server
+// functions (not server actions): the dashboard layout calls loadSidebarData()
+// during server rendering and passes the result to <AppSidebar> as a prop.
+import "server-only"
 
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -36,7 +39,7 @@ export interface SeasonNavItem {
     divisions: SeasonNavDivision[]
 }
 
-export async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
+async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
         return []
@@ -121,7 +124,7 @@ export interface TournamentNavItem {
  * The most recent completed tournaments, for the Historical section. Each links
  * to its read-only results page. Returns [] for anonymous users.
  */
-export async function getRecentTournamentsNav(): Promise<TournamentNavItem[]> {
+async function getRecentTournamentsNav(): Promise<TournamentNavItem[]> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
         return []
@@ -176,7 +179,7 @@ export interface SidebarData {
     tournament: TournamentSidebarInfo | null
 }
 
-export async function getSidebarData(): Promise<SidebarData> {
+export async function loadSidebarData(): Promise<SidebarData> {
     const session = await auth.api.getSession({ headers: await headers() })
 
     if (!session?.user) {

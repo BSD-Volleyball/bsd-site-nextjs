@@ -2,7 +2,7 @@ import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { getRosterData } from "./actions"
-import { DivisionSection } from "./division-section"
+import { RosterDivisionSection } from "./roster-division-section"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -44,7 +44,7 @@ export default async function RosterPage({
                 </div>
             ) : (
                 result.data.divisions.map((division) => (
-                    <DivisionSection
+                    <RosterDivisionSection
                         key={division.id}
                         division={division}
                         currentUserId={session.user.id}

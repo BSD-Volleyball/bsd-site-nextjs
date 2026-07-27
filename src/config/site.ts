@@ -21,6 +21,8 @@ export const site = {
     mailFrom: `Bump Set Drink <${process.env.MAIL_FROM || "info@bumpsetdrink.com"}>`,
     links: {
         soccerplex: "https://www.mdsoccerplex.org",
-        facebook: "https://www.facebook.com/bumpsetdrink"
+        facebook: "https://www.facebook.com/bumpsetdrink",
+        // Avery 5164 shipping labels used for tryout nametag printing
+        avery5164Labels: "https://www.amazon.com/dp/B0BCFNZJK6"
     }
 } as const

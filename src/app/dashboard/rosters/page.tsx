@@ -5,7 +5,7 @@ import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"
 import type { Metadata } from "next"
 import { getRosterData } from "./[seasonId]/actions"
-import { DivisionSection } from "./[seasonId]/division-section"
+import { RosterDivisionSection } from "./[seasonId]/roster-division-section"
 
 export const metadata: Metadata = {
     title: "Rosters"
@@ -83,7 +83,7 @@ export default async function CurrentRosterPage() {
                 </div>
             ) : (
                 result.data.divisions.map((division) => (
-                    <DivisionSection
+                    <RosterDivisionSection
                         key={division.id}
                         division={division}
                         currentUserId={session.user.id}

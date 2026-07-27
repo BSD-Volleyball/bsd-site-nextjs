@@ -1,6 +1,5 @@
-"use client"
-
 import { SignedIn } from "@daveyplate/better-auth-ui"
+import { loadSidebarData } from "@/app/dashboard/sidebar-actions"
 import { RedirectToHome } from "@/components/layout/redirect-to-home"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { DynamicBreadcrumb } from "@/components/layout/dynamic-breadcrumb"
@@ -12,20 +11,22 @@ import {
     SidebarTrigger
 } from "@/components/ui/sidebar"
 
-export default function ProtectedPage({
+export default async function ProtectedPage({
     children,
     onboardingCheck
 }: {
     children: React.ReactNode
     onboardingCheck: React.ReactNode
 }) {
+    const sidebarData = await loadSidebarData()
+
     return (
         <>
             {onboardingCheck}
             <RedirectToHome />
             <SignedIn>
                 <SidebarProvider defaultOpen={true}>
-                    <AppSidebar />
+                    <AppSidebar data={sidebarData} />
                     <SidebarInset>
                         <div className="@container">
                             <div className="mx-auto w-full">

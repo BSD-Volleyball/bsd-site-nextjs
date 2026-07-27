@@ -3,8 +3,11 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
-import { getCurrentSeasonScheduleData } from "./actions"
-import { SeasonDivisionSection } from "./division-section"
+import { DivisionSection } from "@/components/division-section"
+import {
+    type CurrentSeasonScheduleDivision,
+    getCurrentSeasonScheduleData
+} from "./actions"
 import { AddToCalendarButton } from "./add-to-calendar-button"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import type { Metadata } from "next"
@@ -17,6 +20,32 @@ export const dynamic = "force-dynamic"
 
 const SCHEDULE_START_PHASE = "draft"
 const SCHEDULE_END_PHASE = "complete"
+
+function decorateWeeksForUser(
+    weeks: CurrentSeasonScheduleDivision["weeks"],
+    userTeamId: number | null
+) {
+    return weeks.map((week) => ({
+        ...week,
+        matches: week.matches.map((match) => ({
+            ...match,
+            highlightedMatchTeam:
+                userTeamId === match.homeTeamId
+                    ? ("home" as const)
+                    : userTeamId === match.awayTeamId
+                      ? ("away" as const)
+                      : null,
+            highlightScheduleDetails:
+                userTeamId !== null &&
+                (match.homeTeamId === userTeamId ||
+                    match.awayTeamId === userTeamId),
+            winnerHighlighted:
+                userTeamId !== null && match.winnerTeamId === userTeamId,
+            loserHighlighted:
+                userTeamId !== null && match.loserTeamId === userTeamId
+        }))
+    }))
+}
 
 export default async function SeasonSchedulePage() {
     await requireSessionOrRedirect()
@@ -68,14 +97,23 @@ export default async function SeasonSchedulePage() {
                 </div>
             ) : (
                 divisions.map((division) => (
-                    <SeasonDivisionSection
+                    <DivisionSection
                         key={division.id}
-                        division={division}
-                        userTeamId={userTeamId}
+                        title={division.name}
+                        titleBadge={
+                            !division.isDrafted ? (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+                                    Undrafted
+                                </span>
+                            ) : null
+                        }
                         defaultOpen={
                             userDivisionId !== null &&
                             division.id === userDivisionId
                         }
+                        standings={division.standings}
+                        highlightTeamId={userTeamId}
+                        weeks={decorateWeeksForUser(division.weeks, userTeamId)}
                     />
                 ))
             )}

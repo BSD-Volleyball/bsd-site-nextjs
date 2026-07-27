@@ -1,37 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import {
-    RiLineChartLine,
-    RiUser3Line,
-    RiShieldLine,
-    RiSpeedUpLine,
-    RiBasketballLine,
-    RiEditLine,
-    RiSearchLine,
-    RiTeamLine,
-    RiFileList3Line,
-    RiGroupLine,
-    RiTimeLine,
-    RiCoupon3Line,
-    RiStarLine,
-    RiCalendarLine,
     RiArrowDownSLine,
-    RiMergeCellsHorizontal,
-    RiUserUnfollowLine,
-    RiHistoryLine,
-    RiLinksLine,
-    RiUserSettingsLine,
-    RiMailLine,
-    RiTrophyLine,
-    RiSettings3Line,
-    RiAlertLine,
-    RiFileWarningLine,
-    RiCheckboxLine,
-    RiClipboardLine,
-    RiInboxLine,
-    RiImageLine,
-    RiMedalLine
+    RiCalendarLine,
+    RiEditLine,
+    RiGroupLine,
+    RiMedalLine,
+    RiTeamLine,
+    RiTrophyLine
 } from "@remixicon/react"
 import Image from "next/image"
 import Link from "next/link"
@@ -59,419 +35,42 @@ import {
     CollapsibleContent
 } from "@/components/ui/collapsible"
 import { site } from "@/config/site"
-import {
-    getSidebarData,
-    type SeasonNavItem,
-    type TournamentNavItem,
-    type TournamentSidebarInfo
+import type {
+    SeasonNavItem,
+    SidebarData
 } from "@/app/dashboard/sidebar-actions"
 import {
     PHASE_CONFIG,
     SEASON_PHASES,
     type SeasonPhase
 } from "@/lib/season-phases"
-
-const myAvailabilityNavItem = {
-    title: "My Availability",
-    url: "/dashboard/my-availability",
-    icon: RiCheckboxLine
-}
-
-const captainPairingNavItem = {
-    title: "Captain & Pairing",
-    url: "/dashboard/captain-pairing",
-    icon: RiStarLine
-}
-
-const baseNavItems = [
-    { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
-    {
-        title: "League Rules",
-        url: "/dashboard/rules",
-        icon: RiFileList3Line
-    },
-    {
-        title: "Report a Concern",
-        url: "/dashboard/report-concern",
-        icon: RiAlertLine
-    }
-]
-
-const hallOfChampionsNavItem = {
-    title: "Hall of Champions",
-    url: "/dashboard/hall-of-champions",
-    icon: RiTrophyLine
-}
-
-const accountNavItems = [
-    { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
-    {
-        title: "Volleyball Profile",
-        url: "/dashboard/volleyball-profile",
-        icon: RiBasketballLine
-    },
-    { title: "Security", url: "/dashboard/security", icon: RiShieldLine },
-    { title: "Analytics", url: "/dashboard/analytics", icon: RiLineChartLine }
-]
-
-const concernsNavItems = [
-    {
-        title: "Manage Concerns",
-        url: "/dashboard/manage-concerns",
-        icon: RiFileWarningLine
-    }
-]
-
-const reffingNavItems = [
-    {
-        title: "Reffing Schedule",
-        url: "/dashboard/reffing-schedule",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Matches Worked",
-        url: "/dashboard/matches-worked",
-        icon: RiClipboardLine
-    }
-]
-
-const manageRefsNavItems = [
-    {
-        title: "Select Refs",
-        url: "/dashboard/select-refs",
-        icon: RiGroupLine
-    },
-    {
-        title: "Schedule Refs",
-        url: "/dashboard/schedule-refs",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Ref Compensation",
-        url: "/dashboard/ref-compensation",
-        icon: RiCoupon3Line
-    }
-]
-
-const signupNavItem = {
-    title: "Sign-up for Season",
-    url: "/dashboard/pay-season",
-    icon: RiEditLine
-}
-
-const adminNavItems = [
-    {
-        title: "Admin Player Lookup",
-        url: "/dashboard/player-lookup",
-        icon: RiSearchLine
-    },
-    {
-        title: "Admin View Signups",
-        url: "/dashboard/admin-view-signups",
-        icon: RiGroupLine
-    },
-    {
-        title: "Send Email",
-        url: "/dashboard/send-email",
-        icon: RiMailLine
-    },
-    {
-        title: "Manage Emails",
-        url: "/dashboard/manage-emails",
-        icon: RiInboxLine
-    },
-    {
-        title: "View Waitlist",
-        url: "/dashboard/view-waitlist",
-        icon: RiTimeLine
-    },
-    {
-        title: "Google Membership",
-        url: "/dashboard/google-membership",
-        icon: RiMailLine
-    },
-    {
-        title: "Review Pairs",
-        url: "/dashboard/review-pairs",
-        icon: RiLinksLine
-    },
-    {
-        title: "Manage Discounts",
-        url: "/dashboard/manage-discounts",
-        icon: RiCoupon3Line
-    },
-    {
-        title: "Evaluate New Players",
-        url: "/dashboard/evaluate-players",
-        icon: RiStarLine
-    },
-    {
-        title: "Draft History",
-        url: "/dashboard/draft-history",
-        icon: RiFileList3Line
-    },
-    {
-        title: "Audit Log",
-        url: "/dashboard/audit-log",
-        icon: RiHistoryLine
-    },
-    {
-        title: "Tournament Overview",
-        url: "/dashboard/tournament-overview",
-        icon: RiTrophyLine
-    },
-    {
-        title: "Tournament Pools",
-        url: "/dashboard/tournament-pools",
-        icon: RiTeamLine
-    },
-    {
-        title: "Place Tournament Players",
-        url: "/dashboard/view-tournament-waitlist",
-        icon: RiGroupLine
-    },
-    {
-        title: "Insurance Report",
-        url: "/dashboard/insurance-report",
-        icon: RiShieldLine
-    }
-]
-
-const adminDangerNavItems = [
-    {
-        title: "Season Control",
-        url: "/dashboard/season-control",
-        icon: RiSettings3Line
-    },
-    {
-        title: "Season Configuration",
-        url: "/dashboard/season-config",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Tournament Control",
-        url: "/dashboard/tournament-control",
-        icon: RiSettings3Line
-    },
-    {
-        title: "Tournament Configuration",
-        url: "/dashboard/tournament-config",
-        icon: RiTrophyLine
-    },
-    {
-        title: "Manage Roles",
-        url: "/dashboard/manage-roles",
-        icon: RiUserSettingsLine
-    },
-    {
-        title: "Manage Waivers",
-        url: "/dashboard/manage-waivers",
-        icon: RiFileWarningLine
-    },
-    {
-        title: "Create Week 1",
-        url: "/dashboard/create-week-1",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Create Week 2",
-        url: "/dashboard/create-week-2",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Create Week 3",
-        url: "/dashboard/create-week-3",
-        icon: RiCalendarLine
-    },
-    {
-        title: "Edit Week 1",
-        url: "/dashboard/edit-week-1",
-        icon: RiEditLine
-    },
-    {
-        title: "Edit Week 2",
-        url: "/dashboard/edit-week-2",
-        icon: RiEditLine
-    },
-    {
-        title: "Edit Week 3",
-        url: "/dashboard/edit-week-3",
-        icon: RiEditLine
-    },
-    {
-        title: "Select Commissioners",
-        url: "/dashboard/select-commissioners",
-        icon: RiUserSettingsLine
-    },
-    {
-        title: "Create Divisions",
-        url: "/dashboard/create-divisions",
-        icon: RiTeamLine
-    },
-    {
-        title: "Merge Users",
-        url: "/dashboard/merge-users",
-        icon: RiMergeCellsHorizontal
-    },
-    {
-        title: "Edit Player",
-        url: "/dashboard/edit-player",
-        icon: RiEditLine
-    },
-    {
-        title: "Edit Emails",
-        url: "/dashboard/edit-emails",
-        icon: RiMailLine
-    },
-    {
-        title: "Create Schedule",
-        url: "/dashboard/create-schedule",
-        icon: RiCalendarLine
-    }
-]
-
-// These items are never shown in normal sidebar sections — always in the admin hidden section
-const alwaysHiddenAdminItems = [
-    {
-        title: "Attrition",
-        url: "/dashboard/attrition",
-        icon: RiUserUnfollowLine
-    },
-    {
-        title: "Admin Create Teams",
-        url: "/dashboard/admin-create-teams",
-        icon: RiTeamLine
-    }
-]
-
-const week1NavItem = {
-    title: "Pre-Season Week 1",
-    url: "/dashboard/preseason-week-1",
-    icon: RiCalendarLine
-}
-const week2NavItem = {
-    title: "Pre-Season Week 2",
-    url: "/dashboard/preseason-week-2",
-    icon: RiCalendarLine
-}
-const week3NavItem = {
-    title: "Pre-Season Week 3",
-    url: "/dashboard/preseason-week-3",
-    icon: RiCalendarLine
-}
-
-const currentRostersNavItem = {
-    title: "Rosters",
-    url: "/dashboard/rosters",
-    icon: RiTeamLine
-}
-
-const scheduleNavItem = {
-    title: "Schedule",
-    url: "/dashboard/season-schedule",
-    icon: RiCalendarLine
-}
-
-const playoffsNavItem = {
-    title: "Playoffs",
-    url: "/dashboard/season-playoffs",
-    icon: RiTrophyLine
-}
-
-const enterScoresNavItem = {
-    title: "Enter Scores",
-    url: "/dashboard/enter-scores",
-    icon: RiClipboardLine
-}
-
-const addPicturesNavItem = {
-    title: "Add Pictures",
-    url: "/dashboard/add-pictures",
-    icon: RiEditLine
-}
-
-const addTeamPicturesNavItem = {
-    title: "Add Team Pictures",
-    url: "/dashboard/add-team-pictures",
-    icon: RiImageLine
-}
-
-const commissionerNavItems = [
-    {
-        title: "Send Email",
-        url: "/dashboard/send-email",
-        icon: RiMailLine
-    },
-    {
-        title: "Homework Status",
-        url: "/dashboard/homework-status",
-        icon: RiCheckboxLine
-    },
-    {
-        title: "Potential Captains",
-        url: "/dashboard/potential-captains",
-        icon: RiUserSettingsLine
-    },
-    {
-        title: "Select Captains",
-        url: "/dashboard/select-captains",
-        icon: RiTeamLine
-    },
-    {
-        title: "Prepare for Draft",
-        url: "/dashboard/prepare-for-draft",
-        icon: RiFileList3Line
-    },
-    {
-        title: "Draft Day",
-        url: "/dashboard/draft-day",
-        icon: RiFileList3Line
-    }
-]
-
-const captainPagesNavItems = [
-    {
-        title: "Team Availability",
-        url: "/dashboard/team-availability",
-        icon: RiCalendarLine
-    },
-    {
-        title: "View Signups",
-        url: "/dashboard/view-signups",
-        icon: RiGroupLine
-    },
-    {
-        title: "Player Lookup",
-        url: "/dashboard/player-lookup-signups",
-        icon: RiSearchLine
-    },
-    {
-        title: "Rate Player",
-        url: "/dashboard/rate-player",
-        icon: RiStarLine
-    },
-    {
-        title: "Week 2 Homework",
-        url: "/dashboard/week-2-homework",
-        icon: RiEditLine
-    },
-    {
-        title: "Draft Homework",
-        url: "/dashboard/draft-homework",
-        icon: RiEditLine
-    },
-    {
-        title: "Live Draft",
-        url: "/dashboard/draft-division",
-        icon: RiFileList3Line
-    }
-]
-
-const seasonCategories = [
-    { key: "rosters", label: "Rosters", basePath: "/dashboard/rosters" },
-    { key: "schedule", label: "Season", basePath: "/dashboard/schedule" },
-    { key: "playoffs", label: "Playoffs", basePath: "/dashboard/playoffs" }
-]
+import {
+    accountNavItems,
+    addPicturesNavItem,
+    addTeamPicturesNavItem,
+    adminDangerNavItems,
+    adminNavItems,
+    alwaysHiddenAdminItems,
+    baseNavItems,
+    captainPagesNavItems,
+    captainPairingNavItem,
+    commissionerNavItems,
+    concernsNavItems,
+    currentRostersNavItem,
+    enterScoresNavItem,
+    hallOfChampionsNavItem,
+    manageRefsNavItems,
+    myAvailabilityNavItem,
+    type NavItem,
+    playoffsNavItem,
+    reffingNavItems,
+    scheduleNavItem,
+    seasonCategories,
+    signupNavItem,
+    week1NavItem,
+    week2NavItem,
+    week3NavItem
+} from "@/components/layout/sidebar-nav-config"
 
 function SidebarLogo() {
     return (
@@ -498,13 +97,7 @@ function SidebarLogo() {
     )
 }
 
-function NavItems({
-    items,
-    pathname
-}: {
-    items: typeof baseNavItems
-    pathname: string
-}) {
+function NavItems({ items, pathname }: { items: NavItem[]; pathname: string }) {
     return (
         <>
             {items.map((item) => {
@@ -592,45 +185,28 @@ function SeasonNavMenuItem({
     )
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+    data,
+    ...props
+}: React.ComponentProps<typeof Sidebar> & { data: SidebarData }) {
     const pathname = usePathname()
-    const [showSignupLink, setShowSignupLink] = useState(false)
-    const [hasCurrentSeasonSignup, setHasCurrentSeasonSignup] = useState(false)
-    const [isAdmin, setIsAdmin] = useState(false)
-    const [isCommissioner, setIsCommissioner] = useState(false)
-    const [hasCaptainPagesAccess, setHasCaptainPagesAccess] = useState(false)
-    const [isCoach, setIsCoach] = useState(false)
-    const [hasPicturesAccess, setHasPicturesAccess] = useState(false)
-    const [hasScoresAccess, setHasScoresAccess] = useState(false)
-    const [hasConcernsAccess, setHasConcernsAccess] = useState(false)
-    const [isReferee, setIsReferee] = useState(false)
-    const [isRefCoordinator, setIsRefCoordinator] = useState(false)
-    const [seasonNav, setSeasonNav] = useState<SeasonNavItem[]>([])
-    const [tournamentNav, setTournamentNav] = useState<TournamentNavItem[]>([])
-    const [phase, setPhase] = useState<SeasonPhase | null>(null)
-    const [tournament, setTournament] = useState<TournamentSidebarInfo | null>(
-        null
-    )
-
-    useEffect(() => {
-        getSidebarData().then((data) => {
-            setShowSignupLink(data.showSignupLink)
-            setHasCurrentSeasonSignup(data.hasCurrentSeasonSignup)
-            setIsAdmin(data.isAdmin)
-            setIsCommissioner(data.isCommissioner)
-            setHasCaptainPagesAccess(data.hasCaptainPagesAccess)
-            setIsCoach(data.isCoach)
-            setHasPicturesAccess(data.hasPicturesAccess)
-            setHasScoresAccess(data.hasScoresAccess)
-            setHasConcernsAccess(data.hasConcernsAccess)
-            setIsReferee(data.isReferee)
-            setIsRefCoordinator(data.isRefCoordinator)
-            setSeasonNav(data.seasonNav)
-            setTournamentNav(data.tournamentNav)
-            setPhase(data.phase)
-            setTournament(data.tournament)
-        })
-    }, [])
+    const {
+        showSignupLink,
+        hasCurrentSeasonSignup,
+        isAdmin,
+        isCommissioner,
+        hasCaptainPagesAccess,
+        isCoach,
+        hasPicturesAccess,
+        hasScoresAccess,
+        hasConcernsAccess,
+        isReferee,
+        isRefCoordinator,
+        seasonNav,
+        tournamentNav,
+        phase,
+        tournament
+    } = data
 
     const phaseConfig = phase ? PHASE_CONFIG[phase] : null
 
@@ -770,7 +346,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     // Admin hidden section — collect all currently-suppressed items by group
-    type NavItem = { title: string; url: string; icon: typeof RiSpeedUpLine }
     const hiddenGroups: { label: string; items: NavItem[] }[] = []
 
     if (isAdmin) {
@@ -982,11 +557,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                             <SidebarMenu>
                                 <NavItems
                                     items={(() => {
-                                        const items: {
-                                            title: string
-                                            url: string
-                                            icon: typeof RiTrophyLine
-                                        }[] = []
+                                        const items: NavItem[] = []
                                         if (tournament.canSignUp) {
                                             items.push({
                                                 title: "Sign Up for Tournament",

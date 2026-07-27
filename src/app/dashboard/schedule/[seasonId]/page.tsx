@@ -1,8 +1,8 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
+import { DivisionSection } from "@/components/division-section"
 import { getSeasonScheduleData } from "./actions"
-import { DivisionSection } from "./division-section"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -47,7 +47,12 @@ export default async function SchedulePage({
                 </div>
             ) : (
                 result.data.divisions.map((division) => (
-                    <DivisionSection key={division.id} division={division} />
+                    <DivisionSection
+                        key={division.id}
+                        title={division.name}
+                        standings={division.standings}
+                        weeks={division.weeks}
+                    />
                 ))
             )}
         </div>

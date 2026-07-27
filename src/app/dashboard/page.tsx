@@ -1,42 +1,23 @@
 import { Suspense } from "react"
-import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import type { Metadata } from "next"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
-    seasons,
-    signups,
     users,
     drafts,
     teams,
     divisions,
     individual_divisions,
-    waitlist,
-    champions,
-    evaluations,
     concerns,
     week1Rosters,
     week2Rosters,
     week3Rosters,
-    userUnavailability,
-    seasonEvents,
     matchReferees,
-    matches,
-    userRoles
+    matches
 } from "@/database/schema"
-import {
-    eq,
-    and,
-    desc,
-    count,
-    inArray,
-    isNotNull,
-    or,
-    gte,
-    asc
-} from "drizzle-orm"
+import { eq, and, count, or, gte, asc } from "drizzle-orm"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     RiCheckLine,
@@ -47,9 +28,6 @@ import {
 } from "@remixicon/react"
 import Link from "next/link"
 import {
-    getSeasonConfig,
-    getCurrentSeasonAmount,
-    isLatePricing,
     getEventsByType,
     formatEventDate,
     formatShortDate,
@@ -57,7 +35,6 @@ import {
 } from "@/lib/site-config"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { getActiveWaiver } from "@/lib/waivers"
-import { WaitlistButton } from "./waitlist-button"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
 import { WelcomeTeamCard } from "./captain-info-card"
 import {
@@ -84,659 +61,32 @@ import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-c
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
-import { buildPlayerPictureUrl, cn } from "@/lib/utils"
-import { canEditPreferences } from "./captain-pairing/utils"
+import { cn } from "@/lib/utils"
+import { site } from "@/config/site"
+import {
+    getSeasonSignup,
+    getPreviousSeasonsPlayed,
+    getNewPlayerEvalStats,
+    getAllDivisionCaptainSelectionStatus,
+    getCommissionerCaptainSelectionStatus,
+    type CaptainSelectionDivisionStatus
+} from "./queries"
+import { TeamAssignmentDisplay } from "./components/team-assignment-display"
+import { RegistrationConfirmation } from "./components/registration-confirmation"
+import { WaitlistContent } from "./components/waitlist-content"
+import { WaitlistInterestPanel } from "./components/waitlist-interest-panel"
+import { SignupCTA } from "./components/signup-cta"
+
+export type { PreviousSeason } from "./queries"
 
 export const metadata: Metadata = {
     title: "Dashboard"
-}
-
-async function getSeasonSignup(userId: string) {
-    const config = await getSeasonConfig()
-
-    if (!config.seasonId) {
-        return {
-            season: null,
-            signup: null,
-            pairPickName: null,
-            config,
-            seasonFull: false,
-            onWaitlist: false,
-            waitlistApproved: false
-        }
-    }
-
-    const season = { id: config.seasonId }
-
-    // Check if user has a signup for this season
-    const [signup] = await db
-        .select()
-        .from(signups)
-        .where(and(eq(signups.season, season.id), eq(signups.player, userId)))
-        .limit(1)
-
-    // If there's a pair pick, get their name
-    let pairPickName: string | null = null
-    if (signup?.pair_pick) {
-        const [pairUser] = await db
-            .select({
-                first_name: users.first_name,
-                last_name: users.last_name
-            })
-            .from(users)
-            .where(eq(users.id, signup.pair_pick))
-            .limit(1)
-
-        if (pairUser) {
-            pairPickName =
-                [pairUser.first_name, pairUser.last_name]
-                    .filter(Boolean)
-                    .join(" ") || null
-        }
-    }
-
-    // Check if season is full
-    let seasonFull = false
-    const maxPlayers = config.maxPlayers
-    if (maxPlayers > 0 && !signup) {
-        const [result] = await db
-            .select({ total: count() })
-            .from(signups)
-            .where(eq(signups.season, season.id))
-
-        if (result && result.total >= maxPlayers) {
-            seasonFull = true
-        }
-    }
-
-    // Check if user is on the waitlist
-    let onWaitlist = false
-    let waitlistApproved = false
-    if (!signup) {
-        const [waitlistEntry] = await db
-            .select({ id: waitlist.id, approved: waitlist.approved })
-            .from(waitlist)
-            .where(
-                and(eq(waitlist.season, season.id), eq(waitlist.user, userId))
-            )
-            .limit(1)
-
-        onWaitlist = !!waitlistEntry
-        waitlistApproved = waitlistEntry?.approved ?? false
-    }
-
-    // Fetch player unavailability for this signup
-    let unavailableDates: string | null = null
-    if (signup) {
-        const unavailRows = await db
-            .select({ eventDate: seasonEvents.event_date })
-            .from(userUnavailability)
-            .innerJoin(
-                seasonEvents,
-                eq(seasonEvents.id, userUnavailability.event_id)
-            )
-            .where(eq(userUnavailability.signup_id, signup.id))
-
-        if (unavailRows.length > 0) {
-            unavailableDates = unavailRows
-                .map((u) => formatEventDate(u.eventDate))
-                .join(", ")
-        }
-    }
-
-    return {
-        season,
-        signup,
-        pairPickName,
-        unavailableDates,
-        config,
-        seasonFull,
-        onWaitlist,
-        waitlistApproved
-    }
-}
-
-export interface PreviousSeason {
-    year: number
-    season: string
-    divisionName: string
-    teamName: string
-    captainName: string
-    teamId: number
-    champion: boolean
-    championPicture: string | null
-    teamPhotoUrl: string
-}
-
-async function getPreviousSeasonsPlayed(
-    userId: string
-): Promise<PreviousSeason[]> {
-    const results = await db
-        .select({
-            year: seasons.year,
-            season: seasons.season,
-            divisionName: divisions.name,
-            teamName: teams.name,
-            teamId: teams.id,
-            captainFirstName: users.first_name,
-            captainLastName: users.last_name,
-            captainPreferredName: users.preferred_name,
-            championId: champions.id,
-            championPicture: champions.picture,
-            teamPictureUrl: teams.picture_url
-        })
-        .from(drafts)
-        .innerJoin(teams, eq(drafts.team, teams.id))
-        .innerJoin(seasons, eq(teams.season, seasons.id))
-        .innerJoin(divisions, eq(teams.division, divisions.id))
-        .innerJoin(users, eq(teams.captain, users.id))
-        .leftJoin(champions, eq(teams.id, champions.team))
-        .where(eq(drafts.user, userId))
-        .orderBy(desc(seasons.year), desc(seasons.id))
-
-    return results.map((r) => ({
-        year: r.year,
-        season: r.season,
-        divisionName: r.divisionName,
-        teamName: r.teamName,
-        teamId: r.teamId,
-        captainName: `${r.captainPreferredName || r.captainFirstName} ${r.captainLastName}`,
-        champion: !!r.championId,
-        championPicture: r.championPicture,
-        teamPhotoUrl: buildPlayerPictureUrl(
-            playerPicBaseUrl(),
-            r.teamPictureUrl
-        )
-    }))
 }
 
 async function PreviousSeasonsSection({ userId }: { userId: string }) {
     const previousSeasons = await getPreviousSeasonsPlayed(userId)
     if (previousSeasons.length === 0) return null
     return <PreviousSeasonsCard previousSeasons={previousSeasons} />
-}
-
-async function getNewPlayerEvalStats(
-    userId: string,
-    seasonId: number
-): Promise<{ totalNew: number; ratedByUser: number }> {
-    // Get all signed-up players for this season
-    const signedUpUsers = await db
-        .select({ userId: signups.player })
-        .from(signups)
-        .where(eq(signups.season, seasonId))
-
-    const userIds = signedUpUsers.map((r) => r.userId)
-    if (userIds.length === 0) return { totalNew: 0, ratedByUser: 0 }
-
-    // Find which have been drafted before (not new)
-    const draftedUsers = await db
-        .select({ user: drafts.user })
-        .from(drafts)
-        .where(inArray(drafts.user, userIds))
-
-    const draftedUserIds = new Set(draftedUsers.map((d) => d.user))
-    const newPlayerIds = userIds.filter((id) => !draftedUserIds.has(id))
-    const totalNew = newPlayerIds.length
-
-    if (totalNew === 0) return { totalNew: 0, ratedByUser: 0 }
-
-    // Count how many the current user has evaluated this season
-    const [result] = await db
-        .select({ total: count() })
-        .from(evaluations)
-        .where(
-            and(
-                eq(evaluations.season, seasonId),
-                eq(evaluations.evaluator, userId),
-                inArray(evaluations.player, newPlayerIds)
-            )
-        )
-
-    return { totalNew, ratedByUser: result?.total ?? 0 }
-}
-
-interface CaptainSelectionDivisionStatus {
-    divisionId: number
-    divisionName: string
-    requiredTeams: number
-    teamsWithCaptain: number
-    isComplete: boolean
-}
-
-async function getAllDivisionCaptainSelectionStatus(
-    seasonId: number
-): Promise<CaptainSelectionDivisionStatus[]> {
-    const divisionTargets = await db
-        .select({
-            divisionId: individual_divisions.division,
-            divisionName: divisions.name,
-            requiredTeams: individual_divisions.teams
-        })
-        .from(individual_divisions)
-        .innerJoin(divisions, eq(individual_divisions.division, divisions.id))
-        .where(eq(individual_divisions.season, seasonId))
-        .orderBy(divisions.level)
-
-    if (divisionTargets.length === 0) return []
-
-    const captainCounts = await db
-        .select({
-            divisionId: teams.division,
-            total: count()
-        })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, seasonId),
-                inArray(
-                    teams.division,
-                    divisionTargets.map((d) => d.divisionId)
-                ),
-                isNotNull(teams.captain)
-            )
-        )
-        .groupBy(teams.division)
-
-    const countByDivisionId = new Map(
-        captainCounts.map((row) => [row.divisionId, row.total])
-    )
-
-    return divisionTargets.map((division) => {
-        const teamsWithCaptain = countByDivisionId.get(division.divisionId) ?? 0
-        return {
-            divisionId: division.divisionId,
-            divisionName: division.divisionName,
-            requiredTeams: division.requiredTeams,
-            teamsWithCaptain,
-            isComplete:
-                division.requiredTeams > 0 &&
-                teamsWithCaptain === division.requiredTeams
-        }
-    })
-}
-
-async function getCommissionerCaptainSelectionStatus(
-    userId: string,
-    seasonId: number
-): Promise<CaptainSelectionDivisionStatus[]> {
-    const commissionerDivisions = await db
-        .select({
-            divisionId: divisions.id,
-            divisionName: divisions.name,
-            requiredTeams: individual_divisions.teams
-        })
-        .from(userRoles)
-        .innerJoin(divisions, eq(userRoles.division_id, divisions.id))
-        .leftJoin(
-            individual_divisions,
-            and(
-                eq(individual_divisions.season, seasonId),
-                eq(individual_divisions.division, userRoles.division_id)
-            )
-        )
-        .where(
-            and(
-                eq(userRoles.role, "commissioner"),
-                eq(userRoles.season_id, seasonId),
-                eq(userRoles.user_id, userId)
-            )
-        )
-        .orderBy(divisions.level)
-
-    if (commissionerDivisions.length === 0) return []
-
-    const captainCounts = await db
-        .select({
-            divisionId: teams.division,
-            total: count()
-        })
-        .from(teams)
-        .where(
-            and(
-                eq(teams.season, seasonId),
-                inArray(
-                    teams.division,
-                    commissionerDivisions.map((d) => d.divisionId)
-                ),
-                isNotNull(teams.captain)
-            )
-        )
-        .groupBy(teams.division)
-
-    const countByDivisionId = new Map(
-        captainCounts.map((row) => [row.divisionId, row.total])
-    )
-
-    return commissionerDivisions.map((division) => {
-        const requiredTeams = division.requiredTeams ?? 0
-        const teamsWithCaptain = countByDivisionId.get(division.divisionId) ?? 0
-        return {
-            divisionId: division.divisionId,
-            divisionName: division.divisionName,
-            requiredTeams,
-            teamsWithCaptain,
-            isComplete: requiredTeams > 0 && teamsWithCaptain === requiredTeams
-        }
-    })
-}
-
-function TeamAssignmentDisplay({
-    assignment
-}: {
-    assignment: PlayerTeamAssignment
-}) {
-    return (
-        <div className="space-y-3">
-            <div>
-                <p className="font-semibold text-sm">{assignment.teamName}</p>
-                <p className="pl-5 text-muted-foreground text-sm">
-                    {assignment.divisionName} Division
-                </p>
-            </div>
-            <div>
-                <p className="mb-0.5 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-                    Captain
-                </p>
-                <p className="pl-5 text-sm">
-                    {assignment.captainName}{" "}
-                    {assignment.captainEmail && (
-                        <a
-                            href={`mailto:${assignment.captainEmail}`}
-                            className="text-primary hover:underline"
-                        >
-                            {assignment.captainEmail}
-                        </a>
-                    )}
-                </p>
-            </div>
-            <div>
-                <p className="mb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-                    Team Roster
-                </p>
-                <ul className="space-y-0.5">
-                    {assignment.roster.map((player) => (
-                        <li
-                            key={`${player.displayName}-${player.lastName}`}
-                            className="flex items-center gap-1.5 text-sm"
-                        >
-                            {player.isCaptain && (
-                                <RiStarLine className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            )}
-                            <span
-                                className={
-                                    player.isCaptain ? "font-medium" : "pl-5"
-                                }
-                            >
-                                {player.displayName} {player.lastName}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    )
-}
-
-function RegistrationConfirmation({
-    signupStatus
-}: {
-    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
-}) {
-    return (
-        <div className="space-y-4">
-            <div className="flex items-center gap-3">
-                <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                    <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                    <p className="font-medium text-green-700 dark:text-green-400">
-                        You're registered!
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                        Paid ${signupStatus.signup!.amount_paid} on{" "}
-                        {new Date(
-                            signupStatus.signup!.created_at
-                        ).toLocaleDateString()}
-                    </p>
-                </div>
-            </div>
-
-            <div className="space-y-2 border-t pt-4 text-sm">
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">
-                        Captain Interest:
-                    </span>
-                    <span className="font-medium capitalize">
-                        {signupStatus.signup!.captain === "yes"
-                            ? "Yes"
-                            : signupStatus.signup!.captain === "only_if_needed"
-                              ? "Only if needed"
-                              : "No"}
-                    </span>
-                </div>
-
-                {signupStatus.pairPickName && (
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                            Pair Request:
-                        </span>
-                        <span className="font-medium">
-                            {signupStatus.pairPickName}
-                        </span>
-                    </div>
-                )}
-
-                {signupStatus.unavailableDates && (
-                    <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground">
-                            Dates Unavailable:
-                        </span>
-                        <span className="font-medium text-xs">
-                            {signupStatus.unavailableDates}
-                        </span>
-                    </div>
-                )}
-            </div>
-
-            {canEditPreferences(signupStatus.config.phase) && (
-                <div className="flex flex-wrap gap-2 border-t pt-4">
-                    <Link
-                        href="/dashboard/captain-pairing"
-                        className="inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-medium text-sm hover:bg-accent"
-                    >
-                        Edit captain & pairing
-                    </Link>
-                    <Link
-                        href="/dashboard/my-availability"
-                        className="inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-medium text-sm hover:bg-accent"
-                    >
-                        Edit availability
-                    </Link>
-                </div>
-            )}
-        </div>
-    )
-}
-
-function WaitlistContent({
-    signupStatus,
-    seasonLabel,
-    waitlistSeasonId,
-    activeWaiver
-}: {
-    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
-    seasonLabel: string | null
-    waitlistSeasonId: number | null
-    activeWaiver: { id: number; content: string } | null
-}) {
-    return (
-        <div className="space-y-3">
-            <p className="text-muted-foreground">
-                The {seasonLabel} season is currently full.
-            </p>
-            {signupStatus.onWaitlist ? (
-                signupStatus.waitlistApproved ? (
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                            <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                                <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                            </div>
-                            <p className="font-medium text-green-700 text-sm dark:text-green-400">
-                                You have been approved from the waitlist and can
-                                now complete your registration.
-                            </p>
-                        </div>
-                        <Link
-                            href="/dashboard/pay-season"
-                            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                        >
-                            Sign-up Now
-                        </Link>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                            <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                            You've expressed interest in playing. We'll reach
-                            out if a spot opens up!
-                        </p>
-                    </div>
-                )
-            ) : (
-                <div className="space-y-2">
-                    <p className="text-muted-foreground text-sm">
-                        There are occasionally drop-outs, injuries, or
-                        scheduling conflicts. Click here to express your
-                        interest in a spot in the league if one opens up or
-                        possibly a substitute if needed.
-                    </p>
-                    <WaitlistButton
-                        seasonId={waitlistSeasonId!}
-                        activeWaiver={activeWaiver}
-                    />
-                </div>
-            )}
-        </div>
-    )
-}
-
-function WaitlistInterestPanel({
-    signupStatus,
-    waitlistSeasonId,
-    pitch,
-    activeWaiver
-}: {
-    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
-    waitlistSeasonId: number | null
-    pitch: string
-    activeWaiver: { id: number; content: string } | null
-}) {
-    if (signupStatus.onWaitlist) {
-        if (signupStatus.waitlistApproved) {
-            return (
-                <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-green-100 p-2 dark:bg-green-900">
-                            <RiCheckLine className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        </div>
-                        <p className="font-medium text-green-700 text-sm dark:text-green-400">
-                            You've been approved from the waitlist! Please sign
-                            up for the season now.
-                        </p>
-                    </div>
-                    <Link
-                        href="/dashboard/pay-season"
-                        className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                    >
-                        Sign-up Now
-                    </Link>
-                </div>
-            )
-        }
-        return (
-            <div className="flex items-center gap-3">
-                <div className="rounded-full bg-blue-100 p-2 dark:bg-blue-900">
-                    <RiCheckLine className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <p className="font-medium text-blue-700 text-sm dark:text-blue-400">
-                    You've expressed interest in playing. We'll reach out if a
-                    spot opens up!
-                </p>
-            </div>
-        )
-    }
-
-    return (
-        <div className="space-y-2">
-            <p className="text-muted-foreground text-sm">{pitch}</p>
-            <WaitlistButton
-                seasonId={waitlistSeasonId!}
-                activeWaiver={activeWaiver}
-            />
-        </div>
-    )
-}
-
-function SignupCTA({
-    signupStatus,
-    seasonLabel
-}: {
-    signupStatus: NonNullable<Awaited<ReturnType<typeof getSeasonSignup>>>
-    seasonLabel: string | null
-}) {
-    return (
-        <div className="space-y-3">
-            <p className="text-muted-foreground">
-                You haven't signed up for the {seasonLabel} season yet.
-            </p>
-            <div className="space-y-1 rounded-lg bg-muted p-3">
-                <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Season Fee:</span>
-                    <span className="font-semibold">
-                        ${getCurrentSeasonAmount(signupStatus.config)}
-                    </span>
-                </div>
-                {(() => {
-                    const lateDateEvent = getEventsByType(
-                        signupStatus.config,
-                        "late_date"
-                    )[0]
-                    return (
-                        lateDateEvent &&
-                        signupStatus.config.lateAmount &&
-                        (isLatePricing(signupStatus.config) ? (
-                            <p className="text-amber-600 text-xs dark:text-amber-400">
-                                Late registration pricing in effect
-                            </p>
-                        ) : (
-                            <p className="text-muted-foreground text-xs">
-                                Price increases to $
-                                {signupStatus.config.lateAmount} after{" "}
-                                {formatEventDate(lateDateEvent.eventDate)}
-                            </p>
-                        ))
-                    )
-                })()}
-            </div>
-            <div className="flex gap-2">
-                <Link
-                    href="/dashboard/pay-season"
-                    className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90"
-                >
-                    Sign-up Now
-                </Link>
-                <Link
-                    href="/season-info"
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 font-medium text-sm hover:bg-accent hover:text-accent-foreground"
-                >
-                    More Info
-                </Link>
-            </div>
-        </div>
-    )
 }
 
 export default async function DashboardPage() {
@@ -2392,7 +1742,7 @@ export default async function DashboardPage() {
                                 Download Week 1 sessions 1 and 2 Nametags.
                                 Should be printed on{" "}
                                 <a
-                                    href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                    href={site.links.avery5164Labels}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline hover:text-primary/80"
@@ -2423,7 +1773,7 @@ export default async function DashboardPage() {
                                 Download Week 2 sessions 1-3 Nametags. Should be
                                 printed on{" "}
                                 <a
-                                    href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                    href={site.links.avery5164Labels}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline hover:text-primary/80"
@@ -2454,7 +1804,7 @@ export default async function DashboardPage() {
                                 Download Week 3 sessions 1-3 Nametags. Should be
                                 printed on{" "}
                                 <a
-                                    href="https://www.amazon.com/dp/B0BCFNZJK6"
+                                    href={site.links.avery5164Labels}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-primary underline hover:text-primary/80"
