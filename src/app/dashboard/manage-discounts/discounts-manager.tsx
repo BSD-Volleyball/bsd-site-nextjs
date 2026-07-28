@@ -8,12 +8,18 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import {
     RiAddLine,
+    RiArrowDownSLine,
     RiEditLine,
     RiDeleteBinLine,
     RiCheckLine,
     RiCloseLine
 } from "@remixicon/react"
 import { UserCombobox } from "@/components/user-combobox"
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
+} from "@/components/ui/collapsible"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -36,6 +42,14 @@ interface DiscountsManagerProps {
     discounts: DiscountEntry[]
     users: { id: string; name: string }[]
     scope: DiscountScope
+}
+
+// First of the month 14 months out, as a yyyy-mm-dd string for <input type="date">
+function getDefaultExpiration() {
+    const now = new Date()
+    const target = new Date(now.getFullYear(), now.getMonth() + 14, 1)
+    const month = String(target.getMonth() + 1).padStart(2, "0")
+    return `${target.getFullYear()}-${month}-01`
 }
 
 export function DiscountsManager({
@@ -66,6 +80,15 @@ export function DiscountsManager({
         const lower = search.toLowerCase()
         return discounts.filter((d) => d.userName.toLowerCase().includes(lower))
     }, [discounts, search])
+
+    const activeDiscounts = useMemo(
+        () => filteredDiscounts.filter((d) => !d.used),
+        [filteredDiscounts]
+    )
+    const usedDiscounts = useMemo(
+        () => filteredDiscounts.filter((d) => d.used),
+        [filteredDiscounts]
+    )
 
     const handleAddDiscount = async () => {
         if (!newUserId || !newPercentage) {
@@ -168,6 +191,185 @@ export function DiscountsManager({
         return new Date(date) < new Date()
     }
 
+    const renderTable = (rows: DiscountEntry[], emptyMessage: string) => (
+        <table className="w-full text-sm">
+            <thead>
+                <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Player
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Discount
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Expiration
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Status
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Reason
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Created
+                    </th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                        Actions
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows.map((discount) => (
+                    <tr
+                        key={discount.id}
+                        className="border-b transition-colors last:border-0 hover:bg-accent/50"
+                    >
+                        <td className="px-4 py-2 font-medium">
+                            {discount.userName}
+                        </td>
+                        <td className="px-4 py-2">
+                            {editingId === discount.id ? (
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    max="100"
+                                    value={editPercentage}
+                                    onChange={(e) =>
+                                        setEditPercentage(e.target.value)
+                                    }
+                                    className="h-8 w-20"
+                                />
+                            ) : (
+                                <span className="font-semibold text-green-600 dark:text-green-400">
+                                    {discount.percentage}% off
+                                </span>
+                            )}
+                        </td>
+                        <td className="px-4 py-2">
+                            {editingId === discount.id ? (
+                                <Input
+                                    type="date"
+                                    value={editExpiration}
+                                    onChange={(e) =>
+                                        setEditExpiration(e.target.value)
+                                    }
+                                    className="h-8 w-36"
+                                />
+                            ) : (
+                                <span
+                                    className={
+                                        isExpired(discount.expiration)
+                                            ? "text-red-600 dark:text-red-400"
+                                            : ""
+                                    }
+                                >
+                                    {formatDate(discount.expiration)}
+                                    {isExpired(discount.expiration) &&
+                                        " (expired)"}
+                                </span>
+                            )}
+                        </td>
+                        <td className="px-4 py-2">
+                            {discount.used ? (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 text-xs dark:bg-gray-800 dark:text-gray-400">
+                                    Used
+                                </span>
+                            ) : isExpired(discount.expiration) ? (
+                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600 text-xs dark:bg-red-900 dark:text-red-400">
+                                    Expired
+                                </span>
+                            ) : (
+                                <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-600 text-xs dark:bg-green-900 dark:text-green-400">
+                                    Active
+                                </span>
+                            )}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                            {editingId === discount.id ? (
+                                <Input
+                                    value={editReason}
+                                    onChange={(e) =>
+                                        setEditReason(e.target.value)
+                                    }
+                                    className="h-8 w-40"
+                                    placeholder="Optional"
+                                />
+                            ) : (
+                                <span>{discount.reason || "—"}</span>
+                            )}
+                        </td>
+                        <td className="px-4 py-2 text-muted-foreground">
+                            {new Date(discount.createdAt).toLocaleDateString(
+                                "en-US"
+                            )}
+                        </td>
+                        <td className="px-4 py-2">
+                            {editingId === discount.id ? (
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            handleSaveEdit(discount.id)
+                                        }
+                                        disabled={isLoading}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <RiCheckLine className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleCancelEdit}
+                                        className="h-8 w-8 p-0"
+                                    >
+                                        <RiCloseLine className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            handleStartEdit(discount)
+                                        }
+                                        className="h-8 w-8 p-0"
+                                        title="Edit"
+                                    >
+                                        <RiEditLine className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            setDeleteTargetId(discount.id)
+                                        }
+                                        disabled={isLoading}
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                        title="Delete"
+                                    >
+                                        <RiDeleteBinLine className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </td>
+                    </tr>
+                ))}
+                {rows.length === 0 && (
+                    <tr>
+                        <td
+                            colSpan={7}
+                            className="px-4 py-6 text-center text-muted-foreground"
+                        >
+                            {emptyMessage}
+                        </td>
+                    </tr>
+                )}
+            </tbody>
+        </table>
+    )
+
     return (
         <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -192,6 +394,9 @@ export function DiscountsManager({
                     />
                     <Button
                         onClick={() => {
+                            if (!showAddForm) {
+                                setNewExpiration(getDefaultExpiration())
+                            }
                             setShowAddForm(!showAddForm)
                         }}
                         size="sm"
@@ -281,190 +486,33 @@ export function DiscountsManager({
                 </div>
             )}
 
-            <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b bg-muted/50">
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Player
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Discount
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Expiration
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Status
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Reason
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Created
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredDiscounts.map((discount) => (
-                            <tr
-                                key={discount.id}
-                                className="border-b transition-colors last:border-0 hover:bg-accent/50"
-                            >
-                                <td className="px-4 py-2 font-medium">
-                                    {discount.userName}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {editingId === discount.id ? (
-                                        <Input
-                                            type="number"
-                                            min="1"
-                                            max="100"
-                                            value={editPercentage}
-                                            onChange={(e) =>
-                                                setEditPercentage(
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="h-8 w-20"
-                                        />
-                                    ) : (
-                                        <span className="font-semibold text-green-600 dark:text-green-400">
-                                            {discount.percentage}% off
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {editingId === discount.id ? (
-                                        <Input
-                                            type="date"
-                                            value={editExpiration}
-                                            onChange={(e) =>
-                                                setEditExpiration(
-                                                    e.target.value
-                                                )
-                                            }
-                                            className="h-8 w-36"
-                                        />
-                                    ) : (
-                                        <span
-                                            className={
-                                                isExpired(discount.expiration)
-                                                    ? "text-red-600 dark:text-red-400"
-                                                    : ""
-                                            }
-                                        >
-                                            {formatDate(discount.expiration)}
-                                            {isExpired(discount.expiration) &&
-                                                " (expired)"}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {discount.used ? (
-                                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 text-xs dark:bg-gray-800 dark:text-gray-400">
-                                            Used
-                                        </span>
-                                    ) : isExpired(discount.expiration) ? (
-                                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-600 text-xs dark:bg-red-900 dark:text-red-400">
-                                            Expired
-                                        </span>
-                                    ) : (
-                                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-green-600 text-xs dark:bg-green-900 dark:text-green-400">
-                                            Active
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-2 text-muted-foreground">
-                                    {editingId === discount.id ? (
-                                        <Input
-                                            value={editReason}
-                                            onChange={(e) =>
-                                                setEditReason(e.target.value)
-                                            }
-                                            className="h-8 w-40"
-                                            placeholder="Optional"
-                                        />
-                                    ) : (
-                                        <span>{discount.reason || "—"}</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-2 text-muted-foreground">
-                                    {new Date(
-                                        discount.createdAt
-                                    ).toLocaleDateString("en-US")}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {editingId === discount.id ? (
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    handleSaveEdit(discount.id)
-                                                }
-                                                disabled={isLoading}
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <RiCheckLine className="h-4 w-4 text-green-600" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={handleCancelEdit}
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <RiCloseLine className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    handleStartEdit(discount)
-                                                }
-                                                className="h-8 w-8 p-0"
-                                                title="Edit"
-                                            >
-                                                <RiEditLine className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() =>
-                                                    setDeleteTargetId(
-                                                        discount.id
-                                                    )
-                                                }
-                                                disabled={isLoading}
-                                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                                title="Delete"
-                                            >
-                                                <RiDeleteBinLine className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredDiscounts.length === 0 && (
-                            <tr>
-                                <td
-                                    colSpan={7}
-                                    className="px-4 py-6 text-center text-muted-foreground"
-                                >
-                                    No discounts found.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+            <div className="space-y-2">
+                <h3 className="font-medium text-sm">
+                    Active Discounts ({activeDiscounts.length})
+                </h3>
+                <div className="overflow-x-auto rounded-lg border">
+                    {renderTable(activeDiscounts, "No active discounts found.")}
+                </div>
             </div>
+
+            <Collapsible>
+                <div className="rounded-lg border">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2.5 transition-colors hover:bg-muted/50">
+                        <span className="font-medium text-sm">
+                            Used Discounts ({usedDiscounts.length})
+                        </span>
+                        <RiArrowDownSLine className="h-5 w-5 text-muted-foreground transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                        <div className="overflow-x-auto border-t">
+                            {renderTable(
+                                usedDiscounts,
+                                "No used discounts found."
+                            )}
+                        </div>
+                    </CollapsibleContent>
+                </div>
+            </Collapsible>
             <AlertDialog
                 open={deleteTargetId !== null}
                 onOpenChange={(open) => {
