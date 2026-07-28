@@ -1307,6 +1307,77 @@ export const emailBroadcasts = pgTable(
     })
 )
 
+// --- Sub requests (captain-to-captain) ---
+
+export const subRequestStatusEnum = pgEnum("sub_request_status", [
+    "pending",
+    "approved",
+    "declined",
+    "cancelled",
+    "expired"
+])
+
+/**
+ * A captain's request to borrow a rostered player from another team for one
+ * match. Approval (by the target player's captain) creates the
+ * match_substitutions row in the same transaction. Statuses other than
+ * pending are terminal; pending requests for past-dated matches are lazily
+ * flipped to expired.
+ */
+export const subRequests = pgTable(
+    "sub_requests",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "restrict" }),
+        match: integer("match")
+            .notNull()
+            .references(() => matches.id, { onDelete: "cascade" }),
+        requesting_team: integer("requesting_team")
+            .notNull()
+            .references(() => teams.id, { onDelete: "cascade" }),
+        target_team: integer("target_team")
+            .notNull()
+            .references(() => teams.id, { onDelete: "cascade" }),
+        // Player being covered (on the requesting team)
+        original_user: text("original_user")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        // Candidate sub (on the target team)
+        target_user: text("target_user")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        status: subRequestStatusEnum("status").default("pending").notNull(),
+        message: text("message"),
+        requested_by: text("requested_by")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        responded_by: text("responded_by").references(() => users.id, {
+            onDelete: "restrict"
+        }),
+        responded_at: timestamp("responded_at"),
+        response_note: text("response_note"),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        subRequestsMatchIdx: index("sub_requests_match_idx").on(table.match),
+        subRequestsRequestingTeamIdx: index(
+            "sub_requests_requesting_team_idx"
+        ).on(table.requesting_team),
+        subRequestsTargetTeamIdx: index("sub_requests_target_team_idx").on(
+            table.target_team
+        ),
+        subRequestsSeasonIdx: index("sub_requests_season_idx").on(table.season),
+        // One live ask per (match, slot, candidate); resolved requests never
+        // block a re-ask thanks to the partial index.
+        subRequestsPendingUniq: uniqueIndex("sub_requests_pending_uniq")
+            .on(table.match, table.original_user, table.target_user)
+            .where(sql`${table.status} = 'pending'`)
+    })
+)
+
 // --- Notification preferences & log ---
 
 /**

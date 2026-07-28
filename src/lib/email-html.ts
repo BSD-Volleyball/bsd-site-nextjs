@@ -204,6 +204,34 @@ export function buildAvailabilityChangeHtml(opts: {
     })
 }
 
+/**
+ * Shared body for every sub-request lifecycle email (received, approved,
+ * declined, cancelled, locked in) — the states differ only in heading, intro
+ * sentence, detail rows, and an optional free-text note.
+ */
+export function buildSubRequestEmailHtml(opts: {
+    firstName: string
+    heading: string
+    intro: string
+    details: Array<{ label: string; value: string }>
+    note?: string | null
+    actionLabel?: string
+}): string {
+    return renderEmailHtml({
+        heading: opts.heading,
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>${escapeHtml(opts.intro)}</p>
+            ${renderDetailsBlock(
+                opts.details.map((d) => renderDetailRow(d.label, d.value))
+            )}
+            ${opts.note ? `<p style="font-size:13px;color:#6b7280;">Note: ${escapeHtml(opts.note)}</p>` : ""}
+        `,
+        action: opts.actionLabel ?? "View Sub Requests",
+        actionUrl: `${site.url}/dashboard/team-availability`
+    })
+}
+
 export function buildGameReminderHtml(opts: {
     firstName: string
     role: "player" | "referee"

@@ -50,3 +50,13 @@ export type PermanentLockTarget = {
     subUserId: string
     subName: string
 }
+
+export type SubRequestTarget = {
+    matchId: number
+    matchDate: string
+    originalUserId: string
+    originalName: string
+    subUserId: string
+    subName: string
+    subTeamName: string
+}

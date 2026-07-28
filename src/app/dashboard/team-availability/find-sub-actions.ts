@@ -12,8 +12,7 @@ import {
     matches,
     waitlist,
     seasons,
-    substitutions,
-    matchSubstitutions
+    substitutions
 } from "@/database/schema"
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -23,41 +22,11 @@ import {
     isAdminOrDirector,
     getCommissionerDivisionScope
 } from "@/lib/rbac"
-import {
-    getTeamRosterWithSubs,
-    resolveActiveUserForSlot,
-    formatPlayerSummaryName
-} from "@/lib/roster"
+import { getTeamRosterWithSubs, formatPlayerSummaryName } from "@/lib/roster"
 import { ok, fail, type ActionResult } from "@/lib/action-helpers"
+import { insertMatchSubstitution } from "@/lib/match-substitutions"
+import { canAccessTeam } from "@/lib/team-access"
 import { formatDisplayName } from "@/lib/utils"
-
-async function canAccessTeam(
-    userId: string,
-    teamId: number,
-    seasonId: number
-): Promise<boolean> {
-    if (await isAdminOrDirector(userId)) return true
-
-    const [teamRow] = await db
-        .select({
-            captain: teams.captain,
-            captain2: teams.captain2,
-            division: teams.division
-        })
-        .from(teams)
-        .where(eq(teams.id, teamId))
-        .limit(1)
-
-    if (!teamRow) return false
-    if (teamRow.captain === userId || teamRow.captain2 === userId) return true
-
-    const scope = await getCommissionerDivisionScope(userId, seasonId)
-    if (scope.type === "league_wide") return true
-    if (scope.type === "division_specific") {
-        return scope.divisionIds.includes(teamRow.division)
-    }
-    return false
-}
 
 export type RegularSubCandidate = {
     userId: string
@@ -993,106 +962,19 @@ export async function lockInRegularSub(input: {
         return fail("Not authorized.")
     }
 
-    const [matchRow] = await db
-        .select({
-            id: matches.id,
-            season: matches.season,
-            homeTeam: matches.home_team,
-            awayTeam: matches.away_team,
-            date: matches.date
-        })
-        .from(matches)
-        .where(eq(matches.id, matchId))
-        .limit(1)
-    if (!matchRow) return fail("Match not found.")
-    if (matchRow.season !== config.seasonId)
-        return fail("Match is not in the active season.")
-    if (matchRow.homeTeam !== teamId && matchRow.awayTeam !== teamId)
-        return fail("Match does not belong to this team.")
-
-    // Confirm originalUserId is currently active on the team (resolves the
-    // permanent-sub chain). Reject if they've been permanently subbed out.
-    const slot = await resolveActiveUserForSlot(teamId, originalUserId)
-    let activeOriginal: string
-    if (slot && slot.activeUserId === originalUserId) {
-        activeOriginal = originalUserId
-    } else {
-        // Allow callers to pass the original draftee even if no chain exists.
-        // Otherwise reject — the player isn't on this team's active roster.
-        const [draftRow] = await db
-            .select({ id: drafts.id })
-            .from(drafts)
-            .where(
-                and(eq(drafts.team, teamId), eq(drafts.user, originalUserId))
-            )
-            .limit(1)
-        if (!draftRow)
-            return fail(
-                "Player is not on this team's active roster for this match."
-            )
-        activeOriginal = originalUserId
-    }
-
-    // Sub-in user must be on the waitlist for this season.
-    const [waitlistRow] = await db
-        .select({ id: waitlist.id })
-        .from(waitlist)
-        .where(
-            and(
-                eq(waitlist.season, config.seasonId),
-                eq(waitlist.user, subUserId)
-            )
-        )
-        .limit(1)
-    if (!waitlistRow)
-        return fail("Sub user is not on the waitlist for this season.")
-
-    // Reject duplicate (match, original_user) — also enforced by unique index.
-    const [existing] = await db
-        .select({ id: matchSubstitutions.id })
-        .from(matchSubstitutions)
-        .where(
-            and(
-                eq(matchSubstitutions.match, matchId),
-                eq(matchSubstitutions.original_user, activeOriginal)
-            )
-        )
-        .limit(1)
-    if (existing)
-        return fail("A sub is already recorded for this player on this match.")
-
-    const originalName = await findUserName(activeOriginal)
-    const subName = await findUserName(subUserId)
-
-    let insertedId: number
-    try {
-        const inserted = await db
-            .insert(matchSubstitutions)
-            .values({
-                match: matchId,
-                team: teamId,
-                season: config.seasonId,
-                original_user: activeOriginal,
-                sub_user: subUserId,
-                performed_by: sessionUser.id,
-                notes: notes?.trim() || null
-            })
-            .returning({ id: matchSubstitutions.id })
-        insertedId = inserted[0].id
-    } catch (err) {
-        console.error("Failed to lock in regular sub:", err)
-        return fail("Failed to record substitution.")
-    }
-
-    await logAuditEntry({
-        userId: sessionUser.id,
-        action: "create",
-        entityType: "match_substitutions",
-        entityId: insertedId,
-        summary: `Locked in regular sub: ${subName} subs for ${originalName} on team ${teamId} for match ${matchId}${matchRow.date ? ` (${matchRow.date})` : ""} (performed by ${sessionUser.name ?? sessionUser.id})`
+    const result = await insertMatchSubstitution({
+        teamId,
+        matchId,
+        originalUserId,
+        subUserId,
+        performedBy: sessionUser.id,
+        seasonId: config.seasonId,
+        notes,
+        subEligibility: "waitlist"
     })
+    if (!result.ok) return fail(result.message)
 
-    return ok({ matchSubstitutionId: insertedId })
+    return ok({ matchSubstitutionId: result.id })
 }
 
 export async function logSubContactViewed(

@@ -19,6 +19,7 @@ import { formatDisplayName } from "@/lib/utils"
 import { getTeamAvailabilityData } from "./actions"
 import type { RosterPlayer, TeamAvailabilityData } from "./actions"
 import { FindSubPanel } from "./find-sub-panel"
+import { SubRequestsCard } from "./sub-requests-card"
 
 function formatDate(dateStr: string): string {
     const date = new Date(`${dateStr}T00:00:00`)
@@ -317,6 +318,10 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
             </CardContent>
             {roster.length > 0 && (
                 <div className="px-6 pb-6">
+                    <SubRequestsCard
+                        key={`sub-requests-${team.id}`}
+                        teamId={team.id}
+                    />
                     <FindSubPanel
                         key={team.id}
                         teamId={team.id}

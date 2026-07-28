@@ -9,7 +9,108 @@ import {
 } from "@remixicon/react"
 import type { SubContactDetails } from "./find-sub-actions"
 import { formatDate } from "./find-sub-helpers"
-import type { RegularLockTarget, PermanentLockTarget } from "./find-sub-helpers"
+import type {
+    RegularLockTarget,
+    PermanentLockTarget,
+    SubRequestTarget
+} from "./find-sub-helpers"
+
+export function RequestSubModal({
+    target,
+    message,
+    onMessageChange,
+    requestError,
+    isSending,
+    onCancel,
+    onConfirm
+}: {
+    target: SubRequestTarget
+    message: string
+    onMessageChange: (value: string) => void
+    requestError: string | null
+    isSending: boolean
+    onCancel: () => void
+    onConfirm: () => void
+}) {
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onClick={() => !isSending && onCancel()}
+            onKeyDown={(e) => {
+                if (e.key === "Escape" && !isSending) onCancel()
+            }}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+        >
+            <div
+                className="relative w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                role="document"
+            >
+                <h3 className="mb-1 font-semibold text-lg">Request a sub</h3>
+                <p className="mb-3 text-muted-foreground text-sm">
+                    This sends an email to {target.subName}&apos;s captain (
+                    {target.subTeamName}) asking them to approve the sub.
+                </p>
+                <div className="mb-3 space-y-1 text-sm">
+                    <p>
+                        <span className="text-muted-foreground">Match: </span>
+                        {formatDate(target.matchDate)}
+                    </p>
+                    <p>
+                        <span className="text-muted-foreground">Out: </span>
+                        {target.originalName}
+                    </p>
+                    <p>
+                        <span className="text-muted-foreground">
+                            Requested sub:{" "}
+                        </span>
+                        {target.subName}
+                    </p>
+                </div>
+                <label
+                    htmlFor="sub-request-message"
+                    className="mb-1 block font-medium text-sm"
+                >
+                    Message to their captain (optional)
+                </label>
+                <textarea
+                    id="sub-request-message"
+                    value={message}
+                    onChange={(e) => onMessageChange(e.target.value)}
+                    disabled={isSending}
+                    rows={3}
+                    className="mb-3 w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    placeholder="e.g. We're down two players for the 7pm match"
+                />
+                {requestError && (
+                    <p className="mb-3 text-destructive text-sm">
+                        {requestError}
+                    </p>
+                )}
+                <div className="flex justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onCancel}
+                        disabled={isSending}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={isSending}
+                    >
+                        {isSending ? "Sending..." : "Send Request"}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 export function ContactWarningModal({
     onClose,

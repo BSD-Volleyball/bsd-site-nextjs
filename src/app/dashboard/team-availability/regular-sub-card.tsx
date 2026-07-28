@@ -23,7 +23,7 @@ import type { RegularSubCandidate } from "./find-sub-actions"
 import type { RosterPlayer, EventInfo, DateMatchInfo } from "./actions"
 import { RegularCandidateRow } from "./find-sub-candidate-rows"
 import { displayName, formatDate, formatMatchTime } from "./find-sub-helpers"
-import type { RegularLockTarget } from "./find-sub-helpers"
+import type { RegularLockTarget, SubRequestTarget } from "./find-sub-helpers"
 import { formatDisplayName } from "@/lib/utils"
 
 type RegularSubCardProps = {
@@ -37,6 +37,7 @@ type RegularSubCardProps = {
     onOpenContact: (userId: string, name: string) => void
     onLockInvalid: (message: string) => void
     onOpenLock: (target: RegularLockTarget) => void
+    onOpenRequest: (target: SubRequestTarget) => void
 }
 
 export function RegularSubCard({
@@ -49,7 +50,8 @@ export function RegularSubCard({
     onOpenDetail,
     onOpenContact,
     onLockInvalid,
-    onOpenLock
+    onOpenLock,
+    onOpenRequest
 }: RegularSubCardProps) {
     // Regular sub state
     const [selectedEventId, setSelectedEventId] = useState<string>("")
@@ -96,6 +98,40 @@ export function RegularSubCard({
                 candidate.lastName,
                 candidate.preferredName
             )
+        })
+    }
+
+    function handleOpenRequestSub(candidate: RegularSubCandidate) {
+        if (!selectedEventId) return
+        const eventDate = eventDateById[parseInt(selectedEventId, 10)]
+        const info = eventDate ? dateMatchInfo[eventDate] : undefined
+        if (!info?.matchId) {
+            onLockInvalid(
+                "No match found for this date — cannot request a sub."
+            )
+            return
+        }
+        if (selectedMissingUserIds.size !== 1) {
+            onLockInvalid(
+                "Select exactly one player to be replaced before requesting a sub."
+            )
+            return
+        }
+        const originalUserId = Array.from(selectedMissingUserIds)[0]
+        const originalPlayer = roster.find((p) => p.userId === originalUserId)
+        if (!originalPlayer) return
+        onOpenRequest({
+            matchId: info.matchId,
+            matchDate: eventDate,
+            originalUserId,
+            originalName: displayName(originalPlayer),
+            subUserId: candidate.userId,
+            subName: formatDisplayName(
+                candidate.firstName,
+                candidate.lastName,
+                candidate.preferredName
+            ),
+            subTeamName: candidate.teamName
         })
     }
 
@@ -309,6 +345,9 @@ export function RegularSubCard({
                                         onOpenContact={onOpenContact}
                                         onLockIn={() =>
                                             handleOpenRegularLock(c)
+                                        }
+                                        onRequestSub={() =>
+                                            handleOpenRequestSub(c)
                                         }
                                     />
                                 ))}

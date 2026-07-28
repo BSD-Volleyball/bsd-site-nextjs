@@ -16,7 +16,8 @@ export function RegularCandidateRow({
     canLockIn,
     onOpenDetail,
     onOpenContact,
-    onLockIn
+    onLockIn,
+    onRequestSub
 }: {
     candidate: RegularSubCandidate
     rank: number
@@ -25,6 +26,7 @@ export function RegularCandidateRow({
     onOpenDetail: (userId: string) => void
     onOpenContact: (userId: string, name: string) => void
     onLockIn: () => void
+    onRequestSub: () => void
 }) {
     const name = formatDisplayName(c.firstName, c.lastName, c.preferredName)
     return (
@@ -87,15 +89,21 @@ export function RegularCandidateRow({
                 <div className="mt-2 flex flex-wrap gap-2">
                     <Button
                         type="button"
-                        variant="outline"
                         size="sm"
                         className="h-6 px-2 text-xs"
-                        onClick={() => onOpenContact(c.userId, name)}
+                        disabled={!canLockIn}
+                        title={
+                            canLockIn
+                                ? "Ask this player's captain to approve the sub"
+                                : "Select exactly one missing player to enable"
+                        }
+                        onClick={onRequestSub}
                     >
-                        Contact Info
+                        Request sub
                     </Button>
                     <Button
                         type="button"
+                        variant="outline"
                         size="sm"
                         className="h-6 px-2 text-xs"
                         disabled={!canLockIn}
@@ -107,6 +115,15 @@ export function RegularCandidateRow({
                         onClick={onLockIn}
                     >
                         Lock in for this match
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => onOpenContact(c.userId, name)}
+                    >
+                        Contact Info
                     </Button>
                 </div>
             </div>

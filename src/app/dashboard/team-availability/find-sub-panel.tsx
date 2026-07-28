@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -27,14 +28,20 @@ import type {
     DateMatchInfo
 } from "./actions"
 import { displayName } from "./find-sub-helpers"
-import type { RegularLockTarget, PermanentLockTarget } from "./find-sub-helpers"
+import type {
+    RegularLockTarget,
+    PermanentLockTarget,
+    SubRequestTarget
+} from "./find-sub-helpers"
 import { RegularSubCard } from "./regular-sub-card"
 import { PermanentSubCard } from "./permanent-sub-card"
+import { createSubRequest } from "./sub-request-actions"
 import {
     ContactWarningModal,
     ContactDetailsModal,
     RegularLockModal,
-    PermanentLockModal
+    PermanentLockModal,
+    RequestSubModal
 } from "./find-sub-modals"
 
 type FindSubPanelProps = {
@@ -142,6 +149,14 @@ export function FindSubPanel({
         }
     }, [canSeeFullWaitlist, teamId])
 
+    // Sub-request state
+    const [requestTarget, setRequestTarget] = useState<SubRequestTarget | null>(
+        null
+    )
+    const [requestMessage, setRequestMessage] = useState("")
+    const [requestError, setRequestError] = useState<string | null>(null)
+    const [isSendingRequest, setIsSendingRequest] = useState(false)
+
     // Lock-in confirmation state
     const [regularLockTarget, setRegularLockTarget] =
         useState<RegularLockTarget | null>(null)
@@ -161,6 +176,34 @@ export function FindSubPanel({
         setLockError(null)
         setLockNotes("")
         setRegularLockTarget(target)
+    }
+
+    function handleOpenRequestSub(target: SubRequestTarget) {
+        setRequestError(null)
+        setRequestMessage("")
+        setRequestTarget(target)
+    }
+
+    async function handleConfirmRequestSub() {
+        if (!requestTarget) return
+        setIsSendingRequest(true)
+        setRequestError(null)
+        const result = await createSubRequest({
+            teamId,
+            matchId: requestTarget.matchId,
+            originalUserId: requestTarget.originalUserId,
+            targetUserId: requestTarget.subUserId,
+            message: requestMessage.trim() || undefined
+        })
+        setIsSendingRequest(false)
+        if (!result.status) {
+            setRequestError(result.message)
+            return
+        }
+        setRequestTarget(null)
+        setRequestMessage("")
+        toast.success(result.message ?? "Sub request sent.")
+        router.refresh()
     }
 
     function handleOpenPermanentLock(args: { userId: string; name: string }) {
@@ -259,6 +302,7 @@ export function FindSubPanel({
                 onOpenContact={handleOpenContactWarning}
                 onLockInvalid={setLockError}
                 onOpenLock={handleOpenRegularLock}
+                onOpenRequest={handleOpenRequestSub}
             />
 
             {/* Permanent Sub Finder */}
@@ -303,6 +347,19 @@ export function FindSubPanel({
                     onClose={handleCloseContactWarning}
                     onAcknowledge={handleAcknowledgeContact}
                     isLoading={isLoadingContact}
+                />
+            )}
+
+            {/* Sub request modal */}
+            {requestTarget && (
+                <RequestSubModal
+                    target={requestTarget}
+                    message={requestMessage}
+                    onMessageChange={setRequestMessage}
+                    requestError={requestError}
+                    isSending={isSendingRequest}
+                    onCancel={() => setRequestTarget(null)}
+                    onConfirm={handleConfirmRequestSub}
                 />
             )}
 
