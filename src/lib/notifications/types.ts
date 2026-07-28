@@ -191,6 +191,14 @@ export const STREAM_TO_TYPE: Partial<Record<string, NotificationType>> = {
     broadcast: "league_announcements"
 }
 
+/** Friendly names for Postmark streams, for suppression banners. */
+export const STREAM_LABELS: Record<string, string> = {
+    outbound: "account & team emails",
+    broadcast: "league announcements",
+    "in-season-updates": "in-season updates",
+    "automated-reminders": "game reminders"
+}
+
 export function typesInCategory(
     category: NotificationCategoryId
 ): NotificationType[] {

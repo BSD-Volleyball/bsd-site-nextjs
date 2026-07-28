@@ -152,6 +152,8 @@ Common environment variables used across the app include:
 - `POSTMARK_SERVER_TOKEN`
 - `POSTMARK_WEBHOOK_USER`
 - `POSTMARK_WEBHOOK_PASSWORD`
+- `NOTIFICATION_UNSUB_SECRET` (HMAC key for RFC-8058 one-click unsubscribe tokens)
+- `CRON_SECRET` (bearer token protecting `/api/cron/*` routes; set automatically by Vercel Cron)
 - `MAIL_FROM`
 - `NEXT_PUBLIC_APP_URL`
 - `PLAYER_PIC_URL`

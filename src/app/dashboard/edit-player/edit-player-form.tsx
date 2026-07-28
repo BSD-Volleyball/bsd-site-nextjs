@@ -26,6 +26,7 @@ import {
 import { compressImageForUpload } from "@/lib/image-compression"
 import { formatFullTimestamp } from "@/lib/date-utils"
 import { googleMembershipOptions } from "@/lib/google-membership"
+import { NotificationSettingsCard } from "./notification-settings-card"
 
 interface EditPlayerFormProps {
     users: { id: string; name: string }[]
@@ -764,6 +765,15 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                     >
                         {isSignupPending ? "Saving..." : "Save Signup Changes"}
                     </Button>
+                </div>
+            )}
+
+            {selectedUserId && (
+                <div className="space-y-4 border-t pt-6">
+                    <h2 className="font-semibold text-lg">
+                        Notification Settings
+                    </h2>
+                    <NotificationSettingsCard userId={selectedUserId} />
                 </div>
             )}
         </div>

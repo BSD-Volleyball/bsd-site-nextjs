@@ -1,7 +1,24 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import {
+    withAction,
+    ok,
+    fail,
+    requireAdmin,
+    requireSession
+} from "@/lib/action-helpers"
+import { syncCategoryOptouts } from "@/lib/notifications/postmark-sync"
+import {
+    getOptedOutTypes,
+    setUserOptouts
+} from "@/lib/notifications/preferences"
+import { getUserSuppressionState } from "@/lib/notifications/suppressions"
+import {
+    NOTIFICATION_TYPES,
+    type NotificationType,
+    isNotificationType
+} from "@/lib/notifications/types"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -576,5 +593,93 @@ export const updateSignup = withAction(
             console.error("Error updating signup:", error)
             return fail("Failed to update signup.")
         }
+    }
+)
+
+// ---------------------------------------------------------------------------
+// Notification settings (admin view/edit of a player's preferences)
+// ---------------------------------------------------------------------------
+
+export interface AdminNotificationSettings {
+    optedOut: NotificationType[]
+    suppressions: Array<{
+        streamId: string
+        reason: string
+        origin: string
+        suppressedAt: Date
+        canReactivate: boolean
+    }>
+    emailStatus: string
+}
+
+export const getUserNotificationSettings = withAction(
+    async (
+        userId: string
+    ): Promise<ActionResult<AdminNotificationSettings>> => {
+        await requireAdmin()
+
+        const [user] = await db
+            .select({ email: users.email, emailStatus: users.email_status })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+        if (!user) return fail("User not found.")
+
+        const [optedOut, suppressions] = await Promise.all([
+            getOptedOutTypes(userId),
+            getUserSuppressionState(user.email)
+        ])
+        return ok({
+            optedOut: [...optedOut],
+            suppressions,
+            emailStatus: user.emailStatus
+        })
+    }
+)
+
+export const saveUserNotificationSettings = withAction(
+    async (userId: string, optedOut: string[]): Promise<ActionResult> => {
+        await requireAdmin()
+        const session = await requireSession()
+
+        const [user] = await db
+            .select({ email: users.email, name: users.name })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+        if (!user) return fail("User not found.")
+
+        const types: NotificationType[] = []
+        for (const value of optedOut) {
+            if (!isNotificationType(value)) {
+                return fail("Unknown notification type.")
+            }
+            if (NOTIFICATION_TYPES[value].mandatory) {
+                return fail("That notification can't be turned off.")
+            }
+            types.push(value)
+        }
+
+        const before = await getOptedOutTypes(userId)
+        const { added, removed } = await setUserOptouts(userId, types)
+        if (added.length > 0 || removed.length > 0) {
+            await syncCategoryOptouts({
+                userId,
+                email: user.email,
+                before,
+                after: new Set(types),
+                origin: "Admin"
+            })
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "update",
+                entityType: "notification_optouts",
+                entityId: userId,
+                summary: `Admin updated notification preferences for ${user.name ?? userId} (opted out: ${added.join(", ") || "none"}; opted back in: ${removed.join(", ") || "none"})`
+            })
+        }
+
+        revalidatePath("/dashboard/edit-player")
+        return ok(undefined, "Notification settings updated.")
     }
 )
