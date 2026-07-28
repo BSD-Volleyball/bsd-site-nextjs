@@ -19,6 +19,12 @@ import { eq, and, inArray, desc, lt, or } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig } from "@/lib/site-config"
 import { ensureTeamRecipientGroup } from "@/lib/email-recipients"
+import { buildDraftResultHtml } from "@/lib/email-html"
+import {
+    dispatchNotification,
+    type NotificationRecipient
+} from "@/lib/notifications/dispatch"
+import { formatDisplayName } from "@/lib/utils"
 import {
     isAdminOrDirector,
     isCommissionerBySession,
@@ -986,6 +992,8 @@ export const submitDraft = withAction(
                 }
             }
 
+            await sendDraftResultNotifications(picks, config)
+
             return ok(
                 undefined,
                 `Successfully submitted ${picks.length} draft picks!`
@@ -998,3 +1006,102 @@ export const submitDraft = withAction(
         }
     }
 )
+
+/**
+ * Emails every drafted player their team, division, and captain(s). Runs
+ * after the picks are committed; dispatchNotification never throws, so a
+ * mail outage can't fail the draft submission.
+ */
+async function sendDraftResultNotifications(
+    picks: DraftPick[],
+    config: Awaited<ReturnType<typeof getSeasonConfig>>
+): Promise<void> {
+    const draftedTeamIds = [...new Set(picks.map((p) => p.teamId))]
+    const draftedUserIds = [...new Set(picks.map((p) => p.userId))]
+
+    const [teamRows, userRows] = await Promise.all([
+        db
+            .select({
+                id: teams.id,
+                name: teams.name,
+                number: teams.number,
+                divisionName: divisions.name,
+                captain: teams.captain,
+                captain2: teams.captain2
+            })
+            .from(teams)
+            .innerJoin(divisions, eq(teams.division, divisions.id))
+            .where(inArray(teams.id, draftedTeamIds)),
+        db
+            .select({
+                id: users.id,
+                email: users.email,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name
+            })
+            .from(users)
+            .where(inArray(users.id, draftedUserIds))
+    ])
+
+    const captainIds = [
+        ...new Set(
+            teamRows.flatMap((t) => [t.captain, t.captain2]).filter(Boolean)
+        )
+    ] as string[]
+    const captainRows =
+        captainIds.length > 0
+            ? await db
+                  .select({
+                      id: users.id,
+                      firstName: users.first_name,
+                      lastName: users.last_name,
+                      preferredName: users.preferred_name
+                  })
+                  .from(users)
+                  .where(inArray(users.id, captainIds))
+            : []
+    const captainById = new Map(captainRows.map((c) => [c.id, c]))
+
+    const teamById = new Map(teamRows.map((t) => [t.id, t]))
+    const userById = new Map(userRows.map((u) => [u.id, u]))
+    const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+
+    const recipients: NotificationRecipient[] = []
+    const htmlByUserId = new Map<string, string>()
+
+    for (const pick of picks) {
+        const user = userById.get(pick.userId)
+        const team = teamById.get(pick.teamId)
+        if (!user?.email || !team) continue
+
+        const firstName =
+            user.preferredName || user.firstName || user.email.split("@")[0]
+        const captainNames = [team.captain, team.captain2]
+            .map((id) => (id ? captainById.get(id) : null))
+            .filter(Boolean)
+            .map((c) =>
+                formatDisplayName(c!.firstName, c!.lastName, c!.preferredName)
+            )
+
+        htmlByUserId.set(
+            user.id,
+            buildDraftResultHtml({
+                firstName,
+                teamName: team.name || `Team ${team.number ?? team.id}`,
+                divisionName: team.divisionName,
+                captainNames,
+                seasonLabel
+            })
+        )
+        recipients.push({ userId: user.id, email: user.email, firstName })
+    }
+
+    await dispatchNotification({
+        type: "draft_results",
+        recipients,
+        subject: `BSD Volleyball: You've been drafted — ${seasonLabel}`,
+        htmlBody: (r) => htmlByUserId.get(r.userId) ?? "",
+        tag: "draft-results"
+    })
+}

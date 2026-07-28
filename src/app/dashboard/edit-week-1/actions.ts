@@ -4,7 +4,10 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import {
+    dispatchNotification,
+    type NotificationRecipient
+} from "@/lib/notifications/dispatch"
 import {
     buildRosterAssignmentHtml,
     buildRosterRemovalHtml,
@@ -31,7 +34,6 @@ import {
 import { fetchPlayerScores } from "@/lib/player-score"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
-import { site } from "@/config/site"
 
 export interface Week1EditablePlayer {
     id: string
@@ -337,88 +339,90 @@ export const sendWeek1RosterNotifications = withAction(
         )
         const removedSet = new Set(removedUserIds)
 
-        const emailResults = await Promise.allSettled(
-            allUserIds
-                .filter((userId) => {
-                    const user = userById.get(userId)
-                    if (!user?.email) return false
-                    return (
-                        removedSet.has(userId) ||
-                        !!assignmentByUserId.get(userId)
-                    )
-                })
-                .map((userId) => {
-                    const user = userById.get(userId)!
-                    const firstName =
-                        user.preferredName ||
-                        user.firstName ||
-                        user.email!.split("@")[0]
-                    const isRemoved = removedSet.has(userId)
+        const removalRecipients: NotificationRecipient[] = []
+        const assignmentRecipients: NotificationRecipient[] = []
+        const htmlByUserId = new Map<string, string>()
 
-                    if (isRemoved) {
-                        return sendEmail({
-                            from: site.mailFrom,
-                            to: user.email!,
-                            subject: `BSD Volleyball: Week 1 Roster Update — ${seasonLabel}`,
-                            htmlBody: buildRosterRemovalHtml({
-                                firstName,
-                                weekLabel: "Week 1",
-                                seasonLabel
-                            }),
-                            stream: STREAM_OUTBOUND,
-                            tag: "roster-update"
-                        })
-                    }
+        for (const userId of allUserIds) {
+            const user = userById.get(userId)
+            if (!user?.email) continue
+            const firstName =
+                user.preferredName || user.firstName || user.email.split("@")[0]
+            const recipient = { userId, email: user.email, firstName }
 
-                    const assignment = assignmentByUserId.get(userId)!
-
-                    const isAlternate = assignment.sessionNumber === 3
-                    const sessionLabel = isAlternate
-                        ? "Alternate"
-                        : `Session ${assignment.sessionNumber}`
-                    const sessionTime = isAlternate
-                        ? "TBD"
-                        : sessionTimes[assignment.sessionNumber - 1] || "TBD"
-
-                    const detailRows = [
-                        tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
-                        renderDetailRow("Session:", sessionLabel),
-                        renderDetailRow("Time:", sessionTime),
-                        !isAlternate
-                            ? renderDetailRow(
-                                  "Court:",
-                                  `Court ${assignment.courtNumber}`
-                              )
-                            : ""
-                    ].filter(Boolean)
-
-                    return sendEmail({
-                        from: site.mailFrom,
-                        to: user.email!,
-                        subject: `BSD Volleyball: Your Week 1 Assignment — ${seasonLabel}`,
-                        htmlBody: buildRosterAssignmentHtml({
-                            firstName,
-                            weekLabel: "Week 1",
-                            seasonLabel,
-                            introText: `You've been assigned to the Week 1 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
-                            detailBlocks: [renderDetailsBlock(detailRows)],
-                            footnote: "Please plan to arrive 10 minutes early."
-                        }),
-                        stream: STREAM_OUTBOUND,
-                        tag: "roster-assignment"
+            if (removedSet.has(userId)) {
+                htmlByUserId.set(
+                    userId,
+                    buildRosterRemovalHtml({
+                        firstName,
+                        weekLabel: "Week 1",
+                        seasonLabel
                     })
-                })
-        )
-        const sent = emailResults.filter((r) => r.status === "fulfilled").length
-        emailResults
-            .filter((r) => r.status === "rejected")
-            .forEach((r, i) => {
-                console.error(
-                    `Failed to send week 1 email (index ${i}):`,
-                    (r as PromiseRejectedResult).reason
                 )
-            })
+                removalRecipients.push(recipient)
+                continue
+            }
 
-        return ok(undefined, `${sent} notification(s) sent.`)
+            const assignment = assignmentByUserId.get(userId)
+            if (!assignment) continue
+
+            const isAlternate = assignment.sessionNumber === 3
+            const sessionLabel = isAlternate
+                ? "Alternate"
+                : `Session ${assignment.sessionNumber}`
+            const sessionTime = isAlternate
+                ? "TBD"
+                : sessionTimes[assignment.sessionNumber - 1] || "TBD"
+
+            const detailRows = [
+                tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
+                renderDetailRow("Session:", sessionLabel),
+                renderDetailRow("Time:", sessionTime),
+                !isAlternate
+                    ? renderDetailRow(
+                          "Court:",
+                          `Court ${assignment.courtNumber}`
+                      )
+                    : ""
+            ].filter(Boolean)
+
+            htmlByUserId.set(
+                userId,
+                buildRosterAssignmentHtml({
+                    firstName,
+                    weekLabel: "Week 1",
+                    seasonLabel,
+                    introText: `You've been assigned to the Week 1 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
+                    detailBlocks: [renderDetailsBlock(detailRows)],
+                    footnote: "Please plan to arrive 10 minutes early."
+                })
+            )
+            assignmentRecipients.push(recipient)
+        }
+
+        const htmlFor = (r: NotificationRecipient) =>
+            htmlByUserId.get(r.userId) ?? ""
+
+        const removalResult = await dispatchNotification({
+            type: "tryout_roster",
+            recipients: removalRecipients,
+            subject: `BSD Volleyball: Week 1 Roster Update — ${seasonLabel}`,
+            htmlBody: htmlFor,
+            tag: "roster-update"
+        })
+        const assignmentResult = await dispatchNotification({
+            type: "tryout_roster",
+            recipients: assignmentRecipients,
+            subject: `BSD Volleyball: Your Week 1 Assignment — ${seasonLabel}`,
+            htmlBody: htmlFor,
+            tag: "roster-assignment"
+        })
+
+        const sent = removalResult.sent + assignmentResult.sent
+        const skipped = removalResult.skipped + assignmentResult.skipped
+        return ok(
+            undefined,
+            `${sent} notification(s) sent${skipped > 0 ? `, ${skipped} skipped (opted out or unreachable)` : ""}.`
+        )
     }
 )

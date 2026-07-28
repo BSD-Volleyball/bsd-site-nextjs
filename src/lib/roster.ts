@@ -247,6 +247,57 @@ export async function resolveActiveUserForSlot(
 }
 
 /**
+ * Finds the team a user is currently active on for a season, honoring the
+ * permanent-sub chain in both directions: a drafted player who has been
+ * permanently subbed out no longer counts, and a waitlist player who was
+ * permanently subbed in does. Returns null when the user isn't on any roster.
+ */
+export async function findActiveTeamForUser(
+    userId: string,
+    seasonId: number
+): Promise<{ teamId: number } | null> {
+    const draftRows = await db
+        .select({ teamId: drafts.team })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .where(and(eq(drafts.user, userId), eq(teams.season, seasonId)))
+    for (const row of draftRows) {
+        const slot = await resolveActiveUserForSlot(row.teamId, userId)
+        if (slot?.activeUserId === userId) return { teamId: row.teamId }
+    }
+
+    const subRows = await db
+        .select({
+            teamId: substitutions.team,
+            originalDraft: substitutions.original_draft
+        })
+        .from(substitutions)
+        .where(
+            and(
+                eq(substitutions.sub_user, userId),
+                eq(substitutions.season, seasonId)
+            )
+        )
+    for (const row of subRows) {
+        const chain = await db
+            .select({
+                subUser: substitutions.sub_user,
+                id: substitutions.id,
+                effectiveAt: substitutions.effective_at
+            })
+            .from(substitutions)
+            .where(eq(substitutions.original_draft, row.originalDraft))
+        chain.sort((a, b) => {
+            const t = b.effectiveAt.getTime() - a.effectiveAt.getTime()
+            return t !== 0 ? t : b.id - a.id
+        })
+        if (chain[0]?.subUser === userId) return { teamId: row.teamId }
+    }
+
+    return null
+}
+
+/**
  * Returns regular-sub records for a single match. Includes lookups for both
  * the original (subbed-out) and sub-in players so callers can render names
  * directly without a follow-up query.

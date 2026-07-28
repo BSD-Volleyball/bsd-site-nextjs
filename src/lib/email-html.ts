@@ -145,6 +145,65 @@ export function buildRosterRemovalHtml(opts: {
     })
 }
 
+export function buildDraftResultHtml(opts: {
+    firstName: string
+    teamName: string
+    divisionName: string
+    captainNames: string[]
+    seasonLabel: string
+}): string {
+    const captainLine =
+        opts.captainNames.length > 0
+            ? renderDetailRow(
+                  opts.captainNames.length > 1 ? "Captains:" : "Captain:",
+                  opts.captainNames.join(" & ")
+              )
+            : ""
+    const detailRows = [
+        renderDetailRow("Team:", opts.teamName),
+        renderDetailRow("Division:", opts.divisionName),
+        captainLine
+    ].filter(Boolean)
+
+    return renderEmailHtml({
+        heading: "You've Been Drafted!",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>The ${escapeHtml(opts.seasonLabel)} draft is in — here's your team:</p>
+            ${renderDetailsBlock(detailRows)}
+            <p>Your captain will be in touch about the season. See you on the court!</p>
+        `,
+        action: "View Rosters",
+        actionUrl: `${site.url}/dashboard/rosters`
+    })
+}
+
+export function buildAvailabilityChangeHtml(opts: {
+    captainFirstName: string
+    playerName: string
+    teamName: string
+    nowUnavailable: string[]
+    nowAvailable: string[]
+}): string {
+    const listHtml = (label: string, events: string[]) =>
+        events.length > 0
+            ? `<p style="margin:8px 0 4px;font-weight:600;">${escapeHtml(label)}</p>
+               <ul style="margin:0 0 8px;padding-left:20px;">${events.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}</ul>`
+            : ""
+
+    return renderEmailHtml({
+        heading: "Player Availability Update",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.captainFirstName)},</p>
+            <p>${escapeHtml(opts.playerName)} on ${escapeHtml(opts.teamName)} just updated their availability:</p>
+            ${listHtml("Now unavailable for:", opts.nowUnavailable)}
+            ${listHtml("Now available for:", opts.nowAvailable)}
+        `,
+        action: "View Team Availability",
+        actionUrl: `${site.url}/dashboard/team-availability`
+    })
+}
+
 export function buildConcernNotificationHtml(appUrl: string): string {
     return renderEmailHtml({
         heading: "New Concern Submitted",

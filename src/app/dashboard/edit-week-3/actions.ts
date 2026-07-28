@@ -4,7 +4,10 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
-import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import {
+    dispatchNotification,
+    type NotificationRecipient
+} from "@/lib/notifications/dispatch"
 import {
     buildRosterAssignmentHtml,
     buildRosterRemovalHtml,
@@ -35,7 +38,6 @@ import {
     getUnavailableSignupIdsForEvent,
     fetchRatingScoresForReturningPlayers
 } from "@/lib/week-rosters"
-import { site } from "@/config/site"
 import { formatDisplayName } from "@/lib/utils"
 
 export interface Week3EditablePlayer {
@@ -420,91 +422,93 @@ export const sendWeek3RosterNotifications = withAction(
             assignmentsByUser.set(a.userId, list)
         }
 
-        const emailResults = await Promise.allSettled(
-            allUserIds
-                .filter((userId) => !!userById.get(userId)?.email)
-                .map((userId) => {
-                    const user = userById.get(userId)!
-                    const firstName =
-                        user.preferredName ||
-                        user.firstName ||
-                        user.email!.split("@")[0]
-                    const isRemoved = removedSet.has(userId)
+        const removalRecipients: NotificationRecipient[] = []
+        const assignmentRecipients: NotificationRecipient[] = []
+        const htmlByUserId = new Map<string, string>()
 
-                    if (isRemoved) {
-                        return sendEmail({
-                            from: site.mailFrom,
-                            to: user.email!,
-                            subject: `BSD Volleyball: Week 3 Roster Update — ${seasonLabel}`,
-                            htmlBody: buildRosterRemovalHtml({
-                                firstName,
-                                weekLabel: "Week 3",
-                                seasonLabel
-                            }),
-                            stream: STREAM_OUTBOUND,
-                            tag: "roster-update"
-                        })
-                    }
+        for (const userId of allUserIds) {
+            const user = userById.get(userId)
+            if (!user?.email) continue
+            const firstName =
+                user.preferredName || user.firstName || user.email.split("@")[0]
+            const recipient = { userId, email: user.email, firstName }
 
-                    const userAssignments = assignmentsByUser.get(userId) || []
-
-                    const assignmentBlocks = userAssignments.map((a) => {
-                        const divisionIndex = allWeek3Divisions.findIndex(
-                            (d) => d.id === a.divisionId
-                        )
-                        const courtNumber =
-                            legacyCourtByDivision[a.divisionName] ??
-                            (divisionIndex >= 0 ? divisionIndex + 1 : 1)
-                        const matchupIndex = Math.floor((a.teamNumber - 1) / 2)
-                        const sessionTime = sessionTimes[matchupIndex] || "TBD"
-                        const captainName =
-                            captainBySlot.get(
-                                `${a.divisionId}-${a.teamNumber}`
-                            ) || null
-
-                        const rows = [
-                            tryoutDate
-                                ? renderDetailRow("Date:", tryoutDate)
-                                : "",
-                            renderDetailRow("Time:", sessionTime),
-                            renderDetailRow("Court:", `Court ${courtNumber}`),
-                            renderDetailRow("Division:", a.divisionName),
-                            renderDetailRow("Team:", `Team ${a.teamNumber}`),
-                            captainName
-                                ? renderDetailRow("Captain:", captainName)
-                                : ""
-                        ].filter(Boolean)
-
-                        return renderDetailsBlock(rows)
+            if (removedSet.has(userId)) {
+                htmlByUserId.set(
+                    userId,
+                    buildRosterRemovalHtml({
+                        firstName,
+                        weekLabel: "Week 3",
+                        seasonLabel
                     })
-
-                    return sendEmail({
-                        from: site.mailFrom,
-                        to: user.email!,
-                        subject: `BSD Volleyball: Your Week 3 Assignment — ${seasonLabel}`,
-                        htmlBody: buildRosterAssignmentHtml({
-                            firstName,
-                            weekLabel: "Week 3",
-                            seasonLabel,
-                            introText: `You've been assigned to the Week 3 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
-                            detailBlocks: assignmentBlocks,
-                            footnote: "Please plan to arrive 10 minutes early."
-                        }),
-                        stream: STREAM_OUTBOUND,
-                        tag: "roster-assignment"
-                    })
-                })
-        )
-        const sent = emailResults.filter((r) => r.status === "fulfilled").length
-        emailResults
-            .filter((r) => r.status === "rejected")
-            .forEach((r, i) => {
-                console.error(
-                    `Failed to send week 3 email (index ${i}):`,
-                    (r as PromiseRejectedResult).reason
                 )
+                removalRecipients.push(recipient)
+                continue
+            }
+
+            const userAssignments = assignmentsByUser.get(userId) || []
+
+            const assignmentBlocks = userAssignments.map((a) => {
+                const divisionIndex = allWeek3Divisions.findIndex(
+                    (d) => d.id === a.divisionId
+                )
+                const courtNumber =
+                    legacyCourtByDivision[a.divisionName] ??
+                    (divisionIndex >= 0 ? divisionIndex + 1 : 1)
+                const matchupIndex = Math.floor((a.teamNumber - 1) / 2)
+                const sessionTime = sessionTimes[matchupIndex] || "TBD"
+                const captainName =
+                    captainBySlot.get(`${a.divisionId}-${a.teamNumber}`) || null
+
+                const rows = [
+                    tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
+                    renderDetailRow("Time:", sessionTime),
+                    renderDetailRow("Court:", `Court ${courtNumber}`),
+                    renderDetailRow("Division:", a.divisionName),
+                    renderDetailRow("Team:", `Team ${a.teamNumber}`),
+                    captainName ? renderDetailRow("Captain:", captainName) : ""
+                ].filter(Boolean)
+
+                return renderDetailsBlock(rows)
             })
 
-        return ok(undefined, `${sent} notification(s) sent.`)
+            htmlByUserId.set(
+                userId,
+                buildRosterAssignmentHtml({
+                    firstName,
+                    weekLabel: "Week 3",
+                    seasonLabel,
+                    introText: `You've been assigned to the Week 3 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
+                    detailBlocks: assignmentBlocks,
+                    footnote: "Please plan to arrive 10 minutes early."
+                })
+            )
+            assignmentRecipients.push(recipient)
+        }
+
+        const htmlFor = (r: NotificationRecipient) =>
+            htmlByUserId.get(r.userId) ?? ""
+
+        const removalResult = await dispatchNotification({
+            type: "tryout_roster",
+            recipients: removalRecipients,
+            subject: `BSD Volleyball: Week 3 Roster Update — ${seasonLabel}`,
+            htmlBody: htmlFor,
+            tag: "roster-update"
+        })
+        const assignmentResult = await dispatchNotification({
+            type: "tryout_roster",
+            recipients: assignmentRecipients,
+            subject: `BSD Volleyball: Your Week 3 Assignment — ${seasonLabel}`,
+            htmlBody: htmlFor,
+            tag: "roster-assignment"
+        })
+
+        const sent = removalResult.sent + assignmentResult.sent
+        const skipped = removalResult.skipped + assignmentResult.skipped
+        return ok(
+            undefined,
+            `${sent} notification(s) sent${skipped > 0 ? `, ${skipped} skipped (opted out or unreachable)` : ""}.`
+        )
     }
 )

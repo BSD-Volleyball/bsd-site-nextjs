@@ -46,9 +46,26 @@ type BroadcastStream = typeof STREAM_BROADCAST | typeof STREAM_IN_SEASON_UPDATES
 import {
     ensureRecipientGroup,
     getRecipientsForGroup,
-    filterSuppressed
+    filterSuppressed,
+    filterByNotificationPreference,
+    type Recipient
 } from "@/lib/email-recipients"
+import { STREAM_TO_TYPE } from "@/lib/notifications/types"
 import { formatDisplayName } from "@/lib/utils"
+
+/**
+ * Streams that map to an opt-outable notification type additionally drop
+ * recipients who opted out on the Notifications page. in-season-updates has
+ * no mapping (mandatory) and filters by Postmark suppressions only.
+ */
+async function filterOptedOutForStream(
+    recipients: Recipient[],
+    stream: BroadcastStream
+): Promise<Recipient[]> {
+    const type = STREAM_TO_TYPE[stream]
+    if (!type) return recipients
+    return filterByNotificationPreference(recipients, type)
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -540,7 +557,10 @@ export const createAndSendBroadcast = withAction(
 
             const recipients = isTestSend
                 ? [{ email: session.user.email }]
-                : await filterSuppressed(groupRecipients, stream)
+                : await filterOptedOutForStream(
+                      await filterSuppressed(groupRecipients, stream),
+                      stream
+                  )
 
             // Captured before the suppression filter so the history view can
             // show how many of the intended audience were never attempted.
@@ -672,8 +692,11 @@ export const previewBroadcast = withAction(
             sendToType === "just_me"
                 ? 1
                 : (
-                      await filterSuppressed(
-                          await getRecipientsForGroup(group.groupId),
+                      await filterOptedOutForStream(
+                          await filterSuppressed(
+                              await getRecipientsForGroup(group.groupId),
+                              group.stream
+                          ),
                           group.stream
                       )
                   ).length
