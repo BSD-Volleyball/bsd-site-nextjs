@@ -1,3 +1,9 @@
 {
-    "installCommand": "pnpm install --frozen-lockfile"
+    "installCommand": "pnpm install --frozen-lockfile",
+    "crons": [
+        {
+            "path": "/api/cron/game-reminders",
+            "schedule": "0 15 * * *"
+        }
+    ]
 }

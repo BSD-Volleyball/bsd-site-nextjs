@@ -204,6 +204,41 @@ export function buildAvailabilityChangeHtml(opts: {
     })
 }
 
+export function buildGameReminderHtml(opts: {
+    firstName: string
+    role: "player" | "referee"
+    dateLabel: string
+    timeLabel: string
+    courtLabel: string
+    matchupLabel: string
+    teamName: string | null
+}): string {
+    const intro =
+        opts.role === "referee"
+            ? "You're scheduled to referee a match tomorrow:"
+            : `Your team${opts.teamName ? ` (${escapeHtml(opts.teamName)})` : ""} has a match tomorrow:`
+
+    const detailRows = [
+        renderDetailRow("Date:", opts.dateLabel),
+        renderDetailRow("Time:", opts.timeLabel),
+        renderDetailRow("Court:", opts.courtLabel),
+        renderDetailRow("Matchup:", opts.matchupLabel)
+    ]
+
+    return renderEmailHtml({
+        heading:
+            opts.role === "referee" ? "Reffing Reminder" : "Game Day Tomorrow!",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>${intro}</p>
+            ${renderDetailsBlock(detailRows)}
+            <p style="font-size:12px;color:#9ca3af;">Don't want these reminders? <a href="${escapeHtml(site.publicUrl)}/dashboard/notifications" style="color:#9ca3af;">Manage your email preferences</a>.</p>
+        `,
+        action: "View Schedule",
+        actionUrl: `${site.url}/dashboard/season-schedule`
+    })
+}
+
 export function buildConcernNotificationHtml(appUrl: string): string {
     return renderEmailHtml({
         heading: "New Concern Submitted",

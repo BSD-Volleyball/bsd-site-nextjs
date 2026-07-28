@@ -105,3 +105,29 @@ export function formatTimestamp(date: Date | string): string {
 export function formatFullTimestamp(date: Date | string): string {
     return toDate(date).toLocaleString("en-US")
 }
+
+// ---------------------------------------------------------------------------
+// League timezone
+// ---------------------------------------------------------------------------
+
+/**
+ * The league plays in the DC metro area; scheduled jobs (which run in UTC)
+ * must compute "today"/"tomorrow" in this zone or late-evening runs drift a
+ * day.
+ */
+export const LEAGUE_TIME_ZONE = "America/New_York"
+
+/**
+ * Returns "YYYY-MM-DD" for now + offsetDays, evaluated in the league's
+ * timezone (en-CA locale formats as ISO date). Offsetting by whole days
+ * before formatting keeps DST transitions from shifting the result.
+ */
+export function getLeagueDateString(offsetDays = 0): string {
+    const target = new Date(Date.now() + offsetDays * 86_400_000)
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: LEAGUE_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).format(target)
+}
