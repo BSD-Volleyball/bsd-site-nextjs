@@ -7,7 +7,7 @@ import { logger } from "@/lib/logger"
 // ---------------------------------------------------------------------------
 
 export const STREAM_OUTBOUND = "outbound"
-const STREAM_AUTOMATED_REMINDERS = "automated-reminders"
+export const STREAM_AUTOMATED_REMINDERS = "automated-reminders"
 export const STREAM_BROADCAST = "broadcast"
 export const STREAM_IN_SEASON_UPDATES = "in-season-updates"
 
@@ -125,6 +125,14 @@ export interface BatchEmailMessage {
     stream?: MessageStream
     tag?: string
     replyTo?: string
+    headers?: Array<{ name: string; value: string }>
+}
+
+export interface BatchSendResult {
+    sent: number
+    failed: number
+    /** Per-message outcome in submission order; errorCode 0 means accepted. */
+    results: Array<{ to: string; messageId: string | null; errorCode: number }>
 }
 
 export interface BatchThrottleOptions {
@@ -181,11 +189,12 @@ function sleep(ms: number): Promise<void> {
 export async function sendBatchEmails(
     messages: BatchEmailMessage[],
     throttle?: BatchThrottleOptions
-): Promise<{ sent: number; failed: number }> {
+): Promise<BatchSendResult> {
     const client = getPostmarkClient()
     const { batchSize, delayMs } = resolveBatchThrottle(throttle)
     let sent = 0
     let failed = 0
+    const perMessage: BatchSendResult["results"] = []
 
     for (let i = 0; i < messages.length; i += batchSize) {
         const chunk = messages.slice(i, i + batchSize)
@@ -198,10 +207,22 @@ export async function sendBatchEmails(
                 TextBody: m.textBody,
                 MessageStream: m.stream ?? STREAM_OUTBOUND,
                 Tag: m.tag,
-                ReplyTo: m.replyTo
+                ReplyTo: m.replyTo,
+                Headers: m.headers?.map((h) => ({
+                    Name: h.name,
+                    Value: h.value
+                }))
             }))
         )
-        for (const r of results) {
+        for (let j = 0; j < results.length; j++) {
+            const r = results[j]
+            // Postmark omits To on some error responses; fall back to the
+            // submitted address so callers can always correlate outcomes.
+            perMessage.push({
+                to: r.To ?? chunk[j]?.to ?? "",
+                messageId: r.ErrorCode === 0 ? (r.MessageID ?? null) : null,
+                errorCode: r.ErrorCode
+            })
             if (r.ErrorCode === 0) {
                 sent++
             } else {
@@ -220,7 +241,41 @@ export async function sendBatchEmails(
         if (hasMore && delayMs > 0) await sleep(delayMs)
     }
 
-    return { sent, failed }
+    return { sent, failed, results: perMessage }
+}
+
+// ---------------------------------------------------------------------------
+// Suppression management (Postmark REST API)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pushes a stream-level suppression to Postmark, mirroring what happens when
+ * a recipient clicks Postmark's own unsubscribe link. Callers must also
+ * upsert the local email_suppressions row — the SubscriptionChange webhook
+ * echo is idempotent either way.
+ */
+export async function createStreamSuppression(
+    streamId: MessageStream,
+    email: string
+): Promise<void> {
+    const client = getPostmarkClient()
+    await client.createSuppressions(streamId, {
+        Suppressions: [{ EmailAddress: email }]
+    })
+}
+
+/**
+ * Deletes a stream-level suppression at Postmark. Postmark refuses to delete
+ * SpamComplaint suppressions — callers must check canReactivate first.
+ */
+export async function deleteStreamSuppression(
+    streamId: MessageStream,
+    email: string
+): Promise<void> {
+    const client = getPostmarkClient()
+    await client.deleteSuppressions(streamId, {
+        Suppressions: [{ EmailAddress: email }]
+    })
 }
 
 // ---------------------------------------------------------------------------

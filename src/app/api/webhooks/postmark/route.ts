@@ -22,6 +22,7 @@ import {
     buildInboundEmailNotificationHtml,
     buildThreadReplyNotificationHtml
 } from "@/lib/email-html"
+import { recomputeEmailStatus } from "@/lib/notifications/suppressions"
 
 // ---------------------------------------------------------------------------
 // Postmark Inbound Email Payload (subset of fields we use)
@@ -677,38 +678,8 @@ async function handleSubscriptionChange(
                 )
             )
 
-        // Only clear back to 'valid' if no other suppressions remain
-        const remainingSuppressions = await db
-            .select({
-                id: emailSuppressions.id,
-                reason: emailSuppressions.reason
-            })
-            .from(emailSuppressions)
-            .where(eq(emailSuppressions.email, email))
-
-        if (remainingSuppressions.length === 0) {
-            await db
-                .update(users)
-                .set({ email_status: "valid" })
-                .where(eq(users.email, email))
-        } else {
-            // Re-evaluate status from remaining suppressions (highest priority wins)
-            const hasHardBounce = remainingSuppressions.some(
-                (s) => s.reason === "HardBounce"
-            )
-            const hasSpam = remainingSuppressions.some(
-                (s) => s.reason === "SpamComplaint"
-            )
-            const newStatus = hasHardBounce
-                ? "bounced"
-                : hasSpam
-                  ? "spam_complaint"
-                  : "unsubscribed"
-            await db
-                .update(users)
-                .set({ email_status: newStatus })
-                .where(eq(users.email, email))
-        }
+        // Re-derive email_status from whatever suppressions remain
+        await recomputeEmailStatus(email)
     }
 
     logger.info("[postmark-webhook] Subscription change", {

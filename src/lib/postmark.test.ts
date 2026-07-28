@@ -136,7 +136,10 @@ describe("sendBatchEmails", () => {
         })
 
         // One failure per chunk across 3 chunks.
-        expect(result).toEqual({ sent: 117, failed: 3 })
+        expect(result.sent).toBe(117)
+        expect(result.failed).toBe(3)
+        expect(result.results).toHaveLength(120)
+        expect(result.results.filter((r) => r.errorCode !== 0)).toHaveLength(3)
     })
 })
 

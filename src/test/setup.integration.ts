@@ -52,17 +52,25 @@ vi.mock("@/lib/auth", async () => {
 
 vi.mock("@/lib/postmark", () => ({
     STREAM_OUTBOUND: "outbound",
+    STREAM_AUTOMATED_REMINDERS: "automated-reminders",
     STREAM_BROADCAST: "broadcast",
     STREAM_IN_SEASON_UPDATES: "in-season-updates",
     sendEmail: vi.fn(async () => "test-message-id"),
-    sendBatchEmails: vi.fn(async (messages: unknown[]) => ({
+    sendBatchEmails: vi.fn(async (messages: Array<{ to: string }>) => ({
         sent: messages.length,
-        failed: 0
+        failed: 0,
+        results: messages.map((m) => ({
+            to: m.to,
+            messageId: "test-message-id",
+            errorCode: 0
+        }))
     })),
     sendBroadcastEmails: vi.fn(async (opts: { recipients: unknown[] }) => ({
         sent: opts.recipients.length,
         failed: 0
     })),
+    createStreamSuppression: vi.fn(async () => {}),
+    deleteStreamSuppression: vi.fn(async () => {}),
     // Pure classifier — keep the real behaviour so suppression logic under test
     // is exercised rather than stubbed away.
     isPermanentBounceType: (type: string | null | undefined) =>

@@ -15,6 +15,13 @@
       "when": 1785179750556,
       "tag": "0001_schema_overhaul",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785261417905,
+      "tag": "0002_strong_excalibur",
+      "breakpoints": true
     }
   ]
 }

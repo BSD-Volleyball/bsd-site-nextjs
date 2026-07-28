@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm"
+import { relations, sql } from "drizzle-orm"
 import {
     pgTable,
     pgEnum,
@@ -1303,6 +1303,72 @@ export const emailBroadcasts = pgTable(
         ),
         emailBroadcastsCreatedAtIdx: index(
             "email_broadcasts_created_at_idx"
+        ).on(table.created_at)
+    })
+)
+
+// --- Notification preferences & log ---
+
+/**
+ * Per-type notification opt-outs. Absence of a row means the user receives
+ * that type — new users and new notification types are opted in by default
+ * with no backfill. Valid type values live in the code registry
+ * (src/lib/notifications/types.ts); mandatory types never get rows here.
+ */
+export const notificationOptouts = pgTable(
+    "notification_optouts",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        notification_type: text("notification_type").notNull(),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        notificationOptoutsUserTypeUniq: uniqueIndex(
+            "notification_optouts_user_type_uniq"
+        ).on(table.user_id, table.notification_type),
+        notificationOptoutsTypeIdx: index("notification_optouts_type_idx").on(
+            table.notification_type
+        )
+    })
+)
+
+/**
+ * Record of every notification email handed to Postmark by the dispatcher
+ * (src/lib/notifications/dispatch.ts). Doubles as the idempotency ledger for
+ * scheduled sends: cron jobs pass a dedupe_key, and the partial unique index
+ * makes the claim insert a no-op when the same key+email was already claimed,
+ * so a double-fired cron sends nothing twice.
+ */
+export const notificationLog = pgTable(
+    "notification_log",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        email: text("email").notNull(),
+        notification_type: text("notification_type").notNull(),
+        stream_id: text("stream_id").notNull(),
+        tag: text("tag"),
+        subject: text("subject").notNull(),
+        dedupe_key: text("dedupe_key"),
+        // 'claimed' | 'sent' | 'failed'
+        status: text("status").notNull(),
+        postmark_message_id: text("postmark_message_id"),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        notificationLogDedupeUniq: uniqueIndex("notification_log_dedupe_uniq")
+            .on(table.notification_type, table.dedupe_key, table.email)
+            .where(sql`${table.dedupe_key} IS NOT NULL`),
+        notificationLogUserIdx: index("notification_log_user_idx").on(
+            table.user_id
+        ),
+        notificationLogCreatedAtIdx: index(
+            "notification_log_created_at_idx"
         ).on(table.created_at)
     })
 )

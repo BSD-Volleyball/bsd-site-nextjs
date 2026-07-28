@@ -15,11 +15,13 @@ import {
     divisions,
     seasons,
     emailRecipientGroups,
-    emailSuppressions,
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray, isNotNull } from "drizzle-orm"
 import { logger } from "@/lib/logger"
+import { getOptedOutUserIds } from "@/lib/notifications/preferences"
+import { getSuppressedEmails } from "@/lib/notifications/suppressions"
+import type { NotificationType } from "@/lib/notifications/types"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -432,21 +434,29 @@ export async function filterSuppressed(
 ): Promise<Recipient[]> {
     if (recipients.length === 0) return []
 
-    const emails = recipients.map((r) => r.email.toLowerCase())
-    const suppressedRows = await db
-        .select({ email: emailSuppressions.email })
-        .from(emailSuppressions)
-        .where(
-            and(
-                inArray(emailSuppressions.email, emails),
-                eq(emailSuppressions.stream_id, streamId)
-            )
-        )
-
-    const suppressedSet = new Set(
-        suppressedRows.map((r) => r.email.toLowerCase())
+    const suppressedSet = await getSuppressedEmails(
+        recipients.map((r) => r.email),
+        streamId
     )
     return recipients.filter((r) => !suppressedSet.has(r.email.toLowerCase()))
+}
+
+/**
+ * Drops recipients who opted out of the given notification type on the
+ * Notifications preference page. Mandatory types (in-season updates) are not
+ * opt-outable, so callers should skip this filter for them.
+ */
+export async function filterByNotificationPreference(
+    recipients: Recipient[],
+    type: NotificationType
+): Promise<Recipient[]> {
+    if (recipients.length === 0) return []
+
+    const optedOut = await getOptedOutUserIds(
+        type,
+        recipients.map((r) => r.userId)
+    )
+    return recipients.filter((r) => !optedOut.has(r.userId))
 }
 
 // ---------------------------------------------------------------------------
