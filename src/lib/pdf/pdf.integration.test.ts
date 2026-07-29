@@ -4,6 +4,7 @@ import { db } from "@/database/db"
 import { week1Rosters, week2Rosters } from "@/database/schema"
 import { generateWeekNametagsPdf } from "@/lib/pdf/nametags"
 import { generateTryoutSheetsPdf } from "@/lib/pdf/tryout-sheets"
+import { generateWeek1TryoutSheetsPdf } from "@/lib/pdf/tryout-sheets-week1"
 import {
     createDivision,
     createEventTimeSlot,
@@ -120,6 +121,18 @@ describe("generateWeekNametagsPdf (week 1)", () => {
         // One page per session with players; a session-3 page would mean
         // alternates leaked into the nametags
         expect(doc.getPageCount()).toBe(2)
+    })
+
+    it("generateWeek1TryoutSheetsPdf produces a parseable PDF in phase", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        await expectPdfResponse(await generateWeek1TryoutSheetsPdf())
+    })
+
+    it("generateWeek1TryoutSheetsPdf rejects the wrong phase", async () => {
+        await createSeason({ phase: "draft", year: 2027 })
+        await createUserWithRoles([{ role: "admin" }])
+        const response = await generateWeek1TryoutSheetsPdf()
+        expect(response.status).toBeGreaterThanOrEqual(400)
     })
 })
 

@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server"
-import { and, desc, eq, inArray } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
-    drafts,
     divisions,
-    seasons,
     signups,
-    teams,
     users,
     week2Rosters,
     week3Rosters
 } from "@/database/schema"
-import { formatDisplayName } from "@/lib/utils"
 import {
     getSeasonConfig,
     getEventsByType,
@@ -24,6 +20,18 @@ import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import { formatHeight } from "@/components/player-detail/format-height"
+import {
+    capitalize,
+    fitTextToCell,
+    formatGeneratedTimestamp,
+    getGenderLabel,
+    getPositionsLabel,
+    getSheetDisplayName,
+    loadTryoutSheetEnrichment,
+    pdfDownloadResponse,
+    seasonFileSlug,
+    truncateToFit
+} from "./tryout-sheet-shared"
 
 interface TryoutSheetRow {
     idLabel: string
@@ -59,166 +67,6 @@ const PAGE_DIVISIONS: [string[], string[]] = [
     ["AA", "A", "ABA"],
     ["ABB", "BBB", "BB"]
 ]
-
-function capitalize(value: string): string {
-    if (!value) {
-        return value
-    }
-    return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function getSeasonAbbreviation(seasonName: string): string {
-    const normalized = seasonName.trim().toLowerCase()
-
-    if (normalized.startsWith("fall")) {
-        return "F"
-    }
-
-    if (normalized.startsWith("spring")) {
-        return "S"
-    }
-
-    if (normalized.startsWith("summer")) {
-        return "U"
-    }
-
-    return seasonName.charAt(0).toUpperCase()
-}
-
-function getDisplayName({
-    firstName,
-    lastName,
-    preferredName
-}: {
-    firstName: string
-    lastName: string
-    preferredName: string | null
-}): string {
-    return formatDisplayName(firstName, lastName, preferredName)
-}
-
-function getGenderLabel(male: boolean | null): string {
-    if (male === true) {
-        return "M"
-    }
-
-    if (male === false) {
-        return "NM"
-    }
-
-    return "—"
-}
-
-function getPositionsLabel({
-    skillSetter,
-    skillHitter,
-    skillPasser
-}: {
-    skillSetter: boolean | null
-    skillHitter: boolean | null
-    skillPasser: boolean | null
-}): string {
-    const labels: string[] = []
-
-    if (skillSetter) {
-        labels.push("S")
-    }
-
-    if (skillHitter) {
-        labels.push("H")
-    }
-
-    if (skillPasser) {
-        labels.push("P")
-    }
-
-    if (labels.length === 0) {
-        return "—"
-    }
-
-    return labels.join("/")
-}
-
-function truncateToFit({
-    text,
-    maxWidth,
-    fontSize,
-    font
-}: {
-    text: string
-    maxWidth: number
-    fontSize: number
-    font: Awaited<ReturnType<typeof PDFDocument.create>> extends infer T
-        ? T extends PDFDocument
-            ? Awaited<ReturnType<T["embedFont"]>>
-            : never
-        : never
-}): string {
-    if (!text) {
-        return ""
-    }
-
-    if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) {
-        return text
-    }
-
-    const ellipsis = "…"
-    let shortened = text
-    while (shortened.length > 0) {
-        shortened = shortened.slice(0, -1)
-        const candidate = `${shortened}${ellipsis}`
-        if (font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
-            return candidate
-        }
-    }
-
-    return ellipsis
-}
-
-function fitTextToCell({
-    text,
-    maxWidth,
-    baseFontSize,
-    minFontSize,
-    font
-}: {
-    text: string
-    maxWidth: number
-    baseFontSize: number
-    minFontSize: number
-    font: Awaited<ReturnType<typeof PDFDocument.create>> extends infer T
-        ? T extends PDFDocument
-            ? Awaited<ReturnType<T["embedFont"]>>
-            : never
-        : never
-}): { text: string; fontSize: number } {
-    if (!text) {
-        return { text: "", fontSize: baseFontSize }
-    }
-
-    let fontSize = baseFontSize
-
-    while (
-        fontSize > minFontSize &&
-        font.widthOfTextAtSize(text, fontSize) > maxWidth
-    ) {
-        fontSize -= 0.5
-    }
-
-    if (font.widthOfTextAtSize(text, fontSize) <= maxWidth) {
-        return { text, fontSize }
-    }
-
-    return {
-        text: truncateToFit({
-            text,
-            maxWidth,
-            fontSize,
-            font
-        }),
-        fontSize
-    }
-}
 
 function getSessionMatchup(sessionNumber: 1 | 2 | 3): {
     homeTeam: number
@@ -336,55 +184,8 @@ export async function generateTryoutSheetsPdf(
             )
         ]
 
-        const [pairRows, draftRows] = await Promise.all([
-            pairIds.length > 0
-                ? db
-                      .select({
-                          id: users.id,
-                          firstName: users.first_name,
-                          lastName: users.last_name,
-                          preferredName: users.preferred_name
-                      })
-                      .from(users)
-                      .where(inArray(users.id, pairIds))
-                : Promise.resolve([]),
-            db
-                .select({
-                    userId: drafts.user,
-                    seasonId: seasons.id,
-                    seasonName: seasons.season,
-                    seasonYear: seasons.year,
-                    divisionName: divisions.name,
-                    overall: drafts.overall
-                })
-                .from(drafts)
-                .innerJoin(teams, eq(drafts.team, teams.id))
-                .innerJoin(seasons, eq(teams.season, seasons.id))
-                .innerJoin(divisions, eq(teams.division, divisions.id))
-                .where(inArray(drafts.user, userIds))
-                .orderBy(desc(seasons.id), drafts.overall)
-        ])
-
-        const pairNameById = new Map<string, string>()
-        for (const pair of pairRows) {
-            pairNameById.set(pair.id, getDisplayName(pair))
-        }
-
-        const latestDraftByUser = new Map<
-            string,
-            { seasonId: number; seasonLabel: string; divisionLabel: string }
-        >()
-        for (const draft of draftRows) {
-            if (latestDraftByUser.has(draft.userId)) {
-                continue
-            }
-
-            latestDraftByUser.set(draft.userId, {
-                seasonId: draft.seasonId,
-                seasonLabel: `${getSeasonAbbreviation(draft.seasonName)}${String(draft.seasonYear).slice(-2)}`,
-                divisionLabel: draft.divisionName
-            })
-        }
+        const { pairNameById, latestDraftByUser } =
+            await loadTryoutSheetEnrichment({ userIds, pairIds })
 
         const rowsByDivisionTeam = new Map<string, TryoutSheetRow[]>()
         for (const row of rosterRows) {
@@ -394,7 +195,7 @@ export async function generateTryoutSheetsPdf(
 
             currentRows.push({
                 idLabel: row.oldId === null ? "—" : String(row.oldId),
-                name: getDisplayName(row),
+                name: getSheetDisplayName(row),
                 lastName: row.lastName,
                 isMale: !!row.male,
                 pairName: row.pairPickId
@@ -627,15 +428,7 @@ export async function generateTryoutSheetsPdf(
             }
         ] as const
 
-        const generatedTimestamp = new Intl.DateTimeFormat("en-US", {
-            timeZone: "America/New_York",
-            month: "2-digit",
-            day: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true
-        }).format(new Date())
+        const generatedTimestamp = formatGeneratedTimestamp()
 
         const tryoutEvents = getEventsByType(config, "tryout")
         const weekSlots = tryoutEvents[week - 1]?.timeSlots ?? []
@@ -914,12 +707,7 @@ export async function generateTryoutSheetsPdf(
         }
 
         const pdfBytes = await pdfDoc.save()
-        const seasonSlug = config.seasonName
-            .toLowerCase()
-            .trim()
-            .replace(/\s+/g, "-")
-            .replace(/[^a-z0-9-]/g, "")
-        const downloadFileName = `bsd-week${week}-${seasonSlug}-${config.seasonYear}.pdf`
+        const downloadFileName = `bsd-week${week}-${seasonFileSlug(config.seasonName)}-${config.seasonYear}.pdf`
 
         const session = await auth.api.getSession({ headers: await headers() })
         if (session?.user) {
@@ -931,13 +719,7 @@ export async function generateTryoutSheetsPdf(
             })
         }
 
-        return new NextResponse(Buffer.from(pdfBytes), {
-            headers: {
-                "Content-Type": "application/pdf",
-                "Content-Disposition": `attachment; filename="${downloadFileName}"`,
-                "Cache-Control": "no-store"
-            }
-        })
+        return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
         console.error(`Error creating week ${week} tryout sheets PDF:`, error)
         return NextResponse.json(
