@@ -80,8 +80,8 @@ export function WizardForm({
     const playoffEvents = getEventsByType(config, "playoff")
     const week1Tryout = tryoutEvents[0] ?? null
 
-    // Returning players default to sitting out week 1 (they opt in by
-    // unchecking); new players default to attending.
+    // Returning players default to sitting out week 1 (they opt in via the
+    // "Opt-in to Evaluations" checkbox); new players default to attending.
     const initialUnavailableIds =
         isReturningPlayer && week1Tryout ? [week1Tryout.id] : []
 
@@ -428,28 +428,53 @@ export function WizardForm({
 
                             {week1Tryout && (
                                 <Week1TryoutCallout
+                                    audience={
+                                        isReturningPlayer ? "returning" : "new"
+                                    }
                                     dateLabel={formatEventDate(
                                         week1Tryout.eventDate
                                     )}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`event-${week1Tryout.id}`}
-                                            checked={selectedEvents.has(
-                                                week1Tryout.id
-                                            )}
-                                            onCheckedChange={() =>
-                                                toggleEvent(week1Tryout.id)
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor={`event-${week1Tryout.id}`}
-                                            className="cursor-pointer font-normal"
-                                        >
-                                            I will <strong>NOT</strong> be able
-                                            to attend the Week 1 tryout
-                                        </Label>
-                                    </div>
+                                    {isReturningPlayer ? (
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id={`event-${week1Tryout.id}`}
+                                                checked={
+                                                    !selectedEvents.has(
+                                                        week1Tryout.id
+                                                    )
+                                                }
+                                                onCheckedChange={() =>
+                                                    toggleEvent(week1Tryout.id)
+                                                }
+                                            />
+                                            <Label
+                                                htmlFor={`event-${week1Tryout.id}`}
+                                                className="cursor-pointer font-normal"
+                                            >
+                                                Opt-in to Evaluations
+                                            </Label>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id={`event-${week1Tryout.id}`}
+                                                checked={selectedEvents.has(
+                                                    week1Tryout.id
+                                                )}
+                                                onCheckedChange={() =>
+                                                    toggleEvent(week1Tryout.id)
+                                                }
+                                            />
+                                            <Label
+                                                htmlFor={`event-${week1Tryout.id}`}
+                                                className="cursor-pointer font-normal"
+                                            >
+                                                I will <strong>NOT</strong> be
+                                                able to attend the Week 1 tryout
+                                            </Label>
+                                        </div>
+                                    )}
                                 </Week1TryoutCallout>
                             )}
 
