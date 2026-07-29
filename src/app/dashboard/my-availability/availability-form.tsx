@@ -23,18 +23,25 @@ interface AvailabilityFormProps {
     config: SeasonConfig
     initialUnavailableIds: number[]
     scheduledTimesByEventId: Record<number, string>
+    isReturningPlayer: boolean
 }
 
 function EventToggleRow({
     event,
     unavailable,
     scheduledTime,
-    onToggle
+    onToggle,
+    unavailableTone = "red"
 }: {
     event: SeasonEvent
     unavailable: boolean
     scheduledTime: string | undefined
     onToggle: () => void
+    /**
+     * "amber" softens the unavailable styling for dates that are optional
+     * for this player (a returning player sitting out week 1 evaluations).
+     */
+    unavailableTone?: "red" | "amber"
 }) {
     return (
         <button
@@ -43,12 +50,24 @@ function EventToggleRow({
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
         >
             {unavailable ? (
-                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+                <RiCloseCircleFill
+                    className={cn(
+                        "h-4 w-4 shrink-0",
+                        unavailableTone === "amber"
+                            ? "text-amber-500"
+                            : "text-red-500"
+                    )}
+                />
             ) : (
                 <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <span
-                className={cn(unavailable && "text-red-600 dark:text-red-400")}
+                className={cn(
+                    unavailable &&
+                        (unavailableTone === "amber"
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400")
+                )}
             >
                 {formatEventDate(event.eventDate)}
                 {scheduledTime && (
@@ -65,7 +84,8 @@ export function AvailabilityForm({
     signupId,
     config,
     initialUnavailableIds,
-    scheduledTimesByEventId
+    scheduledTimesByEventId,
+    isReturningPlayer
 }: AvailabilityFormProps) {
     const router = useRouter()
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(
@@ -78,6 +98,16 @@ export function AvailabilityForm({
     const playoffEvents = getEventsByType(config, "playoff")
     const week1Tryout = tryoutEvents[0] ?? null
     const laterTryouts = tryoutEvents.slice(1)
+
+    // Sitting out week 1 is the expected default for returning players, so
+    // it doesn't count toward the "quite a few dates" warning for them.
+    const week1SittingOut =
+        isReturningPlayer &&
+        week1Tryout !== null &&
+        selectedEvents.has(week1Tryout.id)
+    const countedUnavailable = week1SittingOut
+        ? selectedEvents.size - 1
+        : selectedEvents.size
 
     const toggleEvent = (eventId: number) => {
         setSelectedEvents((prev) => {
@@ -127,6 +157,7 @@ export function AvailabilityForm({
             <CardContent className="space-y-6">
                 {week1Tryout && (
                     <Week1TryoutCallout
+                        audience={isReturningPlayer ? "returning" : "new"}
                         dateLabel={formatEventDate(week1Tryout.eventDate)}
                     >
                         <EventToggleRow
@@ -136,6 +167,9 @@ export function AvailabilityForm({
                                 scheduledTimesByEventId[week1Tryout.id]
                             }
                             onToggle={() => toggleEvent(week1Tryout.id)}
+                            unavailableTone={
+                                isReturningPlayer ? "amber" : "red"
+                            }
                         />
                     </Week1TryoutCallout>
                 )}
@@ -223,7 +257,7 @@ export function AvailabilityForm({
                         </div>
                     )}
 
-                {selectedEvents.size >= 4 && (
+                {countedUnavailable >= 4 && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
                         Are you sure you want to play this season? You&apos;ve
                         listed quite a few dates that you will miss.

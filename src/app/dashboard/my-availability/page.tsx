@@ -87,10 +87,18 @@ export default async function MyAvailabilityPage() {
         }
 
         // Ref without a player signup — show availability form with no scheduled times
-        const unavailRows = await db
-            .select({ eventId: userUnavailability.event_id })
-            .from(userUnavailability)
-            .where(eq(userUnavailability.user_id, session.user.id))
+        const [unavailRows, refReturningRow] = await Promise.all([
+            db
+                .select({ eventId: userUnavailability.event_id })
+                .from(userUnavailability)
+                .where(eq(userUnavailability.user_id, session.user.id)),
+            db
+                .select({ user: drafts.user })
+                .from(drafts)
+                .where(eq(drafts.user, session.user.id))
+                .limit(1)
+                .then((r) => r[0] ?? null)
+        ])
 
         return (
             <div className="space-y-6">
@@ -103,13 +111,14 @@ export default async function MyAvailabilityPage() {
                     config={config}
                     initialUnavailableIds={unavailRows.map((r) => r.eventId)}
                     scheduledTimesByEventId={{}}
+                    isReturningPlayer={refReturningRow !== null}
                 />
             </div>
         )
     }
 
     // Fetch unavailability + roster placements + team assignment in parallel
-    const [unavailRows, week1Row, week2Row, week3Row, draftRow] =
+    const [unavailRows, week1Row, week2Row, week3Row, draftRow, returningRow] =
         await Promise.all([
             db
                 .select({ eventId: userUnavailability.event_id })
@@ -158,6 +167,13 @@ export default async function MyAvailabilityPage() {
                         eq(teams.season, config.seasonId)
                     )
                 )
+                .limit(1)
+                .then((r) => r[0] ?? null),
+            // Returning player = has ever been drafted (any season)
+            db
+                .select({ user: drafts.user })
+                .from(drafts)
+                .where(eq(drafts.user, session.user.id))
                 .limit(1)
                 .then((r) => r[0] ?? null)
         ])
@@ -245,6 +261,7 @@ export default async function MyAvailabilityPage() {
                 config={config}
                 initialUnavailableIds={initialUnavailableIds}
                 scheduledTimesByEventId={scheduledTimesByEventId}
+                isReturningPlayer={returningRow !== null}
             />
         </div>
     )
