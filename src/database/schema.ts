@@ -304,6 +304,40 @@ export const userUnavailability = pgTable(
     })
 )
 
+// Admin-entered tryout timeslot requests: which slots a player CAN attend
+// for a given preseason tryout week. Week 1 uses slots 1-2 (sessions);
+// weeks 2/3 use slots 1-3. Placement honors these as a strong preference.
+export const tryoutSlotRequests = pgTable(
+    "tryout_slot_requests",
+    {
+        id: serial("id").primaryKey(),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        week: integer("week").notNull(),
+        can_slot_1: boolean("can_slot_1").notNull().default(false),
+        can_slot_2: boolean("can_slot_2").notNull().default(false),
+        can_slot_3: boolean("can_slot_3").notNull().default(false),
+        comment: text("comment"),
+        created_by: text("created_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        tryoutSlotRequestsSeasonIdx: index(
+            "tryout_slot_requests_season_idx"
+        ).on(table.season),
+        tryoutSlotRequestsUnique: uniqueIndex(
+            "tryout_slot_requests_season_user_week_unique"
+        ).on(table.season, table.user_id, table.week)
+    })
+)
+
 export const teams = pgTable(
     "teams",
     {
