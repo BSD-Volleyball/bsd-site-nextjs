@@ -16,7 +16,6 @@ import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
 import { drafts, signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
-import { RiCheckboxCircleLine } from "@remixicon/react"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -52,7 +51,9 @@ export default async function PaySeasonPage() {
 
     // A signups row is only written after payment succeeds, so its presence
     // means this player has already signed up and paid for the current season.
-    // Show a confirmation note instead of letting them re-fill the form.
+    // Passed to the wizard, which shows a confirmation note instead of the
+    // form (unless the signup just completed in this session — then it keeps
+    // its success card up).
     let existingSignup: { amountPaid: string | null; signedUpAt: Date } | null =
         null
     if (session && config.seasonId) {
@@ -88,51 +89,16 @@ export default async function PaySeasonPage() {
                     </Link>
                 </Button>
             </div>
-            {existingSignup ? (
-                <div className="rounded-lg border-2 border-green-600/40 bg-green-50 p-6 dark:bg-green-950/30">
-                    <div className="flex items-start gap-3">
-                        <RiCheckboxCircleLine className="mt-0.5 size-6 shrink-0 text-green-600 dark:text-green-400" />
-                        <div className="space-y-2">
-                            <h2 className="font-semibold text-green-800 text-lg dark:text-green-300">
-                                You&apos;re already registered
-                                {seasonLabel
-                                    ? ` for the ${seasonLabel} season`
-                                    : ""}
-                                !
-                            </h2>
-                            <p className="text-green-700 text-sm dark:text-green-400">
-                                Our records show you signed up
-                                {existingSignup.amountPaid &&
-                                Number(existingSignup.amountPaid) > 0
-                                    ? ` and paid $${existingSignup.amountPaid}`
-                                    : ""}{" "}
-                                on{" "}
-                                {existingSignup.signedUpAt.toLocaleDateString(
-                                    "en-US",
-                                    {
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric"
-                                    }
-                                )}
-                                . There&apos;s no need to sign up again.
-                            </p>
-                            <Button asChild size="sm" className="mt-1">
-                                <Link href="/dashboard">Back to Dashboard</Link>
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <WizardForm
-                    amount={getCurrentSeasonAmount(config)}
-                    users={users}
-                    config={config}
-                    discount={discount}
-                    activeWaiver={activeWaiver}
-                    isReturningPlayer={isReturningPlayer}
-                />
-            )}
+            <WizardForm
+                amount={getCurrentSeasonAmount(config)}
+                users={users}
+                config={config}
+                discount={discount}
+                activeWaiver={activeWaiver}
+                isReturningPlayer={isReturningPlayer}
+                seasonLabel={seasonLabel}
+                existingSignup={existingSignup}
+            />
         </div>
     )
 }

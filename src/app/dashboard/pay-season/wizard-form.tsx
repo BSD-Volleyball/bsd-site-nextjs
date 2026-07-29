@@ -35,6 +35,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import {
     RiCheckLine,
+    RiCheckboxCircleLine,
     RiErrorWarningLine,
     RiArrowRightLine
 } from "@remixicon/react"
@@ -57,6 +58,12 @@ interface WizardFormProps {
     discount: { id: number; percentage: string } | null
     activeWaiver: { id: number; content: string } | null
     isReturningPlayer: boolean
+    seasonLabel: string
+    // Set when a signups row already exists for this player+season. Rendered
+    // here (not by the server page) so the post-payment router.refresh()
+    // keeps this component mounted and the success card visible — a fresh
+    // visit has no paymentResult state and falls through to this notice.
+    existingSignup: { amountPaid: string | null; signedUpAt: Date } | null
 }
 
 const TABS = ["info", "pairing", "schedule", "waivers", "payment"] as const
@@ -68,7 +75,9 @@ export function WizardForm({
     config,
     discount,
     activeWaiver,
-    isReturningPlayer
+    isReturningPlayer,
+    seasonLabel,
+    existingSignup
 }: WizardFormProps) {
     const router = useRouter()
     const { resolvedTheme } = useTheme()
@@ -246,6 +255,45 @@ export function WizardForm({
                     </Button>
                 </CardFooter>
             </Card>
+        )
+    }
+
+    if (existingSignup) {
+        return (
+            <div className="rounded-lg border-2 border-green-600/40 bg-green-50 p-6 dark:bg-green-950/30">
+                <div className="flex items-start gap-3">
+                    <RiCheckboxCircleLine className="mt-0.5 size-6 shrink-0 text-green-600 dark:text-green-400" />
+                    <div className="space-y-2">
+                        <h2 className="font-semibold text-green-800 text-lg dark:text-green-300">
+                            You&apos;re already registered
+                            {seasonLabel
+                                ? ` for the ${seasonLabel} season`
+                                : ""}
+                            !
+                        </h2>
+                        <p className="text-green-700 text-sm dark:text-green-400">
+                            Our records show you signed up
+                            {existingSignup.amountPaid &&
+                            Number(existingSignup.amountPaid) > 0
+                                ? ` and paid $${existingSignup.amountPaid}`
+                                : ""}{" "}
+                            on{" "}
+                            {existingSignup.signedUpAt.toLocaleDateString(
+                                "en-US",
+                                {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric"
+                                }
+                            )}
+                            . There&apos;s no need to sign up again.
+                        </p>
+                        <Button asChild size="sm" className="mt-1">
+                            <Link href="/dashboard">Back to Dashboard</Link>
+                        </Button>
+                    </div>
+                </div>
+            </div>
         )
     }
 
