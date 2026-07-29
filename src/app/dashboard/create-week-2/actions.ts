@@ -1,30 +1,10 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import { db } from "@/database/db"
-import {
-    users,
-    signups,
-    drafts,
-    teams,
-    seasons,
-    divisions,
-    individual_divisions,
-    week2Rosters
-} from "@/database/schema"
-import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
-import { fetchPlayerScores } from "@/lib/player-score"
-import {
-    getUnavailableSignupIdsForEvent,
-    fetchRatingScoresForReturningPlayers
-} from "@/lib/week-rosters"
+import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { logAuditEntry } from "@/lib/audit-log"
-import { formatDisplayName } from "@/lib/utils"
+import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
+import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
 import type {
     Week2Candidate,
     Week2Division,
@@ -32,21 +12,7 @@ import type {
     Week2SavedAssignment
 } from "./week2-types"
 
-interface DraftSeasonRecord {
-    seasonId: number
-    overall: number
-    divisionName: string
-}
-
-function getDisplayName(candidate: Week2Candidate) {
-    return formatDisplayName(
-        candidate.firstName,
-        candidate.lastName,
-        candidate.preferredName
-    )
-}
-
-export async function getCreateWeek2Data(): Promise<{
+interface CreateWeek2Data {
     status: boolean
     message?: string
     seasonId: number
@@ -54,309 +20,58 @@ export async function getCreateWeek2Data(): Promise<{
     divisions: Week2Division[]
     candidates: Week2Candidate[]
     excludedPlayers: Week2ExcludedPlayer[]
-}> {
+}
+
+function emptyResult(message: string): CreateWeek2Data {
+    return {
+        status: false,
+        message,
+        seasonId: 0,
+        seasonLabel: "",
+        divisions: [],
+        candidates: [],
+        excludedPlayers: []
+    }
+}
+
+export async function getCreateWeek2Data(): Promise<CreateWeek2Data> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            seasonId: 0,
-            seasonLabel: "",
-            divisions: [],
-            candidates: [],
-            excludedPlayers: []
-        }
+        return emptyResult("You don't have permission to access this page.")
     }
 
     try {
-        const config = await getSeasonConfig()
+        const result = await loadPreseasonBaseData({
+            tryoutEventIndex: 1,
+            coachCaptainHandling: "exclude"
+        })
 
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                seasonId: 0,
-                seasonLabel: "",
-                divisions: [],
-                candidates: [],
-                excludedPlayers: []
-            }
+        if (!result.ok) {
+            return emptyResult(result.message)
         }
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryouts = getEventsByType(config, "tryout")
-        const tryout2Event = tryouts[1] ?? null
+        const base = result.data
 
-        const [activeDivisions, signupRowsRaw, captainRows, indivDivRows] =
-            await Promise.all([
-                db
-                    .select({
-                        id: divisions.id,
-                        name: divisions.name,
-                        level: divisions.level
-                    })
-                    .from(divisions)
-                    .where(eq(divisions.active, true))
-                    .orderBy(divisions.level),
-                db
-                    .select({
-                        signupId: signups.id,
-                        userId: signups.player,
-                        oldId: users.old_id,
-                        firstName: users.first_name,
-                        lastName: users.last_name,
-                        preferredName: users.preferred_name,
-                        male: users.male,
-                        pairPickId: signups.pair_pick
-                    })
-                    .from(signups)
-                    .innerJoin(users, eq(signups.player, users.id))
-                    .where(eq(signups.season, config.seasonId))
-                    .orderBy(users.last_name, users.first_name),
-                db
-                    .select({
-                        userId: teams.captain,
-                        captain2Id: teams.captain2,
-                        divisionId: teams.division,
-                        divisionName: divisions.name,
-                        isCoachDiv: individual_divisions.coaches
-                    })
-                    .from(teams)
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .leftJoin(
-                        individual_divisions,
-                        and(
-                            eq(individual_divisions.division, teams.division),
-                            eq(individual_divisions.season, config.seasonId)
-                        )
-                    )
-                    .where(eq(teams.season, config.seasonId)),
-                db
-                    .select({
-                        divisionId: individual_divisions.division,
-                        coaches: individual_divisions.coaches
-                    })
-                    .from(individual_divisions)
-                    .where(eq(individual_divisions.season, config.seasonId))
-            ])
-
-        const coachDivisionIds = new Set(
-            indivDivRows
-                .filter((row) => row.coaches)
-                .map((row) => row.divisionId)
-        )
-
-        const divisionsWithMeta: Week2Division[] = activeDivisions.map(
-            (division, index) => ({
-                ...division,
-                index,
-                teamCount: index === activeDivisions.length - 1 ? 4 : 6,
-                isLast: index === activeDivisions.length - 1,
-                usesCoaches: coachDivisionIds.has(division.id)
+        const candidates: Week2Candidate[] = base.candidates.map(
+            (candidate) => ({
+                ...candidate,
+                lastDivisionName:
+                    base.draftsByUser.get(candidate.userId)?.[0]
+                        ?.divisionName ?? null
             })
         )
-
-        const captainDivisionByUser = new Map<string, number>()
-        const captainDivisionNameByUser = new Map<string, string>()
-        for (const row of captainRows) {
-            if (!row.isCoachDiv) {
-                captainDivisionByUser.set(row.userId, row.divisionId)
-                captainDivisionNameByUser.set(row.userId, row.divisionName)
-            }
-        }
-
-        const excludedPlayers: Week2ExcludedPlayer[] = []
-
-        const unavailableSignupIds = tryout2Event
-            ? await getUnavailableSignupIdsForEvent(
-                  tryout2Event.id,
-                  signupRowsRaw.map((row) => row.signupId)
-              )
-            : new Set<number>()
-
-        const signupRows = signupRowsRaw.filter((row) => {
-            if (!tryout2Event) {
-                return true
-            }
-
-            const isExcluded = unavailableSignupIds.has(row.signupId)
-            if (isExcluded) {
-                excludedPlayers.push({
-                    userId: row.userId,
-                    oldId: row.oldId,
-                    firstName: row.firstName,
-                    lastName: row.lastName,
-                    preferredName: row.preferredName
-                })
-            }
-
-            return !isExcluded
-        })
-
-        if (signupRows.length === 0) {
-            return {
-                status: true,
-                seasonId: config.seasonId,
-                seasonLabel,
-                divisions: divisionsWithMeta,
-                candidates: [],
-                excludedPlayers
-            }
-        }
-
-        const userIds = signupRows.map((row) => row.userId)
-
-        const draftRows = await db
-            .select({
-                userId: drafts.user,
-                seasonId: seasons.id,
-                overall: drafts.overall,
-                divisionName: divisions.name
-            })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .innerJoin(seasons, eq(teams.season, seasons.id))
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(inArray(drafts.user, userIds))
-            .orderBy(desc(seasons.id), drafts.overall)
-
-        const draftsByUser = new Map<string, DraftSeasonRecord[]>()
-
-        for (const row of draftRows) {
-            const records = draftsByUser.get(row.userId) || []
-            const hasSeasonAlready = records.some(
-                (record) => record.seasonId === row.seasonId
-            )
-
-            if (!hasSeasonAlready) {
-                records.push({
-                    seasonId: row.seasonId,
-                    overall: row.overall,
-                    divisionName: row.divisionName
-                })
-                draftsByUser.set(row.userId, records)
-            }
-        }
-
-        const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
-
-        const ratingScoreByUser = await fetchRatingScoresForReturningPlayers(
-            userIds,
-            (id) => draftsByUser.has(id),
-            config.seasonId
-        )
-
-        const mutualPairMap = new Map<string, string>()
-        const pairPickMap = new Map(
-            signupRows
-                .filter((row) => !!row.pairPickId)
-                .map((row) => [row.userId, row.pairPickId as string])
-        )
-
-        for (const row of signupRows) {
-            if (!row.pairPickId) {
-                continue
-            }
-
-            const reciprocal = pairPickMap.get(row.pairPickId)
-            if (reciprocal === row.userId) {
-                mutualPairMap.set(row.userId, row.pairPickId)
-            }
-        }
-
-        const pairIds = [
-            ...new Set(signupRows.map((row) => row.pairPickId).filter(Boolean))
-        ] as string[]
-        const pairNameById = new Map<string, string>()
-
-        if (pairIds.length > 0) {
-            const pairRows = await db
-                .select({
-                    id: users.id,
-                    firstName: users.first_name,
-                    lastName: users.last_name,
-                    preferredName: users.preferred_name
-                })
-                .from(users)
-                .where(inArray(users.id, pairIds))
-
-            for (const row of pairRows) {
-                pairNameById.set(
-                    row.id,
-                    formatDisplayName(
-                        row.firstName,
-                        row.lastName,
-                        row.preferredName
-                    )
-                )
-            }
-        }
-
-        const candidates: Week2Candidate[] = signupRows.map((row) => {
-            const history = draftsByUser.get(row.userId) || []
-            const mostRecent = history[0] || null
-            const placementScore = scoreByUser.get(row.userId) ?? 200
-
-            return {
-                userId: row.userId,
-                oldId: row.oldId,
-                firstName: row.firstName,
-                lastName: row.lastName,
-                preferredName: row.preferredName,
-                male: row.male,
-                pairUserId: mutualPairMap.get(row.userId) || null,
-                pairWithName: row.pairPickId
-                    ? (pairNameById.get(row.pairPickId) ?? null)
-                    : null,
-                overallMostRecent: mostRecent?.overall ?? null,
-                placementScore,
-                ratingScore: ratingScoreByUser.get(row.userId) ?? null,
-                seasonsPlayedCount: history.length,
-                captainDivisionId:
-                    captainDivisionByUser.get(row.userId) || null,
-                captainDivisionName:
-                    captainDivisionNameByUser.get(row.userId) || null,
-                isCaptain: captainDivisionByUser.has(row.userId),
-                lastDivisionName: history[0]?.divisionName ?? null
-            }
-        })
-
-        candidates.sort((a, b) => {
-            if (a.placementScore !== b.placementScore) {
-                return a.placementScore - b.placementScore
-            }
-
-            const aLast = a.lastName.toLowerCase()
-            const bLast = b.lastName.toLowerCase()
-            const lastCmp = aLast.localeCompare(bLast)
-            if (lastCmp !== 0) {
-                return lastCmp
-            }
-
-            return getDisplayName(a)
-                .toLowerCase()
-                .localeCompare(getDisplayName(b).toLowerCase())
-        })
 
         return {
             status: true,
-            seasonId: config.seasonId,
-            seasonLabel,
-            divisions: divisionsWithMeta,
+            seasonId: base.seasonId,
+            seasonLabel: base.seasonLabel,
+            divisions: base.divisions,
             candidates,
-            excludedPlayers
+            excludedPlayers: base.excludedPlayers
         }
     } catch (error) {
         console.error("Error loading create week 2 data:", error)
-        return {
-            status: false,
-            message: "Something went wrong while loading data.",
-            seasonId: 0,
-            seasonLabel: "",
-            divisions: [],
-            candidates: [],
-            excludedPlayers: []
-        }
+        return emptyResult("Something went wrong while loading data.")
     }
 }
 
@@ -367,128 +82,6 @@ export const saveWeek2Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        if (assignments.length === 0) {
-            return fail("No roster assignments provided.")
-        }
-
-        const uniqueUsers = new Set(
-            assignments.map((assignment) => assignment.userId)
-        )
-
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return fail("No current season found.")
-        }
-
-        const [validSignups, activeDivisions, captainRows] = await Promise.all([
-            db
-                .select({ userId: signups.player })
-                .from(signups)
-                .where(
-                    and(
-                        eq(signups.season, config.seasonId),
-                        inArray(signups.player, [...uniqueUsers])
-                    )
-                ),
-            db
-                .select({ id: divisions.id })
-                .from(divisions)
-                .where(eq(divisions.active, true)),
-            db
-                .select({
-                    userId: teams.captain,
-                    captain2Id: teams.captain2,
-                    divisionId: teams.division,
-                    isCoachDiv: individual_divisions.coaches
-                })
-                .from(teams)
-                .leftJoin(
-                    individual_divisions,
-                    and(
-                        eq(individual_divisions.division, teams.division),
-                        eq(individual_divisions.season, config.seasonId)
-                    )
-                )
-                .where(eq(teams.season, config.seasonId))
-        ])
-
-        if (validSignups.length !== uniqueUsers.size) {
-            return fail(
-                "All selected players must be signed up for the current season."
-            )
-        }
-
-        const activeDivisionIds = new Set(
-            activeDivisions.map((division) => division.id)
-        )
-
-        const hasInvalidDivision = assignments.some(
-            (assignment) => !activeDivisionIds.has(assignment.divisionId)
-        )
-
-        if (hasInvalidDivision) {
-            return fail(
-                "One or more assignments are using an invalid division."
-            )
-        }
-
-        const captainDivisionByUser = new Map<string, number>()
-        for (const row of captainRows) {
-            if (!row.isCoachDiv) {
-                captainDivisionByUser.set(row.userId, row.divisionId)
-            }
-        }
-
-        for (const assignment of assignments) {
-            const captainDivisionId = captainDivisionByUser.get(
-                assignment.userId
-            )
-            if (
-                captainDivisionId &&
-                (assignment.divisionId !== captainDivisionId ||
-                    !assignment.isCaptain)
-            ) {
-                return fail(
-                    "Captains must remain in their captained division and be flagged as captains."
-                )
-            }
-        }
-
-        try {
-            await db.transaction(async (tx) => {
-                await tx
-                    .delete(week2Rosters)
-                    .where(eq(week2Rosters.season, config.seasonId))
-
-                await tx.insert(week2Rosters).values(
-                    assignments.map((assignment) => ({
-                        season: config.seasonId,
-                        user: assignment.userId,
-                        division: assignment.divisionId,
-                        team_number: assignment.teamNumber,
-                        is_captain: assignment.isCaptain
-                    }))
-                )
-            })
-
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-
-            if (session?.user) {
-                await logAuditEntry({
-                    userId: session.user.id,
-                    action: "create",
-                    entityType: "week2_rosters",
-                    summary: `Created week 2 rosters for season ${config.seasonId}`
-                })
-            }
-
-            return ok(undefined, "Week 2 rosters saved successfully.")
-        } catch (error) {
-            console.error("Error saving week 2 rosters:", error)
-            return fail("Something went wrong while saving week 2 rosters.")
-        }
+        return savePreseasonWeekRosters(2, assignments)
     }
 )

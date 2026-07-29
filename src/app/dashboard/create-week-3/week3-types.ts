@@ -3,12 +3,6 @@
 export type {
     PreseasonDivision as Week3Division,
     Week3Candidate,
-    SavedAssignment as Week3SavedAssignment
+    SavedAssignment as Week3SavedAssignment,
+    ExcludedPlayer as Week3ExcludedPlayer
 } from "@/lib/preseason/types"
-
-export interface Week3ExcludedPlayer {
-    userId: string
-    firstName: string
-    lastName: string
-    preferredName: string | null
-}
