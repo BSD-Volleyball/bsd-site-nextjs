@@ -101,8 +101,13 @@ test.describe("free season signup (100% discount)", () => {
             .getByRole("button", { name: "Complete Free Registration" })
             .click()
 
+        // Transient state: router.refresh() swaps the success card for the
+        // page's already-registered branch — accept either terminal state
+        // (see returning-signup.spec for the full story).
         await expect(
-            page.getByText("Registration Complete!", { exact: true })
+            page
+                .getByText("Registration Complete!", { exact: true })
+                .or(page.getByRole("heading", { name: /already registered/i }))
         ).toBeVisible({ timeout: 20_000 })
 
         // The transaction wrote the signup with the FREE order marker...

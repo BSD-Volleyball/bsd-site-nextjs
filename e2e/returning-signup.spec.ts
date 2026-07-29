@@ -132,8 +132,15 @@ async function completeWizard(
     await page
         .getByRole("button", { name: "Complete Free Registration" })
         .click()
+    // The success card is transient: on success the wizard fires
+    // router.refresh(), and the refreshed page's already-registered branch
+    // replaces the wizard entirely. On slow CI runners that swap can land
+    // before the visibility poller ever observes the card, so accept either
+    // terminal state — the DB assertions afterwards are the real proof.
     await expect(
-        page.getByText("Registration Complete!", { exact: true })
+        page
+            .getByText("Registration Complete!", { exact: true })
+            .or(page.getByRole("heading", { name: /already registered/i }))
     ).toBeVisible({ timeout: 20_000 })
 }
 
