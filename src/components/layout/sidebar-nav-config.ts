@@ -156,6 +156,11 @@ export const adminNavItems: NavItem[] = [
         icon: RiTimeLine
     },
     {
+        title: "Tryout Slot Requests",
+        url: "/dashboard/tryout-slot-requests",
+        icon: RiTimeLine
+    },
+    {
         title: "Google Membership",
         url: "/dashboard/google-membership",
         icon: RiMailLine
