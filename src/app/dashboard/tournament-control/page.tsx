@@ -7,7 +7,9 @@ import {
 } from "./actions"
 import { TournamentPhaseControl } from "./tournament-phase-control"
 import { EndTournamentEarlyCard } from "./end-tournament-early-card"
+import { CreateTournamentCard } from "./create-tournament-card"
 import { TournamentPlacementsCard } from "@/components/tournament/tournament-placements-card"
+import { TOURNAMENT_PHASE_CONFIG } from "@/lib/tournament-phases"
 
 export const metadata: Metadata = {
     title: "Tournament Control"
@@ -49,12 +51,21 @@ export default async function TournamentControlPage() {
                             tournamentId={data.tournamentId}
                         />
                     )}
+                    <CreateTournamentCard
+                        currentTournamentLabel={data.label}
+                        currentPhaseLabel={
+                            TOURNAMENT_PHASE_CONFIG[data.phase].label
+                        }
+                        currentPhaseIsComplete={data.phase === "complete"}
+                    />
                 </>
             ) : (
-                <p className="text-muted-foreground">
-                    No tournament exists yet. Use Tournament Configuration to
-                    create one.
-                </p>
+                <>
+                    <p className="text-muted-foreground">
+                        No tournament exists yet.
+                    </p>
+                    <CreateTournamentCard />
+                </>
             )}
         </div>
     )

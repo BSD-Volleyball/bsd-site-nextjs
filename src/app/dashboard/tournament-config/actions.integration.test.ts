@@ -2,8 +2,13 @@ import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { tournaments } from "@/database/schema"
+import { createDivision, createTournament } from "@/test/factories"
 import { createUserWithRoles, logout } from "@/test/session"
-import { createTournament, type TournamentMetadataInput } from "./actions"
+import {
+    saveTournamentConfig,
+    type TournamentDivisionInput,
+    type TournamentMetadataInput
+} from "./actions"
 
 function baseMetadata(
     overrides: Partial<TournamentMetadataInput> = {}
@@ -33,25 +38,50 @@ function baseMetadata(
     }
 }
 
-describe("createTournament — sets config", () => {
+async function seedTournamentWithDivision() {
+    const tournament = await createTournament()
+    const division = await createDivision()
+    const divisionsInput: TournamentDivisionInput[] = [
+        {
+            divisionId: division.id,
+            teamCount: 4,
+            malePerTeam: 3,
+            nonMalePerTeam: 3,
+            teamsAdvancingPerPool: 2,
+            sortOrder: 0
+        }
+    ]
+    return { tournament, divisionsInput }
+}
+
+describe("saveTournamentConfig — sets config", () => {
     it("rejects unauthenticated callers", async () => {
         logout()
-        const result = await createTournament(baseMetadata())
+        const { tournament, divisionsInput } =
+            await seedTournamentWithDivision()
+        const result = await saveTournamentConfig(
+            tournament.id,
+            baseMetadata(),
+            divisionsInput
+        )
         expect(result).toEqual({ status: false, message: "Unauthorized." })
     })
 
     it("persists the pool and playoff sets formats", async () => {
         await createUserWithRoles([{ role: "admin" }])
-        const result = await createTournament(
+        const { tournament, divisionsInput } =
+            await seedTournamentWithDivision()
+        const result = await saveTournamentConfig(
+            tournament.id,
             baseMetadata({
-                poolSetsMode: "exact",
-                poolSetsCount: 2,
+                poolSetsMode: "best_of",
+                poolSetsCount: 3,
                 playoffSetsMode: "best_of",
-                playoffSetsCount: 3
-            })
+                playoffSetsCount: 1
+            }),
+            divisionsInput
         )
         expect(result.status).toBe(true)
-        if (!result.status) throw new Error("expected success")
 
         const [row] = await db
             .select({
@@ -61,19 +91,23 @@ describe("createTournament — sets config", () => {
                 playoffCount: tournaments.playoff_sets_count
             })
             .from(tournaments)
-            .where(eq(tournaments.id, result.data.tournamentId))
+            .where(eq(tournaments.id, tournament.id))
         expect(row).toEqual({
-            poolMode: "exact",
-            poolCount: 2,
+            poolMode: "best_of",
+            poolCount: 3,
             playoffMode: "best_of",
-            playoffCount: 3
+            playoffCount: 1
         })
     })
 
     it("rejects an even best-of count", async () => {
         await createUserWithRoles([{ role: "admin" }])
-        const result = await createTournament(
-            baseMetadata({ poolSetsMode: "best_of", poolSetsCount: 2 })
+        const { tournament, divisionsInput } =
+            await seedTournamentWithDivision()
+        const result = await saveTournamentConfig(
+            tournament.id,
+            baseMetadata({ poolSetsMode: "best_of", poolSetsCount: 2 }),
+            divisionsInput
         )
         expect(result).toEqual({
             status: false,
@@ -83,8 +117,12 @@ describe("createTournament — sets config", () => {
 
     it("rejects a playoff format that can tie (exact-2)", async () => {
         await createUserWithRoles([{ role: "admin" }])
-        const result = await createTournament(
-            baseMetadata({ playoffSetsMode: "exact", playoffSetsCount: 2 })
+        const { tournament, divisionsInput } =
+            await seedTournamentWithDivision()
+        const result = await saveTournamentConfig(
+            tournament.id,
+            baseMetadata({ playoffSetsMode: "exact", playoffSetsCount: 2 }),
+            divisionsInput
         )
         expect(result).toEqual({
             status: false,

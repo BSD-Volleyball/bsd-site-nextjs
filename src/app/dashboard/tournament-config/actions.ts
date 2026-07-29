@@ -3,18 +3,18 @@
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { divisions, tournamentDivisions, tournaments } from "@/database/schema"
-import { asc, desc, eq, ne } from "drizzle-orm"
+import { asc, eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     fail,
     ok,
     requireAdmin,
-    requireNonEmptyString,
     requirePositiveInt,
     requireSession,
     withAction,
     type ActionResult
 } from "@/lib/action-helpers"
+import { getTournamentConfig } from "@/lib/tournament-config"
 import { isValidSetsFormat, type SetsMode } from "@/lib/tournament-sets"
 
 export interface TournamentDivisionInput {
@@ -140,141 +140,44 @@ export const getTournamentConfigData = withAction(
     async (): Promise<ActionResult<TournamentConfigData | null>> => {
         await requireAdmin()
 
-        const [t] = await db
-            .select()
-            .from(tournaments)
-            .where(ne(tournaments.phase, "complete"))
-            .orderBy(desc(tournaments.id))
-            .limit(1)
-
-        if (!t) return ok(null)
-
-        const divs = await db
-            .select({
-                id: tournamentDivisions.id,
-                division_id: tournamentDivisions.division_id,
-                division_name: divisions.name,
-                division_level: divisions.level,
-                team_count: tournamentDivisions.team_count,
-                male_per_team: tournamentDivisions.male_per_team,
-                non_male_per_team: tournamentDivisions.non_male_per_team,
-                teams_advancing_per_pool:
-                    tournamentDivisions.teams_advancing_per_pool,
-                sort_order: tournamentDivisions.sort_order
-            })
-            .from(tournamentDivisions)
-            .innerJoin(
-                divisions,
-                eq(divisions.id, tournamentDivisions.division_id)
-            )
-            .where(eq(tournamentDivisions.tournament_id, t.id))
-            .orderBy(asc(tournamentDivisions.sort_order))
+        const config = await getTournamentConfig()
+        if (!config) return ok(null)
 
         return ok({
-            tournamentId: t.id,
-            code: t.code,
-            year: t.year,
-            name: t.name,
-            phase: t.phase,
-            tournament_date: t.tournament_date,
-            checkin_time: t.checkin_time,
-            first_serve_time: t.first_serve_time,
-            address: t.address,
-            cost: t.cost,
-            late_cost: t.late_cost,
-            late_date: t.late_date,
-            registration_close_date: t.registration_close_date,
-            roster_lock_date: t.roster_lock_date,
-            tournament_type: t.tournament_type,
-            pool_size: t.pool_size,
-            elimination_format: t.elimination_format,
-            pool_sets_mode: t.pool_sets_mode,
-            pool_sets_count: t.pool_sets_count,
-            playoff_sets_mode: t.playoff_sets_mode,
-            playoff_sets_count: t.playoff_sets_count,
-            additional_info: t.additional_info,
-            divisions: divs
+            tournamentId: config.tournamentId,
+            code: config.code,
+            year: config.year,
+            name: config.name,
+            phase: config.phase,
+            tournament_date: config.tournamentDate,
+            checkin_time: config.checkinTime,
+            first_serve_time: config.firstServeTime,
+            address: config.address,
+            cost: config.cost || null,
+            late_cost: config.lateCost || null,
+            late_date: config.lateDate,
+            registration_close_date: config.registrationCloseDate,
+            roster_lock_date: config.rosterLockDate,
+            tournament_type: config.tournamentType,
+            pool_size: config.poolSize,
+            elimination_format: config.eliminationFormat,
+            pool_sets_mode: config.poolSets.mode,
+            pool_sets_count: config.poolSets.count,
+            playoff_sets_mode: config.playoffSets.mode,
+            playoff_sets_count: config.playoffSets.count,
+            additional_info: config.additionalInfo,
+            divisions: config.divisions.map((d) => ({
+                id: d.id,
+                division_id: d.divisionId,
+                division_name: d.divisionName,
+                division_level: d.divisionLevel,
+                team_count: d.teamCount,
+                male_per_team: d.malePerTeam,
+                non_male_per_team: d.nonMalePerTeam,
+                teams_advancing_per_pool: d.teamsAdvancingPerPool,
+                sort_order: d.sortOrder
+            }))
         })
-    }
-)
-
-export const createTournament = withAction(
-    async (
-        metadata: TournamentMetadataInput
-    ): Promise<ActionResult<{ tournamentId: number }>> => {
-        await requireAdmin()
-        const session = await requireSession()
-
-        const code = requireNonEmptyString(metadata.code, "code").toLowerCase()
-        const name = requireNonEmptyString(metadata.name, "name")
-        const year = requirePositiveInt(metadata.year, "year")
-        const date = requireNonEmptyString(
-            metadata.tournamentDate,
-            "tournament date"
-        )
-
-        if (
-            metadata.tournamentType !== "coed" &&
-            metadata.tournamentType !== "reverse_coed"
-        ) {
-            return fail("Invalid tournament type.")
-        }
-        if (
-            metadata.eliminationFormat !== "single" &&
-            metadata.eliminationFormat !== "double"
-        ) {
-            return fail("Invalid elimination format.")
-        }
-        const setsError = validateSetsMetadata(metadata)
-        if (setsError) return fail(setsError)
-
-        const poolSize = requirePositiveInt(metadata.poolSize, "pool size")
-
-        const [existing] = await db
-            .select({ id: tournaments.id })
-            .from(tournaments)
-            .where(eq(tournaments.code, code))
-            .limit(1)
-        if (existing) return fail("Tournament code already in use.")
-
-        const [row] = await db
-            .insert(tournaments)
-            .values({
-                code,
-                year,
-                name,
-                phase: "registration_open",
-                tournament_date: date,
-                checkin_time: metadata.checkinTime || null,
-                first_serve_time: metadata.firstServeTime || null,
-                address: metadata.address || null,
-                cost: metadata.cost || null,
-                late_cost: metadata.lateCost || null,
-                late_date: metadata.lateDate || null,
-                registration_close_date: metadata.registrationCloseDate || null,
-                roster_lock_date: metadata.rosterLockDate || null,
-                tournament_type: metadata.tournamentType,
-                pool_size: poolSize,
-                elimination_format: metadata.eliminationFormat,
-                pool_sets_mode: metadata.poolSetsMode,
-                pool_sets_count: metadata.poolSetsCount,
-                playoff_sets_mode: metadata.playoffSetsMode,
-                playoff_sets_count: metadata.playoffSetsCount,
-                additional_info: metadata.additionalInfo || null
-            })
-            .returning({ id: tournaments.id })
-
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "create_tournament",
-            entityType: "tournament",
-            entityId: row.id,
-            summary: `Created tournament ${name} (${code})`
-        })
-
-        revalidatePath("/dashboard/tournament-config")
-        revalidatePath("/dashboard")
-        return ok({ tournamentId: row.id })
     }
 )
 

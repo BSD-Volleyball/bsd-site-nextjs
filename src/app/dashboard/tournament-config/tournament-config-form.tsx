@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator"
 import type { SetsMode } from "@/lib/tournament-sets"
 import {
     type AvailableDivision,
-    createTournament,
     saveTournamentConfig,
     type TournamentConfigData,
     type TournamentDivisionInput,
@@ -19,7 +18,7 @@ import {
 } from "./actions"
 
 interface Props {
-    initialData: TournamentConfigData | null | undefined
+    initialData: TournamentConfigData
     availableDivisions: AvailableDivision[]
 }
 
@@ -119,69 +118,68 @@ export function TournamentConfigForm({
     availableDivisions
 }: Props) {
     const router = useRouter()
-    const isNew = !initialData
     const [saving, setSaving] = useState(false)
 
-    const [code, setCode] = useState(initialData?.code ?? "")
-    const [name, setName] = useState(initialData?.name ?? "")
-    const [year, setYear] = useState<number>(
-        initialData?.year ?? new Date().getFullYear()
-    )
+    const [code, setCode] = useState(initialData.code)
+    const [name, setName] = useState(initialData.name)
+    const [year, setYear] = useState<number>(initialData.year)
     const [tournamentDate, setTournamentDate] = useState(
-        initialData?.tournament_date ?? ""
+        initialData.tournament_date
     )
     const [checkinTime, setCheckinTime] = useState(
-        initialData?.checkin_time ?? ""
+        initialData.checkin_time ?? ""
     )
     const [firstServeTime, setFirstServeTime] = useState(
-        initialData?.first_serve_time ?? ""
+        initialData.first_serve_time ?? ""
     )
-    const [address, setAddress] = useState(initialData?.address ?? "")
-    const [cost, setCost] = useState(initialData?.cost ?? "")
-    const [lateCost, setLateCost] = useState(initialData?.late_cost ?? "")
-    const [lateDate, setLateDate] = useState(initialData?.late_date ?? "")
+    const [address, setAddress] = useState(initialData.address ?? "")
+    const [cost, setCost] = useState(initialData.cost ?? "")
+    const [lateCost, setLateCost] = useState(initialData.late_cost ?? "")
+    const [lateDate, setLateDate] = useState(initialData.late_date ?? "")
     const [registrationCloseDate, setRegistrationCloseDate] = useState(
-        initialData?.registration_close_date ?? ""
+        initialData.registration_close_date ?? ""
     )
     const [rosterLockDate, setRosterLockDate] = useState(
-        initialData?.roster_lock_date ?? ""
+        initialData.roster_lock_date ?? ""
     )
     const [tournamentType, setTournamentType] = useState<
         "coed" | "reverse_coed"
-    >((initialData?.tournament_type as "coed" | "reverse_coed") ?? "coed")
-    const [poolSize, setPoolSize] = useState<number>(
-        initialData?.pool_size ?? 4
-    )
+    >(initialData.tournament_type as "coed" | "reverse_coed")
+    const [poolSize, setPoolSize] = useState<number>(initialData.pool_size)
     const [eliminationFormat, setEliminationFormat] = useState<
         "single" | "double"
-    >((initialData?.elimination_format as "single" | "double") ?? "single")
+    >(initialData.elimination_format as "single" | "double")
     const [poolSetsMode, setPoolSetsMode] = useState<SetsMode>(
-        (initialData?.pool_sets_mode as SetsMode) ?? "exact"
+        initialData.pool_sets_mode as SetsMode
     )
     const [poolSetsCount, setPoolSetsCount] = useState<number>(
-        initialData?.pool_sets_count ?? 2
+        initialData.pool_sets_count
     )
     const [playoffSetsMode, setPlayoffSetsMode] = useState<SetsMode>(
-        (initialData?.playoff_sets_mode as SetsMode) ?? "best_of"
+        initialData.playoff_sets_mode as SetsMode
     )
     const [playoffSetsCount, setPlayoffSetsCount] = useState<number>(
-        initialData?.playoff_sets_count ?? 3
+        initialData.playoff_sets_count
     )
     const [additionalInfo, setAdditionalInfo] = useState(
-        initialData?.additional_info ?? ""
+        initialData.additional_info ?? ""
     )
 
+    // A freshly created tournament may have zero divisions (nothing to clone)
+    // — show one blank row so the admin can start adding.
     const [divisions, setDivisions] = useState<DivisionState[]>(
-        initialData?.divisions.map((d) => ({
-            key: makeKey(),
-            id: d.id,
-            divisionId: d.division_id,
-            teamCount: d.team_count,
-            malePerTeam: d.male_per_team,
-            nonMalePerTeam: d.non_male_per_team,
-            teamsAdvancingPerPool: d.teams_advancing_per_pool,
-            sortOrder: d.sort_order
-        })) ?? [blankDivision(0)]
+        initialData.divisions.length > 0
+            ? initialData.divisions.map((d) => ({
+                  key: makeKey(),
+                  id: d.id,
+                  divisionId: d.division_id,
+                  teamCount: d.team_count,
+                  malePerTeam: d.male_per_team,
+                  nonMalePerTeam: d.non_male_per_team,
+                  teamsAdvancingPerPool: d.teams_advancing_per_pool,
+                  sortOrder: d.sort_order
+              }))
+            : [blankDivision(0)]
     )
 
     // Pre-compute division-id → name for quick lookup in the dropdowns.
@@ -242,37 +240,7 @@ export function TournamentConfigForm({
         }))
     }
 
-    async function handleCreate() {
-        if (!code.trim() || !name.trim() || !tournamentDate) {
-            toast.error("Code, name, and tournament date are required.")
-            return
-        }
-        setSaving(true)
-        try {
-            const result = await createTournament(buildMetadata())
-            if (!result.status) {
-                toast.error(result.message)
-                return
-            }
-            // Now save divisions to the new tournament.
-            const save = await saveTournamentConfig(
-                result.data.tournamentId,
-                buildMetadata(),
-                buildDivisions()
-            )
-            if (!save.status) {
-                toast.error(save.message)
-                return
-            }
-            toast.success("Tournament created.")
-            router.refresh()
-        } finally {
-            setSaving(false)
-        }
-    }
-
     async function handleSave() {
-        if (!initialData) return
         if (!code.trim() || !name.trim() || !tournamentDate) {
             toast.error("Code, name, and tournament date are required.")
             return
@@ -299,9 +267,7 @@ export function TournamentConfigForm({
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>
-                        {isNew ? "Create Tournament" : "Tournament Details"}
-                    </CardTitle>
+                    <CardTitle>Tournament Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -682,16 +648,8 @@ export function TournamentConfigForm({
             </Card>
 
             <div className="flex justify-end gap-2">
-                <Button
-                    type="button"
-                    onClick={isNew ? handleCreate : handleSave}
-                    disabled={saving}
-                >
-                    {saving
-                        ? "Saving..."
-                        : isNew
-                          ? "Create Tournament"
-                          : "Save Changes"}
+                <Button type="button" onClick={handleSave} disabled={saving}>
+                    {saving ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
         </div>

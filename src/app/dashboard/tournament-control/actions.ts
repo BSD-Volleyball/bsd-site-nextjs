@@ -12,12 +12,13 @@ import {
     tournamentTeams,
     tournaments
 } from "@/database/schema"
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull, ne, or } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     fail,
     ok,
     requireAdmin,
+    requireNonEmptyString,
     requirePositiveInt,
     requireSession,
     withAction,
@@ -60,6 +61,136 @@ export const getCurrentTournamentPhaseData = withAction(
             label: `${t.name} (${t.year})`,
             phase: t.phase as TournamentPhase
         })
+    }
+)
+
+export const createTournament = withAction(
+    async (input: {
+        name: string
+        year: number
+        code: string
+    }): Promise<ActionResult<{ tournamentId: number }>> => {
+        await requireAdmin()
+        const session = await requireSession()
+
+        const name = requireNonEmptyString(input.name, "name")
+        const code = requireNonEmptyString(input.code, "code").toLowerCase()
+        if (
+            !Number.isInteger(input.year) ||
+            input.year < 2000 ||
+            input.year > 2100
+        ) {
+            return fail("Enter a valid year.")
+        }
+
+        // Only one tournament may run at a time. Any non-complete row (not
+        // just the newest) blocks creation — a stuck older tournament must be
+        // completed or ended early before a new one can exist.
+        const [active] = await db
+            .select({ name: tournaments.name, year: tournaments.year })
+            .from(tournaments)
+            .where(ne(tournaments.phase, "complete"))
+            .limit(1)
+        if (active) {
+            return fail(
+                `Cannot create a new tournament while "${active.name} (${active.year})" is not Complete. Finish it with the phase controls or End Tournament Early.`
+            )
+        }
+
+        const [existing] = await db
+            .select({ id: tournaments.id })
+            .from(tournaments)
+            .where(eq(tournaments.code, code))
+            .limit(1)
+        if (existing) return fail("Tournament code already in use.")
+
+        // Clone source: the newest tournament (complete, per the guard).
+        // Dates are cloned verbatim on purpose — stale past dates fail closed
+        // (registration reads as closed) until the admin sets real ones in
+        // Tournament Configuration, whereas nulling registration_close_date
+        // would instantly open registration at the stale price.
+        const [source] = await db
+            .select()
+            .from(tournaments)
+            .orderBy(desc(tournaments.id))
+            .limit(1)
+
+        const todayEt = new Date().toLocaleDateString("en-CA", {
+            timeZone: "America/New_York"
+        })
+
+        const newId = await db.transaction(async (tx) => {
+            const [row] = await tx
+                .insert(tournaments)
+                .values({
+                    code,
+                    year: input.year,
+                    name,
+                    tournament_date: source?.tournament_date ?? todayEt,
+                    checkin_time: source?.checkin_time ?? null,
+                    first_serve_time: source?.first_serve_time ?? null,
+                    address: source?.address ?? null,
+                    cost: source?.cost ?? null,
+                    late_cost: source?.late_cost ?? null,
+                    late_date: source?.late_date ?? null,
+                    registration_close_date:
+                        source?.registration_close_date ?? null,
+                    roster_lock_date: source?.roster_lock_date ?? null,
+                    tournament_type: source?.tournament_type ?? "coed",
+                    pool_size: source?.pool_size ?? 4,
+                    elimination_format: source?.elimination_format ?? "single",
+                    pool_sets_mode: source?.pool_sets_mode ?? "exact",
+                    pool_sets_count: source?.pool_sets_count ?? 2,
+                    playoff_sets_mode: source?.playoff_sets_mode ?? "best_of",
+                    playoff_sets_count: source?.playoff_sets_count ?? 3,
+                    additional_info: source?.additional_info ?? null
+                })
+                .returning({ id: tournaments.id })
+
+            if (source) {
+                const sourceDivisions = await tx
+                    .select()
+                    .from(tournamentDivisions)
+                    .where(eq(tournamentDivisions.tournament_id, source.id))
+                if (sourceDivisions.length > 0) {
+                    await tx.insert(tournamentDivisions).values(
+                        sourceDivisions.map((d) => ({
+                            tournament_id: row.id,
+                            division_id: d.division_id,
+                            team_count: d.team_count,
+                            male_per_team: d.male_per_team,
+                            non_male_per_team: d.non_male_per_team,
+                            teams_advancing_per_pool:
+                                d.teams_advancing_per_pool,
+                            sort_order: d.sort_order
+                        }))
+                    )
+                }
+            }
+
+            return row.id
+        })
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create_tournament",
+            entityType: "tournament",
+            entityId: newId,
+            summary: source
+                ? `Created tournament ${name} (${code}), cloned config from ${source.name} (${source.year})`
+                : `Created tournament ${name} (${code})`
+        })
+
+        revalidatePath("/dashboard/tournament-control")
+        revalidatePath("/dashboard/tournament-config")
+        revalidatePath("/dashboard")
+        revalidatePath("/")
+        revalidatePath(`/tournament/${code}`)
+
+        return ok(
+            { tournamentId: newId },
+            `${name} created. Edit dates, costs, and divisions in Tournament Configuration.`
+        )
     }
 )
 

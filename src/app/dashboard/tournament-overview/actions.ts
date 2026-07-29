@@ -9,7 +9,6 @@ import {
     tournamentRoster,
     tournamentTeams,
     tournamentWaitlist,
-    tournaments,
     users
 } from "@/database/schema"
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm"
@@ -23,6 +22,7 @@ import {
 } from "@/lib/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { getTournamentConfig } from "@/lib/tournament-config"
 import { formatPlayerName } from "@/lib/utils"
 
 export interface OverviewPlayer {
@@ -147,25 +147,11 @@ export async function getTournamentOverview(): Promise<{
         return { status: false, message: "Unauthorized", data: null }
     }
 
-    const [t] = await db
-        .select({
-            id: tournaments.id,
-            name: tournaments.name,
-            phase: tournaments.phase,
-            tournament_date: tournaments.tournament_date,
-            tournament_type: tournaments.tournament_type,
-            pool_size: tournaments.pool_size,
-            elimination_format: tournaments.elimination_format,
-            cost: tournaments.cost,
-            late_cost: tournaments.late_cost
-        })
-        .from(tournaments)
-        .orderBy(asc(tournaments.id))
-        .limit(1)
-
-    if (!t) {
+    const config = await getTournamentConfig()
+    if (!config) {
         return { status: true, data: null }
     }
+    const tournamentId = config.tournamentId
 
     // All four lookups depend only on the tournament id — run in parallel
     const [divisionRows, teamRows, rosterRows, [waitlistCountRow]] =
@@ -184,7 +170,7 @@ export async function getTournamentOverview(): Promise<{
                     divisions,
                     eq(divisions.id, tournamentDivisions.division_id)
                 )
-                .where(eq(tournamentDivisions.tournament_id, t.id))
+                .where(eq(tournamentDivisions.tournament_id, tournamentId))
                 .orderBy(asc(tournamentDivisions.sort_order)),
             db
                 .select({
@@ -201,7 +187,7 @@ export async function getTournamentOverview(): Promise<{
                 })
                 .from(tournamentTeams)
                 .innerJoin(users, eq(users.id, tournamentTeams.captain_user_id))
-                .where(eq(tournamentTeams.tournament_id, t.id))
+                .where(eq(tournamentTeams.tournament_id, tournamentId))
                 .orderBy(asc(tournamentTeams.name)),
             db
                 .select({
@@ -214,14 +200,14 @@ export async function getTournamentOverview(): Promise<{
                 })
                 .from(tournamentRoster)
                 .innerJoin(users, eq(users.id, tournamentRoster.user_id))
-                .where(eq(tournamentRoster.tournament_id, t.id))
+                .where(eq(tournamentRoster.tournament_id, tournamentId))
                 .orderBy(asc(users.last_name), asc(users.first_name)),
             db
                 .select({ count: sql<number>`count(*)::int` })
                 .from(tournamentWaitlist)
                 .where(
                     and(
-                        eq(tournamentWaitlist.tournament_id, t.id),
+                        eq(tournamentWaitlist.tournament_id, tournamentId),
                         isNull(tournamentWaitlist.placed_team_id)
                     )
                 )
@@ -289,15 +275,15 @@ export async function getTournamentOverview(): Promise<{
         status: true,
         data: {
             tournament: {
-                id: t.id,
-                name: t.name,
-                phase: t.phase,
-                tournamentDate: t.tournament_date,
-                tournamentType: t.tournament_type,
-                poolSize: t.pool_size,
-                eliminationFormat: t.elimination_format,
-                cost: t.cost,
-                lateCost: t.late_cost
+                id: config.tournamentId,
+                name: config.name,
+                phase: config.phase,
+                tournamentDate: config.tournamentDate,
+                tournamentType: config.tournamentType,
+                poolSize: config.poolSize,
+                eliminationFormat: config.eliminationFormat,
+                cost: config.cost || null,
+                lateCost: config.lateCost || null
             },
             divisions: overviewDivisions,
             unassignedTeams,

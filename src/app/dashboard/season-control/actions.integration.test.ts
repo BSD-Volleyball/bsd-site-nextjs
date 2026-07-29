@@ -155,6 +155,15 @@ describe("createSeason", () => {
             code: "F26"
         })
         expect(first.status).toBe(true)
+        const firstId = first.status ? first.data.seasonId : 0
+
+        // The newly created season is off_season, which would trip the
+        // only-one-running guard before the duplicate check — complete it so
+        // the duplicate rejection is what's exercised.
+        await db
+            .update(seasons)
+            .set({ phase: "complete" })
+            .where(eq(seasons.id, firstId))
 
         const second = await createSeason({
             season: "fall",
@@ -165,6 +174,30 @@ describe("createSeason", () => {
             status: false,
             message: "A Fall 2026 season already exists"
         })
+    })
+
+    it("blocks creation while the newest season is not complete", async () => {
+        await seedSeason({
+            code: "S26",
+            year: 2026,
+            season: "spring",
+            phase: "regular_season"
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createSeason({
+            season: "fall",
+            year: 2026,
+            code: "F26"
+        })
+        expect(result).toEqual({
+            status: false,
+            message:
+                "Cannot create a new season while Spring 2026 is not Complete. Finish it in Season Control first."
+        })
+
+        const all = await db.select().from(seasons)
+        expect(all).toHaveLength(1)
     })
 
     it("validates identity fields", async () => {

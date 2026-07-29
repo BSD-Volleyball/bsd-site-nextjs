@@ -14,13 +14,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select"
-import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -30,56 +23,55 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import { createSeason } from "./actions"
+import { createTournament } from "./actions"
 
-const SEASON_OPTIONS = ["spring", "summer", "fall", "winter"]
-
-const capitalize = (value: string) =>
-    value.charAt(0).toUpperCase() + value.slice(1)
-
-interface CreateSeasonCardProps {
-    currentSeasonLabel?: string
+interface CreateTournamentCardProps {
+    currentTournamentLabel?: string
     currentPhaseLabel?: string
     currentPhaseIsComplete?: boolean
 }
 
-export function CreateSeasonCard({
-    currentSeasonLabel,
+export function CreateTournamentCard({
+    currentTournamentLabel,
     currentPhaseLabel,
     currentPhaseIsComplete
-}: CreateSeasonCardProps) {
+}: CreateTournamentCardProps) {
     const router = useRouter()
-    const [season, setSeason] = useState("fall")
+    const [name, setName] = useState("")
     const [year, setYear] = useState(String(new Date().getFullYear()))
     const [code, setCode] = useState("")
     const [saving, setSaving] = useState(false)
     const [confirmOpen, setConfirmOpen] = useState(false)
 
     const yearNum = Number(year)
-    const label = `${capitalize(season)} ${year}`
+    const label = name.trim() ? `${name.trim()} (${year})` : ""
     const valid =
-        season.length > 0 &&
+        name.trim().length > 0 &&
         code.trim().length > 0 &&
         Number.isInteger(yearNum) &&
         yearNum >= 2000 &&
         yearNum <= 2100
 
+    const blocked =
+        currentTournamentLabel !== undefined && currentPhaseIsComplete === false
+
     async function handleConfirm() {
         setSaving(true)
         try {
-            const result = await createSeason({
-                season,
+            const result = await createTournament({
+                name: name.trim(),
                 year: yearNum,
                 code: code.trim()
             })
             if (result.status) {
-                toast.success(result.message ?? "Season created")
+                toast.success(result.message ?? "Tournament created")
                 setConfirmOpen(false)
+                setName("")
                 setCode("")
-                // The new season is now the current one, so Season
+                // The new tournament is now the current one, so Tournament
                 // Configuration loads it — send the admin there to edit the
-                // cloned dates and pricing.
-                router.push("/dashboard/season-config")
+                // cloned dates, costs, and divisions.
+                router.push("/dashboard/tournament-config")
             } else {
                 toast.error(result.message)
             }
@@ -88,41 +80,32 @@ export function CreateSeasonCard({
         }
     }
 
-    const showIncompleteWarning =
-        currentSeasonLabel !== undefined && currentPhaseIsComplete === false
-
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Create New Season</CardTitle>
+                <CardTitle>Create New Tournament</CardTitle>
                 <CardDescription>
-                    Starts a new season in Off-Season with registration closed.
-                    Pricing, ref rates, divisions, and event dates are copied
-                    from the current season for you to edit in Season
-                    Configuration.
+                    Starts a new tournament in Registration Open. Dates, costs,
+                    format, and divisions are copied from the previous
+                    tournament — update them in Tournament Configuration before
+                    announcing.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-name">Season</Label>
-                        <Select value={season} onValueChange={setSeason}>
-                            <SelectTrigger id="new-season-name">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {SEASON_OPTIONS.map((opt) => (
-                                    <SelectItem key={opt} value={opt}>
-                                        {capitalize(opt)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Label htmlFor="new-tournament-name">Name</Label>
+                        <Input
+                            id="new-tournament-name"
+                            value={name}
+                            placeholder="Summer Slam"
+                            onChange={(e) => setName(e.target.value)}
+                        />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-year">Year</Label>
+                        <Label htmlFor="new-tournament-year">Year</Label>
                         <Input
-                            id="new-season-year"
+                            id="new-tournament-year"
                             type="number"
                             inputMode="numeric"
                             value={year}
@@ -130,32 +113,34 @@ export function CreateSeasonCard({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-code">Code</Label>
+                        <Label htmlFor="new-tournament-code">Code</Label>
                         <Input
-                            id="new-season-code"
+                            id="new-tournament-code"
                             value={code}
-                            placeholder="F26"
+                            placeholder="summer-slam-26"
                             onChange={(e) => setCode(e.target.value)}
                         />
                     </div>
                 </div>
                 <p className="text-muted-foreground text-sm">
-                    New season: <span className="font-medium">{label}</span>
+                    The code becomes the public page URL: /tournament/
+                    {code.trim().toLowerCase() || "your-code"}
                 </p>
                 <Button
-                    disabled={!valid || saving || showIncompleteWarning}
+                    disabled={!valid || saving || blocked}
                     onClick={() => setConfirmOpen(true)}
                 >
-                    Create Season
+                    Create Tournament
                 </Button>
-                {showIncompleteWarning ? (
+                {blocked ? (
                     <p className="text-muted-foreground text-sm">
-                        {currentSeasonLabel} is not marked Complete
+                        {currentTournamentLabel} is still{" "}
                         {currentPhaseLabel
-                            ? ` (currently "${currentPhaseLabel}")`
-                            : ""}
-                        . Only one season can run at a time — mark it Complete
-                        with the phase controls above before creating a new one.
+                            ? `in ${currentPhaseLabel}`
+                            : "in progress"}
+                        . Only one tournament can run at a time — finish it with
+                        the phase controls above (or End Tournament Early)
+                        before creating a new one.
                     </p>
                 ) : null}
             </CardContent>
@@ -166,11 +151,12 @@ export function CreateSeasonCard({
                         <AlertDialogTitle>Create {label}?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This will make <strong>{label}</strong> the current
-                            season across the entire site. It starts in
-                            Off-Season with registration closed; pricing, dates,
-                            and divisions are copied from{" "}
-                            {currentSeasonLabel ?? "the current season"} for you
-                            to edit in Season Configuration.
+                            tournament across the entire site. It starts in
+                            Registration Open; dates, costs, format, and
+                            divisions are copied from{" "}
+                            {currentTournamentLabel ??
+                                "the previous tournament"}{" "}
+                            for you to edit in Tournament Configuration.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

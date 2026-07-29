@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/lib/page-guards"
 import type { Metadata } from "next"
@@ -26,10 +27,23 @@ export default async function TournamentConfigPage() {
                 title="Tournament Configuration"
                 description="Configure tournament details, dates, costs, and divisions."
             />
-            <TournamentConfigForm
-                initialData={initialData}
-                availableDivisions={availableDivisions}
-            />
+            {initialData ? (
+                <TournamentConfigForm
+                    initialData={initialData}
+                    availableDivisions={availableDivisions}
+                />
+            ) : (
+                <p className="text-muted-foreground">
+                    No active tournament. Create one from{" "}
+                    <Link
+                        href="/dashboard/tournament-control"
+                        className="underline underline-offset-4"
+                    >
+                        Tournament Control
+                    </Link>
+                    .
+                </p>
+            )}
         </div>
     )
 }

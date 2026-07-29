@@ -1,5 +1,6 @@
 import "server-only"
 
+import { cache } from "react"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -54,6 +55,7 @@ export interface TournamentConfig {
     // Sets-per-match format for pool play and playoffs respectively.
     poolSets: SetsFormat
     playoffSets: SetsFormat
+    additionalInfo: string | null
     divisions: TournamentDivisionConfig[]
 }
 
@@ -93,6 +95,7 @@ function rowToConfig(
             mode: t.playoff_sets_mode as SetsMode,
             count: t.playoff_sets_count
         },
+        additionalInfo: t.additional_info,
         divisions
     }
 }
@@ -121,22 +124,24 @@ async function loadDivisions(
 
 /**
  * Latest tournament whose phase is not yet "complete".
- * Mirrors getSeasonConfig() in spirit but returns null when no tournament
- * exists or all are complete — callers handle the empty case.
+ * Mirrors getSeasonConfig() (request-cached) but returns null when no
+ * tournament exists or all are complete — callers handle the empty case.
  */
-export async function getTournamentConfig(): Promise<TournamentConfig | null> {
-    const [t] = await db
-        .select()
-        .from(tournaments)
-        .where(ne(tournaments.phase, "complete"))
-        .orderBy(desc(tournaments.id))
-        .limit(1)
+export const getTournamentConfig = cache(
+    async (): Promise<TournamentConfig | null> => {
+        const [t] = await db
+            .select()
+            .from(tournaments)
+            .where(ne(tournaments.phase, "complete"))
+            .orderBy(desc(tournaments.id))
+            .limit(1)
 
-    if (!t) return null
+        if (!t) return null
 
-    const divisions = await loadDivisions(t.id)
-    return rowToConfig(t, divisions)
-}
+        const divisions = await loadDivisions(t.id)
+        return rowToConfig(t, divisions)
+    }
+)
 
 function isPastDateET(date: string): boolean {
     const nowET = new Date(

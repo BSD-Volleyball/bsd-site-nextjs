@@ -309,6 +309,23 @@ export const createSeason = withAction(
         const label = seasonLabel(season, year)
 
         try {
+            // Only one season may run at a time — the newest season must be
+            // marked Complete before a new one can be created.
+            const [latest] = await db
+                .select({
+                    season: seasons.season,
+                    year: seasons.year,
+                    phase: seasons.phase
+                })
+                .from(seasons)
+                .orderBy(desc(seasons.id))
+                .limit(1)
+            if (latest && latest.phase !== "complete") {
+                return fail(
+                    `Cannot create a new season while ${seasonLabel(latest.season, latest.year)} is not Complete. Finish it in Season Control first.`
+                )
+            }
+
             // Reject a duplicate of the same year + season name
             const [dup] = await db
                 .select({ id: seasons.id })

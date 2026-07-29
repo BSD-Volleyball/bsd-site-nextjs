@@ -426,6 +426,13 @@ const cases: SmokeCase[] = [
     c("tournamentControl.getCurrentTournamentPhaseData", "fail", () =>
         tournamentControl.getCurrentTournamentPhaseData()
     ),
+    c("tournamentControl.createTournament", "fail", () =>
+        tournamentControl.createTournament({
+            name: "T",
+            year: 2026,
+            code: "t"
+        })
+    ),
     c("tournamentControl.advanceTournamentPhase", "fail", () =>
         tournamentControl.advanceTournamentPhase(1, "pool_play" as never)
     ),
