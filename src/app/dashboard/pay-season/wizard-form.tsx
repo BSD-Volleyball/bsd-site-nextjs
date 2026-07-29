@@ -183,8 +183,8 @@ export function WizardForm({
                         htmlFor={`event-${week1Tryout.id}`}
                         className="cursor-pointer font-normal"
                     >
-                        I will <strong>NOT</strong> be able to attend the Week
-                        1 tryout
+                        I will <strong>NOT</strong> be able to attend the Week 1
+                        tryout
                     </Label>
                 </div>
             )}
