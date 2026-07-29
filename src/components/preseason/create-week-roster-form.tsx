@@ -24,7 +24,10 @@ import {
     sortDivisionPlayers,
     toOriginalPlacedPlayer
 } from "@/lib/preseason/units"
-import { buildTeamsForDivision } from "@/lib/preseason/teams"
+import {
+    buildTeamsForDivision,
+    getSlotViolationEntryIds
+} from "@/lib/preseason/teams"
 import {
     placementReasonClasses,
     placementReasonLabel,
@@ -456,6 +459,56 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
         }))
     }, [editableDivisionPlayers, divisions, config])
 
+    // Mutual pairs whose slot requests have no slot in common: placement
+    // treats them as unrestricted, so the admin must resolve by hand.
+    const pairSlotConflictUserIds = useMemo(() => {
+        const byId = new Map(candidates.map((c) => [c.userId, c]))
+        const result = new Set<string>()
+        for (const candidateEntry of candidates) {
+            if (!candidateEntry.pairUserId || !candidateEntry.availableSlots) {
+                continue
+            }
+            const partner = byId.get(candidateEntry.pairUserId)
+            if (
+                !partner?.availableSlots ||
+                partner.pairUserId !== candidateEntry.userId
+            ) {
+                continue
+            }
+            const overlap = candidateEntry.availableSlots.some((slot) =>
+                partner.availableSlots?.includes(slot)
+            )
+            if (!overlap) {
+                result.add(candidateEntry.userId)
+                result.add(partner.userId)
+            }
+        }
+        return result
+    }, [candidates])
+
+    const slotRequestCommentByUserId = useMemo(
+        () =>
+            new Map(
+                candidates
+                    .filter((c) => c.slotRequestComment)
+                    .map((c) => [c.userId, c.slotRequestComment as string])
+            ),
+        [candidates]
+    )
+
+    const slotViolations = useMemo(() => {
+        const entryIds = new Set<string>()
+        const countByDivisionId = new Map<number, number>()
+        for (const divisionResult of teamAssignments) {
+            const violations = getSlotViolationEntryIds(divisionResult.teams)
+            countByDivisionId.set(divisionResult.division.id, violations.size)
+            for (const entryId of violations) {
+                entryIds.add(entryId)
+            }
+        }
+        return { entryIds, countByDivisionId }
+    }, [teamAssignments])
+
     const playsTwiceAssignmentUserIds = useMemo(() => {
         const counts = new Map<string, number>()
 
@@ -727,6 +780,28 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                                     }
                                                                 </span>
                                                             )}
+                                                            {player.availableSlots && (
+                                                                <span
+                                                                    className="ml-2 font-semibold text-amber-700 dark:text-amber-300"
+                                                                    title={
+                                                                        player.slotRequestComment ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    slots{" "}
+                                                                    {player.availableSlots.join(
+                                                                        ","
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                            {pairSlotConflictUserIds.has(
+                                                                player.sourceUserId
+                                                            ) && (
+                                                                <span className="ml-2 font-semibold text-red-600 dark:text-red-400">
+                                                                    pair slot
+                                                                    conflict
+                                                                </span>
+                                                            )}
                                                             {reasonMode ? (
                                                                 <span className="ml-2 font-semibold">
                                                                     {getPlayerPlacementLabel(
@@ -915,6 +990,16 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                 <CardTitle>
                                     {division.name} | {teams.length} teams
                                 </CardTitle>
+                                {(slotViolations.countByDivisionId.get(
+                                    division.id
+                                ) ?? 0) > 0 && (
+                                    <p className="font-semibold text-red-600 text-sm dark:text-red-400">
+                                        {slotViolations.countByDivisionId.get(
+                                            division.id
+                                        )}{" "}
+                                        slot request(s) could not be honored
+                                    </p>
+                                )}
                             </CardHeader>
                             <CardContent>
                                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -943,7 +1028,11 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                                 ? "bg-sky-100 text-sky-900 dark:bg-sky-950/45 dark:text-sky-100"
                                                                 : "bg-violet-100 text-violet-900 dark:bg-violet-950/45 dark:text-violet-100",
                                                             player.isCaptain &&
-                                                                "border border-primary"
+                                                                "border border-primary",
+                                                            slotViolations.entryIds.has(
+                                                                player.entryId
+                                                            ) &&
+                                                                "ring-2 ring-red-500"
                                                         )}
                                                     >
                                                         <span className="truncate">
@@ -984,6 +1073,29 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                             ) && (
                                                                 <span className="ml-2 font-semibold">
                                                                     plays twice
+                                                                </span>
+                                                            )}
+                                                            {player.availableSlots && (
+                                                                <span
+                                                                    className={cn(
+                                                                        "ml-2 font-semibold",
+                                                                        slotViolations.entryIds.has(
+                                                                            player.entryId
+                                                                        )
+                                                                            ? "text-red-600 dark:text-red-400"
+                                                                            : "text-amber-700 dark:text-amber-300"
+                                                                    )}
+                                                                    title={
+                                                                        slotRequestCommentByUserId.get(
+                                                                            player.assignmentUserId
+                                                                        ) ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    slots{" "}
+                                                                    {player.availableSlots.join(
+                                                                        ","
+                                                                    )}
                                                                 </span>
                                                             )}
                                                         </span>

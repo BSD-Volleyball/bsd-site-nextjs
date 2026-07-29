@@ -5,6 +5,7 @@ import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
+import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import type {
     ExcludedPlayer,
     PreseasonDivision,
@@ -51,14 +52,20 @@ export async function getCreateWeek2Data(): Promise<CreateWeek2Data> {
         }
 
         const base = result.data
+        const slotRequests = await loadTryoutSlotRequests(base.seasonId, 2)
 
         const candidates: Week2Candidate[] = base.candidates.map(
-            (candidate) => ({
-                ...candidate,
-                lastDivisionName:
-                    base.draftsByUser.get(candidate.userId)?.[0]
-                        ?.divisionName ?? null
-            })
+            (candidate) => {
+                const slotRequest = slotRequests.get(candidate.userId)
+                return {
+                    ...candidate,
+                    lastDivisionName:
+                        base.draftsByUser.get(candidate.userId)?.[0]
+                            ?.divisionName ?? null,
+                    availableSlots: slotRequest?.availableSlots ?? null,
+                    slotRequestComment: slotRequest?.comment ?? null
+                }
+            }
         )
 
         return {

@@ -10,6 +10,7 @@ import {
     loadWeek2DivisionByUser
 } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
+import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import type {
     ExcludedPlayer,
     PreseasonDivision,
@@ -61,7 +62,8 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
         const [
             week2DivisionByUser,
             { forcedMoveByUser, recommendationCountByUser },
-            consecutiveSeasonsInTopDivByUser
+            consecutiveSeasonsInTopDivByUser,
+            slotRequests
         ] = await Promise.all([
             loadWeek2DivisionByUser(base.seasonId),
             loadMovingDayInputs(base.seasonId),
@@ -69,7 +71,8 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                 base.seasonId,
                 base.userIds,
                 topDivisionId
-            )
+            ),
+            loadTryoutSlotRequests(base.seasonId, 3)
         ])
 
         const candidates: Week3Candidate[] = base.candidates.map(
@@ -77,6 +80,7 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                 const recommendations = recommendationCountByUser.get(
                     candidate.userId
                 ) || { up: 0, down: 0 }
+                const slotRequest = slotRequests.get(candidate.userId)
 
                 return {
                     ...candidate,
@@ -89,7 +93,9 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                             candidate.userId
                         ) ?? 0,
                     recommendationUpCount: recommendations.up,
-                    recommendationDownCount: recommendations.down
+                    recommendationDownCount: recommendations.down,
+                    availableSlots: slotRequest?.availableSlots ?? null,
+                    slotRequestComment: slotRequest?.comment ?? null
                 }
             }
         )
