@@ -1,7 +1,7 @@
 import { PDFDocument } from "pdf-lib"
 import { beforeEach, describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { week2Rosters } from "@/database/schema"
+import { week1Rosters, week2Rosters } from "@/database/schema"
 import { generateWeekNametagsPdf } from "@/lib/pdf/nametags"
 import { generateTryoutSheetsPdf } from "@/lib/pdf/tryout-sheets"
 import {
@@ -74,6 +74,52 @@ describe("generateWeekNametagsPdf", () => {
     it("produces a parseable PDF for admins", async () => {
         await createUserWithRoles([{ role: "admin" }])
         await expectPdfResponse(await generateWeekNametagsPdf(2))
+    })
+})
+
+describe("generateWeekNametagsPdf (week 1)", () => {
+    async function seedWeek1Fixture() {
+        const season = await createSeason({ phase: "prep_tryout_week_1" })
+        const event = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-09-05",
+            sort_order: 0
+        })
+        await createEventTimeSlot(event.id, { start_time: "18:00" })
+        await createEventTimeSlot(event.id, {
+            start_time: "19:30",
+            sort_order: 1
+        })
+
+        // Sessions 1 and 2 get real players; session 3 rows are alternates
+        for (const sessionNumber of [1, 2, 3]) {
+            const player = await createUser()
+            await db.insert(week1Rosters).values({
+                season: season.id,
+                user: player.id,
+                session_number: sessionNumber,
+                court_number: 1
+            })
+        }
+    }
+
+    beforeEach(seedWeek1Fixture)
+
+    it("denies non-admin users", async () => {
+        await createUserWithRoles([{ role: "captain" }])
+        const response = await generateWeekNametagsPdf(1)
+        expect(response.status).toBe(403)
+    })
+
+    it("produces a PDF for sessions 1-2 only, excluding alternates", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const response = await generateWeekNametagsPdf(1)
+        expect(response.status).toBe(200)
+        const bytes = new Uint8Array(await response.arrayBuffer())
+        const doc = await PDFDocument.load(bytes)
+        // One page per session with players; a session-3 page would mean
+        // alternates leaked into the nametags
+        expect(doc.getPageCount()).toBe(2)
     })
 })
 

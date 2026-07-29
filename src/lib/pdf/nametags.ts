@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import {
     PDFDocument,
     type PDFPage,
@@ -10,7 +10,13 @@ import {
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
-import { divisions, users, week2Rosters, week3Rosters } from "@/database/schema"
+import {
+    divisions,
+    users,
+    week1Rosters,
+    week2Rosters,
+    week3Rosters
+} from "@/database/schema"
 import {
     getSeasonConfig,
     getEventsByType,
@@ -420,24 +426,108 @@ function drawNametag({
     })
 }
 
-/**
- * Builds the nametag-labels PDF response for tryout week 2 or 3. The two
- * weeks share identical logic; only the roster table, the tryout event
- * index, and the labels differ.
- */
-export async function generateWeekNametagsPdf(
-    week: 2 | 3
-): Promise<NextResponse> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 })
-    }
+interface NametagSourceEntry {
+    userId: string
+    sessionNumber: number
+    courtNumber: number
+    oldId: number | null
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    picture: string | null
+}
 
+/**
+ * Week 1 stores session/court directly. Sessions 1-2 only — session 3 rows
+ * are alternates and must never get nametags.
+ */
+async function fetchWeek1NametagEntries(
+    seasonId: number
+): Promise<NametagSourceEntry[]> {
+    return db
+        .select({
+            userId: users.id,
+            sessionNumber: week1Rosters.session_number,
+            courtNumber: week1Rosters.court_number,
+            oldId: users.old_id,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name,
+            picture: users.picture
+        })
+        .from(week1Rosters)
+        .innerJoin(users, eq(week1Rosters.user, users.id))
+        .where(
+            and(
+                eq(week1Rosters.season, seasonId),
+                inArray(week1Rosters.session_number, [1, 2])
+            )
+        )
+        .orderBy(week1Rosters.session_number, users.last_name, users.first_name)
+}
+
+/** Weeks 2/3 derive session from team number and court from division. */
+async function fetchDivisionWeekNametagEntries(
+    week: 2 | 3,
+    seasonId: number
+): Promise<NametagSourceEntry[]> {
     // The two tables are structurally identical; the cast keeps the query
     // builder happy about the nominal table-name difference.
     const rosterTable = (
         week === 2 ? week2Rosters : week3Rosters
     ) as typeof week2Rosters
+
+    const rawRows = await db
+        .select({
+            userId: users.id,
+            teamNumber: rosterTable.team_number,
+            divisionId: rosterTable.division,
+            divisionName: divisions.name,
+            divisionLevel: divisions.level,
+            oldId: users.old_id,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name,
+            picture: users.picture
+        })
+        .from(rosterTable)
+        .innerJoin(users, eq(rosterTable.user, users.id))
+        .innerJoin(divisions, eq(rosterTable.division, divisions.id))
+        .where(eq(rosterTable.season, seasonId))
+        .orderBy(
+            divisions.level,
+            rosterTable.team_number,
+            users.last_name,
+            users.first_name
+        )
+
+    return rawRows.map((raw) => ({
+        userId: raw.userId,
+        sessionNumber: getSessionNumberFromTeam(raw.teamNumber),
+        courtNumber:
+            LEGACY_COURT_BY_DIVISION[raw.divisionName] ??
+            raw.divisionLevel ??
+            raw.divisionId,
+        oldId: raw.oldId,
+        firstName: raw.firstName,
+        lastName: raw.lastName,
+        preferredName: raw.preferredName,
+        picture: raw.picture
+    }))
+}
+
+/**
+ * Builds the nametag-labels PDF response for tryout week 1, 2, or 3. The
+ * weeks share identical drawing logic; only how session/court are sourced
+ * differs (week 1: stored directly; weeks 2/3: derived from team/division).
+ */
+export async function generateWeekNametagsPdf(
+    week: 1 | 2 | 3
+): Promise<NextResponse> {
+    const hasAccess = await isAdminOrDirectorBySession()
+    if (!hasAccess) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
 
     try {
         const config = await getSeasonConfig()
@@ -448,38 +538,15 @@ export async function generateWeekNametagsPdf(
             )
         }
 
-        const rawRows = await db
-            .select({
-                userId: users.id,
-                teamNumber: rosterTable.team_number,
-                divisionId: rosterTable.division,
-                divisionName: divisions.name,
-                divisionLevel: divisions.level,
-                oldId: users.old_id,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name,
-                picture: users.picture
-            })
-            .from(rosterTable)
-            .innerJoin(users, eq(rosterTable.user, users.id))
-            .innerJoin(divisions, eq(rosterTable.division, divisions.id))
-            .where(eq(rosterTable.season, config.seasonId))
-            .orderBy(
-                divisions.level,
-                rosterTable.team_number,
-                users.last_name,
-                users.first_name
-            )
+        const entries =
+            week === 1
+                ? await fetchWeek1NametagEntries(config.seasonId)
+                : await fetchDivisionWeekNametagEntries(week, config.seasonId)
 
         // Group by user so players scheduled for multiple courts/times get one nametag
         const userMap = new Map<string, NametagRow>()
-        for (const raw of rawRows) {
-            const sessionNumber = getSessionNumberFromTeam(raw.teamNumber)
-            const courtNumber =
-                LEGACY_COURT_BY_DIVISION[raw.divisionName] ??
-                raw.divisionLevel ??
-                raw.divisionId
+        for (const raw of entries) {
+            const { sessionNumber, courtNumber } = raw
 
             const existing = userMap.get(raw.userId)
             if (existing) {
