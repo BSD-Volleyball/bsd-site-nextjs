@@ -1,0 +1,106 @@
+"use client"
+
+// One bordered roster column ("Team N" / "Court N" / alternates court):
+// titled list of slot rows — each with a searchable player combobox,
+// optional extra content, detail and remove buttons — plus an Add Player
+// button. Shared by the week-1/2/3 roster editors.
+
+import type { ReactNode } from "react"
+import { Button } from "@/components/ui/button"
+import { RiAddLine, RiDeleteBinLine, RiUserLine } from "@remixicon/react"
+import { PlayerCombobox, type ComboboxPlayer } from "./player-combobox"
+
+export interface SlotBoxSlot {
+    localKey: string
+    userId: string
+}
+
+interface SlotBoxProps<TSlot extends SlotBoxSlot> {
+    title: string
+    slots: TSlot[]
+    players: ComboboxPlayer[]
+    onChangeSlot: (localKey: string, userId: string) => void
+    onRemoveSlot: (localKey: string) => void
+    onAddSlot: () => void
+    onOpenDetail: (userId: string) => void
+    /** Extra content appended to the "Slot N" label line. */
+    slotLabelExtras?: (slot: TSlot) => ReactNode
+    /** Content rendered under the combobox (warnings, captain toggle). */
+    belowCombobox?: (slot: TSlot) => ReactNode
+    comboboxDisabled?: (slot: TSlot) => boolean
+    excludeIdsFor?: (slot: TSlot) => string[]
+}
+
+export function SlotBox<TSlot extends SlotBoxSlot>({
+    title,
+    slots,
+    players,
+    onChangeSlot,
+    onRemoveSlot,
+    onAddSlot,
+    onOpenDetail,
+    slotLabelExtras,
+    belowCombobox,
+    comboboxDisabled,
+    excludeIdsFor
+}: SlotBoxProps<TSlot>) {
+    return (
+        <div className="space-y-2 rounded-md border p-3">
+            <h3 className="font-semibold text-sm">{title}</h3>
+            <div className="space-y-2">
+                {slots.map((slot, idx) => (
+                    <div key={slot.localKey} className="flex items-end gap-1">
+                        <div className="min-w-0 flex-1 space-y-1">
+                            <p className="text-muted-foreground text-xs">
+                                Slot {idx + 1}
+                                {slotLabelExtras?.(slot)}
+                            </p>
+                            <PlayerCombobox
+                                players={players}
+                                value={slot.userId}
+                                onChange={(userId) =>
+                                    onChangeSlot(slot.localKey, userId)
+                                }
+                                disabled={comboboxDisabled?.(slot) ?? false}
+                                excludeIds={excludeIdsFor?.(slot)}
+                            />
+                            {belowCombobox?.(slot)}
+                        </div>
+                        {slot.userId && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                                aria-label="View player details"
+                                onClick={() => onOpenDetail(slot.userId)}
+                            >
+                                <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0"
+                            aria-label="Remove player from slot"
+                            onClick={() => onRemoveSlot(slot.localKey)}
+                        >
+                            <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                    </div>
+                ))}
+            </div>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={onAddSlot}
+            >
+                <RiAddLine className="mr-1 h-4 w-4" />
+                Add Player
+            </Button>
+        </div>
+    )
+}
