@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
+import { buildContinuityDivisionPlacement } from "./division-continuity"
 import {
-    buildDivisionPlacement,
     placementReasonClasses,
     placementReasonLabel,
     placementReasonOrder
-} from "./placement"
-import type { Week3Candidate, Week3Division } from "./week3-types"
+} from "./placement-shared"
+import type { Week3Candidate, PreseasonDivision } from "./types"
 
 function candidate(overrides: Partial<Week3Candidate> = {}): Week3Candidate {
     const id = overrides.userId ?? "user-x"
@@ -45,7 +45,9 @@ describe("placement reason metadata", () => {
     })
 })
 
-function division(overrides: Partial<Week3Division> = {}): Week3Division {
+function division(
+    overrides: Partial<PreseasonDivision> = {}
+): PreseasonDivision {
     return {
         id: 1,
         name: "AA",
@@ -74,7 +76,7 @@ function buildBalancedPool(): Week3Candidate[] {
     )
 }
 
-describe("buildDivisionPlacement", () => {
+describe("buildContinuityDivisionPlacement", () => {
     const divisions = [
         division({ id: 1, teamCount: 2 }),
         division({
@@ -88,7 +90,7 @@ describe("buildDivisionPlacement", () => {
     ]
 
     it("places every player exactly once and hits size targets", () => {
-        const { placement } = buildDivisionPlacement(
+        const { placement } = buildContinuityDivisionPlacement(
             divisions,
             buildBalancedPool()
         )
@@ -111,7 +113,7 @@ describe("buildDivisionPlacement", () => {
             captainDivisionId: 1
         })
 
-        const { placement, lockedUserIds } = buildDivisionPlacement(
+        const { placement, lockedUserIds } = buildContinuityDivisionPlacement(
             divisions,
             pool
         )
@@ -124,9 +126,65 @@ describe("buildDivisionPlacement", () => {
 
     it("assigns a placement reason to every player", () => {
         const pool = buildBalancedPool()
-        const { reasonByUser } = buildDivisionPlacement(divisions, pool)
+        const { reasonByUser } = buildContinuityDivisionPlacement(
+            divisions,
+            pool
+        )
         for (const player of pool) {
             expect(reasonByUser.get(player.userId)).toBeDefined()
         }
+    })
+
+    it("keeps players in their week-2 division by default", () => {
+        const pool = buildBalancedPool()
+        const { placement, reasonByUser } = buildContinuityDivisionPlacement(
+            divisions,
+            pool
+        )
+        const divisionTwo = (placement.get(2)?.units ?? []).flatMap((unit) =>
+            unit.players.map((p) => p.userId)
+        )
+        expect(divisionTwo).toContain("p23")
+        expect(reasonByUser.get("p23")).toBe("tryout2_same_division")
+    })
+
+    it("shifts forced moves exactly one division", () => {
+        const pool = buildBalancedPool()
+        pool[23] = candidate({
+            userId: "mover",
+            placementScore: 24,
+            week2DivisionId: 2,
+            forcedMoveDirection: "up"
+        })
+
+        const { placement, reasonByUser } = buildContinuityDivisionPlacement(
+            divisions,
+            pool
+        )
+        const divisionOne = (placement.get(1)?.units ?? []).flatMap((unit) =>
+            unit.players.map((p) => p.userId)
+        )
+        expect(divisionOne).toContain("mover")
+        expect(reasonByUser.get("mover")).toBe("forced_move_up")
+    })
+
+    it("places players without a week-2 division by score band", () => {
+        const pool = buildBalancedPool()
+        pool[0] = candidate({
+            userId: "newcomer",
+            placementScore: 90,
+            week2DivisionId: null
+        })
+
+        const { placement, reasonByUser } = buildContinuityDivisionPlacement(
+            divisions,
+            pool
+        )
+        expect(reasonByUser.get("newcomer")).toBe("score_based")
+        // Score 90 → band level 2 → division 2
+        const divisionTwo = (placement.get(2)?.units ?? []).flatMap((unit) =>
+            unit.players.map((p) => p.userId)
+        )
+        expect(divisionTwo).toContain("newcomer")
     })
 })
