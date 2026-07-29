@@ -1,9 +1,7 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { CreateWeek1Form } from "./create-week-1-form"
 import { getCreateWeek1Data } from "./actions"
 import type { Metadata } from "next"
@@ -15,13 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function CreateWeek1Page() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsAdminOrDirector()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getCreateWeek1Data()
 

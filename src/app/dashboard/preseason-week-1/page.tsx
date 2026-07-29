@@ -10,7 +10,7 @@ import {
 import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
-import { PrintButton } from "./print-button"
+import { PrintButton } from "@/components/preseason/print-button"
 import type { Metadata } from "next"
 import { formatDisplayName } from "@/lib/utils"
 
