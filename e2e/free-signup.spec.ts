@@ -75,10 +75,17 @@ test.describe("free season signup (100% discount)", () => {
         ).toBeVisible()
         await page.getByRole("button", { name: "Next", exact: true }).click()
 
-        // Schedule tab: available every date
+        // Schedule tab: available every date. The week 1 tryout is broken out
+        // into its own callout and defaults to unchecked (= attending) for
+        // players with no draft history.
         await expect(
             page.getByText("Select which dates you will")
         ).toBeVisible()
+        const week1Checkbox = page.getByRole("checkbox", {
+            name: /Week 1 tryout/i
+        })
+        await expect(week1Checkbox).toBeVisible()
+        await expect(week1Checkbox).not.toBeChecked()
         await page.getByRole("button", { name: "Next", exact: true }).click()
 
         // Waivers tab: the active waiver must be shown and agreed to

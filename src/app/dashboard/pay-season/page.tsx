@@ -14,7 +14,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
-import { signups } from "@/database/schema"
+import { drafts, signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { RiCheckboxCircleLine } from "@remixicon/react"
 
@@ -35,6 +35,19 @@ export default async function PaySeasonPage() {
     const session = await auth.api.getSession({ headers: await headers() })
     if (session) {
         discount = await getActiveDiscountForUser(session.user.id, "season")
+    }
+
+    // Returning player = has ever been drafted. Drives the week 1 tryout
+    // default on the schedule step (returning players opt in, new players
+    // are expected to attend).
+    let isReturningPlayer = false
+    if (session) {
+        const [draftRow] = await db
+            .select({ user: drafts.user })
+            .from(drafts)
+            .where(eq(drafts.user, session.user.id))
+            .limit(1)
+        isReturningPlayer = draftRow !== undefined
     }
 
     // A signups row is only written after payment succeeds, so its presence
@@ -117,6 +130,7 @@ export default async function PaySeasonPage() {
                     config={config}
                     discount={discount}
                     activeWaiver={activeWaiver}
+                    isReturningPlayer={isReturningPlayer}
                 />
             )}
         </div>

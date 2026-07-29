@@ -43,6 +43,7 @@ import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 import Link from "next/link"
 import { WaiverContent } from "@/components/waiver-content"
+import { Week1TryoutCallout } from "@/components/week1-tryout-callout"
 
 interface User {
     id: string
@@ -55,6 +56,7 @@ interface WizardFormProps {
     config: SeasonConfig
     discount: { id: number; percentage: string } | null
     activeWaiver: { id: number; content: string } | null
+    isReturningPlayer: boolean
 }
 
 const TABS = ["info", "pairing", "schedule", "waivers", "payment"] as const
@@ -65,21 +67,35 @@ export function WizardForm({
     users,
     config,
     discount,
-    activeWaiver
+    activeWaiver,
+    isReturningPlayer
 }: WizardFormProps) {
     const router = useRouter()
     const { resolvedTheme } = useTheme()
     const _isDark = resolvedTheme === "dark"
     const [activeTab, setActiveTab] = useState<TabValue>("info")
+
+    const tryoutEvents = getEventsByType(config, "tryout")
+    const seasonEvents = getEventsByType(config, "regular_season")
+    const playoffEvents = getEventsByType(config, "playoff")
+    const week1Tryout = tryoutEvents[0] ?? null
+
+    // Returning players default to sitting out week 1 (they opt in by
+    // unchecking); new players default to attending.
+    const initialUnavailableIds =
+        isReturningPlayer && week1Tryout ? [week1Tryout.id] : []
+
     const [formData, setFormData] = useState<SignupFormData>({
         age: "20+",
         captain: "no",
         pair: false,
         pairPick: null,
         pairReason: "",
-        unavailableEventIds: []
+        unavailableEventIds: initialUnavailableIds
     })
-    const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set())
+    const [selectedEvents, setSelectedEvents] = useState<Set<number>>(
+        () => new Set(initialUnavailableIds)
+    )
     const [waiverAgreed, setWaiverAgreed] = useState(false)
 
     const toggleEvent = (eventId: number) => {
@@ -99,9 +115,6 @@ export function WizardForm({
         })
     }
 
-    const tryoutEvents = getEventsByType(config, "tryout")
-    const seasonEvents = getEventsByType(config, "regular_season")
-    const playoffEvents = getEventsByType(config, "playoff")
     const [isProcessing, setIsProcessing] = useState(false)
     const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(
         null
@@ -413,39 +426,68 @@ export function WizardForm({
                                 be able to play this season:
                             </h3>
 
+                            {week1Tryout && (
+                                <Week1TryoutCallout
+                                    dateLabel={formatEventDate(
+                                        week1Tryout.eventDate
+                                    )}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id={`event-${week1Tryout.id}`}
+                                            checked={selectedEvents.has(
+                                                week1Tryout.id
+                                            )}
+                                            onCheckedChange={() =>
+                                                toggleEvent(week1Tryout.id)
+                                            }
+                                        />
+                                        <Label
+                                            htmlFor={`event-${week1Tryout.id}`}
+                                            className="cursor-pointer font-normal"
+                                        >
+                                            I will <strong>NOT</strong> be able
+                                            to attend the Week 1 tryout
+                                        </Label>
+                                    </div>
+                                </Week1TryoutCallout>
+                            )}
+
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                                {tryoutEvents.length > 0 && (
+                                {tryoutEvents.length > 1 && (
                                     <div className="space-y-2">
                                         <h4 className="font-medium text-muted-foreground text-sm">
-                                            Tryouts
+                                            Tryouts (Weeks 2 &amp; 3)
                                         </h4>
                                         <div className="space-y-2">
-                                            {tryoutEvents.map((event) => (
-                                                <div
-                                                    key={event.id}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <Checkbox
-                                                        id={`event-${event.id}`}
-                                                        checked={selectedEvents.has(
-                                                            event.id
-                                                        )}
-                                                        onCheckedChange={() =>
-                                                            toggleEvent(
-                                                                event.id
-                                                            )
-                                                        }
-                                                    />
-                                                    <Label
-                                                        htmlFor={`event-${event.id}`}
-                                                        className="cursor-pointer font-normal"
+                                            {tryoutEvents
+                                                .slice(1)
+                                                .map((event) => (
+                                                    <div
+                                                        key={event.id}
+                                                        className="flex items-center gap-2"
                                                     >
-                                                        {formatEventDate(
-                                                            event.eventDate
-                                                        )}
-                                                    </Label>
-                                                </div>
-                                            ))}
+                                                        <Checkbox
+                                                            id={`event-${event.id}`}
+                                                            checked={selectedEvents.has(
+                                                                event.id
+                                                            )}
+                                                            onCheckedChange={() =>
+                                                                toggleEvent(
+                                                                    event.id
+                                                                )
+                                                            }
+                                                        />
+                                                        <Label
+                                                            htmlFor={`event-${event.id}`}
+                                                            className="cursor-pointer font-normal"
+                                                        >
+                                                            {formatEventDate(
+                                                                event.eventDate
+                                                            )}
+                                                        </Label>
+                                                    </div>
+                                                ))}
                                         </div>
                                     </div>
                                 )}

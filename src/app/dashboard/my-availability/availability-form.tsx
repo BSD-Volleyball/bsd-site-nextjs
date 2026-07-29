@@ -14,14 +14,51 @@ import {
 import { Button } from "@/components/ui/button"
 import { RiCheckboxCircleLine, RiCloseCircleFill } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import type { SeasonConfig } from "@/lib/season-types"
+import type { SeasonConfig, SeasonEvent } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
+import { Week1TryoutCallout } from "@/components/week1-tryout-callout"
 
 interface AvailabilityFormProps {
     signupId: number | null
     config: SeasonConfig
     initialUnavailableIds: number[]
     scheduledTimesByEventId: Record<number, string>
+}
+
+function EventToggleRow({
+    event,
+    unavailable,
+    scheduledTime,
+    onToggle
+}: {
+    event: SeasonEvent
+    unavailable: boolean
+    scheduledTime: string | undefined
+    onToggle: () => void
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
+        >
+            {unavailable ? (
+                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
+            ) : (
+                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
+            <span
+                className={cn(unavailable && "text-red-600 dark:text-red-400")}
+            >
+                {formatEventDate(event.eventDate)}
+                {scheduledTime && (
+                    <span className="ml-1.5 text-muted-foreground text-xs">
+                        {scheduledTime}
+                    </span>
+                )}
+            </span>
+        </button>
+    )
 }
 
 export function AvailabilityForm({
@@ -39,6 +76,8 @@ export function AvailabilityForm({
     const tryoutEvents = getEventsByType(config, "tryout")
     const seasonEvents = getEventsByType(config, "regular_season")
     const playoffEvents = getEventsByType(config, "playoff")
+    const week1Tryout = tryoutEvents[0] ?? null
+    const laterTryouts = tryoutEvents.slice(1)
 
     const toggleEvent = (eventId: number) => {
         setSelectedEvents((prev) => {
@@ -86,51 +125,41 @@ export function AvailabilityForm({
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {week1Tryout && (
+                    <Week1TryoutCallout
+                        dateLabel={formatEventDate(week1Tryout.eventDate)}
+                    >
+                        <EventToggleRow
+                            event={week1Tryout}
+                            unavailable={selectedEvents.has(week1Tryout.id)}
+                            scheduledTime={
+                                scheduledTimesByEventId[week1Tryout.id]
+                            }
+                            onToggle={() => toggleEvent(week1Tryout.id)}
+                        />
+                    </Week1TryoutCallout>
+                )}
+
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                    {tryoutEvents.length > 0 && (
+                    {laterTryouts.length > 0 && (
                         <div className="space-y-2">
                             <h4 className="font-medium text-muted-foreground text-sm">
-                                Tryouts
+                                Tryouts (Weeks 2 &amp; 3)
                             </h4>
                             <div className="space-y-1">
-                                {tryoutEvents.map((event) => {
-                                    const unavailable = selectedEvents.has(
-                                        event.id
-                                    )
-                                    const scheduledTime =
-                                        scheduledTimesByEventId[event.id]
-                                    return (
-                                        <button
-                                            key={event.id}
-                                            type="button"
-                                            onClick={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-                                        >
-                                            {unavailable ? (
-                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
-                                            ) : (
-                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            )}
-                                            <span
-                                                className={cn(
-                                                    unavailable &&
-                                                        "text-red-600 dark:text-red-400"
-                                                )}
-                                            >
-                                                {formatEventDate(
-                                                    event.eventDate
-                                                )}
-                                                {scheduledTime && (
-                                                    <span className="ml-1.5 text-muted-foreground text-xs">
-                                                        {scheduledTime}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    )
-                                })}
+                                {laterTryouts.map((event) => (
+                                    <EventToggleRow
+                                        key={event.id}
+                                        event={event}
+                                        unavailable={selectedEvents.has(
+                                            event.id
+                                        )}
+                                        scheduledTime={
+                                            scheduledTimesByEventId[event.id]
+                                        }
+                                        onToggle={() => toggleEvent(event.id)}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}
@@ -141,44 +170,19 @@ export function AvailabilityForm({
                                 Regular Season
                             </h4>
                             <div className="space-y-1">
-                                {seasonEvents.map((event) => {
-                                    const unavailable = selectedEvents.has(
-                                        event.id
-                                    )
-                                    const scheduledTime =
-                                        scheduledTimesByEventId[event.id]
-                                    return (
-                                        <button
-                                            key={event.id}
-                                            type="button"
-                                            onClick={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-                                        >
-                                            {unavailable ? (
-                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
-                                            ) : (
-                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            )}
-                                            <span
-                                                className={cn(
-                                                    unavailable &&
-                                                        "text-red-600 dark:text-red-400"
-                                                )}
-                                            >
-                                                {formatEventDate(
-                                                    event.eventDate
-                                                )}
-                                                {scheduledTime && (
-                                                    <span className="ml-1.5 text-muted-foreground text-xs">
-                                                        {scheduledTime}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    )
-                                })}
+                                {seasonEvents.map((event) => (
+                                    <EventToggleRow
+                                        key={event.id}
+                                        event={event}
+                                        unavailable={selectedEvents.has(
+                                            event.id
+                                        )}
+                                        scheduledTime={
+                                            scheduledTimesByEventId[event.id]
+                                        }
+                                        onToggle={() => toggleEvent(event.id)}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}
@@ -189,44 +193,19 @@ export function AvailabilityForm({
                                 Playoffs
                             </h4>
                             <div className="space-y-1">
-                                {playoffEvents.map((event) => {
-                                    const unavailable = selectedEvents.has(
-                                        event.id
-                                    )
-                                    const scheduledTime =
-                                        scheduledTimesByEventId[event.id]
-                                    return (
-                                        <button
-                                            key={event.id}
-                                            type="button"
-                                            onClick={() =>
-                                                toggleEvent(event.id)
-                                            }
-                                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-                                        >
-                                            {unavailable ? (
-                                                <RiCloseCircleFill className="h-4 w-4 shrink-0 text-red-500" />
-                                            ) : (
-                                                <RiCheckboxCircleLine className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            )}
-                                            <span
-                                                className={cn(
-                                                    unavailable &&
-                                                        "text-red-600 dark:text-red-400"
-                                                )}
-                                            >
-                                                {formatEventDate(
-                                                    event.eventDate
-                                                )}
-                                                {scheduledTime && (
-                                                    <span className="ml-1.5 text-muted-foreground text-xs">
-                                                        {scheduledTime}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    )
-                                })}
+                                {playoffEvents.map((event) => (
+                                    <EventToggleRow
+                                        key={event.id}
+                                        event={event}
+                                        unavailable={selectedEvents.has(
+                                            event.id
+                                        )}
+                                        scheduledTime={
+                                            scheduledTimesByEventId[event.id]
+                                        }
+                                        onToggle={() => toggleEvent(event.id)}
+                                    />
+                                ))}
                             </div>
                         </div>
                     )}
