@@ -99,16 +99,6 @@ export function AvailabilityForm({
     const week1Tryout = tryoutEvents[0] ?? null
     const laterTryouts = tryoutEvents.slice(1)
 
-    // Sitting out week 1 is the expected default for returning players, so
-    // it doesn't count toward the "quite a few dates" warning for them.
-    const week1SittingOut =
-        isReturningPlayer &&
-        week1Tryout !== null &&
-        selectedEvents.has(week1Tryout.id)
-    const countedUnavailable = week1SittingOut
-        ? selectedEvents.size - 1
-        : selectedEvents.size
-
     const toggleEvent = (eventId: number) => {
         setSelectedEvents((prev) => {
             const next = new Set(prev)
@@ -244,37 +234,6 @@ export function AvailabilityForm({
                         </div>
                     )}
                 </div>
-
-                {tryoutEvents.length > 0 &&
-                    tryoutEvents.every((event) =>
-                        selectedEvents.has(event.id)
-                    ) && (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                            Are you sure you want to play this season? Missing
-                            all 3 tryouts makes it very hard for you to be
-                            placed on an appropriate team and you&apos;re very
-                            likely to end up on a team in a lower division.
-                        </div>
-                    )}
-
-                {countedUnavailable >= 4 && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                        Are you sure you want to play this season? You&apos;ve
-                        listed quite a few dates that you will miss.
-                    </div>
-                )}
-
-                {playoffEvents.length > 0 &&
-                    playoffEvents.every((event) =>
-                        selectedEvents.has(event.id)
-                    ) && (
-                        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-800 text-sm dark:border-red-900 dark:bg-red-950 dark:text-red-200">
-                            Are you really going to miss all of the playoff
-                            matches? Captains have requested we only accept
-                            players who plan to play at least 1 match of the
-                            playoffs.
-                        </div>
-                    )}
 
                 <div className="pt-2">
                     <Button onClick={handleSave} disabled={isSaving}>
