@@ -1,83 +1,27 @@
 "use server"
 
 import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
-import {
-    dispatchNotification,
-    type NotificationRecipient
-} from "@/lib/notifications/dispatch"
-import {
-    buildRosterAssignmentHtml,
-    buildRosterRemovalHtml,
-    renderDetailRow,
-    renderDetailsBlock
-} from "@/lib/email-html"
-import { db } from "@/database/db"
-import {
-    signups,
-    users,
-    week2Rosters,
-    teams,
-    divisions,
-    individual_divisions,
-    drafts,
-    seasons
-} from "@/database/schema"
-import { and, desc, eq, inArray } from "drizzle-orm"
-import {
-    getSeasonConfig,
-    getEventsByType,
-    formatEventDate,
-    formatEventTime
-} from "@/lib/site-config"
+import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { logAuditEntry } from "@/lib/audit-log"
-import { fetchPlayerScores } from "@/lib/player-score"
 import {
-    getUnavailableSignupIdsForEvent,
-    fetchRatingScoresForReturningPlayers
-} from "@/lib/week-rosters"
-import { formatDisplayName } from "@/lib/utils"
+    EDIT_WEEK_2,
+    getEditWeekData,
+    sendEditWeekRosterNotifications,
+    updateEditWeekRosters,
+    type EditWeekData
+} from "@/lib/preseason/edit-week-actions"
+import type {
+    EditWeekAssignment,
+    EditWeekRosterEntry
+} from "@/components/edit-week-roster/edit-week-roster-form"
 
-export interface Week2EditablePlayer {
-    id: string
-    firstName: string
-    lastName: string
-    preferredName: string | null
-    male: boolean | null
-    hasPairPick: boolean
-    placementScore: number
-    ratingScore: number | null
-    lastDivisionName: string | null
-    seasonsPlayedCount: number
-}
+export type {
+    EditWeekPlayer as Week2EditablePlayer,
+    EditWeekSlot as Week2EditableSlot,
+    EditWeekRosterEntry as Week2RosterEntry
+} from "@/components/edit-week-roster/edit-week-roster-form"
 
-export interface Week2EditableSlot {
-    id: number
-    divisionId: number
-    divisionName: string
-    teamNumber: number
-    userId: string
-    isCaptain: boolean
-}
-
-export interface Week2RosterEntry {
-    divisionId: number
-    teamNumber: number
-    userId: string
-    isCaptain: boolean
-}
-
-export async function getEditWeek2Data(): Promise<{
-    status: boolean
-    message?: string
-    seasonId: number
-    seasonLabel: string
-    players: Week2EditablePlayer[]
-    slots: Week2EditableSlot[]
-}> {
+export async function getEditWeek2Data(): Promise<EditWeekData> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
         return {
@@ -90,267 +34,23 @@ export async function getEditWeek2Data(): Promise<{
         }
     }
 
-    try {
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                seasonId: 0,
-                seasonLabel: "",
-                players: [],
-                slots: []
-            }
-        }
-
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
-        const tryouts = getEventsByType(config, "tryout")
-        const tryout2Event = tryouts[1] ?? null
-
-        const [signupPlayersRaw, rosterSlots] = await Promise.all([
-            db
-                .select({
-                    signupId: signups.id,
-                    id: users.id,
-                    firstName: users.first_name,
-                    lastName: users.last_name,
-                    preferredName: users.preferred_name,
-                    male: users.male,
-                    pairPick: signups.pair_pick
-                })
-                .from(signups)
-                .innerJoin(users, eq(signups.player, users.id))
-                .where(eq(signups.season, config.seasonId))
-                .orderBy(users.last_name, users.first_name),
-            db
-                .select({
-                    id: week2Rosters.id,
-                    divisionId: week2Rosters.division,
-                    divisionName: divisions.name,
-                    teamNumber: week2Rosters.team_number,
-                    userId: week2Rosters.user,
-                    isCaptain: week2Rosters.is_captain
-                })
-                .from(week2Rosters)
-                .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-                .where(eq(week2Rosters.season, config.seasonId))
-                .orderBy(
-                    divisions.level,
-                    week2Rosters.team_number,
-                    week2Rosters.id
-                )
-        ])
-
-        const unavailableSignupIds = tryout2Event
-            ? await getUnavailableSignupIdsForEvent(
-                  tryout2Event.id,
-                  signupPlayersRaw.map((p) => p.signupId)
-              )
-            : new Set<number>()
-
-        const signupPlayers = signupPlayersRaw.filter((player) => {
-            if (!tryout2Event) {
-                return true
-            }
-
-            return !unavailableSignupIds.has(player.signupId)
-        })
-
-        const userIds = signupPlayers.map((p) => p.id)
-
-        const [draftRows, scoreByUser] = await Promise.all([
-            userIds.length > 0
-                ? db
-                      .select({
-                          userId: drafts.user,
-                          seasonId: seasons.id,
-                          divisionName: divisions.name
-                      })
-                      .from(drafts)
-                      .innerJoin(teams, eq(drafts.team, teams.id))
-                      .innerJoin(seasons, eq(teams.season, seasons.id))
-                      .innerJoin(divisions, eq(teams.division, divisions.id))
-                      .where(inArray(drafts.user, userIds))
-                      .orderBy(desc(seasons.id), drafts.overall)
-                : Promise.resolve([]),
-            userIds.length > 0
-                ? fetchPlayerScores(userIds, config.seasonId)
-                : Promise.resolve(new Map<string, number>())
-        ])
-
-        const ratingScoreByUser = await fetchRatingScoresForReturningPlayers(
-            userIds,
-            (id) => draftRows.some((r) => r.userId === id),
-            config.seasonId
-        )
-
-        const lastDivisionByUser = new Map<string, string>()
-        const seasonsCountByUser = new Map<string, Set<number>>()
-        for (const row of draftRows) {
-            if (!lastDivisionByUser.has(row.userId)) {
-                lastDivisionByUser.set(row.userId, row.divisionName)
-            }
-            const seasons = seasonsCountByUser.get(row.userId) || new Set()
-            seasons.add(row.seasonId)
-            seasonsCountByUser.set(row.userId, seasons)
-        }
-
-        return {
-            status: true,
-            seasonId: config.seasonId,
-            seasonLabel,
-            players: signupPlayers.map((player) => ({
-                id: player.id,
-                firstName: player.firstName,
-                lastName: player.lastName,
-                preferredName: player.preferredName,
-                male: player.male,
-                hasPairPick: !!player.pairPick,
-                placementScore: scoreByUser.get(player.id) ?? 200,
-                ratingScore: ratingScoreByUser.get(player.id) ?? null,
-                lastDivisionName: lastDivisionByUser.get(player.id) ?? null,
-                seasonsPlayedCount: seasonsCountByUser.get(player.id)?.size ?? 0
-            })),
-            slots: rosterSlots
-        }
-    } catch (error) {
-        console.error("Error loading edit week 2 data:", error)
-        return {
-            status: false,
-            message: "Something went wrong while loading data.",
-            seasonId: 0,
-            seasonLabel: "",
-            players: [],
-            slots: []
-        }
-    }
+    return getEditWeekData(EDIT_WEEK_2)
 }
 
 export const updateWeek2Rosters = withAction(
-    async (slots: Array<Week2RosterEntry>): Promise<ActionResult> => {
+    async (slots: EditWeekRosterEntry[]): Promise<ActionResult> => {
         const hasAccess = await getIsAdminOrDirector()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }
 
-        const config = await requireSeasonConfig()
-
-        const filledSlots = slots.filter((s) => s.userId)
-        const uniqueUserIds = new Set(filledSlots.map((s) => s.userId))
-
-        if (uniqueUserIds.size > 0) {
-            const [signedUpRows, captainRows] = await Promise.all([
-                db
-                    .select({ playerId: signups.player })
-                    .from(signups)
-                    .where(
-                        and(
-                            eq(signups.season, config.seasonId),
-                            inArray(signups.player, [...uniqueUserIds])
-                        )
-                    ),
-                db
-                    .select({
-                        userId: teams.captain,
-                        captain2Id: teams.captain2,
-                        divisionId: teams.division,
-                        divisionName: divisions.name,
-                        isCoachDiv: individual_divisions.coaches
-                    })
-                    .from(teams)
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .leftJoin(
-                        individual_divisions,
-                        and(
-                            eq(individual_divisions.division, teams.division),
-                            eq(individual_divisions.season, config.seasonId)
-                        )
-                    )
-                    .where(eq(teams.season, config.seasonId))
-            ])
-
-            if (signedUpRows.length !== uniqueUserIds.size) {
-                return fail(
-                    "All selected players must be signed up for the current season."
-                )
-            }
-
-            const captainDivisionByUser = new Map<string, number>()
-            const divisionNameById = new Map<number, string>()
-            for (const row of captainRows) {
-                divisionNameById.set(row.divisionId, row.divisionName)
-                if (!row.isCoachDiv) {
-                    captainDivisionByUser.set(row.userId, row.divisionId)
-                }
-            }
-
-            for (const slot of filledSlots) {
-                if (slot.isCaptain) {
-                    const expectedDivision = captainDivisionByUser.get(
-                        slot.userId
-                    )
-                    if (
-                        !expectedDivision ||
-                        expectedDivision !== slot.divisionId
-                    ) {
-                        const slotDivisionName =
-                            divisionNameById.get(slot.divisionId) ??
-                            `Division ${slot.divisionId}`
-                        return fail(
-                            `Captain slot in ${slotDivisionName} Team ${slot.teamNumber} does not contain a captain assigned to that division.`
-                        )
-                    }
-                }
-            }
-        }
-
-        try {
-            await db.transaction(async (tx) => {
-                await tx
-                    .delete(week2Rosters)
-                    .where(eq(week2Rosters.season, config.seasonId))
-
-                if (filledSlots.length > 0) {
-                    await tx.insert(week2Rosters).values(
-                        filledSlots.map((slot) => ({
-                            season: config.seasonId,
-                            user: slot.userId,
-                            division: slot.divisionId,
-                            team_number: slot.teamNumber,
-                            is_captain: slot.isCaptain
-                        }))
-                    )
-                }
-            })
-
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session?.user) {
-                await logAuditEntry({
-                    userId: session.user.id,
-                    action: "update",
-                    entityType: "week2_rosters",
-                    summary: `Replaced week 2 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
-                })
-            }
-
-            return ok(undefined, "Week 2 rosters saved successfully.")
-        } catch (error) {
-            console.error("Error saving week 2 rosters:", error)
-            return fail("Something went wrong while saving week 2 rosters.")
-        }
+        return updateEditWeekRosters(EDIT_WEEK_2, slots)
     }
 )
 
 export const sendWeek2RosterNotifications = withAction(
     async (
-        assignments: Array<{
-            userId: string
-            divisionId: number
-            divisionName: string
-            teamNumber: number
-        }>,
+        assignments: EditWeekAssignment[],
         removedUserIds: string[],
         seasonLabel: string
     ): Promise<ActionResult> => {
@@ -359,205 +59,11 @@ export const sendWeek2RosterNotifications = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        const allUserIds = [
-            ...new Set([...assignments.map((a) => a.userId), ...removedUserIds])
-        ]
-        if (allUserIds.length === 0) {
-            return ok(undefined, "No notifications to send.")
-        }
-
-        const uniqueDivisionIds = [
-            ...new Set(assignments.map((a) => a.divisionId))
-        ]
-
-        const config = await getSeasonConfig()
-
-        const [userRows, captainRows, allWeek2Divisions] = await Promise.all([
-            db
-                .select({
-                    id: users.id,
-                    firstName: users.first_name,
-                    preferredName: users.preferred_name,
-                    email: users.email
-                })
-                .from(users)
-                .where(inArray(users.id, allUserIds)),
-            uniqueDivisionIds.length > 0
-                ? db
-                      .select({
-                          divisionId: week2Rosters.division,
-                          teamNumber: week2Rosters.team_number,
-                          firstName: users.first_name,
-                          lastName: users.last_name,
-                          preferredName: users.preferred_name
-                      })
-                      .from(week2Rosters)
-                      .innerJoin(users, eq(week2Rosters.user, users.id))
-                      .where(
-                          and(
-                              eq(week2Rosters.season, config.seasonId),
-                              eq(week2Rosters.is_captain, true),
-                              inArray(week2Rosters.division, uniqueDivisionIds)
-                          )
-                      )
-                : Promise.resolve([]),
-            db
-                .selectDistinct({
-                    id: divisions.id,
-                    level: divisions.level
-                })
-                .from(week2Rosters)
-                .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-                .where(eq(week2Rosters.season, config.seasonId))
-                .orderBy(divisions.level)
-        ])
-
-        const tryouts = getEventsByType(config, "tryout")
-        const tryout2Event = tryouts[1] ?? null
-        const tryoutDate = tryout2Event
-            ? formatEventDate(tryout2Event.eventDate)
-            : null
-        const sessionTimes = [
-            tryout2Event?.timeSlots[0]?.startTime
-                ? formatEventTime(tryout2Event.timeSlots[0].startTime)
-                : "TBD",
-            tryout2Event?.timeSlots[1]?.startTime
-                ? formatEventTime(tryout2Event.timeSlots[1].startTime)
-                : "TBD",
-            tryout2Event?.timeSlots[2]?.startTime
-                ? formatEventTime(tryout2Event.timeSlots[2].startTime)
-                : "TBD"
-        ]
-
-        const legacyCourtByDivision: Record<string, number> = {
-            AA: 1,
-            A: 2,
-            ABA: 3,
-            ABB: 4,
-            BB: 7,
-            BBB: 8
-        }
-
-        // Build captain lookup: `${divisionId}-${teamNumber}` → name
-        const captainBySlot = new Map<string, string>()
-        for (const row of captainRows) {
-            const name = formatDisplayName(
-                row.firstName,
-                row.lastName,
-                row.preferredName
-            )
-            captainBySlot.set(`${row.divisionId}-${row.teamNumber}`, name)
-        }
-
-        const userById = new Map(userRows.map((u) => [u.id, u]))
-        const removedSet = new Set(removedUserIds)
-
-        // Group enriched assignments by userId
-        const assignmentsByUser = new Map<
-            string,
-            Array<{
-                divisionId: number
-                divisionName: string
-                teamNumber: number
-            }>
-        >()
-        for (const a of assignments) {
-            const list = assignmentsByUser.get(a.userId) || []
-            list.push({
-                divisionId: a.divisionId,
-                divisionName: a.divisionName,
-                teamNumber: a.teamNumber
-            })
-            assignmentsByUser.set(a.userId, list)
-        }
-
-        const removalRecipients: NotificationRecipient[] = []
-        const assignmentRecipients: NotificationRecipient[] = []
-        const htmlByUserId = new Map<string, string>()
-
-        for (const userId of allUserIds) {
-            const user = userById.get(userId)
-            if (!user?.email) continue
-            const firstName =
-                user.preferredName || user.firstName || user.email.split("@")[0]
-            const recipient = { userId, email: user.email, firstName }
-
-            if (removedSet.has(userId)) {
-                htmlByUserId.set(
-                    userId,
-                    buildRosterRemovalHtml({
-                        firstName,
-                        weekLabel: "Week 2",
-                        seasonLabel
-                    })
-                )
-                removalRecipients.push(recipient)
-                continue
-            }
-
-            const userAssignments = assignmentsByUser.get(userId) || []
-
-            const assignmentBlocks = userAssignments.map((a) => {
-                const divisionIndex = allWeek2Divisions.findIndex(
-                    (d) => d.id === a.divisionId
-                )
-                const courtNumber =
-                    legacyCourtByDivision[a.divisionName] ??
-                    (divisionIndex >= 0 ? divisionIndex + 1 : 1)
-                const matchupIndex = Math.floor((a.teamNumber - 1) / 2)
-                const sessionTime = sessionTimes[matchupIndex] || "TBD"
-                const captainName =
-                    captainBySlot.get(`${a.divisionId}-${a.teamNumber}`) || null
-
-                const rows = [
-                    tryoutDate ? renderDetailRow("Date:", tryoutDate) : "",
-                    renderDetailRow("Time:", sessionTime),
-                    renderDetailRow("Court:", `Court ${courtNumber}`),
-                    renderDetailRow("Division:", a.divisionName),
-                    renderDetailRow("Team:", `Team ${a.teamNumber}`),
-                    captainName ? renderDetailRow("Captain:", captainName) : ""
-                ].filter(Boolean)
-
-                return renderDetailsBlock(rows)
-            })
-
-            htmlByUserId.set(
-                userId,
-                buildRosterAssignmentHtml({
-                    firstName,
-                    weekLabel: "Week 2",
-                    seasonLabel,
-                    introText: `You've been assigned to the Week 2 Pre-Season Tryout for the ${seasonLabel} season. Here are your details:`,
-                    detailBlocks: assignmentBlocks,
-                    footnote: "Please plan to arrive 10 minutes early."
-                })
-            )
-            assignmentRecipients.push(recipient)
-        }
-
-        const htmlFor = (r: NotificationRecipient) =>
-            htmlByUserId.get(r.userId) ?? ""
-
-        const removalResult = await dispatchNotification({
-            type: "tryout_roster",
-            recipients: removalRecipients,
-            subject: `BSD Volleyball: Week 2 Roster Update — ${seasonLabel}`,
-            htmlBody: htmlFor,
-            tag: "roster-update"
-        })
-        const assignmentResult = await dispatchNotification({
-            type: "tryout_roster",
-            recipients: assignmentRecipients,
-            subject: `BSD Volleyball: Your Week 2 Assignment — ${seasonLabel}`,
-            htmlBody: htmlFor,
-            tag: "roster-assignment"
-        })
-
-        const sent = removalResult.sent + assignmentResult.sent
-        const skipped = removalResult.skipped + assignmentResult.skipped
-        return ok(
-            undefined,
-            `${sent} notification(s) sent${skipped > 0 ? `, ${skipped} skipped (opted out or unreachable)` : ""}.`
+        return sendEditWeekRosterNotifications(
+            EDIT_WEEK_2,
+            assignments,
+            removedUserIds,
+            seasonLabel
         )
     }
 )
