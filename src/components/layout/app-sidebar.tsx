@@ -427,6 +427,21 @@ export function AppSidebar({
                 items: hiddenDangerWeekItems
             })
 
+        // Tournament pages suppressed while no tournament is active
+        if (!hasActiveTournament) {
+            hiddenGroups.push({
+                label: "Tournament (no active tournament)",
+                items: [
+                    ...adminNavItems.filter((item) =>
+                        tournamentAdminUrls.includes(item.url)
+                    ),
+                    ...adminDangerNavItems.filter(
+                        (item) => item.url === "/dashboard/tournament-config"
+                    )
+                ]
+            })
+        }
+
         // Captain page items currently suppressed
         const hiddenCaptainItems = captainPagesNavItems.filter((item) => {
             if (item.url === "/dashboard/team-availability")
@@ -801,6 +816,12 @@ export function AppSidebar({
                                             "/dashboard/evaluate-players"
                                         )
                                             return showEvaluatePlayers
+                                        if (
+                                            tournamentAdminUrls.includes(
+                                                item.url
+                                            )
+                                        )
+                                            return hasActiveTournament
                                         return true
                                     })}
                                     pathname={pathname}
@@ -863,6 +884,11 @@ export function AppSidebar({
                                                 "/dashboard/create-schedule"
                                             )
                                                 return phase === "draft"
+                                            if (
+                                                item.url ===
+                                                "/dashboard/tournament-config"
+                                            )
+                                                return hasActiveTournament
                                             return true
                                         }
                                     )}
