@@ -144,6 +144,91 @@ describe("buildAssignments with a full 96-player pool", () => {
     })
 })
 
+describe("buildAssignments with tryout slot requests", () => {
+    it("is unchanged when every candidate is unrestricted", () => {
+        const bare = buildAssignments(buildPool()).assignments
+        const withNulls = buildAssignments(
+            buildPool().map((p) => ({ ...p, availableSlots: null }))
+        ).assignments
+        expect(withNulls).toEqual(bare)
+    })
+
+    it("honors session requests while keeping courts and the 12/12 split", () => {
+        const unrestricted = buildAssignments(buildPool()).assignments
+        const courtByUser = new Map(
+            unrestricted.map((a) => [a.userId, a.courtNumber])
+        )
+
+        // Restrict two singles (p02 sits in court 1, p50 in court 3)
+        const pool = buildPool().map((p) =>
+            p.userId === "p02"
+                ? { ...p, availableSlots: [2] }
+                : p.userId === "p50"
+                  ? { ...p, availableSlots: [1] }
+                  : p
+        )
+        const { assignments } = buildAssignments(pool)
+        const byUser = new Map(assignments.map((a) => [a.userId, a]))
+
+        expect(byUser.get("p02")?.sessionNumber).toBe(2)
+        expect(byUser.get("p50")?.sessionNumber).toBe(1)
+
+        // Court assignment never reads slot requests
+        for (const assignment of assignments) {
+            expect(assignment.courtNumber).toBe(
+                courtByUser.get(assignment.userId)
+            )
+        }
+
+        // The exact 12/12 split still holds everywhere
+        for (const court of [1, 2, 3, 4]) {
+            for (const session of [1, 2]) {
+                expect(
+                    assignments.filter(
+                        (a) =>
+                            a.courtNumber === court &&
+                            a.sessionNumber === session
+                    )
+                ).toHaveLength(12)
+            }
+        }
+    })
+
+    it("keeps a restricted pair together in their requested session", () => {
+        // p04/p05 are a reciprocal pair; the request rides on one member
+        const pool = buildPool().map((p) =>
+            p.userId === "p04" ? { ...p, availableSlots: [2] } : p
+        )
+        const { assignments } = buildAssignments(pool)
+        const byUser = new Map(assignments.map((a) => [a.userId, a]))
+
+        expect(byUser.get("p04")?.sessionNumber).toBe(2)
+        expect(byUser.get("p05")?.sessionNumber).toBe(2)
+        expect(byUser.get("p04")?.courtNumber).toBe(
+            byUser.get("p05")?.courtNumber
+        )
+    })
+
+    it("treats a conflicting pair as unrestricted and keeps them together", () => {
+        const pool = buildPool().map((p) =>
+            p.userId === "p04"
+                ? { ...p, availableSlots: [1] }
+                : p.userId === "p05"
+                  ? { ...p, availableSlots: [2] }
+                  : p
+        )
+        const { assignments } = buildAssignments(pool)
+        const byUser = new Map(assignments.map((a) => [a.userId, a]))
+
+        expect(byUser.get("p04")?.sessionNumber).toBe(
+            byUser.get("p05")?.sessionNumber
+        )
+        expect(byUser.get("p04")?.courtNumber).toBe(
+            byUser.get("p05")?.courtNumber
+        )
+    })
+})
+
 describe("buildAssignments with a partial pool", () => {
     it("still assigns every player exactly once", () => {
         const pool = Array.from({ length: 10 }, (_, i) =>

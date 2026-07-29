@@ -19,6 +19,8 @@ export interface AssignmentView {
     pairAverageScore: number | null
     sessionNumber: 1 | 2
     courtNumber: 1 | 2 | 3 | 4
+    availableSlots: number[] | null
+    slotRequestComment: string | null
 }
 
 export interface CourtAlternates {
@@ -36,6 +38,10 @@ export interface PlacementUnit {
     newMaleCount: number
     newNonMaleCount: number
     scoreBuckets: Array<{ score: number; count: number }>
+    /** Members whose slot request forbids session 1 (must sit session 2). */
+    cannotAttendOneCount: number
+    /** Members whose slot request forbids session 2 (must sit session 1). */
+    cannotAttendTwoCount: number
 }
 
 export const CUTOFF_COUNT = 96
@@ -181,6 +187,42 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
                 (scoreMap.get(player.placementScore) || 0) + 1
             )
         }
+
+        // Tryout slot requests: the unit's effective availability is the
+        // intersection of its members' requests. An empty intersection
+        // (conflicting pair) is treated as unrestricted — the UI surfaces
+        // the conflict for the admin instead.
+        let effectiveSlots: number[] | null = null
+        for (const player of players) {
+            if (!player.availableSlots) {
+                continue
+            }
+            effectiveSlots =
+                effectiveSlots === null
+                    ? player.availableSlots
+                    : effectiveSlots.filter((slot) =>
+                          player.availableSlots?.includes(slot)
+                      )
+        }
+        if (effectiveSlots !== null && effectiveSlots.length === 0) {
+            effectiveSlots = null
+        }
+
+        const restrictedMembers = (session: number) =>
+            players.filter(
+                (player) =>
+                    player.availableSlots &&
+                    !player.availableSlots.includes(session)
+            ).length
+        const cannotAttendOneCount =
+            effectiveSlots !== null && !effectiveSlots.includes(1)
+                ? restrictedMembers(1)
+                : 0
+        const cannotAttendTwoCount =
+            effectiveSlots !== null && !effectiveSlots.includes(2)
+                ? restrictedMembers(2)
+                : 0
+
         return {
             players,
             size,
@@ -193,7 +235,9 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
             scoreBuckets: [...scoreMap.entries()].map(([score, count]) => ({
                 score,
                 count
-            }))
+            })),
+            cannotAttendOneCount,
+            cannotAttendTwoCount
         }
     }
 
@@ -299,7 +343,8 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
                 male: acc.male + unit.maleCount,
                 nonMale: acc.nonMale + unit.nonMaleCount,
                 newMale: acc.newMale + unit.newMaleCount,
-                newNonMale: acc.newNonMale + unit.newNonMaleCount
+                newNonMale: acc.newNonMale + unit.newNonMaleCount,
+                cannotTwo: acc.cannotTwo + unit.cannotAttendTwoCount
             }),
             {
                 size: 0,
@@ -307,7 +352,8 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
                 male: 0,
                 nonMale: 0,
                 newMale: 0,
-                newNonMale: 0
+                newNonMale: 0,
+                cannotTwo: 0
             }
         )
 
@@ -385,10 +431,19 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
             nonMale: 0,
             newMale: 0,
             newNonMale: 0,
+            cannotOne: 0,
+            cannotTwo: 0,
             scoreBuckets: new Map<number, number>()
         }
 
-        type ScoreTuple = readonly [number, number, number, number, number]
+        type ScoreTuple = readonly [
+            number,
+            number,
+            number,
+            number,
+            number,
+            number
+        ]
         let bestTuple: ScoreTuple | null = null
         let bestPicked = new Set<number>()
         const picked = new Set<number>()
@@ -446,7 +501,22 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
 
             const quinary = Math.abs(sessionOne.size - sessionTargets.one.size)
 
-            return [primary, secondary, tertiary, quaternary, quinary] as const
+            // Slot requests lead the tuple: members who can't attend session
+            // 1 but were picked for it, plus members who can't attend session
+            // 2 but were left in it. Constant 0 when no requests exist, so
+            // request-free output is unchanged. Pruning is size-only, so the
+            // exact 12/12 split is always found regardless of requests.
+            const violations =
+                stats.cannotOne + (courtTotals.cannotTwo - stats.cannotTwo)
+
+            return [
+                violations,
+                primary,
+                secondary,
+                tertiary,
+                quaternary,
+                quinary
+            ] as const
         }
 
         const search = (index: number, stats: typeof initialStats) => {
@@ -490,6 +560,8 @@ export function buildAssignments(selectedPlayers: Week1Candidate[]): {
                 nonMale: stats.nonMale + unit.nonMaleCount,
                 newMale: stats.newMale + unit.newMaleCount,
                 newNonMale: stats.newNonMale + unit.newNonMaleCount,
+                cannotOne: stats.cannotOne + unit.cannotAttendOneCount,
+                cannotTwo: stats.cannotTwo + unit.cannotAttendTwoCount,
                 scoreBuckets: nextScoreBuckets
             })
             picked.delete(index)
