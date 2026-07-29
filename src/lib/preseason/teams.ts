@@ -43,6 +43,8 @@ export interface TeamPlayer {
     pairEntryId: string | null
     pairName: string | null
     isDuplicateEntry: boolean
+    /** Tryout slot request: 1-based slots the player can attend (null = any). */
+    availableSlots: number[] | null
 }
 
 export interface TeamBucket {
@@ -62,6 +64,40 @@ export interface TeamUnit {
     newCount: number
     size: number
     averageScore: number
+}
+
+/** Time slot a team plays in (teams 1-2 → 1, 3-4 → 2, 5-6 → 3). */
+function getTeamNumberSlot(teamNumber: number) {
+    return Math.floor((teamNumber - 1) / 2) + 1
+}
+
+function compareTuples(a: readonly number[], b: readonly number[]) {
+    for (let index = 0; index < a.length; index++) {
+        if (a[index] !== b[index]) {
+            return a[index] - b[index]
+        }
+    }
+    return 0
+}
+
+/**
+ * Entry ids of players whose tryout slot request is not satisfied by the
+ * team they ended up on. Used by the create forms to flag violations.
+ */
+export function getSlotViolationEntryIds(teams: TeamBucket[]): Set<string> {
+    const result = new Set<string>()
+    for (const team of teams) {
+        const slotNumber = getTeamNumberSlot(team.number)
+        for (const player of team.players) {
+            if (
+                player.availableSlots !== null &&
+                !player.availableSlots.includes(slotNumber)
+            ) {
+                result.add(player.entryId)
+            }
+        }
+    }
+    return result
 }
 
 export function buildTeamUnits(players: TeamPlayer[]): TeamUnit[] {
@@ -164,7 +200,8 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         isNew: player.overallMostRecent === null,
         pairEntryId: null,
         pairName: null,
-        isDuplicateEntry: player.isDuplicateEntry
+        isDuplicateEntry: player.isDuplicateEntry,
+        availableSlots: player.availableSlots ?? null
     }))
 
     const displayNameByUserId = new Map(
@@ -398,6 +435,22 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
     const getTeamSlotIndex = (teamIndex: number) => Math.floor(teamIndex / 2)
     const maxSlotIndex = Math.floor((teamCount - 1) / 2)
 
+    // Tryout slot requests: slot = team-slot index + 1
+    const canAttendTeam = (
+        availableSlots: number[] | null,
+        teamIndex: number
+    ) =>
+        availableSlots === null ||
+        availableSlots.includes(getTeamSlotIndex(teamIndex) + 1)
+
+    const unitSlotViolationCount = (
+        unitPlayers: TeamPlayer[],
+        teamIndex: number
+    ) =>
+        unitPlayers.filter(
+            (player) => !canAttendTeam(player.availableSlots, teamIndex)
+        ).length
+
     const getDuplicatePlacementPenalty = (
         unitPlayers: TeamPlayer[],
         candidateTeamIndex: number
@@ -514,6 +567,10 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                     continue
                 }
 
+                if (!canAttendTeam(sourcePlayer.availableSlots, teamIndex)) {
+                    continue
+                }
+
                 const targetTeam = teams[teamIndex]
                 const targetCandidates = targetTeam.players
                     .map((player, playerIndex) => ({ player, playerIndex }))
@@ -525,6 +582,10 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                             !(
                                 player.isNew &&
                                 !canHostNewPlayers(source.teamIndex)
+                            ) &&
+                            canAttendTeam(
+                                player.availableSlots,
+                                source.teamIndex
                             )
                     )
                     .sort((a, b) => {
@@ -586,8 +647,7 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         ]
 
         let bestTeamIndex = priorities[0]
-        let bestTuple: [number, number, number, number, number, number] | null =
-            null
+        let bestTuple: readonly number[] | null = null
 
         for (const teamIndex of priorities) {
             const team = teams[teamIndex]
@@ -651,8 +711,12 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                 unit.players,
                 teamIndex
             )
+            // Slot requests lead the tuple: honoring them outranks every
+            // balance concern (but capacity/new-player gates above still win).
+            const slotPenalty = unitSlotViolationCount(unit.players, teamIndex)
 
-            const tuple: [number, number, number, number, number, number] = [
+            const tuple: readonly number[] = [
+                slotPenalty,
                 constraintPenalty,
                 duplicatePenalty,
                 genderPenalty,
@@ -661,29 +725,7 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                 sizePenalty
             ]
 
-            if (
-                !bestTuple ||
-                tuple[0] < bestTuple[0] ||
-                (tuple[0] === bestTuple[0] && tuple[1] < bestTuple[1]) ||
-                (tuple[0] === bestTuple[0] &&
-                    tuple[1] === bestTuple[1] &&
-                    tuple[2] < bestTuple[2]) ||
-                (tuple[0] === bestTuple[0] &&
-                    tuple[1] === bestTuple[1] &&
-                    tuple[2] === bestTuple[2] &&
-                    tuple[3] < bestTuple[3]) ||
-                (tuple[0] === bestTuple[0] &&
-                    tuple[1] === bestTuple[1] &&
-                    tuple[2] === bestTuple[2] &&
-                    tuple[3] === bestTuple[3] &&
-                    tuple[4] < bestTuple[4]) ||
-                (tuple[0] === bestTuple[0] &&
-                    tuple[1] === bestTuple[1] &&
-                    tuple[2] === bestTuple[2] &&
-                    tuple[3] === bestTuple[3] &&
-                    tuple[4] === bestTuple[4] &&
-                    tuple[5] < bestTuple[5])
-            ) {
+            if (!bestTuple || compareTuples(tuple, bestTuple) < 0) {
                 bestTuple = tuple
                 bestTeamIndex = teamIndex
             }
@@ -694,6 +736,7 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                 .map((entry, index) => ({
                     index,
                     remaining: teamCapacities[index] - entry.players.length,
+                    slotPenalty: unitSlotViolationCount(unit.players, index),
                     duplicatePenalty: getDuplicatePlacementPenalty(
                         unit.players,
                         index
@@ -715,6 +758,9 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                     : fallbackCandidates
 
             const fallbackIndex = pool.sort((a, b) => {
+                if (a.slotPenalty !== b.slotPenalty) {
+                    return a.slotPenalty - b.slotPenalty
+                }
                 if (a.duplicatePenalty !== b.duplicatePenalty) {
                     return a.duplicatePenalty - b.duplicatePenalty
                 }
@@ -740,6 +786,123 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         }
     }
 
+    // Slot-request repair: the greedy unit placement can strand a restricted
+    // player on a disallowed team when their allowed teams filled up first.
+    // Swap each violated player with a compatible player from an allowed
+    // team (partner must be able to attend the violated player's team).
+    // Every successful swap removes exactly one violation, so this
+    // terminates; captains and pair members stay put (their violations
+    // surface in the UI instead).
+    for (let pass = 0; pass < 24; pass++) {
+        let changed = false
+
+        for (let teamIndex = 0; teamIndex < teams.length; teamIndex++) {
+            const team = teams[teamIndex]
+
+            for (
+                let playerIndex = 0;
+                playerIndex < team.players.length;
+                playerIndex++
+            ) {
+                const player = team.players[playerIndex]
+                if (player.isCaptain || player.pairEntryId) {
+                    continue
+                }
+                if (canAttendTeam(player.availableSlots, teamIndex)) {
+                    continue
+                }
+
+                let bestSwap: {
+                    targetTeamIndex: number
+                    targetPlayerIndex: number
+                    mismatch: number
+                    scoreDiff: number
+                } | null = null
+
+                for (
+                    let targetIndex = 0;
+                    targetIndex < teams.length;
+                    targetIndex++
+                ) {
+                    if (targetIndex === teamIndex) {
+                        continue
+                    }
+                    if (!canAttendTeam(player.availableSlots, targetIndex)) {
+                        continue
+                    }
+                    if (player.isNew && !canHostNewPlayers(targetIndex)) {
+                        continue
+                    }
+
+                    const targetTeam = teams[targetIndex]
+                    for (
+                        let candidateIndex = 0;
+                        candidateIndex < targetTeam.players.length;
+                        candidateIndex++
+                    ) {
+                        const swapCandidate = targetTeam.players[candidateIndex]
+                        if (
+                            swapCandidate.isCaptain ||
+                            swapCandidate.pairEntryId
+                        ) {
+                            continue
+                        }
+                        if (
+                            !canAttendTeam(
+                                swapCandidate.availableSlots,
+                                teamIndex
+                            )
+                        ) {
+                            continue
+                        }
+                        if (
+                            swapCandidate.isNew &&
+                            !canHostNewPlayers(teamIndex)
+                        ) {
+                            continue
+                        }
+
+                        const mismatch =
+                            Number(swapCandidate.male !== player.male) +
+                            Number(swapCandidate.isNew !== player.isNew)
+                        const scoreDiff = Math.abs(
+                            swapCandidate.placementScore - player.placementScore
+                        )
+
+                        if (
+                            !bestSwap ||
+                            mismatch < bestSwap.mismatch ||
+                            (mismatch === bestSwap.mismatch &&
+                                scoreDiff < bestSwap.scoreDiff)
+                        ) {
+                            bestSwap = {
+                                targetTeamIndex: targetIndex,
+                                targetPlayerIndex: candidateIndex,
+                                mismatch,
+                                scoreDiff
+                            }
+                        }
+                    }
+                }
+
+                if (bestSwap) {
+                    const targetTeam = teams[bestSwap.targetTeamIndex]
+                    const partner =
+                        targetTeam.players[bestSwap.targetPlayerIndex]
+                    team.players[playerIndex] = partner
+                    targetTeam.players[bestSwap.targetPlayerIndex] = player
+                    recomputeTeamStats(team)
+                    recomputeTeamStats(targetTeam)
+                    changed = true
+                }
+            }
+        }
+
+        if (!changed) {
+            break
+        }
+    }
+
     const trySwapGender = (sourceIndex: number, targetIndex: number) => {
         const sourceTeam = teams[sourceIndex]
         const targetTeam = teams[targetIndex]
@@ -751,7 +914,8 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                     player.male !== true &&
                     !player.isCaptain &&
                     !player.pairEntryId &&
-                    !(player.isNew && !canHostNewPlayers(targetIndex))
+                    !(player.isNew && !canHostNewPlayers(targetIndex)) &&
+                    canAttendTeam(player.availableSlots, targetIndex)
             )
 
         const targetCandidates = targetTeam.players
@@ -761,7 +925,8 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                     player.male === true &&
                     !player.isCaptain &&
                     !player.pairEntryId &&
-                    !(player.isNew && !canHostNewPlayers(sourceIndex))
+                    !(player.isNew && !canHostNewPlayers(sourceIndex)) &&
+                    canAttendTeam(player.availableSlots, sourceIndex)
             )
 
         if (sourceCandidates.length === 0 || targetCandidates.length === 0) {
@@ -868,14 +1033,20 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
             .map((player, index) => ({ player, index }))
             .filter(
                 ({ player }) =>
-                    player.isNew && !player.isCaptain && !player.pairEntryId
+                    player.isNew &&
+                    !player.isCaptain &&
+                    !player.pairEntryId &&
+                    canAttendTeam(player.availableSlots, targetIndex)
             )
 
         const targetCandidates = targetTeam.players
             .map((player, index) => ({ player, index }))
             .filter(
                 ({ player }) =>
-                    !player.isNew && !player.isCaptain && !player.pairEntryId
+                    !player.isNew &&
+                    !player.isCaptain &&
+                    !player.pairEntryId &&
+                    canAttendTeam(player.availableSlots, sourceIndex)
             )
 
         if (sourceCandidates.length === 0 || targetCandidates.length === 0) {
@@ -996,7 +1167,8 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                 ({ player }) =>
                     !player.isCaptain &&
                     !player.pairEntryId &&
-                    !(player.isNew && !canHostNewPlayers(lowIndex))
+                    !(player.isNew && !canHostNewPlayers(lowIndex)) &&
+                    canAttendTeam(player.availableSlots, lowIndex)
             )
 
         const lowCandidates = lowTeam.players
@@ -1005,7 +1177,8 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                 ({ player }) =>
                     !player.isCaptain &&
                     !player.pairEntryId &&
-                    !(player.isNew && !canHostNewPlayers(highIndex))
+                    !(player.isNew && !canHostNewPlayers(highIndex)) &&
+                    canAttendTeam(player.availableSlots, highIndex)
             )
 
         if (highCandidates.length === 0 || lowCandidates.length === 0) {

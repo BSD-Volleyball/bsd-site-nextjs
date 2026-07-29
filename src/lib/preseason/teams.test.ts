@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest"
-import { buildTeamsForDivision, type TeamBuildOptions } from "./teams"
+import {
+    buildTeamsForDivision,
+    getSlotViolationEntryIds,
+    type TeamBucket,
+    type TeamBuildOptions
+} from "./teams"
 import { toOriginalPlacedPlayer } from "./units"
 import type { PreseasonCandidate, PreseasonDivision } from "./types"
+import parityFixture from "./teams-parity-fixture.json"
 
 function candidate(
     overrides: Partial<PreseasonCandidate> = {}
@@ -254,5 +260,201 @@ describe("buildTeamsForDivision", () => {
             expect(assigned).toHaveLength(36)
             expect(new Set(assigned).size).toBe(36)
         })
+    })
+})
+
+/**
+ * The fixture holds outputs captured from the engine BEFORE slot requests
+ * existed. With no requests present the engine must reproduce them exactly —
+ * this pins the leading slot-penalty tuple element, the loop comparator, and
+ * the captain-seeding rework as behavior-neutral for request-free seasons.
+ */
+describe("zero-request parity", () => {
+    function parityPool(captainCount: number) {
+        const pool = Array.from({ length: 33 }, (_, i) =>
+            candidate({
+                userId: `p${String(i).padStart(2, "0")}`,
+                placementScore: ((i * 7) % 29) + 3 * (i % 4) + 1,
+                male: i % 3 !== 0,
+                isCaptain: i < captainCount,
+                overallMostRecent: i % 11 === 4 ? null : 1,
+                consecutiveSeasonsInTopDiv: (i * 5) % 9
+            })
+        )
+        pool[10] = { ...pool[10], pairUserId: pool[11].userId }
+        pool[11] = { ...pool[11], pairUserId: pool[10].userId }
+        pool[20] = { ...pool[20], pairUserId: pool[21].userId }
+        pool[21] = { ...pool[21], pairUserId: pool[20].userId }
+
+        const placed = pool.map(toOriginalPlacedPlayer)
+        placed.push({
+            ...pool[8],
+            entryId: `dup:${pool[8].userId}:1`,
+            sourceUserId: pool[8].userId,
+            isDuplicateEntry: true
+        })
+        return placed
+    }
+
+    function project(teams: TeamBucket[]) {
+        return teams.map((team) => ({
+            number: team.number,
+            scoreSum: team.scoreSum,
+            maleCount: team.maleCount,
+            nonMaleCount: team.nonMaleCount,
+            newCount: team.newCount,
+            players: team.players.map((p) => ({
+                entryId: p.entryId,
+                isCaptain: p.isCaptain,
+                isNew: p.isNew
+            }))
+        }))
+    }
+
+    it("reproduces the pre-slot-request outputs exactly", () => {
+        expect(
+            project(
+                buildTeamsForDivision(
+                    division({ teamCount: 6 }),
+                    parityPool(6),
+                    { newPlayersRequireCaptainedTeam: true, backCourt: null }
+                )
+            )
+        ).toEqual(parityFixture.week2SixTeams)
+
+        expect(
+            project(
+                buildTeamsForDivision(
+                    division({ teamCount: 4, isLast: true, index: 3 }),
+                    parityPool(6),
+                    { newPlayersRequireCaptainedTeam: true, backCourt: null }
+                )
+            )
+        ).toEqual(parityFixture.week2LastFourTeams)
+
+        expect(
+            project(
+                buildTeamsForDivision(
+                    division({ teamCount: 6 }),
+                    parityPool(4),
+                    WEEK3_OPTIONS
+                )
+            )
+        ).toEqual(parityFixture.week3BackCourt)
+
+        expect(
+            project(
+                buildTeamsForDivision(
+                    division({ teamCount: 6, index: 1 }),
+                    parityPool(4),
+                    WEEK3_OPTIONS
+                )
+            )
+        ).toEqual(parityFixture.week3NoBackCourt)
+    })
+})
+
+describe("tryout slot requests", () => {
+    const NO_CONSTRAINT: TeamBuildOptions = {
+        newPlayersRequireCaptainedTeam: false,
+        backCourt: null
+    }
+
+    function slotPool(
+        count: number,
+        restrict: (index: number) => number[] | null
+    ) {
+        return Array.from({ length: count }, (_, i) =>
+            candidate({
+                userId: `s${String(i).padStart(2, "0")}`,
+                placementScore: ((i * 11) % 37) + 1,
+                male: i % 3 !== 0,
+                availableSlots: restrict(i)
+            })
+        ).map(toOriginalPlacedPlayer)
+    }
+
+    it("places a slot-restricted player on a matching team", () => {
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            slotPool(36, (i) => (i === 17 ? [1] : i === 23 ? [3] : null)),
+            NO_CONSTRAINT
+        )
+
+        const teamOf = (userId: string) =>
+            teams.find((team) =>
+                team.players.some((p) => p.assignmentUserId === userId)
+            )
+        expect([1, 2]).toContain(teamOf("s17")?.number)
+        expect([5, 6]).toContain(teamOf("s23")?.number)
+        expect(getSlotViolationEntryIds(teams).size).toBe(0)
+    })
+
+    it("honors a full slot's worth of restrictions without violations", () => {
+        // 12 players restricted to slot 2 exactly fill teams 3-4
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            slotPool(36, (i) => (i < 12 ? [2] : null)),
+            NO_CONSTRAINT
+        )
+
+        for (const team of teams) {
+            expect(team.players).toHaveLength(6)
+        }
+
+        const restrictedTeams = new Set(
+            teams
+                .filter((team) =>
+                    team.players.some((p) => p.availableSlots !== null)
+                )
+                .map((team) => team.number)
+        )
+        expect([...restrictedTeams].sort()).toEqual([3, 4])
+        expect(getSlotViolationEntryIds(teams).size).toBe(0)
+    })
+
+    it("keeps team sizes when restrictions are unsatisfiable and reports violations", () => {
+        // 18 players want slot 1 but slot 1 only holds 12
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            slotPool(36, (i) => (i < 18 ? [1] : null)),
+            NO_CONSTRAINT
+        )
+
+        for (const team of teams) {
+            expect(team.players).toHaveLength(6)
+        }
+
+        expect(getSlotViolationEntryIds(teams).size).toBe(6)
+    })
+
+    it("capacity still outranks slot requests with the captained-team rule on", () => {
+        // Week-2 options: new players must sit on captained teams even if
+        // their slot request points elsewhere
+        const pool = Array.from({ length: 18 }, (_, i) =>
+            candidate({
+                userId: `c${String(i).padStart(2, "0")}`,
+                placementScore: i + 1,
+                male: i % 2 === 0,
+                isCaptain: i < 3,
+                overallMostRecent: i === 10 ? null : 1,
+                availableSlots: i === 10 ? [2] : null
+            })
+        ).map(toOriginalPlacedPlayer)
+
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 3 }),
+            pool,
+            WEEK2_OPTIONS
+        )
+
+        const assigned = teams.flatMap((team) =>
+            team.players.map((p) => p.assignmentUserId)
+        )
+        expect(assigned).toHaveLength(18)
+        expect(new Set(assigned).size).toBe(18)
+        for (const team of teams) {
+            expect(team.players).toHaveLength(6)
+        }
     })
 })
