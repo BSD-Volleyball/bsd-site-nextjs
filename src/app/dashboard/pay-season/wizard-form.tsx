@@ -150,6 +150,47 @@ export function WizardForm({
         : "0"
     const isFreeRegistration = discount && discountPercentage >= 100
 
+    // Rendered above the "dates you will NOT be able to play" heading for
+    // returning players (whose control is a positive opt-in) and below it
+    // for new players (whose control matches the heading's semantics).
+    const week1CalloutBlock = week1Tryout && (
+        <Week1TryoutCallout
+            audience={isReturningPlayer ? "returning" : "new"}
+            dateLabel={formatEventDate(week1Tryout.eventDate)}
+        >
+            {isReturningPlayer ? (
+                <div className="flex items-center gap-2">
+                    <Checkbox
+                        id={`event-${week1Tryout.id}`}
+                        checked={!selectedEvents.has(week1Tryout.id)}
+                        onCheckedChange={() => toggleEvent(week1Tryout.id)}
+                    />
+                    <Label
+                        htmlFor={`event-${week1Tryout.id}`}
+                        className="cursor-pointer font-normal"
+                    >
+                        Opt-in to Evaluations
+                    </Label>
+                </div>
+            ) : (
+                <div className="flex items-center gap-2">
+                    <Checkbox
+                        id={`event-${week1Tryout.id}`}
+                        checked={selectedEvents.has(week1Tryout.id)}
+                        onCheckedChange={() => toggleEvent(week1Tryout.id)}
+                    />
+                    <Label
+                        htmlFor={`event-${week1Tryout.id}`}
+                        className="cursor-pointer font-normal"
+                    >
+                        I will <strong>NOT</strong> be able to attend the Week
+                        1 tryout
+                    </Label>
+                </div>
+            )}
+        </Week1TryoutCallout>
+    )
+
     const goToNextTab = () => {
         const currentIndex = TABS.indexOf(activeTab)
         if (currentIndex < TABS.length - 1) {
@@ -421,62 +462,14 @@ export function WizardForm({
                     <TabsContent value="schedule" className="space-y-8 pt-4">
                         {/* Section 1: Dates Missing */}
                         <div className="space-y-4">
+                            {isReturningPlayer && week1CalloutBlock}
+
                             <h3 className="font-medium text-base">
                                 Select which dates you will <strong>NOT</strong>{" "}
                                 be able to play this season:
                             </h3>
 
-                            {week1Tryout && (
-                                <Week1TryoutCallout
-                                    audience={
-                                        isReturningPlayer ? "returning" : "new"
-                                    }
-                                    dateLabel={formatEventDate(
-                                        week1Tryout.eventDate
-                                    )}
-                                >
-                                    {isReturningPlayer ? (
-                                        <div className="flex items-center gap-2">
-                                            <Checkbox
-                                                id={`event-${week1Tryout.id}`}
-                                                checked={
-                                                    !selectedEvents.has(
-                                                        week1Tryout.id
-                                                    )
-                                                }
-                                                onCheckedChange={() =>
-                                                    toggleEvent(week1Tryout.id)
-                                                }
-                                            />
-                                            <Label
-                                                htmlFor={`event-${week1Tryout.id}`}
-                                                className="cursor-pointer font-normal"
-                                            >
-                                                Opt-in to Evaluations
-                                            </Label>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <Checkbox
-                                                id={`event-${week1Tryout.id}`}
-                                                checked={selectedEvents.has(
-                                                    week1Tryout.id
-                                                )}
-                                                onCheckedChange={() =>
-                                                    toggleEvent(week1Tryout.id)
-                                                }
-                                            />
-                                            <Label
-                                                htmlFor={`event-${week1Tryout.id}`}
-                                                className="cursor-pointer font-normal"
-                                            >
-                                                I will <strong>NOT</strong> be
-                                                able to attend the Week 1 tryout
-                                            </Label>
-                                        </div>
-                                    )}
-                                </Week1TryoutCallout>
-                            )}
+                            {!isReturningPlayer && week1CalloutBlock}
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                                 {tryoutEvents.length > 1 && (

@@ -30,5 +30,14 @@ export const PERSONAS = {
         firstName: "Pat",
         lastName: "Player",
         storageState: "e2e/.auth/player.json"
+    },
+    // Given a drafts row by returning-signup.spec.ts, making them a
+    // "returning player" (has been drafted before) in the signup wizard
+    returning: {
+        email: "e2e-returning@example.test",
+        password: "e2e-password-returning",
+        firstName: "Rae",
+        lastName: "Returning",
+        storageState: "e2e/.auth/returning.json"
     }
 } satisfies Record<string, Persona>
