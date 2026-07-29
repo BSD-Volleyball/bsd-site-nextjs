@@ -428,6 +428,102 @@ describe("tryout slot requests", () => {
         expect(getSlotViolationEntryIds(teams).size).toBe(6)
     })
 
+    it("moves a restricted captain to an allowed team, keeping one captain per team", () => {
+        // 4 captains on a 6-team division; the second-best captain can only
+        // attend slot 2, so they must seed team 3 or 4
+        const pool = Array.from({ length: 36 }, (_, i) =>
+            candidate({
+                userId: `k${String(i).padStart(2, "0")}`,
+                placementScore: i + 1,
+                male: i % 2 === 0,
+                isCaptain: i < 4,
+                availableSlots: i === 1 ? [2] : null
+            })
+        ).map(toOriginalPlacedPlayer)
+
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            pool,
+            NO_CONSTRAINT
+        )
+
+        const captainTeams = new Map(
+            teams
+                .filter((team) => team.players.some((p) => p.isCaptain))
+                .map((team) => [
+                    team.players.find((p) => p.isCaptain)?.assignmentUserId,
+                    team.number
+                ])
+        )
+        // Every captained team has exactly one captain
+        expect(captainTeams.size).toBe(4)
+        for (const team of teams) {
+            expect(
+                team.players.filter((p) => p.isCaptain).length
+            ).toBeLessThanOrEqual(1)
+        }
+        // The restricted captain landed on a slot-2 team
+        expect([3, 4]).toContain(captainTeams.get("k01"))
+        // Unconstrained captains keep score order over remaining teams
+        expect(captainTeams.get("k00")).toBe(1)
+        expect(getSlotViolationEntryIds(teams).size).toBe(0)
+    })
+
+    it("still seats every captain when captain requests are unsatisfiable", () => {
+        // Three captains all demand slot 1 (two slot-1 teams): everyone
+        // still seeds a distinct team; one violation is reported
+        const pool = Array.from({ length: 18 }, (_, i) =>
+            candidate({
+                userId: `u${String(i).padStart(2, "0")}`,
+                placementScore: i + 1,
+                male: i % 2 === 0,
+                isCaptain: i < 3,
+                availableSlots: i < 3 ? [1] : null
+            })
+        ).map(toOriginalPlacedPlayer)
+
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            pool,
+            NO_CONSTRAINT
+        )
+
+        const captainedTeams = teams.filter((team) =>
+            team.players.some((p) => p.isCaptain)
+        )
+        expect(captainedTeams).toHaveLength(3)
+
+        const violations = getSlotViolationEntryIds(teams)
+        expect(violations.size).toBe(1)
+    })
+
+    it("puts only-slot-3 veterans on the back court and keeps slot-1-only players off it", () => {
+        const pool = Array.from({ length: 36 }, (_, i) =>
+            candidate({
+                userId: `b${String(i).padStart(2, "0")}`,
+                placementScore: ((i * 7) % 31) + 1,
+                male: i % 3 !== 0,
+                isCaptain: i < 4,
+                consecutiveSeasonsInTopDiv: (i * 5) % 9,
+                availableSlots: i === 20 ? [3] : i === 25 ? [1] : null
+            })
+        ).map(toOriginalPlacedPlayer)
+
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            pool,
+            WEEK3_OPTIONS
+        )
+
+        const teamOf = (userId: string) =>
+            teams.find((team) =>
+                team.players.some((p) => p.assignmentUserId === userId)
+            )
+        expect([5, 6]).toContain(teamOf("b20")?.number)
+        expect([1, 2]).toContain(teamOf("b25")?.number)
+        expect(getSlotViolationEntryIds(teams).size).toBe(0)
+    })
+
     it("capacity still outranks slot requests with the captained-team rule on", () => {
         // Week-2 options: new players must sit on captained teams even if
         // their slot request points elsewhere

@@ -228,6 +228,38 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
             : null
     }
 
+    // Tryout slot requests: slot = team-slot index + 1
+    const getTeamSlotIndex = (teamIndex: number) => Math.floor(teamIndex / 2)
+
+    const canAttendTeam = (
+        availableSlots: number[] | null,
+        teamIndex: number
+    ) =>
+        availableSlots === null ||
+        availableSlots.includes(getTeamSlotIndex(teamIndex) + 1)
+
+    const unitSlotViolationCount = (
+        unitPlayers: TeamPlayer[],
+        teamIndex: number
+    ) =>
+        unitPlayers.filter(
+            (player) => !canAttendTeam(player.availableSlots, teamIndex)
+        ).length
+
+    // Intersection of two availability sets (null = unrestricted). An empty
+    // intersection means the pair's requests conflict — treated unrestricted,
+    // with the conflict surfaced in the UI.
+    const intersectSlots = (a: number[] | null, b: number[] | null) => {
+        if (a === null) {
+            return b
+        }
+        if (b === null) {
+            return a
+        }
+        const merged = a.filter((slot) => b.includes(slot))
+        return merged.length > 0 ? merged : null
+    }
+
     // Back court: pre-fill the trailing teams with the most experienced
     // non-captains before captains seed the front teams.
     const preAssignedEntryIds = new Set<string>()
@@ -272,6 +304,31 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         const newPlayerEntryIds = new Set(
             divisionPlayers.filter((p) => p.isNew).map((p) => p.entryId)
         )
+        // Slot requests: back-court teams play these slots (slot 3 for the
+        // standard 6-team/2-back split)
+        const backSlotNumbers = new Set(
+            Array.from(
+                { length: backTeamCount },
+                (_, offset) => getTeamSlotIndex(backStart + offset) + 1
+            )
+        )
+        const canUnitSitBackCourt = (unit: TeamUnit) =>
+            unit.players.every(
+                (p) =>
+                    p.availableSlots === null ||
+                    p.availableSlots.some((slot) => backSlotNumbers.has(slot))
+            )
+        // Units whose restricted members can ONLY play back-court slots must
+        // be selected here — the back court fills before the main placement
+        // loop, so penalty steering can never help them later.
+        const unitNeedsBackCourt = (unit: TeamUnit) =>
+            unit.players.some((p) => p.availableSlots !== null) &&
+            unit.players.every(
+                (p) =>
+                    p.availableSlots === null ||
+                    p.availableSlots.every((slot) => backSlotNumbers.has(slot))
+            )
+
         const eligibleUnits = buildTeamUnits(
             divisionPlayers.filter(
                 (p) =>
@@ -280,8 +337,13 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
                     !(p.pairEntryId && captainEntryIds.has(p.pairEntryId)) &&
                     !(p.pairEntryId && newPlayerEntryIds.has(p.pairEntryId))
             )
-        )
+        ).filter(canUnitSitBackCourt)
         eligibleUnits.sort((a, b) => {
+            const aNeedsBack = unitNeedsBackCourt(a) ? 0 : 1
+            const bNeedsBack = unitNeedsBackCourt(b) ? 0 : 1
+            if (aNeedsBack !== bNeedsBack) {
+                return aNeedsBack - bNeedsBack
+            }
             const aMax = Math.max(
                 ...a.players.map((p) => p.consecutiveSeasonsInTopDiv)
             )
@@ -368,9 +430,83 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
     const captainTeamLimit = backCourtActive
         ? Math.min(teamCount - backTeamCount, teamCount)
         : teamCount
+
+    // Captain-to-team assignment is a permutation: one captain per front
+    // team is what matters, not which team. Captains with a slot request
+    // (their own, intersected with a riding mutual partner's) claim an
+    // allowed free team first — fewest options, then score order; everyone
+    // else fills the remaining teams ascending in score order. With no
+    // requests this reduces to the previous identity assignment.
+    const seatedCaptains = captains.slice(0, captainTeamLimit)
+
+    const captainAvailability = (captain: TeamPlayer) => {
+        const partner = captain.pairEntryId
+            ? (divisionPlayers.find(
+                  (p) =>
+                      p.entryId === captain.pairEntryId &&
+                      p.pairEntryId === captain.entryId
+              ) ?? null)
+            : null
+        return intersectSlots(
+            captain.availableSlots,
+            partner?.availableSlots ?? null
+        )
+    }
+
+    const captainIndexByEntryId = new Map<string, number>()
+    const freeCaptainIndices = Array.from(
+        { length: captainTeamLimit },
+        (_, index) => index
+    )
+
+    const restrictedCaptains = seatedCaptains
+        .map((captain, order) => ({
+            captain,
+            order,
+            availability: captainAvailability(captain)
+        }))
+        .filter(
+            (entry): entry is typeof entry & { availability: number[] } =>
+                entry.availability !== null
+        )
+        .sort((a, b) => {
+            if (a.availability.length !== b.availability.length) {
+                return a.availability.length - b.availability.length
+            }
+            return a.order - b.order
+        })
+
+    for (const entry of restrictedCaptains) {
+        const allowedPosition = freeCaptainIndices.findIndex((teamIndex) =>
+            canAttendTeam(entry.availability, teamIndex)
+        )
+        if (allowedPosition !== -1) {
+            captainIndexByEntryId.set(
+                entry.captain.entryId,
+                freeCaptainIndices[allowedPosition]
+            )
+            freeCaptainIndices.splice(allowedPosition, 1)
+        }
+    }
+
+    for (const captain of seatedCaptains) {
+        if (captainIndexByEntryId.has(captain.entryId)) {
+            continue
+        }
+        const teamIndex = freeCaptainIndices.shift()
+        if (teamIndex === undefined) {
+            break
+        }
+        captainIndexByEntryId.set(captain.entryId, teamIndex)
+    }
+
     const assignedCaptainIds = new Set<string>()
-    for (let i = 0; i < captains.length && i < captainTeamLimit; i++) {
-        const captain = captains[i]
+    for (const captain of seatedCaptains) {
+        const teamIndex = captainIndexByEntryId.get(captain.entryId)
+        if (teamIndex === undefined) {
+            continue
+        }
+
         const captainMutualPair = captain.pairEntryId
             ? (divisionPlayers.find(
                   (p) =>
@@ -384,23 +520,21 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
             : [captain]
 
         for (const player of toPlace) {
-            teams[i].players.push(player)
-            teams[i].scoreSum += player.placementScore
+            teams[teamIndex].players.push(player)
+            teams[teamIndex].scoreSum += player.placementScore
             if (player.male === true) {
-                teams[i].maleCount += 1
+                teams[teamIndex].maleCount += 1
             } else {
-                teams[i].nonMaleCount += 1
+                teams[teamIndex].nonMaleCount += 1
             }
             if (player.isNew) {
-                teams[i].newCount += 1
+                teams[teamIndex].newCount += 1
             }
             assignedCaptainIds.add(player.entryId)
         }
     }
 
-    const teamsWithCaptain = new Set(
-        captains.slice(0, captainTeamLimit).map((_, i) => i)
-    )
+    const teamsWithCaptain = new Set(captainIndexByEntryId.values())
 
     // Week-2 rule: new players may only land on captained teams
     // (coach divisions exempt).
@@ -432,24 +566,7 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         teamCapacities,
         teamCapacities.map(() => 1)
     )
-    const getTeamSlotIndex = (teamIndex: number) => Math.floor(teamIndex / 2)
     const maxSlotIndex = Math.floor((teamCount - 1) / 2)
-
-    // Tryout slot requests: slot = team-slot index + 1
-    const canAttendTeam = (
-        availableSlots: number[] | null,
-        teamIndex: number
-    ) =>
-        availableSlots === null ||
-        availableSlots.includes(getTeamSlotIndex(teamIndex) + 1)
-
-    const unitSlotViolationCount = (
-        unitPlayers: TeamPlayer[],
-        teamIndex: number
-    ) =>
-        unitPlayers.filter(
-            (player) => !canAttendTeam(player.availableSlots, teamIndex)
-        ).length
 
     const getDuplicatePlacementPenalty = (
         unitPlayers: TeamPlayer[],
