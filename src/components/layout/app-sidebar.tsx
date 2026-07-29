@@ -239,6 +239,16 @@ export function AppSidebar({
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
 
+    // Admin tournament pages only make sense while a tournament is active
+    // (tournament is null when the latest tournament is complete or none
+    // exists). Tournament Control stays visible so a new one can be created.
+    const hasActiveTournament = !!tournament
+    const tournamentAdminUrls = [
+        "/dashboard/tournament-overview",
+        "/dashboard/tournament-pools",
+        "/dashboard/view-tournament-waitlist"
+    ]
+
     // Reffing section — visible to refs during regular_season and playoffs
     const showReffingSection =
         isReferee && inRange("regular_season", "playoffs")

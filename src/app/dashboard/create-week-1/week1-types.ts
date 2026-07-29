@@ -27,6 +27,12 @@ export interface Week1Candidate {
     previousDraftSeasonLabel: string | null
     previousDraftDivisionName: string | null
     pairWithName: string | null
+    /**
+     * Tryout timeslot request: sessions (1-2) the player can attend
+     * (null = unrestricted). Steers session placement only, never inclusion.
+     */
+    availableSlots?: number[] | null
+    slotRequestComment?: string | null
 }
 
 export interface Week1GroupSummary {

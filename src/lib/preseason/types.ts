@@ -31,6 +31,12 @@ export interface PreseasonCandidate {
     // read them uniformly (absent ≡ null/0 for week 2).
     week2DivisionId?: number | null
     consecutiveSeasonsInTopDiv?: number
+    /**
+     * Tryout timeslot request: 1-based slot numbers the player can attend
+     * (null/absent = unrestricted). Slot = ceil(teamNumber / 2).
+     */
+    availableSlots?: number[] | null
+    slotRequestComment?: string | null
 }
 
 export interface Week2Candidate extends PreseasonCandidate {
