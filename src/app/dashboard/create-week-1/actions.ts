@@ -19,6 +19,7 @@ import {
 import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
+import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatDisplayName } from "@/lib/utils"
@@ -307,6 +308,7 @@ export async function getCreateWeek1Data(): Promise<{
             }
         }
         const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
+        const slotRequests = await loadTryoutSlotRequests(config.seasonId, 1)
 
         const candidates: Week1Candidate[] = []
 
@@ -367,7 +369,11 @@ export async function getCreateWeek1Data(): Promise<{
                     secondMostRecentDraft?.divisionName ?? null,
                 pairWithName: row.pairPickId
                     ? (pairNameById.get(row.pairPickId) ?? null)
-                    : null
+                    : null,
+                availableSlots:
+                    slotRequests.get(row.userId)?.availableSlots ?? null,
+                slotRequestComment:
+                    slotRequests.get(row.userId)?.comment ?? null
             })
         }
 

@@ -100,7 +100,9 @@ export function CreateWeek1Form({
                     pairAverageScore:
                         pairInfo.get(player.userId)?.averageScore || null,
                     sessionNumber: assignment.sessionNumber,
-                    courtNumber: assignment.courtNumber
+                    courtNumber: assignment.courtNumber,
+                    availableSlots: player.availableSlots ?? null,
+                    slotRequestComment: player.slotRequestComment ?? null
                 }
             })
             .filter((item): item is AssignmentView => item !== null)
@@ -397,6 +399,20 @@ export function CreateWeek1Form({
                                                 {player.pairWithName
                                                     ? ` | paired: ${player.pairWithName}`
                                                     : ""}
+                                                {player.availableSlots && (
+                                                    <span
+                                                        className="ml-2 font-semibold text-amber-700 dark:text-amber-300"
+                                                        title={
+                                                            player.slotRequestComment ??
+                                                            undefined
+                                                        }
+                                                    >
+                                                        session{" "}
+                                                        {player.availableSlots.join(
+                                                            ","
+                                                        )}
+                                                    </span>
+                                                )}
                                             </p>
                                         </div>
                                         <span className="text-xs">
@@ -487,48 +503,78 @@ export function CreateWeek1Form({
                                             </span>
                                         </div>
                                         <div className="grid gap-1">
-                                            {players.map((player) => (
-                                                <div
-                                                    key={player.userId}
-                                                    className={cn(
-                                                        "flex items-center justify-between rounded-sm px-2 py-1 text-xs",
-                                                        player.isNew
-                                                            ? "bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100"
-                                                            : "bg-muted/40"
-                                                    )}
-                                                >
-                                                    <button
-                                                        type="button"
-                                                        className="text-left underline-offset-2 hover:underline"
-                                                        onClick={() =>
-                                                            modal.openPlayerDetail(
-                                                                player.userId
-                                                            )
-                                                        }
+                                            {players.map((player) => {
+                                                const slotViolated =
+                                                    player.availableSlots !==
+                                                        null &&
+                                                    !player.availableSlots.includes(
+                                                        player.sessionNumber
+                                                    )
+
+                                                return (
+                                                    <div
+                                                        key={player.userId}
+                                                        className={cn(
+                                                            "flex items-center justify-between rounded-sm px-2 py-1 text-xs",
+                                                            player.isNew
+                                                                ? "bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100"
+                                                                : "bg-muted/40",
+                                                            slotViolated &&
+                                                                "ring-2 ring-red-500"
+                                                        )}
                                                     >
-                                                        {player.displayName}
-                                                        {player.pairWith && (
-                                                            <span className="ml-2 text-[11px] opacity-85">
-                                                                (paired with{" "}
-                                                                {
-                                                                    player.pairWith
-                                                                }
-                                                                ; avg{" "}
-                                                                {Math.round(
-                                                                    player.pairAverageScore ||
-                                                                        0
-                                                                )}
+                                                        <button
+                                                            type="button"
+                                                            className="text-left underline-offset-2 hover:underline"
+                                                            onClick={() =>
+                                                                modal.openPlayerDetail(
+                                                                    player.userId
                                                                 )
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                    <span className="text-muted-foreground">
-                                                        {Math.round(
-                                                            player.placementScore
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            ))}
+                                                            }
+                                                        >
+                                                            {player.displayName}
+                                                            {player.pairWith && (
+                                                                <span className="ml-2 text-[11px] opacity-85">
+                                                                    (paired with{" "}
+                                                                    {
+                                                                        player.pairWith
+                                                                    }
+                                                                    ; avg{" "}
+                                                                    {Math.round(
+                                                                        player.pairAverageScore ||
+                                                                            0
+                                                                    )}
+                                                                    )
+                                                                </span>
+                                                            )}
+                                                            {player.availableSlots && (
+                                                                <span
+                                                                    className={cn(
+                                                                        "ml-2 font-semibold",
+                                                                        slotViolated
+                                                                            ? "text-red-600 dark:text-red-400"
+                                                                            : "text-amber-700 dark:text-amber-300"
+                                                                    )}
+                                                                    title={
+                                                                        player.slotRequestComment ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    session{" "}
+                                                                    {player.availableSlots.join(
+                                                                        ","
+                                                                    )}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                        <span className="text-muted-foreground">
+                                                            {Math.round(
+                                                                player.placementScore
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 )
