@@ -1,43 +1,8 @@
-export interface Week2Division {
-    id: number
-    name: string
-    level: number
-    index: number
-    teamCount: number
-    isLast: boolean
-    isCoachDiv: boolean
-}
+// Week-2 aliases for the shared preseason types (src/lib/preseason/types.ts).
 
-export interface Week2Candidate {
-    userId: string
-    oldId: number | null
-    firstName: string
-    lastName: string
-    preferredName: string | null
-    male: boolean | null
-    pairUserId: string | null
-    pairWithName: string | null
-    overallMostRecent: number | null
-    placementScore: number
-    ratingScore: number | null
-    seasonsPlayedCount: number
-    captainDivisionId: number | null
-    captainDivisionName: string | null
-    isCaptain: boolean
-    lastDivisionName: string | null
-}
-
-export interface Week2SavedAssignment {
-    userId: string
-    divisionId: number
-    teamNumber: number
-    isCaptain: boolean
-}
-
-export interface Week2ExcludedPlayer {
-    userId: string
-    oldId: number | null
-    firstName: string
-    lastName: string
-    preferredName: string | null
-}
+export type {
+    PreseasonDivision as Week2Division,
+    Week2Candidate,
+    SavedAssignment as Week2SavedAssignment,
+    ExcludedPlayer as Week2ExcludedPlayer
+} from "@/lib/preseason/types"

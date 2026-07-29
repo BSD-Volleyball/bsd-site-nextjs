@@ -152,7 +152,7 @@ export async function getCreateWeek2Data(): Promise<{
                 index,
                 teamCount: index === activeDivisions.length - 1 ? 4 : 6,
                 isLast: index === activeDivisions.length - 1,
-                isCoachDiv: coachDivisionIds.has(division.id)
+                usesCoaches: coachDivisionIds.has(division.id)
             })
         )
 

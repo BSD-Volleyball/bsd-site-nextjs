@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
-    allocateByWeightWithCapacity,
     buildDivisionPlacement,
-    buildPlacementUnits,
     buildTeamsForDivision,
-    compareCandidates,
-    getDivisionTargets,
-    getSnakeOrder,
-    sortDivisionPlayers,
     toOriginalPlacedPlayer
 } from "./placement"
 import type { Week2Candidate, Week2Division } from "./week2-types"
@@ -35,132 +29,6 @@ function candidate(overrides: Partial<Week2Candidate> = {}): Week2Candidate {
     }
 }
 
-describe("compareCandidates / sortDivisionPlayers", () => {
-    it("orders by placement score, then by display name", () => {
-        const low = candidate({ userId: "z", placementScore: 1 })
-        const highA = candidate({
-            userId: "a",
-            firstName: "Alpha",
-            lastName: "A",
-            placementScore: 9
-        })
-        const highB = candidate({
-            userId: "b",
-            firstName: "Beta",
-            lastName: "B",
-            placementScore: 9
-        })
-        expect(
-            [highB, highA, low].sort(compareCandidates).map((c) => c.userId)
-        ).toEqual(["z", "a", "b"])
-    })
-
-    it("sortDivisionPlayers lists males before non-males", () => {
-        const players = [
-            candidate({ userId: "f1", male: false, placementScore: 1 }),
-            candidate({ userId: "m1", male: true, placementScore: 5 }),
-            candidate({ userId: "m2", male: true, placementScore: 2 })
-        ].map(toOriginalPlacedPlayer)
-
-        const sorted = sortDivisionPlayers(players)
-        expect(sorted.map((p) => p.sourceUserId)).toEqual(["m2", "m1", "f1"])
-    })
-})
-
-describe("buildPlacementUnits", () => {
-    it("merges reciprocal pairs into one unit with the averaged score", () => {
-        const a = candidate({
-            userId: "a",
-            pairUserId: "b",
-            placementScore: 10
-        })
-        const b = candidate({
-            userId: "b",
-            pairUserId: "a",
-            placementScore: 20
-        })
-        const single = candidate({ userId: "c", placementScore: 5 })
-
-        const units = buildPlacementUnits([a, b, single])
-        expect(units).toHaveLength(2)
-        // Sorted by average score: single (5) before pair (15)
-        expect(units[0].players.map((p) => p.userId)).toEqual(["c"])
-        const pairUnit = units[1]
-        expect(pairUnit.size).toBe(2)
-        expect(pairUnit.averageScore).toBe(15)
-        expect(pairUnit.id).toBe("a:b")
-        expect(pairUnit.maleCount).toBe(2)
-    })
-
-    it("does not merge one-way pair requests", () => {
-        const a = candidate({ userId: "a", pairUserId: "b" })
-        const b = candidate({ userId: "b", pairUserId: null })
-        const units = buildPlacementUnits([a, b])
-        expect(units).toHaveLength(2)
-        expect(units.every((u) => u.size === 1)).toBe(true)
-    })
-
-    it("refuses to pair captains locked to different divisions", () => {
-        const a = candidate({
-            userId: "a",
-            pairUserId: "b",
-            captainDivisionId: 1
-        })
-        const b = candidate({
-            userId: "b",
-            pairUserId: "a",
-            captainDivisionId: 2
-        })
-        const units = buildPlacementUnits([a, b])
-        expect(units).toHaveLength(2)
-    })
-
-    it("locks a pair to the captain's division", () => {
-        const a = candidate({
-            userId: "a",
-            pairUserId: "b",
-            captainDivisionId: 7
-        })
-        const b = candidate({ userId: "b", pairUserId: "a" })
-        const [unit] = buildPlacementUnits([a, b])
-        expect(unit.size).toBe(2)
-        expect(unit.lockedDivisionId).toBe(7)
-    })
-})
-
-describe("allocateByWeightWithCapacity", () => {
-    it("splits evenly for equal weights", () => {
-        expect(allocateByWeightWithCapacity(10, [10, 10], [1, 1])).toEqual([
-            5, 5
-        ])
-    })
-
-    it("respects capacity limits and reroutes the overflow", () => {
-        expect(allocateByWeightWithCapacity(10, [3, 10], [1, 1])).toEqual([
-            3, 7
-        ])
-    })
-
-    it("allocates everything even with uneven rounding", () => {
-        const result = allocateByWeightWithCapacity(7, [10, 10, 10], [1, 1, 1])
-        expect(result.reduce((a, b) => a + b, 0)).toBe(7)
-        for (const n of result) {
-            expect(n).toBeGreaterThanOrEqual(2)
-        }
-    })
-
-    it("returns zeros for zero totals or zero weights", () => {
-        expect(allocateByWeightWithCapacity(0, [5, 5], [1, 1])).toEqual([0, 0])
-        expect(allocateByWeightWithCapacity(5, [5, 5], [0, 0])).toEqual([0, 0])
-    })
-
-    it("weights the allocation proportionally", () => {
-        expect(allocateByWeightWithCapacity(9, [10, 10], [2, 1])).toEqual([
-            6, 3
-        ])
-    })
-})
-
 function division(overrides: Partial<Week2Division> = {}): Week2Division {
     return {
         id: 1,
@@ -169,7 +37,7 @@ function division(overrides: Partial<Week2Division> = {}): Week2Division {
         index: 0,
         teamCount: 2,
         isLast: false,
-        isCoachDiv: false,
+        usesCoaches: false,
         ...overrides
     }
 }
@@ -184,34 +52,6 @@ function buildBalancedPool(): Week2Candidate[] {
         })
     )
 }
-
-describe("getDivisionTargets", () => {
-    it("sizes divisions by team count and mirrors the gender ratio", () => {
-        const divisions = [
-            division({ id: 1, teamCount: 2 }),
-            division({
-                id: 2,
-                name: "A",
-                level: 2,
-                index: 1,
-                teamCount: 2,
-                isLast: true
-            })
-        ]
-        const targets = getDivisionTargets(divisions, buildBalancedPool())
-
-        for (const id of [1, 2]) {
-            const target = targets.get(id)
-            expect(target?.size).toBe(12)
-            expect(target?.male).toBe(6)
-            expect(target?.nonMale).toBe(6)
-        }
-    })
-
-    it("returns an empty map when there are no teams", () => {
-        expect(getDivisionTargets([], buildBalancedPool()).size).toBe(0)
-    })
-})
 
 describe("buildDivisionPlacement", () => {
     const divisions = [
@@ -318,31 +158,5 @@ describe("buildTeamsForDivision", () => {
             )
         )
         expect(pairTeams).toHaveLength(1)
-    })
-})
-
-describe("getSnakeOrder", () => {
-    it("snakes forward then backward across teams", () => {
-        expect(getSnakeOrder(8, 4)).toEqual([0, 1, 2, 3, 3, 2, 1, 0])
-    })
-
-    it("continues the pattern for longer drafts", () => {
-        expect(getSnakeOrder(10, 4)).toEqual([0, 1, 2, 3, 3, 2, 1, 0, 0, 1])
-    })
-
-    it("stops at the requested length", () => {
-        expect(getSnakeOrder(2, 4)).toEqual([0, 1])
-        expect(getSnakeOrder(0, 4)).toEqual([])
-    })
-
-    it("gives every team an equal share over full rounds", () => {
-        const order = getSnakeOrder(24, 6)
-        const counts = new Map<number, number>()
-        for (const team of order) {
-            counts.set(team, (counts.get(team) ?? 0) + 1)
-        }
-        for (const team of [0, 1, 2, 3, 4, 5]) {
-            expect(counts.get(team)).toBe(4)
-        }
     })
 })

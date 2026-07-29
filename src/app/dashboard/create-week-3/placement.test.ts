@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
-    allocateByWeightWithCapacity,
     buildDivisionPlacement,
-    buildPlacementUnits,
     buildTeamsForDivision,
-    compareCandidates,
-    getDivisionTargets,
-    getSnakeOrder,
     placementReasonClasses,
     placementReasonLabel,
     placementReasonOrder,
@@ -52,65 +47,6 @@ describe("placement reason metadata", () => {
     })
 })
 
-describe("compareCandidates", () => {
-    it("orders by placement score, then by display name", () => {
-        const low = candidate({ userId: "z", placementScore: 1 })
-        const highA = candidate({
-            userId: "a",
-            firstName: "Alpha",
-            placementScore: 9
-        })
-        const highB = candidate({
-            userId: "b",
-            firstName: "Beta",
-            placementScore: 9
-        })
-        expect(
-            [highB, highA, low].sort(compareCandidates).map((c) => c.userId)
-        ).toEqual(["z", "a", "b"])
-    })
-})
-
-describe("buildPlacementUnits", () => {
-    it("merges reciprocal pairs and keeps one-way requests apart", () => {
-        const a = candidate({
-            userId: "a",
-            pairUserId: "b",
-            placementScore: 10
-        })
-        const b = candidate({
-            userId: "b",
-            pairUserId: "a",
-            placementScore: 20
-        })
-        const oneWay = candidate({ userId: "c", pairUserId: "a" })
-
-        const units = buildPlacementUnits([a, b, oneWay])
-        const sizes = units.map((u) => u.size).sort()
-        expect(sizes).toEqual([1, 2])
-        const pairUnit = units.find((u) => u.size === 2)
-        expect(pairUnit?.averageScore).toBe(15)
-    })
-})
-
-describe("allocateByWeightWithCapacity", () => {
-    it("honors capacities while allocating the full total", () => {
-        // Overflow from the capped first slot goes to the least-loaded slot
-        const result = allocateByWeightWithCapacity(12, [2, 6, 10], [1, 1, 1])
-        expect(result).toEqual([2, 4, 6])
-        expect(result.reduce((a, b) => a + b, 0)).toBe(12)
-        result.forEach((n, i) => {
-            expect(n).toBeLessThanOrEqual([2, 6, 10][i])
-        })
-    })
-})
-
-describe("getSnakeOrder", () => {
-    it("matches the week-2 snake pattern", () => {
-        expect(getSnakeOrder(8, 4)).toEqual([0, 1, 2, 3, 3, 2, 1, 0])
-    })
-})
-
 function division(overrides: Partial<Week3Division> = {}): Week3Division {
     return {
         id: 1,
@@ -139,28 +75,6 @@ function buildBalancedPool(): Week3Candidate[] {
         })
     )
 }
-
-describe("getDivisionTargets", () => {
-    it("sizes divisions by team count and mirrors the gender ratio", () => {
-        const divisions = [
-            division({ id: 1, teamCount: 2 }),
-            division({
-                id: 2,
-                name: "A",
-                level: 2,
-                index: 1,
-                teamCount: 2,
-                isLast: true
-            })
-        ]
-        const targets = getDivisionTargets(divisions, buildBalancedPool())
-        for (const id of [1, 2]) {
-            expect(targets.get(id)?.size).toBe(12)
-            expect(targets.get(id)?.male).toBe(6)
-            expect(targets.get(id)?.nonMale).toBe(6)
-        }
-    })
-})
 
 describe("buildDivisionPlacement", () => {
     const divisions = [

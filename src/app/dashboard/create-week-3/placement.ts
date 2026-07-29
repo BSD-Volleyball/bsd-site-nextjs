@@ -1,39 +1,50 @@
-// Pure placement logic for the week-3 roster builder.
-// Extracted verbatim from create-week-3-form.tsx so the
-// algorithms are separate from the UI (and unit-testable).
+// Week-3 placement logic: continuity-driven division placement (week-2
+// carry-forward, forced moves) plus team building with the top-division
+// back-court split. Shared primitives (units, allocation) live in
+// src/lib/preseason.
 
-import { formatDisplayName, splitByGender } from "@/lib/utils"
-import type { Week3Candidate, Week3Division } from "./week3-types"
+import { splitByGender } from "@/lib/utils"
+import {
+    addUnitToPlacement,
+    buildPlacementUnits,
+    compareCandidates,
+    getDisplayName,
+    removeUnitFromPlacement
+} from "@/lib/preseason/units"
+import {
+    allocateByWeightWithCapacity,
+    getDivisionTargets,
+    getScoreBandLevel,
+    getSnakeOrder
+} from "@/lib/preseason/allocation"
+import type {
+    DivisionPlacement as PreseasonDivisionPlacement,
+    PlacedPlayer,
+    PlacementReason,
+    PlacementUnit as PreseasonPlacementUnit,
+    Week3Candidate
+} from "@/lib/preseason/types"
+import type { Week3Division } from "./week3-types"
 
-export interface Week3PlacedPlayer extends Week3Candidate {
-    entryId: string
-    sourceUserId: string
-    isDuplicateEntry: boolean
-}
+export {
+    addUnitToPlacement,
+    buildPlacementUnits,
+    compareCandidates,
+    getDisplayName,
+    removeUnitFromPlacement,
+    sortDivisionPlayers,
+    toOriginalPlacedPlayer
+} from "@/lib/preseason/units"
+export {
+    allocateByWeightWithCapacity,
+    getDivisionTargets,
+    getSnakeOrder
+} from "@/lib/preseason/allocation"
+export type { PlacementReason } from "@/lib/preseason/types"
 
-export interface PlacementUnit {
-    id: string
-    players: Week3Candidate[]
-    maleCount: number
-    nonMaleCount: number
-    size: number
-    averageScore: number
-    hasCaptain: boolean
-    isMutualPair: boolean
-    captainDivisionId: number | null
-    preferredWeek2DivisionId: number | null
-}
-
-export interface DivisionPlacement {
-    division: Week3Division
-    units: PlacementUnit[]
-    maleCount: number
-    nonMaleCount: number
-    size: number
-    targetSize: number
-    targetMale: number
-    targetNonMale: number
-}
+export type Week3PlacedPlayer = PlacedPlayer<Week3Candidate>
+export type PlacementUnit = PreseasonPlacementUnit<Week3Candidate>
+export type DivisionPlacement = PreseasonDivisionPlacement<Week3Candidate>
 
 export interface TeamPlayer {
     entryId: string
@@ -59,17 +70,10 @@ export interface TeamBucket {
     newCount: number
 }
 
-export type PlacementReason =
-    | "captain_locked"
-    | "mutual_pair_locked"
-    | "tryout2_same_division"
-    | "forced_move_up"
-    | "forced_move_down"
-    | "score_based"
-
 export const placementReasonLabel: Record<PlacementReason, string> = {
     captain_locked: "Captain (locked)",
     mutual_pair_locked: "Paired with captain (locked)",
+    score_cascade: "Placed by score",
     tryout2_same_division: "Played in Week 2 division",
     forced_move_up: "Forced move up",
     forced_move_down: "Forced move down",
@@ -81,6 +85,8 @@ export const placementReasonClasses: Record<PlacementReason, string> = {
         "border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100",
     mutual_pair_locked:
         "border-orange-300 bg-orange-100 text-orange-950 dark:border-orange-700 dark:bg-orange-950/40 dark:text-orange-100",
+    score_cascade:
+        "border-slate-300 bg-slate-100 text-slate-950 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100",
     tryout2_same_division:
         "border-blue-300 bg-blue-100 text-blue-950 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-100",
     forced_move_up:
@@ -99,300 +105,6 @@ export const placementReasonOrder: PlacementReason[] = [
     "forced_move_down",
     "score_based"
 ]
-
-export function getDisplayName(player: Week3Candidate) {
-    return formatDisplayName(
-        player.firstName,
-        player.lastName,
-        player.preferredName
-    )
-}
-
-export function compareCandidates(a: Week3Candidate, b: Week3Candidate) {
-    if (a.placementScore !== b.placementScore) {
-        return a.placementScore - b.placementScore
-    }
-
-    return getDisplayName(a)
-        .toLowerCase()
-        .localeCompare(getDisplayName(b).toLowerCase())
-}
-
-export function sortDivisionPlayers(players: Week3PlacedPlayer[]) {
-    return [...players].sort((a, b) => {
-        if (a.male === true && b.male !== true) {
-            return -1
-        }
-        if (a.male !== true && b.male === true) {
-            return 1
-        }
-        return compareCandidates(a, b)
-    })
-}
-
-export function toOriginalPlacedPlayer(
-    candidate: Week3Candidate
-): Week3PlacedPlayer {
-    return {
-        ...candidate,
-        entryId: `orig:${candidate.userId}`,
-        sourceUserId: candidate.userId,
-        isDuplicateEntry: false
-    }
-}
-
-export function buildPlacementUnits(
-    candidates: Week3Candidate[]
-): PlacementUnit[] {
-    const sorted = [...candidates].sort(compareCandidates)
-    const byId = new Map(
-        sorted.map((candidate) => [candidate.userId, candidate])
-    )
-    const used = new Set<string>()
-    const units: PlacementUnit[] = []
-
-    for (const candidate of sorted) {
-        if (used.has(candidate.userId)) {
-            continue
-        }
-
-        const partner = candidate.pairUserId
-            ? byId.get(candidate.pairUserId)
-            : null
-
-        const canPair =
-            !!partner &&
-            !used.has(partner.userId) &&
-            partner.pairUserId === candidate.userId &&
-            candidate.week2DivisionId === partner.week2DivisionId &&
-            !(
-                candidate.captainDivisionId &&
-                partner.captainDivisionId &&
-                candidate.captainDivisionId !== partner.captainDivisionId
-            )
-
-        const players = canPair ? [candidate, partner] : [candidate]
-        const { males, nonMales } = splitByGender(players)
-        const maleCount = males.length
-        const nonMaleCount = nonMales.length
-        const averageScore =
-            players.reduce((sum, player) => sum + player.placementScore, 0) /
-            players.length
-
-        const captainDivisionId =
-            players.find((player) => !!player.captainDivisionId)
-                ?.captainDivisionId || null
-        const week2DivisionCandidates = players
-            .map((player) => player.week2DivisionId)
-            .filter((value): value is number => value !== null)
-        const preferredWeek2DivisionId =
-            week2DivisionCandidates.length > 0
-                ? week2DivisionCandidates[0]
-                : null
-
-        const unitId = players
-            .map((player) => player.userId)
-            .sort()
-            .join(":")
-
-        units.push({
-            id: unitId,
-            players,
-            maleCount,
-            nonMaleCount,
-            size: players.length,
-            averageScore,
-            hasCaptain: players.some((player) => player.isCaptain),
-            isMutualPair: players.length > 1,
-            captainDivisionId,
-            preferredWeek2DivisionId
-        })
-
-        for (const player of players) {
-            used.add(player.userId)
-        }
-    }
-
-    return units.sort((a, b) => {
-        if (a.averageScore !== b.averageScore) {
-            return a.averageScore - b.averageScore
-        }
-        return a.id.localeCompare(b.id)
-    })
-}
-
-export function addUnitToPlacement(
-    target: DivisionPlacement,
-    unit: PlacementUnit
-) {
-    target.units.push(unit)
-    target.size += unit.size
-    target.maleCount += unit.maleCount
-    target.nonMaleCount += unit.nonMaleCount
-}
-
-export function removeUnitFromPlacement(
-    target: DivisionPlacement,
-    unit: PlacementUnit
-) {
-    target.units = target.units.filter((entry) => entry.id !== unit.id)
-    target.size -= unit.size
-    target.maleCount -= unit.maleCount
-    target.nonMaleCount -= unit.nonMaleCount
-}
-
-export function allocateByWeightWithCapacity(
-    total: number,
-    capacities: number[],
-    weights: number[]
-) {
-    const result = Array(capacities.length).fill(0)
-
-    if (total <= 0 || capacities.length === 0) {
-        return result
-    }
-
-    const activeWeightTotal = weights.reduce((sum, value) => sum + value, 0)
-    if (activeWeightTotal <= 0) {
-        return result
-    }
-
-    const fractions = Array(capacities.length).fill(0)
-
-    for (let index = 0; index < capacities.length; index++) {
-        const exact = (total * weights[index]) / activeWeightTotal
-        const floored = Math.min(capacities[index], Math.floor(exact))
-        result[index] = floored
-        fractions[index] = exact - Math.floor(exact)
-    }
-
-    let assigned = result.reduce((sum, value) => sum + value, 0)
-
-    while (assigned < total) {
-        let bestIndex = -1
-        let bestFraction = -1
-        let bestLoadRatio = Number.POSITIVE_INFINITY
-
-        for (let index = 0; index < capacities.length; index++) {
-            if (result[index] >= capacities[index]) {
-                continue
-            }
-
-            const loadRatio =
-                capacities[index] > 0
-                    ? result[index] / capacities[index]
-                    : Number.POSITIVE_INFINITY
-
-            if (
-                fractions[index] > bestFraction ||
-                (fractions[index] === bestFraction && loadRatio < bestLoadRatio)
-            ) {
-                bestFraction = fractions[index]
-                bestLoadRatio = loadRatio
-                bestIndex = index
-            }
-        }
-
-        if (bestIndex === -1) {
-            break
-        }
-
-        result[bestIndex] += 1
-        assigned += 1
-    }
-
-    return result
-}
-
-export function getDivisionTargets(
-    divisions: Week3Division[],
-    candidates: Week3Candidate[]
-) {
-    const totalPlayers = candidates.length
-    const totalTeams = divisions.reduce(
-        (sum, division) => sum + division.teamCount,
-        0
-    )
-
-    if (totalTeams === 0) {
-        return new Map<
-            number,
-            { size: number; male: number; nonMale: number }
-        >()
-    }
-
-    const baseTeamSize = Math.floor(totalPlayers / totalTeams)
-    const extraPlayers = totalPlayers - baseTeamSize * totalTeams
-
-    const teamCounts = divisions.map((division) => division.teamCount)
-    const sizeWeights = [...teamCounts]
-    const extraPerDivision = allocateByWeightWithCapacity(
-        extraPlayers,
-        teamCounts,
-        sizeWeights
-    )
-
-    const sizeTargets = divisions.map(
-        (division, index) =>
-            division.teamCount * baseTeamSize + extraPerDivision[index]
-    )
-
-    const totalNonMale = splitByGender(candidates).nonMales.length
-    const nonMaleRatio = totalPlayers > 0 ? totalNonMale / totalPlayers : 0
-    const nonMaleTargets = sizeTargets.map((size) =>
-        Math.min(size, Math.floor(size * nonMaleRatio))
-    )
-
-    const assignedNonMale = nonMaleTargets.reduce(
-        (sum, value) => sum + value,
-        0
-    )
-    let remainingNonMale = totalNonMale - assignedNonMale
-
-    if (remainingNonMale > 0) {
-        const divisionOrder = divisions.map((_division, index) => index)
-
-        while (remainingNonMale > 0) {
-            let placedInPass = false
-
-            for (const index of divisionOrder) {
-                if (remainingNonMale <= 0) {
-                    break
-                }
-
-                if (nonMaleTargets[index] >= sizeTargets[index]) {
-                    continue
-                }
-
-                nonMaleTargets[index] += 1
-                remainingNonMale -= 1
-                placedInPass = true
-            }
-
-            if (!placedInPass) {
-                break
-            }
-        }
-    }
-
-    const targets = new Map<
-        number,
-        { size: number; male: number; nonMale: number }
-    >()
-
-    for (let index = 0; index < divisions.length; index++) {
-        const size = sizeTargets[index]
-        const nonMale = nonMaleTargets[index]
-        const male = size - nonMale
-        targets.set(divisions[index].id, {
-            size,
-            male,
-            nonMale
-        })
-    }
-
-    return targets
-}
 
 export function buildDivisionPlacement(
     divisions: Week3Division[],
@@ -675,7 +387,7 @@ export function buildDivisionPlacement(
     )
 
     for (const unit of unassignedUnits) {
-        const targetLevel = Math.floor(unit.averageScore / 50) + 1
+        const targetLevel = getScoreBandLevel(unit.averageScore, 50)
 
         const targetDivision = [...divisions].sort((a, b) => {
             const aDistance = Math.abs(a.level - targetLevel)
@@ -767,26 +479,6 @@ export function buildTeamUnits(players: TeamPlayer[]): Array<{
     }
 
     return result.sort((a, b) => a.averageScore - b.averageScore)
-}
-
-export function getSnakeOrder(length: number, teamCount: number) {
-    const order: number[] = []
-    let ascending = true
-
-    while (order.length < length) {
-        if (ascending) {
-            for (let i = 0; i < teamCount && order.length < length; i++) {
-                order.push(i)
-            }
-        } else {
-            for (let i = teamCount - 1; i >= 0 && order.length < length; i--) {
-                order.push(i)
-            }
-        }
-        ascending = !ascending
-    }
-
-    return order
 }
 
 export function buildTeamsForDivision(

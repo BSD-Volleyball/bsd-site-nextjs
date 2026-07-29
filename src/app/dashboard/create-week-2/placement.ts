@@ -1,36 +1,44 @@
-// Pure placement logic for the week-2 roster builder.
-// Extracted verbatim from create-week-2-form.tsx so the
-// algorithms are separate from the UI (and unit-testable).
+// Week-2 placement logic: score-cascade division placement plus team
+// building. Shared primitives (units, allocation) live in src/lib/preseason.
 
-import { formatDisplayName, splitByGender } from "@/lib/utils"
-import type { Week2Candidate, Week2Division } from "./week2-types"
+import { splitByGender } from "@/lib/utils"
+import {
+    addUnitToPlacement,
+    buildPlacementUnits,
+    getDisplayName,
+    removeUnitFromPlacement
+} from "@/lib/preseason/units"
+import {
+    allocateByWeightWithCapacity,
+    getDivisionTargets,
+    getSnakeOrder
+} from "@/lib/preseason/allocation"
+import type {
+    DivisionPlacement as PreseasonDivisionPlacement,
+    PlacedPlayer,
+    PlacementUnit as PreseasonPlacementUnit,
+    Week2Candidate
+} from "@/lib/preseason/types"
+import type { Week2Division } from "./week2-types"
 
-export interface Week2PlacedPlayer extends Week2Candidate {
-    entryId: string
-    sourceUserId: string
-    isDuplicateEntry: boolean
-}
+export {
+    addUnitToPlacement,
+    buildPlacementUnits,
+    compareCandidates,
+    getDisplayName,
+    removeUnitFromPlacement,
+    sortDivisionPlayers,
+    toOriginalPlacedPlayer
+} from "@/lib/preseason/units"
+export {
+    allocateByWeightWithCapacity,
+    getDivisionTargets,
+    getSnakeOrder
+} from "@/lib/preseason/allocation"
 
-export interface PlacementUnit {
-    id: string
-    players: Week2Candidate[]
-    maleCount: number
-    nonMaleCount: number
-    size: number
-    averageScore: number
-    lockedDivisionId: number | null
-}
-
-export interface DivisionPlacement {
-    division: Week2Division
-    units: PlacementUnit[]
-    maleCount: number
-    nonMaleCount: number
-    size: number
-    targetSize: number
-    targetMale: number
-    targetNonMale: number
-}
+export type Week2PlacedPlayer = PlacedPlayer<Week2Candidate>
+export type PlacementUnit = PreseasonPlacementUnit<Week2Candidate>
+export type DivisionPlacement = PreseasonDivisionPlacement<Week2Candidate>
 
 export interface TeamPlayer {
     entryId: string
@@ -52,289 +60,6 @@ export interface TeamBucket {
     maleCount: number
     nonMaleCount: number
     newCount: number
-}
-
-export function getDisplayName(player: Week2Candidate) {
-    return formatDisplayName(
-        player.firstName,
-        player.lastName,
-        player.preferredName
-    )
-}
-
-export function compareCandidates(a: Week2Candidate, b: Week2Candidate) {
-    if (a.placementScore !== b.placementScore) {
-        return a.placementScore - b.placementScore
-    }
-
-    return getDisplayName(a)
-        .toLowerCase()
-        .localeCompare(getDisplayName(b).toLowerCase())
-}
-
-export function sortDivisionPlayers(players: Week2PlacedPlayer[]) {
-    return [...players].sort((a, b) => {
-        if (a.male === true && b.male !== true) {
-            return -1
-        }
-        if (a.male !== true && b.male === true) {
-            return 1
-        }
-        return compareCandidates(a, b)
-    })
-}
-
-export function toOriginalPlacedPlayer(
-    candidate: Week2Candidate
-): Week2PlacedPlayer {
-    return {
-        ...candidate,
-        entryId: `orig:${candidate.userId}`,
-        sourceUserId: candidate.userId,
-        isDuplicateEntry: false
-    }
-}
-
-export function buildPlacementUnits(
-    candidates: Week2Candidate[]
-): PlacementUnit[] {
-    const sorted = [...candidates].sort(compareCandidates)
-    const byId = new Map(
-        sorted.map((candidate) => [candidate.userId, candidate])
-    )
-    const used = new Set<string>()
-    const units: PlacementUnit[] = []
-
-    for (const candidate of sorted) {
-        if (used.has(candidate.userId)) {
-            continue
-        }
-
-        const partner = candidate.pairUserId
-            ? byId.get(candidate.pairUserId)
-            : null
-
-        const canPair =
-            !!partner &&
-            !used.has(partner.userId) &&
-            partner.pairUserId === candidate.userId &&
-            !(
-                candidate.captainDivisionId &&
-                partner.captainDivisionId &&
-                candidate.captainDivisionId !== partner.captainDivisionId
-            )
-
-        const players = canPair ? [candidate, partner] : [candidate]
-        const { males, nonMales } = splitByGender(players)
-        const maleCount = males.length
-        const nonMaleCount = nonMales.length
-        const averageScore =
-            players.reduce((sum, player) => sum + player.placementScore, 0) /
-            players.length
-
-        const lockedDivisionId =
-            players.find((player) => !!player.captainDivisionId)
-                ?.captainDivisionId || null
-
-        const unitId = players
-            .map((player) => player.userId)
-            .sort()
-            .join(":")
-
-        units.push({
-            id: unitId,
-            players,
-            maleCount,
-            nonMaleCount,
-            size: players.length,
-            averageScore,
-            lockedDivisionId
-        })
-
-        for (const player of players) {
-            used.add(player.userId)
-        }
-    }
-
-    return units.sort((a, b) => {
-        if (a.averageScore !== b.averageScore) {
-            return a.averageScore - b.averageScore
-        }
-        return a.id.localeCompare(b.id)
-    })
-}
-
-export function addUnitToPlacement(
-    target: DivisionPlacement,
-    unit: PlacementUnit
-) {
-    target.units.push(unit)
-    target.size += unit.size
-    target.maleCount += unit.maleCount
-    target.nonMaleCount += unit.nonMaleCount
-}
-
-export function removeUnitFromPlacement(
-    target: DivisionPlacement,
-    unit: PlacementUnit
-) {
-    target.units = target.units.filter((entry) => entry.id !== unit.id)
-    target.size -= unit.size
-    target.maleCount -= unit.maleCount
-    target.nonMaleCount -= unit.nonMaleCount
-}
-
-export function allocateByWeightWithCapacity(
-    total: number,
-    capacities: number[],
-    weights: number[]
-) {
-    const result = Array(capacities.length).fill(0)
-
-    if (total <= 0 || capacities.length === 0) {
-        return result
-    }
-
-    const activeWeightTotal = weights.reduce((sum, value) => sum + value, 0)
-    if (activeWeightTotal <= 0) {
-        return result
-    }
-
-    const fractions = Array(capacities.length).fill(0)
-
-    for (let index = 0; index < capacities.length; index++) {
-        const exact = (total * weights[index]) / activeWeightTotal
-        const floored = Math.min(capacities[index], Math.floor(exact))
-        result[index] = floored
-        fractions[index] = exact - Math.floor(exact)
-    }
-
-    let assigned = result.reduce((sum, value) => sum + value, 0)
-
-    while (assigned < total) {
-        let bestIndex = -1
-        let bestFraction = -1
-        let bestLoadRatio = Number.POSITIVE_INFINITY
-
-        for (let index = 0; index < capacities.length; index++) {
-            if (result[index] >= capacities[index]) {
-                continue
-            }
-
-            const loadRatio =
-                capacities[index] > 0
-                    ? result[index] / capacities[index]
-                    : Number.POSITIVE_INFINITY
-
-            if (
-                fractions[index] > bestFraction ||
-                (fractions[index] === bestFraction && loadRatio < bestLoadRatio)
-            ) {
-                bestFraction = fractions[index]
-                bestLoadRatio = loadRatio
-                bestIndex = index
-            }
-        }
-
-        if (bestIndex === -1) {
-            break
-        }
-
-        result[bestIndex] += 1
-        assigned += 1
-    }
-
-    return result
-}
-
-export function getDivisionTargets(
-    divisions: Week2Division[],
-    candidates: Week2Candidate[]
-) {
-    const totalPlayers = candidates.length
-    const totalTeams = divisions.reduce(
-        (sum, division) => sum + division.teamCount,
-        0
-    )
-
-    if (totalTeams === 0) {
-        return new Map<
-            number,
-            { size: number; male: number; nonMale: number }
-        >()
-    }
-
-    const baseTeamSize = Math.floor(totalPlayers / totalTeams)
-    const extraPlayers = totalPlayers - baseTeamSize * totalTeams
-
-    const teamCounts = divisions.map((division) => division.teamCount)
-    const sizeWeights = [...teamCounts]
-    const extraPerDivision = allocateByWeightWithCapacity(
-        extraPlayers,
-        teamCounts,
-        sizeWeights
-    )
-
-    const sizeTargets = divisions.map(
-        (division, index) =>
-            division.teamCount * baseTeamSize + extraPerDivision[index]
-    )
-
-    const totalNonMale = splitByGender(candidates).nonMales.length
-    const nonMaleRatio = totalPlayers > 0 ? totalNonMale / totalPlayers : 0
-    const nonMaleTargets = sizeTargets.map((size) =>
-        Math.min(size, Math.floor(size * nonMaleRatio))
-    )
-
-    const assignedNonMale = nonMaleTargets.reduce(
-        (sum, value) => sum + value,
-        0
-    )
-    let remainingNonMale = totalNonMale - assignedNonMale
-
-    if (remainingNonMale > 0) {
-        const divisionOrder = divisions.map((_division, index) => index)
-
-        while (remainingNonMale > 0) {
-            let placedInPass = false
-
-            for (const index of divisionOrder) {
-                if (remainingNonMale <= 0) {
-                    break
-                }
-
-                if (nonMaleTargets[index] >= sizeTargets[index]) {
-                    continue
-                }
-
-                nonMaleTargets[index] += 1
-                remainingNonMale -= 1
-                placedInPass = true
-            }
-
-            if (!placedInPass) {
-                break
-            }
-        }
-    }
-
-    const targets = new Map<
-        number,
-        { size: number; male: number; nonMale: number }
-    >()
-
-    for (let index = 0; index < divisions.length; index++) {
-        const size = sizeTargets[index]
-        const nonMale = nonMaleTargets[index]
-        const male = size - nonMale
-        targets.set(divisions[index].id, {
-            size,
-            male,
-            nonMale
-        })
-    }
-
-    return targets
 }
 
 export function buildDivisionPlacement(
@@ -362,8 +87,8 @@ export function buildDivisionPlacement(
     const lastDivision = divisions[divisions.length - 1]
     const nonLastDivisions = divisions.slice(0, -1)
 
-    for (const unit of units.filter((entry) => !!entry.lockedDivisionId)) {
-        const target = placement.get(unit.lockedDivisionId as number)
+    for (const unit of units.filter((entry) => !!entry.captainDivisionId)) {
+        const target = placement.get(unit.captainDivisionId as number)
         if (target) {
             addUnitToPlacement(target, unit)
         }
@@ -387,7 +112,7 @@ export function buildDivisionPlacement(
 
     let preferredBucketIndex = 0
 
-    for (const unit of units.filter((entry) => !entry.lockedDivisionId)) {
+    for (const unit of units.filter((entry) => !entry.captainDivisionId)) {
         while (
             preferredBucketIndex < nonLastBuckets.length &&
             nonLastBuckets[preferredBucketIndex].size >=
@@ -442,7 +167,7 @@ export function buildDivisionPlacement(
 
             while (bucket.size < bucket.targetSize) {
                 const candidateUnit = lastBucket.units.find((unit) => {
-                    if (unit.lockedDivisionId) {
+                    if (unit.captainDivisionId) {
                         return false
                     }
 
@@ -474,7 +199,7 @@ export function buildDivisionPlacement(
     ) => {
         const candidates = bucket.units
             .filter((unit) => {
-                if (unit.lockedDivisionId || unit.size !== 1) {
+                if (unit.captainDivisionId || unit.size !== 1) {
                     return false
                 }
 
@@ -607,26 +332,6 @@ export function buildTeamUnits(players: TeamPlayer[]): Array<{
     }
 
     return result.sort((a, b) => a.averageScore - b.averageScore)
-}
-
-export function getSnakeOrder(length: number, teamCount: number) {
-    const order: number[] = []
-    let ascending = true
-
-    while (order.length < length) {
-        if (ascending) {
-            for (let i = 0; i < teamCount && order.length < length; i++) {
-                order.push(i)
-            }
-        } else {
-            for (let i = teamCount - 1; i >= 0 && order.length < length; i--) {
-                order.push(i)
-            }
-        }
-        ascending = !ascending
-    }
-
-    return order
 }
 
 export function buildTeamsForDivision(
@@ -864,7 +569,7 @@ export function buildTeamsForDivision(
                 }
 
                 if (
-                    !division.isCoachDiv &&
+                    !division.usesCoaches &&
                     sourcePlayer.isNew &&
                     !teamsWithCaptain.has(teamIndex)
                 ) {
@@ -880,7 +585,7 @@ export function buildTeamsForDivision(
                             !player.pairEntryId &&
                             player.assignmentUserId !== assignmentUserId &&
                             !(
-                                !division.isCoachDiv &&
+                                !division.usesCoaches &&
                                 player.isNew &&
                                 !teamsWithCaptain.has(source.teamIndex)
                             )
@@ -964,7 +669,7 @@ export function buildTeamsForDivision(
             }
 
             if (
-                !division.isCoachDiv &&
+                !division.usesCoaches &&
                 unit.newCount > 0 &&
                 !teamsWithCaptain.has(teamIndex)
             ) {
@@ -1065,7 +770,7 @@ export function buildTeamsForDivision(
                 .filter((entry) => entry.remaining >= unit.size)
 
             const preferCaptained =
-                !division.isCoachDiv && unit.newCount > 0
+                !division.usesCoaches && unit.newCount > 0
                     ? fallbackCandidates.filter((entry) => entry.hasCaptain)
                     : []
 
@@ -1112,7 +817,7 @@ export function buildTeamsForDivision(
                     !player.isCaptain &&
                     !player.pairEntryId &&
                     !(
-                        !division.isCoachDiv &&
+                        !division.usesCoaches &&
                         player.isNew &&
                         !teamsWithCaptain.has(targetIndex)
                     )
@@ -1126,7 +831,7 @@ export function buildTeamsForDivision(
                     !player.isCaptain &&
                     !player.pairEntryId &&
                     !(
-                        !division.isCoachDiv &&
+                        !division.usesCoaches &&
                         player.isNew &&
                         !teamsWithCaptain.has(sourceIndex)
                     )
@@ -1325,7 +1030,7 @@ export function buildTeamsForDivision(
         for (const source of surpluses) {
             for (const target of deficits) {
                 if (
-                    !division.isCoachDiv &&
+                    !division.usesCoaches &&
                     !teamsWithCaptain.has(target.index)
                 ) {
                     continue
@@ -1360,7 +1065,7 @@ export function buildTeamsForDivision(
                     !player.isCaptain &&
                     !player.pairEntryId &&
                     !(
-                        !division.isCoachDiv &&
+                        !division.usesCoaches &&
                         player.isNew &&
                         !teamsWithCaptain.has(lowIndex)
                     )
@@ -1373,7 +1078,7 @@ export function buildTeamsForDivision(
                     !player.isCaptain &&
                     !player.pairEntryId &&
                     !(
-                        !division.isCoachDiv &&
+                        !division.usesCoaches &&
                         player.isNew &&
                         !teamsWithCaptain.has(highIndex)
                     )
