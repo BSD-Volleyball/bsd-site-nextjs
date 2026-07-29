@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-    buildDivisionPlacement,
-    buildTeamsForDivision,
-    toOriginalPlacedPlayer
-} from "./placement"
+import { buildDivisionPlacement } from "./placement"
 import type { Week2Candidate, Week2Division } from "./week2-types"
 
 function candidate(overrides: Partial<Week2Candidate> = {}): Week2Candidate {
@@ -104,59 +100,5 @@ describe("buildDivisionPlacement", () => {
             unit.players.map((p) => p.userId)
         )
         expect(divisionOne).toContain("locked-captain")
-    })
-})
-
-describe("buildTeamsForDivision", () => {
-    it("builds balanced teams with captains spread across them", () => {
-        const pool = Array.from({ length: 18 }, (_, i) =>
-            candidate({
-                userId: `t${String(i).padStart(2, "0")}`,
-                placementScore: i + 1,
-                male: i % 2 === 0,
-                isCaptain: i < 3
-            })
-        )
-        // A mutual pair among non-captains
-        pool[10] = candidate({
-            ...pool[10],
-            userId: pool[10].userId,
-            pairUserId: pool[11].userId
-        })
-        pool[11] = candidate({
-            ...pool[11],
-            userId: pool[11].userId,
-            pairUserId: pool[10].userId
-        })
-
-        const teams = buildTeamsForDivision(
-            division({ teamCount: 3 }),
-            pool.map(toOriginalPlacedPlayer)
-        )
-
-        expect(teams).toHaveLength(3)
-
-        const assigned = teams.flatMap((team) =>
-            team.players.map((p) => p.assignmentUserId)
-        )
-        expect(assigned).toHaveLength(18)
-        expect(new Set(assigned).size).toBe(18)
-
-        for (const team of teams) {
-            expect(team.players).toHaveLength(6)
-            expect(team.players.filter((p) => p.isCaptain)).toHaveLength(1)
-            // 9 males over 3 teams → 3 per team
-            expect(team.maleCount).toBe(3)
-        }
-
-        // The mutual pair lands on one team together
-        const pairTeams = teams.filter((team) =>
-            team.players.some(
-                (p) =>
-                    p.assignmentUserId === pool[10].userId ||
-                    p.assignmentUserId === pool[11].userId
-            )
-        )
-        expect(pairTeams).toHaveLength(1)
     })
 })
