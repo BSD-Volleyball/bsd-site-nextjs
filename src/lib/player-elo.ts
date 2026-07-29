@@ -8,9 +8,11 @@ import { getSetScores } from "@/lib/team-ranking"
  * current ratings, and the rating delta is applied to every participant.
  *
  * Divisions only play within themselves, so newcomers are seeded from the
- * division level of their first rated match (ELO_BASE + level * step). After
- * seeding, ratings carry across divisions and seasons — player movement
- * between divisions is what links the otherwise-isolated rating pools.
+ * division of their first rated match. Lower `divisions.level` means a
+ * stronger division, so the seed is ELO_BASE + (lowestLevel - level) * step:
+ * the lowest division starts at ELO_BASE and AA seeds highest. After seeding,
+ * ratings carry across divisions and seasons — player movement between
+ * divisions is what links the otherwise-isolated rating pools.
  *
  * Total rating is only exactly conserved when both rosters are the same size.
  */
@@ -18,6 +20,8 @@ import { getSetScores } from "@/lib/team-ranking"
 export const ELO_BASE = 1000
 export const ELO_DIVISION_STEP = 150
 export const ELO_K_FACTOR = 32
+/** divisions.level ascends as skill descends: 1 = AA (best), 6 = BB (lowest). */
+export const ELO_LOWEST_DIVISION_LEVEL = 6
 
 export interface EloMatchInput {
     id: number
@@ -63,6 +67,7 @@ export interface EloOptions {
     base?: number
     divisionStep?: number
     kFactor?: number
+    lowestDivisionLevel?: number
 }
 
 export interface EloHistoryPoint {
@@ -214,6 +219,8 @@ export function computePlayerElo(
     const base = options.base ?? ELO_BASE
     const divisionStep = options.divisionStep ?? ELO_DIVISION_STEP
     const kFactor = options.kFactor ?? ELO_K_FACTOR
+    const lowestDivisionLevel =
+        options.lowestDivisionLevel ?? ELO_LOWEST_DIVISION_LEVEL
 
     const ratings = new Map<string, number>()
     const histories = new Map<string, EloHistoryPoint[]>()
@@ -228,7 +235,8 @@ export function computePlayerElo(
         const awayRoster = rosters.get(rosterKey(match.id, match.awayTeamId))
         if (!homeRoster?.length || !awayRoster?.length) continue
 
-        const seed = base + match.divisionLevel * divisionStep
+        const seed =
+            base + (lowestDivisionLevel - match.divisionLevel) * divisionStep
         const ratingOf = (userId: string): number => {
             const existing = ratings.get(userId)
             if (existing !== undefined) return existing

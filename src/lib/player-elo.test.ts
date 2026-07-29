@@ -5,6 +5,7 @@ import {
     ELO_BASE,
     ELO_DIVISION_STEP,
     ELO_K_FACTOR,
+    ELO_LOWEST_DIVISION_LEVEL,
     expectedScore,
     actualScore,
     orderMatches,
@@ -71,7 +72,8 @@ function rosters(
     return map
 }
 
-const level1Seed = ELO_BASE + ELO_DIVISION_STEP
+const level1Seed =
+    ELO_BASE + (ELO_LOWEST_DIVISION_LEVEL - 1) * ELO_DIVISION_STEP
 
 describe("expectedScore", () => {
     it("gives 0.5 for equal ratings", () => {
@@ -280,11 +282,14 @@ describe("computePlayerElo", () => {
         expect(result.histories.size).toBe(0)
     })
 
-    it("seeds newcomers from the division level of their first match", () => {
+    it("seeds newcomers higher for stronger (lower-level) divisions", () => {
         const result = computePlayerElo(
             [
-                setMatch(1, 10, 20, [[25, 20]], { divisionLevel: 6 }),
-                setMatch(2, 30, 40, [[25, 20]], { divisionLevel: 1, week: 2 })
+                setMatch(1, 10, 20, [[25, 20]], { divisionLevel: 1 }),
+                setMatch(2, 30, 40, [[25, 20]], {
+                    divisionLevel: ELO_LOWEST_DIVISION_LEVEL,
+                    week: 2
+                })
             ],
             rosters([
                 [1, 10, ["top-a"]],
@@ -293,8 +298,10 @@ describe("computePlayerElo", () => {
                 [2, 40, ["low-b"]]
             ])
         )
-        const topSeed = ELO_BASE + 6 * ELO_DIVISION_STEP
-        const lowSeed = ELO_BASE + 1 * ELO_DIVISION_STEP
+        const topSeed =
+            ELO_BASE + (ELO_LOWEST_DIVISION_LEVEL - 1) * ELO_DIVISION_STEP
+        const lowSeed = ELO_BASE
+        expect(topSeed).toBeGreaterThan(lowSeed)
         expect(result.histories.get("top-a")?.[0]?.ratingBefore).toBe(topSeed)
         expect(result.histories.get("low-a")?.[0]?.ratingBefore).toBe(lowSeed)
     })
@@ -319,7 +326,7 @@ describe("computePlayerElo", () => {
         const secondMatch = result.histories.get("a")?.[1]
         expect(secondMatch?.ratingBefore).toBe(firstMatch?.ratingAfter)
         expect(result.histories.get("newcomer")?.[0]?.ratingBefore).toBe(
-            ELO_BASE + 2 * ELO_DIVISION_STEP
+            ELO_BASE + (ELO_LOWEST_DIVISION_LEVEL - 2) * ELO_DIVISION_STEP
         )
     })
 

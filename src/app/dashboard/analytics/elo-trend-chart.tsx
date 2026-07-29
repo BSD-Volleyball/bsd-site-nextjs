@@ -1,6 +1,12 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle
+} from "@/components/ui/card"
 import {
     Line,
     LineChart,
@@ -70,6 +76,10 @@ export function EloTrendChart({ eloHistory, allSeasons }: EloTrendChartProps) {
                         {currentRating} after {chartData.length} matches
                     </span>
                 </CardTitle>
+                <CardDescription>
+                    Skill ratings are a work in progress — values may shift as
+                    we tune the model.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <ResponsiveContainer width="100%" height={250}>
