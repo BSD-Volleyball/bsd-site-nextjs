@@ -4,16 +4,16 @@ import { CreateWeekRosterForm } from "@/components/preseason/create-week-roster-
 import { WEEK2_CONFIG } from "@/lib/preseason/config"
 import { saveWeek2Rosters } from "./actions"
 import type {
-    Week2Candidate,
-    Week2Division,
-    Week2ExcludedPlayer
-} from "./week2-types"
+    ExcludedPlayer,
+    PreseasonDivision,
+    Week2Candidate
+} from "@/lib/preseason/types"
 
 interface CreateWeek2FormProps {
     seasonLabel: string
-    divisions: Week2Division[]
+    divisions: PreseasonDivision[]
     candidates: Week2Candidate[]
-    excludedPlayers: Week2ExcludedPlayer[]
+    excludedPlayers: ExcludedPlayer[]
     playerPicUrl: string
 }
 

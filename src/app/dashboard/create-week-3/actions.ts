@@ -11,20 +11,20 @@ import {
 } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
 import type {
-    Week3Candidate,
-    Week3Division,
-    Week3ExcludedPlayer,
-    Week3SavedAssignment
-} from "./week3-types"
+    ExcludedPlayer,
+    PreseasonDivision,
+    SavedAssignment,
+    Week3Candidate
+} from "@/lib/preseason/types"
 
 interface CreateWeek3Data {
     status: boolean
     message?: string
     seasonId: number
     seasonLabel: string
-    divisions: Week3Division[]
+    divisions: PreseasonDivision[]
     candidates: Week3Candidate[]
-    excludedPlayers: Week3ExcludedPlayer[]
+    excludedPlayers: ExcludedPlayer[]
 }
 
 function emptyResult(message: string): CreateWeek3Data {
@@ -109,7 +109,7 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
 }
 
 export const saveWeek3Rosters = withAction(
-    async (assignments: Week3SavedAssignment[]): Promise<ActionResult> => {
+    async (assignments: SavedAssignment[]): Promise<ActionResult> => {
         const hasAccess = await getIsAdminOrDirector()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
