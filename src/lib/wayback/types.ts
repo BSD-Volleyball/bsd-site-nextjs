@@ -161,6 +161,34 @@ export interface SeedRow {
     captainSurname: string
 }
 
+/**
+ * A playoff match from the JS-era pages, where both sides are always source
+ * tokens rather than names -- the page never names the participants, it names
+ * the slot ("S1", "W3", "L2") and lets the browser resolve it.
+ */
+export interface JsPlayoffMatch {
+    matchNumber: number
+    week: number
+    dateIso: string | null
+    time: string | null
+    court: number | null
+    homeRef: PlayoffRef | null
+    awayRef: PlayoffRef | null
+    workRef: PlayoffRef | null
+    sets: SetScore[]
+    homeGames: number
+    awayGames: number
+}
+
+export interface ParsedJsPlayoffPage {
+    identity: PageIdentity | null
+    /** Team number by captain surname's team num field. */
+    teams: Map<number, string>
+    /** Seed position (1-based) -> team number, from `var seeds`. */
+    seeding: Map<number, number>
+    matches: JsPlayoffMatch[]
+}
+
 export interface ParsedPlayoffPage {
     identity: PageIdentity | null
     matches: PlayoffMatch[]

@@ -121,6 +121,63 @@ function editDistance(a: string, b: string): number {
 }
 
 /**
+ * Build a lookup that indexes each team under every name it might be printed
+ * under.
+ *
+ * The standings "Captain" column is not a bare surname. Real examples from one
+ * page: `Aaron "Brockovich"`, `"Cheap Tr" Ichniowski`, `"Trouble with"
+ * Gribbles`, `Blanchard & Blanchard`, `Sallerson & Verma`, and `Autonomous
+ * Collective` -- which the results table then calls "AC". Indexing only the
+ * whole string means none of those results ever resolve.
+ *
+ * Each entry is registered under its quoted-part-stripped whole, each word of
+ * length >= 3, and (for multi-word names) its acronym. An alias claimed by two
+ * different teams is dropped, so ambiguity resolves to nothing rather than to
+ * the wrong team.
+ */
+export function buildSurnameIndex<T>(
+    entries: { name: string; value: T }[]
+): Map<string, T> {
+    const index = new Map<string, T>()
+    const ambiguous = new Set<string>()
+
+    const register = (alias: string, value: T) => {
+        if (alias.length < 2) {
+            return
+        }
+        const existing = index.get(alias)
+        if (existing !== undefined && existing !== value) {
+            ambiguous.add(alias)
+            return
+        }
+        index.set(alias, value)
+    }
+
+    for (const entry of entries) {
+        // Nicknames are quoted; the real name is what is left.
+        const stripped = entry.name.replace(/["'“”‘’][^"'“”‘’]*["'“”‘’]/g, " ")
+        const words = stripped
+            .split(/[^A-Za-z]+/)
+            .map((w) => w.toLowerCase())
+            .filter((w) => w.length >= 3)
+
+        register(normalizeSurname(stripped), entry.value)
+        for (const word of words) {
+            register(word, entry.value)
+        }
+        if (words.length >= 2) {
+            register(words.map((w) => w[0]).join(""), entry.value)
+        }
+    }
+
+    for (const alias of ambiguous) {
+        index.delete(alias)
+    }
+
+    return index
+}
+
+/**
  * Resolve a captain surname against a known set, tolerating typos.
  *
  * The standings table and the results table on the SAME page sometimes spell a
@@ -158,6 +215,25 @@ export function resolveSurname<T>(
             near.push(value)
         }
     }
+    if (near.length === 1) {
+        return near[0]
+    }
 
-    return near.length === 1 ? near[0] : null
+    // Some seasons print team nicknames in the results while the standings
+    // list captains -- Fall 2000 BB has "Bower Power", "Howenators" and
+    // "Trouble with Gribbles" for captains Bower, Howe and Gribble, and the
+    // nicknames change from week to week. A captain's surname contained in the
+    // printed name identifies the team, provided only one captain matches.
+    const contained: T[] = []
+    for (const [candidate, value] of candidates) {
+        if (candidate.length < 4) {
+            // Too short to be distinctive inside a longer phrase.
+            continue
+        }
+        if (key.includes(candidate) || candidate.includes(key)) {
+            contained.push(value)
+        }
+    }
+
+    return contained.length === 1 ? contained[0] : null
 }

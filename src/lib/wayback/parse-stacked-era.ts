@@ -21,6 +21,7 @@
 // ever identified. It only surfaced from the local season-results cache.
 
 import {
+    buildSurnameIndex,
     cellsOf,
     clean,
     resolveSurname,
@@ -293,19 +294,12 @@ export function parseStackedStandingsPage(
     )
     const resultRows = parseResultRows(html)
 
-    const numberBySurname = new Map<string, number>()
-    const ambiguous = new Set<string>()
-    for (const row of standings) {
-        const key = row.captainSurname.toLowerCase().replace(/[^a-z]/g, "")
-        if (numberBySurname.has(key)) {
-            ambiguous.add(key)
-        } else {
-            numberBySurname.set(key, row.teamNumber)
-        }
-    }
-    for (const key of ambiguous) {
-        numberBySurname.delete(key)
-    }
+    const numberBySurname = buildSurnameIndex(
+        standings.map((row) => ({
+            name: row.captainSurname,
+            value: row.teamNumber
+        }))
+    )
 
     const matches: ParsedMatch[] = []
 

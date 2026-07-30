@@ -15,6 +15,7 @@
 // Orientation note: the results list the WINNER first. "home" throughout this
 // module means first-listed, and set scores follow the same orientation.
 
+import { buildSurnameIndex, resolveSurname } from "./html-table"
 import { identifyPage } from "./identify"
 import type {
     ParsedMatch,
@@ -294,27 +295,16 @@ export function joinMatches(
     standings: StandingRow[],
     schedule: ScheduleSlot[]
 ): ParsedMatch[] {
-    const numberBySurname = new Map<string, number>()
-    const ambiguous = new Set<string>()
-
-    for (const row of standings) {
-        const key = normalizeSurname(row.captainSurname)
-        if (numberBySurname.has(key)) {
-            ambiguous.add(key)
-        } else {
-            numberBySurname.set(key, row.teamNumber)
-        }
-    }
-    // A surname shared by two captains cannot identify a team on its own.
-    for (const key of ambiguous) {
-        numberBySurname.delete(key)
-    }
+    const numberBySurname = buildSurnameIndex(
+        standings.map((row) => ({
+            name: row.captainSurname,
+            value: row.teamNumber
+        }))
+    )
 
     return matches.map((match) => {
-        const homeNumber =
-            numberBySurname.get(normalizeSurname(match.homeSurname)) ?? null
-        const awayNumber =
-            numberBySurname.get(normalizeSurname(match.awaySurname)) ?? null
+        const homeNumber = resolveSurname(match.homeSurname, numberBySurname)
+        const awayNumber = resolveSurname(match.awaySurname, numberBySurname)
 
         let dateIso = match.dateIso
         let time = match.time
