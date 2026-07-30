@@ -8,6 +8,26 @@
         {
             "key": "F02|bb|playoff",
             "reason": "Only 3 of 6 participants appear in Fall 2002 BB's own standings, and all six appear together in SPRING 2002 BB. Captured 2002-09-15, still showing the previous season's bracket."
+        },
+        {
+            "key": "S17|a|playoff",
+            "reason": "Byte-identical to the corresponding U17 (Summer 2017) playoff file, and its teams match U17's standings 100% while disagreeing with Spring 2017's own. The Spring 2017 directory holds a copy of Summer 2017's playoff pages; Spring 2017's actual playoff results are not in the archive. U17 has its own correct copies, so nothing is lost by excluding these."
+        },
+        {
+            "key": "S17|aa|playoff",
+            "reason": "Byte-identical to the corresponding U17 (Summer 2017) playoff file, and its teams match U17's standings 100% while disagreeing with Spring 2017's own. The Spring 2017 directory holds a copy of Summer 2017's playoff pages; Spring 2017's actual playoff results are not in the archive. U17 has its own correct copies, so nothing is lost by excluding these."
+        },
+        {
+            "key": "S17|ab|playoff",
+            "reason": "Byte-identical to the corresponding U17 (Summer 2017) playoff file, and its teams match U17's standings 100% while disagreeing with Spring 2017's own. The Spring 2017 directory holds a copy of Summer 2017's playoff pages; Spring 2017's actual playoff results are not in the archive. U17 has its own correct copies, so nothing is lost by excluding these."
+        },
+        {
+            "key": "S17|bb|playoff",
+            "reason": "Byte-identical to the corresponding U17 (Summer 2017) playoff file, and its teams match U17's standings 100% while disagreeing with Spring 2017's own. The Spring 2017 directory holds a copy of Summer 2017's playoff pages; Spring 2017's actual playoff results are not in the archive. U17 has its own correct copies, so nothing is lost by excluding these."
+        },
+        {
+            "key": "S17|bbb|playoff",
+            "reason": "Byte-identical to the corresponding U17 (Summer 2017) playoff file, and its teams match U17's standings 100% while disagreeing with Spring 2017's own. The Spring 2017 directory holds a copy of Summer 2017's playoff pages; Spring 2017's actual playoff results are not in the archive. U17 has its own correct copies, so nothing is lost by excluding these."
         }
     ]
 }
