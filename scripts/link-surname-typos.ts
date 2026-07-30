@@ -19,11 +19,42 @@ import "dotenv/config"
 import { Client } from "pg"
 
 const PAIRS = [
+    // Confirmed by the league in the first pass.
     { first: "Manan", legacy: "Thakker", real: "Thakkar" },
     { first: "Matt", legacy: "Dunlop", real: "Dunlap" },
     { first: "Raphael", legacy: "Barbou", real: "Barbau" },
     { first: "Danielle", legacy: "Thierrien", real: "Therrien" },
-    { first: "Madelyn", legacy: "Beilinski", real: "Bielinski" }
+    { first: "Madelyn", legacy: "Beilinski", real: "Bielinski" },
+
+    // One edit apart with a long shared stem -- the same name mistyped.
+    { first: "Stephanie", legacy: "Finkenstaed", real: "Finkenstaedt" },
+    { first: "Rajesh", legacy: "Thangapaham", real: "Thangapazham" },
+    { first: "Gwyn", legacy: "Hoerauff", real: "Hoerauf" },
+    { first: "Dee", legacy: "Pinkowicz", real: "Pinkowitz" },
+    { first: "Ali", legacy: "Alibaklshi", real: "Alibakhshi" },
+    { first: "Arvind", legacy: "Chandron", real: "Chandran" },
+    { first: "Reza", legacy: "Sayed-ali", real: "Seyed-Ali" },
+    { first: "Tisha", legacy: "Elliot", real: "Elliott" },
+    { first: "Dan", legacy: "Casaras", real: "Casares" },
+    { first: "Genevieve", legacy: "Casaras", real: "Casares" },
+    { first: "Claudette", legacy: "Rosada", real: "Rosado" },
+    { first: "Anton", legacy: "Luchytsky", real: "Luchitsky" },
+    { first: "Scott", legacy: "Scheck", real: "Sheck" },
+    { first: "Lindsey", legacy: "Shephard", real: "Shepard" },
+    { first: "Athanasia", legacy: "Zogrofos", real: "Zografos" },
+    { first: "Jeff", legacy: "Jiminez", real: "Jimenez" },
+    { first: "Jose", legacy: "Viera", real: "Vieira" },
+    { first: "Nasr", legacy: "Famy", real: "Fahmy" },
+
+    // Two edits, but a straight transposition of the same letters.
+    { first: "Mark", legacy: "Villanueva", real: "Villaneuva" },
+    { first: "Alan", legacy: "Kurkijan", real: "Kurkjian" }
+
+    // Deliberately NOT included -- one or two edits apart but different
+    // surnames, not misspellings: Thomas Liu/Lin, David Giang/Kiang, Emily
+    // Keller/Mueller, Mark Broeker/Beker, Patrick Chung/Young, Kevin Eng/Zheng,
+    // Andrea Peril/Perry, Jeff Synder/Singer (Synder is a typo of Snyder),
+    // Kevin Egan/Zhan, Jeff Liard/Leaird.
 ]
 
 const apply = process.argv.includes("--apply")
