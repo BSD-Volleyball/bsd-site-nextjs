@@ -218,19 +218,19 @@ describe("getOldUsers / getNewUsers", () => {
         expect(await getNewUsers()).toEqual([])
     })
 
-    it("splits users across the cutoff for an admin", async () => {
+    it("lists every user in both lists for an admin, regardless of signup date", async () => {
         const oldUser = await createUser({
             createdAt: new Date("2025-01-01T00:00:00")
         })
         const newUser = await createUser()
         await createUserWithRoles([{ role: "admin" }])
 
-        const oldList = await getOldUsers()
-        expect(oldList.map((u) => u.id)).toEqual([oldUser.id])
+        const oldIds = (await getOldUsers()).map((u) => u.id)
+        expect(oldIds).toContain(oldUser.id)
+        expect(oldIds).toContain(newUser.id)
 
-        const newList = await getNewUsers()
-        const newIds = newList.map((u) => u.id)
+        const newIds = (await getNewUsers()).map((u) => u.id)
+        expect(newIds).toContain(oldUser.id)
         expect(newIds).toContain(newUser.id)
-        expect(newIds).not.toContain(oldUser.id)
     })
 })

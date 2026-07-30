@@ -39,14 +39,11 @@ import {
     tournamentRoster,
     tournamentWaitlist
 } from "@/database/schema"
-import { eq, lt, gt, and, ne, or, inArray } from "drizzle-orm"
+import { eq, and, ne, or, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUser, isAdminOrDirector } from "@/lib/rbac"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import { formatDisplayName } from "@/lib/utils"
-
-const OLD_USER_CUTOFF = new Date("2026-02-01T00:00:01")
-const NEW_USER_CUTOFF = new Date("2026-02-01T00:00:02")
 
 export interface UserOption {
     id: string
@@ -56,7 +53,9 @@ export interface UserOption {
     createdAt: Date
 }
 
-export async function getOldUsers(): Promise<UserOption[]> {
+// Both sides of the merge form draw from the same pool: any account may be
+// merged into any other, in either direction.
+async function getMergeableUsers(): Promise<UserOption[]> {
     const user = await getSessionUser()
     if (!user) {
         return []
@@ -78,12 +77,7 @@ export async function getOldUsers(): Promise<UserOption[]> {
             createdAt: users.createdAt
         })
         .from(users)
-        .where(
-            and(
-                lt(users.createdAt, OLD_USER_CUTOFF),
-                ne(users.id, GHOST_CAPTAIN_ID)
-            )
-        )
+        .where(ne(users.id, GHOST_CAPTAIN_ID))
         .orderBy(users.last_name, users.first_name)
 
     return results.map((u) => ({
@@ -95,43 +89,12 @@ export async function getOldUsers(): Promise<UserOption[]> {
     }))
 }
 
+export async function getOldUsers(): Promise<UserOption[]> {
+    return getMergeableUsers()
+}
+
 export async function getNewUsers(): Promise<UserOption[]> {
-    const user = await getSessionUser()
-    if (!user) {
-        return []
-    }
-
-    const hasAccess = await isAdminOrDirector(user.id)
-    if (!hasAccess) {
-        return []
-    }
-
-    const results = await db
-        .select({
-            id: users.id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            email: users.email,
-            phone: users.phone,
-            createdAt: users.createdAt
-        })
-        .from(users)
-        .where(
-            and(
-                gt(users.createdAt, NEW_USER_CUTOFF),
-                ne(users.id, GHOST_CAPTAIN_ID)
-            )
-        )
-        .orderBy(users.last_name, users.first_name)
-
-    return results.map((u) => ({
-        id: u.id,
-        name: formatDisplayName(u.firstName, u.lastName, u.preferredName),
-        email: u.email,
-        phone: u.phone,
-        createdAt: u.createdAt
-    }))
+    return getMergeableUsers()
 }
 
 export const mergeUsers = withAction(

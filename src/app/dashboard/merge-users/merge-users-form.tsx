@@ -179,7 +179,8 @@ export function MergeUsersForm({
                             placeholder="Select old user..."
                         />
                         <p className="text-muted-foreground text-xs">
-                            Users created before 2026-02-01 00:00:01
+                            All records are transferred off this account, then
+                            it is deleted.
                         </p>
                     </div>
 
@@ -194,7 +195,8 @@ export function MergeUsersForm({
                             placeholder="Select new user..."
                         />
                         <p className="text-muted-foreground text-xs">
-                            Users created after 2026-02-01 00:00:02
+                            This account survives the merge and inherits the old
+                            account&apos;s records.
                         </p>
                     </div>
 
