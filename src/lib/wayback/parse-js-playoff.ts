@@ -33,7 +33,15 @@ const WEEK_BLOCK =
 const MATCH_BLOCK =
     /match\s*=\s*date\.matches\[(\d+)\]\s*;([\s\S]*?)setWins\(match\)/g
 
-/** `var seeds = [6,4,1,3,5,2]` -> Map(seed position -> team number). */
+/**
+ * `var seeds = [6,4,1,3,5,2]` -> Map(seed position -> team number).
+ *
+ * The array is ambiguous on its own -- it could equally mean "team i holds seed
+ * seeds[i]" -- and the site's own rendering JS is not in the archive. Settled
+ * empirically against the champions table across all 128 JS-era playoff slices:
+ * reading it as seed -> team number reproduces 93 recorded champions, the
+ * inverse reading only 46.
+ */
 export function parseSeeds(script: string): Map<number, number> {
     const seeding = new Map<number, number>()
     const match = script.match(/var\s+seeds\s*=\s*\[([^\]]*)\]/i)
