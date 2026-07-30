@@ -209,9 +209,25 @@ export function parsePlayoffMatches(
         const at = (name: string) =>
             header.labels.findIndex((l) => l.startsWith(name))
         const matchAt = at("match")
-        const winnerAt = at("winner")
-        const loserAt = at("loser")
         const scoresAt = at("score")
+
+        // The two participant columns are labelled either "Winner"/"Loser" or,
+        // in a later variant, just "Team"/"Team". The convention is the same
+        // either way -- the first column is the winner and the scores are
+        // written from its point of view -- but only the first form says so in
+        // the header. Verified across every match on the Team/Team pages: the
+        // first-listed side wins all 35 of them.
+        let winnerAt = at("winner")
+        let loserAt = at("loser")
+        if (winnerAt === -1 || loserAt === -1) {
+            const teamColumns = header.labels
+                .map((label, index) => ({ label, index }))
+                .filter((x) => x.label === "team")
+            if (teamColumns.length === 2) {
+                winnerAt = teamColumns[0].index
+                loserAt = teamColumns[1].index
+            }
+        }
 
         if (matchAt === -1 || winnerAt === -1 || loserAt === -1) {
             continue
@@ -225,7 +241,30 @@ export function parsePlayoffMatches(
         const matches: PlayoffMatch[] = []
 
         for (const row of rows.slice(header.bodyStart)) {
-            const columns = cellsOf(row).map(stack)
+            let columns = cellsOf(row).map(stack)
+
+            // Some pages declare Winner and Loser as two header columns but
+            // write the pairing into a single body cell -- "Quinn vs. Sechler",
+            // or "W3 vs. W4" before the match is played. The body then has one
+            // column fewer than the expanded header, so split that cell back
+            // into two to line the row up again.
+            if (columns.length === header.labels.length - 1 && winnerAt >= 0) {
+                const combined = columns[winnerAt] ?? []
+                const homeSide: string[] = []
+                const awaySide: string[] = []
+                for (const entry of combined) {
+                    const parts = entry.split(/\s+vs\.?\s+/i)
+                    homeSide.push(parts[0] ?? "")
+                    awaySide.push(parts[1] ?? "")
+                }
+                columns = [
+                    ...columns.slice(0, winnerAt),
+                    homeSide,
+                    awaySide,
+                    ...columns.slice(winnerAt + 1)
+                ]
+            }
+
             if (columns.length < header.labels.length) {
                 continue
             }

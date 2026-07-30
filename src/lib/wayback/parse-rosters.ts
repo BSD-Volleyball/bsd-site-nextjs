@@ -68,9 +68,12 @@ function parsePlayerName(raw: string): RosterPlayer | null {
     }
 }
 
+// Later pages (2022+) mark up each player as a list item rather than putting a
+// <br> between them, so both count as a line break:
+//     <ul><li><b>Team #1</b></li><li>Davie, Joel</li>...
 function parseTeamBlock(block: string): RosterPlayer[] {
     return block
-        .split(/<br\s*\/?>/i)
+        .split(/<br\s*\/?>|<\/li>/i)
         .slice(1) // drop the "Team #N" header itself
         .map(parsePlayerName)
         .filter((p): p is RosterPlayer => p !== null)
