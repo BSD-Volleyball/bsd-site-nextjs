@@ -269,7 +269,9 @@ export function parseResults(html: string, seasonYear: number): ParsedMatch[] {
                 homeGames,
                 awayGames,
                 sets: parseSetScores(tail),
-                note: /forfeit/i.test(tail) ? "forfeit" : null
+                note: /forfeit/i.test(tail) ? "forfeit" : null,
+                // Pre-2012 playoffs live on play*.html, never here.
+                isPlayoff: false
             })
         }
     }

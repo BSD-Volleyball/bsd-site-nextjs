@@ -1,0 +1,324 @@
+<!DOCTYPE html PUBLIC "-//w3c//dtd html 4.0 transitional//en">
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;
+      charset=windows-1252">
+    <meta http-equiv="CACHE-CONTROL" content="NO-CACHE">
+    <title>Fall 2016 A Division Standings</title>
+    <link rel="stylesheet" type="text/css" href="bsdstyle.css">
+    <script type="text/javascript" src="standings.js"></script>
+    <script>
+    	//============================================
+    	// Data Setup
+    	//============================================
+		var teams = new Array();
+		teams[0] = {num:1, name:"Toohey", wins:0, losses:0};
+		teams[1] = {num:2, name:"Flaherty", wins:0, losses:0};
+		teams[2] = {num:3, name:"Lowery", wins:0, losses:0};
+		teams[3] = {num:4, name:"Salas", wins:0, losses:0};
+		teams[4] = {num:5, name:"Weiss", wins:0, losses:0};
+		teams[5] = {num:6, name:"Llerena", wins:0, losses:0};
+		
+		var playdates = ["09/08","09/15","09/22","09/29","10/06","10/13","10/20","10/27","11/03","11/10"]
+
+		dates = new Array();
+		for (d=0; d<playdates.length; d++) {
+			dates[d] = new Object();
+			dates[d].date = playdates[d];
+			dates[d].matches = new Array();
+			for (m=0; m<4; m++) {
+				dates[d].matches[m] = new Object();
+				dates[d].matches[m].games = new Array();
+				for (g=0; g<3; g++) {
+					dates[d].matches[m].games[g] = new Array();
+				}
+				dates[d].matches[m].court = 2;	// Almost always on this court
+			}
+		}
+
+
+
+	
+		// Matches - Week 1
+		date = dates[0];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [1,3];
+
+		match.games[0].scores = [25,14];
+		match.games[1].scores = [25,22];
+		match.games[2].scores = [25,11];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [2,6];
+
+		match.games[0].scores = [24,26];
+		match.games[1].scores = [23,25];
+		match.games[2].scores = [18,25];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [4,5];
+
+		match.games[0].scores = [25,19];
+		match.games[1].scores = [25,12];
+		match.games[2].scores = [21,25];
+		setWins(match);
+
+
+		// Matches - Week 2
+		date = dates[1];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [1,4];
+
+		match.games[0].scores = [25,13];
+		match.games[1].scores = [25,22];
+		match.games[2].scores = [25,22];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [2,5];
+
+		match.games[0].scores = [25,22];
+		match.games[1].scores = [25,23];
+		match.games[2].scores = [19,25];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [3,6];
+
+		match.games[0].scores = [21,25];
+		match.games[1].scores = [7,25];
+		match.games[2].scores = [17,25];
+		setWins(match);
+
+
+		// Matches - Week 3
+		date = dates[2];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [2,4];
+
+		match.games[0].scores = [23,25];
+		match.games[1].scores = [25,19];
+		match.games[2].scores = [20,25];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [1,6];
+
+		match.games[0].scores = [25,22];
+		match.games[1].scores = [25,22];
+		match.games[2].scores = [25,21];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [3,5];
+
+		match.games[0].scores = [25,17];
+		match.games[1].scores = [25,21];
+		match.games[2].scores = [25,16];
+		setWins(match);
+
+		// Matches - Week 4
+		date = dates[3];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [5,6];
+
+		match.games[0].scores = [26,27];
+		match.games[1].scores = [17,25];
+		match.games[2].scores = [19,25];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [3,4];
+
+		match.games[0].scores = [12,25];
+		match.games[1].scores = [12,25];
+		match.games[2].scores = [14,25];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [1,2];
+
+		match.games[0].scores = [25,7];
+		match.games[1].scores = [25,12];
+		match.games[2].scores = [25,16];
+		setWins(match);
+
+		// Matches - Week 5
+		date = dates[4];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [1,5];
+
+		match.games[0].scores = [17,25];
+		match.games[1].scores = [25,16];
+		match.games[2].scores = [18,25];
+		setWins(match);
+
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [4,6];
+
+		match.games[0].scores = [25,18];
+		match.games[1].scores = [25,19];
+		match.games[2].scores = [25,23];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [2,3];
+
+		match.games[0].scores = [27,26];
+		match.games[1].scores = [25,18];
+		match.games[2].scores = [19,25];
+		setWins(match);
+
+
+		// Matches - Week 6
+		date = dates[5];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [2,6];
+
+		match.games[0].scores = [25,17];
+		match.games[1].scores = [16,25];
+		match.games[2].scores = [20,25];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [1,3];
+
+		match.games[0].scores = [25,18];
+		match.games[1].scores = [20,25];
+		match.games[2].scores = [25,14];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [4,5];
+
+		match.games[0].scores = [23,25];
+		match.games[1].scores = [22,25];
+		match.games[2].scores = [25,16];
+		setWins(match);
+
+
+		// Matches - Week 7
+		date = dates[6];
+		match = date.matches[0];
+		match.time = "7:00";
+		match.teams = [3,6];
+
+		match.games[0].scores = [23,25];
+		match.games[1].scores = [23,25];
+		match.games[2].scores = [25,21];
+		setWins(match);
+
+		match = date.matches[1];
+		match.time = "8:10";
+		match.teams = [2,5];
+
+		match.games[0].scores = [23,25];
+		match.games[1].scores = [25,10];
+		match.games[2].scores = [25,23];
+		setWins(match);
+
+		match = date.matches[2];
+		match.time = "9:20";
+		match.teams = [1,4];
+
+		match.games[0].scores = [25,23];
+		match.games[1].scores = [16,25];
+		match.games[2].scores = [21,25];
+		setWins(match);
+
+
+		// Matches - Week 8
+		date = dates[7];
+		date.playoffs = true;
+		match = date.matches[0];
+
+		// Matches - Week 9
+		date = dates[8];
+		date.playoffs = true;
+		match = date.matches[0];
+
+		// Matches - Week 10
+		date = dates[9];
+		date.playoffs = true;
+		match = date.matches[0];
+
+	</script>
+  </head>
+  <body style=" color: rgb(0, 0, 0); background-image: url(sand2.gif);"
+    link="#a52a2a" vlink="#808080">
+    <center>
+      <h1>A Division Standings &amp; Schedule</h1>
+      <script>
+		</script> </center>
+    <hr> <br>
+    <center>
+      <table border="1" bordercolor="#000000" cellpadding="7"
+        width="447">
+        <tbody>
+          <tr>
+            <td height="16" valign="top" width="14%"><b>Team</b></td>
+            <td height="16" valign="top" width="43%"><b>Captain</b></td>
+            <td height="16" valign="top" width="14%"><b>Wins</b></td>
+            <td height="16" valign="top" width="14%"><b>Losses</b></td>
+          </tr>
+          <script>
+				computeRecord();
+
+				writeStandings("a");
+		    </script>
+        </tbody>
+      </table>
+      <br>
+      <table border="0" cellpadding="2" cellspacing="2">
+        <tbody>
+          <tr>
+            <td valign="top">
+              <table border="1">
+                <tbody>
+                  <script>
+                    	writeScheduleTable();
+					</script>
+                </tbody>
+              </table>
+            </td>
+            <td valign="top">
+              <table border="1">
+                <tbody>
+                  <script>
+                    	writeResultsTable();
+				    </script>
+                </tbody>
+              </table>
+              &nbsp; </td>
+          </tr>
+        </tbody>
+      </table>
+    </center>
+    <hr><font face="Helvetica, Arial, sans-serif" size="-1">Send
+      comments/suggestions about this page to the <a
+        href="mailto:webmaster@bumpsetdrink.com">Webmaster</a>.&nbsp;
+      Send comments/suggestions about the league to: <a
+        href="mailto:comments@bumpsetdrink.com">Comments</a></font>
+  </body>
+</html>

@@ -109,6 +109,10 @@ export interface ParsedMatch {
     awayGames: number
     sets: SetScore[]
     note: string | null
+    // JS-era standings pages mark playoff weeks inline with
+    // `date.playoffs = true`, so a single page can carry both regular-season
+    // and playoff matches. This decides matches.playoff on import.
+    isPlayoff: boolean
 }
 
 /**

@@ -157,7 +157,8 @@ describe("joinMatches", () => {
                     homeGames: 2,
                     awayGames: 1,
                     sets: [],
-                    note: null
+                    note: null,
+                    isPlayoff: false
                 }
             ],
             [
