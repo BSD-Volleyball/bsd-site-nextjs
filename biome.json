@@ -11,14 +11,14 @@
             "!src/components/ui",
             "!migrations",
             "!**/*.css",
-            "!public"
+            "!public",
+            "!**/__fixtures__"
         ]
     },
     "formatter": {
         "indentStyle": "space",
         "indentWidth": 4
     },
-
     "linter": {
         "rules": {
             "a11y": {
