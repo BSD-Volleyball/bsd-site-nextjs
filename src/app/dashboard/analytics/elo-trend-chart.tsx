@@ -8,6 +8,13 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger
+} from "@/components/ui/dialog"
+import {
     Line,
     LineChart,
     ReferenceLine,
@@ -78,7 +85,108 @@ export function EloTrendChart({ eloHistory, allSeasons }: EloTrendChartProps) {
                 </CardTitle>
                 <CardDescription>
                     Skill ratings are a work in progress — values may shift as
-                    we tune the model.
+                    we tune the model. For how it&apos;s done currently{" "}
+                    <Dialog>
+                        <DialogTrigger className="underline underline-offset-2 hover:text-foreground">
+                            click here
+                        </DialogTrigger>
+                        <DialogContent className="max-h-[85vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>
+                                    How skill ratings work
+                                </DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 text-sm">
+                                <p>
+                                    Every player carries a personal rating that
+                                    follows them across seasons and divisions.
+                                    It moves after every match with a recorded
+                                    result, based on how your team did compared
+                                    to what the ratings predicted.
+                                </p>
+                                <div>
+                                    <h4 className="mb-1 font-medium">
+                                        Your starting rating
+                                    </h4>
+                                    <p className="text-muted-foreground">
+                                        Your first rated match seeds you from
+                                        the division you&apos;re playing in: BB
+                                        starts at 1000 and each division up adds
+                                        150, so AA starts at 1750. After that
+                                        first match the seed never applies again
+                                        — your rating simply carries forward,
+                                        even if you change divisions.
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="mb-1 font-medium">
+                                        After each match
+                                    </h4>
+                                    <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                        <li>
+                                            Each team&apos;s strength is the
+                                            average rating of the players who
+                                            actually played, subs included.
+                                        </li>
+                                        <li>
+                                            The rating gap between the two teams
+                                            sets an expected result — evenly
+                                            matched teams are expected to split,
+                                            heavy favorites are expected to win
+                                            big.
+                                        </li>
+                                        <li>
+                                            The actual result is the share of
+                                            sets your team won: 2–0 counts as a
+                                            full win, 2–1 as about two thirds.
+                                        </li>
+                                        <li>
+                                            Your rating changes by 32 × (actual
+                                            − expected). Everyone on the winning
+                                            roster gains the same amount, and
+                                            everyone on the losing roster loses
+                                            that amount.
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <h4 className="mb-1 font-medium">
+                                        What that means in practice
+                                    </h4>
+                                    <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                                        <li>
+                                            Sweeping an evenly matched team is
+                                            worth about +16; a 2–1 win over them
+                                            only about +5.
+                                        </li>
+                                        <li>
+                                            Upsetting a much stronger team can
+                                            pay close to +30, while a heavy
+                                            favorite earns very little for an
+                                            expected win.
+                                        </li>
+                                        <li>
+                                            A heavy favorite that only wins 2–1
+                                            can even lose a few points, because
+                                            it underperformed the prediction.
+                                        </li>
+                                        <li>
+                                            Ratings are team-based: the system
+                                            only sees match results, so everyone
+                                            on the roster moves together
+                                            regardless of individual
+                                            performance.
+                                        </li>
+                                    </ul>
+                                </div>
+                                <p className="text-muted-foreground">
+                                    Matches without a usable recorded result are
+                                    skipped and don&apos;t move anyone&apos;s
+                                    rating.
+                                </p>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                 </CardDescription>
             </CardHeader>
             <CardContent>
