@@ -28,6 +28,10 @@ import {
     users
 } from "../../src/database/schema"
 import { GHOST_CAPTAIN_ID } from "../../src/lib/ghost-captain"
+import {
+    buildSurnameIndex,
+    resolveSurname
+} from "../../src/lib/wayback/html-table"
 import { type LoadedSlice, loadInventory, loadSlice } from "./lib/load-slice"
 
 const INVENTORY = path.join(process.cwd(), "scripts", "data", "inventory.json")
@@ -225,6 +229,16 @@ async function main() {
             lastName: users.last_name
         })
         .from(users)
+    // Legacy users are keyed by a deterministic email, so a re-run can find
+    // and reuse the row it created last time instead of colliding on the
+    // unique index.
+    const legacyRows = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+    const usersByEmail = new Map(
+        legacyRows.map((r) => [r.email.toLowerCase(), r.id])
+    )
+
     const usersByFullName = new Map<string, string[]>()
     const usersByLastName = new Map<string, string[]>()
     for (const row of userRows) {
@@ -294,6 +308,7 @@ async function main() {
             reviewQueue,
             usersByFullName,
             usersByLastName,
+            usersByEmail,
             seasonsWithRosters
         })
     }
@@ -345,13 +360,19 @@ interface ImportContext {
     reviewQueue: PlayerBinding[]
     usersByFullName: Map<string, string[]>
     usersByLastName: Map<string, string[]>
+    usersByEmail: Map<string, string>
     seasonsWithRosters: Set<number>
 }
 
 /** Existing teams for this season+division, keyed by their team number. */
 async function loadTeamMap(seasonId: number, divisionId: number) {
     const rows = await db
-        .select({ id: teams.id, number: teams.number, name: teams.name })
+        .select({
+            id: teams.id,
+            number: teams.number,
+            name: teams.name,
+            captain: teams.captain
+        })
         .from(teams)
         .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
     const byNumber = new Map<number, number>()
@@ -418,6 +439,24 @@ async function resolveOrCreateTeams(context: ImportContext) {
             continue
         }
 
+        // Never invent a team in a season that already has a real roster. If
+        // the archive says a division existed and the database disagrees, that
+        // is a mapping problem to be reported, not papered over -- creating the
+        // team produces a duplicate that silently splits a season's history in
+        // two. This guard exists because an earlier run did exactly that: 51
+        // duplicate teams and 394 duplicate drafts across 11 divisions.
+        if (
+            rows.some(
+                (row) => row.number !== null && row.captain !== GHOST_CAPTAIN_ID
+            )
+        ) {
+            problems.push(
+                `${slice.record.key}: division already has real teams but no #${teamNumber} ` +
+                    "-- refusing to create a duplicate (division mapping mismatch?)"
+            )
+            continue
+        }
+
         if (options.dryRun) {
             // Use a negative sentinel so downstream counting still works.
             resolved.set(teamNumber, -teamNumber)
@@ -461,7 +500,8 @@ async function importRoster(context: ImportContext) {
         playerBindings,
         reviewQueue,
         usersByFullName,
-        usersByLastName
+        usersByLastName,
+        usersByEmail
     } = context
 
     if (context.seasonsWithRosters.has(seasonId) && !options.replaceExisting) {
@@ -472,6 +512,14 @@ async function importRoster(context: ImportContext) {
 
     const teamIds = await resolveOrCreateTeams(context)
     const teamCount = slice.rosterTeams.length
+
+    // Replace this division's roster wholesale, so re-running is safe.
+    if (!options.dryRun) {
+        const ids = [...teamIds.values()].filter((id) => id > 0)
+        if (ids.length > 0) {
+            await db.delete(drafts).where(inArray(drafts.team, ids))
+        }
+    }
     // First pick of round 4, computed from the division's own team count.
     const overall = (HISTORICAL_ROUND - 1) * teamCount + 1
 
@@ -513,18 +561,24 @@ async function importRoster(context: ImportContext) {
                 if (options.dryRun) {
                     userId = `dry-${full}`
                 } else {
-                    userId = randomUUID()
                     const email = `legacy-roster-${slugify(
                         `${player.firstName}-${player.lastName}-${slice.record.seasonCode}-${team.teamNumber}`
                     )}@bumpsetdrink.com`
-                    await db.insert(users).values({
-                        id: userId,
-                        first_name: player.firstName,
-                        last_name: player.lastName,
-                        email
-                    })
-                    summary.usersCreated++
-                    usersByFullName.set(full, [...exact, userId])
+                    const existing = usersByEmail.get(email)
+                    if (existing) {
+                        userId = existing
+                    } else {
+                        userId = randomUUID()
+                        await db.insert(users).values({
+                            id: userId,
+                            first_name: player.firstName,
+                            last_name: player.lastName,
+                            email
+                        })
+                        usersByEmail.set(email, userId)
+                        summary.usersCreated++
+                        usersByFullName.set(full, [...exact, userId])
+                    }
                 }
             }
 
@@ -557,6 +611,51 @@ async function importRoster(context: ImportContext) {
     }
 
     void seasonId
+}
+
+/**
+ * Postgres `time` rejects anything malformed, and the archive contains typos:
+ * three matches across the whole corpus record "7;00" instead of "7:00". One
+ * bad value aborts the entire import, so times are normalized here and dropped
+ * when they cannot be salvaged -- matches.time is nullable.
+ */
+function normalizeTime(value: string | null): string | null {
+    if (!value) {
+        return null
+    }
+    const match = value.trim().match(/^(\d{1,2})\s*[:;.,]\s*(\d{2})/)
+    if (!match) {
+        return null
+    }
+    const hour = Number.parseInt(match[1], 10)
+    const minute = Number.parseInt(match[2], 10)
+    if (hour > 23 || minute > 59) {
+        return null
+    }
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`
+}
+
+/**
+ * Set scores are only stored when they corroborate the games-won columns.
+ *
+ * The archive sometimes records a partial scoreline -- one page reads
+ * "Scores: 25-?, 25-?, 20-25" because two sets were never written down. Keeping
+ * only the parseable pair silently shifts it into set 1 and leaves a match
+ * showing 3-0 in games but 0-1 in sets. Games won is the authoritative figure,
+ * so when the two disagree the set detail is dropped rather than stored
+ * misaligned.
+ */
+function usableSets(
+    sets: { home: number; away: number }[],
+    homeGames: number,
+    awayGames: number
+): { home: number; away: number }[] {
+    if (sets.length === 0) {
+        return []
+    }
+    const homeWon = sets.filter((s) => s.home > s.away).length
+    const awayWon = sets.filter((s) => s.away > s.home).length
+    return homeWon === homeGames && awayWon === awayGames ? sets : []
 }
 
 function winnerOf(
@@ -614,23 +713,24 @@ async function importMatches(context: ImportContext) {
             continue
         }
 
+        const sets = usableSets(match.sets, match.homeGames, match.awayGames)
         await db.insert(matches).values({
             season: seasonId,
             division: divisionId,
             week: match.week,
             date: match.dateIso,
-            time: match.time,
+            time: normalizeTime(match.time),
             court: match.court,
             home_team: homeTeam,
             away_team: awayTeam,
             home_score: match.homeGames,
             away_score: match.awayGames,
-            home_set1_score: match.sets[0]?.home ?? null,
-            away_set1_score: match.sets[0]?.away ?? null,
-            home_set2_score: match.sets[1]?.home ?? null,
-            away_set2_score: match.sets[1]?.away ?? null,
-            home_set3_score: match.sets[2]?.home ?? null,
-            away_set3_score: match.sets[2]?.away ?? null,
+            home_set1_score: sets[0]?.home ?? null,
+            away_set1_score: sets[0]?.away ?? null,
+            home_set2_score: sets[1]?.home ?? null,
+            away_set2_score: sets[1]?.away ?? null,
+            home_set3_score: sets[2]?.home ?? null,
+            away_set3_score: sets[2]?.away ?? null,
             winner: winnerOf(
                 match.homeGames,
                 match.awayGames,
@@ -662,7 +762,15 @@ async function importMatches(context: ImportContext) {
 
 async function importPlayoffs(context: ImportContext) {
     const { slice, seasonId, divisionId, options, summary, problems } = context
-    const { byNumber } = await loadTeamMap(seasonId, divisionId)
+    let { byNumber } = await loadTeamMap(seasonId, divisionId)
+
+    // Some seasons kept only their playoff page. Its "Position | Team" table is
+    // then the only record that those teams existed at all, so create them from
+    // it rather than dropping the season entirely.
+    if (byNumber.size === 0 && slice.teamCaptains.size > 0) {
+        await resolveOrCreateTeams(context)
+        byNumber = (await loadTeamMap(seasonId, divisionId)).byNumber
+    }
 
     if (byNumber.size === 0) {
         if (!options.dryRun) {
@@ -717,6 +825,21 @@ async function importPlayoffs(context: ImportContext) {
             )
     }
 
+    // Table-era playoff pages name the participants once a match has been
+    // played, rather than referencing a slot. Those names have to be resolved
+    // against the teams -- nulling them (the first cut) left 920 playoff
+    // matches with no teams at all, which in turn left the champion unknown.
+    const teamRowsForNames = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
+    const teamIdBySurname = buildSurnameIndex(
+        teamRowsForNames.map((row) => ({
+            name: row.name.replace(/^team\s+/i, ""),
+            value: row.id
+        }))
+    )
+
     const seedToTeamId = new Map<number, number>()
     for (const [position, teamNumber] of slice.seeding) {
         const teamId = byNumber.get(teamNumber)
@@ -762,8 +885,14 @@ async function importPlayoffs(context: ImportContext) {
     for (const match of [...slice.playoffMatches].sort(
         (a, b) => a.matchNumber - b.matchNumber
     )) {
-        const homeTeam = match.winnerSurname ? null : resolveRef(match.homeRef)
-        const awayTeam = match.loserSurname ? null : resolveRef(match.awayRef)
+        // Table-era pages name the participants once played; JS-era pages
+        // reference a slot. Resolve whichever this page gives us.
+        const homeTeam = match.winnerSurname
+            ? resolveSurname(match.winnerSurname, teamIdBySurname)
+            : resolveRef(match.homeRef)
+        const awayTeam = match.loserSurname
+            ? resolveSurname(match.loserSurname, teamIdBySurname)
+            : resolveRef(match.awayRef)
 
         const week = base + match.week
         summary.playoffMatches++
@@ -775,6 +904,7 @@ async function importPlayoffs(context: ImportContext) {
             continue
         }
 
+        const poSets = usableSets(match.sets, match.homeGames, match.awayGames)
         const inserted = await db
             .insert(matches)
             .values({
@@ -782,18 +912,18 @@ async function importPlayoffs(context: ImportContext) {
                 division: divisionId,
                 week,
                 date: match.dateIso,
-                time: match.time,
+                time: normalizeTime(match.time),
                 court: match.court,
                 home_team: homeTeam,
                 away_team: awayTeam,
                 home_score: match.homeGames,
                 away_score: match.awayGames,
-                home_set1_score: match.sets[0]?.home ?? null,
-                away_set1_score: match.sets[0]?.away ?? null,
-                home_set2_score: match.sets[1]?.home ?? null,
-                away_set2_score: match.sets[1]?.away ?? null,
-                home_set3_score: match.sets[2]?.home ?? null,
-                away_set3_score: match.sets[2]?.away ?? null,
+                home_set1_score: poSets[0]?.home ?? null,
+                away_set1_score: poSets[0]?.away ?? null,
+                home_set2_score: poSets[1]?.home ?? null,
+                away_set2_score: poSets[1]?.away ?? null,
+                home_set3_score: poSets[2]?.home ?? null,
+                away_set3_score: poSets[2]?.away ?? null,
                 winner: winnerOf(
                     match.homeGames,
                     match.awayGames,

@@ -184,8 +184,12 @@ export function loadSlice(record: InventoryRecord): LoadedSlice {
     const page = parsePlayoffPage(html, fileName, season.seasonYear)
     // The "Position | Team" table beside the bracket is the regular-season
     // seeding, not the finishing order.
+    // For a few seasons the playoff page is the ONLY surviving source, so this
+    // table is the sole record of which teams existed. There is no other team
+    // numbering to reconcile against, so the seed position doubles as the team
+    // number -- which also makes teams.rank correct by construction.
     page.seeding.forEach((row) => {
-        slice.seeding.set(row.position, Number.NaN)
+        slice.seeding.set(row.position, row.position)
         slice.teamCaptains.set(row.position, row.captainSurname)
     })
     slice.playoffMatches = page.matches.map((m) => ({
