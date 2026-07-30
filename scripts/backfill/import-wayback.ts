@@ -32,7 +32,16 @@ import {
     buildSurnameIndex,
     resolveSurname
 } from "../../src/lib/wayback/html-table"
-import { type LoadedSlice, loadInventory, loadSlice } from "./lib/load-slice"
+import {
+    type InventoryRecord,
+    type LoadedSlice,
+    loadInventory,
+    loadSlice
+} from "./lib/load-slice"
+
+// The full inventory, so a playoff slice can consult its own season's
+// standings page for the team numbering both pages share.
+let INVENTORY_RECORDS: InventoryRecord[] = []
 
 const INVENTORY = path.join(process.cwd(), "scripts", "data", "inventory.json")
 const REPORT_DIR = path.join(process.cwd(), "scripts", "data")
@@ -137,6 +146,7 @@ async function main() {
     }
 
     let records = loadInventory(INVENTORY)
+    INVENTORY_RECORDS = records
     if (options.seasons) {
         const wanted = new Set(options.seasons)
         records = records.filter((r) => wanted.has(r.seasonCode))
@@ -829,16 +839,47 @@ async function importPlayoffs(context: ImportContext) {
     // played, rather than referencing a slot. Those names have to be resolved
     // against the teams -- nulling them (the first cut) left 920 playoff
     // matches with no teams at all, which in turn left the champion unknown.
+    //
+    // Resolve against the season's OWN standings page first. It shares the
+    // playoff page's naming, whereas the database sometimes records a
+    // different captain for the same team: Fall 2012 A team #6 is "Su" in the
+    // archive and "Team August" in the database (co-captains). Going through
+    // the shared team NUMBER sidesteps that entirely. Team names are the
+    // fallback for divisions whose standings page did not survive.
+    const nameEntries: { name: string; value: number }[] = []
+
+    const standingsRecord = INVENTORY_RECORDS.find(
+        (r) =>
+            r.kind === "standings" &&
+            r.seasonCode === slice.record.seasonCode &&
+            r.divisionCode === slice.record.divisionCode
+    )
+    if (standingsRecord) {
+        try {
+            for (const [number, surname] of loadSlice(standingsRecord)
+                .teamCaptains) {
+                const teamId = byNumber.get(number)
+                if (teamId !== undefined && surname) {
+                    nameEntries.push({ name: surname, value: teamId })
+                }
+            }
+        } catch {
+            // A standings page that will not parse is not fatal here.
+        }
+    }
+
     const teamRowsForNames = await db
         .select({ id: teams.id, name: teams.name })
         .from(teams)
         .where(and(eq(teams.season, seasonId), eq(teams.division, divisionId)))
-    const teamIdBySurname = buildSurnameIndex(
-        teamRowsForNames.map((row) => ({
+    for (const row of teamRowsForNames) {
+        nameEntries.push({
             name: row.name.replace(/^team\s+/i, ""),
             value: row.id
-        }))
-    )
+        })
+    }
+
+    const teamIdBySurname = buildSurnameIndex(nameEntries)
 
     const seedToTeamId = new Map<number, number>()
     for (const [position, teamNumber] of slice.seeding) {
