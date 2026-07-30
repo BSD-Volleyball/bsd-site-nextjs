@@ -212,8 +212,18 @@ async function main() {
                 )
             if (championRow.length > 0) {
                 totals.championChecked++
-                const lastWeek = Math.max(...playoff.map((m) => m.week))
-                const finals = playoff.filter((m) => m.week === lastWeek)
+                // Brackets carry "if necessary" matches that were never played,
+                // and consolation games that are scheduled AFTER the final.
+                // Anchor on the last week that actually decided something, and
+                // accept the champion if it won any match in that week --
+                // otherwise a bracket whose decider went unplayed, or whose
+                // third-place game came last, reads as a mismatch.
+                const decided = playoff.filter((m) => m.winner !== null)
+                const lastWeek =
+                    decided.length > 0
+                        ? Math.max(...decided.map((m) => m.week))
+                        : 0
+                const finals = decided.filter((m) => m.week === lastWeek)
                 const winners = new Set(
                     finals
                         .map((m) => m.winner)

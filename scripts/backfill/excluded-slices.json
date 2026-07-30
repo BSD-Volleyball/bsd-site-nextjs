@@ -1,0 +1,13 @@
+{
+    "comment": "Archive slices that must never be imported. A Wayback playoff page carries no season, so the inventory borrows one from the nearest sibling snapshot. That is unsound for playoff pages: the league leaves a completed bracket up until the NEXT season's playoffs, so a page captured in September still shows the PREVIOUS season's results while its sibling roster page already shows the new season. Detected by scripts/fix-champion-mismatches.ts (participant overlap with the slice's own standings page).",
+    "excluded": [
+        {
+            "key": "F02|a|playoff",
+            "reason": "Only 2 of 6 participants appear in Fall 2002 A's own standings. Names Gartner, McIntyre, Gillick, Lu, Butler, Bower against standings Stump, Gartner, Dethlefsen, Chang, Mulford, Butler."
+        },
+        {
+            "key": "F02|bb|playoff",
+            "reason": "Only 3 of 6 participants appear in Fall 2002 BB's own standings, and all six appear together in SPRING 2002 BB. Captured 2002-09-15, still showing the previous season's bracket."
+        }
+    ]
+}

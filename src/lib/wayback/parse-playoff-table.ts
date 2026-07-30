@@ -278,7 +278,13 @@ export function parsePlayoffMatches(
                     return ""
                 }
                 const column = columns[index] ?? []
-                if (column.length === 1) {
+                // Broadcasting a single value across the row is right for a
+                // Date -- one evening covers every match -- but never for
+                // Scores, where each match has its own line. Fall 2008 AA is
+                // missing the <br> between two score lines, and broadcasting
+                // gave BOTH matches the same fabricated 5-set result. Leave
+                // them blank instead; the Winner column still names the winner.
+                if (column.length === 1 && index !== scoresAt) {
                     return column[0]
                 }
                 return column[i] ?? ""

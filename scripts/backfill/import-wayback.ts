@@ -44,6 +44,12 @@ import {
 let INVENTORY_RECORDS: InventoryRecord[] = []
 
 const INVENTORY = path.join(process.cwd(), "scripts", "data", "inventory.json")
+const EXCLUSIONS = path.join(
+    process.cwd(),
+    "scripts",
+    "backfill",
+    "excluded-slices.json"
+)
 const REPORT_DIR = path.join(process.cwd(), "scripts", "data")
 
 // Historical rosters are alphabetical and carry no draft order, so every
@@ -147,6 +153,26 @@ async function main() {
 
     let records = loadInventory(INVENTORY)
     INVENTORY_RECORDS = records
+
+    // Slices proven to describe a different season or division than the one
+    // they were filed under. Excluded permanently, not deleted after the fact,
+    // or the next full run simply re-imports them.
+    if (fs.existsSync(EXCLUSIONS)) {
+        const excluded = new Set<string>(
+            (
+                JSON.parse(fs.readFileSync(EXCLUSIONS, "utf-8")).excluded as {
+                    key: string
+                }[]
+            ).map((e) => e.key)
+        )
+        const before = records.length
+        records = records.filter((r) => !excluded.has(r.key))
+        if (before !== records.length) {
+            console.log(
+                `excluded ${before - records.length} known-misassigned slices`
+            )
+        }
+    }
     if (options.seasons) {
         const wanted = new Set(options.seasons)
         records = records.filter((r) => wanted.has(r.seasonCode))
@@ -663,6 +689,13 @@ function usableSets(
     if (sets.length === 0) {
         return []
     }
+    // matches has only three set columns. A longer list cannot be stored
+    // faithfully, and truncating it leaves the stored sets contradicting the
+    // games-won columns -- which is exactly what a run-together score line
+    // ("27-25, 25-17 25-21, 22-25, 25-23", missing its <br>) produces.
+    if (sets.length > 3) {
+        return []
+    }
     const homeWon = sets.filter((s) => s.home > s.away).length
     const awayWon = sets.filter((s) => s.away > s.home).length
     return homeWon === homeGames && awayWon === awayGames ? sets : []
@@ -965,12 +998,17 @@ async function importPlayoffs(context: ImportContext) {
                 away_set2_score: poSets[1]?.away ?? null,
                 home_set3_score: poSets[2]?.home ?? null,
                 away_set3_score: poSets[2]?.away ?? null,
-                winner: winnerOf(
-                    match.homeGames,
-                    match.awayGames,
-                    homeTeam,
-                    awayTeam
-                ),
+                // Table-era pages STATE the winner rather than leaving it to
+                // be inferred, and the first-listed side is that winner. Trust
+                // that over the scores, which are occasionally unparseable.
+                winner: match.winnerSurname
+                    ? homeTeam
+                    : winnerOf(
+                          match.homeGames,
+                          match.awayGames,
+                          homeTeam,
+                          awayTeam
+                      ),
                 playoff: true
             })
             .returning({ id: matches.id })
