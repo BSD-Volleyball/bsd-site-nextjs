@@ -282,10 +282,6 @@ export function parseResults(html: string, seasonYear: number): ParsedMatch[] {
 
 // -------------------------------------------------------------------- join
 
-function normalizeSurname(value: string): string {
-    return value.toLowerCase().replace(/[^a-z]/g, "")
-}
-
 /**
  * Fill in team numbers from the standings table, and time/date from the
  * schedule grid. Anything unresolvable is left null rather than guessed.
