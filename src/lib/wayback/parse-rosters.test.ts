@@ -93,12 +93,38 @@ describe("parseFilename", () => {
 })
 
 describe("detectEra", () => {
-    it("classifies the archived static pages as the old era", () => {
-        expect(detectEra(html)).toBe("old")
+    it("distinguishes the two JS generations", () => {
+        expect(detectEra("<script>var teamlist = [];</script>")).toBe(
+            "js-teamlist"
+        )
+        expect(detectEra("<script>var teams = [];</script>")).toBe("js-teams")
     })
 
-    it("classifies JS-driven pages as the new era", () => {
-        expect(detectEra("<script>var teamlist = [];</script>")).toBe("new")
+    it("uses the 'Scores:' label to separate static from stacked", () => {
+        // <=2007 pages label the column; 2008-2012 stacked tables do not.
+        expect(detectEra("<td>Scores: 15-9, 15-11</td>")).toBe("static")
+        expect(detectEra("<th>Winner</th><th>Loser</th>")).toBe("stacked")
+    })
+
+    it("classifies roster pages as plain in every era", () => {
+        // Roster pages were never rewritten -- no JS, no Winner/Loser table --
+        // so one parser covers all of them. Misreading them as "stacked" would
+        // route them to the wrong parser.
+        expect(detectEra(html)).toBe("plain")
+    })
+
+    it("recognises the playdates-only playoff variant", () => {
+        expect(detectEra("<script>var playdates = [];</script>")).toBe(
+            "js-playdates"
+        )
+    })
+
+    it("prefers the JS marker even when a <pre> block is present", () => {
+        // The playoff ASCII bracket survived every rewrite, so <pre> alone
+        // says nothing about which generation a page belongs to.
+        expect(
+            detectEra("<pre>bracket art</pre><script>var teams = [];</script>")
+        ).toBe("js-teams")
     })
 })
 

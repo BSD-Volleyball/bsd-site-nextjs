@@ -86,11 +86,34 @@ export function parseFilename(
 }
 
 /**
- * The new-generation pages (~2012+) drive everything from inline JS. Detecting
- * the era picks which parser to run.
+ * Pick which parser a page needs. See PageEra for the four generations.
+ *
+ * Order matters. The JS markers are checked first because a JS-driven page can
+ * still contain a <pre> block (the playoff ASCII bracket survived every
+ * rewrite). Among the non-JS pages, a literal "Scores:" label is what
+ * distinguishes the <=2007 static layout from the 2008-2012 stacked tables,
+ * which put scores in an unlabelled column instead.
  */
 export function detectEra(html: string): PageEra {
-    return /var\s+teamlist\b/i.test(html) ? "new" : "old"
+    if (/var\s+teamlist\b/i.test(html)) {
+        return "js-teamlist"
+    }
+    if (/var\s+teams\b/i.test(html)) {
+        return "js-teams"
+    }
+    if (/var\s+playdates\b/i.test(html)) {
+        return "js-playdates"
+    }
+    if (/Scores?:/i.test(html)) {
+        return "static"
+    }
+    // A Winner/Loser header is the signature of the <br>-stacked tables. Roster
+    // pages have neither that nor any JS, which is what "plain" captures --
+    // they were never rewritten, so one parser handles every era.
+    if (/>\s*Winner\b/i.test(html) || /<th[^>]*>\s*Winner/i.test(html)) {
+        return "stacked"
+    }
+    return "plain"
 }
 
 function matchSeasonText(text: string) {

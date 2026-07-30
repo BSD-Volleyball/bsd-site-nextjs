@@ -4,10 +4,33 @@
 
 export type PageKind = "standings" | "playoff" | "roster"
 
-// The old site was rebuilt around 2012; the two generations need different
-// parsers. "old" is static HTML tables, "new" is a JS-driven page whose data
-// lives in `var teamlist` / `var playdates` / `match.*` assignments.
-export type PageEra = "old" | "new"
+/**
+ * Which markup family a page uses, i.e. which parser it needs. The site was
+ * rewritten several times and the eras do NOT line up across page kinds.
+ *
+ *   static       "Scores:"-labelled result tables + <pre> schedule
+ *                  -> standings, <=2007
+ *   stacked      <br>-stacked Winner/Loser tables, no JavaScript
+ *                  -> standings 2008-2012; playoff pages up to ~2013
+ *   js-playdates inline JS with `var playdates` only
+ *                  -> playoff pages ~2016-2019
+ *   js-teams     inline JS with `var teams`      -> standings 2013-2021
+ *   js-teamlist  inline JS with `var teamlist`   -> standings/playoff 2022-2024
+ *   plain        no structured markers at all
+ *                  -> ROSTER pages, in every era: they were never rewritten,
+ *                     so a single parser covers all 210 roster slices
+ *
+ * Keying detection on `var teamlist` alone -- the obvious first guess, since
+ * that is what the existing archive importer handles -- misclassifies every
+ * other family and yields silently empty parses rather than errors.
+ */
+export type PageEra =
+    | "static"
+    | "stacked"
+    | "js-playdates"
+    | "js-teams"
+    | "js-teamlist"
+    | "plain"
 
 export interface SeasonRef {
     // "spring" | "summer" | "fall", matching seasons.season
