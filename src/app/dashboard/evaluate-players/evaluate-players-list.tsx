@@ -74,6 +74,139 @@ function getEvaluatorTooltip(player: NewPlayerEntry): string {
         .join(", ")
 }
 
+interface PlayerTableProps {
+    players: NewPlayerEntry[]
+    divisions: DivisionOption[]
+    selections: Record<string, string>
+    showAverages: boolean
+    emptyMessage: string
+    onSelectionChange: (userId: string, division: string) => void
+}
+
+function PlayerTable({
+    players,
+    divisions,
+    selections,
+    showAverages,
+    emptyMessage,
+    onSelectionChange
+}: PlayerTableProps) {
+    return (
+        <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+                <thead>
+                    <tr className="border-b bg-muted/50">
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Name
+                        </th>
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Gender
+                        </th>
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Height
+                        </th>
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Experience
+                        </th>
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Assessment
+                        </th>
+                        <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                            Your Rating
+                        </th>
+                        {showAverages && (
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Average Rating
+                            </th>
+                        )}
+                    </tr>
+                </thead>
+                <tbody>
+                    {players.map((player) => (
+                        <tr
+                            key={player.userId}
+                            className="border-b transition-colors last:border-0 hover:bg-accent/50"
+                        >
+                            <td className="px-4 py-2 font-medium">
+                                {getDisplayName(player)}
+                            </td>
+                            <td className="px-4 py-2">
+                                {player.male === true
+                                    ? "M"
+                                    : player.male === false
+                                      ? "F"
+                                      : "—"}
+                            </td>
+                            <td className="px-4 py-2">
+                                {formatHeight(player.height)}
+                            </td>
+                            <td className="px-4 py-2">
+                                {player.experience || "—"}
+                            </td>
+                            <td className="px-4 py-2">
+                                {player.assessment || "—"}
+                            </td>
+                            <td className="px-4 py-2">
+                                <Select
+                                    value={selections[player.userId] || ""}
+                                    onValueChange={(value) =>
+                                        onSelectionChange(player.userId, value)
+                                    }
+                                >
+                                    <SelectTrigger className="h-8 w-28">
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {divisions.map((div) => (
+                                            <SelectItem
+                                                key={div.id}
+                                                value={String(div.id)}
+                                            >
+                                                {div.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </td>
+                            {showAverages && (
+                                <td className="px-4 py-2">
+                                    {player.evaluationCount > 0 ? (
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="cursor-help underline decoration-dotted">
+                                                    {getAverageRatingDisplay(
+                                                        player,
+                                                        divisions
+                                                    )}
+                                                </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {getEvaluatorTooltip(player)}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    ) : (
+                                        "—"
+                                    )}
+                                </td>
+                            )}
+                        </tr>
+                    ))}
+                    {players.length === 0 && (
+                        <tr>
+                            <td
+                                colSpan={showAverages ? 7 : 6}
+                                className="px-4 py-6 text-center text-muted-foreground"
+                            >
+                                {emptyMessage}
+                            </td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    )
+}
+
 export function EvaluatePlayersList({
     players,
     divisions
@@ -103,6 +236,19 @@ export function EvaluatePlayersList({
             return name.includes(lower) || preferred.includes(lower)
         })
     }, [players, search])
+
+    const { pendingPlayers, evaluatedPlayers } = useMemo(() => {
+        const pending: NewPlayerEntry[] = []
+        const evaluated: NewPlayerEntry[] = []
+        for (const player of filteredPlayers) {
+            if (selections[player.userId]) {
+                evaluated.push(player)
+            } else {
+                pending.push(player)
+            }
+        }
+        return { pendingPlayers: pending, evaluatedPlayers: evaluated }
+    }, [filteredPlayers, selections])
 
     const evaluatedCount = Object.keys(selections).length
 
@@ -199,123 +345,51 @@ export function EvaluatePlayersList({
                 </div>
             </div>
 
-            <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b bg-muted/50">
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Name
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Gender
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Height
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Experience
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Assessment
-                            </th>
-                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                Your Rating
-                            </th>
-                            {showAverages && (
-                                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                                    Average Rating
-                                </th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredPlayers.map((player) => (
-                            <tr
-                                key={player.userId}
-                                className="border-b transition-colors last:border-0 hover:bg-accent/50"
-                            >
-                                <td className="px-4 py-2 font-medium">
-                                    {getDisplayName(player)}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {player.male === true
-                                        ? "M"
-                                        : player.male === false
-                                          ? "F"
-                                          : "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {formatHeight(player.height)}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {player.experience || "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    {player.assessment || "—"}
-                                </td>
-                                <td className="px-4 py-2">
-                                    <Select
-                                        value={selections[player.userId] || ""}
-                                        onValueChange={(value) =>
-                                            handleSelectionChange(
-                                                player.userId,
-                                                value
-                                            )
-                                        }
-                                    >
-                                        <SelectTrigger className="h-8 w-28">
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {divisions.map((div) => (
-                                                <SelectItem
-                                                    key={div.id}
-                                                    value={String(div.id)}
-                                                >
-                                                    {div.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </td>
-                                {showAverages && (
-                                    <td className="px-4 py-2">
-                                        {player.evaluationCount > 0 ? (
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <span className="cursor-help underline decoration-dotted">
-                                                        {getAverageRatingDisplay(
-                                                            player,
-                                                            divisions
-                                                        )}
-                                                    </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    {getEvaluatorTooltip(
-                                                        player
-                                                    )}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        ) : (
-                                            "—"
-                                        )}
-                                    </td>
-                                )}
-                            </tr>
-                        ))}
-                        {filteredPlayers.length === 0 && (
-                            <tr>
-                                <td
-                                    colSpan={showAverages ? 7 : 6}
-                                    className="px-4 py-6 text-center text-muted-foreground"
-                                >
-                                    No new players found.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-base">
+                        Needs Evaluation
+                    </h2>
+                    <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                        {pendingPlayers.length}
+                    </span>
+                </div>
+                <PlayerTable
+                    players={pendingPlayers}
+                    divisions={divisions}
+                    selections={selections}
+                    showAverages={showAverages}
+                    emptyMessage={
+                        search
+                            ? "No unevaluated players match your filter."
+                            : "You have evaluated every new player."
+                    }
+                    onSelectionChange={handleSelectionChange}
+                />
+            </section>
+
+            <section className="space-y-2">
+                <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-base">
+                        Already Evaluated
+                    </h2>
+                    <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                        {evaluatedPlayers.length}
+                    </span>
+                </div>
+                <PlayerTable
+                    players={evaluatedPlayers}
+                    divisions={divisions}
+                    selections={selections}
+                    showAverages={showAverages}
+                    emptyMessage={
+                        search
+                            ? "No evaluated players match your filter."
+                            : "You have not evaluated any players yet."
+                    }
+                    onSelectionChange={handleSelectionChange}
+                />
+            </section>
         </div>
     )
 }
