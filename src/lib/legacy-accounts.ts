@@ -10,7 +10,7 @@ import {
     norm,
     suggestMatch
 } from "@/lib/legacy-matching"
-import { formatDisplayName } from "@/lib/utils"
+import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
 export interface MergeTarget {
     id: string
@@ -62,7 +62,10 @@ export async function fetchMergeTargets(): Promise<MergeTarget[]> {
 
     return rows.map((u) => ({
         id: u.id,
-        name: formatDisplayName(u.firstName, u.lastName, u.preferredName),
+        // "First (Nick) Last" rather than the usual display name: when you are
+        // deciding which real member a placeholder belongs to, the legal first
+        // name and the nickname are both evidence, so show both.
+        name: formatPlayerName(u.firstName, u.lastName, u.preferredName),
         email: u.email
     }))
 }

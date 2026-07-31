@@ -80,14 +80,17 @@ export function UserEmailCombobox({
 
     const selectedUser = users.find((u) => u.id === value)
 
-    const q = search.toLowerCase()
-    const matches = q
-        ? users.filter(
-              (u) =>
-                  u.name.toLowerCase().includes(q) ||
-                  u.email.toLowerCase().includes(q) ||
-                  (u.phone?.toLowerCase().includes(q) ?? false)
-          )
+    // Every whitespace-separated term must appear somewhere in the row. Names
+    // render as "First (Nick) Last", so a plain substring search would miss
+    // "jo pessagno" against "Joann (Jo) Pessagno" -- the terms are adjacent to
+    // the reader but not in the string.
+    const terms = search.toLowerCase().split(/\s+/).filter(Boolean)
+    const matches = terms.length
+        ? users.filter((u) => {
+              const haystack =
+                  `${u.name} ${u.email} ${u.phone ?? ""}`.toLowerCase()
+              return terms.every((term) => haystack.includes(term))
+          })
         : users
     // The full membership is too long to render in a popover, so only the
     // first slice is mounted -- with a visible note, because a list that
