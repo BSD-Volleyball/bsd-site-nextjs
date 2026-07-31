@@ -27,7 +27,8 @@ import {
     RiClipboardLine,
     RiInboxLine,
     RiImageLine,
-    RiNotification3Line
+    RiNotification3Line,
+    RiArchiveLine
 } from "@remixicon/react"
 
 export type NavItem = {
@@ -189,6 +190,11 @@ export const adminNavItems: NavItem[] = [
         title: "Audit Log",
         url: "/dashboard/audit-log",
         icon: RiHistoryLine
+    },
+    {
+        title: "Historical Backfill",
+        url: "/dashboard/historical-backfill",
+        icon: RiArchiveLine
     },
     {
         title: "Tournament Overview",
