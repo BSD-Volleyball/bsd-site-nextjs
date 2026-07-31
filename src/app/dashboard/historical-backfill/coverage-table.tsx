@@ -50,7 +50,7 @@ function StatusCell({
         },
         none: {
             Icon: RiCloseLine,
-            className: "text-muted-foreground/40",
+            className: "text-red-600 dark:text-red-400",
             label: "Missing"
         }
     }[status]
@@ -110,7 +110,7 @@ const LEGEND = [
     },
     {
         Icon: RiCloseLine,
-        className: "text-muted-foreground/40",
+        className: "text-red-600 dark:text-red-400",
         label: "Missing",
         text: "no data for this season"
     }
