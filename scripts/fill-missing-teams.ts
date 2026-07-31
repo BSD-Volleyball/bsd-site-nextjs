@@ -33,16 +33,16 @@ import {
 } from "../src/database/schema"
 import { GHOST_CAPTAIN_ID } from "../src/lib/ghost-captain"
 import { loadInventory, loadSlice } from "./backfill/lib/load-slice"
+import {
+    HISTORICAL_ROUND,
+    historicalOverall
+} from "../src/lib/wayback/historical-pick"
 
 const TARGETS = [
     { seasonCode: "S12", divisionCode: "b" },
     { seasonCode: "S12", divisionCode: "bb" },
     { seasonCode: "S23", divisionCode: "ab" }
 ]
-
-// Matches the rest of the historical backfill: no real draft order survives, so
-// every player in a division gets the same slot -- first pick of round 4.
-const HISTORICAL_ROUND = 4
 
 const apply = process.argv.includes("--apply")
 const norm = (s: string) => (s ?? "").toLowerCase().replace(/[^a-z]/g, "")
@@ -65,7 +65,11 @@ async function main() {
         .select({ id: seasons.id, code: seasons.code })
         .from(seasons)
     const divisionRows = await db
-        .select({ id: divisions.id, name: divisions.name })
+        .select({
+            id: divisions.id,
+            name: divisions.name,
+            level: divisions.level
+        })
         .from(divisions)
 
     const userRows = await db
@@ -95,15 +99,16 @@ async function main() {
         const seasonId = seasonRows.find(
             (s) => s.code === target.seasonCode
         )?.id
-        const divisionId = divisionRows.find(
+        const division = divisionRows.find(
             (d) => d.name.toLowerCase() === target.divisionCode
-        )?.id
-        if (seasonId === undefined || divisionId === undefined) {
+        )
+        if (seasonId === undefined || division === undefined) {
             console.log(
                 `${target.seasonCode}/${target.divisionCode}: unknown season/division`
             )
             continue
         }
+        const divisionId = division.id
 
         const record = inventory.find(
             (r) =>
@@ -131,7 +136,10 @@ async function main() {
                 .map((t) => [t.number as number, t])
         )
 
-        const overall = (HISTORICAL_ROUND - 1) * slice.rosterTeams.length + 1
+        const overall = historicalOverall(
+            division.level,
+            slice.rosterTeams.length
+        )
         console.log(
             `\n${target.seasonCode}/${target.divisionCode.toUpperCase()}: archive has ${slice.rosterTeams.length} teams, database has ${existing.length}`
         )

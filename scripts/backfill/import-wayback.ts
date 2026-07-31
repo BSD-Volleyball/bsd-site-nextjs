@@ -29,6 +29,10 @@ import {
 } from "../../src/database/schema"
 import { GHOST_CAPTAIN_ID } from "../../src/lib/ghost-captain"
 import {
+    HISTORICAL_ROUND,
+    historicalOverall
+} from "../../src/lib/wayback/historical-pick"
+import {
     buildSurnameIndex,
     resolveSurname
 } from "../../src/lib/wayback/html-table"
@@ -51,11 +55,6 @@ const EXCLUSIONS = path.join(
     "excluded-slices.json"
 )
 const REPORT_DIR = path.join(process.cwd(), "scripts", "data")
-
-// Historical rosters are alphabetical and carry no draft order, so every
-// player in a division gets the SAME position: the first pick of round 4.
-// Uniform values assert no false ordering while placing them mid-draft.
-const HISTORICAL_ROUND = 4
 
 interface Options {
     seasons: string[] | null
@@ -202,10 +201,19 @@ async function main() {
     const seasonIdByCode = new Map(seasonRows.map((r) => [r.code, r.id]))
 
     const divisionRows = await db
-        .select({ id: divisions.id, name: divisions.name })
+        .select({
+            id: divisions.id,
+            name: divisions.name,
+            level: divisions.level
+        })
         .from(divisions)
     const divisionIdByCode = new Map(
         divisionRows.map((r) => [r.name.toLowerCase(), r.id])
+    )
+    // `drafts.overall` is banded by division level, so the roster import needs
+    // the level as well as the id -- see src/lib/wayback/historical-pick.ts.
+    const divisionLevelByCode = new Map(
+        divisionRows.map((r) => [r.name.toLowerCase(), r.level])
     )
 
     // Guardrail: never touch a season that already holds data unless the
@@ -307,13 +315,14 @@ async function main() {
 
         const seasonId = seasonIdByCode.get(record.seasonCode)
         const divisionId = divisionIdByCode.get(record.divisionCode)
+        const divisionLevel = divisionLevelByCode.get(record.divisionCode)
         if (seasonId === undefined) {
             problems.push(
                 `${record.key}: no seasons row for ${record.seasonCode}`
             )
             continue
         }
-        if (divisionId === undefined) {
+        if (divisionId === undefined || divisionLevel === undefined) {
             problems.push(
                 `${record.key}: no divisions row for ${record.divisionCode}`
             )
@@ -337,6 +346,7 @@ async function main() {
             slice,
             seasonId,
             divisionId,
+            divisionLevel,
             options,
             summary,
             problems,
@@ -389,6 +399,7 @@ interface ImportContext {
     slice: LoadedSlice
     seasonId: number
     divisionId: number
+    divisionLevel: number
     options: Options
     summary: Record<string, number>
     problems: string[]
@@ -530,6 +541,7 @@ async function importRoster(context: ImportContext) {
     const {
         slice,
         seasonId,
+        divisionLevel,
         options,
         summary,
         problems,
@@ -556,8 +568,8 @@ async function importRoster(context: ImportContext) {
             await db.delete(drafts).where(inArray(drafts.team, ids))
         }
     }
-    // First pick of round 4, computed from the division's own team count.
-    const overall = (HISTORICAL_ROUND - 1) * teamCount + 1
+    // First pick of round 4, offset into this division's band.
+    const overall = historicalOverall(divisionLevel, teamCount)
 
     for (const team of slice.rosterTeams) {
         const teamId = teamIds.get(team.teamNumber)
