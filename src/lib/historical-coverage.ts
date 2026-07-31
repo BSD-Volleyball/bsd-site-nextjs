@@ -28,7 +28,19 @@ import { HISTORICAL_ROUND } from "@/lib/wayback/historical-pick"
  * See src/lib/wayback/historical-pick.ts for the synthetic pick itself.
  */
 
-export type CoverageStatus = "full" | "partial" | "none"
+/**
+ * "na" is not a weaker "none": it means the column has nothing to measure
+ * against (a season with no divisions on record, or a draft-order check on a
+ * season we hold no rosters for), so an X there would report a gap that does
+ * not exist. The missing data is already flagged by whichever column owns the
+ * denominator.
+ */
+export type CoverageStatus = "full" | "partial" | "none" | "na"
+
+/** Whether a status represents data we actually hold. */
+export function hasCoverage(status: CoverageStatus): boolean {
+    return status === "full" || status === "partial"
+}
 
 export interface SeasonCoverage {
     id: number
@@ -95,13 +107,18 @@ interface Raw {
 }
 
 /**
- * `covered` of `total` divisions -> full / partial / none.
+ * `covered` of `total` divisions -> full / partial / none / na.
  *
- * A season with no divisions on record (F26, scheduled but unplayed) reports
- * "none" rather than a misleading "full" from 0 of 0.
+ * A season with no divisions on record has no denominator: report what we hold
+ * ("partial", never a misleading "full" from 0 of 0) rather than measuring
+ * against a total we do not know. "na" is decided by the caller, which is the
+ * only place that can see whether the whole season is empty.
  */
 function statusOf(covered: number, total: number): CoverageStatus {
-    if (total === 0 || covered === 0) {
+    if (total === 0) {
+        return covered > 0 ? "partial" : "none"
+    }
+    if (covered === 0) {
         return "none"
     }
     return covered >= total ? "full" : "partial"
@@ -151,6 +168,22 @@ export async function fetchHistoricalCoverage(): Promise<HistoricalCoverage> {
         const divisions = Number(r.champion_divisions)
         const rosterDivisions = Number(r.roster_divisions)
         const realDivisions = Number(r.real_divisions)
+        const teams = Number(r.teams)
+        const regular = Number(r.regular)
+        const playoff = Number(r.playoff)
+
+        // A season we hold literally nothing for -- no champions, no teams, no
+        // matches, no rosters -- is one that has not been played yet (F26 as of
+        // this writing), not one with a backlog to fill. Every season the
+        // league actually ran has champions on record, so this cannot quietly
+        // hide a real gap: any season missing only *some* of these still
+        // reports its missing pieces.
+        const notPlayed =
+            divisions === 0 &&
+            teams === 0 &&
+            regular === 0 &&
+            playoff === 0 &&
+            rosterDivisions === 0
 
         return {
             id: Number(r.id),
@@ -159,19 +192,28 @@ export async function fetchHistoricalCoverage(): Promise<HistoricalCoverage> {
             season: r.season,
             divisions,
             // Champions is its own denominator, so it is present or absent.
-            champions: divisions > 0 ? "full" : "none",
-            regularMatches: statusOf(Number(r.regular_divisions), divisions),
-            playoffMatches: statusOf(Number(r.playoff_divisions), divisions),
-            rosters: statusOf(rosterDivisions, divisions),
+            champions: notPlayed ? "na" : divisions > 0 ? "full" : "none",
+            regularMatches: notPlayed
+                ? "na"
+                : statusOf(Number(r.regular_divisions), divisions),
+            playoffMatches: notPlayed
+                ? "na"
+                : statusOf(Number(r.playoff_divisions), divisions),
+            rosters: notPlayed ? "na" : statusOf(rosterDivisions, divisions),
             // Measured against the divisions that HAVE a roster, not against
             // the season: the question is whether the rosters we hold carry a
-            // real draft order, not whether we hold all of them.
-            realDraft: statusOf(realDivisions, rosterDivisions),
+            // real draft order, not whether we hold all of them. With no
+            // rosters at all there is nothing to judge -- the rosters column
+            // already carries that gap.
+            realDraft:
+                rosterDivisions === 0
+                    ? "na"
+                    : statusOf(realDivisions, rosterDivisions),
             counts: {
                 championDivisions: divisions,
-                teams: Number(r.teams),
-                regular: Number(r.regular),
-                playoff: Number(r.playoff),
+                teams,
+                regular,
+                playoff,
                 regularDivisions: Number(r.regular_divisions),
                 playoffDivisions: Number(r.playoff_divisions),
                 rosterDivisions,
@@ -191,10 +233,10 @@ export async function fetchHistoricalCoverage(): Promise<HistoricalCoverage> {
         seasons,
         totals: {
             seasons: seasons.length,
-            withChampions: count((s) => s.champions !== "none"),
-            withRegular: count((s) => s.regularMatches !== "none"),
-            withPlayoff: count((s) => s.playoffMatches !== "none"),
-            withRosters: count((s) => s.rosters !== "none"),
+            withChampions: count((s) => hasCoverage(s.champions)),
+            withRegular: count((s) => hasCoverage(s.regularMatches)),
+            withPlayoff: count((s) => hasCoverage(s.playoffMatches)),
+            withRosters: count((s) => hasCoverage(s.rosters)),
             withRealDraft: count((s) => s.counts.realDivisions > 0),
             withSynthetic: count((s) => s.counts.syntheticDivisions > 0),
             champions: sum((s) => s.counts.championDivisions),

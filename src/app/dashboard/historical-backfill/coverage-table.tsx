@@ -4,7 +4,8 @@ import {
     RiCheckLine,
     RiCloseLine,
     RiErrorWarningLine,
-    RiRefreshLine
+    RiRefreshLine,
+    RiSubtractLine
 } from "@remixicon/react"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
@@ -52,6 +53,11 @@ function StatusCell({
             Icon: RiCloseLine,
             className: "text-red-600 dark:text-red-400",
             label: "Missing"
+        },
+        na: {
+            Icon: RiSubtractLine,
+            className: "text-muted-foreground/40",
+            label: "Not applicable"
         }
     }[status]
 
@@ -73,7 +79,7 @@ function StatusCell({
 
 function divisionDetail(covered: number, total: number, noun: string) {
     if (total === 0) {
-        return "season not played yet"
+        return "no divisions on record to measure against"
     }
     if (covered === 0) {
         return `no ${noun} for any of the ${total} divisions`
@@ -113,6 +119,12 @@ const LEGEND = [
         className: "text-red-600 dark:text-red-400",
         label: "Missing",
         text: "no data for this season"
+    },
+    {
+        Icon: RiSubtractLine,
+        className: "text-muted-foreground/40",
+        label: "N/A",
+        text: "nothing to record — season not played, or no rosters to judge"
     }
 ]
 
@@ -121,12 +133,17 @@ export function CoverageTable({ coverage }: { coverage: HistoricalCoverage }) {
     const [pending, startTransition] = useTransition()
     const [onlyGaps, setOnlyGaps] = useState(false)
 
+    // "na" counts as settled, not as a gap: an unplayed season has no backlog,
+    // so "show gaps only" must not park it at the top of the list forever.
+    const settled = (status: CoverageStatus) =>
+        status === "full" || status === "na"
+
     const isComplete = (s: SeasonCoverage) =>
-        s.champions === "full" &&
-        s.regularMatches === "full" &&
-        s.playoffMatches === "full" &&
-        s.rosters === "full" &&
-        s.realDraft === "full"
+        settled(s.champions) &&
+        settled(s.regularMatches) &&
+        settled(s.playoffMatches) &&
+        settled(s.rosters) &&
+        settled(s.realDraft)
 
     const rows = onlyGaps
         ? coverage.seasons.filter((s) => !isComplete(s))
@@ -251,9 +268,11 @@ export function CoverageTable({ coverage }: { coverage: HistoricalCoverage }) {
                                 <StatusCell
                                     status={s.champions}
                                     detail={
-                                        s.divisions > 0
-                                            ? `${s.divisions} divisions recorded`
-                                            : "season not played yet"
+                                        s.champions === "na"
+                                            ? "season not played yet"
+                                            : s.divisions > 0
+                                              ? `${s.divisions} divisions recorded`
+                                              : "no champions recorded"
                                     }
                                 />
                                 <StatusCell
