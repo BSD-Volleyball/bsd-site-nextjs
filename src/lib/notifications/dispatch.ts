@@ -17,6 +17,7 @@ import { and, eq, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { db } from "@/database/db"
 import { notificationLog } from "@/database/schema"
+import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
 import { type BatchEmailMessage, sendBatchEmails } from "@/lib/postmark"
 import { getOptedOutUserIds } from "./preferences"
@@ -77,16 +78,24 @@ export async function dispatchNotification(
         }
         const tag = opts.tag ?? opts.type.replaceAll("_", "-")
 
-        // Dedupe by lowercased email; drop recipients without an address.
+        // Dedupe by lowercased email; drop recipients without a reachable
+        // address. Legacy placeholders count as unaddressed: the archive
+        // backfill invented those addresses, so a message to one is a
+        // guaranteed bounce rather than a delivery worth attempting.
         const seen = new Set<string>()
+        let unaddressable = 0
         let recipients = opts.recipients.filter((r) => {
             const email = r.email?.toLowerCase()
             if (!email || seen.has(email)) return false
+            if (isLegacyEmail(email)) {
+                unaddressable++
+                return false
+            }
             seen.add(email)
             return true
         })
         const initial = recipients.length
-        if (initial === 0) return zero
+        if (initial === 0) return { ...zero, skipped: unaddressable }
 
         if (!def.mandatory) {
             const optedOut = await getOptedOutUserIds(
@@ -108,7 +117,7 @@ export async function dispatchNotification(
         recipients = recipients.filter((r) => !blocked.has(r.userId))
 
         if (recipients.length === 0) {
-            return { ...zero, skipped: initial }
+            return { ...zero, skipped: unaddressable + initial }
         }
 
         // Claim-then-send: the partial unique index on (type, dedupe_key,
@@ -227,7 +236,7 @@ export async function dispatchNotification(
             )
         }
 
-        const skipped = initial - recipients.length
+        const skipped = unaddressable + (initial - recipients.length)
         if (skipped > 0 || failed > 0) {
             logger.info("[notifications] Dispatch complete", {
                 type: opts.type,

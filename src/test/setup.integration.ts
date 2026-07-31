@@ -55,20 +55,46 @@ vi.mock("@/lib/postmark", () => ({
     STREAM_AUTOMATED_REMINDERS: "automated-reminders",
     STREAM_BROADCAST: "broadcast",
     STREAM_IN_SEASON_UPDATES: "in-season-updates",
-    sendEmail: vi.fn(async () => "test-message-id"),
-    sendBatchEmails: vi.fn(async (messages: Array<{ to: string }>) => ({
-        sent: messages.length,
-        failed: 0,
-        results: messages.map((m) => ({
-            to: m.to,
-            messageId: "test-message-id",
-            errorCode: 0
-        }))
-    })),
-    sendBroadcastEmails: vi.fn(async (opts: { recipients: unknown[] }) => ({
-        sent: opts.recipients.length,
-        failed: 0
-    })),
+    // The placeholder-address filter is mirrored here rather than stubbed
+    // away: it is the guarantee that no message ever reaches a legacy-*
+    // address, so a test that asserts it must see it applied on this seam too.
+    sendEmail: vi.fn(async (opts: { to: string }) =>
+        opts.to.startsWith("legacy-") ? null : "test-message-id"
+    ),
+    sendBatchEmails: vi.fn(async (messages: Array<{ to: string }>) => {
+        const skipped = messages.filter((m) => m.to.startsWith("legacy-"))
+        return {
+            sent: messages.length - skipped.length,
+            failed: 0,
+            skipped: skipped.length,
+            results: messages.map((m) =>
+                m.to.startsWith("legacy-")
+                    ? {
+                          to: m.to,
+                          messageId: null,
+                          errorCode: 0,
+                          skipped: true
+                      }
+                    : {
+                          to: m.to,
+                          messageId: "test-message-id",
+                          errorCode: 0
+                      }
+            )
+        }
+    }),
+    sendBroadcastEmails: vi.fn(
+        async (opts: { recipients: Array<{ email: string }> }) => {
+            const skipped = opts.recipients.filter((r) =>
+                r.email.startsWith("legacy-")
+            ).length
+            return {
+                sent: opts.recipients.length - skipped,
+                failed: 0,
+                skipped
+            }
+        }
+    ),
     createStreamSuppression: vi.fn(async () => {}),
     deleteStreamSuppression: vi.fn(async () => {}),
     // Pure classifier — keep the real behaviour so suppression logic under test

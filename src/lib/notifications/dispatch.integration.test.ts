@@ -48,6 +48,56 @@ describe("dispatchNotification", () => {
         expect(logRows[0].notification_type).toBe("draft_results")
     })
 
+    it("never submits a message to a legacy placeholder address", async () => {
+        // The archive backfill invented legacy-* addresses for players it could
+        // not match to an account. They are counted as skipped, not failed:
+        // there was never a delivery to attempt.
+        const real = await createUser()
+        const legacy = await createUser({
+            email: `legacy-roster-jane-doe-f07-1-${crypto
+                .randomUUID()
+                .slice(0, 8)}@bumpsetdrink.com`
+        })
+
+        const result = await dispatchNotification({
+            type: "draft_results",
+            recipients: [recipientOf(real), recipientOf(legacy)],
+            subject: "You've been drafted!",
+            htmlBody: "<p>Welcome to the team.</p>"
+        })
+
+        expect(result).toEqual({ sent: 1, failed: 0, skipped: 1 })
+        const messages = mockedSendBatch.mock.calls[0][0]
+        expect(messages).toHaveLength(1)
+        expect(messages[0].to).toBe(real.email)
+
+        // No log row is written for an address that was never contacted.
+        const logRows = await db
+            .select()
+            .from(notificationLog)
+            .where(eq(notificationLog.user_id, legacy.id))
+        expect(logRows).toHaveLength(0)
+    })
+
+    it("reports a dispatch to only placeholder addresses as fully skipped", async () => {
+        const legacy = await createUser({
+            email: `legacy-hoc-john-roe-${crypto
+                .randomUUID()
+                .slice(0, 8)}@bumpsetdrink.com`
+        })
+        mockedSendBatch.mockClear()
+
+        const result = await dispatchNotification({
+            type: "draft_results",
+            recipients: [recipientOf(legacy)],
+            subject: "s",
+            htmlBody: "b"
+        })
+
+        expect(result).toEqual({ sent: 0, failed: 0, skipped: 1 })
+        expect(mockedSendBatch).not.toHaveBeenCalled()
+    })
+
     it("attaches RFC 8058 one-click headers for opt-outable types", async () => {
         const user = await createUser()
         await dispatchNotification({
@@ -197,6 +247,7 @@ describe("dispatchNotification", () => {
         mockedSendBatch.mockResolvedValueOnce({
             sent: 0,
             failed: 1,
+            skipped: 0,
             results: [{ to: user.email, messageId: null, errorCode: 406 }]
         })
 

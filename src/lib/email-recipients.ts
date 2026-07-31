@@ -18,6 +18,7 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, and, inArray, isNotNull } from "drizzle-orm"
+import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
 import { getOptedOutUserIds } from "@/lib/notifications/preferences"
 import { getSuppressedEmails } from "@/lib/notifications/suppressions"
@@ -156,6 +157,11 @@ type UserRow = {
 
 function toRecipient(r: UserRow): Recipient | null {
     if (!r.email) return null
+    // Placeholder accounts from the archive backfill have no reachable address.
+    // Dropping them here (rather than only at send time) keeps the recipient
+    // counts an admin sees on the compose screen equal to what actually goes
+    // out. Historical team and division groups are full of them.
+    if (isLegacyEmail(r.email)) return null
     return {
         email: r.email,
         firstName: r.first_name ?? "",

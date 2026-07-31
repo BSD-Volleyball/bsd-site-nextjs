@@ -1,5 +1,6 @@
 import "server-only"
 import { ServerClient } from "postmark"
+import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,42 @@ export interface SendEmailOptions {
     }>
 }
 
-export async function sendEmail(opts: SendEmailOptions): Promise<string> {
+// ---------------------------------------------------------------------------
+// Undeliverable-by-construction addresses
+// ---------------------------------------------------------------------------
+
+/**
+ * `legacy-roster-*@bumpsetdrink.com` / `legacy-hoc-*@bumpsetdrink.com` are
+ * placeholder addresses the archive backfill invented for players it could not
+ * match to a real account. Nobody reads them, and every message sent to one is
+ * a guaranteed hard bounce on a domain we own -- which is exactly the signal
+ * that gets a sending domain throttled.
+ *
+ * The check lives here, at the two functions every outbound message passes
+ * through, so it holds no matter which caller assembled the recipient list.
+ * Recipient queries filter these out earlier too; this is the backstop, not
+ * the only line of defence.
+ */
+function isUndeliverable(email: string): boolean {
+    return isLegacyEmail(email.trim().toLowerCase())
+}
+
+/**
+ * Sends one message, or returns null without sending when the recipient is a
+ * placeholder address. Callers that record the Postmark id should store the
+ * null as-is: no message exists to correlate a webhook against.
+ */
+export async function sendEmail(
+    opts: SendEmailOptions
+): Promise<string | null> {
+    if (isUndeliverable(opts.to)) {
+        logger.warn("[postmark] Skipped send to legacy placeholder address", {
+            to: opts.to,
+            subject: opts.subject
+        })
+        return null
+    }
+
     const client = getPostmarkClient()
     const result = await client.sendEmail({
         From: opts.fromName ? `${opts.fromName} <${opts.from}>` : opts.from,
@@ -131,8 +167,19 @@ export interface BatchEmailMessage {
 export interface BatchSendResult {
     sent: number
     failed: number
-    /** Per-message outcome in submission order; errorCode 0 means accepted. */
-    results: Array<{ to: string; messageId: string | null; errorCode: number }>
+    /** Recipients dropped before submission as undeliverable placeholders. */
+    skipped: number
+    /**
+     * Per-message outcome. Accepted messages have errorCode 0; skipped
+     * recipients appear with `skipped: true` and no message id, so callers
+     * correlating by address still find every recipient they submitted.
+     */
+    results: Array<{
+        to: string
+        messageId: string | null
+        errorCode: number
+        skipped?: boolean
+    }>
 }
 
 export interface BatchThrottleOptions {
@@ -196,8 +243,34 @@ export async function sendBatchEmails(
     let failed = 0
     const perMessage: BatchSendResult["results"] = []
 
-    for (let i = 0; i < messages.length; i += batchSize) {
-        const chunk = messages.slice(i, i + batchSize)
+    // Drop placeholder addresses before chunking, so they neither consume a
+    // slot in a Postmark call nor land in the results as a delivery failure.
+    const deliverable: BatchEmailMessage[] = []
+    for (const message of messages) {
+        if (isUndeliverable(message.to)) {
+            perMessage.push({
+                to: message.to,
+                messageId: null,
+                errorCode: 0,
+                skipped: true
+            })
+        } else {
+            deliverable.push(message)
+        }
+    }
+    const skipped = perMessage.length
+    if (skipped > 0) {
+        logger.warn(
+            "[postmark] Skipped legacy placeholder addresses in batch",
+            {
+                skipped,
+                total: messages.length
+            }
+        )
+    }
+
+    for (let i = 0; i < deliverable.length; i += batchSize) {
+        const chunk = deliverable.slice(i, i + batchSize)
         const results = await client.sendEmailBatch(
             chunk.map((m) => ({
                 From: m.from,
@@ -237,11 +310,11 @@ export async function sendBatchEmails(
 
         // Pace only between chunks; a trailing sleep would stall the caller
         // (and burn Vercel function time) after the last message is away.
-        const hasMore = i + batchSize < messages.length
+        const hasMore = i + batchSize < deliverable.length
         if (hasMore && delayMs > 0) await sleep(delayMs)
     }
 
-    return { sent, failed, results: perMessage }
+    return { sent, failed, skipped, results: perMessage }
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +368,7 @@ export interface BroadcastOptions {
 
 export async function sendBroadcastEmails(
     opts: BroadcastOptions
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; skipped: number }> {
     const messages: BatchEmailMessage[] = opts.recipients.map((r) => ({
         from: opts.from,
         to: r.email,

@@ -3,17 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 // The Postmark SDK is replaced wholesale so no network call is made. The mock
 // records every batch it is handed, which is what the chunking assertions read.
 const sendEmailBatch = vi.fn()
+const sendSingleEmail = vi.fn()
 
 vi.mock("postmark", () => ({
     ServerClient: class {
         sendEmailBatch = sendEmailBatch
+        sendEmail = sendSingleEmail
     }
 }))
 
 import {
     isPermanentBounceType,
     resolveBatchThrottle,
-    sendBatchEmails
+    sendBatchEmails,
+    sendEmail
 } from "@/lib/postmark"
 
 function messages(count: number) {
@@ -140,6 +143,88 @@ describe("sendBatchEmails", () => {
         expect(result.failed).toBe(3)
         expect(result.results).toHaveLength(120)
         expect(result.results.filter((r) => r.errorCode !== 0)).toHaveLength(3)
+    })
+})
+
+describe("legacy placeholder addresses", () => {
+    // These addresses were invented by the archive backfill for players it
+    // could not match to a real account. Every message to one is a guaranteed
+    // hard bounce on a domain we own, which is what gets a sender throttled.
+    beforeEach(() => {
+        process.env.POSTMARK_SERVER_TOKEN = "test-token"
+        sendEmailBatch.mockReset()
+        sendSingleEmail.mockReset()
+        sendEmailBatch.mockImplementation((chunk: unknown[]) =>
+            Promise.resolve(chunk.map(() => ({ ErrorCode: 0, To: "x" })))
+        )
+        sendSingleEmail.mockResolvedValue({ MessageID: "real-id" })
+    })
+
+    const single = (to: string) => ({
+        from: "info@bumpsetdrink.com",
+        to,
+        subject: "Subject",
+        htmlBody: "<p>Body</p>"
+    })
+
+    it("does not submit a single send to a placeholder address", async () => {
+        const result = await sendEmail(
+            single("legacy-roster-jane-doe-f07-1@bumpsetdrink.com")
+        )
+
+        expect(result).toBeNull()
+        expect(sendSingleEmail).not.toHaveBeenCalled()
+    })
+
+    it("catches hall-of-champions placeholders and odd casing too", async () => {
+        expect(
+            await sendEmail(single("LEGACY-HOC-Jane-Doe@BumpSetDrink.com"))
+        ).toBeNull()
+        expect(sendSingleEmail).not.toHaveBeenCalled()
+    })
+
+    it("still sends to real addresses", async () => {
+        const result = await sendEmail(single("player@gmail.com"))
+
+        expect(result).toBe("real-id")
+        expect(sendSingleEmail).toHaveBeenCalledTimes(1)
+    })
+
+    it("drops placeholders from a batch without failing them", async () => {
+        const result = await sendBatchEmails(
+            [
+                ...messages(2),
+                single("legacy-roster-jane-doe-f07-1@bumpsetdrink.com"),
+                single("legacy-hoc-john-roe@bumpsetdrink.com")
+            ],
+            { batchSize: 50, delayMs: 0 }
+        )
+
+        // Only the two real recipients reach Postmark...
+        const submitted = sendEmailBatch.mock.calls.flatMap(
+            (call) => call[0] as Array<{ To: string }>
+        )
+        expect(submitted).toHaveLength(2)
+        expect(submitted.every((m) => !m.To.startsWith("legacy-"))).toBe(true)
+
+        // ...and the placeholders are reported as skipped, not as bounces. A
+        // caller correlating outcomes by address must still find every
+        // recipient it submitted.
+        expect(result.sent).toBe(2)
+        expect(result.failed).toBe(0)
+        expect(result.skipped).toBe(2)
+        expect(result.results).toHaveLength(4)
+        expect(result.results.filter((r) => r.skipped)).toHaveLength(2)
+    })
+
+    it("makes no Postmark call at all when every recipient is a placeholder", async () => {
+        const result = await sendBatchEmails([
+            single("legacy-roster-a-f07-1@bumpsetdrink.com"),
+            single("legacy-roster-b-f07-1@bumpsetdrink.com")
+        ])
+
+        expect(sendEmailBatch).not.toHaveBeenCalled()
+        expect(result).toMatchObject({ sent: 0, failed: 0, skipped: 2 })
     })
 })
 
