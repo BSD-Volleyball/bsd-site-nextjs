@@ -2,13 +2,17 @@ import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { db } from "@/database/db"
 import { drafts, teams, seasons, divisions } from "@/database/schema"
-import { eq, desc } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import type { Metadata } from "next"
-import { getEloLeaderboard, getPersonalAnalytics } from "@/lib/player-elo-data"
+import {
+    getAllSeasons,
+    getEloLeaderboard,
+    getPersonalAnalytics
+} from "@/lib/player-elo-data"
+import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { CareerStatsCards } from "./career-stats-cards"
 import { DivisionHistoryChart } from "./division-history-chart"
 import { EloLeaderboard } from "./elo-leaderboard"
-import { EloTrendChart } from "./elo-trend-chart"
 
 const LEADERBOARD_MIN_MATCHES = 10
 
@@ -27,12 +31,6 @@ interface DivisionHistoryItem {
     teamName: string
     round: number
     overall: number
-}
-
-interface SeasonInfo {
-    id: number
-    year: number
-    name: string
 }
 
 async function getDivisionHistory(
@@ -54,17 +52,6 @@ async function getDivisionHistory(
         .innerJoin(divisions, eq(teams.division, divisions.id))
         .where(eq(drafts.user, userId))
         .orderBy(seasons.year, seasons.id)
-}
-
-async function getAllSeasons(): Promise<SeasonInfo[]> {
-    return db
-        .select({
-            id: seasons.id,
-            year: seasons.year,
-            name: seasons.season
-        })
-        .from(seasons)
-        .orderBy(desc(seasons.id))
 }
 
 export default async function AnalyticsPage() {

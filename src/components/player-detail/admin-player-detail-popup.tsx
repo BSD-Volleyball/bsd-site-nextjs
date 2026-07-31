@@ -4,12 +4,18 @@ import { useEffect, useState } from "react"
 import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
+    PlayerAnalyticsResult,
     PlayerDetails,
     PlayerDraftHistory,
     PlayerSignup,
     PlayerSubHistoryEntry
 } from "@/app/dashboard/player-lookup/actions"
-import { getPlayerSubHistory } from "@/app/dashboard/player-lookup/actions"
+import {
+    getPlayerAnalytics,
+    getPlayerSubHistory
+} from "@/app/dashboard/player-lookup/actions"
+import { CareerStatTiles } from "@/components/analytics/career-stat-tiles"
+import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
@@ -30,6 +36,7 @@ interface AdminPlayerDetailPopupProps {
     draftHistory: PlayerDraftHistory[]
     signupHistory: PlayerSignup[]
     subHistory?: PlayerSubHistoryEntry[]
+    analytics?: PlayerAnalyticsResult | null
     playerPicUrl: string
     isLoading: boolean
     pairPickName?: string | null
@@ -55,6 +62,7 @@ export function AdminPlayerDetailPopup({
     draftHistory,
     signupHistory,
     subHistory: subHistoryProp,
+    analytics: analyticsProp,
     playerPicUrl,
     isLoading,
     pairPickName,
@@ -90,6 +98,27 @@ export function AdminPlayerDetailPopup({
         }
     }, [open, playerId, subHistoryProp])
     const subHistory = subHistoryProp ?? fetchedSubHistory
+
+    // Analytics follows the same prop-or-self-fetch contract as sub history.
+    const [fetchedAnalytics, setFetchedAnalytics] =
+        useState<PlayerAnalyticsResult | null>(null)
+    useEffect(() => {
+        if (analyticsProp !== undefined) return
+        if (!open || !playerId) {
+            setFetchedAnalytics(null)
+            return
+        }
+        let cancelled = false
+        setFetchedAnalytics(null)
+        ;(async () => {
+            const result = await getPlayerAnalytics(playerId)
+            if (!cancelled && result.status) setFetchedAnalytics(result.data)
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [open, playerId, analyticsProp])
+    const analytics = analyticsProp ?? fetchedAnalytics
 
     if (!open) return null
 
@@ -567,6 +596,35 @@ export function AdminPlayerDetailPopup({
             {draftHistory.length > 0 && !isLoading && (
                 <div className={inline ? "" : "px-6 pb-6"}>
                     <DraftPickChart draftHistory={draftHistory} />
+                </div>
+            )}
+
+            {/* Performance: skill rating trend and career records */}
+            {playerDetails && !isLoading && (
+                <div
+                    className={
+                        inline ? "space-y-4" : "space-y-4 px-6 pt-2 pb-6"
+                    }
+                >
+                    <h3 className="font-semibold text-sm">Performance</h3>
+                    {analytics ? (
+                        <>
+                            <EloTrendChart
+                                eloHistory={analytics.eloHistory}
+                                allSeasons={analytics.allSeasons}
+                                height={180}
+                            />
+                            <CareerStatTiles
+                                stats={analytics.careerStats}
+                                championships={analytics.championships}
+                                gridClassName="grid grid-cols-2 gap-3"
+                            />
+                        </>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">
+                            Loading analytics...
+                        </p>
+                    )}
                 </div>
             )}
 

@@ -38,9 +38,15 @@ interface EloHistoryItem {
 interface EloTrendChartProps {
     eloHistory: EloHistoryItem[]
     allSeasons: { id: number; year: number; name: string }[]
+    /** Chart height in px. The popup renders a shorter chart than the page. */
+    height?: number
 }
 
-export function EloTrendChart({ eloHistory, allSeasons }: EloTrendChartProps) {
+export function EloTrendChart({
+    eloHistory,
+    allSeasons,
+    height = 250
+}: EloTrendChartProps) {
     if (eloHistory.length === 0) {
         return (
             <Card>
@@ -190,7 +196,7 @@ export function EloTrendChart({ eloHistory, allSeasons }: EloTrendChartProps) {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={height}>
                     <LineChart
                         data={chartData}
                         margin={{ top: 5, right: 20, bottom: 5, left: 0 }}

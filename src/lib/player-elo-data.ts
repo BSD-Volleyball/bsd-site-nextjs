@@ -47,6 +47,12 @@ export interface PersonalAnalytics {
     topCaptains: FrequentPerson[]
 }
 
+export interface SeasonInfo {
+    id: number
+    year: number
+    name: string
+}
+
 export interface LeaderboardRow {
     userId: string
     name: string
@@ -57,6 +63,18 @@ export interface LeaderboardRow {
 
 function formatSeasonLabel(name: string, year: number): string {
     return `${name.charAt(0).toUpperCase() + name.slice(1)} ${year}`
+}
+
+/** Season list used to label points on the ELO trend chart. */
+export async function getAllSeasons(): Promise<SeasonInfo[]> {
+    return db
+        .select({
+            id: seasons.id,
+            year: seasons.year,
+            name: seasons.season
+        })
+        .from(seasons)
+        .orderBy(desc(seasons.id))
 }
 
 /**

@@ -34,6 +34,14 @@ import type {
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
+import type { CareerStats } from "@/lib/player-career-stats"
+import type { EloHistoryPoint } from "@/lib/player-elo"
+import {
+    getAllSeasons,
+    getPersonalAnalytics,
+    type ChampionshipEntry,
+    type SeasonInfo
+} from "@/lib/player-elo-data"
 import { getDraftHistoryForUser } from "@/lib/roster"
 import { formatDisplayName } from "@/lib/utils"
 
@@ -481,3 +489,41 @@ export async function getPlayerSubHistory(
     entries.sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
     return entries
 }
+
+export interface PlayerAnalyticsResult {
+    eloHistory: EloHistoryPoint[]
+    currentRating: number | null
+    careerStats: CareerStats
+    championships: ChampionshipEntry[]
+    allSeasons: SeasonInfo[]
+}
+
+/**
+ * Skill rating trend plus career match/set/playoff records for one player.
+ * Same computation the personal analytics page uses, exposed to admins for any
+ * player. Admin/commissioner only.
+ */
+export const getPlayerAnalytics = withAction(
+    async (playerId: string): Promise<ActionResult<PlayerAnalyticsResult>> => {
+        const hasAccess = await isCommissionerBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
+        }
+        if (typeof playerId !== "string" || !playerId) {
+            return fail("Invalid player.")
+        }
+
+        const [personal, allSeasons] = await Promise.all([
+            getPersonalAnalytics(playerId),
+            getAllSeasons()
+        ])
+
+        return ok({
+            eloHistory: personal.eloHistory,
+            currentRating: personal.currentRating,
+            careerStats: personal.careerStats,
+            championships: personal.championships,
+            allSeasons
+        })
+    }
+)

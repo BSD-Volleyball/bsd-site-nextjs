@@ -1,0 +1,103 @@
+import { describe, expect, it } from "vitest"
+import { db } from "@/database/db"
+import { drafts } from "@/database/schema"
+import {
+    createDivision,
+    createMatch,
+    createSeason,
+    createTeam
+} from "@/test/factories"
+import { createUser, createUserWithRoles, logout } from "@/test/session"
+import { getPlayerAnalytics } from "./actions"
+
+// One recorded match: the target player's team sweeps 2-0, so career stats
+// should read 1-0 in matches, 2-0 in sets, and the player should pick up an
+// ELO history point.
+async function seedOneMatch() {
+    const season = await createSeason()
+    const division = await createDivision({ name: "A", level: 2 })
+    const winner = await createUser()
+    const loser = await createUser()
+    const captain = await createUser()
+
+    const homeTeam = await createTeam({
+        season: season.id,
+        division: division.id,
+        captain: captain.id,
+        name: "Home"
+    })
+    const awayTeam = await createTeam({
+        season: season.id,
+        division: division.id,
+        captain: captain.id,
+        name: "Away"
+    })
+    await db.insert(drafts).values([
+        { team: homeTeam.id, user: winner.id, round: 1, overall: 1 },
+        { team: awayTeam.id, user: loser.id, round: 1, overall: 2 }
+    ])
+    await createMatch({
+        season: season.id,
+        division: division.id,
+        week: 1,
+        home_team: homeTeam.id,
+        away_team: awayTeam.id,
+        winner: homeTeam.id,
+        home_set1_score: 25,
+        away_set1_score: 18,
+        home_set2_score: 25,
+        away_set2_score: 20
+    })
+
+    return { winner, loser }
+}
+
+describe("getPlayerAnalytics", () => {
+    it("returns career stats and rating history for an admin", async () => {
+        const { winner } = await seedOneMatch()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerAnalytics(winner.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.careerStats.matchWins).toBe(1)
+        expect(result.data.careerStats.matchLosses).toBe(0)
+        expect(result.data.careerStats.setWins).toBe(2)
+        expect(result.data.careerStats.setLosses).toBe(0)
+        expect(result.data.eloHistory).toHaveLength(1)
+        expect(result.data.currentRating).not.toBeNull()
+        expect(result.data.allSeasons.length).toBeGreaterThan(0)
+    })
+
+    it("counts the losing side's record too", async () => {
+        const { loser } = await seedOneMatch()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerAnalytics(loser.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.careerStats.matchWins).toBe(0)
+        expect(result.data.careerStats.matchLosses).toBe(1)
+        expect(result.data.careerStats.setLosses).toBe(2)
+    })
+
+    it("rejects an authenticated non-admin", async () => {
+        const player = await createUser()
+        await createUserWithRoles([{ role: "captain" }])
+
+        const result = await getPlayerAnalytics(player.id)
+
+        expect(result.status).toBe(false)
+    })
+
+    it("rejects an unauthenticated caller", async () => {
+        const player = await createUser()
+        logout()
+
+        const result = await getPlayerAnalytics(player.id)
+
+        expect(result.status).toBe(false)
+    })
+})
