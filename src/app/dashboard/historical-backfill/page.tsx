@@ -2,8 +2,9 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrRedirect } from "@/lib/page-guards"
-import { getHistoricalCoverage } from "./actions"
+import { getHistoricalCoverage, getLegacyAccounts } from "./actions"
 import { CoverageTable } from "./coverage-table"
+import { LegacyAccountsPanel } from "./legacy-accounts-panel"
 
 export const metadata: Metadata = {
     title: "Historical Backfill"
@@ -17,7 +18,10 @@ export const dynamic = "force-dynamic"
 export default async function HistoricalBackfillPage() {
     await requireAdminOrRedirect()
 
-    const result = await getHistoricalCoverage()
+    const [result, legacyResult] = await Promise.all([
+        getHistoricalCoverage(),
+        getLegacyAccounts()
+    ])
 
     return (
         <div className="space-y-6">
@@ -31,6 +35,14 @@ export default async function HistoricalBackfillPage() {
                 </StatusBanner>
             ) : (
                 <CoverageTable coverage={result.data} />
+            )}
+            {!legacyResult.status ? (
+                <StatusBanner variant="error">
+                    {legacyResult.message ||
+                        "Failed to load legacy placeholder accounts."}
+                </StatusBanner>
+            ) : (
+                <LegacyAccountsPanel accounts={legacyResult.data} />
             )}
         </div>
     )

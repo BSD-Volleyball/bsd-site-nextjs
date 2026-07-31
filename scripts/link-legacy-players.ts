@@ -29,6 +29,9 @@ import "dotenv/config"
 import fs from "node:fs"
 import path from "node:path"
 import { Client } from "pg"
+// The nickname table and the name comparison live in src/lib so the admin UI
+// at /dashboard/historical-backfill proposes exactly what this script would.
+import { norm, reasonFor } from "@/lib/legacy-matching"
 
 // Pins the run to the set that was reviewed and approved. If the data has
 // shifted enough to change these totals, stop and re-review rather than
@@ -36,140 +39,11 @@ import { Client } from "pg"
 const EXPECTED_ACCOUNTS = 40
 const EXPECTED_ROWS = 118
 
-const NICKNAMES: [string, string][] = [
-    ["mike", "michael"],
-    ["mikey", "michael"],
-    ["bob", "robert"],
-    ["rob", "robert"],
-    ["bobby", "robert"],
-    ["bill", "william"],
-    ["will", "william"],
-    ["billy", "william"],
-    ["jim", "james"],
-    ["jimmy", "james"],
-    ["jamie", "james"],
-    ["dave", "david"],
-    ["dan", "daniel"],
-    ["danny", "daniel"],
-    ["tom", "thomas"],
-    ["tommy", "thomas"],
-    ["chris", "christopher"],
-    ["chris", "christina"],
-    ["chris", "christine"],
-    ["steve", "steven"],
-    ["steve", "stephen"],
-    ["joe", "joseph"],
-    ["joey", "joseph"],
-    ["tony", "anthony"],
-    ["nick", "nicholas"],
-    ["matt", "matthew"],
-    ["jeff", "jeffrey"],
-    ["ken", "kenneth"],
-    ["ron", "ronald"],
-    ["rick", "richard"],
-    ["dick", "richard"],
-    ["rich", "richard"],
-    ["ed", "edward"],
-    ["eddie", "edward"],
-    ["ted", "edward"],
-    ["greg", "gregory"],
-    ["andy", "andrew"],
-    ["drew", "andrew"],
-    ["pete", "peter"],
-    ["sam", "samuel"],
-    ["sam", "samantha"],
-    ["ben", "benjamin"],
-    ["alex", "alexander"],
-    ["alex", "alexandra"],
-    ["max", "maxwell"],
-    ["phil", "philip"],
-    ["phil", "phillip"],
-    ["tim", "timothy"],
-    ["ray", "raymond"],
-    ["larry", "lawrence"],
-    ["jerry", "gerald"],
-    ["frank", "franklin"],
-    ["doug", "douglas"],
-    ["don", "donald"],
-    ["hank", "henry"],
-    ["gabe", "gabriel"],
-    ["zach", "zachary"],
-    ["josh", "joshua"],
-    ["nate", "nathan"],
-    ["vince", "vincent"],
-    ["pat", "patrick"],
-    ["pat", "patricia"],
-    ["kate", "katherine"],
-    ["katie", "katherine"],
-    ["kathy", "katherine"],
-    ["cathy", "catherine"],
-    ["liz", "elizabeth"],
-    ["beth", "elizabeth"],
-    ["betsy", "elizabeth"],
-    ["sue", "susan"],
-    ["susie", "susan"],
-    ["jen", "jennifer"],
-    ["jenny", "jennifer"],
-    ["becky", "rebecca"],
-    ["becca", "rebecca"],
-    ["deb", "deborah"],
-    ["debbie", "deborah"],
-    ["kim", "kimberly"],
-    ["cindy", "cynthia"],
-    ["peggy", "margaret"],
-    ["maggie", "margaret"],
-    ["meg", "margaret"],
-    ["nancy", "ann"],
-    ["annie", "ann"],
-    ["barb", "barbara"],
-    ["barbie", "barbara"],
-    ["carol", "caroline"],
-    ["char", "charlotte"],
-    ["dee", "diane"],
-    ["jess", "jessica"],
-    ["mandy", "amanda"],
-    ["mel", "melissa"],
-    ["mel", "melanie"],
-    ["nat", "natalie"],
-    ["steph", "stephanie"],
-    ["tina", "christina"],
-    ["trish", "patricia"],
-    ["val", "valerie"],
-    ["vicky", "victoria"]
-]
-
-const nickMap = new Map<string, Set<string>>()
-for (const [a, b] of NICKNAMES) {
-    if (!nickMap.has(a)) nickMap.set(a, new Set())
-    if (!nickMap.has(b)) nickMap.set(b, new Set())
-    nickMap.get(a)?.add(b)
-    nickMap.get(b)?.add(a)
-}
-
 // Two members hold duplicate accounts. The pre-2012 rows go to whichever
 // already holds their 2012-2024 history; the other is empty.
 const DUPLICATE_TARGET: Record<string, string> = {
     "isabel|llerena": "SWsg24LVnCsNaY7pAMjeya4pHR6Uj8dc",
     "mae ling|chen": "4eVBhrjEC6GQbwPeb3yNRX2rYHCKkDqQ"
-}
-
-const norm = (s: string) =>
-    (s ?? "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z ]/g, "")
-
-function reasonFor(a: string, b: string): string | null {
-    if (a === b) return "exact"
-    if (nickMap.get(a)?.has(b)) return "nickname"
-    if (a.replace(/\s/g, "") === b.replace(/\s/g, "")) return "spacing"
-    if (
-        (a.startsWith(b) || b.startsWith(a)) &&
-        Math.min(a.length, b.length) >= 3
-    ) {
-        return "prefix"
-    }
-    return null
 }
 
 interface Link {

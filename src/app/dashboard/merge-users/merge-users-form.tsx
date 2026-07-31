@@ -1,16 +1,11 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState } from "react"
 import type { UserOption } from "./actions"
 import { mergeUsers } from "./actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover"
+import { UserEmailCombobox } from "@/components/user-combobox"
 import {
     Dialog,
     DialogContent,
@@ -19,103 +14,6 @@ import {
     DialogDescription,
     DialogFooter
 } from "@/components/ui/dialog"
-
-function UserCombobox({
-    users,
-    value,
-    onChange,
-    placeholder
-}: {
-    users: UserOption[]
-    value: string
-    onChange: (id: string) => void
-    placeholder: string
-}) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState("")
-    const inputRef = useRef<HTMLInputElement>(null)
-
-    const selectedUser = users.find((u) => u.id === value)
-
-    const filtered = users.filter((u) => {
-        const q = search.toLowerCase()
-        return (
-            u.name.toLowerCase().includes(q) ||
-            (u.phone?.toLowerCase().includes(q) ?? false)
-        )
-    })
-
-    useEffect(() => {
-        if (open) {
-            setTimeout(() => inputRef.current?.focus(), 0)
-        }
-    }, [open])
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-start font-normal"
-                >
-                    {selectedUser ? (
-                        <span className="truncate">
-                            {selectedUser.name} ({selectedUser.email})
-                            {selectedUser.phone && ` - ${selectedUser.phone}`}
-                        </span>
-                    ) : (
-                        <span className="text-muted-foreground">
-                            {placeholder}
-                        </span>
-                    )}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-[var(--radix-popover-trigger-width)] p-0"
-                align="start"
-            >
-                <div className="border-b p-2">
-                    <Input
-                        ref={inputRef}
-                        placeholder="Search by name or phone..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="h-8"
-                    />
-                </div>
-                <div className="max-h-60 overflow-y-auto p-1">
-                    {filtered.length === 0 ? (
-                        <p className="p-2 text-center text-muted-foreground text-sm">
-                            No users found.
-                        </p>
-                    ) : (
-                        filtered.map((user) => (
-                            <button
-                                key={user.id}
-                                type="button"
-                                className={`flex w-full cursor-pointer flex-col gap-0.5 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent ${
-                                    value === user.id ? "bg-accent" : ""
-                                }`}
-                                onClick={() => {
-                                    onChange(user.id)
-                                    setOpen(false)
-                                    setSearch("")
-                                }}
-                            >
-                                <span className="font-medium">{user.name}</span>
-                                <span className="text-muted-foreground text-xs">
-                                    {user.phone || "No phone"}
-                                </span>
-                            </button>
-                        ))
-                    )}
-                </div>
-            </PopoverContent>
-        </Popover>
-    )
-}
 
 export function MergeUsersForm({
     oldUsers,
@@ -172,7 +70,7 @@ export function MergeUsersForm({
                         <label className="font-medium text-sm">
                             Old User (will be deleted)
                         </label>
-                        <UserCombobox
+                        <UserEmailCombobox
                             users={oldUsers}
                             value={oldUserId}
                             onChange={setOldUserId}
@@ -188,7 +86,7 @@ export function MergeUsersForm({
                         <label className="font-medium text-sm">
                             New User (will be kept)
                         </label>
-                        <UserCombobox
+                        <UserEmailCombobox
                             users={newUsers}
                             value={newUserId}
                             onChange={setNewUserId}
