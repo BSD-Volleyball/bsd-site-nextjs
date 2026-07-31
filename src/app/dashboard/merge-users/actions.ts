@@ -55,17 +55,12 @@ export interface UserOption {
 
 // Both sides of the merge form draw from the same pool: any account may be
 // merged into any other, in either direction.
-async function getMergeableUsers(): Promise<UserOption[]> {
-    const user = await getSessionUser()
-    if (!user) {
-        return []
-    }
-
-    const hasAccess = await isAdminOrDirector(user.id)
-    if (!hasAccess) {
-        return []
-    }
-
+//
+// The guard lives in each exported action rather than here, so that
+// authorization is enforced at the action boundary as AGENTS.md requires --
+// and so scripts/security/authz-regression-check.js can see it. A guard behind
+// a delegate is invisible to that check, which is the point of the check.
+async function listMergeableUsers(): Promise<UserOption[]> {
     const results = await db
         .select({
             id: users.id,
@@ -90,11 +85,19 @@ async function getMergeableUsers(): Promise<UserOption[]> {
 }
 
 export async function getOldUsers(): Promise<UserOption[]> {
-    return getMergeableUsers()
+    const user = await getSessionUser()
+    if (!user || !(await isAdminOrDirector(user.id))) {
+        return []
+    }
+    return listMergeableUsers()
 }
 
 export async function getNewUsers(): Promise<UserOption[]> {
-    return getMergeableUsers()
+    const user = await getSessionUser()
+    if (!user || !(await isAdminOrDirector(user.id))) {
+        return []
+    }
+    return listMergeableUsers()
 }
 
 export const mergeUsers = withAction(
