@@ -237,18 +237,30 @@ export function EvaluatePlayersList({
         })
     }, [players, search])
 
+    // Snapshot of who was already evaluated when the page was opened. Kept in
+    // mount-time state (never updated) so rating a player does not make the row
+    // jump between sections mid-session — it moves the next time the page loads.
+    const [initiallyEvaluated] = useState<Set<string>>(
+        () =>
+            new Set(
+                players
+                    .filter((p) => p.currentUserEvaluation !== null)
+                    .map((p) => p.userId)
+            )
+    )
+
     const { pendingPlayers, evaluatedPlayers } = useMemo(() => {
         const pending: NewPlayerEntry[] = []
         const evaluated: NewPlayerEntry[] = []
         for (const player of filteredPlayers) {
-            if (selections[player.userId]) {
+            if (initiallyEvaluated.has(player.userId)) {
                 evaluated.push(player)
             } else {
                 pending.push(player)
             }
         }
         return { pendingPlayers: pending, evaluatedPlayers: evaluated }
-    }, [filteredPlayers, selections])
+    }, [filteredPlayers, initiallyEvaluated])
 
     const evaluatedCount = Object.keys(selections).length
 
