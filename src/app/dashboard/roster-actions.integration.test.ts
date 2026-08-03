@@ -1,9 +1,15 @@
+import { and, eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { drafts } from "@/database/schema"
-import { createDivision, createSeason, createTeam } from "@/test/factories"
+import { drafts, waitlist, waiverAcceptances } from "@/database/schema"
+import {
+    createDivision,
+    createSeason,
+    createTeam,
+    createWaiver
+} from "@/test/factories"
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
-import { getTeamRoster } from "./roster-actions"
+import { expressWaitlistInterest, getTeamRoster } from "./roster-actions"
 
 // Seeds a past season and a current season, each with one team whose captain
 // drafted one player. getSeasonConfig resolves the highest season id as
@@ -108,5 +114,102 @@ describe("getTeamRoster", () => {
         const result = await getTeamRoster(currentTeam.id)
         expect(result.status).toBe(true)
         expect(result.teamName).toBe("Current Team")
+    })
+})
+
+describe("expressWaitlistInterest", () => {
+    it("rejects unauthenticated callers", async () => {
+        const season = await createSeason()
+        const waiver = await createWaiver()
+
+        const result = await expressWaitlistInterest(season.id, waiver.id, true)
+        expect(result).toEqual({
+            status: false,
+            message: "Not authenticated."
+        })
+    })
+
+    it("records the waitlist row and the waiver acceptance", async () => {
+        const season = await createSeason()
+        const waiver = await createWaiver()
+        const player = await createUserWithRoles([])
+
+        const result = await expressWaitlistInterest(season.id, waiver.id, true)
+        expect(result.status).toBe(true)
+
+        const rows = await db
+            .select()
+            .from(waitlist)
+            .where(
+                and(
+                    eq(waitlist.season, season.id),
+                    eq(waitlist.user, player.id)
+                )
+            )
+        expect(rows).toHaveLength(1)
+        expect(rows[0].approved).toBe(false)
+
+        const acceptances = await db
+            .select()
+            .from(waiverAcceptances)
+            .where(
+                and(
+                    eq(waiverAcceptances.user_id, player.id),
+                    eq(waiverAcceptances.waiver_id, waiver.id)
+                )
+            )
+        expect(acceptances).toHaveLength(1)
+    })
+
+    it("rejects a join without waiver agreement", async () => {
+        const season = await createSeason()
+        const waiver = await createWaiver()
+        const player = await createUserWithRoles([])
+
+        const result = await expressWaitlistInterest(
+            season.id,
+            waiver.id,
+            false
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toBe(
+            "You must agree to the waiver to join the waitlist."
+        )
+
+        const rows = await db
+            .select()
+            .from(waitlist)
+            .where(eq(waitlist.user, player.id))
+        expect(rows).toHaveLength(0)
+    })
+
+    it("rejects a stale waiver version", async () => {
+        const season = await createSeason()
+        const oldWaiver = await createWaiver({ active: false })
+        await createWaiver({ content: "Republished waiver", active: true })
+        await createUserWithRoles([])
+
+        const result = await expressWaitlistInterest(
+            season.id,
+            oldWaiver.id,
+            true
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("reload")
+    })
+
+    it("rejects a duplicate join for the same season", async () => {
+        const season = await createSeason()
+        const waiver = await createWaiver()
+        await createUserWithRoles([])
+
+        const first = await expressWaitlistInterest(season.id, waiver.id, true)
+        expect(first.status).toBe(true)
+
+        const second = await expressWaitlistInterest(season.id, waiver.id, true)
+        expect(second).toEqual({
+            status: false,
+            message: "You've already expressed interest for this season."
+        })
     })
 })
