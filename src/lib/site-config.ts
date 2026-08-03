@@ -10,7 +10,11 @@ import {
     waitlist
 } from "@/database/schema"
 import { eq, desc, count, and, asc } from "drizzle-orm"
-import { SEASON_PHASES, type SeasonPhase } from "@/lib/season-phases"
+import {
+    SEASON_PHASES,
+    isSeasonRegistrationOpen,
+    type SeasonPhase
+} from "@/lib/season-phases"
 import type { EventType, SeasonEvent, SeasonConfig } from "@/lib/season-types"
 import { getEventsByType } from "@/lib/season-utils"
 
@@ -135,7 +139,7 @@ export function isLatePricing(config: SeasonConfig): boolean {
 export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const config = await getSeasonConfig()
 
-    if (config.phase !== "registration_open" || !config.seasonId) {
+    if (!isSeasonRegistrationOpen(config.phase) || !config.seasonId) {
         return false
     }
 

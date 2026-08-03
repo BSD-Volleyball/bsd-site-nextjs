@@ -2,6 +2,7 @@ import { HeroSection } from "@/components/layout/sections/hero"
 import { site } from "@/config/site"
 import { auth } from "@/lib/auth"
 import { getTournamentConfig } from "@/lib/tournament-config"
+import { isSeasonRegistrationOpen } from "@/lib/season-phases"
 import {
     getSeasonConfig,
     formatSeasonLabel,
@@ -115,7 +116,7 @@ export default async function Home() {
     // Registration banner: show only while the season is accepting signups.
     // The key-date line degrades gracefully if a partially-configured season
     // is opened before every event date has been entered.
-    const registrationOpen = seasonConfig.phase === "registration_open"
+    const registrationOpen = isSeasonRegistrationOpen(seasonConfig.phase)
     const registrationDeadline = getEventsByType(seasonConfig, "late_date")[0]
     const firstTryout = getEventsByType(seasonConfig, "tryout")[0]
     const registrationDateLine = registrationDeadline
@@ -176,7 +177,8 @@ export default async function Home() {
             )}
 
             {/* Registration Open Callout — renders only while the current
-                season's phase is registration_open. Mirrors the tournament
+                season's phase still accepts signups (through Select
+                Captains; see season-phases). Mirrors the tournament
                 callout above so the two read as the same component family;
                 if both are active they stack, tournament first. */}
             {registrationOpen && (

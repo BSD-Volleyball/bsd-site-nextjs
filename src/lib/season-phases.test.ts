@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+    isSeasonRegistrationOpen,
     isValidPhaseRevert,
     isValidPhaseTransition,
     PHASE_CONFIG,
@@ -34,6 +35,33 @@ describe("PHASE_CONFIG", () => {
             for (const next of PHASE_CONFIG[phase].nextPhases) {
                 expect(known.has(next)).toBe(true)
             }
+        }
+    })
+})
+
+describe("isSeasonRegistrationOpen", () => {
+    it("stays open from registration_open through select_captains", () => {
+        expect(isSeasonRegistrationOpen("registration_open")).toBe(true)
+        expect(isSeasonRegistrationOpen("select_commissioners")).toBe(true)
+        expect(isSeasonRegistrationOpen("select_captains")).toBe(true)
+    })
+
+    it("closes at prep_tryout_week_1 and never reopens", () => {
+        const closed: SeasonPhase[] = [
+            "off_season",
+            "prep_tryout_week_1",
+            "prep_tryout_week_2",
+            "prep_tryout_week_3",
+            "draft",
+            "regular_season",
+            "playoffs",
+            "complete"
+        ]
+        for (const phase of closed) {
+            expect(
+                isSeasonRegistrationOpen(phase),
+                `${phase} should not accept signups`
+            ).toBe(false)
         }
     })
 })

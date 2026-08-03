@@ -33,6 +33,7 @@ import {
     formatShortDate,
     formatEventTime
 } from "@/lib/site-config"
+import { isSeasonRegistrationOpen } from "@/lib/season-phases"
 import { getActiveDiscountForUser } from "@/lib/discount"
 import { getActiveWaiver } from "@/lib/waivers"
 import { PreviousSeasonsCard } from "./previous-seasons-card"
@@ -1881,8 +1882,9 @@ export default async function DashboardPage() {
                                         ).toLocaleDateString("en-US")}
                                     </p>
                                 )}
-                                {signupStatus.config.phase ===
-                                    "registration_open" && (
+                                {isSeasonRegistrationOpen(
+                                    signupStatus.config.phase
+                                ) && (
                                     <Link
                                         href="/dashboard/pay-season"
                                         className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 font-medium text-sm text-white hover:bg-green-700"
@@ -1910,9 +1912,11 @@ export default async function DashboardPage() {
                                 <p className="text-muted-foreground">
                                     Check back soon for the next season!
                                 </p>
-                            ) : signupStatus.config.phase ===
-                              "registration_open" ? (
-                                /* Registration phase: signup confirmation, waitlist, or signup CTA */
+                            ) : isSeasonRegistrationOpen(
+                                  signupStatus.config.phase
+                              ) ? (
+                                /* Registration phases (through Select Captains):
+                                   signup confirmation, waitlist, or signup CTA */
                                 signupStatus.signup ? (
                                     <RegistrationConfirmation
                                         signupStatus={signupStatus}
@@ -1932,9 +1936,6 @@ export default async function DashboardPage() {
                                     />
                                 )
                             ) : signupStatus.config.phase ===
-                                  "select_commissioners" ||
-                              signupStatus.config.phase === "select_captains" ||
-                              signupStatus.config.phase ===
                                   "prep_tryout_week_1" ||
                               signupStatus.config.phase ===
                                   "prep_tryout_week_2" ||

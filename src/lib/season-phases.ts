@@ -46,7 +46,7 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
         label: "Registration Open",
         description: "Players can sign up and pay for the season.",
         adminHint:
-            "Monitor signups. Close registration when ready to select commissioners.",
+            "Monitor signups. Advance when ready to select commissioners — registration stays open until Prepare for Tryout Week 1 or the season fills.",
         showRegistration: true,
         showTryoutTools: false,
         showDraftTools: false,
@@ -58,10 +58,10 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
     select_commissioners: {
         label: "Select Commissioners",
         description:
-            "Registration is closed. Assign commissioners for each division.",
+            "Registration is still open. Assign commissioners for each division.",
         adminHint:
-            "Assign commissioners for the season. Advance when all divisions have commissioners.",
-        showRegistration: false,
+            "Assign commissioners for the season. Advance when all divisions have commissioners. Registration stays open.",
+        showRegistration: true,
         showTryoutTools: true,
         showDraftTools: false,
         showSeasonTools: false,
@@ -71,10 +71,11 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
     },
     select_captains: {
         label: "Select Captains",
-        description: "Commissioners select team captains for their divisions.",
+        description:
+            "Registration is still open. Commissioners select team captains for their divisions.",
         adminHint:
-            "Commissioners should identify and select captains. Advance when captains are confirmed.",
-        showRegistration: false,
+            "Commissioners should identify and select captains. Advance when captains are confirmed. Registration stays open until Prepare for Tryout Week 1.",
+        showRegistration: true,
         showTryoutTools: true,
         showDraftTools: false,
         showSeasonTools: false,
@@ -175,6 +176,19 @@ export const PHASE_CONFIG: Record<SeasonPhase, PhaseConfig> = {
         nextPhases: [],
         previousPhase: "playoffs"
     }
+}
+
+/**
+ * Whether the season is still accepting signups at this phase.
+ *
+ * Registration opens at `registration_open` and stays open through
+ * commissioner and captain selection; it closes when Week 1 tryout prep
+ * begins. The player cap (`seasons.max_players`) is enforced separately in
+ * `checkSignupEligibility`/`validateFinalSignupAvailability`, so signups stop
+ * at whichever comes first: this phase boundary or a full season.
+ */
+export function isSeasonRegistrationOpen(phase: SeasonPhase): boolean {
+    return PHASE_CONFIG[phase].showRegistration
 }
 
 export function isValidPhaseTransition(
