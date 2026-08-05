@@ -2,6 +2,7 @@ import { db } from "@/database/db"
 import {
     signups,
     userUnavailability,
+    seasonEvents,
     week1Rosters,
     week2Rosters,
     week3Rosters,
@@ -27,6 +28,27 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = "force-dynamic"
+
+/**
+ * The user's unavailable dates for one season. Scoped by season on purpose:
+ * rows can outlive the season they were entered for, and an unscoped read
+ * feeds prior-season ids straight back into the form, which then submits them.
+ */
+async function selectUnavailableEventIds(userId: string, seasonId: number) {
+    return db
+        .select({ eventId: userUnavailability.event_id })
+        .from(userUnavailability)
+        .innerJoin(
+            seasonEvents,
+            eq(seasonEvents.id, userUnavailability.event_id)
+        )
+        .where(
+            and(
+                eq(userUnavailability.user_id, userId),
+                eq(seasonEvents.season_id, seasonId)
+            )
+        )
+}
 
 export default async function MyAvailabilityPage() {
     const session = await requireSessionOrRedirect()
@@ -88,10 +110,7 @@ export default async function MyAvailabilityPage() {
 
         // Ref without a player signup — show availability form with no scheduled times
         const [unavailRows, refReturningRow] = await Promise.all([
-            db
-                .select({ eventId: userUnavailability.event_id })
-                .from(userUnavailability)
-                .where(eq(userUnavailability.user_id, session.user.id)),
+            selectUnavailableEventIds(session.user.id, config.seasonId),
             db
                 .select({ user: drafts.user })
                 .from(drafts)
@@ -120,10 +139,7 @@ export default async function MyAvailabilityPage() {
     // Fetch unavailability + roster placements + team assignment in parallel
     const [unavailRows, week1Row, week2Row, week3Row, draftRow, returningRow] =
         await Promise.all([
-            db
-                .select({ eventId: userUnavailability.event_id })
-                .from(userUnavailability)
-                .where(eq(userUnavailability.user_id, session.user.id)),
+            selectUnavailableEventIds(session.user.id, config.seasonId),
             db
                 .select({ sessionNumber: week1Rosters.session_number })
                 .from(week1Rosters)

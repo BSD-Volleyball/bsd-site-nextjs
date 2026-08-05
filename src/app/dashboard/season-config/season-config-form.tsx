@@ -3,6 +3,16 @@
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,10 +35,13 @@ interface TimeSlotState {
 
 interface EventState {
     key: string
+    /** Existing season_events row, or null for one added in this editing session. */
+    id: number | null
     event_type: EventType
     event_date: string
     sort_order: number
     label: string
+    unavailable_player_count: number
     time_slots: TimeSlotState[]
 }
 
@@ -91,10 +104,12 @@ function nextKey(): string {
 function buildInitialEvents(data: SeasonConfigData): EventState[] {
     return data.events.map((e) => ({
         key: nextKey(),
+        id: e.id,
         event_type: e.event_type,
         event_date: e.event_date,
         sort_order: e.sort_order,
         label: e.label || "",
+        unavailable_player_count: e.unavailable_player_count,
         time_slots: e.time_slots.map((ts) => ({
             key: nextKey(),
             start_time: ts.start_time.slice(0, 5),
@@ -125,6 +140,10 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
     const [events, setEvents] = useState<EventState[]>(() =>
         buildInitialEvents(initialData)
     )
+    const [pendingRemoval, setPendingRemoval] = useState<EventState | null>(
+        null
+    )
+    const [confirmedDeletions, setConfirmedDeletions] = useState(false)
 
     const getEventsByType = useCallback(
         (type: EventType) =>
@@ -144,17 +163,33 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             ...prev,
             {
                 key: nextKey(),
+                id: null,
                 event_type: type,
                 event_date: "",
                 sort_order: maxOrder + 1,
                 label: "",
+                unavailable_player_count: 0,
                 time_slots: []
             }
         ])
     }
 
     function removeEvent(key: string) {
+        const event = events.find((e) => e.key === key)
+        // Dropping a date deletes the availability players entered against it,
+        // and there is no undo — make the admin acknowledge the cost first.
+        if (event && event.unavailable_player_count > 0) {
+            setPendingRemoval(event)
+            return
+        }
         setEvents((prev) => prev.filter((e) => e.key !== key))
+    }
+
+    function confirmRemoval() {
+        if (!pendingRemoval) return
+        setEvents((prev) => prev.filter((e) => e.key !== pendingRemoval.key))
+        setConfirmedDeletions(true)
+        setPendingRemoval(null)
     }
 
     function updateEvent(
@@ -254,6 +289,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                     })
                 )
                 eventData.push({
+                    id: e.id,
                     event_type: e.event_type,
                     event_date: e.event_date,
                     sort_order: idx + 1,
@@ -274,11 +310,14 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                 certified_ref_rate: certifiedRefRate,
                 uncertified_ref_rate: uncertifiedRefRate
             },
-            eventData
+            eventData,
+            { confirmDeletions: confirmedDeletions }
         )
 
         if (result.status) {
             toast.success(result.message)
+            // Reload so event ids and availability counts match the DB again.
+            setConfirmedDeletions(false)
             router.refresh()
         } else {
             toast.error(result.message)
@@ -466,6 +505,18 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                                         </Button>
                                     </div>
 
+                                    {event.unavailable_player_count > 0 && (
+                                        <p className="ml-9 text-muted-foreground text-xs">
+                                            {event.unavailable_player_count}{" "}
+                                            {event.unavailable_player_count ===
+                                            1
+                                                ? "player has"
+                                                : "players have"}{" "}
+                                            marked themselves unavailable for
+                                            this date.
+                                        </p>
+                                    )}
+
                                     {/* Time Slots */}
                                     {config.hasTimeSlots && (
                                         <div className="ml-9 space-y-2">
@@ -564,6 +615,39 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                     {saving ? "Saving..." : "Save Configuration"}
                 </Button>
             </div>
+
+            <AlertDialog
+                open={pendingRemoval !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPendingRemoval(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Remove this date and its availability?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingRemoval?.unavailable_player_count === 1
+                                ? "1 player has"
+                                : `${pendingRemoval?.unavailable_player_count} players have`}{" "}
+                            marked themselves unavailable for{" "}
+                            {pendingRemoval?.label ||
+                                pendingRemoval?.event_date}
+                            . Removing the date deletes those entries
+                            permanently — they cannot be recovered, and players
+                            would have to re-enter them. To move the date
+                            instead, edit it in place rather than removing it.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmRemoval}>
+                            Remove anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

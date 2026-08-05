@@ -1,6 +1,11 @@
+import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { drafts, notificationOptouts } from "@/database/schema"
+import {
+    drafts,
+    notificationOptouts,
+    userUnavailability
+} from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
     createDivision,
@@ -108,6 +113,49 @@ describe("updatePlayerAvailability captain notification", () => {
         const result = await updatePlayerAvailability(signup.id, [event.id])
         expect(result.status).toBe(true)
         expect(mockedSendBatch).not.toHaveBeenCalled()
+    })
+
+    it("rejects event ids that belong to another season", async () => {
+        const { player, signup, events } = await seedPlayerOnTeam()
+        const otherSeason = await createSeason()
+        const otherEvent = await createSeasonEvent(otherSeason.id)
+        loginAs(player)
+
+        const result = await updatePlayerAvailability(signup.id, [
+            events[0].id,
+            otherEvent.id
+        ])
+
+        expect(result.status).toBe(false)
+        // The whole save is rejected — no partial write.
+        const rows = await db
+            .select()
+            .from(userUnavailability)
+            .where(eq(userUnavailability.user_id, player.id))
+        expect(rows).toHaveLength(0)
+    })
+
+    // Regression: the page used to hand the form every row the user had, from
+    // any season, and the form submitted them straight back — silently
+    // reattaching last season's dates to this season's signup.
+    it("clears stale rows from other seasons when saving", async () => {
+        const { player, signup, events } = await seedPlayerOnTeam()
+        const otherSeason = await createSeason()
+        const otherEvent = await createSeasonEvent(otherSeason.id)
+        await db.insert(userUnavailability).values({
+            user_id: player.id,
+            event_id: otherEvent.id
+        })
+        loginAs(player)
+
+        const result = await updatePlayerAvailability(signup.id, [events[0].id])
+
+        expect(result.status).toBe(true)
+        const rows = await db
+            .select()
+            .from(userUnavailability)
+            .where(eq(userUnavailability.user_id, player.id))
+        expect(rows.map((r) => r.event_id)).toEqual([events[0].id])
     })
 
     it("still saves availability if notification dispatch is impossible", async () => {

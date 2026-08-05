@@ -20,8 +20,31 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { buildAvailabilityChangeHtml } from "@/lib/email-html"
 import { dispatchNotification } from "@/lib/notifications/dispatch"
 import { findActiveTeamForUser } from "@/lib/roster"
-import { formatEventDate } from "@/lib/site-config"
+import { formatEventDate, getSeasonConfig } from "@/lib/site-config"
 import { formatDisplayName } from "@/lib/utils"
+
+/**
+ * Guards against ids from another season riding along in a save. The page
+ * hands the form whatever rows the user has, and a season's events are
+ * re-created often enough that stale ids are a live hazard: reattached to the
+ * current signup they show up as phantom absences in captain and roster views.
+ */
+async function eventsBelongToSeason(
+    eventIds: number[],
+    seasonId: number
+): Promise<boolean> {
+    if (eventIds.length === 0) return true
+    const rows = await db
+        .select({ id: seasonEvents.id })
+        .from(seasonEvents)
+        .where(
+            and(
+                eq(seasonEvents.season_id, seasonId),
+                inArray(seasonEvents.id, eventIds)
+            )
+        )
+    return rows.length === eventIds.length
+}
 
 export const updatePlayerAvailability = withAction(
     async (
@@ -51,6 +74,13 @@ export const updatePlayerAvailability = withAction(
             return fail("Signup not found or does not belong to you.")
         }
 
+        const eventIds = [...new Set(unavailableEventIds)]
+        if (!(await eventsBelongToSeason(eventIds, signup.season))) {
+            return fail(
+                "Those dates are no longer part of this season. Reload the page and try again."
+            )
+        }
+
         // Snapshot before the destructive replace so the captain notification
         // can report an actual diff instead of "something changed".
         const previousRows = await db
@@ -65,9 +95,9 @@ export const updatePlayerAvailability = withAction(
             .where(eq(userUnavailability.user_id, session.user.id))
 
         // Insert new unavailability rows
-        if (unavailableEventIds.length > 0) {
+        if (eventIds.length > 0) {
             await db.insert(userUnavailability).values(
-                unavailableEventIds.map((eventId) => ({
+                eventIds.map((eventId) => ({
                     user_id: session.user.id,
                     signup_id: signupId,
                     event_id: eventId
@@ -75,10 +105,8 @@ export const updatePlayerAvailability = withAction(
             )
         }
 
-        const nextIds = new Set(unavailableEventIds)
-        const becameUnavailable = unavailableEventIds.filter(
-            (id) => !previousIds.has(id)
-        )
+        const nextIds = new Set(eventIds)
+        const becameUnavailable = eventIds.filter((id) => !previousIds.has(id))
         const becameAvailable = [...previousIds].filter(
             (id) => !nextIds.has(id)
         )
@@ -198,15 +226,27 @@ export const updateRefAvailability = withAction(
     async (unavailableEventIds: number[]): Promise<ActionResult> => {
         const session = await requireSession()
 
+        const config = await getSeasonConfig()
+        if (!config.seasonId) {
+            return fail("There is no active season at this time.")
+        }
+
+        const eventIds = [...new Set(unavailableEventIds)]
+        if (!(await eventsBelongToSeason(eventIds, config.seasonId))) {
+            return fail(
+                "Those dates are no longer part of this season. Reload the page and try again."
+            )
+        }
+
         // Delete all existing unavailability rows for this user
         await db
             .delete(userUnavailability)
             .where(eq(userUnavailability.user_id, session.user.id))
 
         // Insert new unavailability rows
-        if (unavailableEventIds.length > 0) {
+        if (eventIds.length > 0) {
             await db.insert(userUnavailability).values(
-                unavailableEventIds.map((eventId) => ({
+                eventIds.map((eventId) => ({
                     user_id: session.user.id,
                     event_id: eventId
                 }))
