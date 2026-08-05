@@ -16,8 +16,11 @@ import {
     type SeasonCoverage
 } from "@/lib/historical-coverage"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
-import { formatSeasonLabel } from "@/lib/season-utils"
+import { formatEventDate, formatSeasonLabel } from "@/lib/season-utils"
 import { getSeasonConfig } from "@/lib/site-config"
+import { db } from "@/database/db"
+import { tournaments } from "@/database/schema"
+import { desc, eq } from "drizzle-orm"
 
 export const dynamic = "force-dynamic"
 
@@ -33,12 +36,28 @@ const CATEGORY_COVERAGE: Record<string, (s: SeasonCoverage) => boolean> = {
     playoffs: (s) => hasCoverage(s.playoffMatches)
 }
 
+// Only completed tournaments appear: their results pages have final
+// standings, matching the sidebar's Historical filter.
+async function getCompletedTournaments() {
+    return await db
+        .select({
+            id: tournaments.id,
+            name: tournaments.name,
+            year: tournaments.year,
+            date: tournaments.tournament_date
+        })
+        .from(tournaments)
+        .where(eq(tournaments.phase, "complete"))
+        .orderBy(desc(tournaments.tournament_date), desc(tournaments.id))
+}
+
 export default async function SeasonHistoryPage() {
     await requireSessionOrRedirect()
 
-    const [config, coverage] = await Promise.all([
+    const [config, coverage, completedTournaments] = await Promise.all([
         getSeasonConfig(),
-        fetchHistoricalCoverage()
+        fetchHistoricalCoverage(),
+        getCompletedTournaments()
     ])
 
     // Same rule as the sidebar: the current season joins the historical list
@@ -57,59 +76,104 @@ export default async function SeasonHistoryPage() {
         <div className="space-y-6">
             <PageHeader
                 title="All Seasons"
-                description="Every BSD season we have records for. Jump to a season's rosters, schedule, or playoff results."
+                description="Every BSD season and tournament we have records for. Jump to a season's rosters, schedule, or playoff results."
             />
 
-            {rows.length === 0 ? (
-                <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
-                    No historical seasons yet.
-                </div>
-            ) : (
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Season</TableHead>
-                                {seasonCategories.map((cat) => (
-                                    <TableHead key={cat.key}>
-                                        {cat.label}
-                                    </TableHead>
-                                ))}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {rows.map((season) => (
-                                <TableRow key={season.id}>
-                                    <TableCell className="whitespace-nowrap font-medium">
-                                        {formatSeasonLabel({
-                                            seasonName: season.season,
-                                            seasonYear: season.year
-                                        })}
-                                    </TableCell>
+            <div className="space-y-3">
+                <h2 className="font-semibold text-lg">Seasons</h2>
+                {rows.length === 0 ? (
+                    <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
+                        No historical seasons yet.
+                    </div>
+                ) : (
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Season</TableHead>
                                     {seasonCategories.map((cat) => (
-                                        <TableCell key={cat.key}>
-                                            {CATEGORY_COVERAGE[cat.key](
-                                                season
-                                            ) ? (
-                                                <Link
-                                                    href={`${cat.basePath}/${season.id}`}
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    {cat.label}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    —
-                                                </span>
-                                            )}
-                                        </TableCell>
+                                        <TableHead key={cat.key}>
+                                            {cat.label}
+                                        </TableHead>
                                     ))}
                                 </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
+                            </TableHeader>
+                            <TableBody>
+                                {rows.map((season) => (
+                                    <TableRow key={season.id}>
+                                        <TableCell className="whitespace-nowrap font-medium">
+                                            {formatSeasonLabel({
+                                                seasonName: season.season,
+                                                seasonYear: season.year
+                                            })}
+                                        </TableCell>
+                                        {seasonCategories.map((cat) => (
+                                            <TableCell key={cat.key}>
+                                                {CATEGORY_COVERAGE[cat.key](
+                                                    season
+                                                ) ? (
+                                                    <Link
+                                                        href={`${cat.basePath}/${season.id}`}
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        {cat.label}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        —
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-3">
+                <h2 className="font-semibold text-lg">Tournaments</h2>
+                {completedTournaments.length === 0 ? (
+                    <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
+                        No completed tournaments yet.
+                    </div>
+                ) : (
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Tournament</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Results</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {completedTournaments.map((tournament) => (
+                                    <TableRow key={tournament.id}>
+                                        <TableCell className="whitespace-nowrap font-medium">
+                                            {tournament.name} ({tournament.year}
+                                            )
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatEventDate(tournament.date)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Link
+                                                href={`/dashboard/tournament-results/${tournament.id}`}
+                                                className="text-primary hover:underline"
+                                            >
+                                                Results
+                                            </Link>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
