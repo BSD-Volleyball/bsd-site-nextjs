@@ -449,8 +449,13 @@ export async function submitSeasonPayment(
                     user?.firstName ||
                     sessionUser.email.split("@")[0]
 
-                // Send confirmation email (don't await to not block response)
-                sendSignupConfirmationEmail(
+                // Awaited on purpose. This used to be fire-and-forget to
+                // shave a round-trip off the response, but work started
+                // after a serverless response returns is not guaranteed to
+                // run — which risked dropping both the receipt and its
+                // notification_log row. A payment the member just waited on
+                // can afford one more round-trip.
+                await sendSignupConfirmationEmail(
                     sessionUser.id,
                     sessionUser.email,
                     firstName,
@@ -649,8 +654,8 @@ export async function submitFreeSignup(
             user?.firstName ||
             sessionUser.email.split("@")[0]
 
-        // Send confirmation email with discount info
-        sendSignupConfirmationEmail(
+        // Awaited for the same reason as the paid path above.
+        await sendSignupConfirmationEmail(
             sessionUser.id,
             sessionUser.email,
             firstName,

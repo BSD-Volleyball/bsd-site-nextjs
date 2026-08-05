@@ -35,7 +35,10 @@ import {
     suppressionOriginLabel,
     suppressionReasonLabel
 } from "@/lib/email-suppression-display"
-import { STREAM_LABELS } from "@/lib/notifications/types"
+import {
+    NOTIFICATION_LOG_RETENTION_LABEL,
+    STREAM_LABELS
+} from "@/lib/notifications/types"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -326,12 +329,22 @@ export function AdminPlayerDetailPopup({
                                         )}
                                     </div>
                                 )}
-                                {emailHistory.length > 0 && (
+                                {playerDetails.email_status && (
                                     <div className="sm:col-span-2">
                                         <span className="text-muted-foreground">
                                             Recent Email:
                                         </span>
                                         <div className="mt-2 space-y-1 rounded-md border p-3">
+                                            {emailHistory.length === 0 && (
+                                                <p className="text-muted-foreground text-xs">
+                                                    Nothing sent to this player
+                                                    in the last{" "}
+                                                    {
+                                                        NOTIFICATION_LOG_RETENTION_LABEL
+                                                    }
+                                                    .
+                                                </p>
+                                            )}
                                             {emailHistory.map((entry) => (
                                                 <div
                                                     key={entry.id}
@@ -357,11 +370,21 @@ export function AdminPlayerDetailPopup({
                                             ))}
                                         </div>
                                         <p className="mt-1 text-muted-foreground text-xs">
-                                            Last {emailHistory.length} message
-                                            {emailHistory.length === 1
-                                                ? ""
-                                                : "s"}{" "}
-                                            we sent this player.
+                                            {emailHistory.length > 0 && (
+                                                <>
+                                                    Last {emailHistory.length}{" "}
+                                                    message
+                                                    {emailHistory.length === 1
+                                                        ? ""
+                                                        : "s"}
+                                                    .{" "}
+                                                </>
+                                            )}
+                                            Email history is kept for{" "}
+                                            {NOTIFICATION_LOG_RETENTION_LABEL}
+                                            {
+                                                " — anything older has been removed."
+                                            }
                                         </p>
                                     </div>
                                 )}
