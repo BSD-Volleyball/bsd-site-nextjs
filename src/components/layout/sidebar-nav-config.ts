@@ -69,6 +69,12 @@ export const hallOfChampionsNavItem: NavItem = {
     icon: RiTrophyLine
 }
 
+export const seasonHistoryNavItem: NavItem = {
+    title: "All Seasons",
+    url: "/dashboard/season-history",
+    icon: RiHistoryLine
+}
+
 export const accountNavItems: NavItem[] = [
     { title: "Account", url: "/dashboard/account", icon: RiUser3Line },
     {

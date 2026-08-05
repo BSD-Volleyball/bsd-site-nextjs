@@ -18,6 +18,7 @@ import {
 } from "@/database/schema"
 import { eq, and, lt, lte, desc, inArray, or } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { dateRecencyKey, seasonRecencyKey } from "@/lib/season-utils"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
@@ -67,8 +68,10 @@ async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
                     ? lte(seasons.id, config.seasonId)
                     : lt(seasons.id, config.seasonId)
             )
+            // Fetch a small buffer so the has-drafts filter below can still
+            // yield two entries when a recent season lacks draft data.
             .orderBy(desc(seasons.id))
-            .limit(3)
+            .limit(4)
 
         if (recentSeasons.length === 0) {
             return []
@@ -102,6 +105,7 @@ async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
 
         return recentSeasons
             .filter((s) => divisionsBySeasonId.has(s.id))
+            .slice(0, 2)
             .map((s) => ({
                 id: s.id,
                 year: s.year,
@@ -121,10 +125,14 @@ export interface TournamentNavItem {
 }
 
 /**
- * The most recent completed tournaments, for the Historical section. Each links
- * to its read-only results page. Returns [] for anonymous users.
+ * The most recent completed tournament, for the Historical section. It links
+ * to its read-only results page. The date is kept internal so the interleave
+ * sort in getHistoricalNav() can place it among seasons by real month.
+ * Returns [] for anonymous users.
  */
-async function getRecentTournamentsNav(): Promise<TournamentNavItem[]> {
+async function getRecentTournamentsNav(): Promise<
+    (TournamentNavItem & { date: string | null })[]
+> {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) {
         return []
@@ -135,16 +143,57 @@ async function getRecentTournamentsNav(): Promise<TournamentNavItem[]> {
             .select({
                 id: tournaments.id,
                 name: tournaments.name,
-                year: tournaments.year
+                year: tournaments.year,
+                date: tournaments.tournament_date
             })
             .from(tournaments)
             .where(eq(tournaments.phase, "complete"))
             .orderBy(desc(tournaments.id))
-            .limit(2)
+            .limit(1)
     } catch (error) {
         console.error("Error fetching recent tournaments nav:", error)
         return []
     }
+}
+
+export type HistoricalNavEntry =
+    | { kind: "season"; season: SeasonNavItem }
+    | { kind: "tournament"; tournament: TournamentNavItem }
+
+/**
+ * The Historical section's recency list: the most recent completed tournament
+ * and the two most recent seasons, interleaved newest-first. Seasons have no
+ * date column, so both sides reduce to an approximate year*12+month key; on a
+ * tie the tournament wins (a same-month tournament is typically the season-end
+ * event), then the higher id.
+ */
+async function getHistoricalNav(): Promise<HistoricalNavEntry[]> {
+    const [seasonNav, tournamentNav] = await Promise.all([
+        getRecentSeasonsNav(),
+        getRecentTournamentsNav()
+    ])
+
+    const keyed: {
+        key: number
+        tieBreak: number
+        entry: HistoricalNavEntry
+    }[] = [
+        ...seasonNav.map((season) => ({
+            key: seasonRecencyKey(season.year, season.season),
+            tieBreak: season.id,
+            entry: { kind: "season" as const, season }
+        })),
+        ...tournamentNav.map(({ date, ...tournament }) => ({
+            key: dateRecencyKey(tournament.year, date),
+            // Tournaments sort above seasons on equal keys.
+            tieBreak: Number.MAX_SAFE_INTEGER,
+            entry: { kind: "tournament" as const, tournament }
+        }))
+    ]
+
+    return keyed
+        .sort((a, b) => b.key - a.key || b.tieBreak - a.tieBreak)
+        .map(({ entry }) => entry)
 }
 
 export interface TournamentSidebarInfo {
@@ -173,8 +222,7 @@ export interface SidebarData {
     hasConcernsAccess: boolean
     isReferee: boolean
     isRefCoordinator: boolean
-    seasonNav: SeasonNavItem[]
-    tournamentNav: TournamentNavItem[]
+    historicalNav: HistoricalNavEntry[]
     phase: SeasonPhase | null
     tournament: TournamentSidebarInfo | null
 }
@@ -195,8 +243,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
             hasConcernsAccess: false,
             isReferee: false,
             isRefCoordinator: false,
-            seasonNav: [],
-            tournamentNav: [],
+            historicalNav: [],
             phase: null,
             tournament: null
         }
@@ -216,8 +263,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         hasConcernsAccess,
         isReferee,
         isRefCoordinator,
-        seasonNav,
-        tournamentNav,
+        historicalNav,
         isCoach
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
@@ -254,8 +300,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         seasonId
             ? hasPermissionBySession("schedule:manage", { seasonId })
             : Promise.resolve(false),
-        getRecentSeasonsNav(),
-        getRecentTournamentsNav(),
+        getHistoricalNav(),
         seasonId
             ? (async () => {
                   const [coachEntry] = await db
@@ -298,8 +343,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         hasConcernsAccess,
         isReferee,
         isRefCoordinator,
-        seasonNav,
-        tournamentNav,
+        historicalNav,
         phase: seasonId ? config.phase : null,
         tournament
     }

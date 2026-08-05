@@ -19,6 +19,34 @@ export function formatSeasonLabel(
     return `${name} ${config.seasonYear}`
 }
 
+// Approximate calendar month each season runs in, used only to order seasons
+// against dated events (tournaments) in the same year. Seasons have no date
+// column and backfilled historical seasons have no season_events rows.
+const SEASON_APPROX_MONTH: Record<string, number> = {
+    spring: 3,
+    summer: 6,
+    fall: 9,
+    winter: 12
+}
+
+/**
+ * Sortable recency key (year*12 + month) for a season identified by its
+ * name ("spring" | "summer" | "fall" | "winter"). Unknown names fall back
+ * to mid-year.
+ */
+export function seasonRecencyKey(year: number, seasonName: string): number {
+    return year * 12 + (SEASON_APPROX_MONTH[seasonName.toLowerCase()] ?? 6)
+}
+
+/**
+ * Sortable recency key (year*12 + month) for a YYYY-MM-DD date string.
+ * Malformed dates fall back to mid-year of the given year.
+ */
+export function dateRecencyKey(year: number, dateStr: string | null): number {
+    const month = Number(dateStr?.slice(5, 7))
+    return year * 12 + (Number.isFinite(month) && month >= 1 ? month : 6)
+}
+
 /** Get events filtered by type, sorted by sort_order */
 export function getEventsByType(
     config: SeasonConfig,

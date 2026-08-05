@@ -66,6 +66,7 @@ import {
     reffingNavItems,
     scheduleNavItem,
     seasonCategories,
+    seasonHistoryNavItem,
     signupNavItem,
     week1NavItem,
     week2NavItem,
@@ -202,8 +203,7 @@ export function AppSidebar({
         hasConcernsAccess,
         isReferee,
         isRefCoordinator,
-        seasonNav,
-        tournamentNav,
+        historicalNav,
         phase,
         tournament
     } = data
@@ -776,23 +776,34 @@ export function AppSidebar({
                     <SidebarGroupContent>
                         <SidebarMenu>
                             <NavItems
-                                items={[
-                                    hallOfChampionsNavItem,
-                                    ...tournamentNav.map((t) => ({
-                                        title: `${t.name} (${t.year})`,
-                                        url: `/dashboard/tournament-results/${t.id}`,
-                                        icon: RiMedalLine
-                                    }))
-                                ]}
+                                items={[hallOfChampionsNavItem]}
                                 pathname={pathname}
                             />
-                            {seasonNav.map((season) => (
-                                <SeasonNavMenuItem
-                                    key={season.id}
-                                    season={season}
-                                    pathname={pathname}
-                                />
-                            ))}
+                            {historicalNav.map((entry) =>
+                                entry.kind === "season" ? (
+                                    <SeasonNavMenuItem
+                                        key={`season-${entry.season.id}`}
+                                        season={entry.season}
+                                        pathname={pathname}
+                                    />
+                                ) : (
+                                    <NavItems
+                                        key={`tournament-${entry.tournament.id}`}
+                                        items={[
+                                            {
+                                                title: `${entry.tournament.name} (${entry.tournament.year})`,
+                                                url: `/dashboard/tournament-results/${entry.tournament.id}`,
+                                                icon: RiMedalLine
+                                            }
+                                        ]}
+                                        pathname={pathname}
+                                    />
+                                )
+                            )}
+                            <NavItems
+                                items={[seasonHistoryNavItem]}
+                                pathname={pathname}
+                            />
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
