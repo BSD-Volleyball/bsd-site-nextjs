@@ -160,6 +160,18 @@ export interface DoubleEliminationBracketProps<M extends Match = Match> {
     }
 }
 
+export interface SingleEliminationBracketProps<M extends Match = Match> {
+    matches: M[]
+    matchComponent: ComponentType<MatchComponentProps<M>>
+    svgWrapper?: ComponentType<SvgWrapperProps>
+    currentRound?: number
+    onMatchClick?: MatchClickHandler
+    onPartyClick?: PartyClickHandler
+    options?: {
+        style?: BracketStyle
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Hover-highlight context store
 // ---------------------------------------------------------------------------

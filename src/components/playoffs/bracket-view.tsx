@@ -11,6 +11,7 @@ import { formatMatchTime } from "@/lib/season-utils"
 import type {
     DoubleEliminationBracketProps,
     MatchComponentProps,
+    SingleEliminationBracketProps,
     SvgWrapperProps
 } from "@/components/playoff-brackets"
 import type { BracketMatch } from "@/app/dashboard/playoffs/[seasonId]/actions"
@@ -21,6 +22,16 @@ const DoubleEliminationBracket = dynamic<
     () =>
         import("@/components/playoff-brackets").then(
             (mod) => mod.DoubleEliminationBracket
+        ),
+    { ssr: false }
+)
+
+const SingleEliminationBracket = dynamic<
+    SingleEliminationBracketProps<BracketMatch>
+>(
+    () =>
+        import("@/components/playoff-brackets").then(
+            (mod) => mod.SingleEliminationBracket
         ),
     { ssr: false }
 )
@@ -406,12 +417,23 @@ export function BracketView({
 
     return (
         <div className="w-full rounded-lg border bg-muted/20">
-            <DoubleEliminationBracket
-                matches={matches}
-                matchComponent={matchComponent}
-                svgWrapper={svgWrapper}
-                options={{ style: BRACKET_STYLE }}
-            />
+            {matches.lower.length === 0 ? (
+                // A single-elimination bracket: DoubleEliminationBracket
+                // crashes on an empty losers array.
+                <SingleEliminationBracket
+                    matches={matches.upper}
+                    matchComponent={matchComponent}
+                    svgWrapper={svgWrapper}
+                    options={{ style: BRACKET_STYLE }}
+                />
+            ) : (
+                <DoubleEliminationBracket
+                    matches={matches}
+                    matchComponent={matchComponent}
+                    svgWrapper={svgWrapper}
+                    options={{ style: BRACKET_STYLE }}
+                />
+            )}
         </div>
     )
 }
