@@ -75,6 +75,10 @@ function sendToLabel(
         return "Current Season Commissioners"
     if (groupType === "all_refs") return "All Refs (All Time)"
     if (groupType === "season_refs") return "Current Season Refs"
+    if (groupType === "season_ref_interest")
+        return "Interested in Reffing (Current Season)"
+    if (groupType === "season_tryout_help")
+        return "Willing to Help with Tryouts (Current Season)"
     if (groupType === "leadership_group") return "Leadership Group"
     if (groupType === "season_division") {
         const div = divisions.find((d) => d.id === divisionId)
@@ -104,6 +108,10 @@ function sendToTypeFromGroupType(groupType: string | null): SendToType | null {
             return "all_refs"
         case "season_refs":
             return "season_refs"
+        case "season_ref_interest":
+            return "season_ref_interest"
+        case "season_tryout_help":
+            return "season_tryout_help"
         case "leadership_group":
             return "leadership_group"
         case "season_division":
@@ -332,6 +340,14 @@ export function SendEmailClient({
                                             </SelectItem>
                                             <SelectItem value="all_refs">
                                                 All Refs (All Time)
+                                            </SelectItem>
+                                            <SelectItem value="season_ref_interest">
+                                                Interested in Reffing (signup
+                                                answer)
+                                            </SelectItem>
+                                            <SelectItem value="season_tryout_help">
+                                                Willing to Help with Tryouts
+                                                (signup answer)
                                             </SelectItem>
                                             <SelectItem value="leadership_group">
                                                 Leadership Group (incl. Admins)

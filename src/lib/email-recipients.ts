@@ -39,6 +39,8 @@ export type RecipientGroupType =
     | "season_commissioners"
     | "all_refs"
     | "season_refs"
+    | "season_ref_interest"
+    | "season_tryout_help"
     | "leadership_group"
 
 export interface Recipient {
@@ -151,6 +153,20 @@ export async function getRecipientsForGroup(
         case "season_refs":
             return group.season_id
                 ? getSeasonRefRecipients(group.season_id)
+                : []
+        case "season_ref_interest":
+            return group.season_id
+                ? getSignupVolunteerRecipients(
+                      group.season_id,
+                      signups.ref_interest
+                  )
+                : []
+        case "season_tryout_help":
+            return group.season_id
+                ? getSignupVolunteerRecipients(
+                      group.season_id,
+                      signups.tryout_help
+                  )
                 : []
         case "leadership_group":
             return getLeadershipGroupRecipients()
@@ -507,6 +523,32 @@ async function getSeasonRefRecipients(seasonId: number): Promise<Recipient[]> {
                 eq(seasonRefs.is_active, true)
             )
         )
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
+    )
+}
+
+/**
+ * Players who answered yes to one of the volunteer questions on their signup
+ * for this season (interest in reffing, or helping run tryouts). Unlike
+ * season_refs — the scheduled ref pool — this is self-reported willingness, so
+ * it is scoped to the season whose signup form collected the answer. NULL
+ * answers predate the question and are excluded by the `= true` match.
+ */
+async function getSignupVolunteerRecipients(
+    seasonId: number,
+    flag: typeof signups.ref_interest | typeof signups.tryout_help
+): Promise<Recipient[]> {
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(signups)
+        .innerJoin(users, eq(signups.player, users.id))
+        .where(and(eq(signups.season, seasonId), eq(flag, true)))
     return deduplicateRecipients(
         rows.map(toRecipient).filter(Boolean) as Recipient[]
     )

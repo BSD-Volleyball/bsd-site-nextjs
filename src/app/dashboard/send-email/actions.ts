@@ -124,6 +124,8 @@ export type SendToType =
     | "season_commissioners"
     | "all_refs"
     | "season_refs"
+    | "season_ref_interest"
+    | "season_tryout_help"
     | "leadership_group"
 
 /** Recipient selections that reach beyond a single division or team. */
@@ -134,6 +136,8 @@ const LEAGUE_WIDE_SEND_TYPES: SendToType[] = [
     "season_commissioners",
     "all_refs",
     "season_refs",
+    "season_ref_interest",
+    "season_tryout_help",
     "leadership_group"
 ]
 
@@ -412,6 +416,25 @@ async function resolveGroup(
             groupName: `${seasonLabel} – Refs`,
             stream: STREAM_IN_SEASON_UPDATES
         }
+    }
+
+    // Self-reported on the season signup form, so scoped to that season.
+    if (sendToType === "season_ref_interest") {
+        const name = `${seasonLabel} – Interested in Reffing`
+        const groupId = await ensureRecipientGroup("season_ref_interest", {
+            seasonId,
+            name
+        })
+        return { groupId, groupName: name, stream: STREAM_IN_SEASON_UPDATES }
+    }
+
+    if (sendToType === "season_tryout_help") {
+        const name = `${seasonLabel} – Willing to Help with Tryouts`
+        const groupId = await ensureRecipientGroup("season_tryout_help", {
+            seasonId,
+            name
+        })
+        return { groupId, groupName: name, stream: STREAM_IN_SEASON_UPDATES }
     }
 
     if (sendToType === "division") {

@@ -1239,7 +1239,8 @@ export const emailRecipientGroups = pgTable(
     {
         id: serial("id").primaryKey(),
         name: text("name").notNull(),
-        // 'all_users' | 'season_signups' | 'season_division' | 'season_team'
+        // One of RecipientGroupType in src/lib/email-recipients.ts, which is
+        // the authority on the accepted values.
         group_type: text("group_type").notNull(),
         season_id: integer("season_id").references(() => seasons.id, {
             onDelete: "set null"

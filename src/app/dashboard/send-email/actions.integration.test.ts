@@ -7,7 +7,8 @@ import { sendBroadcastEmails } from "@/lib/postmark"
 import {
     createDivision,
     createSeason,
-    createSeasonEvent
+    createSeasonEvent,
+    createSignup
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
@@ -269,6 +270,103 @@ describe("createAndSendBroadcast", () => {
         expect(result.status).toBe(true)
         const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
         expect(call.recipients).toEqual([{ email: activeRef.email }])
+    })
+
+    it("sends season_ref_interest to signups that opted into reffing", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const interested = await createUser()
+        const declined = await createUser()
+        const neverAsked = await createUser()
+        const tryoutsOnly = await createUser()
+
+        await createSignup({
+            season: season.id,
+            player: interested.id,
+            ref_interest: true
+        })
+        await createSignup({
+            season: season.id,
+            player: declined.id,
+            ref_interest: false
+        })
+        // Signed up before the question existed
+        await createSignup({ season: season.id, player: neverAsked.id })
+        await createSignup({
+            season: season.id,
+            player: tryoutsOnly.id,
+            ref_interest: false,
+            tryout_help: true
+        })
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_ref_interest",
+            subject: "Want to ref?",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: interested.email }])
+    })
+
+    it("sends season_tryout_help to signups willing to help with tryouts", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const helper = await createUser()
+        const declined = await createUser()
+
+        await createSignup({
+            season: season.id,
+            player: helper.id,
+            tryout_help: true
+        })
+        await createSignup({
+            season: season.id,
+            player: declined.id,
+            tryout_help: false
+        })
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_help",
+            subject: "Tryout help needed",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: helper.email }])
+    })
+
+    it("scopes the volunteer audiences to the current season's signups", async () => {
+        const oldSeason = await createSeason()
+        const pastVolunteer = await createUser()
+        await createSignup({
+            season: oldSeason.id,
+            player: pastVolunteer.id,
+            ref_interest: true,
+            tryout_help: true
+        })
+
+        // A later season becomes current; nobody has answered yes in it yet.
+        const currentSeason = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const currentVolunteer = await createUser()
+        await createSignup({
+            season: currentSeason.id,
+            player: currentVolunteer.id,
+            ref_interest: true
+        })
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_ref_interest",
+            subject: "Want to ref?",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: currentVolunteer.email }])
     })
 
     it("sends all_refs to anyone who has ever reffed, in any season", async () => {
