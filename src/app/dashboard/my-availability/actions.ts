@@ -17,6 +17,8 @@ import {
     requirePositiveInt
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
+import { logAuditEntry } from "@/lib/audit-log"
+import { formatShortDate } from "@/lib/date-utils"
 import { buildAvailabilityChangeHtml } from "@/lib/email-html"
 import { dispatchNotification } from "@/lib/notifications/dispatch"
 import { findActiveTeamForUser } from "@/lib/roster"
@@ -24,18 +26,20 @@ import { formatEventDate, getSeasonConfig } from "@/lib/site-config"
 import { formatDisplayName } from "@/lib/utils"
 
 /**
- * Guards against ids from another season riding along in a save. The page
- * hands the form whatever rows the user has, and a season's events are
- * re-created often enough that stale ids are a live hazard: reattached to the
- * current signup they show up as phantom absences in captain and roster views.
+ * Resolves the submitted ids to this season's events, or null if any of them
+ * belongs elsewhere. Guards against ids from another season riding along in a
+ * save: the page hands the form whatever rows the user has, and a season's
+ * events are re-created often enough that stale ids are a live hazard —
+ * reattached to the current signup they show up as phantom absences in captain
+ * and roster views.
  */
-async function eventsBelongToSeason(
+async function resolveSeasonEvents(
     eventIds: number[],
     seasonId: number
-): Promise<boolean> {
-    if (eventIds.length === 0) return true
+): Promise<{ id: number; date: string }[] | null> {
+    if (eventIds.length === 0) return []
     const rows = await db
-        .select({ id: seasonEvents.id })
+        .select({ id: seasonEvents.id, date: seasonEvents.event_date })
         .from(seasonEvents)
         .where(
             and(
@@ -43,7 +47,21 @@ async function eventsBelongToSeason(
                 inArray(seasonEvents.id, eventIds)
             )
         )
-    return rows.length === eventIds.length
+    return rows.length === eventIds.length ? rows : null
+}
+
+/**
+ * The audit summary for a save. Records the full resulting set rather than a
+ * diff, so a single entry is enough to reconstruct what a player had selected
+ * — the property that was missing when the 2026-08-05 wipe destroyed every
+ * Fall 2026 row and left nothing to restore from.
+ */
+function describeAvailability(events: { date: string }[]): string {
+    if (events.length === 0) return "Available for all dates"
+    const dates = [...events]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((e) => formatShortDate(e.date))
+    return `Unavailable for ${dates.length} ${dates.length === 1 ? "date" : "dates"}: ${dates.join(", ")}`
 }
 
 export const updatePlayerAvailability = withAction(
@@ -75,7 +93,8 @@ export const updatePlayerAvailability = withAction(
         }
 
         const eventIds = [...new Set(unavailableEventIds)]
-        if (!(await eventsBelongToSeason(eventIds, signup.season))) {
+        const savedEvents = await resolveSeasonEvents(eventIds, signup.season)
+        if (!savedEvents) {
             return fail(
                 "Those dates are no longer part of this season. Reload the page and try again."
             )
@@ -104,6 +123,14 @@ export const updatePlayerAvailability = withAction(
                 }))
             )
         }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update_availability",
+            entityType: "user_unavailability",
+            entityId: signupId,
+            summary: describeAvailability(savedEvents)
+        })
 
         const nextIds = new Set(eventIds)
         const becameUnavailable = eventIds.filter((id) => !previousIds.has(id))
@@ -232,7 +259,8 @@ export const updateRefAvailability = withAction(
         }
 
         const eventIds = [...new Set(unavailableEventIds)]
-        if (!(await eventsBelongToSeason(eventIds, config.seasonId))) {
+        const savedEvents = await resolveSeasonEvents(eventIds, config.seasonId)
+        if (!savedEvents) {
             return fail(
                 "Those dates are no longer part of this season. Reload the page and try again."
             )
@@ -252,6 +280,15 @@ export const updateRefAvailability = withAction(
                 }))
             )
         }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "update_availability",
+            // No signup to point at — a ref's availability hangs off the user.
+            entityType: "user_unavailability",
+            entityId: session.user.id,
+            summary: `Ref availability — ${describeAvailability(savedEvents)}`
+        })
 
         return ok(undefined, "Your availability has been updated.")
     }

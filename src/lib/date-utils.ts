@@ -40,6 +40,17 @@ export function formatEventDate(date: string): string {
 }
 
 /**
+ * Format a date-only string ("YYYY-MM-DD") as a compact "M/D", for contexts
+ * that list several dates inline — audit summaries, for instance.
+ *
+ * @example formatShortDate("2026-08-13") // "8/13"
+ */
+export function formatShortDate(date: string): string {
+    const d = parseDateOnly(date)
+    return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+/**
  * Format a "HH:MM" or "HH:MM:SS" time string as a 12-hour clock time.
  *
  * @example formatMatchTime("18:30:00") // "6:30 PM"

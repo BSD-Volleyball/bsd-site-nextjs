@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import {
+    auditLog,
     drafts,
     notificationOptouts,
     userUnavailability
@@ -156,6 +157,57 @@ describe("updatePlayerAvailability captain notification", () => {
             .from(userUnavailability)
             .where(eq(userUnavailability.user_id, player.id))
         expect(rows.map((r) => r.event_id)).toEqual([events[0].id])
+    })
+
+    // The 2026-08-05 wipe was unrecoverable partly because nothing recorded
+    // what players had entered. Each save now logs its full resulting set, so
+    // the audit log alone can reconstruct any player's availability.
+    it("logs the saved dates in the audit entry", async () => {
+        const { player, signup, events } = await seedPlayerOnTeam()
+        loginAs(player)
+
+        await updatePlayerAvailability(signup.id, [events[1].id, events[0].id])
+
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, player.id))
+        expect(entry.action).toBe("update_availability")
+        expect(entry.entity_type).toBe("user_unavailability")
+        expect(entry.entity_id).toBe(String(signup.id))
+        // Chronological, not the order the client happened to submit.
+        expect(entry.summary).toBe("Unavailable for 2 dates: 10/3, 10/10")
+    })
+
+    it("logs an explicit all-clear when every date is deselected", async () => {
+        const { player, signup, events } = await seedPlayerOnTeam()
+        loginAs(player)
+
+        await updatePlayerAvailability(signup.id, [events[0].id])
+        await updatePlayerAvailability(signup.id, [])
+
+        const entries = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, player.id))
+            .orderBy(auditLog.id)
+        expect(entries).toHaveLength(2)
+        expect(entries[1].summary).toBe("Available for all dates")
+    })
+
+    it("writes no audit entry when the save is rejected", async () => {
+        const { player, signup } = await seedPlayerOnTeam()
+        const otherSeason = await createSeason()
+        const otherEvent = await createSeasonEvent(otherSeason.id)
+        loginAs(player)
+
+        await updatePlayerAvailability(signup.id, [otherEvent.id])
+
+        const entries = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, player.id))
+        expect(entries).toHaveLength(0)
     })
 
     it("still saves availability if notification dispatch is impossible", async () => {

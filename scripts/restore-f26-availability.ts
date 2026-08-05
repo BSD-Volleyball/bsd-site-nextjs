@@ -182,9 +182,7 @@ async function main() {
         `Skipped (no F26 signup):   ${unmatchedEmail.length}${unmatchedEmail.length ? ` — ${unmatchedEmail.join(", ")}` : ""}`
     )
     for (const [date, emails] of unmappedDates) {
-        console.log(
-            `Not a Fall 2026 date:      ${date} — ${emails.join(", ")}`
-        )
+        console.log(`Not a Fall 2026 date:      ${date} — ${emails.join(", ")}`)
     }
 
     if (!apply) {
