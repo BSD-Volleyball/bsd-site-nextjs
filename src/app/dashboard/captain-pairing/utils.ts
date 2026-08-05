@@ -5,9 +5,11 @@ export interface SignupPreferences {
     pair: boolean
     pairPick: string | null
     pairReason: string
+    refInterest: boolean
+    tryoutHelp: boolean
 }
 
-// Editing captain/pair choices is only allowed before the draft phase.
+// Editing season preferences is only allowed before the draft phase.
 export function canEditPreferences(phase: SeasonPhase): boolean {
     return SEASON_PHASES.indexOf(phase) < SEASON_PHASES.indexOf("draft")
 }

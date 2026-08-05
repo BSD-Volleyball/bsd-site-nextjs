@@ -44,7 +44,7 @@ export const myAvailabilityNavItem: NavItem = {
 }
 
 export const captainPairingNavItem: NavItem = {
-    title: "Captain & Pairing",
+    title: "My Season Preferences",
     url: "/dashboard/captain-pairing",
     icon: RiStarLine
 }

@@ -227,6 +227,9 @@ export const signups = pgTable(
             onDelete: "set null"
         }),
         pair_reason: text("pair_reason"),
+        // NULL means the question predates these columns (never asked).
+        ref_interest: boolean("ref_interest"),
+        tryout_help: boolean("tryout_help"),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
         created_at: timestamp("created_at").defaultNow().notNull()
@@ -256,6 +259,8 @@ export const deletedSignups = pgTable(
         pair: boolean("pair"),
         pair_pick: text("pair_pick"),
         pair_reason: text("pair_reason"),
+        ref_interest: boolean("ref_interest"),
+        tryout_help: boolean("tryout_help"),
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
         created_at: timestamp("created_at").defaultNow().notNull(),

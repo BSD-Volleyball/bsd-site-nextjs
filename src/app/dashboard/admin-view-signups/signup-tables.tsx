@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils"
 import type { SignupEntry } from "./actions"
 import { getDisplayName } from "./signup-display-name"
 
+// Signup answers added after the fact are NULL for older rows — show those as
+// an em dash rather than claiming the player said "No".
+function formatOptionalYesNo(value: boolean | null): string {
+    return value === true ? "Yes" : value === false ? "No" : "—"
+}
+
 interface SignupTableProps {
     entries: SignupEntry[]
     signupNumberById: Map<number, number>
@@ -47,6 +53,12 @@ export function UndraftedSignupsTable({
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Captain
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Ref
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Tryout Help
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Paid
@@ -107,6 +119,12 @@ export function UndraftedSignupsTable({
                                             : "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
+                                    {formatOptionalYesNo(entry.refInterest)}
+                                </td>
+                                <td className="px-4 py-2">
+                                    {formatOptionalYesNo(entry.tryoutHelp)}
+                                </td>
+                                <td className="px-4 py-2">
                                     {entry.amountPaid
                                         ? `$${entry.amountPaid}`
                                         : "\u2014"}
@@ -134,7 +152,7 @@ export function UndraftedSignupsTable({
                         {entries.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={9}
+                                    colSpan={11}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No undrafted players found.
@@ -183,6 +201,12 @@ export function DraftedSignupsTable({
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Captain
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Ref
+                            </th>
+                            <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
+                                Tryout Help
                             </th>
                             <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
                                 Draft Status
@@ -246,6 +270,12 @@ export function DraftedSignupsTable({
                                             : "\u2014"}
                                 </td>
                                 <td className="px-4 py-2">
+                                    {formatOptionalYesNo(entry.refInterest)}
+                                </td>
+                                <td className="px-4 py-2">
+                                    {formatOptionalYesNo(entry.tryoutHelp)}
+                                </td>
+                                <td className="px-4 py-2">
                                     <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 text-xs dark:bg-amber-900 dark:text-amber-200">
                                         {entry.draftedIn}
                                     </span>
@@ -278,7 +308,7 @@ export function DraftedSignupsTable({
                         {entries.length === 0 && (
                             <tr>
                                 <td
-                                    colSpan={10}
+                                    colSpan={12}
                                     className="px-4 py-6 text-center text-muted-foreground"
                                 >
                                     No drafted players.

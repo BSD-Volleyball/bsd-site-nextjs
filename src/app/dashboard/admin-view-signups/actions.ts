@@ -38,6 +38,8 @@ export interface SignupEntry {
     male: boolean | null
     age: string | null
     captain: string | null
+    refInterest: boolean | null
+    tryoutHelp: boolean | null
     amountPaid: string | null
     signupDate: Date
     isNew: boolean
@@ -109,6 +111,8 @@ export async function getSeasonSignups(): Promise<{
                 male: users.male,
                 age: signups.age,
                 captain: signups.captain,
+                refInterest: signups.ref_interest,
+                tryoutHelp: signups.tryout_help,
                 amountPaid: signups.amount_paid,
                 signupDate: signups.created_at,
                 pairPickId: signups.pair_pick,
@@ -279,6 +283,8 @@ export async function getSeasonSignups(): Promise<{
                 male: row.male,
                 age: row.age,
                 captain: row.captain,
+                refInterest: row.refInterest,
+                tryoutHelp: row.tryoutHelp,
                 amountPaid: row.amountPaid,
                 signupDate: row.signupDate,
                 isNew: !draftedUserIds.has(row.userId),
@@ -359,6 +365,8 @@ export const deleteSignupEntry = withAction(
                     pair: signups.pair,
                     pairPick: signups.pair_pick,
                     pairReason: signups.pair_reason,
+                    refInterest: signups.ref_interest,
+                    tryoutHelp: signups.tryout_help,
                     orderId: signups.order_id,
                     amountPaid: signups.amount_paid,
                     createdAt: signups.created_at
@@ -386,6 +394,8 @@ export const deleteSignupEntry = withAction(
                 pair: signupRecord.pair,
                 pair_pick: signupRecord.pairPick,
                 pair_reason: signupRecord.pairReason,
+                ref_interest: signupRecord.refInterest,
+                tryout_help: signupRecord.tryoutHelp,
                 order_id: signupRecord.orderId,
                 amount_paid: signupRecord.amountPaid,
                 created_at: signupRecord.createdAt,

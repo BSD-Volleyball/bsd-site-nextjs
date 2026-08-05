@@ -39,7 +39,8 @@ import {
     RiErrorWarningLine,
     RiArrowRightLine
 } from "@remixicon/react"
-import { AGE_GROUPS } from "@/lib/age-groups"
+import { AGE_GROUPS, DEFAULT_AGE_GROUP } from "@/lib/age-groups"
+import { SeasonVolunteerQuestions } from "@/components/season-volunteer-questions"
 import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
 import Link from "next/link"
@@ -64,6 +65,9 @@ interface WizardFormProps {
     discount: { id: number; percentage: string } | null
     activeWaiver: { id: number; content: string } | null
     isReturningPlayer: boolean
+    // True when a past signup already recorded "20 or older" for this player.
+    // The age question is skipped entirely and DEFAULT_AGE_GROUP is submitted.
+    isKnownAdult: boolean
     seasonLabel: string
     // Set when a signups row already exists for this player+season. Rendered
     // here (not by the server page) so the post-payment router.refresh()
@@ -82,6 +86,7 @@ export function WizardForm({
     discount,
     activeWaiver,
     isReturningPlayer,
+    isKnownAdult,
     seasonLabel,
     existingSignup
 }: WizardFormProps) {
@@ -101,11 +106,13 @@ export function WizardForm({
         isReturningPlayer && week1Tryout ? [week1Tryout.id] : []
 
     const [formData, setFormData] = useState<SignupFormData>({
-        age: "20+",
+        age: DEFAULT_AGE_GROUP,
         captain: "no",
         pair: false,
         pairPick: null,
         pairReason: "",
+        refInterest: false,
+        tryoutHelp: false,
         unavailableEventIds: initialUnavailableIds
     })
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(
@@ -332,50 +339,54 @@ export function WizardForm({
                     </TabsList>
 
                     <TabsContent value="info" className="space-y-6 pt-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="age">
-                                Age at beginning of the season:
-                            </Label>
-                            <Select
-                                value={formData.age}
-                                onValueChange={(value) =>
-                                    setFormData((prev) => ({
-                                        ...prev,
-                                        age: value,
-                                        // Auto-enable pairing for players aged 15-14
-                                        ...(value === "15-14"
-                                            ? { pair: true }
-                                            : {})
-                                    }))
-                                }
-                            >
-                                <SelectTrigger id="age">
-                                    <SelectValue placeholder="Select your age range" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {[...AGE_GROUPS].reverse().map((group) => (
-                                        <SelectItem
-                                            key={group.value}
-                                            value={group.value}
-                                        >
-                                            {group.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {formData.age === "17-16" && (
-                                <p className="text-amber-600 text-sm dark:text-amber-400">
-                                    Players this age MUST have a parent/guardian
-                                    present.
-                                </p>
-                            )}
-                            {formData.age === "15-14" && (
-                                <p className="text-amber-600 text-sm dark:text-amber-400">
-                                    Players this age MUST pair with another
-                                    player.
-                                </p>
-                            )}
-                        </div>
+                        {!isKnownAdult && (
+                            <div className="space-y-2">
+                                <Label htmlFor="age">
+                                    Age at beginning of the season:
+                                </Label>
+                                <Select
+                                    value={formData.age}
+                                    onValueChange={(value) =>
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            age: value,
+                                            // Auto-enable pairing for players aged 15-14
+                                            ...(value === "15-14"
+                                                ? { pair: true }
+                                                : {})
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger id="age">
+                                        <SelectValue placeholder="Select your age range" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[...AGE_GROUPS]
+                                            .reverse()
+                                            .map((group) => (
+                                                <SelectItem
+                                                    key={group.value}
+                                                    value={group.value}
+                                                >
+                                                    {group.label}
+                                                </SelectItem>
+                                            ))}
+                                    </SelectContent>
+                                </Select>
+                                {formData.age === "17-16" && (
+                                    <p className="text-amber-600 text-sm dark:text-amber-400">
+                                        Players this age MUST have a
+                                        parent/guardian present.
+                                    </p>
+                                )}
+                                {formData.age === "15-14" && (
+                                    <p className="text-amber-600 text-sm dark:text-amber-400">
+                                        Players this age MUST pair with another
+                                        player.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-3">
                             <Label>Interested in being a Captain?</Label>
@@ -428,6 +439,26 @@ export function WizardForm({
                             </RadioGroup>
                         </div>
 
+                        <div className="space-y-4 border-t pt-6">
+                            <SeasonVolunteerQuestions
+                                refInterest={formData.refInterest}
+                                tryoutHelp={formData.tryoutHelp}
+                                onRefInterestChange={(value) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        refInterest: value
+                                    }))
+                                }
+                                onTryoutHelpChange={(value) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        tryoutHelp: value
+                                    }))
+                                }
+                                idPrefix="signup-"
+                            />
+                        </div>
+
                         <div className="pt-4">
                             <Button onClick={goToNextTab} className="gap-2">
                                 Next
@@ -448,7 +479,7 @@ export function WizardForm({
                                 and the reason for pairing. If you can not find
                                 your pair below, they likely haven&apos;t
                                 registered yet — you can come back and select
-                                them from your Captain &amp; Pairing page after
+                                them from your My Season Preferences page after
                                 signing up, once they&apos;ve registered.{" "}
                             </p>
                         </div>

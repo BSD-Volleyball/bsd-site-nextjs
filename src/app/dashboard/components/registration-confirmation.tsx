@@ -70,7 +70,7 @@ export function RegistrationConfirmation({
                         href="/dashboard/captain-pairing"
                         className="inline-flex items-center justify-center rounded-md border px-3 py-1.5 font-medium text-sm hover:bg-accent"
                     >
-                        Edit captain & pairing
+                        Edit season preferences
                     </Link>
                     <Link
                         href="/dashboard/my-availability"

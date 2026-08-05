@@ -340,7 +340,7 @@ export function AppSidebar({
         ]
     }
 
-    // Insert Captain & Pairing after Dashboard for players signed up this season,
+    // Insert My Season Preferences after Dashboard for players signed up this season,
     // but only before drafting starts — once the draft begins these choices lock.
     const showCaptainPairing =
         hasCurrentSeasonSignup &&
@@ -376,13 +376,13 @@ export function AppSidebar({
             })
         }
 
-        // Captain & Pairing — hidden when the user has no current-season signup,
-        // or once drafting has started (the choices are locked).
+        // My Season Preferences — hidden when the user has no current-season
+        // signup, or once drafting has started (the choices are locked).
         if (!showCaptainPairing) {
             hiddenGroups.push({
                 label: hasCurrentSeasonSignup
-                    ? "Captain & Pairing (locked)"
-                    : "Captain & Pairing (no signup)",
+                    ? "My Season Preferences (locked)"
+                    : "My Season Preferences (no signup)",
                 items: [captainPairingNavItem]
             })
         }

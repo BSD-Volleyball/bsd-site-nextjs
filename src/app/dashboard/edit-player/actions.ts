@@ -476,6 +476,8 @@ export interface SignupDetails {
     pair: boolean | null
     pair_pick: string | null
     pair_reason: string | null
+    ref_interest: boolean | null
+    tryout_help: boolean | null
     order_id: string | null
     amount_paid: string | null
     created_at: Date
@@ -524,6 +526,8 @@ export async function getSignupForCurrentSeason(
                 pair: signup.pair,
                 pair_pick: signup.pair_pick,
                 pair_reason: signup.pair_reason,
+                ref_interest: signup.ref_interest,
+                tryout_help: signup.tryout_help,
                 order_id: signup.order_id,
                 amount_paid: signup.amount_paid,
                 created_at: signup.created_at
@@ -544,6 +548,8 @@ export const updateSignup = withAction(
             pair?: boolean | null
             pair_pick?: string | null
             pair_reason?: string | null
+            ref_interest?: boolean | null
+            tryout_help?: boolean | null
             amount_paid?: string | null
         }
     ): Promise<ActionResult> => {

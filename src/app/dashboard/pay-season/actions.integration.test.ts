@@ -30,11 +30,13 @@ vi.mock("square", () => ({
 }))
 
 const formData = {
-    age: "30",
+    age: "20+",
     captain: "no",
     pair: false,
     pairPick: null,
     pairReason: "",
+    refInterest: false,
+    tryoutHelp: false,
     unavailableEventIds: [] as number[]
 }
 
@@ -99,6 +101,8 @@ describe("submitSeasonPayment", () => {
             .where(eq(signups.player, player.id))
         expect(signup.order_id).toBe("PAY-123")
         expect(signup.amount_paid).toBe("100.00")
+        expect(signup.ref_interest).toBe(false)
+        expect(signup.tryout_help).toBe(false)
 
         const acceptances = await db
             .select()
@@ -113,6 +117,38 @@ describe("submitSeasonPayment", () => {
 
         // The confirmation email is fired without await; poll the spy
         await vi.waitFor(() => expect(vi.mocked(sendEmail)).toHaveBeenCalled())
+    })
+
+    it("records the volunteer answers the player opted into", async () => {
+        const player = await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, refInterest: true, tryoutHelp: true },
+            waiverId
+        )
+        expect(result.status).toBe(true)
+
+        const [signup] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.player, player.id))
+        expect(signup.ref_interest).toBe(true)
+        expect(signup.tryout_help).toBe(true)
+    })
+
+    it("rejects an age outside the known age groups without charging", async () => {
+        await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, age: "30" },
+            waiverId
+        )
+
+        expect(result.status).toBe(false)
+        expect(result.message).toBe("Invalid age selection.")
+        expect(paymentsCreate).not.toHaveBeenCalled()
     })
 
     it("applies an active discount to the charged amount and consumes it", async () => {
@@ -233,6 +269,8 @@ describe("submitFreeSignup", () => {
             .where(eq(signups.player, player.id))
         expect(signup.amount_paid).toBe("0")
         expect(signup.order_id).toBe(`FREE-${discount.id}`)
+        expect(signup.ref_interest).toBe(false)
+        expect(signup.tryout_help).toBe(false)
 
         const [used] = await db
             .select()

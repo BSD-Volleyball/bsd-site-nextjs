@@ -26,6 +26,8 @@ function formatSegmentToTitle(segment: string): string {
 
     // Handle special cases and acronyms
     const specialCases: Record<string, string> = {
+        // Route kept as /captain-pairing after the page was renamed.
+        "captain-pairing": "My Season Preferences",
         api: "API",
         ui: "UI",
         ux: "UX",

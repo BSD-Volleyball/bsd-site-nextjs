@@ -17,6 +17,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { UserCombobox } from "@/components/user-combobox"
+import {
+    REF_INTEREST_LABEL,
+    SeasonVolunteerQuestions,
+    TRYOUT_HELP_LABEL
+} from "@/components/season-volunteer-questions"
 import { updateSignupPreferences } from "./actions"
 import type { SignupPreferences } from "./utils"
 
@@ -46,6 +51,8 @@ export function CaptainPairingForm({
     const [pair, setPair] = useState(initial.pair)
     const [pairPick, setPairPick] = useState<string | null>(initial.pairPick)
     const [pairReason, setPairReason] = useState(initial.pairReason ?? "")
+    const [refInterest, setRefInterest] = useState(initial.refInterest)
+    const [tryoutHelp, setTryoutHelp] = useState(initial.tryoutHelp)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -55,7 +62,9 @@ export function CaptainPairingForm({
             captain,
             pair,
             pairPick,
-            pairReason
+            pairReason,
+            refInterest,
+            tryoutHelp
         })
 
         if (result.status) {
@@ -72,7 +81,7 @@ export function CaptainPairingForm({
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Captain & Pairing Preferences</CardTitle>
+                    <CardTitle>My Season Preferences</CardTitle>
                     <CardDescription>
                         These choices can no longer be edited now that drafting
                         has started.
@@ -95,6 +104,22 @@ export function CaptainPairingForm({
                             {pair && pairName ? pairName : "None"}
                         </span>
                     </div>
+                    <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                            {REF_INTEREST_LABEL}
+                        </span>
+                        <span className="font-medium">
+                            {refInterest ? "Yes" : "No"}
+                        </span>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">
+                            {TRYOUT_HELP_LABEL}
+                        </span>
+                        <span className="font-medium">
+                            {tryoutHelp ? "Yes" : "No"}
+                        </span>
+                    </div>
                 </CardContent>
             </Card>
         )
@@ -104,10 +129,11 @@ export function CaptainPairingForm({
         <form onSubmit={handleSubmit}>
             <Card>
                 <CardHeader>
-                    <CardTitle>Captain & Pairing Preferences</CardTitle>
+                    <CardTitle>My Season Preferences</CardTitle>
                     <CardDescription>
-                        Update whether you&apos;re interested in captaining and
-                        who you&apos;d like to pair with for the season.
+                        Update whether you&apos;re interested in captaining, who
+                        you&apos;d like to pair with, and how you&apos;re
+                        willing to help out this season.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -149,6 +175,15 @@ export function CaptainPairingForm({
                                 </Label>
                             </div>
                         </RadioGroup>
+                    </div>
+
+                    <div className="space-y-4 border-t pt-6">
+                        <SeasonVolunteerQuestions
+                            refInterest={refInterest}
+                            tryoutHelp={tryoutHelp}
+                            onRefInterestChange={setRefInterest}
+                            onTryoutHelpChange={setTryoutHelp}
+                        />
                     </div>
 
                     <div className="space-y-4 border-t pt-6">

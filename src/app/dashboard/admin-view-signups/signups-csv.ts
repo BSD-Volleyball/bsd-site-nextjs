@@ -19,6 +19,8 @@ export function generateCsvContent(
         "Gender",
         "Age",
         "Captain",
+        "Ref Interest",
+        "Tryout Help",
         "Captain In",
         "Drafted In",
         "Paid",
@@ -58,6 +60,17 @@ export function generateCsvContent(
               : entry.captain === "no"
                 ? "No"
                 : "",
+        // Empty (not "No") when the question predates these columns.
+        entry.refInterest === true
+            ? "Yes"
+            : entry.refInterest === false
+              ? "No"
+              : "",
+        entry.tryoutHelp === true
+            ? "Yes"
+            : entry.tryoutHelp === false
+              ? "No"
+              : "",
         entry.captainIn || "",
         entry.draftedIn || "",
         entry.amountPaid || "",

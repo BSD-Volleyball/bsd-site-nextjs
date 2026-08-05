@@ -18,6 +18,7 @@ import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logger } from "@/lib/logger"
+import { AGE_GROUPS } from "@/lib/age-groups"
 
 export interface SignupFormData {
     age: string
@@ -25,6 +26,8 @@ export interface SignupFormData {
     pair: boolean
     pairPick: string | null
     pairReason: string
+    refInterest: boolean
+    tryoutHelp: boolean
     unavailableEventIds: number[]
 }
 
@@ -145,6 +148,11 @@ async function validateFinalSignupAvailability(
 async function validateSignupFormData(
     formData: SignupFormData
 ): Promise<string | null> {
+    // The stored value is matched exactly ("20+") when deciding whether to skip
+    // the age question on a later signup, so only known groups may be written.
+    if (!AGE_GROUPS.some((group) => group.value === formData.age)) {
+        return "Invalid age selection."
+    }
     if (
         typeof formData.pairReason === "string" &&
         formData.pairReason.length > 1000
@@ -346,6 +354,8 @@ export async function submitSeasonPayment(
                                     pair: formData.pair,
                                     pair_pick: formData.pairPick,
                                     pair_reason: formData.pairReason,
+                                    ref_interest: formData.refInterest === true,
+                                    tryout_help: formData.tryoutHelp === true,
                                     created_at: new Date()
                                 })
                                 .returning({ id: signups.id })
@@ -556,6 +566,8 @@ export async function submitFreeSignup(
                     pair: formData.pair,
                     pair_pick: formData.pairPick,
                     pair_reason: formData.pairReason,
+                    ref_interest: formData.refInterest === true,
+                    tryout_help: formData.tryoutHelp === true,
                     created_at: new Date()
                 })
                 .returning({ id: signups.id })

@@ -60,6 +60,8 @@ export const updateSignupPreferences = withAction(
         const pair = preferences.pair === true
         const pairPick = pair ? preferences.pairPick || null : null
         const pairReason = pair ? preferences.pairReason : ""
+        const refInterest = preferences.refInterest === true
+        const tryoutHelp = preferences.tryoutHelp === true
 
         await db
             .update(signups)
@@ -67,7 +69,9 @@ export const updateSignupPreferences = withAction(
                 captain: preferences.captain,
                 pair,
                 pair_pick: pairPick,
-                pair_reason: pairReason
+                pair_reason: pairReason,
+                ref_interest: refInterest,
+                tryout_help: tryoutHelp
             })
             .where(
                 and(
@@ -81,7 +85,7 @@ export const updateSignupPreferences = withAction(
             action: "update_signup_preferences",
             entityType: "signup",
             entityId: signupId,
-            summary: `Updated captain/pair preferences (captain=${preferences.captain}, pair=${pair})`
+            summary: `Updated season preferences (captain=${preferences.captain}, pair=${pair}, ref=${refInterest}, tryoutHelp=${tryoutHelp})`
         })
 
         return ok(undefined, "Your preferences have been updated.")

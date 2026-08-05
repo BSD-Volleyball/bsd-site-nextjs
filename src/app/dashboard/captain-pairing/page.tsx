@@ -10,19 +10,19 @@ import { canEditPreferences } from "./utils"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-    title: "Captain & Pairing Preferences"
+    title: "My Season Preferences"
 }
 
 export const dynamic = "force-dynamic"
 
 const DESCRIPTION =
-    "Update your captain interest and pairing request for the current season."
+    "Update your captain interest, pairing request, and volunteer answers for the current season."
 
 function EmptyState({ message }: { message: string }) {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Captain & Pairing Preferences"
+                title="My Season Preferences"
                 description={DESCRIPTION}
             />
             <p className="text-muted-foreground">{message}</p>
@@ -45,7 +45,9 @@ export default async function CaptainPairingPage() {
             captain: signups.captain,
             pair: signups.pair,
             pair_pick: signups.pair_pick,
-            pair_reason: signups.pair_reason
+            pair_reason: signups.pair_reason,
+            ref_interest: signups.ref_interest,
+            tryout_help: signups.tryout_help
         })
         .from(signups)
         .where(
@@ -67,7 +69,7 @@ export default async function CaptainPairingPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Captain & Pairing Preferences"
+                title="My Season Preferences"
                 description={DESCRIPTION}
             />
             <div className="max-w-2xl">
@@ -78,7 +80,9 @@ export default async function CaptainPairingPage() {
                         captain: signup.captain ?? "no",
                         pair: signup.pair ?? false,
                         pairPick: signup.pair_pick ?? null,
-                        pairReason: signup.pair_reason ?? ""
+                        pairReason: signup.pair_reason ?? "",
+                        refInterest: signup.ref_interest ?? false,
+                        tryoutHelp: signup.tryout_help ?? false
                     }}
                     canEdit={canEditPreferences(config.phase)}
                 />

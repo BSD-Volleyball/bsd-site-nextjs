@@ -86,6 +86,8 @@ interface SignupFormData {
     pair: boolean
     pair_pick: string
     pair_reason: string
+    ref_interest: boolean
+    tryout_help: boolean
     order_id: string
     amount_paid: string
     created_at: string
@@ -100,6 +102,8 @@ function signupToFormData(signup: SignupDetails): SignupFormData {
         pair: signup.pair ?? false,
         pair_pick: signup.pair_pick ?? "",
         pair_reason: signup.pair_reason ?? "",
+        ref_interest: signup.ref_interest ?? false,
+        tryout_help: signup.tryout_help ?? false,
         order_id: signup.order_id ?? "",
         amount_paid: signup.amount_paid ?? "",
         created_at: signup.created_at
@@ -377,6 +381,8 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 pair: signupData.pair,
                 pair_pick: signupData.pair_pick || null,
                 pair_reason: signupData.pair_reason || null,
+                ref_interest: signupData.ref_interest,
+                tryout_help: signupData.tryout_help,
                 amount_paid: signupData.amount_paid || null
             })
 
@@ -745,6 +751,36 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                 }
                             />
                             <Label htmlFor="signup_pair">Wants Pair</Label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Switch
+                                id="signup_ref_interest"
+                                checked={signupData.ref_interest}
+                                onCheckedChange={(checked) =>
+                                    handleSignupBooleanChange(
+                                        "ref_interest",
+                                        checked
+                                    )
+                                }
+                            />
+                            <Label htmlFor="signup_ref_interest">
+                                Wants to Ref
+                            </Label>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Switch
+                                id="signup_tryout_help"
+                                checked={signupData.tryout_help}
+                                onCheckedChange={(checked) =>
+                                    handleSignupBooleanChange(
+                                        "tryout_help",
+                                        checked
+                                    )
+                                }
+                            />
+                            <Label htmlFor="signup_tryout_help">
+                                Will Help Run Tryouts
+                            </Label>
                         </div>
                     </div>
 

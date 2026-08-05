@@ -16,6 +16,7 @@ import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
 import { drafts, signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
+import { hasRecordedAdultAge } from "@/lib/signup-age"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -48,6 +49,12 @@ export default async function PaySeasonPage() {
             .limit(1)
         isReturningPlayer = draftRow !== undefined
     }
+
+    // A player who has already told us they were "20 or older" isn't asked
+    // again — the wizard hides the question and submits the same answer.
+    const isKnownAdult = session
+        ? await hasRecordedAdultAge(session.user.id)
+        : false
 
     // A signups row is only written after payment succeeds, so its presence
     // means this player has already signed up and paid for the current season.
@@ -96,6 +103,7 @@ export default async function PaySeasonPage() {
                 discount={discount}
                 activeWaiver={activeWaiver}
                 isReturningPlayer={isReturningPlayer}
+                isKnownAdult={isKnownAdult}
                 seasonLabel={seasonLabel}
                 existingSignup={existingSignup}
             />
