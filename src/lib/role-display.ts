@@ -21,6 +21,11 @@ export const ROLE_OPTIONS: { value: Role; label: string; seasonal: boolean }[] =
             value: "leadership_group",
             label: "Leadership Group",
             seasonal: false
+        },
+        {
+            value: "tryout_volunteer",
+            label: "Tryout Volunteer",
+            seasonal: true
         }
     ]
 
@@ -32,7 +37,8 @@ export const ROLE_BADGE_COLORS: Record<string, string> = {
     ombudsman: "bg-yellow-100 text-yellow-800",
     referee: "bg-orange-100 text-orange-800",
     referee_coordinator: "bg-teal-100 text-teal-800",
-    leadership_group: "bg-indigo-100 text-indigo-800"
+    leadership_group: "bg-indigo-100 text-indigo-800",
+    tryout_volunteer: "bg-pink-100 text-pink-800"
 }
 
 export function roleLabel(role: string): string {

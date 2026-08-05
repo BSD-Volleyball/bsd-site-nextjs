@@ -267,6 +267,72 @@ export function buildGameReminderHtml(opts: {
     })
 }
 
+/**
+ * One block per volunteer job, e.g.
+ *   Tryout 1 — Thursday, September 10, 2026
+ *   Job: Scorekeeper / When: 6:00 PM / Notes: ...
+ */
+export interface VolunteerJobBlock {
+    nightLabel: string
+    jobName: string
+    timeLabel: string
+    notes: string | null
+}
+
+function renderVolunteerJobBlocks(jobs: VolunteerJobBlock[]): string {
+    return jobs
+        .map((job) =>
+            renderDetailsBlock(
+                [
+                    renderDetailRow("When:", job.nightLabel),
+                    renderDetailRow("Job:", job.jobName),
+                    renderDetailRow("Time:", job.timeLabel),
+                    job.notes ? renderDetailRow("Notes:", job.notes) : ""
+                ].filter(Boolean)
+            )
+        )
+        .join("")
+}
+
+export function buildVolunteerJobAssignmentHtml(opts: {
+    firstName: string
+    seasonLabel: string
+    jobs: VolunteerJobBlock[]
+}): string {
+    const plural = opts.jobs.length === 1 ? "job" : "jobs"
+
+    return renderEmailHtml({
+        heading: "Your Tryout Volunteer Assignment",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>Thank you for volunteering to help run ${escapeHtml(opts.seasonLabel)} tryouts! Here ${opts.jobs.length === 1 ? "is your" : "are your"} ${plural}:</p>
+            ${renderVolunteerJobBlocks(opts.jobs)}
+            <p style="font-size:13px;color:#6b7280;">Please plan to arrive 10 minutes early. If you can no longer make it, let us know as soon as you can at <a href="mailto:${escapeHtml(site.mailSupport)}">${escapeHtml(site.mailSupport)}</a>.</p>
+        `,
+        action: "Go to Dashboard",
+        actionUrl: `${site.url}/dashboard`
+    })
+}
+
+export function buildVolunteerJobReminderHtml(opts: {
+    firstName: string
+    dateLabel: string
+    jobs: VolunteerJobBlock[]
+}): string {
+    return renderEmailHtml({
+        heading: "Volunteering Tomorrow",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>A reminder that you're volunteering at tryouts tomorrow, ${escapeHtml(opts.dateLabel)}:</p>
+            ${renderVolunteerJobBlocks(opts.jobs)}
+            <p style="font-size:13px;color:#6b7280;">Please plan to arrive 10 minutes early.</p>
+            <p style="font-size:12px;color:#9ca3af;">Don't want these reminders? <a href="${escapeHtml(site.publicUrl)}/dashboard/notifications" style="color:#9ca3af;">Manage your email preferences</a>.</p>
+        `,
+        action: "Go to Dashboard",
+        actionUrl: `${site.url}/dashboard`
+    })
+}
+
 export function buildConcernNotificationHtml(appUrl: string): string {
     return renderEmailHtml({
         heading: "New Concern Submitted",

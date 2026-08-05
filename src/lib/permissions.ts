@@ -13,6 +13,7 @@ export type Role =
     | "referee"
     | "referee_coordinator"
     | "leadership_group"
+    | "tryout_volunteer"
 
 export type Permission =
     // Season lifecycle
@@ -136,7 +137,12 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
     // Global designation for league leadership volunteers; grants no
     // permissions — used for display and email targeting only.
-    leadership_group: []
+    leadership_group: [],
+
+    // Season-scoped designation for people who help run tryout nights;
+    // grants no permissions — it only makes a user eligible to be picked
+    // on the Assign Tryout Jobs page.
+    tryout_volunteer: []
 }
 
 const VALID_ROLES = new Set<string>(Object.keys(ROLE_PERMISSIONS))

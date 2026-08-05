@@ -24,7 +24,8 @@ import {
     RiCalendarLine,
     RiCoupon3Line,
     RiStarLine,
-    RiAlertLine
+    RiAlertLine,
+    RiHandHeartLine
 } from "@remixicon/react"
 import Link from "next/link"
 import {
@@ -62,6 +63,11 @@ import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-c
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
+import {
+    assignmentNightLabel,
+    assignmentTimeLabel,
+    getVolunteerAssignmentsForSeason
+} from "@/lib/tryout-volunteer-schedule"
 import { cn, formatDisplayName } from "@/lib/utils"
 import { site } from "@/config/site"
 import {
@@ -140,6 +146,13 @@ export default async function DashboardPage() {
         courtNumber: number
         sessionTime: string
     } | null = null
+    let tryoutVolunteerJobs: {
+        assignmentId: number
+        jobName: string
+        notes: string | null
+        nightLabel: string
+        timeLabel: string
+    }[] = []
     let assignedActiveConcernsCount = 0
     let refUpcomingMatches: {
         date: string
@@ -642,6 +655,22 @@ export default async function DashboardPage() {
                 }
             }
         }
+    }
+
+    // Tryout volunteer jobs this player has been assigned
+    if (session?.user && signupStatus?.config.seasonId) {
+        const assignments = await getVolunteerAssignmentsForSeason(
+            signupStatus.config.seasonId
+        )
+        tryoutVolunteerJobs = assignments
+            .filter((a) => a.userId === session.user.id)
+            .map((a) => ({
+                assignmentId: a.assignmentId,
+                jobName: a.jobName,
+                notes: a.jobNotes,
+                nightLabel: assignmentNightLabel(a),
+                timeLabel: assignmentTimeLabel(a)
+            }))
     }
 
     // Ref dashboard card data
@@ -1484,6 +1513,67 @@ export default async function DashboardPage() {
 
                 {shouldShowWelcomeTeamCard && captainWelcomeData && (
                     <WelcomeTeamCard data={captainWelcomeData} />
+                )}
+
+                {tryoutVolunteerJobs.length > 0 && (
+                    <Card className="min-w-[280px] flex-1 border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <RiHandHeartLine className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                <CardTitle className="text-lg text-purple-700 dark:text-purple-300">
+                                    You're volunteering at tryouts
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-purple-700 text-sm dark:text-purple-300">
+                                Thank you for helping run tryouts! Here
+                                {tryoutVolunteerJobs.length === 1
+                                    ? "'s your job"
+                                    : " are your jobs"}
+                                :
+                            </p>
+                            {tryoutVolunteerJobs.map((job) => (
+                                <div
+                                    key={job.assignmentId}
+                                    className="space-y-1.5 rounded-md bg-purple-100 p-3 text-sm dark:bg-purple-900"
+                                >
+                                    <div className="flex justify-between gap-2">
+                                        <span className="text-purple-700 dark:text-purple-300">
+                                            Job:
+                                        </span>
+                                        <span className="text-right font-semibold text-purple-800 dark:text-purple-200">
+                                            {job.jobName}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-2">
+                                        <span className="text-purple-700 dark:text-purple-300">
+                                            Date:
+                                        </span>
+                                        <span className="text-right font-semibold text-purple-800 dark:text-purple-200">
+                                            {job.nightLabel}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-2">
+                                        <span className="text-purple-700 dark:text-purple-300">
+                                            Time:
+                                        </span>
+                                        <span className="text-right font-semibold text-purple-800 dark:text-purple-200">
+                                            {job.timeLabel}
+                                        </span>
+                                    </div>
+                                    {job.notes && (
+                                        <p className="text-purple-600 text-xs dark:text-purple-400">
+                                            {job.notes}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                            <p className="text-purple-600 text-xs dark:text-purple-400">
+                                Please plan to arrive 10 minutes early.
+                            </p>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {userWeek2Roster && signupStatus && (

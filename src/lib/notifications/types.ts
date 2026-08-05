@@ -24,6 +24,8 @@ export type NotificationType =
     | "league_announcements"
     | "in_season_updates"
     | "tryout_roster"
+    | "tryout_volunteer_assignment"
+    | "tryout_volunteer_reminder"
     | "draft_results"
     | "sub_locked_in"
     | "game_reminder_player"
@@ -99,6 +101,20 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Tryout & preseason assignments",
             description:
                 "Your court and session assignments for preseason weeks 1–3."
+        },
+        tryout_volunteer_assignment: {
+            category: "roster_draft",
+            stream: "outbound",
+            label: "Tryout volunteer jobs",
+            description:
+                "The volunteer job you've been assigned on a tryout night."
+        },
+        tryout_volunteer_reminder: {
+            category: "game_reminders",
+            stream: "automated-reminders",
+            label: "Tryout volunteer jobs",
+            description:
+                "A reminder the day before a tryout night you're volunteering at."
         },
         draft_results: {
             category: "roster_draft",

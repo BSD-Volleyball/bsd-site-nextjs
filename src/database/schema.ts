@@ -343,6 +343,77 @@ export const tryoutSlotRequests = pgTable(
     })
 )
 
+// Volunteer jobs to be staffed on each tryout night. A job belongs to one
+// tryout season_events row. "whole_night" jobs are staffed once for the
+// entire evening; "per_session" jobs need `needed` people in EVERY time
+// slot of that night.
+export const tryoutJobScopeEnum = pgEnum("tryout_job_scope", [
+    "whole_night",
+    "per_session"
+])
+
+export const tryoutVolunteerJobs = pgTable(
+    "tryout_volunteer_jobs",
+    {
+        id: serial("id").primaryKey(),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        event_id: integer("event_id")
+            .notNull()
+            .references(() => seasonEvents.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        needed: integer("needed").notNull().default(1),
+        scope: tryoutJobScopeEnum("scope").notNull(),
+        notes: text("notes"),
+        sort_order: integer("sort_order").notNull().default(0),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        tryoutVolunteerJobsSeasonEventIdx: index(
+            "tryout_volunteer_jobs_season_event_idx"
+        ).on(table.season_id, table.event_id)
+    })
+)
+
+// One person filling one slot of a job. time_slot_id is NULL for
+// whole-night jobs and references the session for per-session jobs.
+export const tryoutVolunteerAssignments = pgTable(
+    "tryout_volunteer_assignments",
+    {
+        id: serial("id").primaryKey(),
+        job_id: integer("job_id")
+            .notNull()
+            .references(() => tryoutVolunteerJobs.id, { onDelete: "cascade" }),
+        time_slot_id: integer("time_slot_id").references(
+            () => eventTimeSlots.id,
+            { onDelete: "cascade" }
+        ),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        assigned_by: text("assigned_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        assigned_at: timestamp("assigned_at").defaultNow().notNull()
+    },
+    (table) => ({
+        tryoutVolunteerAssignmentsJobIdx: index(
+            "tryout_volunteer_assignments_job_idx"
+        ).on(table.job_id),
+        tryoutVolunteerAssignmentsUserIdx: index(
+            "tryout_volunteer_assignments_user_idx"
+        ).on(table.user_id),
+        // NULLS NOT DISTINCT so a whole-night job (null time_slot_id)
+        // still blocks assigning the same person twice.
+        tryoutVolunteerAssignmentsUniq: unique(
+            "tryout_volunteer_assignments_uniq"
+        )
+            .on(table.job_id, table.time_slot_id, table.user_id)
+            .nullsNotDistinct()
+    })
+)
+
 export const teams = pgTable(
     "teams",
     {

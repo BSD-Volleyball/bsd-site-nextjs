@@ -167,6 +167,21 @@ export const adminNavItems: NavItem[] = [
         icon: RiTimeLine
     },
     {
+        title: "Configure Tryout Jobs",
+        url: "/dashboard/configure-tryout-jobs",
+        icon: RiClipboardLine
+    },
+    {
+        title: "Pick Tryout Volunteers",
+        url: "/dashboard/pick-tryout-volunteers",
+        icon: RiGroupLine
+    },
+    {
+        title: "Assign Tryout Jobs",
+        url: "/dashboard/assign-tryout-jobs",
+        icon: RiCheckboxLine
+    },
+    {
         title: "Google Membership",
         url: "/dashboard/google-membership",
         icon: RiMailLine
