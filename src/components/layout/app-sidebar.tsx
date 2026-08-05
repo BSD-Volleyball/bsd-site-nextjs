@@ -239,6 +239,16 @@ export function AppSidebar({
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
 
+    // Tryout volunteer tools: staffing is planned from the moment
+    // registration opens and is done once the last tryout night is over.
+    const tryoutVolunteerUrls = [
+        "/dashboard/configure-tryout-jobs",
+        "/dashboard/pick-tryout-volunteers",
+        "/dashboard/assign-tryout-jobs"
+    ]
+    const showTryoutVolunteerTools =
+        isAdmin && inRange("registration_open", "prep_tryout_week_3")
+
     // Admin tournament pages only make sense while a tournament is active
     // (tournament is null when the latest tournament is complete or none
     // exists). Tournament Control stays visible so a new one can be created.
@@ -488,12 +498,15 @@ export function AppSidebar({
                 items: hiddenCommissionerItems
             })
 
-        // Admin items: Review Pairs + Evaluate New Players if suppressed
+        // Admin items: Review Pairs, Evaluate New Players, and the tryout
+        // volunteer tools if suppressed
         const hiddenAdminItems = adminNavItems.filter(
             (item) =>
                 (item.url === "/dashboard/review-pairs" && !showReviewPairs) ||
                 (item.url === "/dashboard/evaluate-players" &&
-                    !showEvaluatePlayers)
+                    !showEvaluatePlayers) ||
+                (tryoutVolunteerUrls.includes(item.url) &&
+                    !showTryoutVolunteerTools)
         )
         if (hiddenAdminItems.length > 0)
             hiddenGroups.push({ label: "Admin", items: hiddenAdminItems })
@@ -833,6 +846,12 @@ export function AppSidebar({
                                             )
                                         )
                                             return hasActiveTournament
+                                        if (
+                                            tryoutVolunteerUrls.includes(
+                                                item.url
+                                            )
+                                        )
+                                            return showTryoutVolunteerTools
                                         return true
                                     })}
                                     pathname={pathname}
