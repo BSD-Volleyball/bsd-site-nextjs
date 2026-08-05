@@ -130,6 +130,11 @@ export type {
     BracketParticipant
 } from "@/lib/playoff-bracket-types"
 
+import type {
+    BracketMatch,
+    BracketParticipant
+} from "@/lib/playoff-bracket-types"
+
 export interface PlayoffDivision {
     id: number
     name: string

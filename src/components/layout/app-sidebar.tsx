@@ -37,7 +37,8 @@ import {
 import { site } from "@/config/site"
 import type {
     SeasonNavItem,
-    SidebarData
+    SidebarData,
+    TournamentNavItem
 } from "@/app/dashboard/sidebar-actions"
 import {
     PHASE_CONFIG,
@@ -68,6 +69,7 @@ import {
     seasonCategories,
     seasonHistoryNavItem,
     signupNavItem,
+    tournamentCategories,
     week1NavItem,
     week2NavItem,
     week3NavItem
@@ -166,6 +168,59 @@ function SeasonNavMenuItem({
                     <SidebarMenuSub>
                         {seasonCategories.map((cat) => {
                             const href = `${cat.basePath}/${season.id}`
+                            return (
+                                <SidebarMenuSubItem key={cat.key}>
+                                    <SidebarMenuSubButton
+                                        asChild
+                                        isActive={pathname.startsWith(href)}
+                                    >
+                                        <Link href={href}>
+                                            <span>{cat.label}</span>
+                                        </Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            )
+                        })}
+                    </SidebarMenuSub>
+                </CollapsibleContent>
+            </SidebarMenuItem>
+        </Collapsible>
+    )
+}
+
+function TournamentNavMenuItem({
+    tournament,
+    pathname
+}: {
+    tournament: TournamentNavItem
+    pathname: string
+}) {
+    const label = `${tournament.name} (${tournament.year})`
+
+    return (
+        <Collapsible asChild className="group/tournament">
+            <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                        className="group/menu-button h-9 gap-3 font-medium transition-all duration-300 ease-out group-data-[collapsible=icon]:px-1.25! [&>svg]:size-auto"
+                        tooltip={label}
+                    >
+                        <RiMedalLine
+                            className="text-muted-foreground/65"
+                            size={22}
+                            aria-hidden="true"
+                        />
+                        <span>{label}</span>
+                        <RiArrowDownSLine
+                            className="ml-auto transition-transform duration-200 group-data-[state=open]/tournament:rotate-180"
+                            size={16}
+                        />
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <SidebarMenuSub>
+                        {tournamentCategories.map((cat) => {
+                            const href = `${cat.basePath}/${tournament.id}`
                             return (
                                 <SidebarMenuSubItem key={cat.key}>
                                     <SidebarMenuSubButton
@@ -800,15 +855,9 @@ export function AppSidebar({
                                         pathname={pathname}
                                     />
                                 ) : (
-                                    <NavItems
+                                    <TournamentNavMenuItem
                                         key={`tournament-${entry.tournament.id}`}
-                                        items={[
-                                            {
-                                                title: `${entry.tournament.name} (${entry.tournament.year})`,
-                                                url: `/dashboard/tournament-results/${entry.tournament.id}`,
-                                                icon: RiMedalLine
-                                            }
-                                        ]}
+                                        tournament={entry.tournament}
                                         pathname={pathname}
                                     />
                                 )

@@ -5,7 +5,6 @@ import {
     divisions,
     tournamentDivisions,
     tournamentMatches,
-    tournamentPlacements,
     tournamentPools,
     tournamentTeams,
     tournaments
@@ -27,7 +26,6 @@ import {
     getPoolStandings,
     type PoolStandingRow
 } from "@/lib/tournament-standings"
-import type { DivisionPlacements } from "@/components/tournament/tournament-placements-card"
 
 export interface DivisionPoolStandings {
     divisionId: number
@@ -35,20 +33,18 @@ export interface DivisionPoolStandings {
     pools: Array<{ poolId: number; poolName: string; rows: PoolStandingRow[] }>
 }
 
-export interface TournamentResults {
+export interface TournamentPoolPlay {
     tournamentLabel: string
     view: TournamentScheduleView
     poolStandings: DivisionPoolStandings[]
-    placements: DivisionPlacements[]
 }
 
 /**
- * Read-only results for any tournament by id: final placements, pool standings,
- * and pool/bracket match scores per division. Session-gated (any logged-in user);
- * unlike the live schedule view this is not limited to the active tournament.
+ * Read-only pool-play results for any tournament by id: pool standings and
+ * pool match scores per division. Session-gated (any logged-in user).
  */
-export const getTournamentResults = withAction(
-    async (tournamentId: number): Promise<ActionResult<TournamentResults>> => {
+export const getTournamentPoolPlay = withAction(
+    async (tournamentId: number): Promise<ActionResult<TournamentPoolPlay>> => {
         await requireSession()
         const id = requirePositiveInt(tournamentId, "tournament ID")
 
@@ -64,7 +60,6 @@ export const getTournamentResults = withAction(
             .limit(1)
         if (!t) return fail("Tournament not found.")
 
-        // Divisions ordered by sort_order — the single ordering used page-wide.
         const divisionRows = await db
             .select({
                 id: tournamentDivisions.id,
@@ -127,44 +122,10 @@ export const getTournamentResults = withAction(
             })
         }
 
-        // Final placements, grouped by division in sort_order, ordered by place.
-        const placementRows = await db
-            .select({
-                divisionId: tournamentPlacements.division_id,
-                teamId: tournamentPlacements.team_id,
-                teamName: tournamentTeams.name,
-                place: tournamentPlacements.place
-            })
-            .from(tournamentPlacements)
-            .innerJoin(
-                tournamentTeams,
-                eq(tournamentTeams.id, tournamentPlacements.team_id)
-            )
-            .where(eq(tournamentPlacements.tournament_id, id))
-            .orderBy(asc(tournamentPlacements.place))
-
-        const placements: DivisionPlacements[] = []
-        for (const div of divisionRows) {
-            const teamsForDiv = placementRows.filter(
-                (r) => r.divisionId === div.id
-            )
-            if (teamsForDiv.length === 0) continue
-            placements.push({
-                divisionId: div.id,
-                divisionName: div.divisionName,
-                teams: teamsForDiv.map((r) => ({
-                    teamId: r.teamId,
-                    teamName: r.teamName,
-                    place: r.place
-                }))
-            })
-        }
-
         return ok({
             tournamentLabel: `${t.name} (${t.year})`,
             view,
-            poolStandings,
-            placements
+            poolStandings
         })
     }
 )

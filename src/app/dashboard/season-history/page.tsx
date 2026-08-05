@@ -1,7 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
-import { seasonCategories } from "@/components/layout/sidebar-nav-config"
+import {
+    seasonCategories,
+    tournamentCategories
+} from "@/components/layout/sidebar-nav-config"
 import {
     Table,
     TableBody,
@@ -146,7 +149,11 @@ export default async function SeasonHistoryPage() {
                                 <TableRow>
                                     <TableHead>Tournament</TableHead>
                                     <TableHead>Date</TableHead>
-                                    <TableHead>Results</TableHead>
+                                    {tournamentCategories.map((cat) => (
+                                        <TableHead key={cat.key}>
+                                            {cat.label}
+                                        </TableHead>
+                                    ))}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -159,14 +166,16 @@ export default async function SeasonHistoryPage() {
                                         <TableCell className="whitespace-nowrap">
                                             {formatEventDate(tournament.date)}
                                         </TableCell>
-                                        <TableCell>
-                                            <Link
-                                                href={`/dashboard/tournament-results/${tournament.id}`}
-                                                className="text-primary hover:underline"
-                                            >
-                                                Results
-                                            </Link>
-                                        </TableCell>
+                                        {tournamentCategories.map((cat) => (
+                                            <TableCell key={cat.key}>
+                                                <Link
+                                                    href={`${cat.basePath}/${tournament.id}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {cat.label}
+                                                </Link>
+                                            </TableCell>
+                                        ))}
                                     </TableRow>
                                 ))}
                             </TableBody>

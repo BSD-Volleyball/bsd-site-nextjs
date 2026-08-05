@@ -67,7 +67,9 @@ import * as teamAvailability from "@/app/dashboard/team-availability/actions"
 import * as findSub from "@/app/dashboard/team-availability/find-sub-actions"
 import * as tournamentControl from "@/app/dashboard/tournament-control/actions"
 import * as tournamentOverview from "@/app/dashboard/tournament-overview/actions"
-import * as tournamentResults from "@/app/dashboard/tournament-results/[tournamentId]/actions"
+import * as tournamentPoolPlay from "@/app/dashboard/tournament-pool-play/[tournamentId]/actions"
+import * as tournamentPlayoffs from "@/app/dashboard/tournament-playoffs/[tournamentId]/actions"
+import * as tournamentRosters from "@/app/dashboard/tournament-rosters/[tournamentId]/actions"
 import * as tournamentSchedule from "@/app/dashboard/tournament-schedule/actions"
 import * as tournamentScheduleView from "@/app/dashboard/tournament-schedule-view/actions"
 import * as viewSignups from "@/app/dashboard/view-signups/actions"
@@ -451,8 +453,14 @@ const cases: SmokeCase[] = [
     c("tournamentOverview.getTournamentOverview", "fail", () =>
         tournamentOverview.getTournamentOverview()
     ),
-    c("tournamentResults.getTournamentResults", "fail", () =>
-        tournamentResults.getTournamentResults(1)
+    c("tournamentPoolPlay.getTournamentPoolPlay", "fail", () =>
+        tournamentPoolPlay.getTournamentPoolPlay(1)
+    ),
+    c("tournamentPlayoffs.getTournamentPlayoffs", "fail", () =>
+        tournamentPlayoffs.getTournamentPlayoffs(1)
+    ),
+    c("tournamentRosters.getTournamentRosters", "fail", () =>
+        tournamentRosters.getTournamentRosters(1)
     ),
     c("tournamentSchedule.getScheduleView", "fail", () =>
         tournamentSchedule.getScheduleView()

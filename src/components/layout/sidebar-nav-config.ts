@@ -479,3 +479,21 @@ export const seasonCategories = [
     { key: "schedule", label: "Season", basePath: "/dashboard/schedule" },
     { key: "playoffs", label: "Playoffs", basePath: "/dashboard/playoffs" }
 ]
+
+export const tournamentCategories = [
+    {
+        key: "rosters",
+        label: "Roster",
+        basePath: "/dashboard/tournament-rosters"
+    },
+    {
+        key: "pool-play",
+        label: "Pool Play",
+        basePath: "/dashboard/tournament-pool-play"
+    },
+    {
+        key: "playoffs",
+        label: "Playoffs",
+        basePath: "/dashboard/tournament-playoffs"
+    }
+]
