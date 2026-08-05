@@ -3,12 +3,21 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select"
 import { compressImageForUpload } from "@/lib/image-compression"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import {
     createTeamPhotoUpload,
     finalizeTeamPhotoUpload,
-    type DivisionTeamGroup
+    getTeamsForPicturePage,
+    type DivisionTeamGroup,
+    type PictureSeasonOption
 } from "./actions"
 
 // Reject before doing any work — compression also enforces this server-side.
@@ -21,12 +30,22 @@ const maxSourceUploadBytes = 25 * 1024 * 1024
 interface AddTeamPicturesClientProps {
     divisions: DivisionTeamGroup[]
     picBaseUrl: string
+    // Admin-only: empty for everyone else, which hides the season selector.
+    seasonOptions: PictureSeasonOption[]
+    currentSeasonId: number
 }
 
 export function AddTeamPicturesClient({
     divisions,
-    picBaseUrl
+    picBaseUrl,
+    seasonOptions,
+    currentSeasonId
 }: AddTeamPicturesClientProps) {
+    const [selectedSeasonId, setSelectedSeasonId] = useState(currentSeasonId)
+    // Server-rendered teams for the current season; replaced client-side when
+    // an admin switches to a previous season.
+    const [teamGroups, setTeamGroups] = useState(divisions)
+    const [loadingTeams, setLoadingTeams] = useState(false)
     const [uploadingTeamId, setUploadingTeamId] = useState<number | null>(null)
     // Local object-URL previews keyed by teamId. Because the R2 key is
     // deterministic, a replacement reuses the same URL — showing the freshly
@@ -49,6 +68,29 @@ export function AddTeamPicturesClient({
             }
         }
     }, [])
+
+    // Re-sync when the server re-renders the current season's teams; ignore it
+    // while an admin is looking at a previous season.
+    useEffect(() => {
+        if (selectedSeasonId === currentSeasonId) setTeamGroups(divisions)
+    }, [divisions, currentSeasonId, selectedSeasonId])
+
+    const handleSeasonChange = async (value: string) => {
+        const seasonId = Number(value)
+        if (!Number.isInteger(seasonId) || seasonId === selectedSeasonId) return
+
+        setSelectedSeasonId(seasonId)
+        setLoadingTeams(true)
+        try {
+            const result = await getTeamsForPicturePage(seasonId)
+            if (!result.status) {
+                toast.error(result.message ?? "Failed to load teams.")
+            }
+            setTeamGroups(result.divisions)
+        } finally {
+            setLoadingTeams(false)
+        }
+    }
 
     const clearFileInput = (teamId: number) => {
         const camera = cameraInputRefs.current[teamId]
@@ -85,7 +127,8 @@ export function AddTeamPicturesClient({
 
             const uploadStart = await createTeamPhotoUpload(
                 teamId,
-                processedImage.blob.size
+                processedImage.blob.size,
+                selectedSeasonId
             )
             if (
                 !uploadStart.status ||
@@ -112,7 +155,8 @@ export function AddTeamPicturesClient({
 
             const finalizeResult = await finalizeTeamPhotoUpload(
                 teamId,
-                uploadStart.objectKey
+                uploadStart.objectKey,
+                selectedSeasonId
             )
 
             if (!finalizeResult.status) {
@@ -135,17 +179,56 @@ export function AddTeamPicturesClient({
         }
     }
 
-    if (divisions.length === 0) {
+    const seasonSelector = seasonOptions.length > 0 && (
+        <div className="w-56">
+            <label
+                htmlFor="team-pictures-season"
+                className="mb-1 block font-medium text-muted-foreground text-sm"
+            >
+                Season
+            </label>
+            <Select
+                value={String(selectedSeasonId)}
+                onValueChange={(value) => void handleSeasonChange(value)}
+                disabled={loadingTeams || !!uploadingTeamId}
+            >
+                <SelectTrigger id="team-pictures-season">
+                    <SelectValue placeholder="Select season" />
+                </SelectTrigger>
+                <SelectContent>
+                    {seasonOptions.map((option) => (
+                        <SelectItem
+                            key={option.seasonId}
+                            value={String(option.seasonId)}
+                        >
+                            {option.label}
+                            {option.seasonId === currentSeasonId
+                                ? " (current)"
+                                : ""}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    )
+
+    if (loadingTeams || teamGroups.length === 0) {
         return (
-            <div className="rounded-md bg-muted p-6 text-center text-muted-foreground">
-                No teams found for the current season.
+            <div className="space-y-6">
+                {seasonSelector}
+                <div className="rounded-md bg-muted p-6 text-center text-muted-foreground">
+                    {loadingTeams
+                        ? "Loading teams…"
+                        : "No teams found for this season."}
+                </div>
             </div>
         )
     }
 
     return (
         <div className="space-y-8">
-            {divisions.map((division) => (
+            {seasonSelector}
+            {teamGroups.map((division) => (
                 <div key={division.divisionId} className="rounded-lg border">
                     <div className="border-b bg-muted/50 px-4 py-3">
                         <h2 className="font-semibold text-lg">

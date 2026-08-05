@@ -3,7 +3,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/lib/rbac"
-import { getTeamsForPicturePage } from "./actions"
+import { getSeasonOptionsForPictures, getTeamsForPicturePage } from "./actions"
 import { AddTeamPicturesClient } from "./add-team-pictures-client"
 
 export default async function AddTeamPicturesPage() {
@@ -20,7 +20,11 @@ export default async function AddTeamPicturesPage() {
         redirect("/dashboard")
     }
 
-    const result = await getTeamsForPicturePage()
+    const [result, seasonOptions] = await Promise.all([
+        getTeamsForPicturePage(),
+        // Empty for non-admins, which hides the selector entirely.
+        getSeasonOptionsForPictures()
+    ])
     const playerPicUrl = playerPicBaseUrl()
 
     return (
@@ -29,6 +33,8 @@ export default async function AddTeamPicturesPage() {
             <AddTeamPicturesClient
                 divisions={result.divisions}
                 picBaseUrl={playerPicUrl}
+                seasonOptions={seasonOptions}
+                currentSeasonId={config.seasonId}
             />
         </div>
     )
