@@ -83,18 +83,6 @@ vi.mock("@/lib/postmark", () => ({
             )
         }
     }),
-    sendBroadcastEmails: vi.fn(
-        async (opts: { recipients: Array<{ email: string }> }) => {
-            const skipped = opts.recipients.filter((r) =>
-                r.email.startsWith("legacy-")
-            ).length
-            return {
-                sent: opts.recipients.length - skipped,
-                failed: 0,
-                skipped
-            }
-        }
-    ),
     createStreamSuppression: vi.fn(async () => {}),
     deleteStreamSuppression: vi.fn(async () => {}),
     // Pure classifier — keep the real behaviour so suppression logic under test

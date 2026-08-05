@@ -14,9 +14,10 @@ import {
     matchSubstitutions,
     matches,
     userRoles,
-    divisions
+    divisions,
+    notificationLog
 } from "@/database/schema"
-import { eq, desc, ne } from "drizzle-orm"
+import { eq, desc, ne, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
@@ -100,6 +101,23 @@ export interface PlayerEmailSuppression {
     canReactivate: boolean
 }
 
+/**
+ * One message the app sent to this player. Every outbound path writes a row
+ * (see src/lib/email/send.ts), so this answers "did they actually get it?"
+ * for notifications, receipts, broadcasts and staff mail alike.
+ */
+export interface PlayerEmailHistoryEntry {
+    id: number
+    subject: string
+    /** notification | transactional | staff | broadcast | reply */
+    mode: string
+    /** Notification type, or the category for other modes. */
+    type: string
+    /** claimed | sent | failed */
+    status: string
+    sentAt: Date
+}
+
 export interface PlayerSignup {
     id: number
     seasonId: number
@@ -176,6 +194,8 @@ export interface PlayerDetailsResult {
     playoffDates: string[]
     /** Per-stream Postmark suppressions on this player's address. */
     emailSuppressions: PlayerEmailSuppression[]
+    /** Most recent messages sent to this player, newest first. */
+    emailHistory: PlayerEmailHistoryEntry[]
 }
 
 export const getPlayerDetails = withAction(
@@ -330,6 +350,29 @@ export const getPlayerDetails = withAction(
               }))
             : []
 
+        // Matched on user id OR address so mail sent before the account
+        // existed (or after a merge) still shows up.
+        const emailHistory: PlayerEmailHistoryEntry[] = isAdmin
+            ? await db
+                  .select({
+                      id: notificationLog.id,
+                      subject: notificationLog.subject,
+                      mode: notificationLog.mode,
+                      type: notificationLog.notification_type,
+                      status: notificationLog.status,
+                      sentAt: notificationLog.created_at
+                  })
+                  .from(notificationLog)
+                  .where(
+                      or(
+                          eq(notificationLog.user_id, playerId),
+                          eq(notificationLog.email, player.email.toLowerCase())
+                      )
+                  )
+                  .orderBy(desc(notificationLog.created_at))
+                  .limit(25)
+            : []
+
         return ok({
             player: sanitizedPlayer,
             signupHistory,
@@ -339,7 +382,8 @@ export const getPlayerDetails = withAction(
             privateRatingNotes: ratingsSection.privateNotes,
             viewerRating: ratingsSection.viewerRating,
             playoffDates,
-            emailSuppressions
+            emailSuppressions,
+            emailHistory
         })
     }
 )

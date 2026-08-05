@@ -8,6 +8,7 @@ import type {
     PlayerAnalyticsResult,
     PlayerDetails,
     PlayerDraftHistory,
+    PlayerEmailHistoryEntry,
     PlayerEmailSuppression,
     PlayerRoleInfo,
     PlayerSignup,
@@ -60,6 +61,7 @@ interface AdminPlayerDetailPopupProps {
     privateRatingNotes?: PlayerRatingPrivateNote[]
     viewerRating?: PlayerViewerRating | null
     emailSuppressions?: PlayerEmailSuppression[]
+    emailHistory?: PlayerEmailHistoryEntry[]
     inline?: boolean
     children?: React.ReactNode
 }
@@ -87,6 +89,7 @@ export function AdminPlayerDetailPopup({
     privateRatingNotes = [],
     viewerRating = null,
     emailSuppressions = [],
+    emailHistory = [],
     inline = false,
     children
 }: AdminPlayerDetailPopupProps) {
@@ -321,6 +324,45 @@ export function AdminPlayerDetailPopup({
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+                                {emailHistory.length > 0 && (
+                                    <div className="sm:col-span-2">
+                                        <span className="text-muted-foreground">
+                                            Recent Email:
+                                        </span>
+                                        <div className="mt-2 space-y-1 rounded-md border p-3">
+                                            {emailHistory.map((entry) => (
+                                                <div
+                                                    key={entry.id}
+                                                    className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs"
+                                                >
+                                                    <span className="min-w-0 flex-1 truncate">
+                                                        {entry.subject}
+                                                    </span>
+                                                    <span className="text-muted-foreground">
+                                                        {entry.mode}
+                                                        {entry.status !==
+                                                            "sent" && (
+                                                            <span className="ml-1 text-destructive">
+                                                                {entry.status}
+                                                            </span>
+                                                        )}{" "}
+                                                        ·{" "}
+                                                        {new Date(
+                                                            entry.sentAt
+                                                        ).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="mt-1 text-muted-foreground text-xs">
+                                            Last {emailHistory.length} message
+                                            {emailHistory.length === 1
+                                                ? ""
+                                                : "s"}{" "}
+                                            we sent this player.
+                                        </p>
                                     </div>
                                 )}
                                 <div>

@@ -14,8 +14,7 @@ import { eq, desc, or, asc } from "drizzle-orm"
 import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { sendEmail } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
 import { site } from "@/config/site"
 import {
     withAction,
@@ -301,15 +300,23 @@ export const sendEmailReply = withAction(
 
         const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
 
-        const postmarkMessageId = await sendEmail({
-            from: site.mailFrom,
-            to: email.from_address,
+        // Reply mode: goes to an arbitrary external address, keeps the
+        // "Re: …" subject unprefixed so threading is not broken, and returns
+        // the Postmark id so the next reply can chain In-Reply-To off it.
+        const replyResult = await sendMail({
+            mode: { kind: "reply", category: "inbound_email_reply" },
+            recipients: [{ email: email.from_address }],
             subject: replySubject,
             htmlBody: bodyHtml,
             textBody: body.trim(),
             inReplyTo: email.email_id,
+            tag: "email-reply",
             headers: [{ name: "X-BSD-Ticket-ID", value: `email-${emailId}` }]
         })
+        const postmarkMessageId =
+            replyResult.messageIds.get(
+                email.from_address.trim().toLowerCase()
+            ) ?? null
 
         await db.insert(inboundEmailReplies).values({
             email_id: emailId,
@@ -446,9 +453,7 @@ export const assignInboundEmail = withAction(
                 ? `${existing.from_name} <${existing.from_address}>`
                 : existing.from_address
             const link = `${site.url}/dashboard/manage-emails`
-            const subjectLine = applyEmailSubjectPrefix(
-                `An email has been assigned to you: ${existing.subject}`
-            )
+            const subjectLine = `An email has been assigned to you: ${existing.subject}`
             const textBody = [
                 `Hi ${assigneeName ?? "there"},`,
                 "",
@@ -470,21 +475,14 @@ export const assignInboundEmail = withAction(
                     <p><a href="${link}">Open Manage Emails</a></p>
                 </div>
             `
-            try {
-                await sendEmail({
-                    from: site.mailFrom,
-                    to: assigneeEmail,
-                    subject: subjectLine,
-                    htmlBody,
-                    textBody,
-                    tag: "email-assignment"
-                })
-            } catch (notifyError) {
-                console.error(
-                    "Failed to send email-assignment notification:",
-                    notifyError
-                )
-            }
+            await sendMail({
+                mode: { kind: "staff", category: "email_assigned" },
+                recipients: [{ userId: assigneeId, email: assigneeEmail }],
+                subject: subjectLine,
+                htmlBody,
+                textBody,
+                tag: "email-assignment"
+            })
         }
 
         revalidatePath("/dashboard/manage-emails")

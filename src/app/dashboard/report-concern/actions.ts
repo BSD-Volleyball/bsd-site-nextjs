@@ -4,8 +4,7 @@ import { db } from "@/database/db"
 import { concerns, userRoles, users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { site } from "@/config/site"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { sendBatchEmails, STREAM_OUTBOUND } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
 import { buildConcernNotificationHtml } from "@/lib/email-html"
 import {
     withAction,
@@ -55,27 +54,23 @@ export const submitConcern = withAction(
         })
 
         const ombudsmenRows = await db
-            .select({ email: users.email })
+            .select({ id: users.id, email: users.email })
             .from(userRoles)
             .innerJoin(users, eq(userRoles.user_id, users.id))
             .where(eq(userRoles.role, "ombudsman"))
 
-        const ombudsmanEmails = [
-            ...new Set(ombudsmenRows.map((r) => r.email).filter(Boolean))
-        ]
-
-        if (ombudsmanEmails.length > 0) {
-            const appUrl = site.publicUrl
-            await sendBatchEmails(
-                ombudsmanEmails.map((to) => ({
-                    from: site.mailFrom,
-                    to,
-                    subject: applyEmailSubjectPrefix("New Concern Submitted"),
-                    htmlBody: buildConcernNotificationHtml(appUrl),
-                    stream: STREAM_OUTBOUND,
-                    tag: "concern-notification"
-                }))
-            )
+        if (ombudsmenRows.length > 0) {
+            // Staff mode: no preference covers operational mail, but a
+            // hard-bounced ombudsman address is still unreachable.
+            await sendMail({
+                mode: { kind: "staff", category: "concern_submitted" },
+                recipients: ombudsmenRows
+                    .filter((r) => r.email)
+                    .map((r) => ({ userId: r.id, email: r.email })),
+                subject: "New Concern Submitted",
+                htmlBody: buildConcernNotificationHtml(site.publicUrl),
+                tag: "concern-notification"
+            })
         }
 
         return ok(

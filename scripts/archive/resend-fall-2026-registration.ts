@@ -15,7 +15,7 @@
  *   - anyone suppressed *now* (for any reason) is excluded, so hard bounces and
  *     genuine unsubscribes recorded since are respected
  *   - --limit N / --skip N for canary runs and their follow-up
- *   - delivery goes through sendBroadcastEmails, inheriting the paced batching
+ *   - delivery goes through sendBatchEmails, inheriting the paced batching
  *     (EMAIL_BATCH_SIZE / EMAIL_BATCH_DELAY_MS) that this incident prompted
  *   - the database is never held open across the send (see withDb)
  *
@@ -27,7 +27,7 @@
 import "dotenv/config"
 import { readFileSync, writeFileSync } from "node:fs"
 import { Client } from "pg"
-import { sendBroadcastEmails, resolveBatchThrottle } from "@/lib/postmark"
+import { sendBatchEmails, resolveBatchThrottle } from "@/lib/postmark"
 import { site } from "@/config/site"
 
 const RESULT_FALLBACK = "scripts/data/resend-result.json"
@@ -224,14 +224,19 @@ async function main() {
     // ---- Phase 3: send with no database connection held -------------------
     let result: { sent: number; failed: number }
     try {
-        result = await sendBroadcastEmails({
-            from: site.mailFrom,
-            subject: source.subject,
-            htmlBody,
-            recipients,
-            stream: STREAM,
-            tag: "broadcast-resend"
-        })
+        // Was sendBroadcastEmails, removed when all outbound mail moved
+        // behind sendMail(); this archived script keeps the raw transport
+        // rather than adopting the funnel's policy filters after the fact.
+        result = await sendBatchEmails(
+            recipients.map((r) => ({
+                from: site.mailFrom,
+                to: r.email,
+                subject: source.subject,
+                htmlBody,
+                stream: STREAM,
+                tag: "broadcast-resend"
+            }))
+        )
     } catch (err) {
         await withDb((c) =>
             c.query(

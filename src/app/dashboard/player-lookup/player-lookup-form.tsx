@@ -51,6 +51,7 @@ export function PlayerLookupForm({
                             sharedRatingNotes={detail?.sharedRatingNotes}
                             privateRatingNotes={detail?.privateRatingNotes}
                             emailSuppressions={detail?.emailSuppressions}
+                            emailHistory={detail?.emailHistory}
                             viewerRating={detail?.viewerRating ?? null}
                             inline
                         />

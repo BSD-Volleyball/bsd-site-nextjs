@@ -37,40 +37,19 @@ import {
 } from "@/lib/email-template-variables"
 import { formatSeasonLabel, getEventsByType } from "@/lib/season-utils"
 import type { SeasonConfig } from "@/lib/season-types"
-import {
-    sendBroadcastEmails,
-    STREAM_BROADCAST,
-    STREAM_IN_SEASON_UPDATES
-} from "@/lib/postmark"
+import { STREAM_BROADCAST, STREAM_IN_SEASON_UPDATES } from "@/lib/postmark"
 
 type BroadcastStream = typeof STREAM_BROADCAST | typeof STREAM_IN_SEASON_UPDATES
 import {
     ensureRecipientGroup,
-    getRecipientsForGroup,
-    filterSuppressed,
-    filterByNotificationPreference,
-    type Recipient
+    getRecipientsForGroup
 } from "@/lib/email-recipients"
-import { STREAM_TO_TYPE } from "@/lib/notifications/types"
+import { applyPolicyFilters, sendMail } from "@/lib/email/send"
 import {
     applyEmailSubjectPrefix,
     stripEmailSubjectPrefix
 } from "@/lib/email-subject"
 import { formatDisplayName } from "@/lib/utils"
-
-/**
- * Streams that map to an opt-outable notification type additionally drop
- * recipients who opted out on the Notifications page. in-season-updates has
- * no mapping (mandatory) and filters by Postmark suppressions only.
- */
-async function filterOptedOutForStream(
-    recipients: Recipient[],
-    stream: BroadcastStream
-): Promise<Recipient[]> {
-    const type = STREAM_TO_TYPE[stream]
-    if (!type) return recipients
-    return filterByNotificationPreference(recipients, type)
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -716,62 +695,43 @@ export const createAndSendBroadcast = withAction(
             .returning({ id: emailBroadcasts.id })
 
         try {
-            // just_me is a test send to the composer only; it bypasses the
-            // group query and the suppression filter so it always arrives.
+            // just_me is a test send to the composer only: it bypasses the
+            // group query, and goes through alwaysInclude so no opt-out or
+            // suppression can stop an admin previewing their own message.
             const isTestSend = sendToType === "just_me"
 
             const groupRecipients = isTestSend
                 ? []
                 : await getRecipientsForGroup(groupId)
 
-            const filtered = isTestSend
-                ? [{ email: session.user.email }]
-                : await filterOptedOutForStream(
-                      await filterSuppressed(groupRecipients, stream),
-                      stream
-                  )
-
-            // The directors group is an alias, not a member — it is appended
-            // after filtering so a per-user opt-out or suppression can never
-            // drop it, and deduped in case it is also a real recipient.
+            // The directors group is an alias, not a member, so it rides the
+            // same always-include path rather than being filtered as a user.
             const ccDirectors = shouldCcDirectors(input, isAdmin)
-            const recipients =
-                ccDirectors &&
-                !filtered.some(
-                    (r) =>
-                        r.email.toLowerCase() ===
-                        site.mailDirectors.toLowerCase()
-                )
-                    ? [...filtered, { email: site.mailDirectors }]
-                    : filtered
+            const alwaysInclude = [
+                ...(isTestSend ? [session.user.email] : []),
+                ...(ccDirectors ? [site.mailDirectors] : [])
+            ]
 
-            // Captured before the suppression filter so the history view can
-            // show how many of the intended audience were never attempted.
+            // Counted before filtering so the history view can show how many
+            // of the intended audience were never attempted.
             const recipientTotal =
                 (isTestSend ? 1 : groupRecipients.length) +
-                (recipients.length > filtered.length ? 1 : 0)
+                (ccDirectors ? 1 : 0)
 
-            if (recipients.length === 0) {
-                await db
-                    .update(emailBroadcasts)
-                    .set({
-                        status: "sent",
-                        recipient_total: recipientTotal,
-                        sent_count: 0,
-                        failed_count: 0,
-                        sent_at: new Date(),
-                        updated_at: new Date()
-                    })
-                    .where(eq(emailBroadcasts.id, broadcast.id))
-                return ok({ broadcastId: broadcast.id })
-            }
-
-            const result = await sendBroadcastEmails({
-                from: site.mailFrom,
+            const result = await sendMail({
+                mode: {
+                    kind: "broadcast",
+                    stream,
+                    broadcastId: broadcast.id
+                },
+                recipients: groupRecipients.map((r) => ({
+                    userId: r.userId,
+                    email: r.email,
+                    firstName: r.firstName
+                })),
+                alwaysInclude,
                 subject: resolved.subject,
                 htmlBody: htmlWithFooter,
-                recipients: recipients.map((r) => ({ email: r.email })),
-                stream,
                 tag: "broadcast"
             })
 
@@ -875,16 +835,19 @@ export const previewBroadcast = withAction(
 
         const ccDirectors = shouldCcDirectors(input, isAdmin)
 
+        // Same filter the send runs, so the previewed count cannot drift
+        // from what actually goes out.
         const audienceCount =
             sendToType === "just_me"
                 ? 1
                 : (
-                      await filterOptedOutForStream(
-                          await filterSuppressed(
-                              await getRecipientsForGroup(group.groupId),
-                              group.stream
-                          ),
-                          group.stream
+                      await applyPolicyFilters(
+                          {
+                              kind: "broadcast",
+                              stream: group.stream,
+                              broadcastId: 0
+                          },
+                          await getRecipientsForGroup(group.groupId)
                       )
                   ).length
 

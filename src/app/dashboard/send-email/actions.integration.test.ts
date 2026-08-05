@@ -1,5 +1,5 @@
 import { inArray } from "drizzle-orm"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import {
     drafts,
@@ -13,7 +13,8 @@ import {
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import { normalizeEmailTemplateContent } from "@/lib/email-template-content"
 import { site } from "@/config/site"
-import { sendBroadcastEmails } from "@/lib/postmark"
+import { sendBatchEmails } from "@/lib/postmark"
+import { broadcastCall } from "@/test/email"
 import {
     createDivision,
     createSeason,
@@ -83,8 +84,8 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        expect(sendBroadcastEmails).toHaveBeenCalledOnce()
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(sendBatchEmails).toHaveBeenCalledOnce()
+        const call = broadcastCall(0)
         expect(call.subject).toContain("BSD Fall 2026 Registration is Open")
         expect(call.subject).toContain("September 5, 2026")
         // No unresolved [variable] markers survive past the "[BSD] " prefix.
@@ -153,7 +154,7 @@ describe("createAndSendBroadcast", () => {
 
         expect(result.status).toBe(false)
         expect(result.message).toContain("captain_names")
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
         expect(await broadcastRows()).toHaveLength(0)
     })
 
@@ -169,7 +170,7 @@ describe("createAndSendBroadcast", () => {
 
         expect(result.status).toBe(false)
         expect(result.message).toContain("captain_rounds")
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
         expect(await broadcastRows()).toHaveLength(0)
     })
 
@@ -187,8 +188,8 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        expect(sendBroadcastEmails).toHaveBeenCalledOnce()
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(sendBatchEmails).toHaveBeenCalledOnce()
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: admin.email }])
         expect(call.subject).toBe(
             "[BSD] Test: BSD Fall 2026 Registration is Open!!"
@@ -212,8 +213,8 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        expect(sendBroadcastEmails).toHaveBeenCalledOnce()
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(sendBatchEmails).toHaveBeenCalledOnce()
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: commissioner.email }])
     })
 
@@ -228,7 +229,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.subject).toBe("[BSD] Week 3 schedule")
     })
 
@@ -243,7 +244,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.subject).toBe("[BSD] Week 3 schedule")
 
         const [row] = await broadcastRows()
@@ -279,7 +280,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: activeRef.email }])
     })
 
@@ -317,7 +318,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: interested.email }])
     })
 
@@ -345,7 +346,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: helper.email }])
     })
 
@@ -376,7 +377,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: currentVolunteer.email }])
     })
 
@@ -411,7 +412,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients.map((r) => r.email).sort()).toEqual(
             [pastRef.email, currentRef.email].sort()
         )
@@ -445,7 +446,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: ref.email }])
     })
 
@@ -469,7 +470,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients.map((r) => r.email).sort()).toEqual(
             [admin.email, leader.email, legacyDirector.email].sort()
         )
@@ -489,7 +490,7 @@ describe("createAndSendBroadcast", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: admin.email }])
     })
 
@@ -509,7 +510,7 @@ describe("createAndSendBroadcast", () => {
             status: false,
             message: "Unauthorized: only admins can send league-wide emails."
         })
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
     })
 
     it("blocks commissioners from sending to either ref group", async () => {
@@ -530,7 +531,7 @@ describe("createAndSendBroadcast", () => {
                     "Unauthorized: only admins can send league-wide emails."
             })
         }
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
     })
 
     it("returns Unauthorized for an authenticated non-admin", async () => {
@@ -587,7 +588,7 @@ describe("previewBroadcast", () => {
         expect(result.data.groupName).toBe("All Users")
         expect(result.data.recipientCount).toBe(2)
 
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
         expect(await broadcastRows()).toHaveLength(0)
     })
 
@@ -607,7 +608,7 @@ describe("previewBroadcast", () => {
         expect(result.data.subject).toBe("[BSD] Test: Fall 2026")
         expect(result.data.groupName).toBe("Just Me")
         expect(result.data.recipientCount).toBe(1)
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
     })
 
     it("reports unresolved variables instead of previewing", async () => {
@@ -726,7 +727,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(new Set(call.recipients.map((r) => r.email))).toEqual(
             new Set([one.email, two.email])
         )
@@ -748,7 +749,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: nightTwoVolunteer.email }])
     })
 
@@ -780,7 +781,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: assigned.email }])
     })
 
@@ -798,7 +799,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: busy.email }])
     })
 
@@ -820,7 +821,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: currentVolunteer.email }])
     })
 
@@ -900,7 +901,7 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
             status: false,
             message: "Unauthorized: only admins can send league-wide emails."
         })
-        expect(sendBroadcastEmails).not.toHaveBeenCalled()
+        expect(sendBatchEmails).not.toHaveBeenCalled()
     })
 })
 
@@ -942,7 +943,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients.map((r) => r.email)).not.toContain(DIRECTORS)
     })
 
@@ -959,7 +960,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(new Set(call.recipients.map((r) => r.email))).toEqual(
             new Set([player.email, captain.email, DIRECTORS])
         )
@@ -980,7 +981,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(new Set(call.recipients.map((r) => r.email))).toEqual(
             new Set([player.email, captain.email, DIRECTORS])
         )
@@ -1003,7 +1004,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients.map((r) => r.email)).toContain(DIRECTORS)
     })
 
@@ -1018,7 +1019,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: admin.email }])
     })
 
@@ -1037,7 +1038,7 @@ describe("createAndSendBroadcast — CC directors", () => {
         })
 
         expect(result.status).toBe(true)
-        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        const call = broadcastCall(0)
         expect(call.recipients).toEqual([{ email: DIRECTORS }])
     })
 

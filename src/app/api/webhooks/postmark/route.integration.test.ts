@@ -2,8 +2,13 @@ import { NextRequest } from "next/server"
 import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { auditLog, emailSuppressions, users } from "@/database/schema"
-import { sendBatchEmails } from "@/lib/postmark"
+import {
+    auditLog,
+    emailSuppressions,
+    inboundEmails,
+    users
+} from "@/database/schema"
+import { sendBatchEmails, sendEmail } from "@/lib/postmark"
 import { createUser } from "@/test/session"
 import { POST } from "./route"
 
@@ -237,5 +242,53 @@ describe("email status auditing", () => {
         await POST(webhookRequest(payload))
 
         expect(await auditEntriesFor(user.id)).toHaveLength(1)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Inbound tickets — a notifier failure used to return HTTP 400, which made
+// Postmark redeliver the same message against an already-committed ticket row
+// and create a duplicate every retry.
+// ---------------------------------------------------------------------------
+
+describe("inbound ticket notifications", () => {
+    function inboundEmail(overrides: Record<string, unknown> = {}) {
+        return {
+            MessageID: `inbound-${Math.abs(Date.now() % 100000)}`,
+            From: "outsider@example.test",
+            FromName: "An Outsider",
+            To: "info@bumpsetdrink.com",
+            Subject: "Question about the league",
+            TextBody: "How do I sign up?",
+            HtmlBody: "<p>How do I sign up?</p>",
+            ...overrides
+        }
+    }
+
+    it("acknowledges with 200 even when the staff notification fails", async () => {
+        await createUser()
+        vi.mocked(sendBatchEmails).mockRejectedValueOnce(
+            new Error("postmark down")
+        )
+        vi.mocked(sendEmail).mockRejectedValueOnce(new Error("postmark down"))
+
+        const response = await POST(webhookRequest(inboundEmail()))
+
+        // A 400 here would make Postmark retry and duplicate the ticket.
+        expect(response.status).toBe(200)
+
+        const tickets = await db.select().from(inboundEmails)
+        expect(tickets).toHaveLength(1)
+    })
+
+    it("records the ticket exactly once per delivery", async () => {
+        await createUser()
+
+        const payload = inboundEmail()
+        await POST(webhookRequest(payload))
+
+        const tickets = await db.select().from(inboundEmails)
+        expect(tickets).toHaveLength(1)
+        expect(tickets[0].from_address).toBe("outsider@example.test")
     })
 })

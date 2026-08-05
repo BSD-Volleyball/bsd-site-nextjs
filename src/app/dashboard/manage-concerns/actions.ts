@@ -14,8 +14,7 @@ import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { sendEmail } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
 import { site } from "@/config/site"
 import {
     withAction,
@@ -393,19 +392,25 @@ export const sendConcernReply = withAction(
                 : `Concern #${concernId}`
         const subject = `Re: ${baseSubject}`
 
-        const postmarkMessageId = await sendEmail({
+        // Reply mode: a dedicated From identity, an unprefixed "Re: …"
+        // subject so threading holds, and the Postmark id returned so the
+        // next reply can chain In-Reply-To off it.
+        const replyResult = await sendMail({
+            mode: { kind: "reply", category: "concern_reply" },
+            recipients: [{ email: replyTo }],
             from: fromAddress,
             fromName: fromName || undefined,
-            to: replyTo,
             subject,
             htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
             textBody: body.trim(),
-            stream: "outbound",
             inReplyTo,
+            tag: "concern-reply",
             headers: [
                 { name: "X-BSD-Ticket-ID", value: `concern-${concernId}` }
             ]
         })
+        const postmarkMessageId =
+            replyResult.messageIds.get(replyTo.trim().toLowerCase()) ?? null
 
         await db.insert(concernReplies).values({
             concern_id: concernId,
@@ -582,9 +587,7 @@ export const assignConcern = withAction(
                     : "Web submission"
             const conciseSubject = `Concern #${concernId}: ${existingConcern.person_involved}`
             const link = `${site.url}/dashboard/manage-concerns`
-            const subjectLine = applyEmailSubjectPrefix(
-                `A concern has been assigned to you: ${conciseSubject}`
-            )
+            const subjectLine = `A concern has been assigned to you: ${conciseSubject}`
             const textBody = [
                 `Hi ${assigneeName ?? "there"},`,
                 "",
@@ -606,21 +609,14 @@ export const assignConcern = withAction(
                     <p><a href="${link}">Open Manage Concerns</a></p>
                 </div>
             `
-            try {
-                await sendEmail({
-                    from: site.mailFrom,
-                    to: assigneeEmail,
-                    subject: subjectLine,
-                    htmlBody,
-                    textBody,
-                    tag: "concern-assignment"
-                })
-            } catch (notifyError) {
-                console.error(
-                    "Failed to send concern-assignment notification:",
-                    notifyError
-                )
-            }
+            await sendMail({
+                mode: { kind: "staff", category: "concern_assigned" },
+                recipients: [{ userId: assigneeId, email: assigneeEmail }],
+                subject: subjectLine,
+                htmlBody,
+                textBody,
+                tag: "concern-assignment"
+            })
         }
 
         revalidatePath("/dashboard/manage-concerns")

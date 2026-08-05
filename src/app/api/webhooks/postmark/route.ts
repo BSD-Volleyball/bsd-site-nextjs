@@ -17,8 +17,8 @@ import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { isPermanentBounceType, sendBatchEmails } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
+import { isPermanentBounceType } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
     buildInboundEmailNotificationHtml,
@@ -120,50 +120,64 @@ function parseFromAddress(from: string): {
     return { name: null, email: from.trim() }
 }
 
-async function notifyOmbudsmen(appUrl: string) {
-    const ombudsmenRows = await db
-        .select({ email: users.email })
+/**
+ * Everyone holding a role, deduped by address. Ids come along so the send
+ * funnel can honour suppressions and dead-address state for staff too.
+ */
+async function recipientsWithRole(role: "admin" | "ombudsman") {
+    const rows = await db
+        .select({ id: users.id, email: users.email })
         .from(userRoles)
         .innerJoin(users, eq(userRoles.user_id, users.id))
-        .where(eq(userRoles.role, "ombudsman"))
+        .where(eq(userRoles.role, role))
 
-    const emails = [
-        ...new Set(ombudsmenRows.map((r) => r.email).filter(Boolean))
-    ]
+    const seen = new Set<string>()
+    return rows
+        .filter((r) => {
+            const email = r.email?.toLowerCase()
+            if (!email || seen.has(email)) return false
+            seen.add(email)
+            return true
+        })
+        .map((r) => ({ userId: r.id, email: r.email }))
+}
 
-    if (emails.length > 0) {
-        await sendBatchEmails(
-            emails.map((to) => ({
-                from: site.mailFrom,
-                to,
-                subject: applyEmailSubjectPrefix(
-                    "New Concern Submitted via Email"
-                ),
-                htmlBody: buildConcernNotificationHtml(appUrl)
-            }))
-        )
+/**
+ * Staff notifications are best-effort by construction.
+ *
+ * These run *after* the ticket row is committed, so a throw here used to
+ * escape to the route handler, return HTTP 400, and make Postmark redeliver
+ * the same inbound message — creating a duplicate ticket every retry.
+ * sendMail already never throws; this guard covers the role lookups too.
+ */
+async function notifyQuietly(fn: () => Promise<unknown>, context: string) {
+    try {
+        await fn()
+    } catch (error) {
+        logger.error(`[postmark-webhook] ${context} notification failed`, {
+            error: error instanceof Error ? error.message : String(error)
+        })
     }
 }
 
+async function notifyOmbudsmen(appUrl: string) {
+    await sendMail({
+        mode: { kind: "staff", category: "concern_submitted_by_email" },
+        recipients: await recipientsWithRole("ombudsman"),
+        subject: "New Concern Submitted via Email",
+        htmlBody: buildConcernNotificationHtml(appUrl),
+        tag: "concern-notification"
+    })
+}
+
 async function notifyAdmins(appUrl: string) {
-    const adminRows = await db
-        .select({ email: users.email })
-        .from(userRoles)
-        .innerJoin(users, eq(userRoles.user_id, users.id))
-        .where(eq(userRoles.role, "admin"))
-
-    const emails = [...new Set(adminRows.map((r) => r.email).filter(Boolean))]
-
-    if (emails.length > 0) {
-        await sendBatchEmails(
-            emails.map((to) => ({
-                from: site.mailFrom,
-                to,
-                subject: applyEmailSubjectPrefix("New Inbound Email Received"),
-                htmlBody: buildInboundEmailNotificationHtml({ appUrl })
-            }))
-        )
-    }
+    await sendMail({
+        mode: { kind: "staff", category: "inbound_email_received" },
+        recipients: await recipientsWithRole("admin"),
+        subject: "New Inbound Email Received",
+        htmlBody: buildInboundEmailNotificationHtml({ appUrl }),
+        tag: "inbound-email-notification"
+    })
 }
 
 async function notifyAssignee(opts: {
@@ -173,77 +187,38 @@ async function notifyAssignee(opts: {
     ticketId: number
 }) {
     const label = opts.ticketType === "email" ? "Email" : "Concern"
-    const notifSubject = applyEmailSubjectPrefix(
-        `New Reply on ${label} #${opts.ticketId}`
-    )
     const notifHtml = buildThreadReplyNotificationHtml({
         appUrl: opts.appUrl,
         ticketType: opts.ticketType,
         ticketId: opts.ticketId
     })
 
+    // The assignee if there is one; otherwise the whole group that owns
+    // this kind of ticket, so a reply is never left unseen.
+    let recipients: { userId: string; email: string }[] = []
     if (opts.assignedTo) {
         const [assignee] = await db
-            .select({ email: users.email })
+            .select({ id: users.id, email: users.email })
             .from(users)
             .where(eq(users.id, opts.assignedTo))
             .limit(1)
-
         if (assignee?.email) {
-            await sendBatchEmails([
-                {
-                    from: site.mailFrom,
-                    to: assignee.email,
-                    subject: notifSubject,
-                    htmlBody: notifHtml
-                }
-            ])
-            return
+            recipients = [{ userId: assignee.id, email: assignee.email }]
         }
     }
-
-    // No assignee (or assignee has no email) — notify the whole group
-    if (opts.ticketType === "email") {
-        const adminRows = await db
-            .select({ email: users.email })
-            .from(userRoles)
-            .innerJoin(users, eq(userRoles.user_id, users.id))
-            .where(eq(userRoles.role, "admin"))
-
-        const emails = [
-            ...new Set(adminRows.map((r) => r.email).filter(Boolean))
-        ]
-        if (emails.length > 0) {
-            await sendBatchEmails(
-                emails.map((to) => ({
-                    from: site.mailFrom,
-                    to,
-                    subject: notifSubject,
-                    htmlBody: notifHtml
-                }))
-            )
-        }
-    } else {
-        const ombudsmenRows = await db
-            .select({ email: users.email })
-            .from(userRoles)
-            .innerJoin(users, eq(userRoles.user_id, users.id))
-            .where(eq(userRoles.role, "ombudsman"))
-
-        const emails = [
-            ...new Set(ombudsmenRows.map((r) => r.email).filter(Boolean))
-        ]
-        if (emails.length > 0) {
-            await sendBatchEmails(
-                emails.map((to) => ({
-                    from: site.mailFrom,
-                    to,
-                    subject: notifSubject,
-                    htmlBody: notifHtml
-                }))
-            )
-        }
+    if (recipients.length === 0) {
+        recipients = await recipientsWithRole(
+            opts.ticketType === "email" ? "admin" : "ombudsman"
+        )
     }
+
+    await sendMail({
+        mode: { kind: "staff", category: "thread_reply" },
+        recipients,
+        subject: `New Reply on ${label} #${opts.ticketId}`,
+        htmlBody: notifHtml,
+        tag: "thread-reply-notification"
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -551,12 +526,16 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 postmark_message_id: messageId
             })
 
-            await notifyAssignee({
-                assignedTo: ticket?.assigned_to ?? null,
-                appUrl,
-                ticketType: "email",
-                ticketId: existingThread.id
-            })
+            await notifyQuietly(
+                () =>
+                    notifyAssignee({
+                        assignedTo: ticket?.assigned_to ?? null,
+                        appUrl,
+                        ticketType: "email",
+                        ticketId: existingThread.id
+                    }),
+                "assignee"
+            )
 
             logger.info("[postmark-webhook] Routed reply to email thread", {
                 threadType: "email",
@@ -579,12 +558,16 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 postmark_message_id: messageId
             })
 
-            await notifyAssignee({
-                assignedTo: ticket?.assigned_to ?? null,
-                appUrl,
-                ticketType: "concern",
-                ticketId: existingThread.id
-            })
+            await notifyQuietly(
+                () =>
+                    notifyAssignee({
+                        assignedTo: ticket?.assigned_to ?? null,
+                        appUrl,
+                        ticketType: "concern",
+                        ticketId: existingThread.id
+                    }),
+                "assignee"
+            )
 
             logger.info("[postmark-webhook] Routed reply to concern thread", {
                 threadType: "concern",
@@ -610,7 +593,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             source: "email",
             source_email_id: messageId
         })
-        await notifyOmbudsmen(appUrl)
+        await notifyQuietly(() => notifyOmbudsmen(appUrl), "ombudsmen")
     } else {
         await db.insert(inboundEmails).values({
             email_id: messageId,
@@ -622,7 +605,7 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             body_html: bodyHtml,
             status: "new"
         })
-        await notifyAdmins(appUrl)
+        await notifyQuietly(() => notifyAdmins(appUrl), "admins")
     }
 }
 

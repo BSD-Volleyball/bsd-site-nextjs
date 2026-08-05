@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { concerns, userRoles } from "@/database/schema"
-import { sendBatchEmails } from "@/lib/postmark"
+import { sentMessages } from "@/test/email"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { type SubmitConcernInput, submitConcern } from "./actions"
 
@@ -80,11 +80,13 @@ describe("submitConcern", () => {
         expect(row.description).toBe("Detailed description.")
         expect(row.status).toBe("new")
 
-        expect(vi.mocked(sendBatchEmails)).toHaveBeenCalledTimes(1)
-        const messages = vi.mocked(sendBatchEmails).mock.calls[0][0]
-        expect(messages).toHaveLength(1)
-        expect(messages[0].to).toBe(ombudsman.email)
-        expect(messages[0].subject).toBe("[BSD] New Concern Submitted")
+        // Asserted against the shared helper rather than a specific
+        // transport: sendMail picks single vs batch by recipient count, and
+        // that choice is not what this test is about.
+        const sent = sentMessages()
+        expect(sent).toHaveLength(1)
+        expect(sent[0].to).toBe(ombudsman.email)
+        expect(sent[0].subject).toBe("[BSD] New Concern Submitted")
     })
 
     it("stores an anonymous concern without a user id and skips email when no ombudsmen exist", async () => {
@@ -97,6 +99,6 @@ describe("submitConcern", () => {
         expect(rows).toHaveLength(1)
         expect(rows[0].user_id).toBeNull()
         expect(rows[0].anonymous).toBe(true)
-        expect(vi.mocked(sendBatchEmails)).not.toHaveBeenCalled()
+        expect(sentMessages()).toHaveLength(0)
     })
 })

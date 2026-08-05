@@ -350,34 +350,3 @@ export async function deleteStreamSuppression(
         Suppressions: [{ EmailAddress: email }]
     })
 }
-
-// ---------------------------------------------------------------------------
-// Broadcast email — sends individually via batch API to a list of recipients.
-// Uses the appropriate broadcast stream and includes unsubscribe placeholder.
-// ---------------------------------------------------------------------------
-
-export interface BroadcastOptions {
-    from: string
-    subject: string
-    htmlBody: string
-    textBody?: string
-    recipients: Array<{ email: string }>
-    stream: typeof STREAM_BROADCAST | typeof STREAM_IN_SEASON_UPDATES
-    tag?: string
-}
-
-export async function sendBroadcastEmails(
-    opts: BroadcastOptions
-): Promise<{ sent: number; failed: number; skipped: number }> {
-    const messages: BatchEmailMessage[] = opts.recipients.map((r) => ({
-        from: opts.from,
-        to: r.email,
-        subject: opts.subject,
-        htmlBody: opts.htmlBody,
-        textBody: opts.textBody,
-        stream: opts.stream,
-        tag: opts.tag
-    }))
-
-    return sendBatchEmails(messages)
-}

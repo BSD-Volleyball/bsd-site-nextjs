@@ -1538,6 +1538,13 @@ export const notificationLog = pgTable(
             onDelete: "set null"
         }),
         email: text("email").notNull(),
+        // Which send policy produced this row. See MailMode in
+        // src/lib/email/send.ts — 'notification' | 'transactional' |
+        // 'staff' | 'broadcast' | 'reply'. Defaults to 'notification'
+        // because every row predating the unified funnel was one.
+        mode: text("mode").default("notification").notNull(),
+        // The specific notification type or, for non-notification modes,
+        // the category ('password_reset', 'concern_assigned', …).
         notification_type: text("notification_type").notNull(),
         stream_id: text("stream_id").notNull(),
         tag: text("tag"),
@@ -1546,6 +1553,12 @@ export const notificationLog = pgTable(
         // 'claimed' | 'sent' | 'failed'
         status: text("status").notNull(),
         postmark_message_id: text("postmark_message_id"),
+        // Set for mode='broadcast', giving email_broadcasts the
+        // per-recipient detail its aggregate counts never had.
+        broadcast_id: integer("broadcast_id").references(
+            () => emailBroadcasts.id,
+            { onDelete: "set null" }
+        ),
         created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
@@ -1554,6 +1567,14 @@ export const notificationLog = pgTable(
             .where(sql`${table.dedupe_key} IS NOT NULL`),
         notificationLogUserIdx: index("notification_log_user_idx").on(
             table.user_id
+        ),
+        // The admin email-history lookup matches on address as well as
+        // user id, so sends that predate an account are still found.
+        notificationLogEmailIdx: index("notification_log_email_idx").on(
+            table.email
+        ),
+        notificationLogBroadcastIdx: index("notification_log_broadcast_idx").on(
+            table.broadcast_id
         ),
         notificationLogCreatedAtIdx: index(
             "notification_log_created_at_idx"

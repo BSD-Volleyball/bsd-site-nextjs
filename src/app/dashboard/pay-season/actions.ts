@@ -12,14 +12,12 @@ import {
     markDiscountAsUsed,
     calculateDiscountedAmount
 } from "@/lib/discount"
-import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     logAvailabilityChange,
     selectEventDates
 } from "@/lib/availability-audit"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logger } from "@/lib/logger"
@@ -47,6 +45,7 @@ const getSquareClient = () => {
 }
 
 async function sendSignupConfirmationEmail(
+    userId: string,
     email: string,
     firstName: string,
     seasonName: string,
@@ -66,25 +65,21 @@ async function sendSignupConfirmationEmail(
         }
     }
 
-    try {
-        await sendEmail({
-            from: site.mailFrom,
-            to: email,
-            subject: applyEmailSubjectPrefix(
-                `You're registered for ${seasonLabel}!`
-            ),
-            htmlBody: buildSignupConfirmationHtml({
-                firstName,
-                seasonLabel,
-                amountPaid: amountDisplay,
-                receiptUrl
-            }),
-            stream: STREAM_OUTBOUND,
-            tag: "signup-confirmation"
-        })
-    } catch (error) {
-        console.error("Failed to send signup confirmation email:", error)
-    }
+    // Transactional: a receipt is owed regardless of preferences or
+    // suppression state. sendMail never throws, so a mail failure cannot
+    // undo a payment that already succeeded.
+    await sendMail({
+        mode: { kind: "transactional", category: "signup_confirmation" },
+        recipients: [{ userId, email }],
+        subject: `You're registered for ${seasonLabel}!`,
+        htmlBody: buildSignupConfirmationHtml({
+            firstName,
+            seasonLabel,
+            amountPaid: amountDisplay,
+            receiptUrl
+        }),
+        tag: "signup-confirmation"
+    })
 }
 
 export interface PaymentResult {
@@ -456,6 +451,7 @@ export async function submitSeasonPayment(
 
                 // Send confirmation email (don't await to not block response)
                 sendSignupConfirmationEmail(
+                    sessionUser.id,
                     sessionUser.email,
                     firstName,
                     config.seasonName,
@@ -655,6 +651,7 @@ export async function submitFreeSignup(
 
         // Send confirmation email with discount info
         sendSignupConfirmationEmail(
+            sessionUser.id,
             sessionUser.email,
             firstName,
             config.seasonName,

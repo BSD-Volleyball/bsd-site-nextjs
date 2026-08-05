@@ -8,8 +8,7 @@ import React from "react"
 import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
-import { applyEmailSubjectPrefix } from "@/lib/email-subject"
-import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
+import { sendMail } from "@/lib/email/send"
 
 const logoBase64 = readFileSync(
     join(process.cwd(), "public", "logo.png")
@@ -123,12 +122,13 @@ export const auth = betterAuth({
                 })
             )
 
-            await sendEmail({
-                from: site.mailFrom,
-                to: user.email,
-                subject: applyEmailSubjectPrefix("Reset your password"),
+            // Transactional: deliberately unfiltered. A wrong bounce record
+            // must never be able to lock someone out of account recovery.
+            await sendMail({
+                mode: { kind: "transactional", category: "password_reset" },
+                recipients: [{ userId: user.id, email: user.email }],
+                subject: "Reset your password",
                 htmlBody,
-                stream: STREAM_OUTBOUND,
                 tag: "password-reset",
                 attachments: [
                     {

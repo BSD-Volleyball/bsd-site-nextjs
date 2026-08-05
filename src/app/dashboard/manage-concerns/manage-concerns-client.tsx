@@ -805,6 +805,7 @@ export function ManageConcernsClient({
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
                 emailSuppressions={modal.emailSuppressions}
+                emailHistory={modal.emailHistory}
                 viewerRating={modal.viewerRating}
             />
         </div>

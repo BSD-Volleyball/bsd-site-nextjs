@@ -57,6 +57,13 @@
       "when": 1785964524127,
       "tag": "0007_yellow_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785969650985,
+      "tag": "0008_bent_prowler",
+      "breakpoints": true
     }
   ]
 }

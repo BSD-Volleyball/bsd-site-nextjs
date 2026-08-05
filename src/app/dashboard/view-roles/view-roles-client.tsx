@@ -33,6 +33,7 @@ export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
         sharedRatingNotes,
         privateRatingNotes,
         emailSuppressions,
+        emailHistory,
         viewerRating,
         pairPickName,
         pairReason,
@@ -154,6 +155,7 @@ export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
                 emailSuppressions={emailSuppressions}
+                emailHistory={emailHistory}
                 viewerRating={viewerRating}
             />
         </div>

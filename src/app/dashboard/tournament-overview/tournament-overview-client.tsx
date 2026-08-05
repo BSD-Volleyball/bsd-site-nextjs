@@ -199,6 +199,7 @@ export function TournamentOverviewClient({ data, playerPicUrl }: Props) {
         sharedRatingNotes,
         privateRatingNotes,
         emailSuppressions,
+        emailHistory,
         viewerRating,
         pairPickName,
         pairReason,
@@ -335,6 +336,7 @@ export function TournamentOverviewClient({ data, playerPicUrl }: Props) {
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
                 emailSuppressions={emailSuppressions}
+                emailHistory={emailHistory}
                 viewerRating={viewerRating}
             />
         </div>
