@@ -51,6 +51,10 @@ import {
     type Recipient
 } from "@/lib/email-recipients"
 import { STREAM_TO_TYPE } from "@/lib/notifications/types"
+import {
+    applyEmailSubjectPrefix,
+    stripEmailSubjectPrefix
+} from "@/lib/email-subject"
 import { formatDisplayName } from "@/lib/utils"
 
 /**
@@ -118,6 +122,18 @@ export type SendToType =
     | "team"
     | "season_captains"
     | "season_commissioners"
+    | "all_refs"
+    | "season_refs"
+
+/** Recipient selections that reach beyond a single division or team. */
+const LEAGUE_WIDE_SEND_TYPES: SendToType[] = [
+    "everyone",
+    "season",
+    "season_captains",
+    "season_commissioners",
+    "all_refs",
+    "season_refs"
+]
 
 // ---------------------------------------------------------------------------
 // getEmailFormData
@@ -312,6 +328,18 @@ async function resolveGroup(
         return { groupId, groupName: "All Users", stream: STREAM_BROADCAST }
     }
 
+    // Not season-bound: anyone who has ever reffed, in any season.
+    if (sendToType === "all_refs") {
+        const groupId = await ensureRecipientGroup("all_refs", {
+            name: "All Refs (All Time)"
+        })
+        return {
+            groupId,
+            groupName: "All Refs (All Time)",
+            stream: STREAM_BROADCAST
+        }
+    }
+
     if (!seasonId) throw new Error("No active season configured.")
 
     // Load season label once
@@ -356,6 +384,18 @@ async function resolveGroup(
         return {
             groupId,
             groupName: `${seasonLabel} – Commissioners`,
+            stream: STREAM_IN_SEASON_UPDATES
+        }
+    }
+
+    if (sendToType === "season_refs") {
+        const groupId = await ensureRecipientGroup("season_refs", {
+            seasonId,
+            name: `${seasonLabel} – Refs`
+        })
+        return {
+            groupId,
+            groupName: `${seasonLabel} – Refs`,
             stream: STREAM_IN_SEASON_UPDATES
         }
     }
@@ -466,8 +506,12 @@ async function resolveBroadcastTemplate(
         input.lexicalContent,
         values
     )
+    // Prefix last, after variable resolution, so a subject whose "[BSD]" came
+    // from a template variable is still de-duplicated rather than doubled.
     return {
-        subject: resolveSubjectVariables(input.subject.trim(), values),
+        subject: applyEmailSubjectPrefix(
+            resolveSubjectVariables(input.subject.trim(), values)
+        ),
         html: convertEmailTemplateContentToHtml(content),
         content
     }
@@ -484,17 +528,14 @@ export const createAndSendBroadcast = withAction(
 
         const { sendToType, divisionId, teamId, subject } = input
 
-        if (!subject.trim()) return fail("Subject is required.")
+        // Checked against the stripped subject so "[BSD]" alone is not a subject.
+        if (!stripEmailSubjectPrefix(subject))
+            return fail("Subject is required.")
         if (!sendToType) return fail("Recipient selection is required.")
 
-        // Only admins can send to everyone, all season players, captains, or commissioners
-        if (
-            !isAdmin &&
-            (sendToType === "everyone" ||
-                sendToType === "season" ||
-                sendToType === "season_captains" ||
-                sendToType === "season_commissioners")
-        ) {
+        // Commissioners are scoped to their divisions/teams; every group that
+        // spans the league (or the whole ref pool) is admin-only.
+        if (!isAdmin && LEAGUE_WIDE_SEND_TYPES.includes(sendToType)) {
             return fail(
                 "Unauthorized: only admins can send league-wide emails."
             )
@@ -649,17 +690,14 @@ export const previewBroadcast = withAction(
 
         const { sendToType, divisionId, teamId, subject } = input
 
-        if (!subject.trim()) return fail("Subject is required.")
+        // Checked against the stripped subject so "[BSD]" alone is not a subject.
+        if (!stripEmailSubjectPrefix(subject))
+            return fail("Subject is required.")
         if (!sendToType) return fail("Recipient selection is required.")
 
-        // Only admins can send to everyone, all season players, captains, or commissioners
-        if (
-            !isAdmin &&
-            (sendToType === "everyone" ||
-                sendToType === "season" ||
-                sendToType === "season_captains" ||
-                sendToType === "season_commissioners")
-        ) {
+        // Commissioners are scoped to their divisions/teams; every group that
+        // spans the league (or the whole ref pool) is admin-only.
+        if (!isAdmin && LEAGUE_WIDE_SEND_TYPES.includes(sendToType)) {
             return fail(
                 "Unauthorized: only admins can send league-wide emails."
             )

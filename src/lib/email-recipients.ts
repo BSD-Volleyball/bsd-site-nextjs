@@ -15,9 +15,10 @@ import {
     divisions,
     seasons,
     emailRecipientGroups,
-    userRoles
+    userRoles,
+    seasonRefs
 } from "@/database/schema"
-import { eq, and, inArray, isNotNull } from "drizzle-orm"
+import { eq, and, inArray, isNotNull, isNull } from "drizzle-orm"
 import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
 import { getOptedOutUserIds } from "@/lib/notifications/preferences"
@@ -36,6 +37,8 @@ export type RecipientGroupType =
     | "season_team"
     | "season_captains"
     | "season_commissioners"
+    | "all_refs"
+    | "season_refs"
 
 export interface Recipient {
     email: string
@@ -63,7 +66,9 @@ export async function ensureRecipientGroup(
     const divisionId = opts.divisionId ?? null
     const teamId = opts.teamId ?? null
 
-    // Check if group already exists
+    // Check if group already exists. Null scope columns must be matched with
+    // IS NULL — `col = NULL` is never true, so season-less groups (all_users,
+    // self, all_refs) would otherwise be re-inserted on every send.
     const existing = await db
         .select({ id: emailRecipientGroups.id })
         .from(emailRecipientGroups)
@@ -72,15 +77,16 @@ export async function ensureRecipientGroup(
                 eq(emailRecipientGroups.group_type, type),
                 seasonId
                     ? eq(emailRecipientGroups.season_id, seasonId)
-                    : eq(emailRecipientGroups.season_id, seasonId as never),
+                    : isNull(emailRecipientGroups.season_id),
                 divisionId
                     ? eq(emailRecipientGroups.division_id, divisionId)
-                    : eq(emailRecipientGroups.division_id, divisionId as never),
+                    : isNull(emailRecipientGroups.division_id),
                 teamId
                     ? eq(emailRecipientGroups.team_id, teamId)
-                    : eq(emailRecipientGroups.team_id, teamId as never)
+                    : isNull(emailRecipientGroups.team_id)
             )
         )
+        .orderBy(emailRecipientGroups.id)
         .limit(1)
 
     if (existing.length > 0) {
@@ -138,6 +144,12 @@ export async function getRecipientsForGroup(
         case "season_commissioners":
             return group.season_id
                 ? getSeasonCommissionerRecipients(group.season_id)
+                : []
+        case "all_refs":
+            return getAllRefRecipients()
+        case "season_refs":
+            return group.season_id
+                ? getSeasonRefRecipients(group.season_id)
                 : []
         default:
             return []
@@ -423,6 +435,51 @@ async function getSeasonCommissionerRecipients(
             and(
                 eq(userRoles.role, "commissioner"),
                 eq(userRoles.season_id, seasonId)
+            )
+        )
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
+    )
+}
+
+/**
+ * All-time refs: anyone with a season_refs row in any season, including refs
+ * later marked inactive — the group is "has ever reffed", not "is reffing now".
+ */
+async function getAllRefRecipients(): Promise<Recipient[]> {
+    const rows = await db
+        .selectDistinct({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(seasonRefs)
+        .innerJoin(users, eq(seasonRefs.user_id, users.id))
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
+    )
+}
+
+/**
+ * Current-season refs: the active ref pool for the season. Refs deactivated on
+ * the Select Refs page are excluded — they are no longer being scheduled, so
+ * season ref traffic no longer applies to them.
+ */
+async function getSeasonRefRecipients(seasonId: number): Promise<Recipient[]> {
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(seasonRefs)
+        .innerJoin(users, eq(seasonRefs.user_id, users.id))
+        .where(
+            and(
+                eq(seasonRefs.season_id, seasonId),
+                eq(seasonRefs.is_active, true)
             )
         )
     return deduplicateRecipients(

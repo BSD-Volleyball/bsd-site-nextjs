@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { emailBroadcasts } from "@/database/schema"
+import { emailBroadcasts, seasonRefs } from "@/database/schema"
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import { normalizeEmailTemplateContent } from "@/lib/email-template-content"
 import { sendBroadcastEmails } from "@/lib/postmark"
@@ -75,7 +75,8 @@ describe("createAndSendBroadcast", () => {
         const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
         expect(call.subject).toContain("BSD Fall 2026 Registration is Open")
         expect(call.subject).toContain("September 5, 2026")
-        expect(call.subject).not.toContain("[")
+        // No unresolved [variable] markers survive past the "[BSD] " prefix.
+        expect(call.subject.slice("[BSD] ".length)).not.toContain("[")
         expect(call.htmlBody).toContain("Welcome to Fall 2026")
 
         // The stored broadcast records what was actually sent
@@ -177,7 +178,9 @@ describe("createAndSendBroadcast", () => {
         expect(sendBroadcastEmails).toHaveBeenCalledOnce()
         const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
         expect(call.recipients).toEqual([{ email: admin.email }])
-        expect(call.subject).toBe("Test: BSD Fall 2026 Registration is Open!!")
+        expect(call.subject).toBe(
+            "[BSD] Test: BSD Fall 2026 Registration is Open!!"
+        )
 
         const [row] = await broadcastRows()
         expect(row.sent_count).toBe(1)
@@ -200,6 +203,162 @@ describe("createAndSendBroadcast", () => {
         expect(sendBroadcastEmails).toHaveBeenCalledOnce()
         const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
         expect(call.recipients).toEqual([{ email: commissioner.email }])
+    })
+
+    it("prefixes the subject with [BSD]", async () => {
+        await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "just_me",
+            subject: "Week 3 schedule",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.subject).toBe("[BSD] Week 3 schedule")
+    })
+
+    it("does not double a prefix the admin typed themselves", async () => {
+        await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "just_me",
+            subject: "[bsd]  Week 3 schedule",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.subject).toBe("[BSD] Week 3 schedule")
+
+        const [row] = await broadcastRows()
+        expect(row.subject).toBe("[BSD] Week 3 schedule")
+    })
+
+    it("sends season_refs to the current season's active ref pool only", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const activeRef = await createUser()
+        const inactiveRef = await createUser()
+        await createUser() // never a ref
+
+        await db.insert(seasonRefs).values([
+            {
+                season_id: season.id,
+                user_id: activeRef.id,
+                is_active: true,
+                max_division_level: 3
+            },
+            {
+                season_id: season.id,
+                user_id: inactiveRef.id,
+                is_active: false,
+                max_division_level: 3
+            }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_refs",
+            subject: "Ref meeting",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: activeRef.email }])
+    })
+
+    it("sends all_refs to anyone who has ever reffed, in any season", async () => {
+        const oldSeason = await createSeason()
+        const currentSeason = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const pastRef = await createUser()
+        const currentRef = await createUser()
+        await createUser() // never a ref
+
+        await db.insert(seasonRefs).values([
+            {
+                season_id: oldSeason.id,
+                user_id: pastRef.id,
+                // Deactivated long ago, but they have still "ever been a ref".
+                is_active: false,
+                max_division_level: 3
+            },
+            {
+                season_id: currentSeason.id,
+                user_id: currentRef.id,
+                is_active: true,
+                max_division_level: 3
+            }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "all_refs",
+            subject: "Ref clinic",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients.map((r) => r.email).sort()).toEqual(
+            [pastRef.email, currentRef.email].sort()
+        )
+    })
+
+    it("counts a ref in two seasons once", async () => {
+        const oldSeason = await createSeason()
+        const currentSeason = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const ref = await createUser()
+
+        await db.insert(seasonRefs).values([
+            {
+                season_id: oldSeason.id,
+                user_id: ref.id,
+                is_active: true,
+                max_division_level: 3
+            },
+            {
+                season_id: currentSeason.id,
+                user_id: ref.id,
+                is_active: true,
+                max_division_level: 3
+            }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "all_refs",
+            subject: "Ref clinic",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: ref.email }])
+    })
+
+    it("blocks commissioners from sending to either ref group", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        for (const sendToType of ["all_refs", "season_refs"] as const) {
+            const result = await createAndSendBroadcast({
+                sendToType,
+                subject: "Ref clinic",
+                lexicalContent: EMPTY_BODY
+            })
+            expect(result).toMatchObject({
+                status: false,
+                message:
+                    "Unauthorized: only admins can send league-wide emails."
+            })
+        }
+        expect(sendBroadcastEmails).not.toHaveBeenCalled()
     })
 
     it("returns Unauthorized for an authenticated non-admin", async () => {
@@ -249,7 +408,9 @@ describe("previewBroadcast", () => {
 
         expect(result.status).toBe(true)
         if (!result.status) throw new Error("expected success")
-        expect(result.data.subject).toBe("BSD Fall 2026 Registration is Open!!")
+        expect(result.data.subject).toBe(
+            "[BSD] BSD Fall 2026 Registration is Open!!"
+        )
         expect(result.data.html).toContain("Welcome to Fall 2026")
         expect(result.data.groupName).toBe("All Users")
         expect(result.data.recipientCount).toBe(2)
@@ -271,7 +432,7 @@ describe("previewBroadcast", () => {
 
         expect(result.status).toBe(true)
         if (!result.status) throw new Error("expected success")
-        expect(result.data.subject).toBe("Test: Fall 2026")
+        expect(result.data.subject).toBe("[BSD] Test: Fall 2026")
         expect(result.data.groupName).toBe("Just Me")
         expect(result.data.recipientCount).toBe(1)
         expect(sendBroadcastEmails).not.toHaveBeenCalled()

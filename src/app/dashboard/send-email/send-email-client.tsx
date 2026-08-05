@@ -36,6 +36,10 @@ import {
     type LexicalEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
+import {
+    EMAIL_SUBJECT_PREFIX,
+    stripEmailSubjectPrefix
+} from "@/lib/email-subject"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
 import type {
     BroadcastPreview,
@@ -69,6 +73,8 @@ function sendToLabel(
     if (groupType === "season_captains") return "Current Season Captains"
     if (groupType === "season_commissioners")
         return "Current Season Commissioners"
+    if (groupType === "all_refs") return "All Refs (All Time)"
+    if (groupType === "season_refs") return "Current Season Refs"
     if (groupType === "season_division") {
         const div = divisions.find((d) => d.id === divisionId)
         return div ? `Division: ${div.name}` : "Division"
@@ -93,6 +99,10 @@ function sendToTypeFromGroupType(groupType: string | null): SendToType | null {
             return "season_captains"
         case "season_commissioners":
             return "season_commissioners"
+        case "all_refs":
+            return "all_refs"
+        case "season_refs":
+            return "season_refs"
         case "season_division":
             return "division"
         case "season_team":
@@ -146,7 +156,10 @@ export function SendEmailClient({
         (templateId: string) => {
             const template = templates.find((t) => String(t.id) === templateId)
             if (!template) return
-            if (template.subject) setSubject(template.subject)
+            // Strip any stored prefix so the field never visually doubles the
+            // adornment; the send re-applies it either way.
+            if (template.subject)
+                setSubject(stripEmailSubjectPrefix(template.subject))
             setContent(template.content)
             setEditorKey((k) => k + 1)
         },
@@ -155,7 +168,7 @@ export function SendEmailClient({
 
     const handleLoadIntoComposer = useCallback(
         (item: BroadcastHistoryItem) => {
-            setSubject(item.subject)
+            setSubject(stripEmailSubjectPrefix(item.subject))
             setContent(item.lexicalContent)
             setEditorKey((k) => k + 1)
 
@@ -185,7 +198,7 @@ export function SendEmailClient({
             return "Please select a division."
         if (sendToType === "team" && !selectedTeamId)
             return "Please select a team."
-        if (!subject.trim()) return "Subject is required."
+        if (!stripEmailSubjectPrefix(subject)) return "Subject is required."
         return null
     }
 
@@ -247,7 +260,7 @@ export function SendEmailClient({
         !!sendToType &&
         (sendToType !== "division" || !!selectedDivisionId) &&
         (sendToType !== "team" || !!selectedTeamId) &&
-        !!subject.trim()
+        !!stripEmailSubjectPrefix(subject)
 
     return (
         <div className="space-y-6">
@@ -310,6 +323,12 @@ export function SendEmailClient({
                                             </SelectItem>
                                             <SelectItem value="season_commissioners">
                                                 Current Season Commissioners
+                                            </SelectItem>
+                                            <SelectItem value="season_refs">
+                                                Current Season Refs
+                                            </SelectItem>
+                                            <SelectItem value="all_refs">
+                                                All Refs (All Time)
                                             </SelectItem>
                                         </>
                                     )}
@@ -387,17 +406,28 @@ export function SendEmailClient({
                         )}
                     </div>
 
-                    {/* Subject */}
+                    {/* Subject — the [BSD] prefix is added on send, so it is
+                        shown as a fixed adornment rather than editable text. */}
                     <div className="space-y-1.5">
                         <Label htmlFor="email-subject">
                             Subject <span className="text-destructive">*</span>
                         </Label>
-                        <Input
-                            id="email-subject"
-                            value={subject}
-                            onChange={(e) => setSubject(e.target.value)}
-                            placeholder="Email subject line…"
-                        />
+                        <div className="flex items-center gap-2">
+                            <span className="shrink-0 rounded-md border bg-muted px-2.5 py-2 font-medium text-muted-foreground text-sm">
+                                {EMAIL_SUBJECT_PREFIX.trim()}
+                            </span>
+                            <Input
+                                id="email-subject"
+                                value={subject}
+                                onChange={(e) => setSubject(e.target.value)}
+                                placeholder="Email subject line…"
+                            />
+                        </div>
+                        <p className="text-muted-foreground text-xs">
+                            Every broadcast subject starts with{" "}
+                            {EMAIL_SUBJECT_PREFIX.trim()} — you don't need to
+                            type it. If you do, it won't be doubled.
+                        </p>
                     </div>
 
                     {/* Rich text editor */}
