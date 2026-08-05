@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import {
+    auditLog,
     discounts,
     signups,
     waitlist,
@@ -12,6 +13,7 @@ import {
     addToWaitlist,
     createDiscount,
     createSeason,
+    createSeasonEvent,
     createSignup,
     createWaiver,
     seedBaselineSeason
@@ -119,6 +121,66 @@ describe("submitSeasonPayment", () => {
         await vi.waitFor(() => expect(vi.mocked(sendEmail)).toHaveBeenCalled())
     })
 
+    // The wizard is where most players set availability, and it used to record
+    // only "Paid season signup ($100)" — no trace of the dates. That gap is
+    // what made the 2026-08-05 wipe unrecoverable from the audit log.
+    it("audit-logs the dates selected during the signup wizard", async () => {
+        const player = await createUserWithRoles([])
+        const week2 = await createSeasonEvent(seasonId, {
+            event_type: "regular_season",
+            event_date: "2026-10-10",
+            sort_order: 2
+        })
+        const week1 = await createSeasonEvent(seasonId, {
+            event_type: "regular_season",
+            event_date: "2026-10-03",
+            sort_order: 1
+        })
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, unavailableEventIds: [week2.id, week1.id] },
+            waiverId
+        )
+        expect(result.status).toBe(true)
+
+        const [signup] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.player, player.id))
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(
+                and(
+                    eq(auditLog.user, player.id),
+                    eq(auditLog.action, "update_availability")
+                )
+            )
+        expect(entry.entity_type).toBe("user_unavailability")
+        expect(entry.entity_id).toBe(String(signup.id))
+        expect(entry.summary).toBe(
+            "At signup — Unavailable for 2 dates: 10/3, 10/10"
+        )
+    })
+
+    it("audit-logs an all-clear when the wizard selects no dates", async () => {
+        const player = await createUserWithRoles([])
+
+        await submitSeasonPayment("src-token", formData, waiverId)
+
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(
+                and(
+                    eq(auditLog.user, player.id),
+                    eq(auditLog.action, "update_availability")
+                )
+            )
+        expect(entry.summary).toBe("At signup — Available for all dates")
+    })
+
     it("records the volunteer answers the player opted into", async () => {
         const player = await createUserWithRoles([])
 
@@ -222,9 +284,10 @@ describe("submitSeasonPayment", () => {
 
 describe("submitFreeSignup", () => {
     let waiverId: number
+    let seasonId: number
 
     beforeEach(async () => {
-        await seedBaselineSeason()
+        seasonId = (await seedBaselineSeason()).season.id
         waiverId = (await createWaiver()).id
     })
 
@@ -277,6 +340,37 @@ describe("submitFreeSignup", () => {
             .from(discounts)
             .where(eq(discounts.id, discount.id))
         expect(used.used).toBe(true)
+    })
+
+    it("audit-logs the dates selected on the free path too", async () => {
+        const player = await createUserWithRoles([])
+        const discount = await createDiscount({
+            user: player.id,
+            percentage: "100"
+        })
+        const event = await createSeasonEvent(seasonId, {
+            event_type: "regular_season",
+            event_date: "2026-10-03",
+            sort_order: 1
+        })
+
+        const result = await submitFreeSignup(
+            { ...formData, unavailableEventIds: [event.id] },
+            discount.id,
+            waiverId
+        )
+        expect(result.status).toBe(true)
+
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(
+                and(
+                    eq(auditLog.user, player.id),
+                    eq(auditLog.action, "update_availability")
+                )
+            )
+        expect(entry.summary).toBe("At signup — Unavailable for 1 date: 10/3")
     })
 
     it("rejects an already-registered player", async () => {

@@ -17,8 +17,7 @@ import {
     requirePositiveInt
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
-import { logAuditEntry } from "@/lib/audit-log"
-import { formatShortDate } from "@/lib/date-utils"
+import { logAvailabilityChange } from "@/lib/availability-audit"
 import { buildAvailabilityChangeHtml } from "@/lib/email-html"
 import { dispatchNotification } from "@/lib/notifications/dispatch"
 import { findActiveTeamForUser } from "@/lib/roster"
@@ -48,20 +47,6 @@ async function resolveSeasonEvents(
             )
         )
     return rows.length === eventIds.length ? rows : null
-}
-
-/**
- * The audit summary for a save. Records the full resulting set rather than a
- * diff, so a single entry is enough to reconstruct what a player had selected
- * — the property that was missing when the 2026-08-05 wipe destroyed every
- * Fall 2026 row and left nothing to restore from.
- */
-function describeAvailability(events: { date: string }[]): string {
-    if (events.length === 0) return "Available for all dates"
-    const dates = [...events]
-        .sort((a, b) => a.date.localeCompare(b.date))
-        .map((e) => formatShortDate(e.date))
-    return `Unavailable for ${dates.length} ${dates.length === 1 ? "date" : "dates"}: ${dates.join(", ")}`
 }
 
 export const updatePlayerAvailability = withAction(
@@ -124,12 +109,10 @@ export const updatePlayerAvailability = withAction(
             )
         }
 
-        await logAuditEntry({
+        await logAvailabilityChange({
             userId: session.user.id,
-            action: "update_availability",
-            entityType: "user_unavailability",
             entityId: signupId,
-            summary: describeAvailability(savedEvents)
+            events: savedEvents
         })
 
         const nextIds = new Set(eventIds)
@@ -281,13 +264,12 @@ export const updateRefAvailability = withAction(
             )
         }
 
-        await logAuditEntry({
+        await logAvailabilityChange({
             userId: session.user.id,
-            action: "update_availability",
             // No signup to point at — a ref's availability hangs off the user.
-            entityType: "user_unavailability",
             entityId: session.user.id,
-            summary: `Ref availability — ${describeAvailability(savedEvents)}`
+            events: savedEvents,
+            context: "Ref availability"
         })
 
         return ok(undefined, "Your availability has been updated.")

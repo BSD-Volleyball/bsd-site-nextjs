@@ -14,6 +14,10 @@ import {
 } from "@/lib/discount"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
+import {
+    logAvailabilityChange,
+    selectEventDates
+} from "@/lib/availability-audit"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
@@ -375,6 +379,19 @@ export async function submitSeasonPayment(
                                 )
                             }
 
+                            await logAvailabilityChange(
+                                {
+                                    userId: sessionUser.id,
+                                    entityId: newSignup.id,
+                                    events: await selectEventDates(
+                                        formData.unavailableEventIds,
+                                        tx
+                                    ),
+                                    context: "At signup"
+                                },
+                                tx
+                            )
+
                             await tx
                                 .delete(waitlist)
                                 .where(
@@ -582,6 +599,19 @@ export async function submitFreeSignup(
                     }))
                 )
             }
+
+            await logAvailabilityChange(
+                {
+                    userId: sessionUser.id,
+                    entityId: newSignup.id,
+                    events: await selectEventDates(
+                        formData.unavailableEventIds,
+                        tx
+                    ),
+                    context: "At signup"
+                },
+                tx
+            )
 
             await tx
                 .delete(waitlist)
