@@ -147,7 +147,7 @@ export async function sendGameRemindersForDate(
         const playerResult = await dispatchNotification({
             type: "game_reminder_player",
             recipients: playerRecipients,
-            subject: `BSD Volleyball: Match reminder — ${dateLabel} at ${timeLabel}`,
+            subject: `Match reminder — ${dateLabel} at ${timeLabel}`,
             htmlBody: (r) =>
                 buildGameReminderHtml({
                     firstName: r.firstName ?? "there",
@@ -174,7 +174,7 @@ export async function sendGameRemindersForDate(
                     email: r.email,
                     firstName: r.preferredName || r.firstName
                 })),
-                subject: `BSD Volleyball: Reffing reminder — ${dateLabel} at ${timeLabel}`,
+                subject: `Reffing reminder — ${dateLabel} at ${timeLabel}`,
                 htmlBody: (r) =>
                     buildGameReminderHtml({
                         firstName: r.firstName ?? "there",

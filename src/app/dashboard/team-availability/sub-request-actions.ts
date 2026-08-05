@@ -352,7 +352,7 @@ export const createSubRequest = withAction(
             await notifySubRequestParties({
                 type: "sub_request_received",
                 userIds: captainIdsOf(targetTeam, session.user.id),
-                subject: `BSD Volleyball: Sub request for ${candidateName}`,
+                subject: `Sub request for ${candidateName}`,
                 heading: "Sub Request Received",
                 intro: `${requesterName} (captain of ${teamLabel(requestingTeam)}) is asking to borrow ${candidateName} to cover ${coveredName} for one match. Approve or decline from your Team Availability page.`,
                 details: [
@@ -469,7 +469,7 @@ export const respondToSubRequest = withAction(
                         request.requested_by,
                         ...captainIdsOf(requestingTeam)
                     ],
-                    subject: `BSD Volleyball: Sub request declined — ${candidateName}`,
+                    subject: `Sub request declined — ${candidateName}`,
                     heading: "Sub Request Declined",
                     intro: `${responderName} declined your request to borrow ${candidateName} to cover ${coveredName}.`,
                     details: matchDetailRows(match),
@@ -572,7 +572,7 @@ export const respondToSubRequest = withAction(
                     request.requested_by,
                     ...captainIdsOf(requestingTeam)
                 ],
-                subject: `BSD Volleyball: Sub request approved — ${candidateName}`,
+                subject: `Sub request approved — ${candidateName}`,
                 heading: "Sub Request Approved",
                 intro: `${responderName} approved your request: ${candidateName} will cover ${coveredName}. The substitution is locked in.`,
                 details: matchDetailRows(match),
@@ -584,7 +584,7 @@ export const respondToSubRequest = withAction(
         await notifySubRequestParties({
             type: "sub_locked_in",
             userIds: [request.target_user],
-            subject: "BSD Volleyball: You're subbing in!",
+            subject: "You're subbing in!",
             heading: "You're Locked In as a Sub",
             intro: `${responderName} approved a sub request: you'll play for ${requestingTeamName}, covering ${coveredName}.`,
             details: matchDetailRows(match),
@@ -598,7 +598,7 @@ export const respondToSubRequest = withAction(
             await notifySubRequestParties({
                 type: "sub_request_cancelled",
                 userIds: captainIdsOf(siblingTeam),
-                subject: `BSD Volleyball: Sub request withdrawn — ${siblingCandidate}`,
+                subject: `Sub request withdrawn — ${siblingCandidate}`,
                 heading: "Sub Request Withdrawn",
                 intro: `${requestingTeamName}'s request to borrow ${siblingCandidate} was withdrawn — another player was approved for that slot. No action needed.`,
                 details: matchDetailRows(match),
@@ -679,7 +679,7 @@ export const cancelSubRequest = withAction(
             await notifySubRequestParties({
                 type: "sub_request_cancelled",
                 userIds: captainIdsOf(targetTeam),
-                subject: `BSD Volleyball: Sub request withdrawn — ${candidateName}`,
+                subject: `Sub request withdrawn — ${candidateName}`,
                 heading: "Sub Request Withdrawn",
                 intro: `${teamLabel(requestingTeam)} withdrew their request to borrow ${candidateName}. No action needed.`,
                 details: matchDetailRows(match),

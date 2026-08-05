@@ -477,7 +477,7 @@ export const sendVolunteerAssignmentEmails = withAction(
         const result = await dispatchNotification({
             type: "tryout_volunteer_assignment",
             recipients,
-            subject: `BSD Volleyball: Your Tryout Volunteer Job — ${seasonLabel}`,
+            subject: `Your Tryout Volunteer Job — ${seasonLabel}`,
             htmlBody: (recipient) =>
                 buildVolunteerJobAssignmentHtml({
                     firstName: recipient.firstName ?? "there",

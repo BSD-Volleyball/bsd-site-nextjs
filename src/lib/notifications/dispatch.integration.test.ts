@@ -239,7 +239,54 @@ describe("dispatchNotification", () => {
         expect(result.sent).toBe(1)
         const messages = mockedSendBatch.mock.calls[0][0]
         expect(messages).toHaveLength(1)
-        expect(messages[0].subject).toBe("Hi Sam")
+        // Every dispatched subject leaves with the shared "[BSD] " marker.
+        expect(messages[0].subject).toBe("[BSD] Hi Sam")
+    })
+
+    it("prefixes every subject with the shared [BSD] marker", async () => {
+        const user = await createUser()
+
+        await dispatchNotification({
+            type: "league_announcements",
+            recipients: [{ userId: user.id, email: user.email }],
+            subject: "Fall registration is open",
+            htmlBody: "<p>hi</p>"
+        })
+
+        const messages = mockedSendBatch.mock.calls[0][0]
+        expect(messages[0].subject).toBe("[BSD] Fall registration is open")
+    })
+
+    // Callers should not have to know whether the dispatcher adds it.
+    it("does not double the prefix when a caller already added one", async () => {
+        const user = await createUser()
+
+        await dispatchNotification({
+            type: "league_announcements",
+            recipients: [{ userId: user.id, email: user.email }],
+            subject: "[BSD] Fall registration is open",
+            htmlBody: "<p>hi</p>"
+        })
+
+        const messages = mockedSendBatch.mock.calls[0][0]
+        expect(messages[0].subject).toBe("[BSD] Fall registration is open")
+    })
+
+    it("logs the prefixed subject, matching what was actually sent", async () => {
+        const user = await createUser()
+
+        await dispatchNotification({
+            type: "league_announcements",
+            recipients: [{ userId: user.id, email: user.email }],
+            subject: "Roster posted",
+            htmlBody: "<p>hi</p>"
+        })
+
+        const [logged] = await db
+            .select({ subject: notificationLog.subject })
+            .from(notificationLog)
+            .where(eq(notificationLog.user_id, user.id))
+        expect(logged.subject).toBe("[BSD] Roster posted")
     })
 
     it("records failures without throwing", async () => {

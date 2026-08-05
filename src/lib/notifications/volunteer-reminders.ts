@@ -70,7 +70,7 @@ export async function sendVolunteerJobRemindersForDate(
     const dispatched = await dispatchNotification({
         type: "tryout_volunteer_reminder",
         recipients,
-        subject: `BSD Volleyball: You're volunteering at tryouts tomorrow — ${dateLabel}`,
+        subject: `You're volunteering at tryouts tomorrow — ${dateLabel}`,
         htmlBody: (recipient) =>
             buildVolunteerJobReminderHtml({
                 firstName: recipient.firstName ?? "there",

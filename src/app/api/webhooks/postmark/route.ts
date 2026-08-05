@@ -17,6 +17,7 @@ import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { isPermanentBounceType, sendBatchEmails } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
@@ -135,7 +136,9 @@ async function notifyOmbudsmen(appUrl: string) {
             emails.map((to) => ({
                 from: site.mailFrom,
                 to,
-                subject: "New Concern Submitted via Email",
+                subject: applyEmailSubjectPrefix(
+                    "New Concern Submitted via Email"
+                ),
                 htmlBody: buildConcernNotificationHtml(appUrl)
             }))
         )
@@ -156,7 +159,7 @@ async function notifyAdmins(appUrl: string) {
             emails.map((to) => ({
                 from: site.mailFrom,
                 to,
-                subject: "New Inbound Email Received",
+                subject: applyEmailSubjectPrefix("New Inbound Email Received"),
                 htmlBody: buildInboundEmailNotificationHtml({ appUrl })
             }))
         )
@@ -170,7 +173,9 @@ async function notifyAssignee(opts: {
     ticketId: number
 }) {
     const label = opts.ticketType === "email" ? "Email" : "Concern"
-    const notifSubject = `New Reply on ${label} #${opts.ticketId}`
+    const notifSubject = applyEmailSubjectPrefix(
+        `New Reply on ${label} #${opts.ticketId}`
+    )
     const notifHtml = buildThreadReplyNotificationHtml({
         appUrl: opts.appUrl,
         ticketType: opts.ticketType,

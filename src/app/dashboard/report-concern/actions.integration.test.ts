@@ -84,7 +84,7 @@ describe("submitConcern", () => {
         const messages = vi.mocked(sendBatchEmails).mock.calls[0][0]
         expect(messages).toHaveLength(1)
         expect(messages[0].to).toBe(ombudsman.email)
-        expect(messages[0].subject).toBe("New Concern Submitted")
+        expect(messages[0].subject).toBe("[BSD] New Concern Submitted")
     })
 
     it("stores an anonymous concern without a user id and skips email when no ombudsmen exist", async () => {

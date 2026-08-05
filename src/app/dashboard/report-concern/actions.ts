@@ -4,6 +4,7 @@ import { db } from "@/database/db"
 import { concerns, userRoles, users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { site } from "@/config/site"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { sendBatchEmails, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildConcernNotificationHtml } from "@/lib/email-html"
 import {
@@ -69,7 +70,7 @@ export const submitConcern = withAction(
                 ombudsmanEmails.map((to) => ({
                     from: site.mailFrom,
                     to,
-                    subject: "New Concern Submitted",
+                    subject: applyEmailSubjectPrefix("New Concern Submitted"),
                     htmlBody: buildConcernNotificationHtml(appUrl),
                     stream: STREAM_OUTBOUND,
                     tag: "concern-notification"

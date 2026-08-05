@@ -218,7 +218,7 @@ async function notifyCaptainsOfAvailabilityChange(
             email: c.email,
             firstName: c.preferredName || c.firstName
         })),
-        subject: `BSD Volleyball: ${playerName} updated their availability`,
+        subject: `${playerName} updated their availability`,
         htmlBody: (r) =>
             buildAvailabilityChangeHtml({
                 captainFirstName: r.firstName ?? "Captain",

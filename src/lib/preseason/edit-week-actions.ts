@@ -537,14 +537,14 @@ export async function sendEditWeekRosterNotifications(
     const removalResult = await dispatchNotification({
         type: "tryout_roster",
         recipients: removalRecipients,
-        subject: `BSD Volleyball: ${weekLabel} Roster Update — ${seasonLabel}`,
+        subject: `${weekLabel} Roster Update — ${seasonLabel}`,
         htmlBody: htmlFor,
         tag: "roster-update"
     })
     const assignmentResult = await dispatchNotification({
         type: "tryout_roster",
         recipients: assignmentRecipients,
-        subject: `BSD Volleyball: Your ${weekLabel} Assignment — ${seasonLabel}`,
+        subject: `Your ${weekLabel} Assignment — ${seasonLabel}`,
         htmlBody: htmlFor,
         tag: "roster-assignment"
     })

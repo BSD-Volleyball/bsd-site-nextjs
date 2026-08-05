@@ -14,6 +14,7 @@ import { eq, desc, or, asc } from "drizzle-orm"
 import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
 import {
@@ -445,7 +446,9 @@ export const assignInboundEmail = withAction(
                 ? `${existing.from_name} <${existing.from_address}>`
                 : existing.from_address
             const link = `${site.url}/dashboard/manage-emails`
-            const subjectLine = `[BSD] An email has been assigned to you: ${existing.subject}`
+            const subjectLine = applyEmailSubjectPrefix(
+                `An email has been assigned to you: ${existing.subject}`
+            )
             const textBody = [
                 `Hi ${assigneeName ?? "there"},`,
                 "",

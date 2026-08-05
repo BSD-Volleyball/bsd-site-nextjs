@@ -1100,7 +1100,7 @@ async function sendDraftResultNotifications(
     await dispatchNotification({
         type: "draft_results",
         recipients,
-        subject: `BSD Volleyball: You've been drafted — ${seasonLabel}`,
+        subject: `You've been drafted — ${seasonLabel}`,
         htmlBody: (r) => htmlByUserId.get(r.userId) ?? "",
         tag: "draft-results"
     })

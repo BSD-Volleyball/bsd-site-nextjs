@@ -18,6 +18,7 @@ import {
     logAvailabilityChange,
     selectEventDates
 } from "@/lib/availability-audit"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
@@ -69,7 +70,9 @@ async function sendSignupConfirmationEmail(
         await sendEmail({
             from: site.mailFrom,
             to: email,
-            subject: `You're registered for BSD ${seasonLabel}!`,
+            subject: applyEmailSubjectPrefix(
+                `You're registered for ${seasonLabel}!`
+            ),
             htmlBody: buildSignupConfirmationHtml({
                 firstName,
                 seasonLabel,

@@ -14,6 +14,7 @@ import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession } from "@/lib/rbac"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { sendEmail } from "@/lib/postmark"
 import { site } from "@/config/site"
 import {
@@ -581,7 +582,9 @@ export const assignConcern = withAction(
                     : "Web submission"
             const conciseSubject = `Concern #${concernId}: ${existingConcern.person_involved}`
             const link = `${site.url}/dashboard/manage-concerns`
-            const subjectLine = `[BSD] A concern has been assigned to you: ${conciseSubject}`
+            const subjectLine = applyEmailSubjectPrefix(
+                `A concern has been assigned to you: ${conciseSubject}`
+            )
             const textBody = [
                 `Hi ${assigneeName ?? "there"},`,
                 "",

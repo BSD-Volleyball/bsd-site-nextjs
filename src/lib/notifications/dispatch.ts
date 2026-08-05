@@ -17,6 +17,7 @@ import { and, eq, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { db } from "@/database/db"
 import { notificationLog } from "@/database/schema"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { isLegacyEmail } from "@/lib/legacy-matching"
 import { logger } from "@/lib/logger"
 import { type BatchEmailMessage, sendBatchEmails } from "@/lib/postmark"
@@ -58,6 +59,20 @@ export interface DispatchResult {
 
 function render(value: PerRecipient, recipient: NotificationRecipient): string {
     return typeof value === "function" ? value(recipient) : value
+}
+
+/**
+ * Subjects leave with the shared "[BSD] " marker so members can filter every
+ * message from the league the same way, whether it came from the Send Email
+ * page or an automated trigger. Applied centrally here rather than at each
+ * call site so a new notification type cannot forget it; the helper strips
+ * any prefix the caller already added, so it never doubles.
+ */
+function renderSubject(
+    value: PerRecipient,
+    recipient: NotificationRecipient
+): string {
+    return applyEmailSubjectPrefix(render(value, recipient))
 }
 
 export function buildUnsubscribeUrl(token: string): string {
@@ -133,7 +148,7 @@ export async function dispatchNotification(
                         notification_type: opts.type,
                         stream_id: def.stream,
                         tag,
-                        subject: render(opts.subject, r),
+                        subject: renderSubject(opts.subject, r),
                         dedupe_key: opts.dedupeKey,
                         status: "claimed"
                     }))
@@ -156,7 +171,7 @@ export async function dispatchNotification(
             return {
                 from: site.mailFrom,
                 to: r.email,
-                subject: render(opts.subject, r),
+                subject: renderSubject(opts.subject, r),
                 htmlBody: render(opts.htmlBody, r),
                 textBody: opts.textBody ? render(opts.textBody, r) : undefined,
                 stream: def.stream,
@@ -229,7 +244,7 @@ export async function dispatchNotification(
                     notification_type: opts.type,
                     stream_id: def.stream,
                     tag,
-                    subject: render(opts.subject, o.recipient),
+                    subject: renderSubject(opts.subject, o.recipient),
                     status: o.ok ? "sent" : "failed",
                     postmark_message_id: o.messageId
                 }))

@@ -8,6 +8,7 @@ import React from "react"
 import { db } from "@/database/db"
 import * as schema from "@/database/schema"
 import { site } from "@/config/site"
+import { applyEmailSubjectPrefix } from "@/lib/email-subject"
 import { sendEmail, STREAM_OUTBOUND } from "@/lib/postmark"
 
 const logoBase64 = readFileSync(
@@ -125,7 +126,7 @@ export const auth = betterAuth({
             await sendEmail({
                 from: site.mailFrom,
                 to: user.email,
-                subject: "Reset your password",
+                subject: applyEmailSubjectPrefix("Reset your password"),
                 htmlBody,
                 stream: STREAM_OUTBOUND,
                 tag: "password-reset",

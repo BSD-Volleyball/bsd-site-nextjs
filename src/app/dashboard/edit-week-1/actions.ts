@@ -395,14 +395,14 @@ export const sendWeek1RosterNotifications = withAction(
         const removalResult = await dispatchNotification({
             type: "tryout_roster",
             recipients: removalRecipients,
-            subject: `BSD Volleyball: Week 1 Roster Update — ${seasonLabel}`,
+            subject: `Week 1 Roster Update — ${seasonLabel}`,
             htmlBody: htmlFor,
             tag: "roster-update"
         })
         const assignmentResult = await dispatchNotification({
             type: "tryout_roster",
             recipients: assignmentRecipients,
-            subject: `BSD Volleyball: Your Week 1 Assignment — ${seasonLabel}`,
+            subject: `Your Week 1 Assignment — ${seasonLabel}`,
             htmlBody: htmlFor,
             tag: "roster-assignment"
         })
