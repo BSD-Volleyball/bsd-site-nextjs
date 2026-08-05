@@ -4,7 +4,8 @@ import { PageHeader } from "@/components/layout/page-header"
 import { db } from "@/database/db"
 import { champions, divisions, seasons, teams, users } from "@/database/schema"
 import { ChampionsList, type ChampionListRow } from "./champions-list"
-import { formatDisplayName } from "@/lib/utils"
+import { playerPicBaseUrl } from "@/config/env"
+import { buildPlayerPictureUrl, formatDisplayName } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +25,8 @@ interface ChampionRow {
     captainPreferredName: string | null
     teamName: string
     picture: string | null
+    // Live R2 object key on the team row; used when champions.picture is null.
+    teamPictureUrl: string | null
     picture2: string | null
     caption: string | null
 }
@@ -42,6 +45,7 @@ async function getChampions(): Promise<ChampionRow[]> {
             captainPreferredName: users.preferred_name,
             teamName: teams.name,
             picture: champions.picture,
+            teamPictureUrl: teams.picture_url,
             picture2: champions.picture2,
             caption: champions.caption
         })
@@ -59,6 +63,10 @@ function formatSeasonLabel(season: string, year: number): string {
 
 export default async function HallOfChampionsPage() {
     const rows = await getChampions()
+    // champions.picture is snapshotted when a season advances to "complete".
+    // Photos uploaded after that point only live on teams.picture_url, so fall
+    // back to the team's current photo rather than showing an empty pop-up.
+    const picBaseUrl = playerPicBaseUrl()
     const listRows: ChampionListRow[] = rows.map((row) => ({
         id: row.id,
         seasonId: row.seasonId,
@@ -71,7 +79,9 @@ export default async function HallOfChampionsPage() {
             row.captainLastName,
             row.captainPreferredName
         ),
-        picture: row.picture,
+        picture:
+            row.picture ??
+            (buildPlayerPictureUrl(picBaseUrl, row.teamPictureUrl) || null),
         picture2: row.picture2,
         caption: row.caption
     }))
