@@ -50,6 +50,7 @@ export function PlayerLookupForm({
                             ratingAverages={detail?.ratingAverages}
                             sharedRatingNotes={detail?.sharedRatingNotes}
                             privateRatingNotes={detail?.privateRatingNotes}
+                            emailSuppressions={detail?.emailSuppressions}
                             viewerRating={detail?.viewerRating ?? null}
                             inline
                         />

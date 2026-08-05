@@ -692,6 +692,7 @@ export function ManageEmailsClient({
         ratingAverages,
         sharedRatingNotes,
         privateRatingNotes,
+        emailSuppressions,
         viewerRating,
         pairPickName,
         pairReason,
@@ -762,6 +763,7 @@ export function ManageEmailsClient({
                 ratingAverages={ratingAverages}
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
+                emailSuppressions={emailSuppressions}
                 viewerRating={viewerRating}
             />
         </div>

@@ -146,6 +146,7 @@ export function DraftHistoryClient({
         ratingAverages,
         sharedRatingNotes,
         privateRatingNotes,
+        emailSuppressions,
         viewerRating,
         pairPickName,
         pairReason,
@@ -328,6 +329,7 @@ export function DraftHistoryClient({
                 ratingAverages={ratingAverages}
                 sharedRatingNotes={sharedRatingNotes}
                 privateRatingNotes={privateRatingNotes}
+                emailSuppressions={emailSuppressions}
                 viewerRating={viewerRating}
             />
         </div>

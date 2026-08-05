@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { drafts, userRoles } from "@/database/schema"
+import { drafts, emailSuppressions, userRoles } from "@/database/schema"
 import {
     createDivision,
     createMatch,
@@ -8,7 +8,7 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import { getPlayerAnalytics, getPlayerRoles } from "./actions"
+import { getPlayerAnalytics, getPlayerDetails, getPlayerRoles } from "./actions"
 
 // One recorded match: the target player's team sweeps 2-0, so career stats
 // should read 1-0 in matches, 2-0 in sets, and the player should pick up an
@@ -153,5 +153,135 @@ describe("getPlayerRoles", () => {
         logout()
 
         expect(await getPlayerRoles(player.id)).toEqual([])
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Email deliverability — surfaced to admins so they can tell "never got the
+// email" from "we stopped sending to them".
+// ---------------------------------------------------------------------------
+
+describe("getPlayerDetails — email suppressions", () => {
+    async function seedSuppressedPlayer() {
+        const player = await createUser({ email_status: "bounced" })
+        await db.insert(emailSuppressions).values({
+            user_id: player.id,
+            email: player.email.toLowerCase(),
+            stream_id: "outbound",
+            reason: "HardBounce",
+            origin: "Recipient"
+        })
+        return player
+    }
+
+    it("returns the player's suppressions to an admin", async () => {
+        const player = await seedSuppressedPlayer()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.player.email_status).toBe("bounced")
+        expect(result.data.emailSuppressions).toHaveLength(1)
+        expect(result.data.emailSuppressions[0]).toMatchObject({
+            streamId: "outbound",
+            reason: "HardBounce",
+            origin: "Recipient",
+            canReactivate: true
+        })
+    })
+
+    it("marks a spam complaint as non-reactivatable", async () => {
+        const player = await createUser({ email_status: "spam_complaint" })
+        await db.insert(emailSuppressions).values({
+            user_id: player.id,
+            email: player.email.toLowerCase(),
+            stream_id: "broadcast",
+            reason: "SpamComplaint",
+            origin: "Recipient"
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.emailSuppressions[0].canReactivate).toBe(false)
+    })
+
+    it("reports every suppressed stream separately", async () => {
+        const player = await createUser({ email_status: "unsubscribed" })
+        await db.insert(emailSuppressions).values([
+            {
+                user_id: player.id,
+                email: player.email.toLowerCase(),
+                stream_id: "broadcast",
+                reason: "ManualSuppression",
+                origin: "Customer"
+            },
+            {
+                user_id: player.id,
+                email: player.email.toLowerCase(),
+                stream_id: "automated-reminders",
+                reason: "ManualSuppression",
+                origin: "Recipient"
+            }
+        ])
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(
+            new Set(result.data.emailSuppressions.map((s) => s.streamId))
+        ).toEqual(new Set(["broadcast", "automated-reminders"]))
+    })
+
+    it("returns an empty list for a deliverable address", async () => {
+        const player = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.player.email_status).toBe("valid")
+        expect(result.data.emailSuppressions).toEqual([])
+    })
+
+    // Commissioners already have the address itself redacted; deliverability
+    // state must follow it rather than leaking around the redaction.
+    it("hides suppressions and status from a non-admin commissioner", async () => {
+        const season = await createSeason()
+        const player = await seedSuppressedPlayer()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.player.email).toBe("")
+        expect(result.data.player.email_status).toBe("")
+        expect(result.data.emailSuppressions).toEqual([])
+    })
+
+    it("rejects callers with no commissioner access", async () => {
+        const player = await seedSuppressedPlayer()
+        await createUserWithRoles([{ role: "referee" }])
+
+        const result = await getPlayerDetails(player.id)
+        expect(result.status).toBe(false)
+    })
+
+    it("rejects unauthenticated callers", async () => {
+        const player = await seedSuppressedPlayer()
+        logout()
+
+        const result = await getPlayerDetails(player.id)
+        expect(result.status).toBe(false)
     })
 })

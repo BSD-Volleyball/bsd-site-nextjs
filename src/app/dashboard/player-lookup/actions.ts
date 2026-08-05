@@ -44,6 +44,7 @@ import {
     type ChampionshipEntry,
     type SeasonInfo
 } from "@/lib/player-elo-data"
+import { getUserSuppressionState } from "@/lib/notifications/suppressions"
 import { getDraftHistoryForUser } from "@/lib/roster"
 import { formatDisplayName } from "@/lib/utils"
 
@@ -64,6 +65,8 @@ export interface PlayerDetails {
     preferred_name: string | null
     email: string
     emailVerified: boolean
+    /** 'valid' | 'unsubscribed' | 'bounced' | 'spam_complaint' */
+    email_status: string
     phone: string | null
     pronouns: string | null
     emergency_contact: string | null
@@ -82,6 +85,19 @@ export interface PlayerDetails {
     picture: string | null
     createdAt: Date
     updatedAt: Date
+}
+
+/**
+ * One Postmark suppression on a player's address. `streamId` is the Postmark
+ * message stream it applies to — suppressions are per-stream, so a player can
+ * be blocked from broadcasts while still receiving receipts.
+ */
+export interface PlayerEmailSuppression {
+    streamId: string
+    reason: string
+    origin: string
+    suppressedAt: Date
+    canReactivate: boolean
 }
 
 export interface PlayerSignup {
@@ -158,6 +174,8 @@ export interface PlayerDetailsResult {
     privateRatingNotes: PlayerRatingPrivateNote[]
     viewerRating: PlayerViewerRating | null
     playoffDates: string[]
+    /** Per-stream Postmark suppressions on this player's address. */
+    emailSuppressions: PlayerEmailSuppression[]
 }
 
 export const getPlayerDetails = withAction(
@@ -177,6 +195,7 @@ export const getPlayerDetails = withAction(
                 preferred_name: users.preferred_name,
                 email: users.email,
                 emailVerified: users.emailVerified,
+                email_status: users.email_status,
                 phone: users.phone,
                 pronouns: users.pronouns,
                 emergency_contact: users.emergency_contact,
@@ -293,12 +312,23 @@ export const getPlayerDetails = withAction(
                   ...player,
                   email: "",
                   emailVerified: false,
+                  email_status: "",
                   phone: null,
                   emergency_contact: null,
                   onboarding_completed: null,
                   createdAt: new Date(0),
                   updatedAt: new Date(0)
               }
+
+        const emailSuppressions: PlayerEmailSuppression[] = isAdmin
+            ? (await getUserSuppressionState(player.email)).map((row) => ({
+                  streamId: row.streamId,
+                  reason: row.reason,
+                  origin: row.origin,
+                  suppressedAt: row.suppressedAt,
+                  canReactivate: row.canReactivate
+              }))
+            : []
 
         return ok({
             player: sanitizedPlayer,
@@ -308,7 +338,8 @@ export const getPlayerDetails = withAction(
             sharedRatingNotes: ratingsSection.sharedNotes,
             privateRatingNotes: ratingsSection.privateNotes,
             viewerRating: ratingsSection.viewerRating,
-            playoffDates
+            playoffDates,
+            emailSuppressions
         })
     }
 )

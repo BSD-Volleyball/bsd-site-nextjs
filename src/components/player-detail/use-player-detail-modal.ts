@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import type {
     PlayerDetails,
     PlayerDraftHistory,
+    PlayerEmailSuppression,
     PlayerSignup
 } from "@/app/dashboard/player-lookup/actions"
 import { getPlayerDetails } from "@/app/dashboard/player-lookup/actions"
@@ -27,6 +28,7 @@ interface FetchPayload {
     pairReason?: string | null
     unavailableDates?: string | null
     playoffDates?: string[]
+    emailSuppressions?: PlayerEmailSuppression[]
 }
 
 // Mirrors ActionResult<FetchPayload> from src/lib/action-helpers.ts without
@@ -52,6 +54,7 @@ export interface PlayerDetailModalState {
     pairReason: string | null
     unavailableDates: string | null
     playoffDates: string[]
+    emailSuppressions: PlayerEmailSuppression[]
     isLoading: boolean
     showImageModal: boolean
     setShowImageModal: (v: boolean) => void
@@ -87,7 +90,8 @@ const defaultFetchFn = async (playerId: string): Promise<FetchResult> => {
             pairPickName,
             pairReason,
             unavailableDates,
-            playoffDates: result.data.playoffDates ?? []
+            playoffDates: result.data.playoffDates ?? [],
+            emailSuppressions: result.data.emailSuppressions ?? []
         }
     }
 }
@@ -119,6 +123,9 @@ export function usePlayerDetailModal(
         null
     )
     const [playoffDates, setPlayoffDates] = useState<string[]>([])
+    const [emailSuppressions, setEmailSuppressions] = useState<
+        PlayerEmailSuppression[]
+    >([])
     const [isLoading, setIsLoading] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
 
@@ -139,6 +146,7 @@ export function usePlayerDetailModal(
             setPairReason(null)
             setUnavailableDates(null)
             setPlayoffDates([])
+            setEmailSuppressions([])
 
             const result = await fetchFn(playerId)
 
@@ -155,6 +163,7 @@ export function usePlayerDetailModal(
                 setPairReason(data.pairReason ?? null)
                 setUnavailableDates(data.unavailableDates ?? null)
                 setPlayoffDates(data.playoffDates ?? [])
+                setEmailSuppressions(data.emailSuppressions ?? [])
             }
 
             setIsLoading(false)
@@ -175,6 +184,7 @@ export function usePlayerDetailModal(
         setPairReason(null)
         setUnavailableDates(null)
         setPlayoffDates([])
+        setEmailSuppressions([])
     }, [])
 
     useEffect(() => {
@@ -204,6 +214,7 @@ export function usePlayerDetailModal(
         pairReason,
         unavailableDates,
         playoffDates,
+        emailSuppressions,
         isLoading,
         showImageModal,
         setShowImageModal,

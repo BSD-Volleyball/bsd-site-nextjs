@@ -8,6 +8,7 @@ import type {
     PlayerAnalyticsResult,
     PlayerDetails,
     PlayerDraftHistory,
+    PlayerEmailSuppression,
     PlayerRoleInfo,
     PlayerSignup,
     PlayerSubHistoryEntry
@@ -25,6 +26,15 @@ import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
 import { PlayerRatingsSection } from "./player-ratings-section"
 import { getGoogleMembershipLabel } from "@/lib/google-membership"
+import {
+    emailStatusBadgeColor,
+    emailStatusLabel,
+    isEmailStatusBlocking,
+    suppressionExplanation,
+    suppressionOriginLabel,
+    suppressionReasonLabel
+} from "@/lib/email-suppression-display"
+import { STREAM_LABELS } from "@/lib/notifications/types"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -49,6 +59,7 @@ interface AdminPlayerDetailPopupProps {
     sharedRatingNotes?: PlayerRatingSharedNote[]
     privateRatingNotes?: PlayerRatingPrivateNote[]
     viewerRating?: PlayerViewerRating | null
+    emailSuppressions?: PlayerEmailSuppression[]
     inline?: boolean
     children?: React.ReactNode
 }
@@ -75,6 +86,7 @@ export function AdminPlayerDetailPopup({
     sharedRatingNotes = [],
     privateRatingNotes = [],
     viewerRating = null,
+    emailSuppressions = [],
     inline = false,
     children
 }: AdminPlayerDetailPopupProps) {
@@ -232,6 +244,85 @@ export function AdminPlayerDetailPopup({
                                             : "No"}
                                     </span>
                                 </div>
+                                {playerDetails.email_status && (
+                                    <div className="sm:col-span-2">
+                                        <span className="text-muted-foreground">
+                                            Email Status:
+                                        </span>
+                                        <Badge
+                                            className={`ml-2 ${emailStatusBadgeColor(
+                                                playerDetails.email_status
+                                            )}`}
+                                            variant="secondary"
+                                        >
+                                            {emailStatusLabel(
+                                                playerDetails.email_status
+                                            )}
+                                        </Badge>
+                                        {isEmailStatusBlocking(
+                                            playerDetails.email_status
+                                        ) && (
+                                            <span className="ml-2 text-muted-foreground text-xs">
+                                                We are not delivering any email
+                                                to this address.
+                                            </span>
+                                        )}
+                                        {emailSuppressions.length > 0 && (
+                                            <div className="mt-2 space-y-2 rounded-md border p-3">
+                                                <p className="font-medium text-xs">
+                                                    Suppressed on{" "}
+                                                    {emailSuppressions.length}{" "}
+                                                    {emailSuppressions.length ===
+                                                    1
+                                                        ? "stream"
+                                                        : "streams"}
+                                                </p>
+                                                {emailSuppressions.map(
+                                                    (suppression) => (
+                                                        <div
+                                                            key={`${suppression.streamId}-${suppression.reason}`}
+                                                            className="space-y-0.5 text-xs"
+                                                        >
+                                                            <div className="flex flex-wrap items-center gap-x-2">
+                                                                <span className="font-medium">
+                                                                    {STREAM_LABELS[
+                                                                        suppression
+                                                                            .streamId
+                                                                    ] ??
+                                                                        suppression.streamId}
+                                                                </span>
+                                                                <span className="text-muted-foreground">
+                                                                    {suppressionReasonLabel(
+                                                                        suppression.reason
+                                                                    )}{" "}
+                                                                    {suppressionOriginLabel(
+                                                                        suppression.origin
+                                                                    )}{" "}
+                                                                    on{" "}
+                                                                    {new Date(
+                                                                        suppression.suppressedAt
+                                                                    ).toLocaleDateString()}
+                                                                </span>
+                                                                {!suppression.canReactivate && (
+                                                                    <span className="text-destructive">
+                                                                        cannot
+                                                                        be
+                                                                        reactivated
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-muted-foreground">
+                                                                {suppressionExplanation(
+                                                                    suppression.reason
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div>
                                     <span className="text-muted-foreground">
                                         Phone:

@@ -577,6 +577,9 @@ export const getPlayerDetailsPublic = withAction(
             name: null,
             email: "",
             emailVerified: false,
+            // Redacted alongside the address itself — captains never see
+            // deliverability state.
+            email_status: "",
             phone: null,
             emergency_contact: null,
             onboarding_completed: null,

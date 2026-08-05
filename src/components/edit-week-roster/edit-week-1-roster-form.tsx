@@ -371,6 +371,7 @@ export function EditWeek1RosterForm({
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                emailSuppressions={modal.emailSuppressions}
                 viewerRating={modal.viewerRating}
             />
 

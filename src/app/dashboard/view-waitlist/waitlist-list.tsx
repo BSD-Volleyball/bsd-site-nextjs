@@ -187,6 +187,7 @@ export function WaitlistList({ entries, playerPicUrl }: WaitlistListProps) {
                 ratingAverages={modal.ratingAverages}
                 sharedRatingNotes={modal.sharedRatingNotes}
                 privateRatingNotes={modal.privateRatingNotes}
+                emailSuppressions={modal.emailSuppressions}
                 viewerRating={modal.viewerRating}
             />
         </div>
