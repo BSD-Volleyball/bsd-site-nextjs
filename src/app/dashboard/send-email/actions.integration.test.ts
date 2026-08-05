@@ -2,6 +2,7 @@ import { inArray } from "drizzle-orm"
 import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import {
+    drafts,
     emailBroadcasts,
     emailRecipientGroups,
     seasonRefs,
@@ -11,12 +12,14 @@ import {
 } from "@/database/schema"
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import { normalizeEmailTemplateContent } from "@/lib/email-template-content"
+import { site } from "@/config/site"
 import { sendBroadcastEmails } from "@/lib/postmark"
 import {
     createDivision,
     createSeason,
     createSeasonEvent,
-    createSignup
+    createSignup,
+    createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
@@ -898,5 +901,169 @@ describe("createAndSendBroadcast — tryout volunteers", () => {
             message: "Unauthorized: only admins can send league-wide emails."
         })
         expect(sendBroadcastEmails).not.toHaveBeenCalled()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// CC Directors — an alias appended to the distribution list. Optional for
+// admins, mandatory for commissioners.
+// ---------------------------------------------------------------------------
+
+describe("createAndSendBroadcast — CC directors", () => {
+    const DIRECTORS = site.mailDirectors
+
+    async function seedDivisionAudience() {
+        const season = await createSeason()
+        const division = await createDivision()
+        const captain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            division: division.id,
+            captain: captain.id
+        })
+        const player = await createUser()
+        await db
+            .insert(drafts)
+            .values({ team: team.id, user: player.id, round: 1, overall: 1 })
+        // A division audience covers drafted players AND the team captain.
+        return { season, division, player, captain }
+    }
+
+    it("omits directors when an admin leaves the box unchecked", async () => {
+        const { season, division } = await seedDivisionAudience()
+        await createUserWithRoles([{ role: "admin" }])
+        expect(season.id).toBeGreaterThan(0)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            subject: "No CC",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients.map((r) => r.email)).not.toContain(DIRECTORS)
+    })
+
+    it("includes directors when an admin checks the box", async () => {
+        const { division, player, captain } = await seedDivisionAudience()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            ccDirectors: true,
+            subject: "With CC",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(new Set(call.recipients.map((r) => r.email))).toEqual(
+            new Set([player.email, captain.email, DIRECTORS])
+        )
+    })
+
+    it("forces directors on for a commissioner", async () => {
+        const { season, division, player, captain } =
+            await seedDivisionAudience()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            subject: "Commissioner send",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(new Set(call.recipients.map((r) => r.email))).toEqual(
+            new Set([player.email, captain.email, DIRECTORS])
+        )
+    })
+
+    // The disabled checkbox is only the UI half of the rule; a hand-crafted
+    // payload must not be able to cut directors out of a commissioner's send.
+    it("ignores ccDirectors:false from a commissioner", async () => {
+        const { season, division } = await seedDivisionAudience()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            ccDirectors: false,
+            subject: "Trying to hide",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients.map((r) => r.email)).toContain(DIRECTORS)
+    })
+
+    it("never CCs directors on a test send to yourself", async () => {
+        const admin = await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "just_me",
+            ccDirectors: true,
+            subject: "Test",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: admin.email }])
+    })
+
+    it("still reaches directors when the audience is empty", async () => {
+        const season = await createSeason()
+        const division = await createDivision()
+        await createUserWithRoles([{ role: "admin" }])
+        expect(season.id).toBeGreaterThan(0)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            ccDirectors: true,
+            subject: "Nobody but directors",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: DIRECTORS }])
+    })
+
+    it("counts the directors address in the preview", async () => {
+        const { division } = await seedDivisionAudience()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const without = await previewBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            subject: "Preview",
+            lexicalContent: EMPTY_BODY
+        })
+        const withCc = await previewBroadcast({
+            sendToType: "division",
+            divisionId: division.id,
+            ccDirectors: true,
+            subject: "Preview",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(without.status && without.data.ccDirectors).toBe(false)
+        expect(withCc.status && withCc.data.ccDirectors).toBe(true)
+        expect(
+            (withCc.status ? withCc.data.recipientCount : 0) -
+                (without.status ? without.data.recipientCount : 0)
+        ).toBe(1)
     })
 })

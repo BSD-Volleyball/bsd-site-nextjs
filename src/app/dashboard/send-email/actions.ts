@@ -343,8 +343,24 @@ export interface SendBroadcastInput {
     teamId?: number
     /** For season_tryout_volunteers: one tryout night, or omitted for all. */
     tryoutEventId?: number
+    /** Also deliver to the directors group. Forced on for non-admins. */
+    ccDirectors?: boolean
     subject: string
     lexicalContent: LexicalEmailTemplateContent
+}
+
+/**
+ * Whether this send includes the directors group. Commissioners cannot turn
+ * it off — the decision is made here, server-side, so a tampered client
+ * payload cannot suppress director oversight. Test sends to yourself never
+ * include it.
+ */
+function shouldCcDirectors(
+    input: SendBroadcastInput,
+    isAdmin: boolean
+): boolean {
+    if (input.sendToType === "just_me") return false
+    return isAdmin ? input.ccDirectors === true : true
 }
 
 /** Resolves/creates the recipient group and infers the stream from sendToType. */
@@ -708,16 +724,32 @@ export const createAndSendBroadcast = withAction(
                 ? []
                 : await getRecipientsForGroup(groupId)
 
-            const recipients = isTestSend
+            const filtered = isTestSend
                 ? [{ email: session.user.email }]
                 : await filterOptedOutForStream(
                       await filterSuppressed(groupRecipients, stream),
                       stream
                   )
 
+            // The directors group is an alias, not a member — it is appended
+            // after filtering so a per-user opt-out or suppression can never
+            // drop it, and deduped in case it is also a real recipient.
+            const ccDirectors = shouldCcDirectors(input, isAdmin)
+            const recipients =
+                ccDirectors &&
+                !filtered.some(
+                    (r) =>
+                        r.email.toLowerCase() ===
+                        site.mailDirectors.toLowerCase()
+                )
+                    ? [...filtered, { email: site.mailDirectors }]
+                    : filtered
+
             // Captured before the suppression filter so the history view can
             // show how many of the intended audience were never attempted.
-            const recipientTotal = isTestSend ? 1 : groupRecipients.length
+            const recipientTotal =
+                (isTestSend ? 1 : groupRecipients.length) +
+                (recipients.length > filtered.length ? 1 : 0)
 
             if (recipients.length === 0) {
                 await db
@@ -760,7 +792,7 @@ export const createAndSendBroadcast = withAction(
                 action: "create",
                 entityType: "email_broadcast",
                 entityId: broadcast.id,
-                summary: `Sent broadcast "${resolved.subject}" to "${groupName}" via ${stream} (${result.sent} sent of ${recipientTotal} intended, ${result.failed} failed)`
+                summary: `Sent broadcast "${resolved.subject}" to "${groupName}"${ccDirectors ? " + directors" : ""} via ${stream} (${result.sent} sent of ${recipientTotal} intended, ${result.failed} failed)`
             })
 
             return ok({ broadcastId: broadcast.id })
@@ -784,6 +816,8 @@ export interface BroadcastPreview {
     html: string
     groupName: string
     recipientCount: number
+    /** True when the directors group is included in recipientCount. */
+    ccDirectors: boolean
 }
 
 /**
@@ -839,7 +873,9 @@ export const previewBroadcast = withAction(
             )
         }
 
-        const recipientCount =
+        const ccDirectors = shouldCcDirectors(input, isAdmin)
+
+        const audienceCount =
             sendToType === "just_me"
                 ? 1
                 : (
@@ -856,7 +892,8 @@ export const previewBroadcast = withAction(
             subject: resolved.subject,
             html: resolved.html,
             groupName: group.groupName,
-            recipientCount
+            recipientCount: audienceCount + (ccDirectors ? 1 : 0),
+            ccDirectors
         })
     }
 )

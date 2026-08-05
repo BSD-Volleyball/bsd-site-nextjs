@@ -125,42 +125,10 @@ export interface PlayoffSeed {
     teamId: number | null
 }
 
-export interface BracketParticipant {
-    id: string
-    name: string
-    resultText: string | null
-    isWinner: boolean
-    status: "PLAYED" | "NO_SHOW" | "WALK_OVER" | "NO_PARTY" | null
-}
-
-export interface BracketMatch {
-    id: number
-    name: string
-    nextMatchId: number | null
-    nextLooserMatchId: number | null
-    tournamentRoundText: string
-    startTime: string
-    state: string
-    participants: BracketParticipant[]
-    matchNum: number
-    week: number
-    date: string | null
-    time: string | null
-    court: number | null
-    scoresDisplay: string
-    homeSourceLabel: string | null
-    awaySourceLabel: string | null
-    workTeamLabel: string | null
-    homeTeamId: number | null
-    awayTeamId: number | null
-    workTeamId: number | null
-    homeSourceRefMatch: number | null
-    homeSourceRefIsWin: boolean | null
-    awaySourceRefMatch: number | null
-    awaySourceRefIsWin: boolean | null
-    workSourceRefMatch: number | null
-    workSourceRefIsWin: boolean | null
-}
+export type {
+    BracketMatch,
+    BracketParticipant
+} from "@/lib/playoff-bracket-types"
 
 export interface PlayoffDivision {
     id: number

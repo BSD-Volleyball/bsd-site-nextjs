@@ -13,6 +13,11 @@ export const site = {
     ogImage: `${site_url}/og.jpg`,
     logo: "/logo.svg",
     mailSupport: "info@bumpsetdrink.com",
+    // Google Group for the league directors. Broadcasts can opt to include it
+    // so directors see what went out; commissioner sends always include it.
+    // It is a group alias with no user row, so it bypasses the per-user
+    // opt-out and suppression filters that apply to real recipients.
+    mailDirectors: "bumpsetdrink-directors@googlegroups.com",
     // Falls back to the apex domain, which is the only one that authenticates:
     // it carries the SPF record, Postmark's DKIM signs as bumpsetdrink.com, and
     // pm-bounces.bumpsetdrink.com provides the aligned Return-Path. The previous

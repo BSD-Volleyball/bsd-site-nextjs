@@ -22,6 +22,7 @@ import {
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
     Dialog,
     DialogContent,
@@ -40,6 +41,7 @@ import {
     EMAIL_SUBJECT_PREFIX,
     stripEmailSubjectPrefix
 } from "@/lib/email-subject"
+import { site } from "@/config/site"
 import { formatShortDate } from "@/lib/season-utils"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
 import type {
@@ -158,6 +160,11 @@ export function SendEmailClient({
     const [selectedDivisionId, setSelectedDivisionId] = useState<string>("")
     const [selectedTeamId, setSelectedTeamId] = useState<string>("")
     const [selectedTryout, setSelectedTryout] = useState<string>(ALL_TRYOUTS)
+    // canSendToAll is set from isAdmin server-side, so !canSendToAll means a
+    // commissioner — they always CC directors and cannot turn it off. The
+    // server enforces this too; the disabled checkbox is only the UI half.
+    const directorsForced = !canSendToAll
+    const [ccDirectors, setCcDirectors] = useState(directorsForced)
     const [subject, setSubject] = useState("")
     const [content, setContent] =
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
@@ -249,6 +256,7 @@ export function SendEmailClient({
             selectedTryout !== ALL_TRYOUTS
                 ? Number(selectedTryout)
                 : undefined,
+        ccDirectors: directorsForced || ccDirectors,
         subject,
         lexicalContent: content
     })
@@ -501,6 +509,36 @@ export function SendEmailClient({
                                 </Select>
                             </div>
                         )}
+
+                        {/* CC Directors — appended to the distribution list;
+                            there is no true CC on a broadcast send. */}
+                        <div className="flex items-start gap-2 pt-1">
+                            <Checkbox
+                                id="cc-directors"
+                                checked={directorsForced || ccDirectors}
+                                disabled={
+                                    directorsForced || sendToType === "just_me"
+                                }
+                                onCheckedChange={(checked) =>
+                                    setCcDirectors(checked === true)
+                                }
+                            />
+                            <div className="space-y-0.5">
+                                <Label
+                                    htmlFor="cc-directors"
+                                    className="font-normal"
+                                >
+                                    CC Directors
+                                </Label>
+                                <p className="text-muted-foreground text-xs">
+                                    {directorsForced
+                                        ? `Always included on your sends: ${site.mailDirectors}`
+                                        : sendToType === "just_me"
+                                          ? "Not included on a test send to yourself."
+                                          : `Adds ${site.mailDirectors} to the recipient list.`}
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Subject — the [BSD] prefix is added on send, so it is
@@ -560,7 +598,7 @@ export function SendEmailClient({
                         <DialogTitle>Preview Email</DialogTitle>
                         <DialogDescription>
                             {preview
-                                ? `This is what will be sent to ${preview.groupName} (${preview.recipientCount} ${preview.recipientCount === 1 ? "recipient" : "recipients"}).`
+                                ? `This is what will be sent to ${preview.groupName}${preview.ccDirectors ? " plus the directors group" : ""} (${preview.recipientCount} ${preview.recipientCount === 1 ? "recipient" : "recipients"}).`
                                 : ""}
                         </DialogDescription>
                     </DialogHeader>
