@@ -143,7 +143,9 @@ async function seedOrder(
     }
 
     const seedByTeam = new Map<number, number>()
-    ordered.forEach((teamId, i) => seedByTeam.set(teamId, i + 1))
+    for (const [i, teamId] of ordered.entries()) {
+        seedByTeam.set(teamId, i + 1)
+    }
     return seedByTeam
 }
 
