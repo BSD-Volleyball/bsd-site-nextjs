@@ -1,5 +1,6 @@
 import { db } from "@/database/db"
 import {
+    accounts,
     auditLog,
     concernComments,
     concernReplies,
@@ -41,8 +42,9 @@ export interface MergeUserRecordsOptions {
     /**
      * Copy the deleted account's `old_id` and `picture` onto the survivor.
      *
-     * True for a duplicate-account merge: the older row usually holds the
-     * legacy numeric id and the photo, and the newer sign-up is the empty one.
+     * True for a fixed-policy duplicate-account merge: the older row usually
+     * holds the legacy numeric id and the photo, and the newer sign-up is the
+     * empty one.
      *
      * False when the deleted account is a synthetic placeholder (a
      * `legacy-roster-*` / `legacy-hoc-*` row invented by the archive
@@ -50,8 +52,32 @@ export interface MergeUserRecordsOptions {
      * so copying them would overwrite the real member's legacy id and erase
      * their photo. The placeholder has no identity worth keeping — only its
      * records.
+     *
+     * A blunt precursor to `survivorPatch`, kept for the legacy-placeholder
+     * callers that only ever need this one rule. Pass `false` alongside a
+     * `survivorPatch`, which carries `old_id`/`picture` like any other field.
      */
     copyIdentity: boolean
+
+    /**
+     * Column values to write onto the survivor once the deleted row is gone.
+     *
+     * Lets an admin compose the surviving record field by field instead of
+     * accepting the survivor's stored values wholesale. Applied AFTER the
+     * delete -- see the ordering note on `mergeUserRecords`.
+     */
+    survivorPatch?: Partial<typeof users.$inferInsert>
+
+    /**
+     * Move the deleted account's better-auth `accounts` rows (Google links,
+     * password credentials) onto the survivor instead of letting them cascade
+     * away.
+     *
+     * Set this when the survivor is adopting the deleted account's email: those
+     * login methods are how the person signs in as that address, so dropping
+     * them while keeping the address would lock them out.
+     */
+    moveAuthAccounts?: boolean
 }
 
 /**
@@ -64,6 +90,14 @@ export interface MergeUserRecordsOptions {
  * final delete. Non-cascading columns must be repointed explicitly here or
  * that delete raises an FK violation.
  *
+ * Ordering around the delete is load-bearing:
+ *
+ *   - `moveAuthAccounts` runs BEFORE it, because `accounts.userId` cascades and
+ *     the rows would be gone by the time we could repoint them.
+ *   - `survivorPatch` runs AFTER it, because `users.email` is UNIQUE NOT NULL.
+ *     Writing the deleted account's email onto the survivor while both rows
+ *     still exist violates that constraint and aborts the transaction.
+ *
  * Callers are responsible for authorization and for audit logging.
  */
 export async function mergeUserRecords(
@@ -72,6 +106,32 @@ export async function mergeUserRecords(
     opts: MergeUserRecordsOptions
 ): Promise<void> {
     await db.transaction(async (tx) => {
+        // better-auth logins. Must happen before the delete below, which would
+        // otherwise cascade these rows away. Drop any old row whose provider the
+        // survivor already has -- better-auth resolves a sign-in by
+        // (providerId, accountId), so two rows for the same provider on one user
+        // is at best redundant and at worst ambiguous.
+        if (opts.moveAuthAccounts) {
+            await tx
+                .delete(accounts)
+                .where(
+                    and(
+                        eq(accounts.userId, oldUserId),
+                        inArray(
+                            accounts.providerId,
+                            tx
+                                .select({ providerId: accounts.providerId })
+                                .from(accounts)
+                                .where(eq(accounts.userId, newUserId))
+                        )
+                    )
+                )
+            await tx
+                .update(accounts)
+                .set({ userId: newUserId, updatedAt: new Date() })
+                .where(eq(accounts.userId, oldUserId))
+        }
+
         if (opts.copyIdentity) {
             const [oldUser] = await tx
                 .select({ old_id: users.old_id, picture: users.picture })
@@ -575,5 +635,15 @@ export async function mergeUserRecords(
         // user_unavailability, season_refs, match_referees, and any remaining
         // user_roles rows for the old id cascade automatically.
         await tx.delete(users).where(eq(users.id, oldUserId))
+
+        // Compose the surviving record. Only legal now that the deleted row is
+        // gone: `email` is unique, so the survivor could not have taken the
+        // deleted account's address a moment ago.
+        if (opts.survivorPatch && Object.keys(opts.survivorPatch).length > 0) {
+            await tx
+                .update(users)
+                .set({ ...opts.survivorPatch, updatedAt: new Date() })
+                .where(eq(users.id, newUserId))
+        }
     })
 }
