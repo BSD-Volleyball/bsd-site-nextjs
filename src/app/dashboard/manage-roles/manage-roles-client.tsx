@@ -44,7 +44,8 @@ const ALL_ROLES: { value: Role; label: string; seasonal: boolean }[] = [
         value: "referee_coordinator",
         label: "Referee Coordinator",
         seasonal: true
-    }
+    },
+    { value: "leadership_group", label: "Leadership Group", seasonal: false }
 ]
 
 const ROLE_BADGE_COLORS: Record<string, string> = {
@@ -54,7 +55,8 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
     court_manager: "bg-purple-100 text-purple-800",
     ombudsman: "bg-yellow-100 text-yellow-800",
     referee: "bg-orange-100 text-orange-800",
-    referee_coordinator: "bg-teal-100 text-teal-800"
+    referee_coordinator: "bg-teal-100 text-teal-800",
+    leadership_group: "bg-indigo-100 text-indigo-800"
 }
 
 interface ManageRolesClientProps {

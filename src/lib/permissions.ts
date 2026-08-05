@@ -12,6 +12,7 @@ export type Role =
     | "ombudsman"
     | "referee"
     | "referee_coordinator"
+    | "leadership_group"
 
 export type Permission =
     // Season lifecycle
@@ -131,7 +132,11 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
         "schedule:manage",
         "scores:enter",
         "player:lookup"
-    ]
+    ],
+
+    // Global designation for league leadership volunteers; grants no
+    // permissions — used for display and email targeting only.
+    leadership_group: []
 }
 
 const VALID_ROLES = new Set<string>(Object.keys(ROLE_PERMISSIONS))

@@ -39,6 +39,7 @@ export type RecipientGroupType =
     | "season_commissioners"
     | "all_refs"
     | "season_refs"
+    | "leadership_group"
 
 export interface Recipient {
     email: string
@@ -151,6 +152,8 @@ export async function getRecipientsForGroup(
             return group.season_id
                 ? getSeasonRefRecipients(group.season_id)
                 : []
+        case "leadership_group":
+            return getLeadershipGroupRecipients()
         default:
             return []
     }
@@ -436,6 +439,28 @@ async function getSeasonCommissionerRecipients(
                 eq(userRoles.role, "commissioner"),
                 eq(userRoles.season_id, seasonId)
             )
+        )
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
+    )
+}
+
+/**
+ * Leadership Group: everyone with the global leadership_group role, plus all
+ * admins ("director" is a legacy spelling still present in user_roles data).
+ */
+async function getLeadershipGroupRecipients(): Promise<Recipient[]> {
+    const rows = await db
+        .selectDistinct({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(
+            inArray(userRoles.role, ["leadership_group", "admin", "director"])
         )
     return deduplicateRecipients(
         rows.map(toRecipient).filter(Boolean) as Recipient[]

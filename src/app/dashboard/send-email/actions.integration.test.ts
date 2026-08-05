@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { emailBroadcasts, seasonRefs } from "@/database/schema"
+import { emailBroadcasts, seasonRefs, userRoles } from "@/database/schema"
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import { normalizeEmailTemplateContent } from "@/lib/email-template-content"
 import { sendBroadcastEmails } from "@/lib/postmark"
@@ -338,6 +338,69 @@ describe("createAndSendBroadcast", () => {
         expect(result.status).toBe(true)
         const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
         expect(call.recipients).toEqual([{ email: ref.email }])
+    })
+
+    it("sends leadership_group to leadership members plus all admins", async () => {
+        await createSeason()
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        const leader = await createUser()
+        const legacyDirector = await createUser()
+        await createUser() // bystander with no roles
+
+        await db.insert(userRoles).values([
+            { user_id: leader.id, role: "leadership_group" },
+            // Legacy spelling still present in prod user_roles data.
+            { user_id: legacyDirector.id, role: "director" }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "leadership_group",
+            subject: "Leadership meeting",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients.map((r) => r.email).sort()).toEqual(
+            [admin.email, leader.email, legacyDirector.email].sort()
+        )
+    })
+
+    it("counts a user who is both admin and leadership once", async () => {
+        await createSeason()
+        const admin = await createUserWithRoles([
+            { role: "admin" },
+            { role: "leadership_group" }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "leadership_group",
+            subject: "Leadership meeting",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: admin.email }])
+    })
+
+    it("blocks commissioners from sending to the leadership group", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "leadership_group",
+            subject: "Leadership meeting",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result).toMatchObject({
+            status: false,
+            message: "Unauthorized: only admins can send league-wide emails."
+        })
+        expect(sendBroadcastEmails).not.toHaveBeenCalled()
     })
 
     it("blocks commissioners from sending to either ref group", async () => {

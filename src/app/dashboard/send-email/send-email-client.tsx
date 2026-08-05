@@ -75,6 +75,7 @@ function sendToLabel(
         return "Current Season Commissioners"
     if (groupType === "all_refs") return "All Refs (All Time)"
     if (groupType === "season_refs") return "Current Season Refs"
+    if (groupType === "leadership_group") return "Leadership Group"
     if (groupType === "season_division") {
         const div = divisions.find((d) => d.id === divisionId)
         return div ? `Division: ${div.name}` : "Division"
@@ -103,6 +104,8 @@ function sendToTypeFromGroupType(groupType: string | null): SendToType | null {
             return "all_refs"
         case "season_refs":
             return "season_refs"
+        case "leadership_group":
+            return "leadership_group"
         case "season_division":
             return "division"
         case "season_team":
@@ -329,6 +332,9 @@ export function SendEmailClient({
                                             </SelectItem>
                                             <SelectItem value="all_refs">
                                                 All Refs (All Time)
+                                            </SelectItem>
+                                            <SelectItem value="leadership_group">
+                                                Leadership Group (incl. Admins)
                                             </SelectItem>
                                         </>
                                     )}

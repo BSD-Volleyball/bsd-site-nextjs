@@ -124,6 +124,7 @@ export type SendToType =
     | "season_commissioners"
     | "all_refs"
     | "season_refs"
+    | "leadership_group"
 
 /** Recipient selections that reach beyond a single division or team. */
 const LEAGUE_WIDE_SEND_TYPES: SendToType[] = [
@@ -132,7 +133,8 @@ const LEAGUE_WIDE_SEND_TYPES: SendToType[] = [
     "season_captains",
     "season_commissioners",
     "all_refs",
-    "season_refs"
+    "season_refs",
+    "leadership_group"
 ]
 
 // ---------------------------------------------------------------------------
@@ -336,6 +338,18 @@ async function resolveGroup(
         return {
             groupId,
             groupName: "All Refs (All Time)",
+            stream: STREAM_BROADCAST
+        }
+    }
+
+    // Not season-bound: the global leadership_group role plus all admins.
+    if (sendToType === "leadership_group") {
+        const groupId = await ensureRecipientGroup("leadership_group", {
+            name: "Leadership Group"
+        })
+        return {
+            groupId,
+            groupName: "Leadership Group",
             stream: STREAM_BROADCAST
         }
     }
