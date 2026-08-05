@@ -3,7 +3,18 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle
+} from "@/components/ui/alert-dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { isDestructiveConfirmation } from "@/lib/confirm-destructive"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -119,6 +130,7 @@ export function TournamentConfigForm({
 }: Props) {
     const router = useRouter()
     const [saving, setSaving] = useState(false)
+    const [pendingDeletion, setPendingDeletion] = useState<string | null>(null)
 
     const [code, setCode] = useState(initialData.code)
     const [name, setName] = useState(initialData.name)
@@ -240,7 +252,7 @@ export function TournamentConfigForm({
         }))
     }
 
-    async function handleSave() {
+    async function handleSave(confirmDeletions = false) {
         if (!code.trim() || !name.trim() || !tournamentDate) {
             toast.error("Code, name, and tournament date are required.")
             return
@@ -250,12 +262,21 @@ export function TournamentConfigForm({
             const result = await saveTournamentConfig(
                 initialData.tournamentId,
                 buildMetadata(),
-                buildDivisions()
+                buildDivisions(),
+                { confirmDeletions }
             )
             if (!result.status) {
+                // A removal that would cascade is refused once, with a message
+                // naming what would be lost. Surface it as a decision rather
+                // than a dead end.
+                if (isDestructiveConfirmation(result.message)) {
+                    setPendingDeletion(result.message)
+                    return
+                }
                 toast.error(result.message)
                 return
             }
+            setPendingDeletion(null)
             toast.success("Tournament configuration saved.")
             router.refresh()
         } finally {
@@ -648,10 +669,38 @@ export function TournamentConfigForm({
             </Card>
 
             <div className="flex justify-end gap-2">
-                <Button type="button" onClick={handleSave} disabled={saving}>
+                <Button
+                    type="button"
+                    onClick={() => handleSave()}
+                    disabled={saving}
+                >
                     {saving ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
+
+            <AlertDialog
+                open={pendingDeletion !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPendingDeletion(null)
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Remove this division and its bracket?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingDeletion} This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleSave(true)}>
+                            Remove anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

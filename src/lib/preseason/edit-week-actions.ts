@@ -551,6 +551,20 @@ export async function sendEditWeekRosterNotifications(
 
     const sent = removalResult.sent + assignmentResult.sent
     const skipped = removalResult.skipped + assignmentResult.skipped
+
+    // Mass mail to players is attributable everywhere else (send-email logs
+    // email_broadcast); this path should be no different.
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (session?.user) {
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "send_roster_notifications",
+            entityType: `week${actionConfig.week}_rosters`,
+            entityId: config.seasonId ?? undefined,
+            summary: `Sent ${weekLabel} roster emails for ${seasonLabel}: ${assignmentRecipients.length} assignment, ${removalRecipients.length} removal (${sent} sent, ${skipped} skipped)`
+        })
+    }
+
     return ok(
         undefined,
         `${sent} notification(s) sent${skipped > 0 ? `, ${skipped} skipped (opted out or unreachable)` : ""}.`

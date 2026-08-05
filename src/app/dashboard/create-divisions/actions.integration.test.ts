@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { individual_divisions } from "@/database/schema"
+import { auditLog, individual_divisions } from "@/database/schema"
 import { createDivision, createSeason, createSignup } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { getDivisionsPageData, saveDivisionSelections } from "./actions"
@@ -141,5 +141,44 @@ describe("saveDivisionSelections", () => {
             teams: 6,
             gender_split: "4-4"
         })
+    })
+
+    // The save replaces every row for the season, so a count-only audit
+    // summary would leave a bad save with nothing to restore from.
+    it("records the full selection payload in the audit entry", async () => {
+        const season = await createSeason()
+        const divA = await createDivision({ name: "A", level: 2 })
+        const admin = await createUserWithRoles([{ role: "admin" }])
+
+        await saveDivisionSelections({
+            seasonId: season.id,
+            selections: [
+                {
+                    divisionId: divA.id,
+                    enabled: true,
+                    teams: 4,
+                    genderSplit: "5-3",
+                    coaches: true
+                }
+            ]
+        })
+
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, admin.id))
+        expect(entry.summary).toContain("1 division(s) enabled")
+        // Replayable: the exact rows that were written.
+        expect(JSON.parse(entry.summary.split("Full selections: ")[1])).toEqual(
+            [
+                {
+                    divisionId: divA.id,
+                    enabled: true,
+                    teams: 4,
+                    genderSplit: "5-3",
+                    coaches: true
+                }
+            ]
+        )
     })
 })

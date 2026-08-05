@@ -15,6 +15,7 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
+import { logAuditEntry } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { isPermanentBounceType, sendBatchEmails } from "@/lib/postmark"
 import {
@@ -624,6 +625,30 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
 // Subscription change handling
 // ---------------------------------------------------------------------------
 
+/**
+ * Record an email-status change driven by Postmark.
+ *
+ * The actor is an external system, but audit_log keys on a user, so the entry
+ * is attributed to the affected player with the origin named in the summary.
+ * Addresses with no matching account get no entry — the suppression row is the
+ * only record that exists for those.
+ */
+async function logEmailStatusChange(email: string, summary: string) {
+    const [user] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1)
+    if (!user) return
+    await logAuditEntry({
+        userId: user.id,
+        action: "update_email_status",
+        entityType: "users",
+        entityId: user.id,
+        summary
+    })
+}
+
 async function handleSubscriptionChange(
     payload: PostmarkSubscriptionChangePayload
 ) {
@@ -663,10 +688,17 @@ async function handleSubscriptionChange(
         }
 
         // Only set to 'unsubscribed' if not already at a higher-priority status
-        await db
+        const downgraded = await db
             .update(users)
             .set({ email_status: "unsubscribed" })
             .where(and(eq(users.email, email), eq(users.email_status, "valid")))
+            .returning({ id: users.id })
+        if (downgraded.length > 0) {
+            await logEmailStatusChange(
+                email,
+                `Email status set to "unsubscribed" by Postmark subscription change (stream ${streamId}, reason ${payload.SuppressionReason ?? "ManualSuppression"}, origin ${payload.Origin ?? "Recipient"})`
+            )
+        }
     } else {
         // Remove this stream's suppression
         await db
@@ -679,7 +711,13 @@ async function handleSubscriptionChange(
             )
 
         // Re-derive email_status from whatever suppressions remain
-        await recomputeEmailStatus(email)
+        const recomputed = await recomputeEmailStatus(email)
+        if (recomputed.changed) {
+            await logEmailStatusChange(
+                email,
+                `Email status set to "${recomputed.status}" after Postmark removed the ${streamId} suppression`
+            )
+        }
     }
 
     logger.info("[postmark-webhook] Subscription change", {
@@ -748,10 +786,17 @@ async function handleBounce(payload: PostmarkBouncePayload) {
     // Only hard bounces mark the address itself dead; a SpamComplaint reaching
     // this point gets its email_status from the dedicated SpamComplaint webhook.
     if (isHardBounce) {
-        await db
+        const marked = await db
             .update(users)
             .set({ email_status: "bounced" })
             .where(eq(users.email, email))
+            .returning({ id: users.id })
+        if (marked.length > 0) {
+            await logEmailStatusChange(
+                email,
+                `Email status set to "bounced" by Postmark hard bounce (stream ${streamId}, type ${payload.Type})`
+            )
+        }
     }
 
     logger.info("[postmark-webhook] Bounce", {
@@ -801,16 +846,24 @@ async function handleSpamComplaint(payload: PostmarkSpamComplaintPayload) {
     }
 
     // Spam complaint takes priority over unsubscribed but not over bounced
-    await db
+    const fromValid = await db
         .update(users)
         .set({ email_status: "spam_complaint" })
         .where(and(eq(users.email, email), eq(users.email_status, "valid")))
-    await db
+        .returning({ id: users.id })
+    const fromUnsubscribed = await db
         .update(users)
         .set({ email_status: "spam_complaint" })
         .where(
             and(eq(users.email, email), eq(users.email_status, "unsubscribed"))
         )
+        .returning({ id: users.id })
+    if (fromValid.length > 0 || fromUnsubscribed.length > 0) {
+        await logEmailStatusChange(
+            email,
+            `Email status set to "spam_complaint" by Postmark spam complaint (stream ${streamId ?? "outbound"})`
+        )
+    }
 
     logger.info("[postmark-webhook] Spam complaint", {
         maskedEmail: maskEmail(email),

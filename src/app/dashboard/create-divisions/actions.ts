@@ -337,7 +337,9 @@ export const saveDivisionSelections = withAction(
                     action: "update",
                     entityType: "individual_divisions",
                     entityId: seasonId,
-                    summary: `Saved division selections for season ${seasonId}: ${enabledSelections.length} division(s) enabled`
+                    // Replaces every row for the season, so record the
+                    // selections rather than just how many there were.
+                    summary: `Saved division selections for season ${seasonId}: ${enabledSelections.length} division(s) enabled. Full selections: ${JSON.stringify(enabledSelections)}`
                 })
             }
 

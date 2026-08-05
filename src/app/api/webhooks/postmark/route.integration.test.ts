@@ -2,7 +2,7 @@ import { NextRequest } from "next/server"
 import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { emailSuppressions, users } from "@/database/schema"
+import { auditLog, emailSuppressions, users } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import { createUser } from "@/test/session"
 import { POST } from "./route"
@@ -166,5 +166,76 @@ describe("Bounce handling", () => {
         expect(await suppressionsFor(user.email)).toHaveLength(0)
         expect(await emailStatusOf(user.id)).toBe("valid")
         expect(vi.mocked(sendBatchEmails)).not.toHaveBeenCalled()
+    })
+})
+
+// An address going quiet used to leave no attributable trace: the webhook
+// flipped users.email_status with only a logger.info. The suppression row
+// survives, but nothing said when the account itself changed state.
+describe("email status auditing", () => {
+    async function auditEntriesFor(userId: string) {
+        return db.select().from(auditLog).where(eq(auditLog.user, userId))
+    }
+
+    it("audits an unsubscribe and the later resubscribe", async () => {
+        const user = await createUser()
+        const base = {
+            RecordType: "SubscriptionChange",
+            MessageStream: "broadcast",
+            Recipient: user.email,
+            SuppressionReason: "ManualSuppression",
+            Origin: "Recipient",
+            Timestamp: "2026-07-01T12:00:00Z"
+        }
+
+        await POST(webhookRequest({ ...base, SuppressSending: true }))
+        await POST(webhookRequest({ ...base, SuppressSending: false }))
+
+        const entries = await auditEntriesFor(user.id)
+        expect(entries).toHaveLength(2)
+        expect(entries[0].action).toBe("update_email_status")
+        expect(entries[0].summary).toContain('set to "unsubscribed"')
+        expect(entries[0].summary).toContain("ManualSuppression")
+        expect(entries[1].summary).toContain('set to "valid"')
+    })
+
+    it("audits a hard bounce", async () => {
+        const user = await createUser()
+
+        await POST(
+            webhookRequest({
+                RecordType: "Bounce",
+                Type: "HardBounce",
+                TypeCode: 1,
+                MessageStream: "outbound",
+                Email: user.email,
+                BouncedAt: "2026-07-01T12:00:00Z"
+            })
+        )
+
+        const entries = await auditEntriesFor(user.id)
+        expect(entries).toHaveLength(1)
+        expect(entries[0].summary).toContain('set to "bounced"')
+        expect(entries[0].summary).toContain("HardBounce")
+    })
+
+    // Postmark retries deliveries; a redelivery that changes nothing should
+    // not accumulate audit noise.
+    it("writes nothing when the status does not move", async () => {
+        const user = await createUser()
+        const payload = {
+            RecordType: "SubscriptionChange",
+            MessageStream: "broadcast",
+            Recipient: user.email,
+            SuppressSending: true,
+            SuppressionReason: "ManualSuppression",
+            Origin: "Recipient",
+            Timestamp: "2026-07-01T12:00:00Z"
+        }
+
+        await POST(webhookRequest(payload))
+        await POST(webhookRequest(payload))
+
+        expect(await auditEntriesFor(user.id)).toHaveLength(1)
     })
 })

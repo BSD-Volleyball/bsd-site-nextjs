@@ -16,6 +16,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { site } from "@/config/site"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
+import { logAuditEntry } from "@/lib/audit-log"
 import { logger } from "@/lib/logger"
 import { syncCategoryOptouts } from "@/lib/notifications/postmark-sync"
 import { addOptout, getOptedOutTypes } from "@/lib/notifications/preferences"
@@ -49,6 +50,16 @@ async function applyOptout(
             before,
             after,
             origin: "Customer"
+        })
+        // The dashboard logs the same change; without this an opt-out is
+        // attributable when made in the UI and invisible when made from an
+        // email client's one-click link.
+        await logAuditEntry({
+            userId: user.id,
+            action: "update_notification_preferences",
+            entityType: "notification_optouts",
+            entityId: user.id,
+            summary: `Opted out of "${type}" via one-click unsubscribe`
         })
         logger.info("[unsubscribe] One-click opt-out applied", {
             userId: user.id,

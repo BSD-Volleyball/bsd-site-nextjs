@@ -257,7 +257,10 @@ export const updateWeek1Rosters = withAction(
                     userId: session.user.id,
                     action: "update",
                     entityType: "week1_rosters",
-                    summary: `Replaced week 1 rosters for season ${config.seasonId} (${filledSlots.length} slots)`
+                    // The delete above drops every week 1 row for the season,
+                    // so a count alone leaves nothing to restore from. Record
+                    // the placements themselves — this entry is replayable.
+                    summary: `Replaced week 1 rosters for season ${config.seasonId} (${filledSlots.length} slots). Full roster: ${JSON.stringify(filledSlots)}`
                 })
             }
 
@@ -406,6 +409,20 @@ export const sendWeek1RosterNotifications = withAction(
 
         const sent = removalResult.sent + assignmentResult.sent
         const skipped = removalResult.skipped + assignmentResult.skipped
+
+        // Mass mail to players is attributable everywhere else (send-email
+        // logs email_broadcast); this path should be no different.
+        const session = await auth.api.getSession({ headers: await headers() })
+        if (session?.user) {
+            await logAuditEntry({
+                userId: session.user.id,
+                action: "send_roster_notifications",
+                entityType: "week1_rosters",
+                entityId: config.seasonId ?? undefined,
+                summary: `Sent week 1 roster emails for ${seasonLabel}: ${assignmentRecipients.length} assignment, ${removalRecipients.length} removal (${sent} sent, ${skipped} skipped)`
+            })
+        }
+
         return ok(
             undefined,
             `${sent} notification(s) sent${skipped > 0 ? `, ${skipped} skipped (opted out or unreachable)` : ""}.`

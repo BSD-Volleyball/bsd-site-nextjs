@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm"
 import { NextRequest } from "next/server"
 import { beforeEach, describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { notificationOptouts } from "@/database/schema"
+import { auditLog, notificationOptouts } from "@/database/schema"
 import { createUnsubscribeToken } from "@/lib/notifications/unsubscribe-token"
 import { createUser } from "@/test/session"
 import { GET, POST } from "./route"
@@ -89,5 +89,44 @@ describe("one-click unsubscribe endpoint", () => {
             .from(notificationOptouts)
             .where(eq(notificationOptouts.user_id, user.id))
         expect(rows).toHaveLength(1)
+    })
+})
+
+// The dashboard already audits preference changes. Without this the same
+// opt-out is attributable in the UI and invisible from an email client.
+describe("one-click unsubscribe auditing", () => {
+    beforeEach(() => {
+        process.env.NOTIFICATION_UNSUB_SECRET = "test-secret"
+    })
+
+    it("audits the opt-out", async () => {
+        const user = await createUser()
+        const token = createUnsubscribeToken(user.id, "game_reminder_player")
+
+        await POST(requestWithToken(token, "POST"))
+
+        const entries = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, user.id))
+        expect(entries).toHaveLength(1)
+        expect(entries[0].action).toBe("update_notification_preferences")
+        expect(entries[0].summary).toBe(
+            'Opted out of "game_reminder_player" via one-click unsubscribe'
+        )
+    })
+
+    it("does not re-audit a repeat click", async () => {
+        const user = await createUser()
+        const token = createUnsubscribeToken(user.id, "draft_results")
+
+        await POST(requestWithToken(token, "POST"))
+        await POST(requestWithToken(token, "POST"))
+
+        const entries = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, user.id))
+        expect(entries).toHaveLength(1)
     })
 })

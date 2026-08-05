@@ -56,7 +56,9 @@ export async function getBlockedUserIds(
  * valid. Extracted from the Postmark subscription-change webhook so the
  * preference actions can share it after deleting suppressions.
  */
-export async function recomputeEmailStatus(email: string): Promise<void> {
+export async function recomputeEmailStatus(
+    email: string
+): Promise<{ status: string; changed: boolean }> {
     const lowered = email.toLowerCase()
     const remaining = await db
         .select({ reason: emailSuppressions.reason })
@@ -72,10 +74,22 @@ export async function recomputeEmailStatus(email: string): Promise<void> {
         status = "unsubscribed"
     }
 
+    // Report whether this actually moved, so callers can audit real changes
+    // rather than every webhook delivery.
+    const [before] = await db
+        .select({ status: users.email_status })
+        .from(users)
+        .where(eq(users.email, lowered))
+        .limit(1)
+    if (!before || before.status === status) {
+        return { status, changed: false }
+    }
+
     await db
         .update(users)
         .set({ email_status: status })
         .where(eq(users.email, lowered))
+    return { status, changed: true }
 }
 
 export interface SuppressionState {

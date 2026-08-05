@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
-import { divisions, tournamentDivisions, tournaments } from "@/database/schema"
-import { asc, eq } from "drizzle-orm"
+import {
+    divisions,
+    tournamentDivisions,
+    tournamentPlacements,
+    tournamentPools,
+    tournaments
+} from "@/database/schema"
+import { asc, eq, inArray } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { CONFIRM_DESTRUCTIVE_SUFFIX } from "@/lib/confirm-destructive"
 import {
     fail,
     ok,
@@ -27,6 +34,15 @@ export interface TournamentDivisionInput {
     nonMalePerTeam: number
     teamsAdvancingPerPool: number
     sortOrder: number
+}
+
+export interface SaveTournamentConfigOptions {
+    /**
+     * Permit removing a division that already has pools or recorded
+     * placements. Without it such a save is refused, because the delete
+     * cascades through pools to their matches and team assignments.
+     */
+    confirmDeletions?: boolean
 }
 
 export interface TournamentMetadataInput {
@@ -185,7 +201,8 @@ export const saveTournamentConfig = withAction(
     async (
         tournamentId: number,
         metadata: TournamentMetadataInput,
-        divisionsInput: TournamentDivisionInput[]
+        divisionsInput: TournamentDivisionInput[],
+        options: SaveTournamentConfigOptions = {}
     ): Promise<ActionResult<void>> => {
         await requireAdmin()
         const session = await requireSession()
@@ -226,6 +243,55 @@ export const saveTournamentConfig = withAction(
             }
         }
 
+        // Removing a division cascades: tournament_pools (and through them
+        // tournament_matches and tournament_pool_teams) plus
+        // tournament_placements all go with it, silently. Resolve the removals
+        // up front so a destructive save has to be intentional.
+        const existingDivisions = await db
+            .select({
+                id: tournamentDivisions.id,
+                divisionId: tournamentDivisions.division_id
+            })
+            .from(tournamentDivisions)
+            .where(eq(tournamentDivisions.tournament_id, id))
+        const keepIds = new Set(
+            divisionsInput.filter((d) => d.id).map((d) => d.id as number)
+        )
+        const removedDivisionIds = existingDivisions
+            .map((r) => r.id)
+            .filter((rid) => !keepIds.has(rid))
+
+        if (removedDivisionIds.length > 0 && !options.confirmDeletions) {
+            const [pools, placements] = await Promise.all([
+                db
+                    .select({ id: tournamentPools.id })
+                    .from(tournamentPools)
+                    .where(
+                        inArray(tournamentPools.division_id, removedDivisionIds)
+                    ),
+                db
+                    .select({ id: tournamentPlacements.id })
+                    .from(tournamentPlacements)
+                    .where(
+                        inArray(
+                            tournamentPlacements.division_id,
+                            removedDivisionIds
+                        )
+                    )
+            ])
+            if (pools.length > 0 || placements.length > 0) {
+                const parts = [
+                    pools.length > 0 &&
+                        `${pools.length} pool${pools.length === 1 ? "" : "s"} (with their matches and team assignments)`,
+                    placements.length > 0 &&
+                        `${placements.length} recorded placement${placements.length === 1 ? "" : "s"}`
+                ].filter(Boolean)
+                return fail(
+                    `Removing that division would permanently delete ${parts.join(" and ")}. ${CONFIRM_DESTRUCTIVE_SUFFIX}`
+                )
+            }
+        }
+
         await db.transaction(async (tx) => {
             await tx
                 .update(tournaments)
@@ -254,17 +320,6 @@ export const saveTournamentConfig = withAction(
                 })
                 .where(eq(tournaments.id, id))
 
-            const existing = await tx
-                .select({ id: tournamentDivisions.id })
-                .from(tournamentDivisions)
-                .where(eq(tournamentDivisions.tournament_id, id))
-            const keepIds = new Set(
-                divisionsInput.filter((d) => d.id).map((d) => d.id as number)
-            )
-            const toDelete = existing
-                .map((r) => r.id)
-                .filter((rid) => !keepIds.has(rid))
-
             for (const d of divisionsInput) {
                 if (d.id) {
                     await tx
@@ -290,7 +345,7 @@ export const saveTournamentConfig = withAction(
                     })
                 }
             }
-            for (const rid of toDelete) {
+            for (const rid of removedDivisionIds) {
                 await tx
                     .delete(tournamentDivisions)
                     .where(eq(tournamentDivisions.id, rid))

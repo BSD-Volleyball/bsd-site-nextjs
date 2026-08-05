@@ -1,6 +1,7 @@
+import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { notificationOptouts } from "@/database/schema"
+import { auditLog, notificationOptouts } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import { createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
@@ -53,5 +54,28 @@ describe("sendWeek1RosterNotifications", () => {
         expect(sentTo).toContain(assigned.email)
         expect(sentTo).toContain(removed.email)
         expect(sentTo).not.toContain(optedOut.email)
+    })
+
+    // send-email logs an email_broadcast entry for mass mail; this path is
+    // just as outward-facing and used to leave no record of who sent it.
+    it("audits the send", async () => {
+        await createSeason()
+        const assigned = await createUser()
+        const removed = await createUser()
+        const admin = await createUserWithRoles([{ role: "admin" }])
+
+        await sendWeek1RosterNotifications(
+            [{ userId: assigned.id, sessionNumber: 1, courtNumber: 2 }],
+            [removed.id],
+            "Fall 2026"
+        )
+
+        const [entry] = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, admin.id))
+        expect(entry.action).toBe("send_roster_notifications")
+        expect(entry.summary).toContain("Fall 2026")
+        expect(entry.summary).toContain("1 assignment, 1 removal")
     })
 })

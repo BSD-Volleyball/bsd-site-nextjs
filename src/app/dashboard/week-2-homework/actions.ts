@@ -4,6 +4,7 @@ import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail } from "@/lib/action-helpers"
 import { and, asc, count, eq, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
+import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
 import {
@@ -707,6 +708,16 @@ export const submitWeek2Homework = withAction(
             )
         }
 
+        // The delete above replaces this submitter's picks wholesale, so the
+        // entry records the resulting set rather than the fact of a save.
+        await logAuditEntry({
+            userId: sessionUser.id,
+            action: "submit_week2_homework",
+            entityType: "moving_day",
+            entityId: config.seasonId,
+            summary: `Submitted captain week 2 homework: ${entries.length} moving-day pick(s). Full picks: ${JSON.stringify(entries)}`
+        })
+
         return ok(undefined, "Homework submitted successfully!")
     }
 )
@@ -859,6 +870,16 @@ export const submitCoachWeek2Homework = withAction(
                 }))
             )
         }
+
+        // The delete above replaces this submitter's picks wholesale, so the
+        // entry records the resulting set rather than the fact of a save.
+        await logAuditEntry({
+            userId: sessionUser.id,
+            action: "submit_week2_homework",
+            entityType: "moving_day",
+            entityId: config.seasonId,
+            summary: `Submitted coach week 2 homework: ${entries.length} moving-day pick(s). Full picks: ${JSON.stringify(entries)}`
+        })
 
         return ok(undefined, "Homework submitted successfully!")
     }
