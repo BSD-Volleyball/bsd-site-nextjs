@@ -3,17 +3,21 @@
 import { useEffect, useState } from "react"
 import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import type {
     PlayerAnalyticsResult,
     PlayerDetails,
     PlayerDraftHistory,
+    PlayerRoleInfo,
     PlayerSignup,
     PlayerSubHistoryEntry
 } from "@/app/dashboard/player-lookup/actions"
 import {
     getPlayerAnalytics,
+    getPlayerRoles,
     getPlayerSubHistory
 } from "@/app/dashboard/player-lookup/actions"
+import { ROLE_BADGE_COLORS, roleLabel } from "@/lib/role-display"
 import { CareerStatTiles } from "@/components/analytics/career-stat-tiles"
 import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { formatHeight } from "./format-height"
@@ -119,6 +123,24 @@ export function AdminPlayerDetailPopup({
         }
     }, [open, playerId, analyticsProp])
     const analytics = analyticsProp ?? fetchedAnalytics
+
+    // Roles are always self-fetched; the action is admin-gated and returns []
+    // for other viewers, which hides the section entirely.
+    const [roles, setRoles] = useState<PlayerRoleInfo[]>([])
+    useEffect(() => {
+        if (!open || !playerId) {
+            setRoles([])
+            return
+        }
+        let cancelled = false
+        ;(async () => {
+            const result = await getPlayerRoles(playerId)
+            if (!cancelled) setRoles(result)
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [open, playerId])
 
     if (!open) return null
 
@@ -409,6 +431,52 @@ export function AdminPlayerDetailPopup({
                                 </div>
                             </div>
                         </div>
+
+                        {/* Roles (admin viewers only — empty otherwise) */}
+                        {roles.length > 0 && (
+                            <div>
+                                <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                                    Roles
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {roles.map((r) => (
+                                        <div
+                                            key={r.id}
+                                            className="flex items-center gap-2 rounded-md border px-3 py-1.5"
+                                        >
+                                            <span
+                                                className={`rounded-full px-2 py-0.5 font-medium text-xs ${ROLE_BADGE_COLORS[r.role] ?? "bg-gray-100 text-gray-800"}`}
+                                            >
+                                                {roleLabel(r.role)}
+                                            </span>
+                                            {r.season_label && (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs"
+                                                >
+                                                    {r.season_label}
+                                                </Badge>
+                                            )}
+                                            {r.division_label ? (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-xs"
+                                                >
+                                                    {r.division_label}
+                                                </Badge>
+                                            ) : r.season_id !== null ? (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-muted-foreground text-xs"
+                                                >
+                                                    league-wide
+                                                </Badge>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Page-specific actions */}
                         {children}

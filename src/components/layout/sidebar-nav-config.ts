@@ -142,6 +142,11 @@ export const adminNavItems: NavItem[] = [
         icon: RiGroupLine
     },
     {
+        title: "View Roles",
+        url: "/dashboard/view-roles",
+        icon: RiUserSettingsLine
+    },
+    {
         title: "Send Email",
         url: "/dashboard/send-email",
         icon: RiMailLine

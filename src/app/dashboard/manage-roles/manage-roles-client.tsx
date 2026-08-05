@@ -32,32 +32,10 @@ import {
     removeUserRole
 } from "./actions"
 import type { Role } from "@/lib/permissions"
-
-const ALL_ROLES: { value: Role; label: string; seasonal: boolean }[] = [
-    { value: "admin", label: "Admin", seasonal: false },
-    { value: "commissioner", label: "Commissioner", seasonal: true },
-    { value: "captain", label: "Captain", seasonal: true },
-    { value: "court_manager", label: "Court Manager", seasonal: true },
-    { value: "ombudsman", label: "Ombudsman", seasonal: true },
-    { value: "referee", label: "Referee", seasonal: true },
-    {
-        value: "referee_coordinator",
-        label: "Referee Coordinator",
-        seasonal: true
-    },
-    { value: "leadership_group", label: "Leadership Group", seasonal: false }
-]
-
-const ROLE_BADGE_COLORS: Record<string, string> = {
-    admin: "bg-red-100 text-red-800",
-    commissioner: "bg-blue-100 text-blue-800",
-    captain: "bg-green-100 text-green-800",
-    court_manager: "bg-purple-100 text-purple-800",
-    ombudsman: "bg-yellow-100 text-yellow-800",
-    referee: "bg-orange-100 text-orange-800",
-    referee_coordinator: "bg-teal-100 text-teal-800",
-    leadership_group: "bg-indigo-100 text-indigo-800"
-}
+import {
+    ROLE_BADGE_COLORS,
+    ROLE_OPTIONS as ALL_ROLES
+} from "@/lib/role-display"
 
 interface ManageRolesClientProps {
     seasons: SeasonOption[]

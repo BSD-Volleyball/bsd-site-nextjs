@@ -12,7 +12,9 @@ import {
     seasonEvents,
     substitutions,
     matchSubstitutions,
-    matches
+    matches,
+    userRoles,
+    divisions
 } from "@/database/schema"
 import { eq, desc, ne } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
@@ -310,6 +312,59 @@ export const getPlayerDetails = withAction(
         })
     }
 )
+
+export interface PlayerRoleInfo {
+    id: number
+    role: string
+    season_id: number | null
+    season_label: string | null
+    division_label: string | null
+}
+
+/**
+ * Returns this player's role assignments with season/division scope labels.
+ * Admin-only: the popup hides its Roles section when this comes back empty,
+ * so commissioners viewing player details simply never see role data.
+ */
+export async function getPlayerRoles(
+    userId: string
+): Promise<PlayerRoleInfo[]> {
+    if (!(await isAdminOrDirectorBySession())) return []
+    if (typeof userId !== "string" || !userId) return []
+
+    const rows = await db
+        .select({
+            id: userRoles.id,
+            role: userRoles.role,
+            season_id: userRoles.season_id,
+            season_code: seasons.code,
+            season_year: seasons.year,
+            season_season: seasons.season,
+            division_name: divisions.name
+        })
+        .from(userRoles)
+        .leftJoin(seasons, eq(userRoles.season_id, seasons.id))
+        .leftJoin(divisions, eq(userRoles.division_id, divisions.id))
+        .where(eq(userRoles.user_id, userId))
+
+    return rows
+        .map((r) => ({
+            id: r.id,
+            role: r.role,
+            season_id: r.season_id,
+            season_label: r.season_code
+                ? `${r.season_code} ${r.season_year} ${r.season_season}`
+                : null,
+            division_label: r.division_name ?? null
+        }))
+        .sort(
+            (a, b) =>
+                (a.season_id === null ? 0 : 1) -
+                    (b.season_id === null ? 0 : 1) ||
+                a.role.localeCompare(b.role) ||
+                (b.season_id ?? 0) - (a.season_id ?? 0)
+        )
+}
 
 /**
  * Returns this player's substitution history — both permanent (substitutions)

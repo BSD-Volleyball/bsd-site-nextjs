@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { drafts } from "@/database/schema"
+import { drafts, userRoles } from "@/database/schema"
 import {
     createDivision,
     createMatch,
@@ -8,7 +8,7 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import { getPlayerAnalytics } from "./actions"
+import { getPlayerAnalytics, getPlayerRoles } from "./actions"
 
 // One recorded match: the target player's team sweeps 2-0, so career stats
 // should read 1-0 in matches, 2-0 in sets, and the player should pick up an
@@ -99,5 +99,59 @@ describe("getPlayerAnalytics", () => {
         const result = await getPlayerAnalytics(player.id)
 
         expect(result.status).toBe(false)
+    })
+})
+
+describe("getPlayerRoles", () => {
+    it("returns role assignments with scope labels, global roles first", async () => {
+        const season = await createSeason({ code: "F26" })
+        await createUserWithRoles([{ role: "admin" }])
+        const player = await createUser()
+        await db.insert(userRoles).values([
+            {
+                user_id: player.id,
+                role: "commissioner",
+                season_id: season.id
+            },
+            { user_id: player.id, role: "leadership_group" }
+        ])
+
+        const roles = await getPlayerRoles(player.id)
+
+        expect(roles).toHaveLength(2)
+        expect(roles[0]).toMatchObject({
+            role: "leadership_group",
+            season_id: null,
+            season_label: null,
+            division_label: null
+        })
+        expect(roles[1]).toMatchObject({
+            role: "commissioner",
+            season_id: season.id,
+            season_label: "F26 2026 fall"
+        })
+    })
+
+    it("returns [] for commissioners (admin-only data)", async () => {
+        const season = await createSeason()
+        const player = await createUser()
+        await db
+            .insert(userRoles)
+            .values([{ user_id: player.id, role: "leadership_group" }])
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        expect(await getPlayerRoles(player.id)).toEqual([])
+    })
+
+    it("returns [] for unauthenticated callers", async () => {
+        const player = await createUser()
+        await db
+            .insert(userRoles)
+            .values([{ user_id: player.id, role: "leadership_group" }])
+        logout()
+
+        expect(await getPlayerRoles(player.id)).toEqual([])
     })
 })
