@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic"
 export default async function SendEmailPage() {
     await requireAdminOrCommissionerOrRedirect()
 
-    const [{ canSendToAll, divisions, teams, templates }, history] =
+    const [{ canSendToAll, divisions, teams, templates, tryouts }, history] =
         await Promise.all([getEmailFormData(), getBroadcastHistory()])
 
     return (
@@ -23,6 +23,7 @@ export default async function SendEmailPage() {
                 divisions={divisions}
                 teams={teams}
                 templates={templates}
+                tryouts={tryouts}
                 history={history}
             />
         </div>

@@ -1322,6 +1322,11 @@ export const emailRecipientGroups = pgTable(
         team_id: integer("team_id").references(() => teams.id, {
             onDelete: "set null"
         }),
+        // Scopes a group to a single season event (currently only used to
+        // target one tryout night's volunteers).
+        event_id: integer("event_id").references(() => seasonEvents.id, {
+            onDelete: "set null"
+        }),
         created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
@@ -1331,7 +1336,8 @@ export const emailRecipientGroups = pgTable(
             table.group_type,
             table.season_id,
             table.division_id,
-            table.team_id
+            table.team_id,
+            table.event_id
         ),
         recipientGroupSeasonIdx: index("email_recipient_groups_season_idx").on(
             table.season_id

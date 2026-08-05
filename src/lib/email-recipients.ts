@@ -16,7 +16,9 @@ import {
     seasons,
     emailRecipientGroups,
     userRoles,
-    seasonRefs
+    seasonRefs,
+    tryoutVolunteerAssignments,
+    tryoutVolunteerJobs
 } from "@/database/schema"
 import { eq, and, inArray, isNotNull, isNull } from "drizzle-orm"
 import { isLegacyEmail } from "@/lib/legacy-matching"
@@ -41,6 +43,13 @@ export type RecipientGroupType =
     | "season_refs"
     | "season_ref_interest"
     | "season_tryout_help"
+    // Volunteers actually assigned to a job — every tryout night this season.
+    | "season_tryout_volunteers"
+    // Volunteers assigned to a job on one specific tryout night; requires
+    // event_id. A separate type from the season-wide one so that an event
+    // deleted out from under the group (event_id → NULL) resolves to nobody
+    // rather than silently widening to every night.
+    | "season_tryout_volunteers_event"
     | "leadership_group"
 
 export interface Recipient {
@@ -55,6 +64,7 @@ interface EnsureGroupOptions {
     seasonId?: number
     divisionId?: number
     teamId?: number
+    eventId?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +78,7 @@ export async function ensureRecipientGroup(
     const seasonId = opts.seasonId ?? null
     const divisionId = opts.divisionId ?? null
     const teamId = opts.teamId ?? null
+    const eventId = opts.eventId ?? null
 
     // Check if group already exists. Null scope columns must be matched with
     // IS NULL — `col = NULL` is never true, so season-less groups (all_users,
@@ -86,7 +97,10 @@ export async function ensureRecipientGroup(
                     : isNull(emailRecipientGroups.division_id),
                 teamId
                     ? eq(emailRecipientGroups.team_id, teamId)
-                    : isNull(emailRecipientGroups.team_id)
+                    : isNull(emailRecipientGroups.team_id),
+                eventId
+                    ? eq(emailRecipientGroups.event_id, eventId)
+                    : isNull(emailRecipientGroups.event_id)
             )
         )
         .orderBy(emailRecipientGroups.id)
@@ -103,7 +117,8 @@ export async function ensureRecipientGroup(
             group_type: type,
             season_id: seasonId,
             division_id: divisionId,
-            team_id: teamId
+            team_id: teamId,
+            event_id: eventId
         })
         .returning({ id: emailRecipientGroups.id })
 
@@ -167,6 +182,14 @@ export async function getRecipientsForGroup(
                       group.season_id,
                       signups.tryout_help
                   )
+                : []
+        case "season_tryout_volunteers":
+            return group.season_id
+                ? getTryoutVolunteerRecipients(group.season_id)
+                : []
+        case "season_tryout_volunteers_event":
+            return group.season_id && group.event_id
+                ? getTryoutVolunteerRecipients(group.season_id, group.event_id)
                 : []
         case "leadership_group":
             return getLeadershipGroupRecipients()
@@ -549,6 +572,43 @@ async function getSignupVolunteerRecipients(
         .from(signups)
         .innerJoin(users, eq(signups.player, users.id))
         .where(and(eq(signups.season, seasonId), eq(flag, true)))
+    return deduplicateRecipients(
+        rows.map(toRecipient).filter(Boolean) as Recipient[]
+    )
+}
+
+/**
+ * Volunteers actually holding a tryout job — not everyone who offered to
+ * help (that's season_tryout_help) and not everyone carrying the
+ * tryout_volunteer role. Only people with a row in
+ * tryout_volunteer_assignments. Pass eventId to narrow to one tryout night;
+ * omit it for every night in the season.
+ */
+async function getTryoutVolunteerRecipients(
+    seasonId: number,
+    eventId?: number
+): Promise<Recipient[]> {
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            first_name: users.first_name,
+            last_name: users.last_name
+        })
+        .from(tryoutVolunteerAssignments)
+        .innerJoin(
+            tryoutVolunteerJobs,
+            eq(tryoutVolunteerJobs.id, tryoutVolunteerAssignments.job_id)
+        )
+        .innerJoin(users, eq(users.id, tryoutVolunteerAssignments.user_id))
+        .where(
+            and(
+                eq(tryoutVolunteerJobs.season_id, seasonId),
+                eventId ? eq(tryoutVolunteerJobs.event_id, eventId) : undefined
+            )
+        )
+    // A volunteer working several jobs (or several sessions of one job)
+    // appears once per assignment; dedupe to one email.
     return deduplicateRecipients(
         rows.map(toRecipient).filter(Boolean) as Recipient[]
     )

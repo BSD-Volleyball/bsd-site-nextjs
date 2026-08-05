@@ -8,9 +8,10 @@ import {
     users,
     teams,
     divisions,
-    seasons
+    seasons,
+    seasonEvents
 } from "@/database/schema"
-import { eq, desc } from "drizzle-orm"
+import { and, asc, eq, desc } from "drizzle-orm"
 import { withAction, requireSession, ok, fail } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -34,7 +35,7 @@ import {
     resolveSubjectVariables,
     resolveTemplateVariablesInContent
 } from "@/lib/email-template-variables"
-import { formatSeasonLabel } from "@/lib/season-utils"
+import { formatSeasonLabel, getEventsByType } from "@/lib/season-utils"
 import type { SeasonConfig } from "@/lib/season-types"
 import {
     sendBroadcastEmails,
@@ -95,6 +96,13 @@ export interface TemplateOption {
     content: LexicalEmailTemplateContent
 }
 
+export interface TryoutOption {
+    id: number
+    /** 1-based position of this tryout night within the season. */
+    ordinal: number
+    eventDate: string
+}
+
 export interface BroadcastHistoryItem {
     id: number
     subject: string
@@ -103,6 +111,7 @@ export interface BroadcastHistoryItem {
     groupType: string | null
     divisionId: number | null
     teamId: number | null
+    eventId: number | null
     streamId: string | null
     lexicalContent: LexicalEmailTemplateContent
     sentByName: string
@@ -126,6 +135,7 @@ export type SendToType =
     | "season_refs"
     | "season_ref_interest"
     | "season_tryout_help"
+    | "season_tryout_volunteers"
     | "leadership_group"
 
 /** Recipient selections that reach beyond a single division or team. */
@@ -138,6 +148,7 @@ const LEAGUE_WIDE_SEND_TYPES: SendToType[] = [
     "season_refs",
     "season_ref_interest",
     "season_tryout_help",
+    "season_tryout_volunteers",
     "leadership_group"
 ]
 
@@ -155,12 +166,19 @@ export async function getEmailFormData(): Promise<{
     divisions: DivisionOption[]
     teams: TeamOption[]
     templates: TemplateOption[]
+    tryouts: TryoutOption[]
 }> {
     const isAdmin = await isAdminOrDirectorBySession()
     const isCommissioner = await isCommissionerBySession()
 
     if (!isAdmin && !isCommissioner) {
-        return { canSendToAll: false, divisions: [], teams: [], templates: [] }
+        return {
+            canSendToAll: false,
+            divisions: [],
+            teams: [],
+            templates: [],
+            tryouts: []
+        }
     }
 
     const config = await getSeasonConfig()
@@ -232,11 +250,23 @@ export async function getEmailFormData(): Promise<{
         content: normalizeEmailTemplateContent(t.content)
     }))
 
+    // Tryout nights, for the volunteer recipient sub-picker. Read from the
+    // season config rather than a fresh query so the ordering matches every
+    // other "Tryout N" label in the app.
+    const tryouts: TryoutOption[] = getEventsByType(config, "tryout").map(
+        (event, index) => ({
+            id: event.id,
+            ordinal: index + 1,
+            eventDate: event.eventDate
+        })
+    )
+
     return {
         canSendToAll: isAdmin,
         divisions: divisionRows,
         teams: teamRows,
-        templates
+        templates,
+        tryouts
     }
 }
 
@@ -258,6 +288,7 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
             groupType: emailRecipientGroups.group_type,
             divisionId: emailRecipientGroups.division_id,
             teamId: emailRecipientGroups.team_id,
+            eventId: emailRecipientGroups.event_id,
             streamId: emailBroadcasts.stream_id,
             lexicalContent: emailBroadcasts.lexical_content,
             recipientTotal: emailBroadcasts.recipient_total,
@@ -286,6 +317,7 @@ export async function getBroadcastHistory(): Promise<BroadcastHistoryItem[]> {
         groupType: r.groupType ?? null,
         divisionId: r.divisionId ?? null,
         teamId: r.teamId ?? null,
+        eventId: r.eventId ?? null,
         streamId: r.streamId,
         lexicalContent: normalizeEmailTemplateContent(r.lexicalContent),
         sentByName: formatDisplayName(
@@ -309,6 +341,8 @@ export interface SendBroadcastInput {
     sendToType: SendToType
     divisionId?: number
     teamId?: number
+    /** For season_tryout_volunteers: one tryout night, or omitted for all. */
+    tryoutEventId?: number
     subject: string
     lexicalContent: LexicalEmailTemplateContent
 }
@@ -318,7 +352,8 @@ async function resolveGroup(
     sendToType: SendToType,
     seasonId: number | null,
     divisionId?: number,
-    teamId?: number
+    teamId?: number,
+    tryoutEventId?: number
 ): Promise<{ groupId: number; groupName: string; stream: BroadcastStream }> {
     // A shared bookkeeping group so test sends appear in broadcast history;
     // recipients for it come from the caller's session, never from the group.
@@ -434,6 +469,45 @@ async function resolveGroup(
             seasonId,
             name
         })
+        return { groupId, groupName: name, stream: STREAM_IN_SEASON_UPDATES }
+    }
+
+    // People holding an actual job, not everyone who volunteered.
+    if (sendToType === "season_tryout_volunteers") {
+        if (!tryoutEventId) {
+            const name = `${seasonLabel} – Tryout Volunteers (All Tryouts)`
+            const groupId = await ensureRecipientGroup(
+                "season_tryout_volunteers",
+                { seasonId, name }
+            )
+            return {
+                groupId,
+                groupName: name,
+                stream: STREAM_IN_SEASON_UPDATES
+            }
+        }
+
+        const tryoutEvents = await db
+            .select({ id: seasonEvents.id })
+            .from(seasonEvents)
+            .where(
+                and(
+                    eq(seasonEvents.season_id, seasonId),
+                    eq(seasonEvents.event_type, "tryout")
+                )
+            )
+            .orderBy(asc(seasonEvents.sort_order), asc(seasonEvents.id))
+
+        const ordinal = tryoutEvents.findIndex((e) => e.id === tryoutEventId)
+        if (ordinal < 0) {
+            throw new Error("Tryout date not found in the current season.")
+        }
+
+        const name = `${seasonLabel} – Tryout ${ordinal + 1} Volunteers`
+        const groupId = await ensureRecipientGroup(
+            "season_tryout_volunteers_event",
+            { seasonId, eventId: tryoutEventId, name }
+        )
         return { groupId, groupName: name, stream: STREAM_IN_SEASON_UPDATES }
     }
 
@@ -563,7 +637,7 @@ export const createAndSendBroadcast = withAction(
         const isCommissioner = await isCommissionerBySession()
         if (!isAdmin && !isCommissioner) return fail("Unauthorized.")
 
-        const { sendToType, divisionId, teamId, subject } = input
+        const { sendToType, divisionId, teamId, tryoutEventId, subject } = input
 
         // Checked against the stripped subject so "[BSD]" alone is not a subject.
         if (!stripEmailSubjectPrefix(subject))
@@ -593,7 +667,8 @@ export const createAndSendBroadcast = withAction(
                 sendToType,
                 config.seasonId ?? null,
                 divisionId,
-                teamId
+                teamId,
+                tryoutEventId
             )
         } catch (err) {
             return fail(
@@ -725,7 +800,7 @@ export const previewBroadcast = withAction(
         const isCommissioner = await isCommissionerBySession()
         if (!isAdmin && !isCommissioner) return fail("Unauthorized.")
 
-        const { sendToType, divisionId, teamId, subject } = input
+        const { sendToType, divisionId, teamId, tryoutEventId, subject } = input
 
         // Checked against the stripped subject so "[BSD]" alone is not a subject.
         if (!stripEmailSubjectPrefix(subject))
@@ -755,7 +830,8 @@ export const previewBroadcast = withAction(
                 sendToType,
                 config.seasonId ?? null,
                 divisionId,
-                teamId
+                teamId,
+                tryoutEventId
             )
         } catch (err) {
             return fail(

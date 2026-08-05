@@ -1,6 +1,14 @@
+import { inArray } from "drizzle-orm"
 import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { emailBroadcasts, seasonRefs, userRoles } from "@/database/schema"
+import {
+    emailBroadcasts,
+    emailRecipientGroups,
+    seasonRefs,
+    tryoutVolunteerAssignments,
+    tryoutVolunteerJobs,
+    userRoles
+} from "@/database/schema"
 import type { LexicalEmailTemplateContent } from "@/lib/email-template-content"
 import { normalizeEmailTemplateContent } from "@/lib/email-template-content"
 import { sendBroadcastEmails } from "@/lib/postmark"
@@ -642,5 +650,253 @@ describe("previewBroadcast", () => {
             status: false,
             message: "Not authenticated."
         })
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Tryout volunteers — people actually assigned to a job, not everyone who
+// offered to help and not everyone holding the tryout_volunteer role.
+// ---------------------------------------------------------------------------
+
+describe("createAndSendBroadcast — tryout volunteers", () => {
+    /**
+     * Two tryout nights, each with one whole-night job. Returns the jobs so
+     * tests can assign whoever they need.
+     */
+    async function seedTryoutJobs() {
+        const season = await createSeason()
+        const nightOne = await createSeasonEvent(season.id, {
+            sort_order: 0,
+            event_date: "2026-09-10"
+        })
+        const nightTwo = await createSeasonEvent(season.id, {
+            sort_order: 1,
+            event_date: "2026-09-17"
+        })
+
+        const [jobOne] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: nightOne.id,
+                name: "Check-in Table",
+                needed: 2,
+                scope: "whole_night",
+                sort_order: 0
+            })
+            .returning()
+        const [jobTwo] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: nightTwo.id,
+                name: "Scorekeeper",
+                needed: 2,
+                scope: "whole_night",
+                sort_order: 0
+            })
+            .returning()
+
+        return { season, nightOne, nightTwo, jobOne, jobTwo }
+    }
+
+    async function assign(jobId: number, userId: string) {
+        await db.insert(tryoutVolunteerAssignments).values({
+            job_id: jobId,
+            time_slot_id: null,
+            user_id: userId
+        })
+    }
+
+    it("sends to everyone assigned on any night when no tryout is picked", async () => {
+        const { jobOne, jobTwo } = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const one = await createUser()
+        const two = await createUser()
+        await assign(jobOne.id, one.id)
+        await assign(jobTwo.id, two.id)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "Thanks for volunteering",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(new Set(call.recipients.map((r) => r.email))).toEqual(
+            new Set([one.email, two.email])
+        )
+    })
+
+    it("narrows to a single tryout night when one is picked", async () => {
+        const { nightTwo, jobOne, jobTwo } = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const nightOneVolunteer = await createUser()
+        const nightTwoVolunteer = await createUser()
+        await assign(jobOne.id, nightOneVolunteer.id)
+        await assign(jobTwo.id, nightTwoVolunteer.id)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            tryoutEventId: nightTwo.id,
+            subject: "See you tomorrow",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: nightTwoVolunteer.email }])
+    })
+
+    it("excludes people who only offered to help or only hold the role", async () => {
+        const { season, jobOne } = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const assigned = await createUser()
+        await assign(jobOne.id, assigned.id)
+
+        // Offered on their signup but never given a job.
+        const willing = await createUser()
+        await createSignup({
+            season: season.id,
+            player: willing.id,
+            tryout_help: true
+        })
+        // Holds the role but was never assigned.
+        const roleOnly = await createUser()
+        await db.insert(userRoles).values({
+            user_id: roleOnly.id,
+            role: "tryout_volunteer",
+            season_id: season.id
+        })
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "Job details",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: assigned.email }])
+    })
+
+    it("sends one copy to a volunteer working several jobs", async () => {
+        const { jobOne, jobTwo } = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const busy = await createUser()
+        await assign(jobOne.id, busy.id)
+        await assign(jobTwo.id, busy.id)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "Your jobs",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: busy.email }])
+    })
+
+    it("ignores volunteers assigned in a previous season", async () => {
+        const previous = await seedTryoutJobs()
+        const pastVolunteer = await createUser()
+        await assign(previous.jobOne.id, pastVolunteer.id)
+
+        // A newer season makes the one above historical.
+        const current = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const currentVolunteer = await createUser()
+        await assign(current.jobOne.id, currentVolunteer.id)
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "Current season only",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result.status).toBe(true)
+        const call = vi.mocked(sendBroadcastEmails).mock.calls[0][0]
+        expect(call.recipients).toEqual([{ email: currentVolunteer.email }])
+    })
+
+    it("rejects a tryout date from another season", async () => {
+        const other = await seedTryoutJobs()
+        await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            tryoutEventId: other.nightOne.id,
+            subject: "Wrong season",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result).toEqual({
+            status: false,
+            message: "Tryout date not found in the current season."
+        })
+    })
+
+    it("reuses one recipient group per tryout night across sends", async () => {
+        const { nightOne, jobOne } = await seedTryoutJobs()
+        await createUserWithRoles([{ role: "admin" }])
+        const volunteer = await createUser()
+        await assign(jobOne.id, volunteer.id)
+
+        await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            tryoutEventId: nightOne.id,
+            subject: "First",
+            lexicalContent: EMPTY_BODY
+        })
+        await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            tryoutEventId: nightOne.id,
+            subject: "Second",
+            lexicalContent: EMPTY_BODY
+        })
+        // The season-wide variant must not collapse into the per-night one.
+        await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "All nights",
+            lexicalContent: EMPTY_BODY
+        })
+
+        const groups = await db
+            .select()
+            .from(emailRecipientGroups)
+            .where(
+                inArray(emailRecipientGroups.group_type, [
+                    "season_tryout_volunteers",
+                    "season_tryout_volunteers_event"
+                ])
+            )
+        expect(groups).toHaveLength(2)
+        const perNight = groups.find(
+            (g) => g.group_type === "season_tryout_volunteers_event"
+        )
+        expect(perNight?.event_id).toBe(nightOne.id)
+        expect(perNight?.name).toContain("Tryout 1 Volunteers")
+    })
+
+    it("blocks commissioners from the volunteer audience", async () => {
+        const { season } = await seedTryoutJobs()
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "season_tryout_volunteers",
+            subject: "Not allowed",
+            lexicalContent: EMPTY_BODY
+        })
+
+        expect(result).toEqual({
+            status: false,
+            message: "Unauthorized: only admins can send league-wide emails."
+        })
+        expect(sendBroadcastEmails).not.toHaveBeenCalled()
     })
 })

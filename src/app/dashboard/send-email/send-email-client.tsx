@@ -40,12 +40,14 @@ import {
     EMAIL_SUBJECT_PREFIX,
     stripEmailSubjectPrefix
 } from "@/lib/email-subject"
+import { formatShortDate } from "@/lib/season-utils"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
 import type {
     BroadcastPreview,
     DivisionOption,
     TeamOption,
     TemplateOption,
+    TryoutOption,
     BroadcastHistoryItem,
     SendToType
 } from "./actions"
@@ -55,8 +57,12 @@ interface SendEmailClientProps {
     divisions: DivisionOption[]
     teams: TeamOption[]
     templates: TemplateOption[]
+    tryouts: TryoutOption[]
     history: BroadcastHistoryItem[]
 }
+
+/** Sentinel for the "every tryout night" option in the sub-picker. */
+const ALL_TRYOUTS = "all"
 
 const EMPTY_CONTENT = normalizeEmailTemplateContent("")
 
@@ -64,8 +70,10 @@ function sendToLabel(
     groupType: string | null,
     divisionId: number | null,
     teamId: number | null,
+    eventId: number | null,
     divisions: DivisionOption[],
-    teams: TeamOption[]
+    teams: TeamOption[],
+    tryouts: TryoutOption[]
 ): string {
     if (groupType === "self") return "Just Me"
     if (groupType === "all_users") return "Everyone"
@@ -79,6 +87,15 @@ function sendToLabel(
         return "Interested in Reffing (Current Season)"
     if (groupType === "season_tryout_help")
         return "Willing to Help with Tryouts (Current Season)"
+    if (groupType === "season_tryout_volunteers")
+        return "Tryout Volunteers (All Tryouts)"
+    if (groupType === "season_tryout_volunteers_event") {
+        const tryout = tryouts.find((t) => t.id === eventId)
+        // A tryout date deleted since the send leaves no ordinal to show.
+        return tryout
+            ? `Tryout ${tryout.ordinal} Volunteers`
+            : "Tryout Volunteers (past tryout)"
+    }
     if (groupType === "leadership_group") return "Leadership Group"
     if (groupType === "season_division") {
         const div = divisions.find((d) => d.id === divisionId)
@@ -112,6 +129,9 @@ function sendToTypeFromGroupType(groupType: string | null): SendToType | null {
             return "season_ref_interest"
         case "season_tryout_help":
             return "season_tryout_help"
+        case "season_tryout_volunteers":
+        case "season_tryout_volunteers_event":
+            return "season_tryout_volunteers"
         case "leadership_group":
             return "leadership_group"
         case "season_division":
@@ -128,6 +148,7 @@ export function SendEmailClient({
     divisions,
     teams,
     templates,
+    tryouts,
     history: initialHistory
 }: SendEmailClientProps) {
     const router = useRouter()
@@ -136,6 +157,7 @@ export function SendEmailClient({
     const [sendToType, setSendToType] = useState<SendToType | "">("")
     const [selectedDivisionId, setSelectedDivisionId] = useState<string>("")
     const [selectedTeamId, setSelectedTeamId] = useState<string>("")
+    const [selectedTryout, setSelectedTryout] = useState<string>(ALL_TRYOUTS)
     const [subject, setSubject] = useState("")
     const [content, setContent] =
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
@@ -161,6 +183,7 @@ export function SendEmailClient({
         setSendToType(value as SendToType)
         setSelectedDivisionId("")
         setSelectedTeamId("")
+        setSelectedTryout(ALL_TRYOUTS)
     }, [])
 
     const handleTemplateSelect = useCallback(
@@ -193,6 +216,10 @@ export function SendEmailClient({
                     // Also set the division for context
                     const team = teams.find((t) => t.id === item.teamId)
                     if (team) setSelectedDivisionId(String(team.divisionId))
+                } else if (type === "season_tryout_volunteers") {
+                    setSelectedTryout(
+                        item.eventId ? String(item.eventId) : ALL_TRYOUTS
+                    )
                 }
             } else {
                 setSendToType("")
@@ -217,6 +244,11 @@ export function SendEmailClient({
         sendToType: sendToType as SendToType,
         divisionId: selectedDivisionId ? Number(selectedDivisionId) : undefined,
         teamId: selectedTeamId ? Number(selectedTeamId) : undefined,
+        tryoutEventId:
+            sendToType === "season_tryout_volunteers" &&
+            selectedTryout !== ALL_TRYOUTS
+                ? Number(selectedTryout)
+                : undefined,
         subject,
         lexicalContent: content
     })
@@ -349,6 +381,10 @@ export function SendEmailClient({
                                                 Willing to Help with Tryouts
                                                 (signup answer)
                                             </SelectItem>
+                                            <SelectItem value="season_tryout_volunteers">
+                                                Tryout Volunteers (assigned to a
+                                                job)
+                                            </SelectItem>
                                             <SelectItem value="leadership_group">
                                                 Leadership Group (incl. Admins)
                                             </SelectItem>
@@ -361,6 +397,45 @@ export function SendEmailClient({
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        {/* Tryout picker — only for volunteer sends */}
+                        {sendToType === "season_tryout_volunteers" && (
+                            <div className="space-y-1.5 border-muted border-l-2 pl-4">
+                                <Label htmlFor="tryout-select">
+                                    Which tryout{" "}
+                                    <span className="text-destructive">*</span>
+                                </Label>
+                                <Select
+                                    value={selectedTryout}
+                                    onValueChange={setSelectedTryout}
+                                >
+                                    <SelectTrigger id="tryout-select">
+                                        <SelectValue placeholder="Select a tryout…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ALL_TRYOUTS}>
+                                            All Tryouts
+                                        </SelectItem>
+                                        {tryouts.map((t) => (
+                                            <SelectItem
+                                                key={t.id}
+                                                value={String(t.id)}
+                                            >
+                                                Tryout {t.ordinal} —{" "}
+                                                {formatShortDate(t.eventDate)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-muted-foreground text-xs">
+                                    Only volunteers assigned to a job
+                                    {selectedTryout === ALL_TRYOUTS
+                                        ? " on any tryout night"
+                                        : " on that night"}{" "}
+                                    are included.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Division picker */}
                         {sendToType === "division" && (
@@ -565,8 +640,10 @@ export function SendEmailClient({
                                                         item.groupType,
                                                         item.divisionId,
                                                         item.teamId,
+                                                        item.eventId,
                                                         divisions,
-                                                        teams
+                                                        teams,
+                                                        tryouts
                                                     )}
                                                 </span>
                                                 <Badge
