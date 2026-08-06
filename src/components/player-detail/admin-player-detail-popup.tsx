@@ -35,10 +35,8 @@ import {
     suppressionOriginLabel,
     suppressionReasonLabel
 } from "@/lib/email-suppression-display"
-import {
-    NOTIFICATION_LOG_RETENTION_LABEL,
-    STREAM_LABELS
-} from "@/lib/notifications/types"
+import { STREAM_LABELS } from "@/lib/notifications/types"
+import { RETENTION_LABEL } from "@/lib/retention-policy"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -339,10 +337,7 @@ export function AdminPlayerDetailPopup({
                                                 <p className="text-muted-foreground text-xs">
                                                     Nothing sent to this player
                                                     in the last{" "}
-                                                    {
-                                                        NOTIFICATION_LOG_RETENTION_LABEL
-                                                    }
-                                                    .
+                                                    {RETENTION_LABEL}.
                                                 </p>
                                             )}
                                             {emailHistory.map((entry) => (
@@ -381,7 +376,7 @@ export function AdminPlayerDetailPopup({
                                                 </>
                                             )}
                                             Email history is kept for{" "}
-                                            {NOTIFICATION_LOG_RETENTION_LABEL}
+                                            {RETENTION_LABEL}
                                             {
                                                 " — anything older has been removed."
                                             }

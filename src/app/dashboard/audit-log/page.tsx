@@ -3,6 +3,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { AuditLogList } from "./audit-log-list"
 import { getAuditLogs } from "./actions"
+import { RETENTION_LABEL } from "@/lib/retention-policy"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export default async function AuditLogPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Audit Log"
-                description="View a history of all actions performed in the system."
+                description={`View a history of all actions performed in the system. Entries are kept for ${RETENTION_LABEL} — anything older has been removed.`}
             />
             {!result.status ? (
                 <StatusBanner variant="error">

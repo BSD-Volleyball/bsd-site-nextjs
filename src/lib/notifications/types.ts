@@ -207,16 +207,6 @@ export const STREAM_TO_TYPE: Partial<Record<string, NotificationType>> = {
     broadcast: "league_announcements"
 }
 
-/**
- * How long a row survives in notification_log before the nightly prune
- * removes it (see src/lib/notifications/log-retention.ts). Lives here rather
- * than beside the prune job because admin UI needs it too — a history panel
- * that silently stops a year back would read as missing data.
- */
-export const NOTIFICATION_LOG_RETENTION_DAYS = 365
-
-export const NOTIFICATION_LOG_RETENTION_LABEL = "1 year"
-
 /** Friendly names for Postmark streams, for suppression banners. */
 export const STREAM_LABELS: Record<string, string> = {
     outbound: "account & team emails",
