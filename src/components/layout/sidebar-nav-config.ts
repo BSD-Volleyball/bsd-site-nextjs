@@ -403,6 +403,18 @@ export const addTeamPicturesNavItem: NavItem = {
     icon: RiImageLine
 }
 
+export const tournamentScheduleNavItem: NavItem = {
+    title: "Tournament Schedule",
+    url: "/dashboard/tournament-schedule",
+    icon: RiCalendarLine
+}
+
+export const tournamentScoresNavItem: NavItem = {
+    title: "Enter Tournament Scores",
+    url: "/dashboard/tournament-scores",
+    icon: RiEditLine
+}
+
 export const commissionerNavItems: NavItem[] = [
     {
         title: "Send Email",

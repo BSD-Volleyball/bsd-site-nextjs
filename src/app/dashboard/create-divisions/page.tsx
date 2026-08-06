@@ -2,10 +2,7 @@ import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import {
-    getIsAdminOrDirector,
-    getSeasonPhase
-} from "@/app/dashboard/access-actions"
+import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getDivisionsPageData } from "./actions"
 import { CreateDivisionsClient } from "./create-divisions-client"
 import type { Metadata } from "next"
@@ -21,14 +18,6 @@ export default async function CreateDivisionsPage() {
 
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
-        redirect("/dashboard")
-    }
-
-    const currentPhase = await getSeasonPhase()
-    if (
-        currentPhase !== "select_commissioners" &&
-        currentPhase !== "select_captains"
-    ) {
         redirect("/dashboard")
     }
 

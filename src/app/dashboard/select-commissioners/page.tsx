@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
 import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { getSeasonPhase } from "@/app/dashboard/access-actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -20,11 +19,6 @@ export default async function SelectCommissionersPage() {
     const hasAccess = await getIsAdminOrDirector()
 
     if (!hasAccess) {
-        redirect("/dashboard")
-    }
-
-    const currentPhase = await getSeasonPhase()
-    if (currentPhase !== "select_commissioners") {
         redirect("/dashboard")
     }
 

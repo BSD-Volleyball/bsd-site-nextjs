@@ -3,7 +3,6 @@
 import {
     RiArrowDownSLine,
     RiCalendarLine,
-    RiEditLine,
     RiGroupLine,
     RiMedalLine,
     RiTeamLine,
@@ -70,6 +69,8 @@ import {
     seasonHistoryNavItem,
     signupNavItem,
     tournamentCategories,
+    tournamentScheduleNavItem,
+    tournamentScoresNavItem,
     week1NavItem,
     week2NavItem,
     week3NavItem
@@ -293,6 +294,10 @@ export function AppSidebar({
     const showReviewPairs = isAdmin && inRange("select_commissioners", "draft")
     const showEvaluatePlayers =
         isAdmin && inRange("select_commissioners", "prep_tryout_week_1")
+    const showSelectCommissioners = phase === "select_commissioners"
+    const showCreateDivisions =
+        phase === "select_commissioners" || phase === "select_captains"
+    const showCreateSchedule = phase === "draft"
 
     // Tryout volunteer tools: staffing is planned from the moment
     // registration opens and is done once the last tryout night is over.
@@ -467,8 +472,8 @@ export function AppSidebar({
                 items: hiddenSeasonItems
             })
 
-        // Danger Zone week pages currently suppressed
-        const hiddenDangerWeekItems = adminDangerNavItems.filter(
+        // Danger Zone pages currently suppressed by phase
+        const hiddenDangerItems = adminDangerNavItems.filter(
             (item) =>
                 ([
                     "/dashboard/create-week-1",
@@ -484,12 +489,18 @@ export function AppSidebar({
                     "/dashboard/create-week-3",
                     "/dashboard/edit-week-3"
                 ].includes(item.url) &&
-                    !showWeek3)
+                    !showWeek3) ||
+                (item.url === "/dashboard/select-commissioners" &&
+                    !showSelectCommissioners) ||
+                (item.url === "/dashboard/create-divisions" &&
+                    !showCreateDivisions) ||
+                (item.url === "/dashboard/create-schedule" &&
+                    !showCreateSchedule)
         )
-        if (hiddenDangerWeekItems.length > 0)
+        if (hiddenDangerItems.length > 0)
             hiddenGroups.push({
-                label: "Danger Zone (Weeks)",
-                items: hiddenDangerWeekItems
+                label: "Danger Zone",
+                items: hiddenDangerItems
             })
 
         // Tournament pages suppressed while no tournament is active
@@ -542,6 +553,35 @@ export function AppSidebar({
                 label: "Court Mgmt",
                 items: hiddenCourtMgmtItems
             })
+
+        // Reffing pages suppressed outside regular season/playoffs
+        if (!showReffingSection)
+            hiddenGroups.push({ label: "Reffing", items: reffingNavItems })
+
+        // Ref Management pages suppressed outside draft through playoffs
+        if (!showManageRefsSection)
+            hiddenGroups.push({
+                label: "Ref Management",
+                items: manageRefsNavItems
+            })
+
+        // Tournament schedule/score tools suppressed while a tournament is
+        // active but out of its pool-play/bracket phases
+        if (hasActiveTournament) {
+            const hiddenTournamentTools = [
+                ...(!tournament.showPoolTools
+                    ? [tournamentScheduleNavItem]
+                    : []),
+                ...(!tournament.showPoolTools && !tournament.showBracketTools
+                    ? [tournamentScoresNavItem]
+                    : [])
+            ]
+            if (hiddenTournamentTools.length > 0)
+                hiddenGroups.push({
+                    label: "Tournament (out of phase)",
+                    items: hiddenTournamentTools
+                })
+        }
 
         // Commissioner items currently suppressed
         const hiddenCommissionerItems = commissionerNavItems.filter(
@@ -690,23 +730,13 @@ export function AppSidebar({
                                             })
                                         }
                                         if (tournament.showPoolTools) {
-                                            items.push({
-                                                title: "Tournament Schedule",
-                                                url: "/dashboard/tournament-schedule",
-                                                icon: RiCalendarLine
-                                            })
-                                            items.push({
-                                                title: "Enter Tournament Scores",
-                                                url: "/dashboard/tournament-scores",
-                                                icon: RiEditLine
-                                            })
+                                            items.push(
+                                                tournamentScheduleNavItem
+                                            )
+                                            items.push(tournamentScoresNavItem)
                                         }
                                         if (tournament.showBracketTools) {
-                                            items.push({
-                                                title: "Enter Tournament Scores",
-                                                url: "/dashboard/tournament-scores",
-                                                icon: RiEditLine
-                                            })
+                                            items.push(tournamentScoresNavItem)
                                         }
                                         return items
                                     })()}
@@ -945,24 +975,17 @@ export function AppSidebar({
                                                 item.url ===
                                                 "/dashboard/select-commissioners"
                                             )
-                                                return (
-                                                    phase ===
-                                                    "select_commissioners"
-                                                )
+                                                return showSelectCommissioners
                                             if (
                                                 item.url ===
                                                 "/dashboard/create-divisions"
                                             )
-                                                return (
-                                                    phase ===
-                                                        "select_commissioners" ||
-                                                    phase === "select_captains"
-                                                )
+                                                return showCreateDivisions
                                             if (
                                                 item.url ===
                                                 "/dashboard/create-schedule"
                                             )
-                                                return phase === "draft"
+                                                return showCreateSchedule
                                             if (
                                                 item.url ===
                                                 "/dashboard/tournament-config"
