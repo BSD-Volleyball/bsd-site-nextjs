@@ -11,10 +11,20 @@ import { getSetScores } from "@/lib/team-ranking"
  * division of their first rated match. Lower `divisions.level` means a
  * stronger division, so the seed is ELO_BASE + (lowestLevel - level) * step:
  * the lowest division starts at ELO_BASE and AA seeds highest. After seeding,
- * ratings carry across divisions and seasons — player movement between
+ * ratings carry across divisions within a season — player movement between
  * divisions is what links the otherwise-isolated rating pools.
  *
- * Total rating is only exactly conserved when both rosters are the same size.
+ * At a player's first non-sub match of each new season the carried rating is
+ * blended toward the seed of the division they return in: 90% carried / 10%
+ * seed across contiguous seasons, shifting another 10% toward the seed per
+ * fully missed season (measured by ordinal position among seasons that have
+ * matches), so a nine-season gap reseeds entirely. Per-match sub appearances
+ * never anchor — the carried rating enters unadjusted — but they count as
+ * staying active for gap measurement. Permanent subs take over a drafted
+ * roster slot, so they anchor like draftees.
+ *
+ * Total rating is only exactly conserved when both rosters are the same size
+ * and no season boundary intervenes.
  */
 
 export const ELO_BASE = 1000
@@ -22,6 +32,10 @@ export const ELO_DIVISION_STEP = 150
 export const ELO_K_FACTOR = 32
 /** divisions.level ascends as skill descends: 1 = AA (best), 6 = BB (lowest). */
 export const ELO_LOWEST_DIVISION_LEVEL = 6
+/** Weight kept on a player's carried rating at a contiguous season boundary. */
+export const ELO_CARRYOVER_RETENTION = 0.9
+/** Extra weight shifted to the division seed per fully missed season. */
+export const ELO_CARRYOVER_GAP_DECAY = 0.1
 
 export interface EloMatchInput {
     id: number
@@ -68,6 +82,8 @@ export interface EloOptions {
     divisionStep?: number
     kFactor?: number
     lowestDivisionLevel?: number
+    carryoverRetention?: number
+    carryoverGapDecay?: number
 }
 
 export interface EloHistoryPoint {
@@ -90,6 +106,10 @@ export interface PlayerEloResult {
 
 export function rosterKey(matchId: number, teamId: number): string {
     return `${matchId}:${teamId}`
+}
+
+export function subAppearanceKey(matchId: number, userId: string): string {
+    return `${matchId}:${userId}`
 }
 
 export function orderMatches(matches: EloMatchInput[]): EloMatchInput[] {
@@ -214,19 +234,36 @@ export function buildMatchRosters(
 export function computePlayerElo(
     matches: EloMatchInput[],
     rosters: Map<string, string[]>,
-    options: EloOptions = {}
+    options: EloOptions = {},
+    subAppearances: ReadonlySet<string> = new Set()
 ): PlayerEloResult {
     const base = options.base ?? ELO_BASE
     const divisionStep = options.divisionStep ?? ELO_DIVISION_STEP
     const kFactor = options.kFactor ?? ELO_K_FACTOR
     const lowestDivisionLevel =
         options.lowestDivisionLevel ?? ELO_LOWEST_DIVISION_LEVEL
+    const carryoverRetention =
+        options.carryoverRetention ?? ELO_CARRYOVER_RETENTION
+    const carryoverGapDecay =
+        options.carryoverGapDecay ?? ELO_CARRYOVER_GAP_DECAY
+
+    // Season gaps are measured by ordinal position among the seasons present,
+    // not seasonId arithmetic, so non-contiguous ids can't fake a gap.
+    const ordered = orderMatches(matches)
+    const seasonOrdinals = new Map<number, number>()
+    for (const match of ordered) {
+        if (!seasonOrdinals.has(match.seasonId)) {
+            seasonOrdinals.set(match.seasonId, seasonOrdinals.size)
+        }
+    }
 
     const ratings = new Map<string, number>()
     const histories = new Map<string, EloHistoryPoint[]>()
     const matchCounts = new Map<string, number>()
+    const lastPlayedOrdinal = new Map<string, number>()
+    const anchoredOrdinal = new Map<string, number>()
 
-    for (const match of orderMatches(matches)) {
+    for (const match of ordered) {
         const score = actualScore(match)
         if (score === null) continue
         if (match.homeTeamId === null || match.awayTeamId === null) continue
@@ -235,13 +272,38 @@ export function computePlayerElo(
         const awayRoster = rosters.get(rosterKey(match.id, match.awayTeamId))
         if (!homeRoster?.length || !awayRoster?.length) continue
 
+        const seasonOrdinal = seasonOrdinals.get(match.seasonId) ?? 0
         const seed =
             base + (lowestDivisionLevel - match.divisionLevel) * divisionStep
         const ratingOf = (userId: string): number => {
             const existing = ratings.get(userId)
-            if (existing !== undefined) return existing
-            ratings.set(userId, seed)
-            return seed
+            if (existing === undefined) {
+                const isSub = subAppearances.has(
+                    subAppearanceKey(match.id, userId)
+                )
+                ratings.set(userId, seed)
+                lastPlayedOrdinal.set(userId, seasonOrdinal)
+                if (!isSub) anchoredOrdinal.set(userId, seasonOrdinal)
+                return seed
+            }
+            if (
+                anchoredOrdinal.get(userId) === seasonOrdinal ||
+                subAppearances.has(subAppearanceKey(match.id, userId))
+            ) {
+                lastPlayedOrdinal.set(userId, seasonOrdinal)
+                return existing
+            }
+            const previous = lastPlayedOrdinal.get(userId) ?? seasonOrdinal
+            const gap = Math.max(0, seasonOrdinal - previous - 1)
+            const retention = Math.max(
+                0,
+                carryoverRetention - gap * carryoverGapDecay
+            )
+            const blended = retention * existing + (1 - retention) * seed
+            ratings.set(userId, blended)
+            lastPlayedOrdinal.set(userId, seasonOrdinal)
+            anchoredOrdinal.set(userId, seasonOrdinal)
+            return blended
         }
 
         const mean = (roster: string[]) =>

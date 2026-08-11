@@ -19,7 +19,8 @@ import {
     buildMatchRosters,
     computePlayerElo,
     type EloHistoryPoint,
-    type EloMatchInput
+    type EloMatchInput,
+    subAppearanceKey
 } from "@/lib/player-elo"
 import { computeCareerStats, type CareerStats } from "@/lib/player-career-stats"
 import { getLastDraftInfoByUser } from "@/lib/roster"
@@ -151,10 +152,15 @@ const getLeagueElo = cache(async () => {
         permanentSubs,
         matchSubs
     )
+    // Per-match subs only: permanent subs take over a drafted slot, so they
+    // anchor at season boundaries like draftees.
+    const subAppearances = new Set(
+        matchSubs.map((sub) => subAppearanceKey(sub.matchId, sub.subUser))
+    )
     return {
         matches: matchRows,
         rosters,
-        ...computePlayerElo(matchRows, rosters)
+        ...computePlayerElo(matchRows, rosters, {}, subAppearances)
     }
 })
 

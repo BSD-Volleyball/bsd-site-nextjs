@@ -118,10 +118,32 @@ export function EloTrendChart({
                                         Your first rated match seeds you from
                                         the division you&apos;re playing in: BB
                                         starts at 1000 and each division up adds
-                                        150, so AA starts at 1750. After that
-                                        first match the seed never applies again
-                                        — your rating simply carries forward,
-                                        even if you change divisions.
+                                        150, so AA starts at 1750. Within a
+                                        season your rating simply carries
+                                        forward, even if you change divisions.
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="mb-1 font-medium">
+                                        Between seasons
+                                    </h4>
+                                    <p className="text-muted-foreground">
+                                        At your first match of each new season,
+                                        your rating is nudged toward the
+                                        starting value of the division
+                                        you&apos;re drafted into: 90% your old
+                                        rating, 10% the division&apos;s starting
+                                        value. Time away pulls harder — each
+                                        season you sit out shifts another 10%
+                                        toward the starting value, so after nine
+                                        or more missed seasons you come back
+                                        seeded fresh, just like a newcomer.
+                                        Subbing for a match doesn&apos;t
+                                        re-anchor you — you play with your
+                                        rating as-is, though wins and losses
+                                        still count — but it does count as
+                                        staying active. Season-long replacements
+                                        are treated like drafted players.
                                     </p>
                                 </div>
                                 <div>

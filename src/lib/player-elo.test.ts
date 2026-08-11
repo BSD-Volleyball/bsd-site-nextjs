@@ -3,6 +3,8 @@ import {
     buildMatchRosters,
     computePlayerElo,
     ELO_BASE,
+    ELO_CARRYOVER_GAP_DECAY,
+    ELO_CARRYOVER_RETENTION,
     ELO_DIVISION_STEP,
     ELO_K_FACTOR,
     ELO_LOWEST_DIVISION_LEVEL,
@@ -10,6 +12,7 @@ import {
     actualScore,
     orderMatches,
     rosterKey,
+    subAppearanceKey,
     type DraftRosterRow,
     type EloMatchInput,
     type MatchSubRow,
@@ -306,7 +309,7 @@ describe("computePlayerElo", () => {
         expect(result.histories.get("low-a")?.[0]?.ratingBefore).toBe(lowSeed)
     })
 
-    it("carries a player's rating into a new division instead of re-seeding", () => {
+    it("carries a player's rating into a new division within a season instead of re-seeding", () => {
         const result = computePlayerElo(
             [
                 setMatch(1, 10, 20, [[25, 20]], { divisionLevel: 1 }),
@@ -362,6 +365,227 @@ describe("computePlayerElo", () => {
         )
         expect(result.matchCounts.get("a")).toBe(2)
         expect(result.histories.get("a")?.[1]?.playoff).toBe(true)
+    })
+
+    describe("season carryover", () => {
+        const sweep: Array<[number, number]> = [
+            [25, 20],
+            [25, 15]
+        ]
+        // A sweep between fresh equal single-player rosters moves each by K/2
+        const seasonOne = setMatch(1, 10, 20, sweep)
+        const afterWin = level1Seed + ELO_K_FACTOR / 2
+        const afterLoss = level1Seed - ELO_K_FACTOR / 2
+        const retained = (carried: number, retention: number) =>
+            retention * carried + (1 - retention) * level1Seed
+
+        it("blends toward the division seed across contiguous seasons", () => {
+            const result = computePlayerElo(
+                [seasonOne, setMatch(2, 10, 20, sweep, { seasonId: 2 })],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["b"]]
+                ])
+            )
+            expect(result.histories.get("a")?.[1]?.ratingBefore).toBeCloseTo(
+                retained(afterWin, ELO_CARRYOVER_RETENTION)
+            )
+            expect(result.histories.get("b")?.[1]?.ratingBefore).toBeCloseTo(
+                retained(afterLoss, ELO_CARRYOVER_RETENTION)
+            )
+        })
+
+        it("applies the blend before computing the expected score", () => {
+            const result = computePlayerElo(
+                [seasonOne, setMatch(2, 10, 20, sweep, { seasonId: 2 })],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["b"]]
+                ])
+            )
+            const aBefore = retained(afterWin, ELO_CARRYOVER_RETENTION)
+            const bBefore = retained(afterLoss, ELO_CARRYOVER_RETENTION)
+            expect(result.histories.get("a")?.[1]?.delta).toBeCloseTo(
+                ELO_K_FACTOR * (1 - expectedScore(aBefore, bBefore))
+            )
+        })
+
+        it("shifts further toward the seed per missed season", () => {
+            const result = computePlayerElo(
+                [
+                    seasonOne,
+                    setMatch(2, 30, 40, sweep, { seasonId: 2 }),
+                    setMatch(3, 10, 20, sweep, { seasonId: 3 })
+                ],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 30, ["c"]],
+                    [2, 40, ["d"]],
+                    [3, 10, ["a"]],
+                    [3, 20, ["b"]]
+                ])
+            )
+            const retention = ELO_CARRYOVER_RETENTION - ELO_CARRYOVER_GAP_DECAY
+            expect(result.histories.get("a")?.[1]?.ratingBefore).toBeCloseTo(
+                retained(afterWin, retention)
+            )
+        })
+
+        it("fully reseeds into the returning division after nine missed seasons", () => {
+            const filler = Array.from({ length: 9 }, (_, i) =>
+                setMatch(2 + i, 30, 40, sweep, { seasonId: 2 + i })
+            )
+            const entries: Array<[number, number, string[]]> = [
+                [1, 10, ["a"]],
+                [1, 20, ["b"]],
+                [11, 10, ["a"]],
+                [11, 20, ["e"]]
+            ]
+            for (const m of filler) {
+                entries.push([m.id, 30, ["c"]], [m.id, 40, ["d"]])
+            }
+            const result = computePlayerElo(
+                [
+                    seasonOne,
+                    ...filler,
+                    setMatch(11, 10, 20, sweep, {
+                        seasonId: 11,
+                        divisionLevel: 3
+                    })
+                ],
+                rosters(entries)
+            )
+            const level3Seed =
+                ELO_BASE + (ELO_LOWEST_DIVISION_LEVEL - 3) * ELO_DIVISION_STEP
+            expect(result.histories.get("a")?.[1]?.ratingBefore).toBeCloseTo(
+                level3Seed
+            )
+        })
+
+        it("seeds a newcomer appearing in a later season without blending", () => {
+            const result = computePlayerElo(
+                [seasonOne, setMatch(2, 10, 20, sweep, { seasonId: 2 })],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["newbie"]]
+                ])
+            )
+            expect(result.histories.get("newbie")?.[0]?.ratingBefore).toBe(
+                level1Seed
+            )
+        })
+
+        it("measures gaps by season ordinal, not seasonId arithmetic", () => {
+            const result = computePlayerElo(
+                [
+                    setMatch(1, 10, 20, sweep, { seasonId: 5 }),
+                    setMatch(2, 10, 20, sweep, { seasonId: 17 })
+                ],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["b"]]
+                ])
+            )
+            expect(result.histories.get("a")?.[1]?.ratingBefore).toBeCloseTo(
+                retained(afterWin, ELO_CARRYOVER_RETENTION)
+            )
+        })
+
+        it("blends only once per season boundary", () => {
+            const result = computePlayerElo(
+                [
+                    seasonOne,
+                    setMatch(2, 10, 20, sweep, { seasonId: 2 }),
+                    setMatch(3, 10, 20, sweep, { seasonId: 2, week: 2 })
+                ],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["b"]],
+                    [3, 10, ["a"]],
+                    [3, 20, ["b"]]
+                ])
+            )
+            const history = result.histories.get("a") ?? []
+            expect(history[2]?.ratingBefore).toBe(history[1]?.ratingAfter)
+        })
+
+        it("does not re-anchor per-match subs", () => {
+            const result = computePlayerElo(
+                [seasonOne, setMatch(2, 10, 20, sweep, { seasonId: 2 })],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["x"]]
+                ]),
+                {},
+                new Set([subAppearanceKey(2, "a")])
+            )
+            const history = result.histories.get("a") ?? []
+            expect(history[1]?.ratingBefore).toBe(afterWin)
+            expect(history[1]?.delta).toBeGreaterThan(0)
+        })
+
+        it("counts a sub-only season as played when measuring the gap", () => {
+            const result = computePlayerElo(
+                [
+                    seasonOne,
+                    setMatch(2, 10, 20, sweep, { seasonId: 2 }),
+                    setMatch(3, 10, 20, sweep, { seasonId: 3 })
+                ],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["c"]],
+                    [3, 10, ["a"]],
+                    [3, 20, ["d"]]
+                ]),
+                {},
+                new Set([subAppearanceKey(2, "a")])
+            )
+            const history = result.histories.get("a") ?? []
+            const afterSub = history[1]?.ratingAfter ?? 0
+            expect(history[2]?.ratingBefore).toBeCloseTo(
+                retained(afterSub, ELO_CARRYOVER_RETENTION)
+            )
+        })
+
+        it("anchors at the drafted debut even after subbing earlier that season", () => {
+            const result = computePlayerElo(
+                [
+                    seasonOne,
+                    setMatch(2, 10, 20, sweep, { seasonId: 2 }),
+                    setMatch(3, 10, 20, sweep, { seasonId: 2, week: 2 })
+                ],
+                rosters([
+                    [1, 10, ["a"]],
+                    [1, 20, ["b"]],
+                    [2, 10, ["a"]],
+                    [2, 20, ["c"]],
+                    [3, 10, ["a"]],
+                    [3, 20, ["d"]]
+                ]),
+                {},
+                new Set([subAppearanceKey(2, "a")])
+            )
+            const history = result.histories.get("a") ?? []
+            const afterSub = history[1]?.ratingAfter ?? 0
+            expect(history[2]?.ratingBefore).toBeCloseTo(
+                retained(afterSub, ELO_CARRYOVER_RETENTION)
+            )
+        })
     })
 })
 
