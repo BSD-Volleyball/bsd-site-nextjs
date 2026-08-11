@@ -20,6 +20,12 @@ if (!dbUrl.includes("localhost") || !dbUrl.includes("bsd_e2e")) {
 // read DATABASE_URL through the db singleton; point them at the e2e db too.
 process.env.DATABASE_URL = dbUrl
 
+// Postmark's documented test token: sends validate and return a fake
+// MessageID but are never delivered. Without this the dev server loads the
+// real token from .env.local and e2e signups mail e2e-*@example.test for
+// real, logging hard bounces against our server.
+process.env.POSTMARK_SERVER_TOKEN = "POSTMARK_API_TEST"
+
 export default defineConfig({
     testDir: "e2e",
     outputDir: "test-results",
@@ -61,7 +67,10 @@ export default defineConfig({
             ...(process.env as Record<string, string>),
             DATABASE_URL: dbUrl,
             BETTER_AUTH_BASE_URL: baseURL,
-            NEXT_PUBLIC_APP_URL: baseURL
+            NEXT_PUBLIC_APP_URL: baseURL,
+            // Explicit OS-level env beats .env.local inside next dev, so the
+            // spawned server also uses Postmark's no-delivery test token.
+            POSTMARK_SERVER_TOKEN: "POSTMARK_API_TEST"
         }
     }
 })
