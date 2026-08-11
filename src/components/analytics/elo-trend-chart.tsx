@@ -120,7 +120,7 @@ export function EloTrendChart({
                                         starts at 1000 and each division up adds
                                         150, so AA starts at 1750. Within a
                                         season your rating simply carries
-                                        forward, even if you change divisions.
+                                        forward.
                                     </p>
                                 </div>
                                 <div>
