@@ -36,6 +36,8 @@ interface PlayerInfo {
     skill_passer: boolean | null
     skill_other: boolean | null
     picture: string | null
+    email?: string | null
+    phone?: string | null
 }
 
 interface PlayerDetailPopupProps {
@@ -151,6 +153,29 @@ export function PlayerDetailPopup({
                                               : "\u2014"}
                                     </span>
                                 </div>
+                                {/* Contact info is only populated server-side
+                                    for current-season commissioners; hide the
+                                    rows entirely for everyone else. */}
+                                {playerDetails.phone && (
+                                    <div>
+                                        <span className="text-muted-foreground">
+                                            Phone:
+                                        </span>
+                                        <span className="ml-2 font-medium">
+                                            {playerDetails.phone}
+                                        </span>
+                                    </div>
+                                )}
+                                {playerDetails.email && (
+                                    <div>
+                                        <span className="text-muted-foreground">
+                                            Email:
+                                        </span>
+                                        <span className="ml-2 break-all font-medium">
+                                            {playerDetails.email}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

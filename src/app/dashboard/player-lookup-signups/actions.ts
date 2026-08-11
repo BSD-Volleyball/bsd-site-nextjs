@@ -9,7 +9,7 @@ import {
     seasonEvents
 } from "@/database/schema"
 import { eq, desc } from "drizzle-orm"
-import { getSessionUserId } from "@/lib/rbac"
+import { getSessionUserId, isCommissionerBySession } from "@/lib/rbac"
 import {
     withAction,
     ok,
@@ -105,6 +105,8 @@ export interface PlayerDetails {
     skill_other: boolean | null
     male: boolean | null
     picture: string | null
+    email: string | null
+    phone: string | null
 }
 
 export interface PlayerDraftHistory {
@@ -136,7 +138,7 @@ export const getPlayerDetailsForSignups = withAction(
     ): Promise<ActionResult<PlayerDetailsForSignups>> => {
         await requireCaptainAccess()
 
-        const [player] = await db
+        const [playerRow] = await db
             .select({
                 id: users.id,
                 first_name: users.first_name,
@@ -151,14 +153,25 @@ export const getPlayerDetailsForSignups = withAction(
                 skill_passer: users.skill_passer,
                 skill_other: users.skill_other,
                 male: users.male,
-                picture: users.picture
+                picture: users.picture,
+                email: users.email,
+                phone: users.phone
             })
             .from(users)
             .where(eq(users.id, playerId))
             .limit(1)
 
-        if (!player) {
+        if (!playerRow) {
             return fail("Player not found.")
+        }
+
+        // Current-season commissioners (and admins) may see contact info;
+        // captains and court managers get the redacted sentinels.
+        const isCommissioner = await isCommissionerBySession()
+        const player: PlayerDetails = {
+            ...playerRow,
+            email: isCommissioner ? playerRow.email : null,
+            phone: isCommissioner ? playerRow.phone : null
         }
 
         const config = await getSeasonConfig()

@@ -17,7 +17,11 @@ import {
     getEventsByType,
     formatEventDate
 } from "@/lib/site-config"
-import { hasCaptainPagesAccessBySession, getSessionUserId } from "@/lib/rbac"
+import {
+    hasCaptainPagesAccessBySession,
+    getSessionUserId,
+    isCommissionerBySession
+} from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     type ActionResult,
@@ -561,7 +565,9 @@ export const getPlayerDetailsPublic = withAction(
                 skill_passer: users.skill_passer,
                 skill_other: users.skill_other,
                 male: users.male,
-                picture: users.picture
+                picture: users.picture,
+                email: users.email,
+                phone: users.phone
             })
             .from(users)
             .where(eq(users.id, playerId))
@@ -571,16 +577,19 @@ export const getPlayerDetailsPublic = withAction(
             return fail("Player not found.")
         }
 
+        // Current-season commissioners (and admins) may see contact info;
+        // captains and court managers get the redacted sentinels.
+        const isCommissioner = await isCommissionerBySession()
+
         const player: AdminPlayerDetails = {
             ...userData,
             old_id: null,
             name: null,
-            email: "",
+            email: isCommissioner ? userData.email : "",
             emailVerified: false,
-            // Redacted alongside the address itself — captains never see
-            // deliverability state.
+            // Deliverability state stays redacted even for commissioners.
             email_status: "",
-            phone: null,
+            phone: isCommissioner ? userData.phone : null,
             emergency_contact: null,
             onboarding_completed: null,
             seasons_list: "",

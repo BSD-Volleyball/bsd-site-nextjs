@@ -251,8 +251,8 @@ describe("getPlayerDetails — email suppressions", () => {
         expect(result.data.emailSuppressions).toEqual([])
     })
 
-    // Commissioners already have the address itself redacted; deliverability
-    // state must follow it rather than leaking around the redaction.
+    // Commissioners see contact info (email/phone) but deliverability state
+    // and suppression history stay admin-only.
     it("hides suppressions and status from a non-admin commissioner", async () => {
         const season = await createSeason()
         const player = await seedSuppressedPlayer()
@@ -264,9 +264,28 @@ describe("getPlayerDetails — email suppressions", () => {
 
         expect(result.status).toBe(true)
         if (!result.status) return
-        expect(result.data.player.email).toBe("")
+        expect(result.data.player.email).toBe(player.email)
         expect(result.data.player.email_status).toBe("")
         expect(result.data.emailSuppressions).toEqual([])
+    })
+
+    it("returns phone and email to a current-season commissioner but keeps emergency contact redacted", async () => {
+        const season = await createSeason()
+        const player = await createUser({
+            phone: "555-123-4567",
+            emergency_contact: "Jane Doe 555-999-0000"
+        })
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id }
+        ])
+
+        const result = await getPlayerDetails(player.id)
+
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        expect(result.data.player.phone).toBe("555-123-4567")
+        expect(result.data.player.email).toBe(player.email)
+        expect(result.data.player.emergency_contact).toBeNull()
     })
 
     it("rejects callers with no commissioner access", async () => {

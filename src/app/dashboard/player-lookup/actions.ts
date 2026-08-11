@@ -326,14 +326,14 @@ export const getPlayerDetails = withAction(
         )
 
         const isAdmin = await isAdminOrDirectorBySession()
+        // Non-admin viewers here are current-season commissioners (action
+        // guard above), so email and phone stay visible for them.
         const sanitizedPlayer = isAdmin
             ? player
             : {
                   ...player,
-                  email: "",
                   emailVerified: false,
                   email_status: "",
-                  phone: null,
                   emergency_contact: null,
                   onboarding_completed: null,
                   createdAt: new Date(0),
