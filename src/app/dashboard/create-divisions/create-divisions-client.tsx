@@ -593,7 +593,7 @@ export function CreateDivisionsClient({
                     disabled={saving}
                     className="rounded-md border px-4 py-2 font-medium text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    Reset to Defaults
+                    Recalc values based on current Sign Ups
                 </button>
             </div>
         </div>
