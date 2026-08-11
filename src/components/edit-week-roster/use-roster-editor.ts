@@ -113,6 +113,22 @@ export function useRosterEditor<TSlot extends RosterEditorSlot>({
         setIsSaving(false)
     }
 
+    // Offers every saved assignment for notification (diff against an empty
+    // baseline), covering the initial lock-in where nothing has "changed"
+    // since page load so the post-save dialog never fires.
+    const handleNotifyAll = () => {
+        const changes = computeDiff(
+            [],
+            lastSavedSlots.current.filter((s) => s.userId)
+        )
+        if (changes.length === 0) {
+            toast.error("No saved assignments to notify.")
+            return
+        }
+        setPendingChanges(changes)
+        setNotifyDialogOpen(true)
+    }
+
     const handleSendNotifications = async (selectedUserIds: string[]) => {
         setIsSendingNotifications(true)
         const toNotify = pendingChanges.filter((c) =>
@@ -132,6 +148,7 @@ export function useRosterEditor<TSlot extends RosterEditorSlot>({
         updateSlot,
         isSaving,
         handleSubmit,
+        handleNotifyAll,
         notifyDialog: {
             open: notifyDialogOpen,
             changes: pendingChanges,
