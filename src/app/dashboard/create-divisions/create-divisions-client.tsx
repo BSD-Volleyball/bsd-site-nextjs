@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { StatusBanner } from "@/components/ui/status-banner"
 import { saveDivisionSelections } from "./actions"
 import type {
     ActiveDivision,
@@ -10,6 +11,11 @@ import type {
     ExistingDivisionConfig,
     GenderSplit
 } from "./actions"
+
+// Maximum player deficit that can be absorbed by 7-player teams in the
+// lowest division (which has 4 teams in every tier) before the default
+// algorithm drops down a tier.
+const SHORT_TEAM_SLACK = 4
 
 interface DivisionState {
     divisionId: number
@@ -59,27 +65,33 @@ function computeDefaults(
 
     const total = totalMales + totalNonMales
 
+    // The lowest division (BB, index N-1) has 4 teams in every tier, and each
+    // of its teams can run with 7 players instead of 8 — so a deficit of up
+    // to 4 players is absorbed by short BB teams rather than dropping a
+    // division from 6 teams to 4 (or disabling one).
+    const effectiveTotal = total + SHORT_TEAM_SLACK
+
     // Step 1 — determine which divisions are enabled and their team counts.
     // Indices are into allDivisions (0 = lowest level, N-1 = highest level).
     let disabledIndices: number[]
     let fourTeamIndices: number[]
 
-    if (total >= 272) {
+    if (effectiveTotal >= 272) {
         disabledIndices = []
         fourTeamIndices = [N - 1]
-    } else if (total >= 256) {
+    } else if (effectiveTotal >= 256) {
         disabledIndices = []
         fourTeamIndices = [N - 1, N - 2]
-    } else if (total >= 240) {
+    } else if (effectiveTotal >= 240) {
         disabledIndices = []
         fourTeamIndices = [N - 1, N - 2, 0]
-    } else if (total >= 224) {
+    } else if (effectiveTotal >= 224) {
         disabledIndices = [N - 3]
         fourTeamIndices = [N - 1]
-    } else if (total >= 208) {
+    } else if (effectiveTotal >= 208) {
         disabledIndices = [N - 3]
         fourTeamIndices = [N - 1, 0]
-    } else if (total >= 192) {
+    } else if (effectiveTotal >= 192) {
         disabledIndices = [N - 3]
         fourTeamIndices = [N - 1, 0, 1]
     } else {
@@ -249,6 +261,21 @@ export function CreateDivisionsClient({
     const leftoverMales = totalMales - placedMales
     const leftoverNonMales = totalNonMales - placedNonMales
 
+    // A deficit of up to SHORT_TEAM_SLACK players is absorbed by the lowest
+    // division (last in the ascending-by-level list) running that many teams
+    // with 7 players instead of 8.
+    const totalLeftover = leftoverMales + leftoverNonMales
+    const lowestDivision = activeDivisions[activeDivisions.length - 1]
+    const lowestState = divStates.find(
+        (s) => s.divisionId === lowestDivision?.id
+    )
+    const shortTeams =
+        totalLeftover < 0 &&
+        totalLeftover >= -SHORT_TEAM_SLACK &&
+        lowestState?.enabled
+            ? -totalLeftover
+            : 0
+
     const handleSave = async () => {
         setSaving(true)
         try {
@@ -271,6 +298,34 @@ export function CreateDivisionsClient({
 
     return (
         <div className="space-y-6">
+            {/* Action buttons + feedback */}
+            <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {saving ? "Saving…" : "Save Division Configuration"}
+                </button>
+                <button
+                    type="button"
+                    onClick={handleResetToDefaults}
+                    disabled={saving}
+                    className="rounded-md border px-4 py-2 font-medium text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    Recalc values based on current Sign Ups
+                </button>
+            </div>
+
+            {shortTeams > 0 && lowestDivision && lowestState && (
+                <StatusBanner variant="warning">
+                    {shortTeams >= lowestState.teams
+                        ? `All ${lowestState.teams} ${lowestDivision.name} teams will only have 7 players (not enough signups to fill every team to 8).`
+                        : `${shortTeams} of the ${lowestState.teams} ${lowestDivision.name} teams will only have 7 players (not enough signups to fill every team to 8).`}
+                </StatusBanner>
+            )}
+
             <div className="flex items-start gap-6">
                 {/* Left: Total counts */}
                 <div className="w-40 shrink-0">
@@ -575,26 +630,6 @@ export function CreateDivisionsClient({
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Action buttons + feedback */}
-            <div className="flex items-center gap-3">
-                <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    {saving ? "Saving…" : "Save Division Configuration"}
-                </button>
-                <button
-                    type="button"
-                    onClick={handleResetToDefaults}
-                    disabled={saving}
-                    className="rounded-md border px-4 py-2 font-medium text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    Recalc values based on current Sign Ups
-                </button>
             </div>
         </div>
     )
