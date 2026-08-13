@@ -20,8 +20,7 @@ import {
     DialogTitle
 } from "@/components/ui/dialog"
 import { UserCombobox } from "@/components/user-combobox"
-import { formatShortDate } from "@/lib/season-utils"
-import type { NextMatch, LastMatchResult } from "@/lib/next-match"
+import { friendScheduleLine, friendLastResultLine } from "@/lib/friends-display"
 import type { FriendsPageData } from "./data"
 import {
     cancelFriendRequest,
@@ -54,24 +53,6 @@ function FriendThumbnail({
             {name.charAt(0)}
         </div>
     )
-}
-
-function nextMatchLine(nextMatch: NextMatch | null): string {
-    if (!nextMatch) return "No upcoming match"
-    const parts = [
-        `Week ${nextMatch.week}`,
-        `${formatShortDate(nextMatch.date)}${nextMatch.time ? ` ${nextMatch.time}` : ""}`
-    ]
-    if (nextMatch.court !== null) parts.push(`Court ${nextMatch.court}`)
-    parts.push(`vs ${nextMatch.opponentName}`)
-    if (nextMatch.divisionName) parts.push(`(${nextMatch.divisionName})`)
-    return parts.join(" · ")
-}
-
-function lastResultLine(lastResult: LastMatchResult | null): string {
-    if (!lastResult) return "—"
-    const letter = lastResult.won ? "W" : "L"
-    return `${letter} ${lastResult.myGames}–${lastResult.oppGames} vs ${lastResult.opponentName}`
 }
 
 export function FriendsPageClient({ data }: { data: FriendsPageData }) {
@@ -231,15 +212,16 @@ export function FriendsPageClient({ data }: { data: FriendsPageData }) {
                                             {friend.name}
                                         </button>
                                         <div className="text-muted-foreground text-sm">
-                                            {friend.nextMatch
-                                                ? `Next: ${nextMatchLine(friend.nextMatch)}`
-                                                : friend.lastResult
-                                                  ? "No upcoming match"
-                                                  : "Not playing this season"}
+                                            {friend.nextMatch ||
+                                            friend.preseason
+                                                ? `Next: ${friendScheduleLine(friend, { includeOpponent: true })}`
+                                                : friendScheduleLine(friend)}
                                         </div>
                                         <div className="text-muted-foreground text-sm">
                                             Last result:{" "}
-                                            {lastResultLine(friend.lastResult)}
+                                            {friendLastResultLine(
+                                                friend.lastResult
+                                            )}
                                         </div>
                                     </div>
                                     {confirmRemoveId === friend.userId ? (

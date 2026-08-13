@@ -1,23 +1,12 @@
 import { RiUserHeartLine } from "@remixicon/react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatShortDate } from "@/lib/season-utils"
+import { friendScheduleLine } from "@/lib/friends-display"
 import type { FriendNextMatchEntry } from "@/lib/friends"
 
 export interface FriendsCardData {
     playerPicUrl: string
     friends: FriendNextMatchEntry[]
-}
-
-function nextMatchLine(friend: FriendNextMatchEntry): string {
-    const nextMatch = friend.nextMatch
-    if (!nextMatch) return "No upcoming match"
-    const parts = [
-        `Week ${nextMatch.week}`,
-        `${formatShortDate(nextMatch.date)}${nextMatch.time ? ` ${nextMatch.time}` : ""}`
-    ]
-    if (nextMatch.court !== null) parts.push(`Court ${nextMatch.court}`)
-    return parts.join(" · ")
 }
 
 export function FriendsCard({ data }: { data: FriendsCardData }) {
@@ -58,7 +47,7 @@ export function FriendsCard({ data }: { data: FriendsCardData }) {
                                 {friend.name}
                             </div>
                             <div className="text-muted-foreground text-xs">
-                                {nextMatchLine(friend)}
+                                {friendScheduleLine(friend)}
                             </div>
                         </div>
                     </div>

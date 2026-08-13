@@ -9,8 +9,8 @@
  */
 
 import { db } from "@/database/db"
-import { friendships, users } from "@/database/schema"
-import { eq, and, or, desc } from "drizzle-orm"
+import { friendships, signups, users } from "@/database/schema"
+import { eq, and, or, desc, inArray } from "drizzle-orm"
 import { formatPlayerName } from "@/lib/utils"
 import {
     getNextMatchForUser,
@@ -18,6 +18,10 @@ import {
     type NextMatch,
     type LastMatchResult
 } from "@/lib/next-match"
+import {
+    getPreseasonAssignmentsForUsers,
+    type PreseasonAssignment
+} from "@/lib/preseason-assignment"
 
 export interface FriendProfile {
     userId: string
@@ -30,14 +34,21 @@ export interface FriendEntry extends FriendProfile {
     friendshipId: number
 }
 
-export interface FriendListEntry extends FriendEntry {
+/** Season-schedule context shared by the page rows and the dashboard card. */
+export interface FriendScheduleContext {
     nextMatch: NextMatch | null
+    preseason: PreseasonAssignment | null
+    /** Has a signups row for the season, whether or not they're scheduled. */
+    signedUpForSeason: boolean
+}
+
+export interface FriendListEntry extends FriendEntry, FriendScheduleContext {
     lastResult: LastMatchResult | null
 }
 
-export interface FriendNextMatchEntry extends FriendEntry {
-    nextMatch: NextMatch | null
-}
+export interface FriendNextMatchEntry
+    extends FriendEntry,
+        FriendScheduleContext {}
 
 export interface PendingRequestEntry extends FriendProfile {
     friendshipId: number
@@ -190,6 +201,39 @@ export async function listOutgoingRequests(
 }
 
 /**
+ * Season context for a set of users, batched: who is signed up and who holds
+ * a preseason tryout slot. Both are needed to tell "no assignment yet" apart
+ * from "not in this season".
+ */
+async function loadSeasonContext(
+    userIds: string[],
+    seasonId: number
+): Promise<{
+    signedUp: Set<string>
+    preseason: Map<string, PreseasonAssignment>
+}> {
+    if (userIds.length === 0) {
+        return { signedUp: new Set(), preseason: new Map() }
+    }
+    const [signupRows, preseason] = await Promise.all([
+        db
+            .select({ player: signups.player })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, seasonId),
+                    inArray(signups.player, userIds)
+                )
+            ),
+        getPreseasonAssignmentsForUsers(userIds, seasonId)
+    ])
+    return {
+        signedUp: new Set(signupRows.map((row) => row.player)),
+        preseason
+    }
+}
+
+/**
  * Friends with their next match and last result for the season. Pass a null
  * seasonId (no season configured) to skip schedule lookups.
  */
@@ -198,33 +242,62 @@ export async function getFriendsWithSchedule(
     seasonId: number | null
 ): Promise<FriendListEntry[]> {
     const friends = await listFriends(userId)
+    if (seasonId === null) {
+        return friends.map((friend) => ({
+            ...friend,
+            nextMatch: null,
+            preseason: null,
+            signedUpForSeason: false,
+            lastResult: null
+        }))
+    }
+
+    const context = await loadSeasonContext(
+        friends.map((f) => f.userId),
+        seasonId
+    )
     return Promise.all(
         friends.map(async (friend) => {
-            const [nextMatch, lastResult] =
-                seasonId !== null
-                    ? await Promise.all([
-                          getNextMatchForUser(friend.userId, seasonId),
-                          getLastMatchResultForUser(friend.userId, seasonId)
-                      ])
-                    : [null, null]
-            return { ...friend, nextMatch, lastResult }
+            const [nextMatch, lastResult] = await Promise.all([
+                getNextMatchForUser(friend.userId, seasonId),
+                getLastMatchResultForUser(friend.userId, seasonId)
+            ])
+            return {
+                ...friend,
+                nextMatch,
+                preseason: context.preseason.get(friend.userId) ?? null,
+                signedUpForSeason: context.signedUp.has(friend.userId),
+                lastResult
+            }
         })
     )
 }
 
-/** Lighter variant for the dashboard card: next match only. */
+/** Lighter variant for the dashboard card: no last-result lookup. */
 export async function getFriendsWithNextMatch(
     userId: string,
     seasonId: number | null
 ): Promise<FriendNextMatchEntry[]> {
     const friends = await listFriends(userId)
+    if (seasonId === null) {
+        return friends.map((friend) => ({
+            ...friend,
+            nextMatch: null,
+            preseason: null,
+            signedUpForSeason: false
+        }))
+    }
+
+    const context = await loadSeasonContext(
+        friends.map((f) => f.userId),
+        seasonId
+    )
     return Promise.all(
         friends.map(async (friend) => ({
             ...friend,
-            nextMatch:
-                seasonId !== null
-                    ? await getNextMatchForUser(friend.userId, seasonId)
-                    : null
+            nextMatch: await getNextMatchForUser(friend.userId, seasonId),
+            preseason: context.preseason.get(friend.userId) ?? null,
+            signedUpForSeason: context.signedUp.has(friend.userId)
         }))
     )
 }
