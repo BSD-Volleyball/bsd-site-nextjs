@@ -59,6 +59,12 @@ import {
     type PlayoffNextMatchData
 } from "./next-match-actions"
 import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
+import { FriendsCard } from "@/components/dashboard/friends-card"
+import {
+    getFriendsWithNextMatch,
+    type FriendNextMatchEntry
+} from "@/lib/friends"
+import { playerPicBaseUrl } from "@/config/env"
 import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-card"
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
@@ -130,6 +136,7 @@ export default async function DashboardPage() {
     let playerTeamAssignment: PlayerTeamAssignment | null = null
     let nextMatch: NextMatch | null = null
     let playoffNextMatches: PlayoffNextMatchData | null = null
+    let friendsNextMatches: FriendNextMatchEntry[] = []
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -191,6 +198,11 @@ export default async function DashboardPage() {
         userName = user?.preferred_name || user?.first_name || null
 
         const seasonId = signupStatus?.config.seasonId
+
+        friendsNextMatches = await getFriendsWithNextMatch(
+            session.user.id,
+            seasonId ?? null
+        )
 
         // Run permission check and admin eval stats in parallel — both are independent
         const [canViewConcerns, evalStatsResult] = await Promise.all([
@@ -932,6 +944,14 @@ export default async function DashboardPage() {
                 )}
                 {playoffNextMatches && (
                     <PlayoffNextMatchCard data={playoffNextMatches} />
+                )}
+                {friendsNextMatches.length > 0 && (
+                    <FriendsCard
+                        data={{
+                            playerPicUrl: playerPicBaseUrl(),
+                            friends: friendsNextMatches
+                        }}
+                    />
                 )}
                 {!playoffNextMatches && nextMatch && (
                     <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">

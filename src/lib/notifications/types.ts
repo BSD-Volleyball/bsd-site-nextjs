@@ -19,6 +19,7 @@ export type NotificationCategoryId =
     | "roster_draft"
     | "game_reminders"
     | "captain"
+    | "friends"
 
 export type NotificationType =
     | "league_announcements"
@@ -35,6 +36,8 @@ export type NotificationType =
     | "sub_request_approved"
     | "sub_request_declined"
     | "sub_request_cancelled"
+    | "friend_request_received"
+    | "friend_request_accepted"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -75,6 +78,11 @@ export const NOTIFICATION_CATEGORIES: Record<
         label: "Captain notifications",
         description:
             "Only sent while you're a team captain: roster availability and sub requests."
+    },
+    friends: {
+        label: "Friends",
+        description:
+            "Friend requests and confirmations from other league members."
     }
 }
 
@@ -175,6 +183,18 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Sub request cancelled",
             description:
                 "When a sub request involving your team is cancelled or superseded."
+        },
+        friend_request_received: {
+            category: "friends",
+            stream: "outbound",
+            label: "Friend requests",
+            description: "When another member sends you a friend request."
+        },
+        friend_request_accepted: {
+            category: "friends",
+            stream: "outbound",
+            label: "Friend request accepted",
+            description: "When someone accepts your friend request."
         },
         transactional: {
             category: null,

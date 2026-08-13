@@ -28,7 +28,8 @@ import {
     RiInboxLine,
     RiImageLine,
     RiNotification3Line,
-    RiArchiveLine
+    RiArchiveLine,
+    RiUserHeartLine
 } from "@remixicon/react"
 
 export type NavItem = {
@@ -55,6 +56,11 @@ export const baseNavItems: NavItem[] = [
         title: "League Rules",
         url: "/dashboard/rules",
         icon: RiFileList3Line
+    },
+    {
+        title: "Friends",
+        url: "/dashboard/friends",
+        icon: RiUserHeartLine
     },
     {
         title: "Report a Concern",

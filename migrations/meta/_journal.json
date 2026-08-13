@@ -64,6 +64,13 @@
       "when": 1785969650985,
       "tag": "0008_bent_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786628129532,
+      "tag": "0009_even_gauntlet",
+      "breakpoints": true
     }
   ]
 }

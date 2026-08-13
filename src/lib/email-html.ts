@@ -232,6 +232,36 @@ export function buildSubRequestEmailHtml(opts: {
     })
 }
 
+export function buildFriendRequestHtml(opts: {
+    firstName: string
+    requesterName: string
+}): string {
+    return renderEmailHtml({
+        heading: "New friend request",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p><strong>${escapeHtml(opts.requesterName)}</strong> sent you a friend request. Approve it to follow each other's schedules and results.</p>
+        `,
+        action: "View Friend Requests",
+        actionUrl: `${site.url}/dashboard/friends`
+    })
+}
+
+export function buildFriendAcceptedHtml(opts: {
+    firstName: string
+    accepterName: string
+}): string {
+    return renderEmailHtml({
+        heading: "Friend request accepted",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p><strong>${escapeHtml(opts.accepterName)}</strong> accepted your friend request. You can now see each other's upcoming matches and results.</p>
+        `,
+        action: "View Friends",
+        actionUrl: `${site.url}/dashboard/friends`
+    })
+}
+
 export function buildGameReminderHtml(opts: {
     firstName: string
     role: "player" | "referee"

@@ -14,7 +14,8 @@ import {
     unique,
     uniqueIndex,
     jsonb,
-    index
+    index,
+    check
 } from "drizzle-orm/pg-core"
 
 export const users = pgTable("users", {
@@ -1492,6 +1493,60 @@ export const subRequests = pgTable(
         subRequestsPendingUniq: uniqueIndex("sub_requests_pending_uniq")
             .on(table.match, table.original_user, table.target_user)
             .where(sql`${table.status} = 'pending'`)
+    })
+)
+
+// --- Friendships (player-to-player) ---
+
+export const friendshipStatusEnum = pgEnum("friendship_status", [
+    "pending",
+    "accepted",
+    "declined",
+    "cancelled",
+    "removed"
+])
+
+/**
+ * A friend request / friendship edge. `requester` → `addressee` records who
+ * asked; once accepted the relationship is mutual and the direction is only
+ * historical. declined/cancelled/removed are terminal and never block a
+ * re-request (partial unique index below).
+ */
+export const friendships = pgTable(
+    "friendships",
+    {
+        id: serial("id").primaryKey(),
+        requester: text("requester")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        addressee: text("addressee")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        status: friendshipStatusEnum("status").default("pending").notNull(),
+        responded_at: timestamp("responded_at"),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        friendshipsRequesterIdx: index("friendships_requester_idx").on(
+            table.requester
+        ),
+        friendshipsAddresseeIdx: index("friendships_addressee_idx").on(
+            table.addressee
+        ),
+        // One live edge per unordered pair: blocks duplicate pendings in
+        // either direction and a second accepted edge, while terminal rows
+        // accumulate as history.
+        friendshipsLivePairUniq: uniqueIndex("friendships_live_pair_uniq")
+            .on(
+                sql`least(${table.requester}, ${table.addressee})`,
+                sql`greatest(${table.requester}, ${table.addressee})`
+            )
+            .where(sql`${table.status} IN ('pending', 'accepted')`),
+        friendshipsNoSelf: check(
+            "friendships_no_self",
+            sql`${table.requester} <> ${table.addressee}`
+        )
     })
 )
 

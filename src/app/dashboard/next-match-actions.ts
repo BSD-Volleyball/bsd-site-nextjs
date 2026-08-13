@@ -14,7 +14,8 @@ import {
     userUnavailability,
     playoffMatchesMeta
 } from "@/database/schema"
-import { eq, and, inArray, asc, or, isNull } from "drizzle-orm"
+import { eq, and, inArray, asc } from "drizzle-orm"
+import { getNextMatchForUser, type NextMatch } from "@/lib/next-match"
 import {
     parseSourceToken,
     sourceContainsTeam,
@@ -34,184 +35,23 @@ import {
 } from "@/lib/rbac"
 import { formatMatchTime } from "@/lib/season-utils"
 
-export interface NextMatch {
-    date: string
-    time: string | null
-    court: number | null
-    opponentName: string
-    divisionName: string
-    week: number
-    isUnavailable: boolean
-}
+export type { NextMatch } from "@/lib/next-match"
 
 export async function getNextMatch(
     userId: string,
     seasonId: number
 ): Promise<NextMatch | null> {
-    try {
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (!session) return null
-        if (session.user.id !== userId) {
-            const allowed =
-                (await isAdminOrDirectorBySession()) ||
-                (await isCommissionerBySession()) ||
-                (await hasCaptainPagesAccessBySession())
-            if (!allowed) return null
-        }
-
-        const [draftRecord] = await db
-            .select({ teamId: teams.id, divisionId: teams.division })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .where(and(eq(drafts.user, userId), eq(teams.season, seasonId)))
-            .limit(1)
-
-        if (!draftRecord) return null
-
-        const [nextMatchRow] = await db
-            .select({
-                id: matches.id,
-                date: matches.date,
-                time: matches.time,
-                court: matches.court,
-                week: matches.week,
-                playoff: matches.playoff,
-                homeTeamId: matches.home_team,
-                awayTeamId: matches.away_team,
-                divisionId: matches.division
-            })
-            .from(matches)
-            .where(
-                and(
-                    eq(matches.season, seasonId),
-                    // Unplayed matches: no score entered via either scoring mode
-                    isNull(matches.home_score),
-                    isNull(matches.home_set1_score),
-                    or(
-                        eq(matches.home_team, draftRecord.teamId),
-                        eq(matches.away_team, draftRecord.teamId)
-                    )
-                )
-            )
-            .orderBy(matches.week, matches.time)
-            .limit(1)
-
-        if (!nextMatchRow) return null
-
-        // Always resolve the season event by week so we can check availability.
-        // The match.date column may be set directly, but availability is stored
-        // against season_events entries — so we need matchEventId regardless.
-        let matchDate: string | null = nextMatchRow.date
-        let matchEventId: number | null = null
-        const eventType = nextMatchRow.playoff ? "playoff" : "regular_season"
-        const seasonEventsForType = await db
-            .select({
-                eventDate: seasonEvents.event_date,
-                id: seasonEvents.id
-            })
-            .from(seasonEvents)
-            .where(
-                and(
-                    eq(seasonEvents.season_id, seasonId),
-                    eq(seasonEvents.event_type, eventType)
-                )
-            )
-            .orderBy(asc(seasonEvents.event_date))
-        const weekEvent = seasonEventsForType[nextMatchRow.week - 1]
-        if (weekEvent) {
-            matchEventId = weekEvent.id
-            if (!matchDate) {
-                matchDate = weekEvent.eventDate
-            }
-        }
-
-        if (!matchDate) return null
-
-        const opponentTeamId =
-            nextMatchRow.homeTeamId === draftRecord.teamId
-                ? nextMatchRow.awayTeamId
-                : nextMatchRow.homeTeamId
-
-        if (opponentTeamId === null) return null
-
-        const [opponentTeam, divisionRow] = await Promise.all([
-            db
-                .select({
-                    id: teams.id,
-                    number: teams.number,
-                    name: teams.name,
-                    divisionId: teams.division
-                })
-                .from(teams)
-                .where(eq(teams.id, opponentTeamId))
-                .limit(1),
-            db
-                .select({ name: divisions.name })
-                .from(divisions)
-                .where(eq(divisions.id, nextMatchRow.divisionId))
-                .limit(1)
-        ])
-
-        const opponent = opponentTeam[0]
-        if (!opponent) return null
-
-        // Check if opponent's division is drafted
-        const [draftedCheck] = await db
-            .select({ teamId: drafts.team })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .where(eq(teams.division, opponent.divisionId))
-            .limit(1)
-
-        const isDivisionDrafted = !!draftedCheck
-        const opponentName = isDivisionDrafted
-            ? opponent.name
-            : opponent.number !== null
-              ? `Team ${opponent.number}`
-              : opponent.name
-
-        // Check if player has marked themselves unavailable for this match's event
-        let isUnavailable = false
-        if (matchEventId !== null) {
-            const [signup] = await db
-                .select({ id: signups.id })
-                .from(signups)
-                .where(
-                    and(
-                        eq(signups.player, userId),
-                        eq(signups.season, seasonId)
-                    )
-                )
-                .limit(1)
-
-            if (signup) {
-                const [unavailRecord] = await db
-                    .select({ id: userUnavailability.id })
-                    .from(userUnavailability)
-                    .where(
-                        and(
-                            eq(userUnavailability.signup_id, signup.id),
-                            eq(userUnavailability.event_id, matchEventId)
-                        )
-                    )
-                    .limit(1)
-                isUnavailable = !!unavailRecord
-            }
-        }
-
-        return {
-            date: matchDate,
-            time: formatMatchTime(nextMatchRow.time),
-            court: nextMatchRow.court,
-            opponentName,
-            divisionName: divisionRow[0]?.name ?? "",
-            week: nextMatchRow.week,
-            isUnavailable
-        }
-    } catch (error) {
-        console.error("Error fetching next match:", error)
-        return null
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session) return null
+    if (session.user.id !== userId) {
+        const allowed =
+            (await isAdminOrDirectorBySession()) ||
+            (await isCommissionerBySession()) ||
+            (await hasCaptainPagesAccessBySession())
+        if (!allowed) return null
     }
+
+    return getNextMatchForUser(userId, seasonId)
 }
 
 export interface PlayoffNextMatchItem {
