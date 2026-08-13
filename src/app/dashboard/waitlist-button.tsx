@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { WaiverContent } from "@/components/waiver-content"
 import { expressWaitlistInterest } from "./roster-actions"
@@ -19,10 +26,18 @@ export function WaitlistButton({
     activeWaiver
 }: WaitlistButtonProps) {
     const router = useRouter()
+    const [open, setOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [waiverAgreed, setWaiverAgreed] = useState(false)
 
-    const handleClick = async () => {
+    // Never carry a checked box across openings — each visit to the dialog has
+    // to be its own affirmative acceptance.
+    const handleOpenChange = (next: boolean) => {
+        setOpen(next)
+        if (!next) setWaiverAgreed(false)
+    }
+
+    const handleSubmit = async () => {
         if (!activeWaiver) return
         setIsLoading(true)
 
@@ -31,14 +46,16 @@ export function WaitlistButton({
             activeWaiver.id,
             waiverAgreed
         )
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
         setIsLoading(false)
+
+        if (!result.status) {
+            toast.error(result.message)
+            return
+        }
+
+        toast.success(result.message)
+        handleOpenChange(false)
+        router.refresh()
     }
 
     if (!activeWaiver) {
@@ -51,31 +68,50 @@ export function WaitlistButton({
     }
 
     return (
-        <div className="space-y-3">
-            <div className="space-y-2">
-                <h3 className="font-medium text-base">
-                    Liability and Conduct Waiver
-                </h3>
-                <WaiverContent content={activeWaiver.content} />
-            </div>
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id={`waitlist-waiver-agree-${seasonId}`}
-                    checked={waiverAgreed}
-                    onCheckedChange={(checked: boolean | "indeterminate") =>
-                        setWaiverAgreed(checked === true)
-                    }
-                />
-                <Label
-                    htmlFor={`waitlist-waiver-agree-${seasonId}`}
-                    className="cursor-pointer font-medium"
-                >
-                    I Agree
-                </Label>
-            </div>
-            <Button onClick={handleClick} disabled={isLoading || !waiverAgreed}>
-                {isLoading ? "Submitting..." : "Express Interest"}
-            </Button>
-        </div>
+        <>
+            <Button onClick={() => setOpen(true)}>Express Interest</Button>
+            <Dialog open={open} onOpenChange={handleOpenChange}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Liability and Conduct Waiver</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-muted-foreground text-sm">
+                        Before we add you to the waitlist, please read and
+                        accept the waiver below.
+                    </p>
+                    <WaiverContent content={activeWaiver.content} />
+                    <div className="flex items-start gap-2 pt-2">
+                        <Checkbox
+                            id={`waitlist-waiver-agree-${seasonId}`}
+                            checked={waiverAgreed}
+                            onCheckedChange={(
+                                checked: boolean | "indeterminate"
+                            ) => setWaiverAgreed(checked === true)}
+                        />
+                        <Label
+                            htmlFor={`waitlist-waiver-agree-${seasonId}`}
+                            className="cursor-pointer font-normal text-sm"
+                        >
+                            I have read and agree to the waiver.
+                        </Label>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleOpenChange(false)}
+                            disabled={isLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={isLoading || !waiverAgreed}
+                        >
+                            {isLoading ? "Submitting..." : "Express Interest"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }
