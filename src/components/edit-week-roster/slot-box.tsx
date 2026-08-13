@@ -7,6 +7,11 @@
 
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger
+} from "@/components/ui/tooltip"
 import { RiAddLine, RiDeleteBinLine, RiUserLine } from "@remixicon/react"
 import { PlayerCombobox, type ComboboxPlayer } from "./player-combobox"
 
@@ -45,11 +50,11 @@ export function SlotBox<TSlot extends SlotBoxSlot>({
     excludeIdsFor
 }: SlotBoxProps<TSlot>) {
     return (
-        <div className="space-y-2 rounded-md border p-3">
+        <div className="space-y-2 rounded-md border p-2 sm:p-3">
             <h3 className="font-semibold text-sm">{title}</h3>
             <div className="space-y-2">
                 {slots.map((slot, idx) => (
-                    <div key={slot.localKey} className="flex items-end gap-1">
+                    <div key={slot.localKey} className="flex items-end gap-0.5">
                         <div className="min-w-0 flex-1 space-y-1">
                             <p className="text-muted-foreground text-xs">
                                 Slot {idx + 1}
@@ -67,27 +72,43 @@ export function SlotBox<TSlot extends SlotBoxSlot>({
                             {belowCombobox?.(slot)}
                         </div>
                         {slot.userId && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="shrink-0"
-                                aria-label="View player details"
-                                onClick={() => onOpenDetail(slot.userId)}
-                            >
-                                <RiUserLine className="h-4 w-4 text-muted-foreground" />
-                            </Button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-7 shrink-0"
+                                        aria-label="View player details"
+                                        onClick={() =>
+                                            onOpenDetail(slot.userId)
+                                        }
+                                    >
+                                        <RiUserLine className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                    View player details
+                                </TooltipContent>
+                            </Tooltip>
                         )}
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0"
-                            aria-label="Remove player from slot"
-                            onClick={() => onRemoveSlot(slot.localKey)}
-                        >
-                            <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-7 shrink-0"
+                                    aria-label="Remove this slot"
+                                    onClick={() => onRemoveSlot(slot.localKey)}
+                                >
+                                    <RiDeleteBinLine className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                                Remove this slot
+                            </TooltipContent>
+                        </Tooltip>
                     </div>
                 ))}
             </div>

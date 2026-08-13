@@ -12,6 +12,11 @@ import {
     PopoverContent,
     PopoverTrigger
 } from "@/components/ui/popover"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger
+} from "@/components/ui/tooltip"
 import { cn, formatDisplayName } from "@/lib/utils"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 
@@ -99,60 +104,74 @@ export function PlayerCombobox({
         })
     }, [players, search, excludeIds, value])
 
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className={cn(
-                        "w-full justify-between font-normal",
-                        selectedPlayer && getGenderClass(selectedPlayer.male)
-                    )}
-                    disabled={disabled}
-                >
-                    {selectedPlayer ? (
-                        <span className="flex min-w-0 flex-1 items-baseline gap-2 truncate">
-                            <span className="truncate">
-                                {getComboboxPlayerLabel(selectedPlayer)}
-                            </span>
-                            <PlayerMeta player={selectedPlayer} />
+    const trigger = (
+        <PopoverTrigger asChild>
+            <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className={cn(
+                    "h-9 w-full justify-between gap-1 px-2 font-normal",
+                    selectedPlayer && getGenderClass(selectedPlayer.male)
+                )}
+                disabled={disabled}
+            >
+                {selectedPlayer ? (
+                    <span className="flex min-w-0 flex-1 items-baseline gap-1.5 truncate">
+                        <span className="truncate">
+                            {getComboboxPlayerLabel(selectedPlayer)}
                         </span>
-                    ) : (
-                        <span className="truncate text-muted-foreground">
-                            Select player...
-                        </span>
-                    )}
-                    <div className="flex items-center gap-1">
-                        {selectedPlayer && !disabled && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
+                        <PlayerMeta player={selectedPlayer} />
+                    </span>
+                ) : (
+                    <span className="truncate text-muted-foreground">
+                        Select player...
+                    </span>
+                )}
+                <div className="flex shrink-0 items-center">
+                    {selectedPlayer && !disabled && (
+                        <span
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Clear player"
+                            className="rounded-sm p-0.5 hover:bg-accent"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                setOpen(false)
+                                onChange("")
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
                                     e.stopPropagation()
                                     setOpen(false)
                                     onChange("")
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        setOpen(false)
-                                        onChange("")
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                        )}
-                        <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                </Button>
-            </PopoverTrigger>
+                                }
+                            }}
+                        >
+                            <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                    )}
+                    <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                </div>
+            </Button>
+        </PopoverTrigger>
+    )
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            {selectedPlayer ? (
+                <Tooltip>
+                    <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+                    <TooltipContent side="top">
+                        {getComboboxPlayerLabel(selectedPlayer)}
+                    </TooltipContent>
+                </Tooltip>
+            ) : (
+                trigger
+            )}
             <PopoverContent
-                className="w-(--radix-popover-trigger-width) p-2"
+                className="w-(--radix-popover-trigger-width) min-w-64 p-2"
                 align="start"
             >
                 <Input
@@ -188,7 +207,10 @@ export function PlayerCombobox({
                                 }}
                             >
                                 <span className="flex items-baseline justify-between gap-2">
-                                    <span>
+                                    <span
+                                        className="truncate"
+                                        title={getComboboxPlayerLabel(player)}
+                                    >
                                         {getComboboxPlayerLabel(player)}
                                     </span>
                                     <PlayerMeta player={player} />
