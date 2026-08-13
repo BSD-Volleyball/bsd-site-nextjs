@@ -37,6 +37,7 @@ export function RatePlayerDialog({
         setting,
         hitting,
         serving,
+        blocking,
         sharedNotes,
         setSharedNotes,
         privateNotes,
@@ -138,6 +139,14 @@ export function RatePlayerDialog({
                                 disabled={false}
                                 onChange={(value) =>
                                     handleSkillChange("serving", value)
+                                }
+                            />
+                            <SkillSlider
+                                label="Blocking"
+                                value={blocking}
+                                disabled={false}
+                                onChange={(value) =>
+                                    handleSkillChange("blocking", value)
                                 }
                             />
 

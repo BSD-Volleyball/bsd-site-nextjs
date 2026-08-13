@@ -50,7 +50,8 @@ export function PlayerRatingsSection({
         ratingAverages.passing !== null ||
         ratingAverages.setting !== null ||
         ratingAverages.hitting !== null ||
-        ratingAverages.serving !== null
+        ratingAverages.serving !== null ||
+        ratingAverages.blocking !== null
 
     const hasRatingEvaluators =
         showRatingEvaluators && ratingAverages.sampleEvaluators.length > 0
@@ -143,6 +144,12 @@ export function PlayerRatingsSection({
                             {formatRatingValue(ratingAverages.serving)}
                         </span>
                     </div>
+                    <div>
+                        <span className="text-muted-foreground">Blocking:</span>
+                        <span className="ml-2 font-medium">
+                            {formatRatingValue(ratingAverages.blocking)}
+                        </span>
+                    </div>
                 </div>
             ) : (
                 <p className="text-muted-foreground text-sm">
@@ -219,6 +226,14 @@ export function PlayerRatingsSection({
                             </span>
                             <span className="ml-2 font-medium">
                                 {formatRatingValue(viewerRating.serving)}
+                            </span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">
+                                Blocking:
+                            </span>
+                            <span className="ml-2 font-medium">
+                                {formatRatingValue(viewerRating.blocking)}
                             </span>
                         </div>
                     </div>

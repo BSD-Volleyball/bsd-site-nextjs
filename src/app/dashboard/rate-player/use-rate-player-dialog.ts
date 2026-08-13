@@ -26,6 +26,7 @@ export function useRatePlayerDialog(
     const [setting, setSetting] = useState(0)
     const [hitting, setHitting] = useState(0)
     const [serving, setServing] = useState(0)
+    const [blocking, setBlocking] = useState(0)
     const [sharedNotes, setSharedNotes] = useState("")
     const [privateNotes, setPrivateNotes] = useState("")
     const [hasPendingSkillSave, setHasPendingSkillSave] = useState(false)
@@ -54,7 +55,8 @@ export function useRatePlayerDialog(
                 passing,
                 setting,
                 hitting,
-                serving
+                serving,
+                blocking
             })
 
             if (latestSaveRequestIdRef.current !== requestId) {
@@ -83,7 +85,8 @@ export function useRatePlayerDialog(
         passing,
         setting,
         hitting,
-        serving
+        serving,
+        blocking
     ])
 
     useEffect(
@@ -107,6 +110,7 @@ export function useRatePlayerDialog(
         setSetting(rating.setting ?? 0)
         setHitting(rating.hitting ?? 0)
         setServing(rating.serving ?? 0)
+        setBlocking(rating.blocking ?? 0)
         setSharedNotes(rating.sharedNotes || "")
         setPrivateNotes(rating.privateNotes || "")
         setSelectedPlayer(player)
@@ -153,8 +157,10 @@ export function useRatePlayerDialog(
             setSetting(value)
         } else if (skill === "hitting") {
             setHitting(value)
-        } else {
+        } else if (skill === "serving") {
             setServing(value)
+        } else {
+            setBlocking(value)
         }
 
         updateRatingStateForPlayer(selectedPlayer.id, { [skill]: value })
@@ -181,7 +187,8 @@ export function useRatePlayerDialog(
                     passing,
                     setting,
                     hitting,
-                    serving
+                    serving,
+                    blocking
                 }),
                 savePlayerRatingNote(selectedPlayer.id, "shared", sharedNotes),
                 savePlayerRatingNote(selectedPlayer.id, "private", privateNotes)
@@ -195,7 +202,8 @@ export function useRatePlayerDialog(
                 passing,
                 setting,
                 hitting,
-                serving
+                serving,
+                blocking
             })
         }
 
@@ -236,6 +244,7 @@ export function useRatePlayerDialog(
         setting,
         hitting,
         serving,
+        blocking,
         sharedNotes,
         setSharedNotes,
         privateNotes,

@@ -1,0 +1,1 @@
+ALTER TABLE "player_ratings" ADD COLUMN "blocking" real;

@@ -65,6 +65,7 @@ export async function getPlayerRatingsSectionData(
             setting: playerRatings.setting,
             hitting: playerRatings.hitting,
             serving: playerRatings.serving,
+            blocking: playerRatings.blocking,
             sharedNote: playerRatings.shared_notes,
             privateNote: playerRatings.private_notes,
             updatedAt: playerRatings.updated_at
@@ -123,6 +124,7 @@ export async function getPlayerRatingsSectionData(
               setting: viewerRow.setting,
               hitting: viewerRow.hitting,
               serving: viewerRow.serving,
+              blocking: viewerRow.blocking,
               privateNote: viewerRow.privateNote?.trim() || null,
               seasonLabel:
                   seasonLabelById.get(viewerRow.seasonId) ||
@@ -137,6 +139,7 @@ export async function getPlayerRatingsSectionData(
             setting: average(ratingRows.map((row) => row.setting)),
             hitting: average(ratingRows.map((row) => row.hitting)),
             serving: average(ratingRows.map((row) => row.serving)),
+            blocking: average(ratingRows.map((row) => row.blocking)),
             sampleCount: ratingRows.length,
             sampleEvaluators: ratingRows.map((row) => ({
                 evaluatorName:

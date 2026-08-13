@@ -36,6 +36,7 @@ export function getEmptyRating(): PlayerRatingValues {
         setting: null,
         hitting: null,
         serving: null,
+        blocking: null,
         sharedNotes: null,
         privateNotes: null
     }

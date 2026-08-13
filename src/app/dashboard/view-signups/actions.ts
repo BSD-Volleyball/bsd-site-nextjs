@@ -75,6 +75,7 @@ export interface SignupCsvEntry {
     viewerSettingRating: number | null
     viewerHittingRating: number | null
     viewerServingRating: number | null
+    viewerBlockingRating: number | null
     viewerSharedNotes: string | null
     viewerPrivateNotes: string | null
 }
@@ -215,6 +216,7 @@ export const getSignupsCsvData = withAction(
                         setting: number | null
                         hitting: number | null
                         serving: number | null
+                        blocking: number | null
                         sharedNotes: string | null
                         privateNotes: string | null
                     }
@@ -228,6 +230,7 @@ export const getSignupsCsvData = withAction(
                         setting: playerRatings.setting,
                         hitting: playerRatings.hitting,
                         serving: playerRatings.serving,
+                        blocking: playerRatings.blocking,
                         sharedNotes: playerRatings.shared_notes,
                         privateNotes: playerRatings.private_notes
                     })
@@ -247,6 +250,7 @@ export const getSignupsCsvData = withAction(
                         setting: row.setting,
                         hitting: row.hitting,
                         serving: row.serving,
+                        blocking: row.blocking,
                         sharedNotes: row.sharedNotes?.trim() || null,
                         privateNotes: row.privateNotes?.trim() || null
                     })
@@ -310,6 +314,7 @@ export const getSignupsCsvData = withAction(
                 viewerSettingRating: viewerRating?.setting ?? null,
                 viewerHittingRating: viewerRating?.hitting ?? null,
                 viewerServingRating: viewerRating?.serving ?? null,
+                viewerBlockingRating: viewerRating?.blocking ?? null,
                 viewerSharedNotes: viewerRating?.sharedNotes ?? null,
                 viewerPrivateNotes: viewerRating?.privateNotes ?? null
             }

@@ -813,6 +813,7 @@ export const playerRatings = pgTable(
         setting: real("setting"),
         hitting: real("hitting"),
         serving: real("serving"),
+        blocking: real("blocking"),
         shared_notes: text("shared_notes"),
         private_notes: text("private_notes"),
         updated_at: timestamp("updated_at").defaultNow().notNull()

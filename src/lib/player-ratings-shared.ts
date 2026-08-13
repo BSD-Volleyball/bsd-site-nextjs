@@ -9,6 +9,7 @@ export interface PlayerRatingAverages {
     setting: number | null
     hitting: number | null
     serving: number | null
+    blocking: number | null
     sampleCount: number
     sampleEvaluators: PlayerRatingSampleEvaluator[]
     seasonLabels: string[]
@@ -38,6 +39,7 @@ export interface PlayerViewerRating {
     setting: number | null
     hitting: number | null
     serving: number | null
+    blocking: number | null
     privateNote: string | null
     seasonLabel: string
 }
@@ -56,6 +58,7 @@ export function getEmptyPlayerRatingAverages(): PlayerRatingAverages {
         setting: null,
         hitting: null,
         serving: null,
+        blocking: null,
         sampleCount: 0,
         sampleEvaluators: [],
         seasonLabels: []

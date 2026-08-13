@@ -34,6 +34,7 @@ export function generateCsvContent(
         "My Setting Rating",
         "My Hitting Rating",
         "My Serving Rating",
+        "My Blocking Rating",
         "My Shared Notes",
         "My Private Notes"
     ]
@@ -65,6 +66,7 @@ export function generateCsvContent(
         entry.viewerSettingRating ?? "",
         entry.viewerHittingRating ?? "",
         entry.viewerServingRating ?? "",
+        entry.viewerBlockingRating ?? "",
         entry.viewerSharedNotes || "",
         entry.viewerPrivateNotes || ""
     ])

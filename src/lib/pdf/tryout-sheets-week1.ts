@@ -627,7 +627,7 @@ export async function generateWeek1TryoutSheetsPdf(): Promise<NextResponse> {
 
                             page.drawText(
                                 truncateToFit({
-                                    text: "Pass __  Set __  Hit __  Serve __",
+                                    text: "Pass __  Set __  Hit __  Serve __  Block __",
                                     maxWidth: column.width - 8,
                                     fontSize: notesFontSize,
                                     font: regularFont

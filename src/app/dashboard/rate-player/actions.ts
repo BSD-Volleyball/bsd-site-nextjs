@@ -47,6 +47,7 @@ export interface PlayerRatingValues {
     setting: number | null
     hitting: number | null
     serving: number | null
+    blocking: number | null
     sharedNotes: string | null
     privateNotes: string | null
 }
@@ -97,6 +98,7 @@ export type RatingSkill =
     | "setting"
     | "hitting"
     | "serving"
+    | "blocking"
 export type RatingNoteType = "shared" | "private"
 
 export interface SkillRatingsInput {
@@ -105,6 +107,7 @@ export interface SkillRatingsInput {
     setting: number
     hitting: number
     serving: number
+    blocking: number
 }
 
 const validSkills = new Set<RatingSkill>([
@@ -112,7 +115,8 @@ const validSkills = new Set<RatingSkill>([
     "passing",
     "setting",
     "hitting",
-    "serving"
+    "serving",
+    "blocking"
 ])
 
 const validNoteTypes = new Set<RatingNoteType>(["shared", "private"])
@@ -214,7 +218,11 @@ function getRatingSkillUpdate(
         return { hitting: nullableValue }
     }
 
-    return { serving: nullableValue }
+    if (skill === "serving") {
+        return { serving: nullableValue }
+    }
+
+    return { blocking: nullableValue }
 }
 
 function getRatingNoteUpdate(
@@ -390,6 +398,7 @@ export async function getRatePlayerData(): Promise<{
                 setting: playerRatings.setting,
                 hitting: playerRatings.hitting,
                 serving: playerRatings.serving,
+                blocking: playerRatings.blocking,
                 sharedNotes: playerRatings.shared_notes,
                 privateNotes: playerRatings.private_notes
             })
@@ -409,6 +418,7 @@ export async function getRatePlayerData(): Promise<{
                 setting: row.setting,
                 hitting: row.hitting,
                 serving: row.serving,
+                blocking: row.blocking,
                 sharedNotes: row.sharedNotes,
                 privateNotes: row.privateNotes
             }
@@ -729,7 +739,8 @@ export const savePlayerSkillRatings = withAction(
             values.passing,
             values.setting,
             values.hitting,
-            values.serving
+            values.serving,
+            values.blocking
         ]
 
         const areValuesValid = skillValues.every(
@@ -763,6 +774,7 @@ export const savePlayerSkillRatings = withAction(
                     setting: toNullableRating(values.setting),
                     hitting: toNullableRating(values.hitting),
                     serving: toNullableRating(values.serving),
+                    blocking: toNullableRating(values.blocking),
                     updated_at: now
                 })
                 .onConflictDoUpdate({
@@ -777,6 +789,7 @@ export const savePlayerSkillRatings = withAction(
                         setting: toNullableRating(values.setting),
                         hitting: toNullableRating(values.hitting),
                         serving: toNullableRating(values.serving),
+                        blocking: toNullableRating(values.blocking),
                         updated_at: now
                     }
                 })
