@@ -452,7 +452,7 @@ export const assignInboundEmail = withAction(
             const senderLabel = existing.from_name
                 ? `${existing.from_name} <${existing.from_address}>`
                 : existing.from_address
-            const link = `${site.url}/dashboard/manage-emails`
+            const link = `${site.url}/dashboard/manage-emails?email=${emailId}`
             const subjectLine = `An email has been assigned to you: ${existing.subject}`
             const textBody = [
                 `Hi ${assigneeName ?? "there"},`,

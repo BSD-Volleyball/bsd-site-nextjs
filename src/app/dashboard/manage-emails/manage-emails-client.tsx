@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import DOMPurify from "isomorphic-dompurify"
 import {
     addInboundEmailComment,
@@ -148,22 +148,38 @@ function StatusBadge({ status }: { status: string }) {
 function EmailCard({
     email,
     assignableAdmins,
+    initiallyExpanded = false,
     onUpdate,
     onPlayerClick
 }: {
     email: InboundEmailRow
     assignableAdmins: AssignableAdmin[]
+    initiallyExpanded?: boolean
     onUpdate: () => void
     onPlayerClick: (userId: string) => void
 }) {
     const [isPending, startTransition] = useTransition()
-    const [expanded, setExpanded] = useState(false)
+    const [expanded, setExpanded] = useState(initiallyExpanded)
     const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
     const [threadLoaded, setThreadLoaded] = useState(false)
     const [newComment, setNewComment] = useState("")
     const [commentMsg, setCommentMsg] = useState<string | null>(null)
     const [replyBody, setReplyBody] = useState("")
     const [replyMsg, setReplyMsg] = useState<string | null>(null)
+    const cardRef = useRef<HTMLDivElement | null>(null)
+
+    // Deep link (?email=<id>): the card mounts already expanded, so fetch the
+    // thread and bring it into view without waiting for a toggle click.
+    useEffect(() => {
+        if (!initiallyExpanded) return
+        cardRef.current?.scrollIntoView({ block: "center" })
+        getEmailThread(email.id).then((result) => {
+            if (result.status) {
+                setThreadItems(result.data)
+                setThreadLoaded(true)
+            }
+        })
+    }, [initiallyExpanded, email.id])
 
     function loadThread() {
         if (threadLoaded) return
@@ -258,7 +274,7 @@ function EmailCard({
 
     return (
         <Collapsible open={expanded} onOpenChange={handleToggle}>
-            <div className="rounded-lg border bg-card">
+            <div ref={cardRef} className="rounded-lg border bg-card">
                 <CollapsibleTrigger asChild>
                     <button
                         type="button"
@@ -619,6 +635,7 @@ function EmailSection({
     emails,
     assignableAdmins,
     defaultOpen,
+    focusEmailId,
     onUpdate,
     onPlayerClick
 }: {
@@ -626,10 +643,15 @@ function EmailSection({
     emails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
     defaultOpen: boolean
+    focusEmailId: number | null
     onUpdate: () => void
     onPlayerClick: (userId: string) => void
 }) {
-    const [open, setOpen] = useState(defaultOpen)
+    // A deep-linked email must be reachable even when it sits in a section
+    // that is collapsed by default (Closed/Spam).
+    const containsFocus =
+        focusEmailId !== null && emails.some((e) => e.id === focusEmailId)
+    const [open, setOpen] = useState(defaultOpen || containsFocus)
 
     return (
         <Collapsible open={open} onOpenChange={setOpen}>
@@ -661,6 +683,7 @@ function EmailSection({
                                 key={e.id}
                                 email={e}
                                 assignableAdmins={assignableAdmins}
+                                initiallyExpanded={e.id === focusEmailId}
                                 onUpdate={onUpdate}
                                 onPlayerClick={onPlayerClick}
                             />
@@ -675,11 +698,13 @@ function EmailSection({
 export function ManageEmailsClient({
     initialEmails,
     assignableAdmins,
-    playerPicUrl
+    playerPicUrl,
+    focusEmailId = null
 }: {
     initialEmails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
     playerPicUrl: string
+    focusEmailId?: number | null
 }) {
     const [emails, setEmails] = useState(initialEmails)
     const [_isRefreshing, startRefresh] = useTransition()
@@ -723,6 +748,7 @@ export function ManageEmailsClient({
                 title="New Emails"
                 emails={newEmails}
                 assignableAdmins={assignableAdmins}
+                focusEmailId={focusEmailId}
                 defaultOpen={true}
                 onUpdate={refresh}
                 onPlayerClick={openPlayerDetail}
@@ -731,6 +757,7 @@ export function ManageEmailsClient({
                 title="Active Emails"
                 emails={activeEmails}
                 assignableAdmins={assignableAdmins}
+                focusEmailId={focusEmailId}
                 defaultOpen={true}
                 onUpdate={refresh}
                 onPlayerClick={openPlayerDetail}
@@ -739,6 +766,7 @@ export function ManageEmailsClient({
                 title="Closed Emails"
                 emails={closedEmails}
                 assignableAdmins={assignableAdmins}
+                focusEmailId={focusEmailId}
                 defaultOpen={false}
                 onUpdate={refresh}
                 onPlayerClick={openPlayerDetail}
@@ -747,6 +775,7 @@ export function ManageEmailsClient({
                 title="Spam"
                 emails={spamEmails}
                 assignableAdmins={assignableAdmins}
+                focusEmailId={focusEmailId}
                 defaultOpen={false}
                 onUpdate={refresh}
                 onPlayerClick={openPlayerDetail}

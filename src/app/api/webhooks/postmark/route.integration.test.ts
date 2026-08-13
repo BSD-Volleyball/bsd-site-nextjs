@@ -10,7 +10,7 @@ import {
     users
 } from "@/database/schema"
 import { sendBatchEmails, sendEmail } from "@/lib/postmark"
-import { createUser } from "@/test/session"
+import { createUser, createUserWithRoles } from "@/test/session"
 import { POST } from "./route"
 
 const WEBHOOK_USER = "postmark-hook"
@@ -48,6 +48,17 @@ async function emailStatusOf(userId: string) {
         .from(users)
         .where(eq(users.id, userId))
     return row.email_status
+}
+
+/** Every notification body handed to the (mocked) Postmark send layer. */
+function sentHtmlBodies(): string[] {
+    const single = vi
+        .mocked(sendEmail)
+        .mock.calls.map(([opts]) => opts.htmlBody)
+    const batch = vi
+        .mocked(sendBatchEmails)
+        .mock.calls.flatMap(([messages]) => messages.map((m) => m.htmlBody))
+    return [...single, ...batch]
 }
 
 beforeEach(() => {
@@ -292,6 +303,19 @@ describe("inbound ticket notifications", () => {
         expect(tickets).toHaveLength(1)
         expect(tickets[0].from_address).toBe("outsider@example.test")
     })
+
+    it("links the new-ticket notification directly to the created ticket", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+
+        await POST(webhookRequest(inboundEmail()))
+
+        const [ticket] = await db
+            .select({ id: inboundEmails.id })
+            .from(inboundEmails)
+        expect(sentHtmlBodies().join("\n")).toContain(
+            `/dashboard/manage-emails?email=${ticket.id}`
+        )
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -387,6 +411,17 @@ describe("closed thread auto-reopen", () => {
             .from(inboundEmails)
             .where(eq(inboundEmails.id, ticketId))
         expect(ticket.status).toBe("spam")
+    })
+
+    it("links the staff notification directly to the thread", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const ticketId = await seedEmailThread("active")
+
+        await POST(webhookRequest(replyTo(`email-${ticketId}`)))
+
+        expect(sentHtmlBodies().join("\n")).toContain(
+            `/dashboard/manage-emails?email=${ticketId}`
+        )
     })
 
     it("leaves a new email thread as new", async () => {

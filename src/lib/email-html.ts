@@ -374,12 +374,13 @@ export function buildConcernNotificationHtml(appUrl: string): string {
 
 export function buildInboundEmailNotificationHtml(opts: {
     appUrl: string
+    ticketId: number
 }): string {
     return renderEmailHtml({
         heading: "New Inbound Email Received",
         bodyHtml: `<p>A new email has been received and is awaiting review.</p>`,
-        action: "View Emails",
-        actionUrl: `${opts.appUrl}/dashboard/manage-emails`
+        action: "View Email",
+        actionUrl: `${opts.appUrl}/dashboard/manage-emails?email=${opts.ticketId}`
     })
 }
 
@@ -390,7 +391,7 @@ export function buildThreadReplyNotificationHtml(opts: {
 }): string {
     const pageUrl =
         opts.ticketType === "email"
-            ? `${opts.appUrl}/dashboard/manage-emails`
+            ? `${opts.appUrl}/dashboard/manage-emails?email=${opts.ticketId}`
             : `${opts.appUrl}/dashboard/manage-concerns`
 
     const label = opts.ticketType === "email" ? "Email" : "Concern"

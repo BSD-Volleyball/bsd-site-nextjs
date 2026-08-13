@@ -12,8 +12,18 @@ export const metadata: Metadata = {
 
 export const revalidate = 300
 
-export default async function ManageEmailsPage() {
+export default async function ManageEmailsPage({
+    searchParams
+}: {
+    searchParams: Promise<{ email?: string }>
+}) {
     await requireAdminOrRedirect()
+
+    // Notification emails deep-link to a specific thread via ?email=<id>.
+    const { email } = await searchParams
+    const parsedId = Number.parseInt(email ?? "", 10)
+    const focusEmailId =
+        Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null
 
     const [emailsResult, assignableAdmins] = await Promise.all([
         getInboundEmails(),
@@ -35,6 +45,7 @@ export default async function ManageEmailsPage() {
                     initialEmails={emailsResult.data}
                     assignableAdmins={assignableAdmins}
                     playerPicUrl={playerPicBaseUrl()}
+                    focusEmailId={focusEmailId}
                 />
             )}
         </div>

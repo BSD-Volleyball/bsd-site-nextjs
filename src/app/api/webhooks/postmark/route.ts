@@ -170,12 +170,12 @@ async function notifyOmbudsmen(appUrl: string) {
     })
 }
 
-async function notifyAdmins(appUrl: string) {
+async function notifyAdmins(appUrl: string, ticketId: number) {
     await sendMail({
         mode: { kind: "staff", category: "inbound_email_received" },
         recipients: await recipientsWithRole("admin"),
         subject: "New Inbound Email Received",
-        htmlBody: buildInboundEmailNotificationHtml({ appUrl }),
+        htmlBody: buildInboundEmailNotificationHtml({ appUrl, ticketId }),
         tag: "inbound-email-notification"
     })
 }
@@ -626,17 +626,20 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
         })
         await notifyQuietly(() => notifyOmbudsmen(appUrl), "ombudsmen")
     } else {
-        await db.insert(inboundEmails).values({
-            email_id: messageId,
-            from_address: fromEmail,
-            from_name: fromName,
-            to_address: toAddresses[0] || payload.To,
-            subject,
-            body_text: bodyText,
-            body_html: bodyHtml,
-            status: "new"
-        })
-        await notifyQuietly(() => notifyAdmins(appUrl), "admins")
+        const [created] = await db
+            .insert(inboundEmails)
+            .values({
+                email_id: messageId,
+                from_address: fromEmail,
+                from_name: fromName,
+                to_address: toAddresses[0] || payload.To,
+                subject,
+                body_text: bodyText,
+                body_html: bodyHtml,
+                status: "new"
+            })
+            .returning({ id: inboundEmails.id })
+        await notifyQuietly(() => notifyAdmins(appUrl, created.id), "admins")
     }
 }
 
