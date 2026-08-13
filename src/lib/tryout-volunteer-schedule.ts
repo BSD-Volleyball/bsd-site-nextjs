@@ -183,14 +183,28 @@ export async function getVolunteerAssignmentsForDate(
     )
 }
 
+/**
+ * Whether an assignment covers the whole evening rather than one session —
+ * either by scope, or because no session time is set. Callers that label the
+ * assignment and callers that order it must both read this, or a whole-night
+ * job that carries a stray time slot reads "All night" while sorting at that
+ * slot's time.
+ */
+export function isAllNightAssignment(
+    assignment: Pick<VolunteerAssignmentDetail, "scope" | "startTime">
+): boolean {
+    return assignment.scope === "whole_night" || !assignment.startTime
+}
+
 /** Human-readable "when" for one assignment, e.g. "All night" or "6:00 PM". */
 export function assignmentTimeLabel(
     assignment: VolunteerAssignmentDetail
 ): string {
-    if (assignment.scope === "whole_night" || !assignment.startTime) {
+    const { startTime } = assignment
+    if (!startTime || isAllNightAssignment(assignment)) {
         return "All night"
     }
-    return formatEventTime(assignment.startTime)
+    return formatEventTime(startTime)
 }
 
 /** Human-readable "which night", e.g. "Tryout 2 — Thursday, September 17, 2026". */

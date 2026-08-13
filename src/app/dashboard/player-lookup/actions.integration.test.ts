@@ -699,6 +699,65 @@ describe("getPlayerSchedule", () => {
         ])
     })
 
+    it("keeps a whole-night job first even when a time slot is attached", async () => {
+        const season = await createSeason()
+        const tryout = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: future(3),
+            sort_order: 0
+        })
+        const early = await createEventTimeSlot(tryout.id, {
+            start_time: "18:00",
+            sort_order: 0
+        })
+        const late = await createEventTimeSlot(tryout.id, {
+            start_time: "20:00",
+            sort_order: 1
+        })
+        const player = await createUser()
+        const [wholeNightJob] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: tryout.id,
+                name: "Check-in",
+                scope: "whole_night"
+            })
+            .returning()
+        const [sessionJob] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: tryout.id,
+                name: "Scorekeeper",
+                scope: "per_session",
+                sort_order: 1
+            })
+            .returning()
+        // A whole-night job carrying a slot is a data anomaly, but it must
+        // still read and sort as all-night rather than at the slot time.
+        await db.insert(tryoutVolunteerAssignments).values([
+            {
+                job_id: wholeNightJob.id,
+                user_id: player.id,
+                time_slot_id: late.id
+            },
+            {
+                job_id: sessionJob.id,
+                user_id: player.id,
+                time_slot_id: early.id
+            }
+        ])
+        await createUserWithRoles([{ role: "captain" }])
+
+        const result = await getPlayerSchedule(player.id)
+
+        expect(result.volunteering.map((v) => [v.label, v.timeLabel])).toEqual([
+            ["Check-in — Tryout 1", "All night"],
+            ["Scorekeeper — Tryout 1", "6:00 PM"]
+        ])
+    })
+
     it("returns an empty schedule to viewers without captain access", async () => {
         const season = await createSeason()
         const player = await createUser()

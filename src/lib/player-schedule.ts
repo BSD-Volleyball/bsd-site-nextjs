@@ -42,7 +42,8 @@ import { getTeamRosterWithSubs } from "@/lib/roster"
 import { formatMatchTime } from "@/lib/season-utils"
 import {
     assignmentTimeLabel,
-    getVolunteerAssignmentsForSeason
+    getVolunteerAssignmentsForSeason,
+    isAllNightAssignment
 } from "@/lib/tryout-volunteer-schedule"
 import { formatDisplayName } from "@/lib/utils"
 
@@ -392,9 +393,13 @@ async function buildVolunteering(
         assignments
             .filter((a) => a.userId === userId && a.eventDate >= today)
             .map((a) => ({
-                // Whole-night jobs (null startTime) span the whole evening,
-                // so they sort ahead of the per-session ones.
-                sortKey: sortKeyFor(a.eventDate, a.startTime ?? "00:00:00"),
+                // Whole-night jobs span the evening, so they sort ahead of
+                // the per-session ones instead of taking sortKeyFor's
+                // unknown-time default, which sorts last.
+                sortKey: sortKeyFor(
+                    a.eventDate,
+                    isAllNightAssignment(a) ? "00:00:00" : a.startTime
+                ),
                 entry: {
                     date: a.eventDate,
                     timeLabel: assignmentTimeLabel(a),
