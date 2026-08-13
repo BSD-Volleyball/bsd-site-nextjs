@@ -511,7 +511,10 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
         if (existingThread.type === "email") {
             // Fetch assignee before inserting so we have it for notification
             const [ticket] = await db
-                .select({ assigned_to: inboundEmails.assigned_to })
+                .select({
+                    assigned_to: inboundEmails.assigned_to,
+                    status: inboundEmails.status
+                })
                 .from(inboundEmails)
                 .where(eq(inboundEmails.id, existingThread.id))
                 .limit(1)
@@ -525,6 +528,20 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 body_html: bodyHtml,
                 postmark_message_id: messageId
             })
+
+            // A reply to a closed thread reopens it so it resurfaces in the
+            // Active tab. Spam threads stay spam — junk must not resurrect
+            // its own ticket by replying.
+            if (ticket?.status === "closed") {
+                await db
+                    .update(inboundEmails)
+                    .set({ status: "active", updated_at: new Date() })
+                    .where(eq(inboundEmails.id, existingThread.id))
+                logger.info(
+                    "[postmark-webhook] Reopened closed email thread on reply",
+                    { ticketId: existingThread.id }
+                )
+            }
 
             await notifyQuietly(
                 () =>
@@ -543,7 +560,10 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
             })
         } else {
             const [ticket] = await db
-                .select({ assigned_to: concerns.assigned_to })
+                .select({
+                    assigned_to: concerns.assigned_to,
+                    status: concerns.status
+                })
                 .from(concerns)
                 .where(eq(concerns.id, existingThread.id))
                 .limit(1)
@@ -557,6 +577,17 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 body_html: bodyHtml,
                 postmark_message_id: messageId
             })
+
+            if (ticket?.status === "closed") {
+                await db
+                    .update(concerns)
+                    .set({ status: "active", updated_at: new Date() })
+                    .where(eq(concerns.id, existingThread.id))
+                logger.info(
+                    "[postmark-webhook] Reopened closed concern thread on reply",
+                    { ticketId: existingThread.id }
+                )
+            }
 
             await notifyQuietly(
                 () =>
