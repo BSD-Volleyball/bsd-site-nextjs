@@ -148,14 +148,20 @@ function StatusBadge({ status }: { status: string }) {
 function EmailCard({
     email,
     assignableAdmins,
+    currentUserId,
     initiallyExpanded = false,
+    focusRequest,
     onUpdate,
+    onFocusEmail,
     onPlayerClick
 }: {
     email: InboundEmailRow
     assignableAdmins: AssignableAdmin[]
+    currentUserId: string
     initiallyExpanded?: boolean
+    focusRequest: number
     onUpdate: () => void
+    onFocusEmail: (emailId: number) => void
     onPlayerClick: (userId: string) => void
 }) {
     const [isPending, startTransition] = useTransition()
@@ -166,12 +172,16 @@ function EmailCard({
     const [commentMsg, setCommentMsg] = useState<string | null>(null)
     const [replyBody, setReplyBody] = useState("")
     const [replyMsg, setReplyMsg] = useState<string | null>(null)
+    const [assignMsg, setAssignMsg] = useState<string | null>(null)
+    const [pendingFocus, setPendingFocus] = useState(0)
     const cardRef = useRef<HTMLDivElement | null>(null)
+    const replyRef = useRef<HTMLTextAreaElement | null>(null)
 
     // Deep link (?email=<id>): the card mounts already expanded, so fetch the
     // thread and bring it into view without waiting for a toggle click.
     useEffect(() => {
-        if (!initiallyExpanded) return
+        // A focus request handles its own scroll and thread load.
+        if (!initiallyExpanded || focusRequest) return
         cardRef.current?.scrollIntoView({ block: "center" })
         getEmailThread(email.id).then((result) => {
             if (result.status) {
@@ -179,7 +189,33 @@ function EmailCard({
                 setThreadLoaded(true)
             }
         })
-    }, [initiallyExpanded, email.id])
+    }, [initiallyExpanded, focusRequest, email.id])
+
+    // "Assign to Me" asks the parent to focus this email once the list has
+    // refreshed. The card may have moved sections (and remounted) or may have
+    // stayed put, so the request arrives as an incrementing nonce rather than a
+    // boolean read at mount.
+    useEffect(() => {
+        if (!focusRequest) return
+        setPendingFocus(focusRequest)
+        setExpanded(true)
+        getEmailThread(email.id).then((result) => {
+            if (result.status) {
+                setThreadItems(result.data)
+                setThreadLoaded(true)
+            }
+        })
+    }, [focusRequest, email.id])
+
+    // Deferred to the commit where the card is expanded, so the reply composer
+    // is mounted by the time we reach for it. Closed/spam emails have no
+    // composer — they just scroll into view.
+    useEffect(() => {
+        if (!pendingFocus || !expanded) return
+        setPendingFocus(0)
+        cardRef.current?.scrollIntoView({ block: "center" })
+        replyRef.current?.focus()
+    }, [pendingFocus, expanded])
 
     function loadThread() {
         if (threadLoaded) return
@@ -205,12 +241,31 @@ function EmailCard({
     }
 
     function handleAssignChange(assigneeId: string) {
+        setAssignMsg(null)
         startTransition(async () => {
-            await assignInboundEmail(
+            const result = await assignInboundEmail(
                 email.id,
                 assigneeId === "unassigned" ? null : assigneeId
             )
+            // Resync either way: on failure the select is showing a value that
+            // was never persisted.
+            if (!result.status) setAssignMsg(result.message)
             onUpdate()
+        })
+    }
+
+    // Shortcut past the admin dropdown: claim the email, which also promotes a
+    // "new" email to "active", then ask the parent to focus it for a reply.
+    function handleAssignToMe() {
+        setAssignMsg(null)
+        startTransition(async () => {
+            const result = await assignInboundEmail(email.id, currentUserId)
+            if (!result.status) {
+                setAssignMsg(result.message)
+                return
+            }
+            onUpdate()
+            onFocusEmail(email.id)
         })
     }
 
@@ -420,6 +475,22 @@ function EmailCard({
                                 </Select>
                             </div>
 
+                            {email.assigned_to !== currentUserId && (
+                                <div className="space-y-1">
+                                    <p className="font-medium text-muted-foreground text-xs">
+                                        Shortcut
+                                    </p>
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={handleAssignToMe}
+                                        disabled={isPending}
+                                    >
+                                        Assign to Me
+                                    </Button>
+                                </div>
+                            )}
+
                             {email.status === "active" && (
                                 <div className="space-y-1">
                                     <p className="font-medium text-muted-foreground text-xs">
@@ -481,6 +552,12 @@ function EmailCard({
                                 </div>
                             )}
                         </div>
+
+                        {assignMsg && (
+                            <p className="text-destructive text-sm">
+                                {assignMsg}
+                            </p>
+                        )}
 
                         {/* Thread: replies + internal comments (chronological) */}
                         <div className="space-y-3 border-t pt-2">
@@ -571,6 +648,7 @@ function EmailCard({
                                         {email.from_name ?? email.from_address}
                                     </p>
                                     <Textarea
+                                        ref={replyRef}
                                         rows={4}
                                         placeholder="Write your reply…"
                                         value={replyBody}
@@ -634,17 +712,23 @@ function EmailSection({
     title,
     emails,
     assignableAdmins,
+    currentUserId,
     defaultOpen,
     focusEmailId,
+    focusNonce,
     onUpdate,
+    onFocusEmail,
     onPlayerClick
 }: {
     title: string
     emails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
+    currentUserId: string
     defaultOpen: boolean
     focusEmailId: number | null
+    focusNonce: number
     onUpdate: () => void
+    onFocusEmail: (emailId: number) => void
     onPlayerClick: (userId: string) => void
 }) {
     // A deep-linked email must be reachable even when it sits in a section
@@ -683,8 +767,13 @@ function EmailSection({
                                 key={e.id}
                                 email={e}
                                 assignableAdmins={assignableAdmins}
+                                currentUserId={currentUserId}
                                 initiallyExpanded={e.id === focusEmailId}
+                                focusRequest={
+                                    e.id === focusEmailId ? focusNonce : 0
+                                }
                                 onUpdate={onUpdate}
+                                onFocusEmail={onFocusEmail}
                                 onPlayerClick={onPlayerClick}
                             />
                         ))
@@ -699,15 +788,27 @@ export function ManageEmailsClient({
     initialEmails,
     assignableAdmins,
     playerPicUrl,
+    currentUserId,
     focusEmailId = null
 }: {
     initialEmails: InboundEmailRow[]
     assignableAdmins: AssignableAdmin[]
     playerPicUrl: string
+    currentUserId: string
     focusEmailId?: number | null
 }) {
     const [emails, setEmails] = useState(initialEmails)
     const [_isRefreshing, startRefresh] = useTransition()
+    // Which email the page is focused on. Seeded by the ?email=<id> deep link
+    // and re-pointed by "Assign to Me"; the nonce re-fires focus even when the
+    // target email hasn't changed.
+    const [focusId, setFocusId] = useState(focusEmailId)
+    const [focusNonce, setFocusNonce] = useState(0)
+
+    function focusEmail(emailId: number) {
+        setFocusId(emailId)
+        setFocusNonce((n) => n + 1)
+    }
 
     const {
         selectedUserId,
@@ -748,36 +849,48 @@ export function ManageEmailsClient({
                 title="New Emails"
                 emails={newEmails}
                 assignableAdmins={assignableAdmins}
-                focusEmailId={focusEmailId}
+                currentUserId={currentUserId}
+                focusEmailId={focusId}
+                focusNonce={focusNonce}
                 defaultOpen={true}
                 onUpdate={refresh}
+                onFocusEmail={focusEmail}
                 onPlayerClick={openPlayerDetail}
             />
             <EmailSection
                 title="Active Emails"
                 emails={activeEmails}
                 assignableAdmins={assignableAdmins}
-                focusEmailId={focusEmailId}
+                currentUserId={currentUserId}
+                focusEmailId={focusId}
+                focusNonce={focusNonce}
                 defaultOpen={true}
                 onUpdate={refresh}
+                onFocusEmail={focusEmail}
                 onPlayerClick={openPlayerDetail}
             />
             <EmailSection
                 title="Closed Emails"
                 emails={closedEmails}
                 assignableAdmins={assignableAdmins}
-                focusEmailId={focusEmailId}
+                currentUserId={currentUserId}
+                focusEmailId={focusId}
+                focusNonce={focusNonce}
                 defaultOpen={false}
                 onUpdate={refresh}
+                onFocusEmail={focusEmail}
                 onPlayerClick={openPlayerDetail}
             />
             <EmailSection
                 title="Spam"
                 emails={spamEmails}
                 assignableAdmins={assignableAdmins}
-                focusEmailId={focusEmailId}
+                currentUserId={currentUserId}
+                focusEmailId={focusId}
+                focusNonce={focusNonce}
                 defaultOpen={false}
                 onUpdate={refresh}
+                onFocusEmail={focusEmail}
                 onPlayerClick={openPlayerDetail}
             />
             <AdminPlayerDetailPopup

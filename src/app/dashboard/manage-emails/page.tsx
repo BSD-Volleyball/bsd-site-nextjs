@@ -17,7 +17,7 @@ export default async function ManageEmailsPage({
 }: {
     searchParams: Promise<{ email?: string }>
 }) {
-    await requireAdminOrRedirect()
+    const session = await requireAdminOrRedirect()
 
     // Notification emails deep-link to a specific thread via ?email=<id>.
     const { email } = await searchParams
@@ -46,6 +46,7 @@ export default async function ManageEmailsPage({
                     assignableAdmins={assignableAdmins}
                     playerPicUrl={playerPicBaseUrl()}
                     focusEmailId={focusEmailId}
+                    currentUserId={session.user.id}
                 />
             )}
         </div>
