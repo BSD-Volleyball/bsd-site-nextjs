@@ -8,6 +8,7 @@ import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DivisionHistoryChart } from "./division-history-chart"
 import { PlayerRatingsSection } from "./player-ratings-section"
+import { PlayerScheduleSection } from "./player-schedule-section"
 import {
     getEmptyPlayerRatingAverages,
     type PlayerRatingAverages,
@@ -23,6 +24,7 @@ interface SeasonInfo {
 }
 
 interface PlayerInfo {
+    id?: string
     first_name: string
     last_name: string
     preferred_name: string | null
@@ -127,6 +129,11 @@ export function PlayerDetailPopup({
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        <PlayerScheduleSection
+                            open={open}
+                            playerId={playerDetails.id}
+                        />
+
                         {/* Basic Info */}
                         <div>
                             <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">

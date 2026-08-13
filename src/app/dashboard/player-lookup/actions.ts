@@ -21,6 +21,7 @@ import { eq, desc, ne, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
+    hasCaptainPagesAccessBySession,
     isCommissionerBySession,
     isAdminOrDirectorBySession
 } from "@/lib/rbac"
@@ -48,6 +49,14 @@ import {
 import { getUserSuppressionState } from "@/lib/notifications/suppressions"
 import { getDraftHistoryForUser } from "@/lib/roster"
 import { formatDisplayName } from "@/lib/utils"
+import { getLeagueDateString } from "@/lib/date-utils"
+import { getPlayerScheduleForUser } from "@/lib/player-schedule"
+import {
+    EMPTY_PLAYER_SCHEDULE,
+    type PlayerScheduleData,
+    type PlayerScheduleEntry
+} from "@/lib/player-schedule-types"
+import { getPlayoffNextMatches } from "@/app/dashboard/next-match-actions"
 
 export interface PlayerListItem {
     id: string
@@ -439,6 +448,54 @@ export async function getPlayerRoles(
                 a.role.localeCompare(b.role) ||
                 (b.season_id ?? 0) - (a.season_id ?? 0)
         )
+}
+
+/**
+ * Upcoming current-season schedule for a player: tryouts, games, reffing and
+ * volunteering. Captain-access gated (the lowest common gate across both
+ * player detail pop-ups); the pop-ups hide the Schedule section when this
+ * comes back empty. Playoff play/work rows are merged in from the bracket
+ * resolver in getPlayoffNextMatches().
+ */
+export async function getPlayerSchedule(
+    userId: string
+): Promise<PlayerScheduleData> {
+    if (typeof userId !== "string" || !userId) return EMPTY_PLAYER_SCHEDULE
+    if (!(await hasCaptainPagesAccessBySession())) return EMPTY_PLAYER_SCHEDULE
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return EMPTY_PLAYER_SCHEDULE
+
+    const [schedule, playoff] = await Promise.all([
+        getPlayerScheduleForUser(userId, config.seasonId),
+        getPlayoffNextMatches(userId, config.seasonId)
+    ])
+
+    if (playoff && playoff.status === "upcoming") {
+        const today = getLeagueDateString()
+        for (const item of playoff.items) {
+            const date = item.date ?? playoff.date
+            if (!date || date < today) continue
+            const entry: PlayerScheduleEntry = {
+                date,
+                // getPlayoffNextMatches pre-formats time; "" means TBD.
+                timeLabel: item.time || null,
+                court: item.court,
+                label:
+                    item.role === "play"
+                        ? `Playoffs Week ${item.week} vs ${item.opponentLabel ?? "TBD"} (${playoff.divisionName})`
+                        : `Playoff work duty (Week ${item.week}, ${playoff.divisionName})`,
+                sublabel: item.condition
+            }
+            if (item.role === "play") schedule.games.push(entry)
+            else schedule.reffing.push(entry)
+        }
+        // Re-sort by date only; the stable sort keeps the lib's within-date
+        // time ordering intact for the pre-existing entries.
+        schedule.games.sort((a, b) => a.date.localeCompare(b.date))
+        schedule.reffing.sort((a, b) => a.date.localeCompare(b.date))
+    }
+
+    return schedule
 }
 
 /**

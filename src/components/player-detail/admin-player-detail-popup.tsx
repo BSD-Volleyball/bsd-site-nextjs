@@ -26,6 +26,7 @@ import { formatHeight } from "./format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
 import { PlayerRatingsSection } from "./player-ratings-section"
+import { PlayerScheduleSection } from "./player-schedule-section"
 import { getGoogleMembershipLabel } from "@/lib/google-membership"
 import {
     emailStatusBadgeColor,
@@ -208,6 +209,11 @@ export function AdminPlayerDetailPopup({
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        <PlayerScheduleSection
+                            open={open}
+                            playerId={playerDetails.id}
+                        />
+
                         {/* Basic Info */}
                         <div>
                             <h3 className="mb-3 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
