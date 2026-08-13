@@ -48,10 +48,13 @@ export function DivisionHistoryChart({
         BB: 1
     }
 
-    const firstSeasonId = divisionHistory[0].seasonId
-    const lastSeasonId = divisionHistory[divisionHistory.length - 1].seasonId
+    const playedSeasonIds = divisionHistory.map((item) => item.seasonId)
+    const firstSeasonId = Math.min(...playedSeasonIds)
+    const lastSeasonId = Math.max(...playedSeasonIds)
+    // allSeasons arrives newest-first; sort ascending so the chart reads
+    // oldest season on the left, most recent on the right.
     const seasonsInRange = [...allSeasons]
-        .reverse()
+        .sort((a, b) => a.id - b.id)
         .filter((s) => s.id >= firstSeasonId && s.id <= lastSeasonId)
 
     const draftBySeasonId = new Map<number, DivisionHistoryItem>()
