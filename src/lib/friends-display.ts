@@ -14,6 +14,14 @@ export interface FriendScheduleFields {
 }
 
 /**
+ * Has a place to be: an upcoming match, or a tryout slot during the preseason
+ * weeks when nobody is drafted yet.
+ */
+export function isFriendScheduled(friend: FriendScheduleFields): boolean {
+    return !!(friend.nextMatch || friend.preseason)
+}
+
+/**
  * What a friend is doing next, in priority order: a scheduled match, then a
  * preseason tryout slot, then the two "nothing scheduled" cases — which are
  * different facts and must not be collapsed: a player signed up for the season
@@ -32,9 +40,10 @@ export function friendScheduleLine(
         ]
         if (nextMatch.court !== null) parts.push(`Court ${nextMatch.court}`)
         if (options.includeOpponent) {
-            parts.push(`vs ${nextMatch.opponentName}`)
-            if (nextMatch.divisionName)
-                parts.push(`(${nextMatch.divisionName})`)
+            const division = nextMatch.divisionName
+                ? ` (${nextMatch.divisionName})`
+                : ""
+            parts.push(`vs ${nextMatch.opponentName}${division}`)
         }
         return parts.join(" · ")
     }

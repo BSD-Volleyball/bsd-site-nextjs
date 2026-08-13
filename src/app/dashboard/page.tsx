@@ -64,6 +64,7 @@ import {
     getFriendsWithNextMatch,
     type FriendNextMatchEntry
 } from "@/lib/friends"
+import { isFriendScheduled } from "@/lib/friends-display"
 import { playerPicBaseUrl } from "@/config/env"
 import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-card"
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
@@ -136,7 +137,7 @@ export default async function DashboardPage() {
     let playerTeamAssignment: PlayerTeamAssignment | null = null
     let nextMatch: NextMatch | null = null
     let playoffNextMatches: PlayoffNextMatchData | null = null
-    let friendsNextMatches: FriendNextMatchEntry[] = []
+    let scheduledFriends: FriendNextMatchEntry[] = []
     let userWeek1Roster: { sessionNumber: number; courtNumber: number } | null =
         null
     let userWeek2Roster: {
@@ -199,10 +200,11 @@ export default async function DashboardPage() {
 
         const seasonId = signupStatus?.config.seasonId
 
-        friendsNextMatches = await getFriendsWithNextMatch(
-            session.user.id,
-            seasonId ?? null
-        )
+        // The card is "Friends Playing" — friends with nothing scheduled are
+        // still listed on the Friends page, just not surfaced here.
+        scheduledFriends = (
+            await getFriendsWithNextMatch(session.user.id, seasonId ?? null)
+        ).filter(isFriendScheduled)
 
         // Run permission check and admin eval stats in parallel — both are independent
         const [canViewConcerns, evalStatsResult] = await Promise.all([
@@ -2160,11 +2162,11 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
-                {friendsNextMatches.length > 0 && (
+                {scheduledFriends.length > 0 && (
                     <FriendsCard
                         data={{
                             playerPicUrl: playerPicBaseUrl(),
-                            friends: friendsNextMatches
+                            friends: scheduledFriends
                         }}
                     />
                 )}

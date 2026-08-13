@@ -28,7 +28,7 @@ import {
     respondToFriendRequest,
     sendFriendRequest
 } from "./actions"
-import { FriendAnalyticsPopup } from "./friend-analytics-popup"
+import { FriendAnalyticsPopup } from "@/components/friends/friend-analytics-popup"
 
 function FriendThumbnail({
     picture,
