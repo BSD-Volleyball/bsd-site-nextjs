@@ -29,7 +29,10 @@ import type {
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
-import { getDraftHistoryForUser } from "@/lib/roster"
+import {
+    getSeasonHistoryForUser,
+    type SeasonHistoryEntry
+} from "@/lib/player-season-history"
 
 export interface PlayerListItem {
     id: string
@@ -109,15 +112,8 @@ export interface PlayerDetails {
     phone: string | null
 }
 
-export interface PlayerDraftHistory {
-    seasonId: number
-    seasonYear: number
-    seasonName: string
-    divisionName: string
-    teamName: string
-    round: number
-    overall: number
-}
+/** Draft placement plus that season's record — see getSeasonHistoryForUser. */
+export type PlayerDraftHistory = SeasonHistoryEntry
 
 export interface PlayerDetailsForSignups {
     player: PlayerDetails
@@ -238,7 +234,7 @@ export const getPlayerDetailsForSignups = withAction(
         }
 
         // Fetch draft history
-        const draftData = await getDraftHistoryForUser(playerId)
+        const draftData = await getSeasonHistoryForUser(playerId)
 
         const playoffDates = getEventsByType(config, "playoff").map((e) =>
             formatEventDate(e.eventDate)

@@ -22,11 +22,17 @@ import {
     type EloMatchInput,
     subAppearanceKey
 } from "@/lib/player-elo"
-import { computeCareerStats, type CareerStats } from "@/lib/player-career-stats"
+import {
+    computeCareerStats,
+    computeSeasonRecords,
+    type CareerStats,
+    type SeasonRecord
+} from "@/lib/player-career-stats"
 import { getLastDraftInfoByUser } from "@/lib/roster"
 import { formatPlayerName } from "@/lib/utils"
 
 export interface ChampionshipEntry {
+    seasonId: number
     seasonLabel: string
     divisionName: string
     teamName: string | null
@@ -198,10 +204,44 @@ async function getChampionships(userId: string): Promise<ChampionshipEntry[]> {
     return [...byTeam.values()]
         .sort((a, b) => b.seasonYear - a.seasonYear || b.seasonId - a.seasonId)
         .map((row) => ({
+            seasonId: row.seasonId,
             seasonLabel: formatSeasonLabel(row.seasonName, row.seasonYear),
             divisionName: row.divisionName,
             teamName: row.teamName
         }))
+}
+
+/**
+ * A player's per-season match record plus whether they won the championship
+ * that season. Keyed by season id for joining onto draft history.
+ */
+export interface PlayerSeasonRecord extends SeasonRecord {
+    seasonId: number
+    champion: boolean
+}
+
+export async function getSeasonRecordsForUser(
+    userId: string
+): Promise<PlayerSeasonRecord[]> {
+    const [league, championships] = await Promise.all([
+        getLeagueElo(),
+        getChampionships(userId)
+    ])
+
+    const records = computeSeasonRecords(userId, league.matches, league.rosters)
+    const championSeasonIds = new Set(championships.map((c) => c.seasonId))
+
+    // A title season with no scored matches still deserves a row, so seed
+    // from both sources rather than only the ones with a record.
+    const seasonIds = new Set([...records.keys(), ...championSeasonIds])
+    return [...seasonIds].map((seasonId) => ({
+        seasonId,
+        regularWins: records.get(seasonId)?.regularWins ?? 0,
+        regularLosses: records.get(seasonId)?.regularLosses ?? 0,
+        playoffWins: records.get(seasonId)?.playoffWins ?? 0,
+        playoffLosses: records.get(seasonId)?.playoffLosses ?? 0,
+        champion: championSeasonIds.has(seasonId)
+    }))
 }
 
 async function getTopTeammates(

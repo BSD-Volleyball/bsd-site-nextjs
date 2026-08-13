@@ -39,11 +39,8 @@ import type {
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
-import {
-    getLastDraftInfoByUser,
-    getCurrentDraftDivisions,
-    getDraftHistoryForUser
-} from "@/lib/roster"
+import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
+import { getSeasonHistoryForUser } from "@/lib/player-season-history"
 import type {
     PlayerDetails as AdminPlayerDetails,
     PlayerDraftHistory,
@@ -661,7 +658,7 @@ export const getPlayerDetailsPublic = withAction(
             }
         }
 
-        const draftData = await getDraftHistoryForUser(playerId)
+        const draftData = await getSeasonHistoryForUser(playerId)
 
         const playoffDates = getEventsByType(config, "playoff").map((e) =>
             formatEventDate(e.eventDate)

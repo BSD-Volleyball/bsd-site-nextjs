@@ -1,17 +1,16 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
-import { db } from "@/database/db"
-import { drafts, teams, seasons, divisions } from "@/database/schema"
-import { eq } from "drizzle-orm"
 import type { Metadata } from "next"
 import {
     getAllSeasons,
     getEloLeaderboard,
     getPersonalAnalytics
 } from "@/lib/player-elo-data"
+import { getSeasonHistoryForUser } from "@/lib/player-season-history"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { CareerStatsCards } from "./career-stats-cards"
-import { DivisionHistoryChart } from "./division-history-chart"
+import { DivisionHistoryChart } from "@/components/player-detail/division-history-chart"
 import { EloLeaderboard } from "./elo-leaderboard"
 
 const LEADERBOARD_MIN_MATCHES = 10
@@ -23,43 +22,12 @@ export const metadata: Metadata = {
     title: "Analytics"
 }
 
-interface DivisionHistoryItem {
-    seasonId: number
-    seasonYear: number
-    seasonName: string
-    divisionName: string
-    teamName: string
-    round: number
-    overall: number
-}
-
-async function getDivisionHistory(
-    userId: string
-): Promise<DivisionHistoryItem[]> {
-    return db
-        .select({
-            seasonId: seasons.id,
-            seasonYear: seasons.year,
-            seasonName: seasons.season,
-            divisionName: divisions.name,
-            teamName: teams.name,
-            round: drafts.round,
-            overall: drafts.overall
-        })
-        .from(drafts)
-        .innerJoin(teams, eq(drafts.team, teams.id))
-        .innerJoin(seasons, eq(teams.season, seasons.id))
-        .innerJoin(divisions, eq(teams.division, divisions.id))
-        .where(eq(drafts.user, userId))
-        .orderBy(seasons.year, seasons.id)
-}
-
 export default async function AnalyticsPage() {
     const session = await requireSessionOrRedirect()
 
     const [divisionHistory, allSeasons, personal, leaderboard] =
         await Promise.all([
-            getDivisionHistory(session.user.id),
+            getSeasonHistoryForUser(session.user.id),
             getAllSeasons(),
             getPersonalAnalytics(session.user.id),
             SHOW_LEAGUE_SECTION
@@ -74,10 +42,21 @@ export default async function AnalyticsPage() {
                 description="Your career stats and skill rating."
             />
             <div className="grid gap-6 lg:grid-cols-2">
-                <DivisionHistoryChart
-                    divisionHistory={divisionHistory}
-                    allSeasons={allSeasons}
-                />
+                <Card className="max-w-2xl">
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Division History
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <DivisionHistoryChart
+                            draftHistory={divisionHistory}
+                            allSeasons={allSeasons}
+                            emptyMessage="No division history found yet."
+                            hideHeading
+                        />
+                    </CardContent>
+                </Card>
                 <EloTrendChart
                     eloHistory={personal.eloHistory}
                     allSeasons={allSeasons}

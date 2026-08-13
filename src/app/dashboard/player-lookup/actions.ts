@@ -47,7 +47,10 @@ import {
     type SeasonInfo
 } from "@/lib/player-elo-data"
 import { getUserSuppressionState } from "@/lib/notifications/suppressions"
-import { getDraftHistoryForUser } from "@/lib/roster"
+import {
+    getSeasonHistoryForUser,
+    type SeasonHistoryEntry
+} from "@/lib/player-season-history"
 import { formatDisplayName } from "@/lib/utils"
 import { getLeagueDateString } from "@/lib/date-utils"
 import { getPlayerScheduleForUser } from "@/lib/player-schedule"
@@ -145,15 +148,8 @@ export interface PlayerSignup {
     createdAt: Date
 }
 
-export interface PlayerDraftHistory {
-    seasonId: number
-    seasonYear: number
-    seasonName: string
-    divisionName: string
-    teamName: string
-    round: number
-    overall: number
-}
+/** Draft placement plus that season's record — see getSeasonHistoryForUser. */
+export type PlayerDraftHistory = SeasonHistoryEntry
 
 export interface PlayerSubHistoryEntry {
     kind: "permanent" | "regular"
@@ -328,7 +324,7 @@ export const getPlayerDetails = withAction(
         )
 
         // Fetch draft history
-        const draftData = await getDraftHistoryForUser(playerId)
+        const draftData = await getSeasonHistoryForUser(playerId)
 
         const playoffDates = getEventsByType(config, "playoff").map((e) =>
             formatEventDate(e.eventDate)

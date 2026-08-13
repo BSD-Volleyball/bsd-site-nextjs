@@ -30,7 +30,7 @@ import {
     getCommissionerDivisionAccess,
     isCommissionerBySession
 } from "@/lib/rbac"
-import { getDraftHistoryForUser } from "@/lib/roster"
+import { getSeasonHistoryForUser } from "@/lib/player-season-history"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -146,7 +146,7 @@ export const getPotentialCaptainPlayerDetails = withAction(
             return fail("Player not found.")
         }
 
-        const draftHistory = await getDraftHistoryForUser(playerId)
+        const draftHistory = await getSeasonHistoryForUser(playerId)
 
         let pairPickName: string | null = null
         let pairReason: string | null = null

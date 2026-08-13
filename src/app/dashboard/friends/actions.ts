@@ -22,9 +22,9 @@ import {
 import type { EloHistoryPoint } from "@/lib/player-elo"
 import type { CareerStats } from "@/lib/player-career-stats"
 import {
-    getDraftHistoryForUser,
-    type UserDraftHistoryEntry
-} from "@/lib/roster"
+    getSeasonHistoryForUser,
+    type SeasonHistoryEntry
+} from "@/lib/player-season-history"
 import { dispatchNotification } from "@/lib/notifications/dispatch"
 import {
     buildFriendRequestHtml,
@@ -283,7 +283,7 @@ export interface FriendAnalyticsResult {
     careerStats: CareerStats
     championships: ChampionshipEntry[]
     allSeasons: SeasonInfo[]
-    draftHistory: UserDraftHistoryEntry[]
+    draftHistory: SeasonHistoryEntry[]
 }
 
 /**
@@ -321,7 +321,7 @@ export const getFriendAnalytics = withAction(
         const [personal, allSeasons, draftHistory] = await Promise.all([
             getPersonalAnalytics(targetId),
             getAllSeasons(),
-            getDraftHistoryForUser(targetId)
+            getSeasonHistoryForUser(targetId)
         ])
 
         return ok({

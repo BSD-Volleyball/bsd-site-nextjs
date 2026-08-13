@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { computeCareerStats } from "@/lib/player-career-stats"
+import {
+    computeCareerStats,
+    computeSeasonRecords
+} from "@/lib/player-career-stats"
 import { rosterKey, type EloMatchInput } from "@/lib/player-elo"
 
 function eloMatch(overrides: Partial<EloMatchInput> = {}): EloMatchInput {
@@ -157,5 +160,83 @@ describe("computeCareerStats", () => {
         expect(stats.setLosses).toBe(1)
         // Legacy scores carry no point information
         expect(stats.pointDiff).toBe(0)
+    })
+})
+
+describe("computeSeasonRecords", () => {
+    it("splits regular season and playoff records per season", () => {
+        const matches = [
+            // Season 1: two regular-season results, one playoff win
+            setMatch(1, 10, 20, [[25, 20]], { seasonId: 1 }),
+            setMatch(2, 10, 20, [[20, 25]], { seasonId: 1, week: 2 }),
+            setMatch(3, 10, 20, [[25, 18]], {
+                seasonId: 1,
+                week: 3,
+                playoff: true
+            }),
+            // Season 2: one regular-season loss
+            setMatch(4, 30, 40, [[18, 25]], { seasonId: 2 })
+        ]
+        const records = computeSeasonRecords(
+            "a",
+            matches,
+            rosters([
+                [1, 10, ["a"]],
+                [1, 20, ["b"]],
+                [2, 10, ["a"]],
+                [2, 20, ["b"]],
+                [3, 10, ["a"]],
+                [3, 20, ["b"]],
+                [4, 30, ["a"]],
+                [4, 40, ["b"]]
+            ])
+        )
+
+        expect(records.get(1)).toEqual({
+            regularWins: 1,
+            regularLosses: 1,
+            playoffWins: 1,
+            playoffLosses: 0
+        })
+        expect(records.get(2)).toEqual({
+            regularWins: 0,
+            regularLosses: 1,
+            playoffWins: 0,
+            playoffLosses: 0
+        })
+    })
+
+    it("holds playoff results out of the regular-season record", () => {
+        const records = computeSeasonRecords(
+            "a",
+            [
+                setMatch(1, 10, 20, [[25, 20]], {
+                    seasonId: 7,
+                    playoff: true
+                })
+            ],
+            rosters([
+                [1, 10, ["a"]],
+                [1, 20, ["b"]]
+            ])
+        )
+        expect(records.get(7)).toEqual({
+            regularWins: 0,
+            regularLosses: 0,
+            playoffWins: 1,
+            playoffLosses: 0
+        })
+    })
+
+    it("omits seasons the player has no result in", () => {
+        const records = computeSeasonRecords(
+            "a",
+            [setMatch(1, 10, 20, [[25, 20]], { seasonId: 1 })],
+            rosters([
+                [1, 10, ["b"]],
+                [1, 20, ["c"]]
+            ])
+        )
+        expect(records.size).toBe(0)
     })
 })
