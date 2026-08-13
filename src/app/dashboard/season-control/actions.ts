@@ -18,6 +18,7 @@ import {
 import { and, asc, eq, desc, inArray, isNull, or } from "drizzle-orm"
 import { isAdminOrDirectorBySession, getSessionUserId } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
+import { pruneUnplayedBracketResets } from "@/lib/playoff-bracket-cleanup"
 import {
     type SeasonPhase,
     PHASE_CONFIG,
@@ -59,6 +60,7 @@ export const advanceSeasonPhase = withAction(
 
             let seedingSummary: string | null = null
             let championsSummary: string | null = null
+            let resetSummary: string | null = null
 
             if (targetPhase === "complete") {
                 const champs = await getDivisionChampions(seasonId)
@@ -137,6 +139,35 @@ export const advanceSeasonPhase = withAction(
                 })
 
                 championsSummary = ` Recorded champions for ${champs.length} division${champs.length === 1 ? "" : "s"}.`
+
+                // Seeding schedules the "if necessary" reset final up front,
+                // since nobody knows in advance whether it will be needed.
+                // Completion is the first moment we know it was not: leaving it
+                // renders an empty box on the end of the bracket, which reads
+                // as a missing result rather than a match that never happened.
+                // Non-fatal -- a cosmetic cleanup must not block completion,
+                // and the season can be re-swept with
+                // scripts/prune-unplayed-bracket-resets.ts.
+                try {
+                    const { pruned, skipped } =
+                        await pruneUnplayedBracketResets(seasonId)
+                    if (pruned.length > 0) {
+                        resetSummary = ` Removed ${pruned.length} unplayed "if necessary" final${pruned.length === 1 ? "" : "s"}.`
+                    }
+                    if (skipped.length > 0) {
+                        console.warn(
+                            "[season-control] Left unplayed finals in place",
+                            seasonId,
+                            skipped
+                        )
+                    }
+                } catch (err) {
+                    console.error(
+                        "[season-control] Reset-final cleanup failed",
+                        seasonId,
+                        err
+                    )
+                }
             }
 
             if (targetPhase === "playoffs") {
@@ -197,7 +228,7 @@ export const advanceSeasonPhase = withAction(
                 action: "advance_season_phase",
                 entityType: "season",
                 entityId: seasonId,
-                summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}${championsSummary ?? ""}`
+                summary: `Advanced season phase from "${PHASE_CONFIG[currentPhase].label}" to "${PHASE_CONFIG[targetPhase].label}"${seedingSummary ?? ""}${championsSummary ?? ""}${resetSummary ?? ""}`
             })
 
             // When season completes, clean up granular recipient groups (fire-and-forget)
@@ -214,7 +245,7 @@ export const advanceSeasonPhase = withAction(
             revalidatePath("/dashboard/season-control")
             return ok(
                 undefined,
-                `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}`
+                `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}${resetSummary ?? ""}`
             )
         } catch (error) {
             console.error("Failed to advance season phase:", error)
