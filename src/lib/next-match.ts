@@ -27,6 +27,8 @@ export interface NextMatch {
     divisionName: string
     week: number
     isUnavailable: boolean
+    /** Sortable `YYYY-MM-DDTHH:MM:SS`; `time` is display-formatted. */
+    sortKey: string
 }
 
 export interface LastMatchResult {
@@ -203,7 +205,8 @@ export async function getNextMatchForUser(
             opponentName: opponent.name,
             divisionName: divisionRow[0]?.name ?? "",
             week: nextMatchRow.week,
-            isUnavailable
+            isUnavailable,
+            sortKey: `${matchDate}T${nextMatchRow.time ?? "00:00:00"}`
         }
     } catch (error) {
         console.error("Error fetching next match:", error)

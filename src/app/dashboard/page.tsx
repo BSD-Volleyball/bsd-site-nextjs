@@ -945,14 +945,6 @@ export default async function DashboardPage() {
                 {playoffNextMatches && (
                     <PlayoffNextMatchCard data={playoffNextMatches} />
                 )}
-                {friendsNextMatches.length > 0 && (
-                    <FriendsCard
-                        data={{
-                            playerPicUrl: playerPicBaseUrl(),
-                            friends: friendsNextMatches
-                        }}
-                    />
-                )}
                 {!playoffNextMatches && nextMatch && (
                     <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
                         <CardHeader className="pb-2">
@@ -2166,6 +2158,15 @@ export default async function DashboardPage() {
                             )}
                         </CardContent>
                     </Card>
+                )}
+
+                {friendsNextMatches.length > 0 && (
+                    <FriendsCard
+                        data={{
+                            playerPicUrl: playerPicBaseUrl(),
+                            friends: friendsNextMatches
+                        }}
+                    />
                 )}
             </div>
 

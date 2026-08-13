@@ -11,7 +11,7 @@
 import { db } from "@/database/db"
 import { friendships, signups, users } from "@/database/schema"
 import { eq, and, or, desc, inArray } from "drizzle-orm"
-import { formatPlayerName } from "@/lib/utils"
+import { formatDisplayName } from "@/lib/utils"
 import {
     getNextMatchForUser,
     getLastMatchResultForUser,
@@ -25,7 +25,10 @@ import {
 
 export interface FriendProfile {
     userId: string
+    /** "Preferred Last" — the Friends page reads as a people list, not a roster. */
     name: string
+    /** Kept separate so lists can sort by surname. */
+    lastName: string
     picture: string | null
     pronouns: string | null
 }
@@ -76,10 +79,36 @@ type ProfileRow = {
 function toProfile(row: ProfileRow): FriendProfile {
     return {
         userId: row.userId,
-        name: formatPlayerName(row.firstName, row.lastName, row.preferredName),
+        name: formatDisplayName(row.firstName, row.lastName, row.preferredName),
+        lastName: row.lastName,
         picture: row.picture,
         pronouns: row.pronouns
     }
+}
+
+function compareByLastName(a: FriendProfile, b: FriendProfile): number {
+    return a.lastName.localeCompare(b.lastName) || a.name.localeCompare(b.name)
+}
+
+/**
+ * Playing soonest first — a match if there is one, otherwise a tryout slot —
+ * then everyone with nothing scheduled. Surname breaks ties in both groups.
+ */
+function sortBySchedule<T extends FriendProfile & FriendScheduleContext>(
+    entries: T[]
+): T[] {
+    const keyOf = (entry: T) =>
+        entry.nextMatch?.sortKey ?? entry.preseason?.sortKey ?? null
+    return entries.sort((a, b) => {
+        const aKey = keyOf(a)
+        const bKey = keyOf(b)
+        if (aKey && bKey) {
+            return aKey.localeCompare(bKey) || compareByLastName(a, b)
+        }
+        if (aKey) return -1
+        if (bKey) return 1
+        return compareByLastName(a, b)
+    })
 }
 
 /** Accepted friendships for a user (either direction), newest first. */
@@ -243,20 +272,22 @@ export async function getFriendsWithSchedule(
 ): Promise<FriendListEntry[]> {
     const friends = await listFriends(userId)
     if (seasonId === null) {
-        return friends.map((friend) => ({
-            ...friend,
-            nextMatch: null,
-            preseason: null,
-            signedUpForSeason: false,
-            lastResult: null
-        }))
+        return sortBySchedule(
+            friends.map((friend) => ({
+                ...friend,
+                nextMatch: null,
+                preseason: null,
+                signedUpForSeason: false,
+                lastResult: null
+            }))
+        )
     }
 
     const context = await loadSeasonContext(
         friends.map((f) => f.userId),
         seasonId
     )
-    return Promise.all(
+    const entries = await Promise.all(
         friends.map(async (friend) => {
             const [nextMatch, lastResult] = await Promise.all([
                 getNextMatchForUser(friend.userId, seasonId),
@@ -271,6 +302,7 @@ export async function getFriendsWithSchedule(
             }
         })
     )
+    return sortBySchedule(entries)
 }
 
 /** Lighter variant for the dashboard card: no last-result lookup. */
@@ -280,19 +312,21 @@ export async function getFriendsWithNextMatch(
 ): Promise<FriendNextMatchEntry[]> {
     const friends = await listFriends(userId)
     if (seasonId === null) {
-        return friends.map((friend) => ({
-            ...friend,
-            nextMatch: null,
-            preseason: null,
-            signedUpForSeason: false
-        }))
+        return sortBySchedule(
+            friends.map((friend) => ({
+                ...friend,
+                nextMatch: null,
+                preseason: null,
+                signedUpForSeason: false
+            }))
+        )
     }
 
     const context = await loadSeasonContext(
         friends.map((f) => f.userId),
         seasonId
     )
-    return Promise.all(
+    const entries = await Promise.all(
         friends.map(async (friend) => ({
             ...friend,
             nextMatch: await getNextMatchForUser(friend.userId, seasonId),
@@ -300,4 +334,5 @@ export async function getFriendsWithNextMatch(
             signedUpForSeason: context.signedUp.has(friend.userId)
         }))
     )
+    return sortBySchedule(entries)
 }

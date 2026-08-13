@@ -53,14 +53,14 @@ export const captainPairingNavItem: NavItem = {
 export const baseNavItems: NavItem[] = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
     {
-        title: "League Rules",
-        url: "/dashboard/rules",
-        icon: RiFileList3Line
-    },
-    {
         title: "Friends",
         url: "/dashboard/friends",
         icon: RiUserHeartLine
+    },
+    {
+        title: "League Rules",
+        url: "/dashboard/rules",
+        icon: RiFileList3Line
     },
     {
         title: "Report a Concern",

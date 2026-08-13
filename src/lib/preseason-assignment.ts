@@ -31,6 +31,8 @@ export interface PreseasonAssignment {
     divisionName: string | null
     date: string | null
     time: string | null
+    /** Sortable `YYYY-MM-DDTHH:MM:SS`; null when the tryout date is unset. */
+    sortKey: string | null
 }
 
 const PHASE_WEEK: Partial<Record<SeasonPhase, 1 | 2 | 3>> = {
@@ -58,9 +60,18 @@ export async function getPreseasonAssignmentsForUsers(
     const date = tryoutEvent?.eventDate ?? null
     const slots = tryoutEvent?.timeSlots ?? []
 
+    function sessionSlot(sessionNumber: number) {
+        return slots[Math.min(sessionNumber, 2) - 1]
+    }
+
     function sessionTime(sessionNumber: number): string | null {
-        const slot = slots[Math.min(sessionNumber, 2) - 1]
+        const slot = sessionSlot(sessionNumber)
         return slot ? formatEventTime(slot.startTime) || null : null
+    }
+
+    function sessionSortKey(sessionNumber: number): string | null {
+        if (!date) return null
+        return `${date}T${sessionSlot(sessionNumber)?.startTime ?? "00:00:00"}`
     }
 
     if (week === 1) {
@@ -88,7 +99,8 @@ export async function getPreseasonAssignmentsForUsers(
                 courtNumber: isAlternate ? null : row.courtNumber,
                 divisionName: null,
                 date,
-                time: isAlternate ? null : sessionTime(row.sessionNumber)
+                time: isAlternate ? null : sessionTime(row.sessionNumber),
+                sortKey: sessionSortKey(row.sessionNumber)
             })
         }
         return result
@@ -113,7 +125,8 @@ export async function getPreseasonAssignmentsForUsers(
             courtNumber: LEGACY_COURT_BY_DIVISION[row.divisionName] ?? null,
             divisionName: row.divisionName,
             date,
-            time: sessionTime(sessionNumber)
+            time: sessionTime(sessionNumber),
+            sortKey: sessionSortKey(sessionNumber)
         })
     }
     return result

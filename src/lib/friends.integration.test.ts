@@ -20,6 +20,96 @@ async function befriend(a: string, b: string) {
     })
 }
 
+describe("getFriendsWithSchedule ordering and names", () => {
+    it("puts the soonest tryout slot first and sorts the rest by surname", async () => {
+        const me = await createUser()
+        const season = await createSeason({ phase: "prep_tryout_week_1" })
+        const tryout = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-09-03",
+            sort_order: 0
+        })
+        await createEventTimeSlot(tryout.id, {
+            start_time: "18:00",
+            sort_order: 0
+        })
+        await createEventTimeSlot(tryout.id, {
+            start_time: "20:00",
+            sort_order: 1
+        })
+
+        // Late session, early session, and two unscheduled friends whose
+        // surnames are deliberately out of alphabetical order.
+        const late = await createUser({ first_name: "Late", last_name: "Aaa" })
+        const early = await createUser({
+            first_name: "Early",
+            last_name: "Zzz"
+        })
+        const unscheduledZ = await createUser({
+            first_name: "Un",
+            last_name: "Wilson"
+        })
+        const unscheduledA = await createUser({
+            first_name: "Un",
+            last_name: "Adams"
+        })
+        for (const friend of [late, early, unscheduledZ, unscheduledA]) {
+            await befriend(me.id, friend.id)
+        }
+        await db.insert(week1Rosters).values([
+            {
+                season: season.id,
+                user: late.id,
+                session_number: 2,
+                court_number: 1
+            },
+            {
+                season: season.id,
+                user: early.id,
+                session_number: 1,
+                court_number: 2
+            }
+        ])
+
+        const entries = await getFriendsWithSchedule(me.id, season.id)
+        expect(entries.map((e) => e.userId)).toEqual([
+            early.id,
+            late.id,
+            unscheduledA.id,
+            unscheduledZ.id
+        ])
+    })
+
+    it("names friends as Preferred Last", async () => {
+        const me = await createUser()
+        const friend = await createUser({
+            first_name: "Jonathan",
+            last_name: "Lukens",
+            preferred_name: "Josh"
+        })
+        await befriend(me.id, friend.id)
+        const season = await createSeason()
+
+        const [entry] = await getFriendsWithSchedule(me.id, season.id)
+        expect(entry.name).toBe("Josh Lukens")
+        expect(entry.lastName).toBe("Lukens")
+    })
+
+    it("falls back to the first name when there is no preferred name", async () => {
+        const me = await createUser()
+        const friend = await createUser({
+            first_name: "Dana",
+            last_name: "Reyes",
+            preferred_name: null
+        })
+        await befriend(me.id, friend.id)
+        const season = await createSeason()
+
+        const [entry] = await getFriendsWithSchedule(me.id, season.id)
+        expect(entry.name).toBe("Dana Reyes")
+    })
+})
+
 describe("getFriendsWithSchedule season context", () => {
     it("marks a signed-up friend with no assignment as signed up", async () => {
         const me = await createUser()
