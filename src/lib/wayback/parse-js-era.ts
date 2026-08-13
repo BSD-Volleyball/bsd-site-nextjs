@@ -46,6 +46,45 @@ export function stripBlockComments(script: string): string {
     return script.replace(/\/\*[\s\S]*?\*\//g, "")
 }
 
+/**
+ * Remove // line comments, quote-aware.
+ *
+ * The same hazard as stripBlockComments, one match at a time: a scheduled match
+ * that turned out not to be needed -- the double-elimination "if necessary"
+ * final, or a third set a sweep made moot -- was left in place with every line
+ * prefixed "//". Since pages were copied forward season to season, those lines
+ * usually still carried the PREVIOUS season's scores, so reading them yields a
+ * confident, entirely fabricated result. That is how 29 finals that were never
+ * played reached the database, most of them recording the champion losing.
+ *
+ * Callers MUST split week blocks before calling this: the week delimiter is
+ * itself a "// Matches - Week N" comment, so stripping earlier erases the very
+ * markers the week parser keys on.
+ */
+export function stripLineComments(script: string): string {
+    return script
+        .split("\n")
+        .map((line) => {
+            let quote: string | null = null
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i]
+                if (quote !== null) {
+                    if (char === "\\") {
+                        i++
+                    } else if (char === quote) {
+                        quote = null
+                    }
+                } else if (char === '"' || char === "'") {
+                    quote = char
+                } else if (char === "/" && line[i + 1] === "/") {
+                    return line.slice(0, i)
+                }
+            }
+            return line
+        })
+        .join("\n")
+}
+
 const TEAM_ENTRY = /(?:teamlist|teams)\s*\[\s*\d+\s*\]\s*=\s*\{([^}]*)\}/g
 const WEEK_BLOCK =
     /\/\/\s*Matches\s*-\s*Week\s*(\d+)\s*([\s\S]*?)(?=\/\/\s*Matches\s*-\s*Week\s*\d+|$)/g
@@ -145,7 +184,8 @@ export function parseJsMatches(
     WEEK_BLOCK.lastIndex = 0
     for (const weekBlock of script.matchAll(WEEK_BLOCK)) {
         const week = Number.parseInt(weekBlock[1], 10)
-        const body = weekBlock[2]
+        // Safe here and only here: the week markers have already been consumed.
+        const body = stripLineComments(weekBlock[2])
         if (Number.isNaN(week)) {
             continue
         }

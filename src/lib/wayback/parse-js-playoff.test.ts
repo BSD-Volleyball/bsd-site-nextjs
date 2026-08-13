@@ -81,4 +81,26 @@ describe("parseJsPlayoffPage", () => {
         expect(first.homeRef?.kind).toBe("seed")
         expect(first.week).toBe(1)
     })
+
+    it("ignores the commented-out 'if necessary' final", () => {
+        // Spring 2024 A ended at match 10: the winners-bracket team was
+        // undefeated, so the bracket reset was never played and the league
+        // commented the whole block out. Reading it anyway imported a final
+        // that recorded the champion LOSING -- 29 divisions were repaired for
+        // exactly this. The block is still in the fixture on purpose.
+        expect(html).toContain("//\tmatch.num = 11;")
+        expect(page.matches.map((m) => m.matchNumber)).not.toContain(11)
+        expect(Math.max(...page.matches.map((m) => m.matchNumber))).toBe(10)
+    })
+
+    it("ignores a commented-out set inside a match that was played", () => {
+        // A sweep leaves the third set commented out. Counting it inflates the
+        // match score (2-0 read as 3-0) even though the winner is unchanged.
+        for (const match of page.matches) {
+            expect(match.sets.length).toBeLessThanOrEqual(3)
+            expect(match.homeGames + match.awayGames).toBe(match.sets.length)
+        }
+        const tenth = page.matches.find((m) => m.matchNumber === 10)
+        expect(tenth?.sets.length).toBe(2)
+    })
 })

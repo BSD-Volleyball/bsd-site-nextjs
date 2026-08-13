@@ -21,7 +21,8 @@
 import {
     parsePlaydates,
     resolvePlaydate,
-    stripBlockComments
+    stripBlockComments,
+    stripLineComments
 } from "./parse-js-era"
 import { identifyPage } from "./identify"
 import { parseRef } from "./parse-playoff-table"
@@ -85,7 +86,9 @@ export function parseJsPlayoffMatches(
     WEEK_BLOCK.lastIndex = 0
     for (const weekBlock of script.matchAll(WEEK_BLOCK)) {
         const week = Number.parseInt(weekBlock[1], 10)
-        const body = weekBlock[2]
+        // Drops the commented-out "if necessary" final and any commented-out
+        // set. Safe here and only here: the week markers are already consumed.
+        const body = stripLineComments(weekBlock[2])
         if (Number.isNaN(week)) {
             continue
         }

@@ -6,7 +6,8 @@ import {
     parsePlaydates,
     parseTeams,
     resolvePlaydate,
-    stripBlockComments
+    stripBlockComments,
+    stripLineComments
 } from "./parse-js-era"
 
 const read = (name: string) =>
@@ -64,6 +65,35 @@ describe("stripBlockComments", () => {
             page.matches.flatMap((m) => [m.homeNumber, m.awayNumber])
         )
         expect([...referenced].sort()).toEqual([1, 2, 3, 4])
+    })
+})
+
+describe("stripLineComments", () => {
+    it("removes a commented-out match block", () => {
+        const script = [
+            "\tmatch.num = 10;",
+            "\tmatch.games[0].scores = [25,20];",
+            "//\tmatch.num = 11;",
+            "//\tmatch.games[0].scores = [24,26];"
+        ].join("\n")
+        const stripped = stripLineComments(script)
+        expect(stripped).toContain("match.num = 10")
+        expect(stripped).not.toContain("match.num = 11")
+        expect(stripped).not.toContain("[24,26]")
+    })
+
+    it("leaves // inside a string literal alone", () => {
+        // Nothing in these pages currently does this, but a truncating regex
+        // would silently eat half a value if one ever did.
+        const script = 'match.note = "see http://x/y"; // drop me'
+        expect(stripLineComments(script)).toBe(
+            'match.note = "see http://x/y"; '
+        )
+    })
+
+    it("erases the week markers, which is why callers split first", () => {
+        // Documents the ordering constraint the parsers depend on.
+        expect(stripLineComments("// Matches - Week 1\nkeep")).toBe("\nkeep")
     })
 })
 
