@@ -286,6 +286,8 @@ describe("submitSeasonPayment", () => {
             .from(discounts)
             .where(eq(discounts.id, discount.id))
         expect(used.used).toBe(true)
+        expect(used.used_signup_id).toBe(signup.id)
+        expect(used.used_at).not.toBeNull()
     })
 
     it("rejects an already-registered player without charging", async () => {
@@ -402,6 +404,8 @@ describe("submitFreeSignup", () => {
             .from(discounts)
             .where(eq(discounts.id, discount.id))
         expect(used.used).toBe(true)
+        expect(used.used_signup_id).toBe(signup.id)
+        expect(used.used_at).not.toBeNull()
     })
 
     it("audit-logs the dates selected on the free path too", async () => {

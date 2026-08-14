@@ -403,7 +403,11 @@ export async function submitSeasonPayment(
                                 )
 
                             if (discountId && discountInfo) {
-                                await markDiscountAsUsed(discountId, tx)
+                                await markDiscountAsUsed(
+                                    discountId,
+                                    tx,
+                                    newSignup.id
+                                )
                             }
 
                             await logAuditEntry(
@@ -629,7 +633,7 @@ export async function submitFreeSignup(
                     )
                 )
 
-            await markDiscountAsUsed(discountId, tx)
+            await markDiscountAsUsed(discountId, tx, newSignup.id)
 
             await logAuditEntry(
                 {

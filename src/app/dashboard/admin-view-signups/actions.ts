@@ -144,7 +144,7 @@ export async function getSeasonSignups(): Promise<{
         const [
             draftedUserIds,
             unavailabilityMap,
-            usedDiscountByUserId,
+            usedDiscountBySignupId,
             pairPickNames,
             lastDraftInfo,
             draftedInMap,
@@ -186,29 +186,27 @@ export async function getSeasonSignups(): Promise<{
                 }
                 return map
             })(),
-            // Used discount codes, most recent per user
+            // Discounts consumed against *these* signups. Keying on
+            // discounts.used alone would surface codes a player redeemed in an
+            // earlier season, since `used` is a lifetime flag.
             (async () => {
-                const map = new Map<string, string>()
-                if (userIds.length === 0) return map
+                const map = new Map<number, string>()
+                if (signupIds.length === 0) return map
                 const usedDiscountRows = await db
                     .select({
-                        userId: discounts.user,
+                        signupId: discounts.used_signup_id,
                         discountId: discounts.id,
                         reason: discounts.reason
                     })
                     .from(discounts)
-                    .where(
-                        and(
-                            inArray(discounts.user, userIds),
-                            eq(discounts.used, true)
-                        )
-                    )
+                    .where(inArray(discounts.used_signup_id, signupIds))
                     .orderBy(desc(discounts.created_at), desc(discounts.id))
 
                 for (const discount of usedDiscountRows) {
-                    if (!map.has(discount.userId)) {
+                    if (discount.signupId === null) continue
+                    if (!map.has(discount.signupId)) {
                         map.set(
-                            discount.userId,
+                            discount.signupId,
                             discount.reason ||
                                 `Discount #${discount.discountId}`
                         )
@@ -305,7 +303,8 @@ export async function getSeasonSignups(): Promise<{
                 lastDraftDivision: lastDraft?.divisionName ?? null,
                 lastDraftCaptain: lastDraft?.captainName ?? null,
                 lastDraftOverall: lastDraft?.overall ?? null,
-                discountCodeName: usedDiscountByUserId.get(row.userId) ?? null,
+                discountCodeName:
+                    usedDiscountBySignupId.get(row.signupId) ?? null,
                 captainIn: captainDivisionMap.get(row.userId) ?? null,
                 draftedIn: draftedInMap.get(row.userId)?.divisionName ?? null,
                 seasonsList: row.seasonsList,

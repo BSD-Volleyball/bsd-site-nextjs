@@ -756,11 +756,22 @@ export const discounts = pgTable(
         expiration: timestamp("expiration"),
         reason: text("reason"),
         used: boolean("used").default(false).notNull(),
+        // When the discount was consumed, and against which season signup.
+        // used_signup_id stays NULL for tournament-scope discounts (they are
+        // consumed against tournament_teams, not signups) and for historical
+        // rows whose target signup could not be identified during backfill.
+        used_at: timestamp("used_at"),
+        used_signup_id: integer("used_signup_id").references(() => signups.id, {
+            onDelete: "set null"
+        }),
         scope: text("scope").default("season").notNull(),
         created_at: timestamp("created_at").defaultNow().notNull()
     },
     (table) => ({
-        discountsUserIdx: index("discounts_user_idx").on(table.user)
+        discountsUserIdx: index("discounts_user_idx").on(table.user),
+        discountsUsedSignupIdx: index("discounts_used_signup_idx").on(
+            table.used_signup_id
+        )
     })
 )
 

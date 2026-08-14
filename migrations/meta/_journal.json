@@ -78,6 +78,13 @@
       "when": 1786664111258,
       "tag": "0010_condemned_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786729348998,
+      "tag": "0011_charming_slyde",
+      "breakpoints": true
     }
   ]
 }

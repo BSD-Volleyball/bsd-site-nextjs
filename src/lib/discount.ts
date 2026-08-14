@@ -42,13 +42,25 @@ export async function getActiveDiscountForUser(
         : null
 }
 
+/**
+ * Consume a discount. `signupId` records which season signup the discount was
+ * applied to, so "who used a discount this season" is answerable later — the
+ * `used` flag alone is a lifetime flag and cannot be scoped to a season.
+ * Tournament-scope discounts are consumed against a tournament team rather than
+ * a signup, so they record only `used_at`.
+ */
 export async function markDiscountAsUsed(
     discountId: number,
-    executor: DbExecutor = db
+    executor: DbExecutor = db,
+    signupId?: number
 ): Promise<void> {
     await executor
         .update(discounts)
-        .set({ used: true })
+        .set({
+            used: true,
+            used_at: new Date(),
+            used_signup_id: signupId ?? null
+        })
         .where(eq(discounts.id, discountId))
 }
 

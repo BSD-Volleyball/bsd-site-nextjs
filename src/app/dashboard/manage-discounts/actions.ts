@@ -198,7 +198,12 @@ export const updateDiscount = withAction(
                         ? new Date(data.expiration)
                         : null,
                     reason: data.reason || null,
-                    used: false
+                    // Editing hands the code back to the player (this is how
+                    // recurring comps are reissued each season), so the record
+                    // of the redemption it used to hold no longer applies.
+                    used: false,
+                    used_at: null,
+                    used_signup_id: null
                 })
                 .where(eq(discounts.id, data.id))
 
