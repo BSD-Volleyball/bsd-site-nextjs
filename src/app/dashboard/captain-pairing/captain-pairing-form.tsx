@@ -36,19 +36,24 @@ interface CaptainPairingFormProps {
     users: { id: string; name: string }[]
     initial: SignupPreferences
     canEdit: boolean
+    // League rules: 14-15 year olds must stay paired with a registered
+    // parent/guardian. Locks the pair toggle on and requires a pair pick
+    // before saving; the server action enforces the same rule.
+    pairRequired: boolean
 }
 
 export function CaptainPairingForm({
     signupId,
     users,
     initial,
-    canEdit
+    canEdit,
+    pairRequired
 }: CaptainPairingFormProps) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
 
     const [captain, setCaptain] = useState(initial.captain || "no")
-    const [pair, setPair] = useState(initial.pair)
+    const [pair, setPair] = useState(initial.pair || pairRequired)
     const [pairPick, setPairPick] = useState<string | null>(initial.pairPick)
     const [pairReason, setPairReason] = useState(initial.pairReason ?? "")
     const [refInterest, setRefInterest] = useState(initial.refInterest)
@@ -202,6 +207,19 @@ export function CaptainPairingForm({
                             </p>
                         </div>
 
+                        {pairRequired && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                                <p>
+                                    Players aged 14-15 MUST stay paired with a
+                                    parent/guardian, so the pairing request
+                                    cannot be turned off and a pair must be
+                                    selected below. If your parent/guardian is
+                                    not in the list, they haven&apos;t
+                                    registered yet — they must register first.
+                                </p>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between">
                             <Label
                                 htmlFor="pair-toggle"
@@ -212,6 +230,7 @@ export function CaptainPairingForm({
                             <Switch
                                 id="pair-toggle"
                                 checked={pair}
+                                disabled={pairRequired}
                                 onCheckedChange={(checked: boolean) => {
                                     setPair(checked)
                                     if (!checked) {
@@ -253,7 +272,10 @@ export function CaptainPairingForm({
                     </div>
                 </CardContent>
                 <CardFooter className="border-t pt-6">
-                    <Button type="submit" disabled={isLoading}>
+                    <Button
+                        type="submit"
+                        disabled={isLoading || (pairRequired && !pairPick)}
+                    >
                         {isLoading ? "Saving..." : "Save Changes"}
                     </Button>
                 </CardFooter>

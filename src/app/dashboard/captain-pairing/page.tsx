@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { CaptainPairingForm } from "./captain-pairing-form"
 import { listUserNames } from "@/lib/user-directory"
 import { canEditPreferences } from "./utils"
+import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export default async function CaptainPairingPage() {
     const [signup] = await db
         .select({
             id: signups.id,
+            age: signups.age,
             captain: signups.captain,
             pair: signups.pair,
             pair_pick: signups.pair_pick,
@@ -85,6 +87,7 @@ export default async function CaptainPairingPage() {
                         tryoutHelp: signup.tryout_help ?? false
                     }}
                     canEdit={canEditPreferences(config.phase)}
+                    pairRequired={signup.age === PAIR_REQUIRED_AGE_GROUP}
                 />
             </div>
         </div>

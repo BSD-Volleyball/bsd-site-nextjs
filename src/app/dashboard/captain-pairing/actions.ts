@@ -12,6 +12,7 @@ import {
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import { getSeasonConfig } from "@/lib/site-config"
+import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import { logAuditEntry } from "@/lib/audit-log"
 import { canEditPreferences, type SignupPreferences } from "./utils"
 
@@ -42,7 +43,11 @@ export const updateSignupPreferences = withAction(
 
         // Verify the signup belongs to the authenticated user.
         const [signup] = await db
-            .select({ id: signups.id, player: signups.player })
+            .select({
+                id: signups.id,
+                player: signups.player,
+                age: signups.age
+            })
             .from(signups)
             .where(
                 and(
@@ -60,6 +65,14 @@ export const updateSignupPreferences = withAction(
         const pair = preferences.pair === true
         const pairPick = pair ? preferences.pairPick || null : null
         const pairReason = pair ? preferences.pairReason : ""
+
+        // League rules require 14-15 year olds to stay paired; signup enforces
+        // the pick and this action must not become the back door that drops it.
+        if (signup.age === PAIR_REQUIRED_AGE_GROUP && !pairPick) {
+            return fail(
+                "Players aged 14-15 must stay paired with a registered parent/guardian."
+            )
+        }
         const refInterest = preferences.refInterest === true
         const tryoutHelp = preferences.tryoutHelp === true
 

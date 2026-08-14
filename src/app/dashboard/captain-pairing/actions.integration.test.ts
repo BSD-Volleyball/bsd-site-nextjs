@@ -72,6 +72,91 @@ describe("updateSignupPreferences", () => {
         expect(row.pair_reason).toBe("")
     })
 
+    // League rules require 14-15 year olds to stay paired with a registered
+    // parent/guardian. Signup now enforces the pick; preferences editing must
+    // not become the back door that removes it.
+    it("refuses to turn pairing off on a 15-14 signup", async () => {
+        const player = await createUserWithRoles([])
+        const guardian = await createUser()
+        const signup = await createSignup({
+            season: seasonId,
+            player: player.id,
+            age: "15-14",
+            pair: true,
+            pair_pick: guardian.id,
+            pair_reason: "Parent"
+        })
+
+        const result = await updateSignupPreferences(signup.id, {
+            ...PREFERENCES,
+            pair: false,
+            pairPick: null
+        })
+        expect(result.status).toBe(false)
+        expect(result.message).toBe(
+            "Players aged 14-15 must stay paired with a registered parent/guardian."
+        )
+
+        const [row] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.id, signup.id))
+        expect(row.pair).toBe(true)
+        expect(row.pair_pick).toBe(guardian.id)
+    })
+
+    it("refuses to clear the pair pick on a 15-14 signup", async () => {
+        const player = await createUserWithRoles([])
+        const guardian = await createUser()
+        const signup = await createSignup({
+            season: seasonId,
+            player: player.id,
+            age: "15-14",
+            pair: true,
+            pair_pick: guardian.id
+        })
+
+        const result = await updateSignupPreferences(signup.id, {
+            ...PREFERENCES,
+            pair: true,
+            pairPick: null
+        })
+        expect(result.status).toBe(false)
+
+        const [row] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.id, signup.id))
+        expect(row.pair_pick).toBe(guardian.id)
+    })
+
+    it("allows a 15-14 player to change their pair to another player", async () => {
+        const player = await createUserWithRoles([])
+        const guardian = await createUser()
+        const newGuardian = await createUser()
+        const signup = await createSignup({
+            season: seasonId,
+            player: player.id,
+            age: "15-14",
+            pair: true,
+            pair_pick: guardian.id
+        })
+
+        const result = await updateSignupPreferences(signup.id, {
+            ...PREFERENCES,
+            pair: true,
+            pairPick: newGuardian.id,
+            pairReason: "Other parent"
+        })
+        expect(result.status).toBe(true)
+
+        const [row] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.id, signup.id))
+        expect(row.pair_pick).toBe(newGuardian.id)
+    })
+
     it("refuses to edit another player's signup", async () => {
         const other = await createUser()
         const signup = await createSignup({
