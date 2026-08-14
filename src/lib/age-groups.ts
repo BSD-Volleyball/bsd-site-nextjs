@@ -19,6 +19,11 @@ export type AgeGroupValue = (typeof AGE_GROUPS)[number]["value"]
 // that year (e.g. tournament-only players — tournaments don't collect an age).
 export const DEFAULT_AGE_GROUP: AgeGroupValue = "20+"
 
+// League rules require players in this group to be paired with a registered
+// parent/guardian. Signup (client wizard and server action) must not complete
+// without a pair pick for this group.
+export const PAIR_REQUIRED_AGE_GROUP: AgeGroupValue = "15-14"
+
 const ORDER = new Map<string, number>(
     AGE_GROUPS.map((group, index) => [group.value, index])
 )

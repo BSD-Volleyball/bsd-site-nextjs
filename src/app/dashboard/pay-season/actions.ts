@@ -21,7 +21,7 @@ import { sendMail } from "@/lib/email/send"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logger } from "@/lib/logger"
-import { AGE_GROUPS } from "@/lib/age-groups"
+import { AGE_GROUPS, PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 
 export interface SignupFormData {
     age: string
@@ -154,6 +154,9 @@ async function validateSignupFormData(
     // the age question on a later signup, so only known groups may be written.
     if (!AGE_GROUPS.some((group) => group.value === formData.age)) {
         return "Invalid age selection."
+    }
+    if (formData.age === PAIR_REQUIRED_AGE_GROUP && !formData.pairPick) {
+        return "Players aged 14-15 must select a registered parent/guardian to pair with."
     }
     if (
         typeof formData.pairReason === "string" &&

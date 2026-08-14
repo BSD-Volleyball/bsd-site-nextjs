@@ -39,7 +39,11 @@ import {
     RiErrorWarningLine,
     RiArrowRightLine
 } from "@remixicon/react"
-import { AGE_GROUPS, DEFAULT_AGE_GROUP } from "@/lib/age-groups"
+import {
+    AGE_GROUPS,
+    DEFAULT_AGE_GROUP,
+    PAIR_REQUIRED_AGE_GROUP
+} from "@/lib/age-groups"
 import { SeasonVolunteerQuestions } from "@/components/season-volunteer-questions"
 import type { SeasonConfig } from "@/lib/season-types"
 import { getEventsByType, formatEventDate } from "@/lib/season-utils"
@@ -224,6 +228,13 @@ export function WizardForm({
         </Week1TryoutCallout>
     )
 
+    // League rules: 14-15 year olds must be paired with a registered
+    // parent/guardian. The server action rejects such signups without a pair
+    // pick; the wizard mirrors that by locking the pair toggle on and blocking
+    // every tab past Pairing until a pair is selected.
+    const pairRequired = formData.age === PAIR_REQUIRED_AGE_GROUP
+    const missingRequiredPair = pairRequired && !formData.pairPick
+
     const goToNextTab = () => {
         const currentIndex = TABS.indexOf(activeTab)
         if (currentIndex < TABS.length - 1) {
@@ -331,9 +342,22 @@ export function WizardForm({
                     <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="info">Info</TabsTrigger>
                         <TabsTrigger value="pairing">Pairing</TabsTrigger>
-                        <TabsTrigger value="schedule">Schedule</TabsTrigger>
-                        <TabsTrigger value="waivers">Waivers</TabsTrigger>
-                        <TabsTrigger value="payment" disabled={!waiverAgreed}>
+                        <TabsTrigger
+                            value="schedule"
+                            disabled={missingRequiredPair}
+                        >
+                            Schedule
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="waivers"
+                            disabled={missingRequiredPair}
+                        >
+                            Waivers
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="payment"
+                            disabled={!waiverAgreed || missingRequiredPair}
+                        >
                             Payment
                         </TabsTrigger>
                     </TabsList>
@@ -351,7 +375,8 @@ export function WizardForm({
                                             ...prev,
                                             age: value,
                                             // Auto-enable pairing for players aged 15-14
-                                            ...(value === "15-14"
+                                            ...(value ===
+                                            PAIR_REQUIRED_AGE_GROUP
                                                 ? { pair: true }
                                                 : {})
                                         }))
@@ -379,10 +404,14 @@ export function WizardForm({
                                         parent/guardian present.
                                     </p>
                                 )}
-                                {formData.age === "15-14" && (
+                                {pairRequired && (
                                     <p className="text-amber-600 text-sm dark:text-amber-400">
-                                        Players this age MUST pair with another
-                                        player.
+                                        Players this age MUST pair with a
+                                        parent/guardian who is registered for
+                                        the season. Your parent/guardian must
+                                        register first — you will select them on
+                                        the Pairing tab before you can finish
+                                        signing up.
                                     </p>
                                 )}
                             </div>
@@ -484,6 +513,20 @@ export function WizardForm({
                             </p>
                         </div>
 
+                        {pairRequired && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 text-sm dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                                <p>
+                                    Players aged 14-15 MUST pair with a
+                                    parent/guardian and cannot finish signing up
+                                    until that pair is selected below. If your
+                                    parent/guardian is not in the list, they
+                                    haven&apos;t registered yet — they must
+                                    register first, then return here to complete
+                                    your signup.
+                                </p>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between">
                             <Label
                                 htmlFor="pair-toggle"
@@ -494,6 +537,7 @@ export function WizardForm({
                             <Switch
                                 id="pair-toggle"
                                 checked={formData.pair}
+                                disabled={pairRequired}
                                 onCheckedChange={(checked: boolean) =>
                                     setFormData((prev) => ({
                                         ...prev,
@@ -548,7 +592,11 @@ export function WizardForm({
                         )}
 
                         <div className="pt-4">
-                            <Button onClick={goToNextTab} className="gap-2">
+                            <Button
+                                onClick={goToNextTab}
+                                disabled={missingRequiredPair}
+                                className="gap-2"
+                            >
                                 Next
                                 <RiArrowRightLine className="h-4 w-4" />
                             </Button>

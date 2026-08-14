@@ -199,6 +199,49 @@ describe("submitSeasonPayment", () => {
         expect(signup.tryout_help).toBe(true)
     })
 
+    // League rules require 14-15 year olds to be paired (with a registered
+    // parent/guardian). The wizard nudges but a crafted or careless request
+    // could omit the pick, so the action must reject it before charging.
+    it("rejects a 15-14 signup without a selected pair without charging", async () => {
+        await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, age: "15-14", pair: true, pairPick: null },
+            waiverId
+        )
+
+        expect(result.status).toBe(false)
+        expect(result.message).toBe(
+            "Players aged 14-15 must select a registered parent/guardian to pair with."
+        )
+        expect(paymentsCreate).not.toHaveBeenCalled()
+    })
+
+    it("accepts a 15-14 signup when a pair is selected", async () => {
+        const guardian = await createUser()
+        const player = await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            {
+                ...formData,
+                age: "15-14",
+                pair: true,
+                pairPick: guardian.id,
+                pairReason: "Parent"
+            },
+            waiverId
+        )
+
+        expect(result.status).toBe(true)
+        const [signup] = await db
+            .select()
+            .from(signups)
+            .where(eq(signups.player, player.id))
+        expect(signup.pair_pick).toBe(guardian.id)
+    })
+
     it("rejects an age outside the known age groups without charging", async () => {
         await createUserWithRoles([])
 
@@ -301,6 +344,25 @@ describe("submitFreeSignup", () => {
         const result = await submitFreeSignup(formData, discount.id, waiverId)
         expect(result.status).toBe(false)
         expect(result.message).toBe("This discount requires payment.")
+    })
+
+    it("rejects a 15-14 signup without a selected pair on the free path", async () => {
+        const player = await createUserWithRoles([])
+        const discount = await createDiscount({
+            user: player.id,
+            percentage: "100"
+        })
+
+        const result = await submitFreeSignup(
+            { ...formData, age: "15-14", pair: true, pairPick: null },
+            discount.id,
+            waiverId
+        )
+
+        expect(result.status).toBe(false)
+        expect(result.message).toBe(
+            "Players aged 14-15 must select a registered parent/guardian to pair with."
+        )
     })
 
     it("rejects a discount that belongs to someone else", async () => {
