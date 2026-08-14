@@ -769,7 +769,10 @@ export const discounts = pgTable(
     },
     (table) => ({
         discountsUserIdx: index("discounts_user_idx").on(table.user),
-        discountsUsedSignupIdx: index("discounts_used_signup_idx").on(
+        // A signup is paid for by at most one discount, and a discount is
+        // redeemed exactly once — NULLs (unused and tournament-scope rows) are
+        // exempt, since Postgres treats them as distinct.
+        discountsUsedSignupUniq: uniqueIndex("discounts_used_signup_uniq").on(
             table.used_signup_id
         )
     })

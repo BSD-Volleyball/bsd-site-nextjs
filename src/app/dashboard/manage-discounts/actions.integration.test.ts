@@ -93,12 +93,11 @@ describe("createDiscount", () => {
 })
 
 describe("updateDiscount", () => {
-    it("updates the percentage and resets the used flag", async () => {
+    it("updates an unused discount", async () => {
         const target = await createUser()
         const discount = await createDiscount({
             user: target.id,
-            percentage: "10",
-            used: true
+            percentage: "10"
         })
         await createUserWithRoles([{ role: "admin" }])
 
@@ -116,6 +115,48 @@ describe("updateDiscount", () => {
             .where(eq(discounts.id, discount.id))
         expect(row.percentage).toBe("60")
         expect(row.used).toBe(false)
+    })
+
+    it("refuses to edit a used discount, so it cannot be redeemed twice", async () => {
+        const target = await createUser()
+        const discount = await createDiscount({
+            user: target.id,
+            percentage: "10",
+            used: true,
+            used_at: new Date()
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await updateDiscount({
+            id: discount.id,
+            percentage: "60",
+            expiration: null,
+            reason: "Updated"
+        })
+
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("already been used")
+        const [row] = await db
+            .select()
+            .from(discounts)
+            .where(eq(discounts.id, discount.id))
+        expect(row.percentage).toBe("10")
+        expect(row.used).toBe(true)
+        expect(row.used_at).not.toBeNull()
+    })
+
+    it("rejects an unknown discount id", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await updateDiscount({
+            id: 999999,
+            percentage: "60",
+            expiration: null,
+            reason: "Updated"
+        })
+
+        expect(result.status).toBe(false)
+        expect(result.message).toBe("Discount not found.")
     })
 })
 

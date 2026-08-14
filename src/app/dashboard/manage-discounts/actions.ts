@@ -190,6 +190,25 @@ export const updateDiscount = withAction(
                 return fail("Percentage must be between 1 and 100.")
             }
 
+            // A discount is redeemed exactly once. Editing used to reset
+            // `used`, which is how recurring comps were reissued each season,
+            // but that left one row standing for several redemptions and made
+            // per-season reporting impossible. Reissue by creating a new
+            // discount instead.
+            const [existing] = await db
+                .select({ used: discounts.used })
+                .from(discounts)
+                .where(eq(discounts.id, data.id))
+
+            if (!existing) {
+                return fail("Discount not found.")
+            }
+            if (existing.used) {
+                return fail(
+                    "This discount has already been used and cannot be edited. Create a new discount instead."
+                )
+            }
+
             await db
                 .update(discounts)
                 .set({
@@ -197,13 +216,7 @@ export const updateDiscount = withAction(
                     expiration: data.expiration
                         ? new Date(data.expiration)
                         : null,
-                    reason: data.reason || null,
-                    // Editing hands the code back to the player (this is how
-                    // recurring comps are reissued each season), so the record
-                    // of the redemption it used to hold no longer applies.
-                    used: false,
-                    used_at: null,
-                    used_signup_id: null
+                    reason: data.reason || null
                 })
                 .where(eq(discounts.id, data.id))
 

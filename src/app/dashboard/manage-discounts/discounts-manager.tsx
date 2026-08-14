@@ -328,17 +328,22 @@ export function DiscountsManager({
                                 </div>
                             ) : (
                                 <div className="flex gap-1">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                            handleStartEdit(discount)
-                                        }
-                                        className="h-8 w-8 p-0"
-                                        title="Edit"
-                                    >
-                                        <RiEditLine className="h-4 w-4" />
-                                    </Button>
+                                    {/* A used discount is spent — reissuing it
+                                        means creating a new one, so there is
+                                        nothing left to edit. */}
+                                    {!discount.used && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() =>
+                                                handleStartEdit(discount)
+                                            }
+                                            className="h-8 w-8 p-0"
+                                            title="Edit"
+                                        >
+                                            <RiEditLine className="h-4 w-4" />
+                                        </Button>
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="sm"
