@@ -6,8 +6,13 @@
  * without a database and the descriptor can be shared by the server action and
  * the client form.
  *
+ * The two accounts are symmetric: the admin picks a Player A and a Player B in
+ * whatever order, and every consequential decision is made here, field by
+ * field. Nothing about A or B is privileged.
+ *
  * Deliberately NOT mergeable:
- *   - `id`         — fixed by whichever account the admin keeps
+ *   - `id`         — fixed by the `email` choice, which decides which row
+ *                    survives so that logins always follow the address
  *   - `updatedAt`  — stamped by the merge itself
  */
 
@@ -43,9 +48,12 @@ export type MergeFieldKey =
     | "createdAt"
 
 /** Which of the two accounts a field's surviving value comes from. */
-export type MergeChoice = "old" | "new"
+export type MergeChoice = "a" | "b"
 
-/** field -> which account supplies it. Absent keys keep the survivor's value. */
+/**
+ * field -> which account supplies it. Absent keys are fields the two accounts
+ * already agree on, so there is nothing to choose.
+ */
 export type MergeSelection = Partial<Record<MergeFieldKey, MergeChoice>>
 
 export type MergeFieldKind = "text" | "number" | "boolean" | "date"
@@ -155,7 +163,12 @@ export function isMergeFieldKey(value: unknown): value is MergeFieldKey {
 }
 
 export function isMergeChoice(value: unknown): value is MergeChoice {
-    return value === "old" || value === "new"
+    return value === "a" || value === "b"
+}
+
+/** The other side. */
+export function otherChoice(choice: MergeChoice): MergeChoice {
+    return choice === "a" ? "b" : "a"
 }
 
 /** The subset of a user row the merge UI and resolver care about. */
@@ -183,60 +196,130 @@ function sameValue(a: unknown, b: unknown): boolean {
 }
 
 /**
+ * Account facts that are not themselves mergeable columns but that the default
+ * rules need to break ties. Kept as plain values so this module stays free of
+ * database imports and unit-tests without one.
+ */
+export interface MergeDefaultsContext {
+    /** `users.updatedAt` — proxy for which record was maintained most recently. */
+    aUpdatedAt: Date | null
+    bUpdatedAt: Date | null
+    /** How many better-auth providers each account can sign in with. */
+    aLoginMethodCount: number
+    bLoginMethodCount: number
+    /** Newest session start, or null if the account has never signed in. */
+    aLastLoginAt: Date | null
+    bLastLoginAt: Date | null
+}
+
+function newer(a: Date | null, b: Date | null): MergeChoice | null {
+    if (a instanceof Date && b instanceof Date) {
+        if (a.getTime() === b.getTime()) {
+            return null
+        }
+        return a.getTime() > b.getTime() ? "a" : "b"
+    }
+    if (a instanceof Date) {
+        return "a"
+    }
+    if (b instanceof Date) {
+        return "b"
+    }
+    return null
+}
+
+/**
+ * Which account should supply the surviving email — and therefore, since the
+ * survivor is the account whose address wins, which record survives the merge
+ * at all.
+ *
+ * Logins live on an account, not on an address, so the default is whichever
+ * side the person can actually sign in with. Falling back to recency keeps a
+ * sensible answer when neither side (or both) has a login.
+ */
+function resolveEmailDefault(ctx: MergeDefaultsContext): MergeChoice {
+    if (ctx.aLoginMethodCount !== ctx.bLoginMethodCount) {
+        return ctx.aLoginMethodCount > ctx.bLoginMethodCount ? "a" : "b"
+    }
+    return (
+        newer(ctx.aLastLoginAt, ctx.bLastLoginAt) ??
+        newer(ctx.aUpdatedAt, ctx.bUpdatedAt) ??
+        "a"
+    )
+}
+
+/**
  * Pre-tick the choices an admin would almost always make, so step 2 is a review
  * rather than 29 decisions:
  *
  *   - identical on both sides -> omitted entirely (nothing to choose)
  *   - only one side has a value -> take that side
- *   - both differ -> keep the survivor's, the account the admin already picked
+ *   - both differ -> the more recently updated account, as the fresher record
+ *   - email -> the account that can actually sign in (see resolveEmailDefault)
+ *   - old_id -> the side with a photo, else the lower (older) id
  *   - createdAt -> the earlier date, so "member since" survives the merge
  *   - emailVerified / email_status -> follow the email, since they describe it
  *
- * Returns only keys where a choice is meaningful. Absent keys leave the
- * survivor's stored value untouched.
+ * Symmetric in A and B: swapping the two arguments (and the context fields)
+ * yields the mirrored selection. Returns only keys where a choice is
+ * meaningful; absent keys are fields the accounts already agree on.
  */
 export function resolveDefaultSelections(
-    oldUser: MergeFieldValues,
-    newUser: MergeFieldValues
+    userA: MergeFieldValues,
+    userB: MergeFieldValues,
+    ctx: MergeDefaultsContext
 ): MergeSelection {
     const selection: MergeSelection = {}
+    const fresher = newer(ctx.aUpdatedAt, ctx.bUpdatedAt) ?? "a"
 
     for (const field of MERGE_FIELDS) {
-        const oldValue = oldUser[field.key]
-        const newValue = newUser[field.key]
+        const aValue = userA[field.key]
+        const bValue = userB[field.key]
 
-        if (sameValue(oldValue, newValue)) {
+        if (sameValue(aValue, bValue)) {
             continue
         }
 
-        const oldEmpty = isEmptyFieldValue(oldValue)
-        const newEmpty = isEmptyFieldValue(newValue)
+        const aEmpty = isEmptyFieldValue(aValue)
+        const bEmpty = isEmptyFieldValue(bValue)
 
-        if (oldEmpty && newEmpty) {
+        if (aEmpty && bEmpty) {
             continue
         }
 
-        // Only the survivor being empty forces the old value; otherwise the
-        // survivor wins, whether or not the old side has something too.
-        selection[field.key] = newEmpty ? "old" : "new"
+        // A real value always beats an empty one. With both sides populated
+        // there is nothing in the values themselves to prefer, so fall back to
+        // whichever record was touched more recently.
+        if (aEmpty || bEmpty) {
+            selection[field.key] = aEmpty ? "b" : "a"
+        } else {
+            selection[field.key] = fresher
+        }
     }
 
-    // old_id is a serial, so both accounts always have one and the generic
-    // "survivor wins" rule would quietly keep a freshly-issued id. Photo
-    // filenames are built from `{old_id}_{initials}.jpg`, so the useful default
-    // is the side that actually has a photo; failing that, the lower id, which
-    // is the older legacy record.
-    if (selection.old_id) {
-        const oldHasPicture = !isEmptyFieldValue(oldUser.picture)
-        const newHasPicture = !isEmptyFieldValue(newUser.picture)
+    // The email decides which row survives, so it is never left to the generic
+    // recency rule. `users.email` is UNIQUE NOT NULL, so the two sides always
+    // differ and this key is always present.
+    if (selection.email) {
+        selection.email = resolveEmailDefault(ctx)
+    }
 
-        if (oldHasPicture !== newHasPicture) {
-            selection.old_id = oldHasPicture ? "old" : "new"
+    // old_id is a serial, so both accounts always have one and the recency rule
+    // would quietly keep a freshly-issued id. Photo filenames are built from
+    // `{old_id}_{initials}.jpg`, so the useful default is the side that
+    // actually has a photo; failing that, the lower id, which is the older
+    // legacy record.
+    if (selection.old_id) {
+        const aHasPicture = !isEmptyFieldValue(userA.picture)
+        const bHasPicture = !isEmptyFieldValue(userB.picture)
+
+        if (aHasPicture !== bHasPicture) {
+            selection.old_id = aHasPicture ? "a" : "b"
         } else {
-            const oldId = oldUser.old_id
-            const newId = newUser.old_id
-            if (typeof oldId === "number" && typeof newId === "number") {
-                selection.old_id = oldId <= newId ? "old" : "new"
+            const aId = userA.old_id
+            const bId = userB.old_id
+            if (typeof aId === "number" && typeof bId === "number") {
+                selection.old_id = aId <= bId ? "a" : "b"
             }
         }
 
@@ -248,11 +331,11 @@ export function resolveDefaultSelections(
 
     // createdAt: the older account is the one the member actually joined on.
     if (selection.createdAt) {
-        const oldCreated = oldUser.createdAt
-        const newCreated = newUser.createdAt
-        if (oldCreated instanceof Date && newCreated instanceof Date) {
+        const aCreated = userA.createdAt
+        const bCreated = userB.createdAt
+        if (aCreated instanceof Date && bCreated instanceof Date) {
             selection.createdAt =
-                oldCreated.getTime() <= newCreated.getTime() ? "old" : "new"
+                aCreated.getTime() <= bCreated.getTime() ? "a" : "b"
         }
     }
 
@@ -260,7 +343,7 @@ export function resolveDefaultSelections(
     // they travel with whichever address wins rather than being judged alone.
     if (selection.email) {
         for (const key of ["emailVerified", "email_status"] as const) {
-            if (!sameValue(oldUser[key], newUser[key])) {
+            if (!sameValue(userA[key], userB[key])) {
                 selection[key] = selection.email
             }
         }

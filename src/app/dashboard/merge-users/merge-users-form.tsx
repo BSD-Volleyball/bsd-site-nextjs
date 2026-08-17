@@ -1,7 +1,11 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import type { MergeCandidates, UserOption } from "./actions"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type {
+    MergeAccountSnapshot,
+    MergeCandidates,
+    UserOption
+} from "./actions"
 import { getMergeCandidateDetails, mergeUsers } from "./actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,7 +19,7 @@ import type {
 import {
     isEmptyFieldValue,
     MERGE_FIELD_GROUPS,
-    resolveDefaultSelections
+    otherChoice
 } from "@/lib/merge-user-fields"
 import {
     Dialog,
@@ -55,21 +59,48 @@ function formatValue(value: unknown, kind: MergeFieldDescriptor["kind"]) {
 
 interface FieldRow {
     field: MergeFieldDescriptor
-    oldValue: unknown
-    newValue: unknown
+    aValue: unknown
+    bValue: unknown
 }
 
-export function MergeUsersForm({
-    oldUsers,
-    newUsers
-}: {
-    oldUsers: UserOption[]
-    newUsers: UserOption[]
-}) {
-    const [oldUserId, setOldUserId] = useState<string>("")
-    const [newUserId, setNewUserId] = useState<string>("")
+/** The account facts that are the same on both steps. */
+function AccountFacts({ snap }: { snap: MergeAccountSnapshot }) {
+    return (
+        <dl className="mt-2 space-y-0.5 text-muted-foreground text-xs">
+            <div>{String(snap.fields.email ?? "—")}</div>
+            <div>Created {formatDate(snap.activity.createdAt)}</div>
+            <div>Updated {formatDate(snap.activity.updatedAt)}</div>
+            <div>
+                {snap.activity.signupCount} signup
+                {snap.activity.signupCount === 1 ? "" : "s"}
+                {snap.activity.firstSeasonCode
+                    ? ` (${snap.activity.firstSeasonCode}–${snap.activity.lastSeasonCode})`
+                    : ""}
+            </div>
+            <div>
+                {snap.activity.teamsCaptained} team
+                {snap.activity.teamsCaptained === 1 ? "" : "s"} captained
+                {" · "}
+                {snap.activity.roleCount} role
+                {snap.activity.roleCount === 1 ? "" : "s"}
+            </div>
+            <div>Last login {formatDate(snap.activity.lastLoginAt)}</div>
+            <div>
+                Login:{" "}
+                {snap.activity.loginMethods.length > 0
+                    ? snap.activity.loginMethods.join(", ")
+                    : "none"}
+            </div>
+        </dl>
+    )
+}
+
+export function MergeUsersForm({ users }: { users: UserOption[] }) {
+    const [userAId, setUserAId] = useState<string>("")
+    const [userBId, setUserBId] = useState<string>("")
     const [candidates, setCandidates] = useState<MergeCandidates | null>(null)
     const [selection, setSelection] = useState<MergeSelection>({})
+    const [onFieldsStep, setOnFieldsStep] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -79,8 +110,47 @@ export function MergeUsersForm({
         message: string
     } | null>(null)
 
-    const oldUser = oldUsers.find((u) => u.id === oldUserId)
-    const newUser = newUsers.find((u) => u.id === newUserId)
+    // Load both accounts as soon as two distinct people are picked, so step 1
+    // can show what each one brings before the admin commits to comparing.
+    // The counter discards responses for a pair that has since changed.
+    const requestRef = useRef(0)
+    useEffect(() => {
+        if (!userAId || !userBId || userAId === userBId) {
+            setCandidates(null)
+            setSelection({})
+            return
+        }
+
+        const requestId = ++requestRef.current
+        setIsLoading(true)
+        setResult(null)
+
+        getMergeCandidateDetails(userAId, userBId).then((response) => {
+            if (requestRef.current !== requestId) {
+                return
+            }
+            setIsLoading(false)
+
+            if (!response.status || !response.data) {
+                setCandidates(null)
+                setResult({
+                    status: false,
+                    message:
+                        response.message ?? "Could not load those accounts."
+                })
+                return
+            }
+
+            setCandidates(response.data)
+            setSelection(response.data.defaults)
+        })
+    }, [userAId, userBId])
+
+    // The email choice decides which record survives -- logins belong to an
+    // account, not to an address, so keeping the account that owns the chosen
+    // address is what keeps the person able to sign in.
+    const survivorSide: MergeChoice = selection.email ?? "a"
+    const deletedSide = otherChoice(survivorSide)
 
     // Split every mergeable column into "the admin must choose" and "both
     // accounts already agree", so step 2 shows only real decisions.
@@ -98,21 +168,21 @@ export function MergeUsersForm({
         for (const group of MERGE_FIELD_GROUPS) {
             const rows: FieldRow[] = []
             for (const field of group.fields) {
-                const oldValue = candidates.oldUser.fields[field.key]
-                const newValue = candidates.newUser.fields[field.key]
+                const aValue = candidates.userA.fields[field.key]
+                const bValue = candidates.userB.fields[field.key]
 
                 const bothEmpty =
-                    isEmptyFieldValue(oldValue) && isEmptyFieldValue(newValue)
+                    isEmptyFieldValue(aValue) && isEmptyFieldValue(bValue)
                 const same =
-                    oldValue instanceof Date && newValue instanceof Date
-                        ? oldValue.getTime() === newValue.getTime()
-                        : oldValue === newValue
+                    aValue instanceof Date && bValue instanceof Date
+                        ? aValue.getTime() === bValue.getTime()
+                        : aValue === bValue
 
                 if (bothEmpty || same) {
                     identical += 1
                     continue
                 }
-                rows.push({ field, oldValue, newValue })
+                rows.push({ field, aValue, bValue })
             }
             if (rows.length > 0) {
                 groups.push({ title: group.title, rows })
@@ -122,56 +192,45 @@ export function MergeUsersForm({
         return { differing: groups, identicalCount: identical }
     }, [candidates])
 
-    const takingEmailFromOld = selection.email === "old"
+    const survivorSnap: MergeAccountSnapshot | null = candidates
+        ? survivorSide === "a"
+            ? candidates.userA
+            : candidates.userB
+        : null
+    const deletedSnap: MergeAccountSnapshot | null = candidates
+        ? survivorSide === "a"
+            ? candidates.userB
+            : candidates.userA
+        : null
+
     const identitySplit =
         selection.old_id !== undefined &&
         selection.picture !== undefined &&
         selection.old_id !== selection.picture
 
-    const takenFromOld = useMemo(() => {
+    // Keeping an address whose account has no login attached, while the other
+    // one does, hands this person an account they cannot sign in to.
+    const lockout =
+        survivorSnap !== null &&
+        deletedSnap !== null &&
+        survivorSnap.activity.loginMethods.length === 0 &&
+        deletedSnap.activity.loginMethods.length > 0
+
+    const takenFromDeleted = useMemo(() => {
         return differing
             .flatMap((g) => g.rows)
-            .filter((r) => selection[r.field.key] === "old")
-    }, [differing, selection])
-
-    const handleCompare = async () => {
-        if (!oldUserId || !newUserId) {
-            return
-        }
-        setIsLoading(true)
-        setResult(null)
-
-        const response = await getMergeCandidateDetails(oldUserId, newUserId)
-        setIsLoading(false)
-
-        if (!response.status || !response.data) {
-            setResult({
-                status: false,
-                message: response.message ?? "Could not load those accounts."
-            })
-            return
-        }
-
-        setCandidates(response.data)
-        setSelection(response.data.defaults)
-    }
+            .filter((r) => selection[r.field.key] === deletedSide)
+    }, [differing, selection, deletedSide])
 
     const handleBack = () => {
-        setCandidates(null)
-        setSelection({})
+        setOnFieldsStep(false)
         setShowIdentical(false)
     }
 
     const handleReset = () => {
-        if (!candidates) {
-            return
+        if (candidates) {
+            setSelection(candidates.defaults)
         }
-        setSelection(
-            resolveDefaultSelections(
-                candidates.oldUser.fields,
-                candidates.newUser.fields
-            )
-        )
     }
 
     const choose = (key: keyof MergeSelection, choice: MergeChoice) => {
@@ -182,7 +241,7 @@ export function MergeUsersForm({
         setIsSubmitting(true)
         setResult(null)
 
-        const response = await mergeUsers(oldUserId, newUserId, selection)
+        const response = await mergeUsers(userAId, userBId, selection)
         setResult({
             status: response.status,
             message: response.message ?? ""
@@ -191,10 +250,11 @@ export function MergeUsersForm({
         setShowConfirm(false)
 
         if (response.status) {
-            setOldUserId("")
-            setNewUserId("")
+            setUserAId("")
+            setUserBId("")
             setCandidates(null)
             setSelection({})
+            setOnFieldsStep(false)
         }
     }
 
@@ -211,49 +271,62 @@ export function MergeUsersForm({
     )
 
     // ---------------------------------------------------------------- step 1
-    if (!candidates) {
+    if (!onFieldsStep || !candidates || !survivorSnap || !deletedSnap) {
+        const sameUser = Boolean(userAId) && userAId === userBId
+
         return (
             <Card className="max-w-2xl">
                 <CardHeader>
-                    <CardTitle>Step 1 &mdash; Select Users to Merge</CardTitle>
+                    <CardTitle>Step 1 &mdash; Pick the Two Accounts</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <label className="font-medium text-sm">
-                            Old User (will be deleted)
-                        </label>
-                        <UserEmailCombobox
-                            users={oldUsers}
-                            value={oldUserId}
-                            onChange={setOldUserId}
-                            placeholder="Select old user..."
-                        />
-                        <p className="text-muted-foreground text-xs">
-                            All records are transferred off this account, then
-                            it is deleted. You can still keep individual field
-                            values from it in the next step.
-                        </p>
+                    <p className="text-muted-foreground text-sm">
+                        Order does not matter. You decide what the merged
+                        account keeps &mdash; including which email address and
+                        login it ends up with &mdash; in the next step.
+                    </p>
+
+                    <div className="grid gap-6 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <label className="font-medium text-sm">
+                                Player A
+                            </label>
+                            <UserEmailCombobox
+                                users={users}
+                                value={userAId}
+                                onChange={setUserAId}
+                                placeholder="Select a player..."
+                            />
+                            {candidates && (
+                                <AccountFacts snap={candidates.userA} />
+                            )}
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="font-medium text-sm">
+                                Player B
+                            </label>
+                            <UserEmailCombobox
+                                users={users}
+                                value={userBId}
+                                onChange={setUserBId}
+                                placeholder="Select a player..."
+                            />
+                            {candidates && (
+                                <AccountFacts snap={candidates.userB} />
+                            )}
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="font-medium text-sm">
-                            New User (will be kept)
-                        </label>
-                        <UserEmailCombobox
-                            users={newUsers}
-                            value={newUserId}
-                            onChange={setNewUserId}
-                            placeholder="Select new user..."
-                        />
-                        <p className="text-muted-foreground text-xs">
-                            This account survives the merge and inherits the old
-                            account&apos;s records.
+                    {sameUser && (
+                        <p className="text-red-700 text-sm dark:text-red-300">
+                            Pick two different people.
                         </p>
-                    </div>
+                    )}
 
                     <Button
-                        onClick={handleCompare}
-                        disabled={!oldUserId || !newUserId || isLoading}
+                        onClick={() => setOnFieldsStep(true)}
+                        disabled={!candidates || isLoading}
                     >
                         {isLoading ? "Loading..." : "Compare Accounts"}
                     </Button>
@@ -265,58 +338,34 @@ export function MergeUsersForm({
     }
 
     // ---------------------------------------------------------------- step 2
-    const { oldUser: oldSnap, newUser: newSnap } = candidates
-
     const columnHeader = (
-        snap: typeof oldSnap,
-        variant: "old" | "new",
-        fallback: UserOption | undefined
-    ) => (
-        <div
-            className={`rounded-md p-3 ${
-                variant === "old"
-                    ? "bg-red-50 dark:bg-red-950"
-                    : "bg-green-50 dark:bg-green-950"
-            }`}
-        >
-            <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-sm">
-                    {snap.displayName || fallback?.name}
-                </p>
-                <Badge
-                    variant={variant === "old" ? "destructive" : "secondary"}
-                >
-                    {variant === "old" ? "Will be deleted" : "Kept"}
-                </Badge>
+        snap: MergeAccountSnapshot,
+        side: MergeChoice,
+        label: string
+    ) => {
+        const survives = side === survivorSide
+        return (
+            <div
+                className={`rounded-md p-3 ${
+                    survives
+                        ? "bg-green-50 dark:bg-green-950"
+                        : "bg-red-50 dark:bg-red-950"
+                }`}
+            >
+                <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-sm">
+                        {label}: {snap.displayName}
+                    </p>
+                    <Badge variant={survives ? "secondary" : "destructive"}>
+                        {survives ? "Record kept" : "Record deleted"}
+                    </Badge>
+                </div>
+                <AccountFacts snap={snap} />
             </div>
-            <dl className="mt-2 space-y-0.5 text-muted-foreground text-xs">
-                <div>{String(snap.fields.email ?? "—")}</div>
-                <div>Created {formatDate(snap.activity.createdAt)}</div>
-                <div>Updated {formatDate(snap.activity.updatedAt)}</div>
-                <div>
-                    {snap.activity.signupCount} signup
-                    {snap.activity.signupCount === 1 ? "" : "s"}
-                    {snap.activity.firstSeasonCode
-                        ? ` (${snap.activity.firstSeasonCode}–${snap.activity.lastSeasonCode})`
-                        : ""}
-                </div>
-                <div>
-                    {snap.activity.teamsCaptained} team
-                    {snap.activity.teamsCaptained === 1 ? "" : "s"} captained
-                    {" · "}
-                    {snap.activity.roleCount} role
-                    {snap.activity.roleCount === 1 ? "" : "s"}
-                </div>
-                <div>Last login {formatDate(snap.activity.lastLoginAt)}</div>
-                <div>
-                    Login:{" "}
-                    {snap.activity.loginMethods.length > 0
-                        ? snap.activity.loginMethods.join(", ")
-                        : "none"}
-                </div>
-            </dl>
-        </div>
-    )
+        )
+    }
+
+    const survivorLogins = survivorSnap.activity.loginMethods
 
     return (
         <>
@@ -328,22 +377,39 @@ export function MergeUsersForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid gap-3 sm:grid-cols-2">
-                        {columnHeader(oldSnap, "old", oldUser)}
-                        {columnHeader(newSnap, "new", newUser)}
+                        {columnHeader(candidates.userA, "a", "Player A")}
+                        {columnHeader(candidates.userB, "b", "Player B")}
                     </div>
 
                     <p className="text-muted-foreground text-sm">
                         Pick the value that should survive for each field. Only
                         fields that differ between the two accounts are listed.
-                        Dates shown are per account &mdash; individual fields
-                        are not timestamped.
+                        Every record on both accounts &mdash; signups, rosters,
+                        ratings, availability, history &mdash; moves onto the
+                        surviving account either way. Dates shown are per
+                        account; individual fields are not timestamped.
                     </p>
 
-                    {takingEmailFromOld && (
-                        <div className="rounded-md bg-blue-50 p-3 text-blue-800 text-sm dark:bg-blue-950 dark:text-blue-200">
-                            Login methods from the deleted account will be moved
-                            across so this person can still sign in with{" "}
-                            {String(oldSnap.fields.email)}.
+                    <div className="rounded-md bg-blue-50 p-3 text-blue-800 text-sm dark:bg-blue-950 dark:text-blue-200">
+                        The <strong>Email</strong> choice decides which record
+                        survives. After the merge this person signs in as{" "}
+                        <strong>{String(survivorSnap.fields.email)}</strong>{" "}
+                        using{" "}
+                        {survivorLogins.length > 0
+                            ? survivorLogins.join(", ")
+                            : "no login method"}
+                        .
+                    </div>
+
+                    {lockout && (
+                        <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
+                            The account holding{" "}
+                            {String(survivorSnap.fields.email)} has no login
+                            attached, while {String(deletedSnap.fields.email)}{" "}
+                            has {deletedSnap.activity.loginMethods.join(", ")}.
+                            Merging this way leaves this person unable to sign
+                            in &mdash; pick the other email unless they are
+                            switching addresses deliberately.
                         </div>
                     )}
 
@@ -369,7 +435,7 @@ export function MergeUsersForm({
                                 </h3>
                                 <div className="divide-y rounded-md border">
                                     {group.rows.map(
-                                        ({ field, oldValue, newValue }) => (
+                                        ({ field, aValue, bValue }) => (
                                             <div
                                                 key={field.key}
                                                 className="grid gap-2 p-3 sm:grid-cols-[10rem_1fr_1fr] sm:items-center"
@@ -379,8 +445,8 @@ export function MergeUsersForm({
                                                 </span>
                                                 {(
                                                     [
-                                                        ["old", oldValue],
-                                                        ["new", newValue]
+                                                        ["a", aValue],
+                                                        ["b", bValue]
                                                     ] as const
                                                 ).map(([side, value]) => (
                                                     <label
@@ -474,24 +540,26 @@ export function MergeUsersForm({
                     <div className="space-y-4 py-4">
                         <div className="rounded-md bg-red-50 p-4 dark:bg-red-950">
                             <p className="font-medium text-red-800 text-sm dark:text-red-200">
-                                Old User (will be DELETED)
+                                Record that will be DELETED
                             </p>
                             <div className="mt-2 text-red-700 text-sm dark:text-red-300">
-                                <p>Name: {oldSnap.displayName}</p>
+                                <p>Name: {deletedSnap.displayName}</p>
                                 <p>
-                                    Email: {String(oldSnap.fields.email ?? "")}
+                                    Email:{" "}
+                                    {String(deletedSnap.fields.email ?? "")}
                                 </p>
                             </div>
                         </div>
 
                         <div className="rounded-md bg-green-50 p-4 dark:bg-green-950">
                             <p className="font-medium text-green-800 text-sm dark:text-green-200">
-                                New User (will be KEPT)
+                                Record that will be KEPT
                             </p>
                             <div className="mt-2 text-green-700 text-sm dark:text-green-300">
-                                <p>Name: {newSnap.displayName}</p>
+                                <p>Name: {survivorSnap.displayName}</p>
                                 <p>
-                                    Email: {String(newSnap.fields.email ?? "")}
+                                    Email:{" "}
+                                    {String(survivorSnap.fields.email ?? "")}
                                 </p>
                             </div>
                         </div>
@@ -500,19 +568,21 @@ export function MergeUsersForm({
                             <p className="font-medium text-sm">
                                 Values taken from the deleted account
                             </p>
-                            {takenFromOld.length === 0 ? (
+                            {takenFromDeleted.length === 0 ? (
                                 <p className="text-muted-foreground text-sm">
                                     None &mdash; the kept account&apos;s own
                                     values survive unchanged.
                                 </p>
                             ) : (
                                 <ul className="list-disc space-y-0.5 pl-5 text-sm">
-                                    {takenFromOld.map((row) => (
+                                    {takenFromDeleted.map((row) => (
                                         <li key={row.field.key}>
                                             {row.field.label}:{" "}
                                             <span className="font-medium">
                                                 {formatValue(
-                                                    row.oldValue,
+                                                    deletedSide === "a"
+                                                        ? row.aValue
+                                                        : row.bValue,
                                                     row.field.kind
                                                 )}
                                             </span>
@@ -522,18 +592,28 @@ export function MergeUsersForm({
                             )}
                         </div>
 
-                        {takingEmailFromOld && (
-                            <p className="text-blue-800 text-sm dark:text-blue-200">
-                                Login methods from the deleted account will move
-                                to the kept account.
+                        <p className="text-blue-800 text-sm dark:text-blue-200">
+                            This person will sign in as{" "}
+                            {String(survivorSnap.fields.email ?? "")} using{" "}
+                            {survivorLogins.length > 0
+                                ? survivorLogins.join(", ")
+                                : "no login method"}
+                            . Logins on the deleted account are removed with it.
+                        </p>
+
+                        {lockout && (
+                            <p className="font-medium text-red-800 text-sm dark:text-red-200">
+                                Warning: the kept account has no login attached
+                                &mdash; this person will not be able to sign in.
                             </p>
                         )}
 
                         <p className="text-muted-foreground text-sm">
-                            All records from the old user will be transferred to
-                            the new user, including signups, team captaincy,
-                            draft picks, waitlist entries, discounts,
-                            evaluations, and commissioner roles.
+                            All records from both accounts end up on the kept
+                            one, including signups, team captaincy, draft picks,
+                            waitlist entries, discounts, evaluations, ratings,
+                            availability, referee assignments, friendships, and
+                            roles.
                         </p>
                     </div>
 

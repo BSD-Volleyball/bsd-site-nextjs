@@ -23,6 +23,8 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import type {
+    MergeChoice,
+    MergeDefaultsContext,
     MergeFieldKey,
     MergeFieldValues,
     MergeSelection
@@ -68,19 +70,22 @@ export interface MergeAccountSnapshot {
 }
 
 export interface MergeCandidates {
-    oldUser: MergeAccountSnapshot
-    newUser: MergeAccountSnapshot
+    userA: MergeAccountSnapshot
+    userB: MergeAccountSnapshot
     /** Pre-ticked choices the admin reviews rather than makes from scratch. */
     defaults: MergeSelection
 }
 
-// Both sides of the merge form draw from the same pool: any account may be
-// merged into any other, in either direction.
-//
-// The guard lives in each exported action rather than here, so that
-// authorization is enforced at the action boundary as AGENTS.md requires --
-// and so scripts/security/authz-regression-check.js can see it. A guard behind
-// a delegate is invisible to that check, which is the point of the check.
+/**
+ * Every account, for both pickers. The two sides are symmetric -- there is no
+ * "old" and "new" -- so one list serves both.
+ *
+ * The authorization guard is inlined in the exported action below rather than
+ * living here, so that it is enforced at the action boundary as AGENTS.md
+ * requires and so scripts/security/authz-regression-check.js can see it. A
+ * guard behind a delegate is invisible to that check, which is the point of
+ * the check.
+ */
 async function listMergeableUsers(): Promise<UserOption[]> {
     const results = await db
         .select({
@@ -105,15 +110,7 @@ async function listMergeableUsers(): Promise<UserOption[]> {
     }))
 }
 
-export async function getOldUsers(): Promise<UserOption[]> {
-    const user = await getSessionUser()
-    if (!user || !(await isAdminOrDirector(user.id))) {
-        return []
-    }
-    return listMergeableUsers()
-}
-
-export async function getNewUsers(): Promise<UserOption[]> {
+export async function getMergeableUsers(): Promise<UserOption[]> {
     const user = await getSessionUser()
     if (!user || !(await isAdminOrDirector(user.id))) {
         return []
@@ -175,6 +172,25 @@ async function loadActivity(row: UserRow): Promise<MergeAccountActivity> {
     }
 }
 
+/**
+ * The non-column facts the default rules need: recency of maintenance, and
+ * which account can actually sign in (which decides the email default, and so
+ * the survivor).
+ */
+function defaultsContext(
+    userA: MergeAccountSnapshot,
+    userB: MergeAccountSnapshot
+): MergeDefaultsContext {
+    return {
+        aUpdatedAt: userA.activity.updatedAt,
+        bUpdatedAt: userB.activity.updatedAt,
+        aLoginMethodCount: userA.activity.loginMethods.length,
+        bLoginMethodCount: userB.activity.loginMethods.length,
+        aLastLoginAt: userA.activity.lastLoginAt,
+        bLastLoginAt: userB.activity.lastLoginAt
+    }
+}
+
 async function snapshot(row: UserRow): Promise<MergeAccountSnapshot> {
     return {
         id: row.id,
@@ -197,95 +213,107 @@ async function snapshot(row: UserRow): Promise<MergeAccountSnapshot> {
  */
 export const getMergeCandidateDetails = withAction(
     async (
-        oldUserId: string,
-        newUserId: string
+        userAId: string,
+        userBId: string
     ): Promise<ActionResult<MergeCandidates>> => {
         const session = await requireSession()
         if (!(await isAdminOrDirector(session.user.id))) {
             return fail("Access denied.")
         }
 
-        const oldId = requireNonEmptyString(oldUserId, "Old user")
-        const newId = requireNonEmptyString(newUserId, "New user")
+        const aId = requireNonEmptyString(userAId, "Player A")
+        const bId = requireNonEmptyString(userBId, "Player B")
 
-        if (oldId === newId) {
+        if (aId === bId) {
             return fail("Cannot merge a user with themselves.")
         }
 
-        const [oldRow] = await db
+        const [aRow] = await db
             .select()
             .from(users)
-            .where(eq(users.id, oldId))
+            .where(eq(users.id, aId))
             .limit(1)
-        if (!oldRow) {
-            return fail("Old user not found.")
+        if (!aRow) {
+            return fail("Player A not found.")
         }
 
-        const [newRow] = await db
+        const [bRow] = await db
             .select()
             .from(users)
-            .where(eq(users.id, newId))
+            .where(eq(users.id, bId))
             .limit(1)
-        if (!newRow) {
-            return fail("New user not found.")
+        if (!bRow) {
+            return fail("Player B not found.")
         }
 
-        const [oldSnapshot, newSnapshot] = await Promise.all([
-            snapshot(oldRow),
-            snapshot(newRow)
+        const [aSnapshot, bSnapshot] = await Promise.all([
+            snapshot(aRow),
+            snapshot(bRow)
         ])
 
         return ok({
-            oldUser: oldSnapshot,
-            newUser: newSnapshot,
+            userA: aSnapshot,
+            userB: bSnapshot,
             defaults: resolveDefaultSelections(
-                oldSnapshot.fields,
-                newSnapshot.fields
+                aSnapshot.fields,
+                bSnapshot.fields,
+                defaultsContext(aSnapshot, bSnapshot)
             )
         })
     }
 )
 
 /**
- * Turn the client's choice tokens into a column patch.
+ * Turn the client's choice tokens into a column patch for the surviving row.
  *
- * The client sends only "old"/"new" per field, never values, so nothing
+ * The client sends only "a"/"b" per field, never values, so nothing
  * user-supplied reaches the UPDATE. Unknown keys, bad tokens, and choices that
  * would not change anything are dropped.
  */
 function buildSurvivorPatch(
     selection: MergeSelection,
-    oldRow: UserRow,
-    newRow: UserRow
-): { patch: Partial<UserRow>; takenFromOld: MergeFieldKey[] } {
+    survivorRow: UserRow,
+    deletedRow: UserRow,
+    survivorSide: MergeChoice
+): { patch: Partial<UserRow>; takenFromDeleted: MergeFieldKey[] } {
     const patch: Record<string, unknown> = {}
-    const takenFromOld: MergeFieldKey[] = []
+    const takenFromDeleted: MergeFieldKey[] = []
 
     for (const [rawKey, rawChoice] of Object.entries(selection)) {
         if (!isMergeFieldKey(rawKey) || !isMergeChoice(rawChoice)) {
             continue
         }
-        if (rawChoice !== "old") {
-            // "new" means keep what the survivor already stores -- no write.
+        if (rawChoice === survivorSide) {
+            // The survivor already stores this value -- no write.
             continue
         }
 
         const key = rawKey as keyof UserRow
-        if (oldRow[key] === newRow[key]) {
+        if (survivorRow[key] === deletedRow[key]) {
             continue
         }
 
-        patch[key] = oldRow[key]
-        takenFromOld.push(rawKey)
+        patch[key] = deletedRow[key]
+        takenFromDeleted.push(rawKey)
     }
 
-    return { patch: patch as Partial<UserRow>, takenFromOld }
+    return { patch: patch as Partial<UserRow>, takenFromDeleted }
 }
 
+/**
+ * Merge two accounts the admin picked in either order.
+ *
+ * The `email` choice decides which row survives: logins live on an account
+ * rather than on an address, so keeping the account that owns the chosen
+ * address is what makes "auth follows the email" true. The other row's records
+ * are moved across and the row itself is deleted, taking its sessions and
+ * better-auth logins with it. Every other field is composed onto the survivor
+ * from either side.
+ */
 export const mergeUsers = withAction(
     async (
-        oldUserId: string,
-        newUserId: string,
+        userAId: string,
+        userBId: string,
         selection: MergeSelection = {}
     ): Promise<ActionResult> => {
         const session = await requireSession()
@@ -295,62 +323,67 @@ export const mergeUsers = withAction(
             return fail("Access denied.")
         }
 
-        const oldId = requireNonEmptyString(oldUserId, "Old user")
-        const newId = requireNonEmptyString(newUserId, "New user")
+        const aId = requireNonEmptyString(userAId, "Player A")
+        const bId = requireNonEmptyString(userBId, "Player B")
 
-        if (oldId === newId) {
+        if (aId === bId) {
             return fail("Cannot merge a user with themselves.")
         }
 
+        // users.email is UNIQUE NOT NULL, so the two accounts always differ
+        // here and a well-formed selection always carries this choice.
+        const survivorSide = selection.email
+        if (!isMergeChoice(survivorSide)) {
+            return fail("Choose which email address the merged account keeps.")
+        }
+
         try {
-            const [oldUser] = await db
+            const [aUser] = await db
                 .select()
                 .from(users)
-                .where(eq(users.id, oldId))
+                .where(eq(users.id, aId))
                 .limit(1)
 
-            if (!oldUser) {
-                return fail("Old user not found.")
+            if (!aUser) {
+                return fail("Player A not found.")
             }
 
-            const [newUser] = await db
+            const [bUser] = await db
                 .select()
                 .from(users)
-                .where(eq(users.id, newId))
+                .where(eq(users.id, bId))
                 .limit(1)
 
-            if (!newUser) {
-                return fail("New user not found.")
+            if (!bUser) {
+                return fail("Player B not found.")
             }
 
-            const { patch, takenFromOld } = buildSurvivorPatch(
+            const survivor = survivorSide === "a" ? aUser : bUser
+            const deleted = survivorSide === "a" ? bUser : aUser
+
+            const { patch, takenFromDeleted } = buildSurvivorPatch(
                 selection,
-                oldUser,
-                newUser
+                survivor,
+                deleted,
+                survivorSide
             )
 
-            // The survivor is adopting the deleted account's address, so the
-            // logins that authenticate as that address have to come with it.
-            const moveAuthAccounts = patch.email !== undefined
-
-            await mergeUserRecords(oldId, newId, {
+            await mergeUserRecords(deleted.id, survivor.id, {
                 copyIdentity: false,
-                survivorPatch: patch,
-                moveAuthAccounts
+                survivorPatch: patch
             })
 
             const kept =
-                takenFromOld.length > 0
-                    ? `kept from deleted account: ${takenFromOld.join(", ")}`
+                takenFromDeleted.length > 0
+                    ? `kept from deleted account: ${takenFromDeleted.join(", ")}`
                     : "kept no fields from the deleted account"
-            const auth = moveAuthAccounts ? "; login methods moved" : ""
 
             await logAuditEntry({
                 userId: session.user.id,
                 action: "merge",
                 entityType: "users",
-                entityId: newId,
-                summary: `Merged user ${oldId} into ${newId} (old user deleted); ${kept}${auth}`
+                entityId: survivor.id,
+                summary: `Merged user ${deleted.id} into ${survivor.id} (deleted account: ${deleted.email}); surviving login email ${survivor.email}; ${kept}`
             })
 
             revalidatePath("/dashboard/merge-users")

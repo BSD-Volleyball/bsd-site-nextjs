@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { MergeUsersForm } from "./merge-users-form"
-import { getOldUsers } from "./actions"
+import { getMergeableUsers } from "./actions"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -13,16 +13,16 @@ export const revalidate = 300
 export default async function MergeUsersPage() {
     await requireAdminOrRedirect()
 
-    // Both selects offer the same pool now, so one query feeds both.
-    const allUsers = await getOldUsers()
+    // The two sides are symmetric, so one query feeds both pickers.
+    const allUsers = await getMergeableUsers()
 
     return (
         <div className="space-y-6">
             <PageHeader
                 title="Merge Users"
-                description="Combine duplicate user accounts by transferring records from an old user to a new user."
+                description="Combine two duplicate accounts into one, choosing field by field what the surviving record keeps."
             />
-            <MergeUsersForm oldUsers={allUsers} newUsers={allUsers} />
+            <MergeUsersForm users={allUsers} />
         </div>
     )
 }

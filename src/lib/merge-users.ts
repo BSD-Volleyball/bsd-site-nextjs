@@ -1,6 +1,5 @@
 import { db } from "@/database/db"
 import {
-    accounts,
     auditLog,
     concernComments,
     concernReplies,
@@ -14,13 +13,17 @@ import {
     emailBroadcasts,
     emailSuppressions,
     evaluations,
+    friendships,
     inboundEmailComments,
     inboundEmailReplies,
     inboundEmails,
+    matchReferees,
     matchSubstitutions,
     movingDay,
+    notificationOptouts,
     playerRatings,
     scoreSheets,
+    seasonRefs,
     signups,
     subRequests,
     substitutions,
@@ -28,7 +31,10 @@ import {
     tournamentRoster,
     tournamentTeams,
     tournamentWaitlist,
+    tryoutSlotRequests,
+    tryoutVolunteerAssignments,
     userRoles,
+    userUnavailability,
     users,
     waitlist,
     waiverAcceptances,
@@ -67,36 +73,28 @@ export interface MergeUserRecordsOptions {
      * delete -- see the ordering note on `mergeUserRecords`.
      */
     survivorPatch?: Partial<typeof users.$inferInsert>
-
-    /**
-     * Move the deleted account's better-auth `accounts` rows (Google links,
-     * password credentials) onto the survivor instead of letting them cascade
-     * away.
-     *
-     * Set this when the survivor is adopting the deleted account's email: those
-     * login methods are how the person signs in as that address, so dropping
-     * them while keeping the address would lock them out.
-     */
-    moveAuthAccounts?: boolean
 }
 
 /**
  * Move every record owned by `oldUserId` onto `newUserId`, then delete the old
  * account. Runs in a single transaction, so a failure anywhere rolls back.
  *
- * Tables with ON DELETE CASCADE (sessions, accounts, user_unavailability,
- * season_refs, match_referees, notification_optouts, tryout_slot_requests,
- * sub_requests.original_user/target_user) are left to be cleaned up by the
- * final delete. Non-cascading columns must be repointed explicitly here or
- * that delete raises an FK violation.
+ * Only `sessions` and `accounts` are left to the final delete's ON DELETE
+ * CASCADE: they authenticate a specific account rather than describing a
+ * player, so they belong to the row that is going away. Everything else that
+ * references a user -- including the cascading tables, which would otherwise be
+ * silently destroyed rather than merged -- is repointed explicitly below.
  *
- * Ordering around the delete is load-bearing:
+ * Repointing has to reckon with unique constraints: where both accounts hold a
+ * row that would collide after the move (the same season's signup, the same
+ * waiver acceptance, the same night's availability), the deleted account's copy
+ * is dropped and the survivor's is kept.
  *
- *   - `moveAuthAccounts` runs BEFORE it, because `accounts.userId` cascades and
- *     the rows would be gone by the time we could repoint them.
- *   - `survivorPatch` runs AFTER it, because `users.email` is UNIQUE NOT NULL.
- *     Writing the deleted account's email onto the survivor while both rows
- *     still exist violates that constraint and aborts the transaction.
+ * `survivorPatch` runs AFTER the delete, because `users.email` is UNIQUE NOT
+ * NULL. Writing the deleted account's email onto the survivor while both rows
+ * still exist violates that constraint and aborts the transaction. Callers that
+ * derive the survivor from the email choice never patch `email` at all, but the
+ * ordering stays as cheap insurance for the ones that might.
  *
  * Callers are responsible for authorization and for audit logging.
  */
@@ -106,32 +104,6 @@ export async function mergeUserRecords(
     opts: MergeUserRecordsOptions
 ): Promise<void> {
     await db.transaction(async (tx) => {
-        // better-auth logins. Must happen before the delete below, which would
-        // otherwise cascade these rows away. Drop any old row whose provider the
-        // survivor already has -- better-auth resolves a sign-in by
-        // (providerId, accountId), so two rows for the same provider on one user
-        // is at best redundant and at worst ambiguous.
-        if (opts.moveAuthAccounts) {
-            await tx
-                .delete(accounts)
-                .where(
-                    and(
-                        eq(accounts.userId, oldUserId),
-                        inArray(
-                            accounts.providerId,
-                            tx
-                                .select({ providerId: accounts.providerId })
-                                .from(accounts)
-                                .where(eq(accounts.userId, newUserId))
-                        )
-                    )
-                )
-            await tx
-                .update(accounts)
-                .set({ userId: newUserId, updatedAt: new Date() })
-                .where(eq(accounts.userId, oldUserId))
-        }
-
         if (opts.copyIdentity) {
             const [oldUser] = await tx
                 .select({ old_id: users.old_id, picture: users.picture })
@@ -177,6 +149,17 @@ export async function mergeUserRecords(
             .update(signups)
             .set({ pair_pick: newUserId })
             .where(eq(signups.pair_pick, oldUserId))
+        // If the two merged accounts had paired with each other, the signup now
+        // points at itself. Nobody is their own pair pick, so clear it.
+        await tx
+            .update(signups)
+            .set({ pair_pick: null })
+            .where(
+                and(
+                    eq(signups.player, newUserId),
+                    eq(signups.pair_pick, newUserId)
+                )
+            )
 
         // deleted_signups
         await tx
@@ -421,21 +404,106 @@ export async function mergeUserRecords(
             .set({ player: newUserId })
             .where(eq(draftHomework.player, oldUserId))
 
-        // draft_capt_rounds
+        // draft_capt_rounds: (season, division, captain) is unique — drop the
+        // old account's row where the survivor already captained that division.
         await tx
             .update(draftCaptRounds)
             .set({ saved_by: newUserId })
             .where(eq(draftCaptRounds.saved_by, oldUserId))
+        const [oldCaptRoundRows, newCaptRoundRows] = await Promise.all([
+            tx
+                .select({
+                    id: draftCaptRounds.id,
+                    season: draftCaptRounds.season,
+                    division: draftCaptRounds.division
+                })
+                .from(draftCaptRounds)
+                .where(eq(draftCaptRounds.captain, oldUserId)),
+            tx
+                .select({
+                    season: draftCaptRounds.season,
+                    division: draftCaptRounds.division
+                })
+                .from(draftCaptRounds)
+                .where(eq(draftCaptRounds.captain, newUserId))
+        ])
+        const newCaptRoundKeys = new Set(
+            newCaptRoundRows.map((r) => `${r.season}|${r.division}`)
+        )
+        const dupCaptRoundIds = oldCaptRoundRows
+            .filter((r) => newCaptRoundKeys.has(`${r.season}|${r.division}`))
+            .map((r) => r.id)
+        if (dupCaptRoundIds.length > 0) {
+            await tx
+                .delete(draftCaptRounds)
+                .where(inArray(draftCaptRounds.id, dupCaptRoundIds))
+        }
         await tx
             .update(draftCaptRounds)
             .set({ captain: newUserId })
             .where(eq(draftCaptRounds.captain, oldUserId))
 
-        // draft_pair_diffs
+        // draft_pair_diffs: (season, division, player1, player2) is unique, and
+        // a row pairing the two merged accounts would collapse to a player
+        // paired with themselves. Drop those outright, then drop the old rows
+        // that would duplicate one the survivor already has.
         await tx
             .update(draftPairDiffs)
             .set({ saved_by: newUserId })
             .where(eq(draftPairDiffs.saved_by, oldUserId))
+        const [oldPairDiffRows, newPairDiffRows] = await Promise.all([
+            tx
+                .select({
+                    id: draftPairDiffs.id,
+                    season: draftPairDiffs.season,
+                    division: draftPairDiffs.division,
+                    player1: draftPairDiffs.player1,
+                    player2: draftPairDiffs.player2
+                })
+                .from(draftPairDiffs)
+                .where(
+                    or(
+                        eq(draftPairDiffs.player1, oldUserId),
+                        eq(draftPairDiffs.player2, oldUserId)
+                    )
+                ),
+            tx
+                .select({
+                    season: draftPairDiffs.season,
+                    division: draftPairDiffs.division,
+                    player1: draftPairDiffs.player1,
+                    player2: draftPairDiffs.player2
+                })
+                .from(draftPairDiffs)
+                .where(
+                    or(
+                        eq(draftPairDiffs.player1, newUserId),
+                        eq(draftPairDiffs.player2, newUserId)
+                    )
+                )
+        ])
+        const pairDiffKey = (r: {
+            season: number
+            division: number
+            player1: string
+            player2: string
+        }) => `${r.season}|${r.division}|${r.player1}|${r.player2}`
+        const newPairDiffKeys = new Set(newPairDiffRows.map(pairDiffKey))
+        const dropPairDiffIds = oldPairDiffRows
+            .filter((r) => {
+                const player1 = r.player1 === oldUserId ? newUserId : r.player1
+                const player2 = r.player2 === oldUserId ? newUserId : r.player2
+                return (
+                    player1 === player2 ||
+                    newPairDiffKeys.has(pairDiffKey({ ...r, player1, player2 }))
+                )
+            })
+            .map((r) => r.id)
+        if (dropPairDiffIds.length > 0) {
+            await tx
+                .delete(draftPairDiffs)
+                .where(inArray(draftPairDiffs.id, dropPairDiffIds))
+        }
         await tx
             .update(draftPairDiffs)
             .set({ player1: newUserId })
@@ -557,6 +625,24 @@ export async function mergeUserRecords(
             .update(substitutions)
             .set({ performed_by: newUserId })
             .where(eq(substitutions.performed_by, oldUserId))
+        // (match, original_user) is unique — drop the old account's row where
+        // the survivor was already subbed out of that match.
+        await tx
+            .delete(matchSubstitutions)
+            .where(
+                and(
+                    eq(matchSubstitutions.original_user, oldUserId),
+                    inArray(
+                        matchSubstitutions.match,
+                        tx
+                            .select({ match: matchSubstitutions.match })
+                            .from(matchSubstitutions)
+                            .where(
+                                eq(matchSubstitutions.original_user, newUserId)
+                            )
+                    )
+                )
+            )
         await tx
             .update(matchSubstitutions)
             .set({ original_user: newUserId })
@@ -570,9 +656,10 @@ export async function mergeUserRecords(
             .set({ performed_by: newUserId })
             .where(eq(matchSubstitutions.performed_by, oldUserId))
 
-        // sub_requests: original_user/target_user cascade away with the delete,
-        // but requested_by and responded_by are RESTRICT — Postgres raises on
-        // those before any cascade runs, so they have to be repointed here.
+        // sub_requests. A request between the two merged accounts becomes a
+        // request to sub for oneself, and pending requests are unique on
+        // (match, original_user, target_user) — drop both cases, then repoint
+        // the rest so the sub history survives.
         await tx
             .update(subRequests)
             .set({ requested_by: newUserId })
@@ -581,6 +668,73 @@ export async function mergeUserRecords(
             .update(subRequests)
             .set({ responded_by: newUserId })
             .where(eq(subRequests.responded_by, oldUserId))
+        const [oldSubReqRows, newSubReqRows] = await Promise.all([
+            tx
+                .select({
+                    id: subRequests.id,
+                    match: subRequests.match,
+                    original_user: subRequests.original_user,
+                    target_user: subRequests.target_user,
+                    status: subRequests.status
+                })
+                .from(subRequests)
+                .where(
+                    or(
+                        eq(subRequests.original_user, oldUserId),
+                        eq(subRequests.target_user, oldUserId)
+                    )
+                ),
+            tx
+                .select({
+                    match: subRequests.match,
+                    original_user: subRequests.original_user,
+                    target_user: subRequests.target_user
+                })
+                .from(subRequests)
+                .where(
+                    and(
+                        eq(subRequests.status, "pending"),
+                        or(
+                            eq(subRequests.original_user, newUserId),
+                            eq(subRequests.target_user, newUserId)
+                        )
+                    )
+                )
+        ])
+        const subReqKey = (r: {
+            match: number
+            original_user: string
+            target_user: string
+        }) => `${r.match}|${r.original_user}|${r.target_user}`
+        const newSubReqKeys = new Set(newSubReqRows.map(subReqKey))
+        const dropSubReqIds = oldSubReqRows
+            .filter((r) => {
+                const original_user =
+                    r.original_user === oldUserId ? newUserId : r.original_user
+                const target_user =
+                    r.target_user === oldUserId ? newUserId : r.target_user
+                return (
+                    original_user === target_user ||
+                    (r.status === "pending" &&
+                        newSubReqKeys.has(
+                            subReqKey({ ...r, original_user, target_user })
+                        ))
+                )
+            })
+            .map((r) => r.id)
+        if (dropSubReqIds.length > 0) {
+            await tx
+                .delete(subRequests)
+                .where(inArray(subRequests.id, dropSubReqIds))
+        }
+        await tx
+            .update(subRequests)
+            .set({ original_user: newUserId })
+            .where(eq(subRequests.original_user, oldUserId))
+        await tx
+            .update(subRequests)
+            .set({ target_user: newUserId })
+            .where(eq(subRequests.target_user, oldUserId))
 
         // tournament participation. tournament_roster has a unique
         // (tournament, user) — keep-new policy like signups. If both accounts
@@ -631,9 +785,250 @@ export async function mergeUserRecords(
             .set({ user_id: newUserId })
             .where(eq(tournamentWaitlist.user_id, oldUserId))
 
-        // Finally delete the old user. Sessions, accounts,
-        // user_unavailability, season_refs, match_referees, and any remaining
-        // user_roles rows for the old id cascade automatically.
+        // user_unavailability: (user_id, event_id) is unique. Rows attached to
+        // a duplicate signup already cascaded away when that signup was
+        // dropped above; what remains is availability the survivor should
+        // inherit rather than lose.
+        await tx
+            .delete(userUnavailability)
+            .where(
+                and(
+                    eq(userUnavailability.user_id, oldUserId),
+                    inArray(
+                        userUnavailability.event_id,
+                        tx
+                            .select({ event_id: userUnavailability.event_id })
+                            .from(userUnavailability)
+                            .where(eq(userUnavailability.user_id, newUserId))
+                    )
+                )
+            )
+        await tx
+            .update(userUnavailability)
+            .set({ user_id: newUserId })
+            .where(eq(userUnavailability.user_id, oldUserId))
+
+        // season_refs: (season_id, user_id) is unique — keep the survivor's
+        // certification row for a season they both hold one for.
+        await tx
+            .delete(seasonRefs)
+            .where(
+                and(
+                    eq(seasonRefs.user_id, oldUserId),
+                    inArray(
+                        seasonRefs.season_id,
+                        tx
+                            .select({ season_id: seasonRefs.season_id })
+                            .from(seasonRefs)
+                            .where(eq(seasonRefs.user_id, newUserId))
+                    )
+                )
+            )
+        await tx
+            .update(seasonRefs)
+            .set({ user_id: newUserId })
+            .where(eq(seasonRefs.user_id, oldUserId))
+
+        // match_referees: the unique index is (match_id, role), so repointing
+        // cannot violate it — but it could leave one person reffing the same
+        // match twice under two roles. Drop those rather than create them.
+        await tx
+            .delete(matchReferees)
+            .where(
+                and(
+                    eq(matchReferees.referee_id, oldUserId),
+                    inArray(
+                        matchReferees.match_id,
+                        tx
+                            .select({ match_id: matchReferees.match_id })
+                            .from(matchReferees)
+                            .where(eq(matchReferees.referee_id, newUserId))
+                    )
+                )
+            )
+        await tx
+            .update(matchReferees)
+            .set({ referee_id: newUserId })
+            .where(eq(matchReferees.referee_id, oldUserId))
+
+        // notification_optouts: (user_id, notification_type) is unique. An
+        // opt-out on either account is a stated preference, so the survivor
+        // inherits the union rather than only its own.
+        await tx.delete(notificationOptouts).where(
+            and(
+                eq(notificationOptouts.user_id, oldUserId),
+                inArray(
+                    notificationOptouts.notification_type,
+                    tx
+                        .select({
+                            notification_type:
+                                notificationOptouts.notification_type
+                        })
+                        .from(notificationOptouts)
+                        .where(eq(notificationOptouts.user_id, newUserId))
+                )
+            )
+        )
+        await tx
+            .update(notificationOptouts)
+            .set({ user_id: newUserId })
+            .where(eq(notificationOptouts.user_id, oldUserId))
+
+        // tryout_slot_requests: (season, user_id, week) is unique.
+        const [oldSlotRows, newSlotRows] = await Promise.all([
+            tx
+                .select({
+                    id: tryoutSlotRequests.id,
+                    season: tryoutSlotRequests.season,
+                    week: tryoutSlotRequests.week
+                })
+                .from(tryoutSlotRequests)
+                .where(eq(tryoutSlotRequests.user_id, oldUserId)),
+            tx
+                .select({
+                    season: tryoutSlotRequests.season,
+                    week: tryoutSlotRequests.week
+                })
+                .from(tryoutSlotRequests)
+                .where(eq(tryoutSlotRequests.user_id, newUserId))
+        ])
+        const newSlotKeys = new Set(
+            newSlotRows.map((r) => `${r.season}|${r.week}`)
+        )
+        const dupSlotIds = oldSlotRows
+            .filter((r) => newSlotKeys.has(`${r.season}|${r.week}`))
+            .map((r) => r.id)
+        if (dupSlotIds.length > 0) {
+            await tx
+                .delete(tryoutSlotRequests)
+                .where(inArray(tryoutSlotRequests.id, dupSlotIds))
+        }
+        await tx
+            .update(tryoutSlotRequests)
+            .set({ user_id: newUserId })
+            .where(eq(tryoutSlotRequests.user_id, oldUserId))
+        await tx
+            .update(tryoutSlotRequests)
+            .set({ created_by: newUserId })
+            .where(eq(tryoutSlotRequests.created_by, oldUserId))
+
+        // tryout_volunteer_assignments: (job_id, time_slot_id, user_id) is
+        // unique with NULLS NOT DISTINCT, so a whole-night job (null slot)
+        // collides too.
+        const [oldVolRows, newVolRows] = await Promise.all([
+            tx
+                .select({
+                    id: tryoutVolunteerAssignments.id,
+                    job_id: tryoutVolunteerAssignments.job_id,
+                    time_slot_id: tryoutVolunteerAssignments.time_slot_id
+                })
+                .from(tryoutVolunteerAssignments)
+                .where(eq(tryoutVolunteerAssignments.user_id, oldUserId)),
+            tx
+                .select({
+                    job_id: tryoutVolunteerAssignments.job_id,
+                    time_slot_id: tryoutVolunteerAssignments.time_slot_id
+                })
+                .from(tryoutVolunteerAssignments)
+                .where(eq(tryoutVolunteerAssignments.user_id, newUserId))
+        ])
+        const volKey = (r: { job_id: number; time_slot_id: number | null }) =>
+            `${r.job_id}|${r.time_slot_id ?? "null"}`
+        const newVolKeys = new Set(newVolRows.map(volKey))
+        const dupVolIds = oldVolRows
+            .filter((r) => newVolKeys.has(volKey(r)))
+            .map((r) => r.id)
+        if (dupVolIds.length > 0) {
+            await tx
+                .delete(tryoutVolunteerAssignments)
+                .where(inArray(tryoutVolunteerAssignments.id, dupVolIds))
+        }
+        await tx
+            .update(tryoutVolunteerAssignments)
+            .set({ user_id: newUserId })
+            .where(eq(tryoutVolunteerAssignments.user_id, oldUserId))
+        await tx
+            .update(tryoutVolunteerAssignments)
+            .set({ assigned_by: newUserId })
+            .where(eq(tryoutVolunteerAssignments.assigned_by, oldUserId))
+
+        // friendships. Two constraints bite here: a CHECK forbids befriending
+        // yourself, so the edge between the two merged accounts has to go; and
+        // a partial unique index allows only one LIVE (pending/accepted) edge
+        // per unordered pair, so an old live edge is dropped where the survivor
+        // already has a live edge with the same person. Terminal rows
+        // (declined/cancelled/removed) sit outside that index and are kept as
+        // history.
+        const LIVE_FRIENDSHIP = ["pending", "accepted"] as const
+        const [oldFriendRows, newLiveFriendRows] = await Promise.all([
+            tx
+                .select({
+                    id: friendships.id,
+                    requester: friendships.requester,
+                    addressee: friendships.addressee,
+                    status: friendships.status
+                })
+                .from(friendships)
+                .where(
+                    or(
+                        eq(friendships.requester, oldUserId),
+                        eq(friendships.addressee, oldUserId)
+                    )
+                ),
+            tx
+                .select({
+                    requester: friendships.requester,
+                    addressee: friendships.addressee
+                })
+                .from(friendships)
+                .where(
+                    and(
+                        inArray(friendships.status, [...LIVE_FRIENDSHIP]),
+                        or(
+                            eq(friendships.requester, newUserId),
+                            eq(friendships.addressee, newUserId)
+                        )
+                    )
+                )
+        ])
+        const survivorLivePartners = new Set(
+            newLiveFriendRows.map((r) =>
+                r.requester === newUserId ? r.addressee : r.requester
+            )
+        )
+        const dropFriendshipIds = oldFriendRows
+            .filter((r) => {
+                const partner =
+                    r.requester === oldUserId ? r.addressee : r.requester
+                if (partner === newUserId) {
+                    // The two accounts were friends with each other.
+                    return true
+                }
+                return (
+                    LIVE_FRIENDSHIP.includes(
+                        r.status as (typeof LIVE_FRIENDSHIP)[number]
+                    ) && survivorLivePartners.has(partner)
+                )
+            })
+            .map((r) => r.id)
+        if (dropFriendshipIds.length > 0) {
+            await tx
+                .delete(friendships)
+                .where(inArray(friendships.id, dropFriendshipIds))
+        }
+        await tx
+            .update(friendships)
+            .set({ requester: newUserId })
+            .where(eq(friendships.requester, oldUserId))
+        await tx
+            .update(friendships)
+            .set({ addressee: newUserId })
+            .where(eq(friendships.addressee, oldUserId))
+
+        // Finally delete the old user. Only its sessions and better-auth
+        // `accounts` rows cascade away with it: those authenticate this
+        // specific account, and the survivor keeps its own. Any remaining
+        // user_roles rows for the old id cascade too.
         await tx.delete(users).where(eq(users.id, oldUserId))
 
         // Compose the surviving record. Only legal now that the deleted row is
