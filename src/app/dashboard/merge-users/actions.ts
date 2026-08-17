@@ -3,6 +3,7 @@
 import { db } from "@/database/db"
 import {
     accounts,
+    drafts,
     seasons,
     sessions,
     signups,
@@ -10,7 +11,7 @@ import {
     userRoles,
     users
 } from "@/database/schema"
-import { asc, desc, eq, ne, or } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import type { ActionResult } from "@/lib/action-helpers"
 import {
@@ -74,6 +75,39 @@ export interface MergeCandidates {
     userB: MergeAccountSnapshot
     /** Pre-ticked choices the admin reviews rather than makes from scratch. */
     defaults: MergeSelection
+    /**
+     * The two accounts were drafted onto the same team at least once. A roster
+     * never lists one person twice, so this is strong evidence they are two
+     * different people and the merge is a mistake.
+     */
+    sharesTeam: boolean
+}
+
+/**
+ * Whether the two accounts ever appear on the same team's roster.
+ *
+ * Mirrors the conflict rule the historical backfill uses to refuse a suggested
+ * match (see fetchSameTeamConflicts in src/lib/legacy-accounts.ts), narrowed to
+ * a single pair.
+ */
+async function sharesATeam(aId: string, bId: string): Promise<boolean> {
+    const rows = await db
+        .select({ team: drafts.team })
+        .from(drafts)
+        .where(
+            and(
+                eq(drafts.user, aId),
+                inArray(
+                    drafts.team,
+                    db
+                        .select({ team: drafts.team })
+                        .from(drafts)
+                        .where(eq(drafts.user, bId))
+                )
+            )
+        )
+        .limit(1)
+    return rows.length > 0
 }
 
 /**
@@ -246,9 +280,10 @@ export const getMergeCandidateDetails = withAction(
             return fail("Player B not found.")
         }
 
-        const [aSnapshot, bSnapshot] = await Promise.all([
+        const [aSnapshot, bSnapshot, sharesTeam] = await Promise.all([
             snapshot(aRow),
-            snapshot(bRow)
+            snapshot(bRow),
+            sharesATeam(aId, bId)
         ])
 
         return ok({
@@ -258,7 +293,8 @@ export const getMergeCandidateDetails = withAction(
                 aSnapshot.fields,
                 bSnapshot.fields,
                 defaultsContext(aSnapshot, bSnapshot)
-            )
+            ),
+            sharesTeam
         })
     }
 )

@@ -95,12 +95,27 @@ function AccountFacts({ snap }: { snap: MergeAccountSnapshot }) {
     )
 }
 
-export function MergeUsersForm({ users }: { users: UserOption[] }) {
-    const [userAId, setUserAId] = useState<string>("")
-    const [userBId, setUserBId] = useState<string>("")
+export function MergeUsersForm({
+    users,
+    initialUserAId = "",
+    initialUserBId = ""
+}: {
+    users: UserOption[]
+    initialUserAId?: string
+    initialUserBId?: string
+}) {
+    const [userAId, setUserAId] = useState<string>(initialUserAId)
+    const [userBId, setUserBId] = useState<string>(initialUserBId)
     const [candidates, setCandidates] = useState<MergeCandidates | null>(null)
     const [selection, setSelection] = useState<MergeSelection>({})
-    const [onFieldsStep, setOnFieldsStep] = useState(false)
+    // Arriving with both ids already chosen means another screen did step 1 on
+    // the admin's behalf, so land on the field comparison rather than on a form
+    // that is already filled in. "Back" still returns to the pickers.
+    const handedOffPair =
+        Boolean(initialUserAId) &&
+        Boolean(initialUserBId) &&
+        initialUserAId !== initialUserBId
+    const [onFieldsStep, setOnFieldsStep] = useState(handedOffPair)
     const [isLoading, setIsLoading] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -270,6 +285,18 @@ export function MergeUsersForm({ users }: { users: UserOption[] }) {
         </div>
     )
 
+    // Handed a pair by another screen: the comparison is what was asked for, so
+    // wait for it rather than flashing the picker form on the way through.
+    if (onFieldsStep && !candidates && isLoading) {
+        return (
+            <Card className="max-w-2xl">
+                <CardContent className="py-10 text-center text-muted-foreground text-sm">
+                    Loading both accounts...
+                </CardContent>
+            </Card>
+        )
+    }
+
     // ---------------------------------------------------------------- step 1
     if (!onFieldsStep || !candidates || !survivorSnap || !deletedSnap) {
         const sameUser = Boolean(userAId) && userAId === userBId
@@ -410,6 +437,15 @@ export function MergeUsersForm({ users }: { users: UserOption[] }) {
                             Merging this way leaves this person unable to sign
                             in &mdash; pick the other email unless they are
                             switching addresses deliberately.
+                        </div>
+                    )}
+
+                    {candidates.sharesTeam && (
+                        <div className="rounded-md bg-amber-50 p-3 text-amber-800 text-sm dark:bg-amber-950 dark:text-amber-200">
+                            These two accounts were drafted onto the same team.
+                            A roster never lists one person twice, so this is
+                            most likely two different people. Merge only if you
+                            know otherwise.
                         </div>
                     )}
 
@@ -605,6 +641,14 @@ export function MergeUsersForm({ users }: { users: UserOption[] }) {
                             <p className="font-medium text-red-800 text-sm dark:text-red-200">
                                 Warning: the kept account has no login attached
                                 &mdash; this person will not be able to sign in.
+                            </p>
+                        )}
+
+                        {candidates.sharesTeam && (
+                            <p className="font-medium text-amber-700 text-sm dark:text-amber-300">
+                                Warning: these two were drafted onto the same
+                                team, so they are most likely two different
+                                people.
                             </p>
                         )}
 

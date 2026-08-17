@@ -661,6 +661,58 @@ describe("getMergeCandidateDetails", () => {
         expect(data.defaults.createdAt).toBe("a")
         // email is UNIQUE NOT NULL, so a choice is always offered.
         expect(data.defaults.email).toBeDefined()
+        expect(data.sharesTeam).toBe(false)
+    })
+
+    it("flags two accounts that were drafted onto the same team", async () => {
+        // A roster never lists one person twice, so this pair is almost
+        // certainly two different people.
+        const season = await createSeason()
+        const division = await createDivision()
+        const userA = await createUser()
+        const userB = await createUser()
+        const captain = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const team = await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: division.id
+        })
+        await db.insert(drafts).values([
+            { team: team.id, user: userA.id, round: 1, overall: 1 },
+            { team: team.id, user: userB.id, round: 2, overall: 2 }
+        ])
+
+        const result = await getMergeCandidateDetails(userA.id, userB.id)
+        if (!result.status) {
+            throw new Error(`expected candidate data, got: ${result.message}`)
+        }
+        expect(result.data.sharesTeam).toBe(true)
+    })
+
+    it("never defaults to keeping a legacy placeholder address", async () => {
+        // The Historical Backfill page hands placeholders here. A `legacy-*`
+        // address is not a real mailbox, so the member's must survive even
+        // though neither account has a login to break the tie.
+        const placeholder = await createUser({
+            email: "legacy-roster-9001@bumpsetdrink.com"
+        })
+        const member = await createUser({ email: "real.member@merge.test" })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const asA = await getMergeCandidateDetails(placeholder.id, member.id)
+        if (!asA.status) {
+            throw new Error(asA.message)
+        }
+        expect(asA.data.defaults.email).toBe("b")
+
+        // Symmetric: the placeholder loses from either side.
+        const asB = await getMergeCandidateDetails(member.id, placeholder.id)
+        if (!asB.status) {
+            throw new Error(asB.message)
+        }
+        expect(asB.data.defaults.email).toBe("a")
     })
 })
 

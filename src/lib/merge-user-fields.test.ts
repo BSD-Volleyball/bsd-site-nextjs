@@ -150,6 +150,86 @@ describe("resolveDefaultSelections", () => {
         expect(selection.email).toBe("b")
     })
 
+    it("never keeps a legacy placeholder address over a real one", () => {
+        // Placeholders are minted by the archive backfill and are not real
+        // mailboxes, so they lose outright -- even holding the only login.
+        const selection = resolveDefaultSelections(
+            makeUser({ email: "legacy-roster-9001@bumpsetdrink.com" }),
+            makeUser({ email: "real@example.com" }),
+            makeContext({ aLoginMethodCount: 1, bLoginMethodCount: 0 })
+        )
+
+        expect(selection.email).toBe("b")
+    })
+
+    it("lets the real member win every contested field against a placeholder", () => {
+        // A placeholder is a husk: a freshly-issued old_id, an invented
+        // address and the short form of a name. Only its records matter, so
+        // none of the generic rules -- recency, lower old_id, earlier
+        // createdAt -- may hand it a field the member also holds.
+        const placeholder = makeUser({
+            email: "legacy-roster-9001@bumpsetdrink.com",
+            first_name: "Bill",
+            old_id: 12,
+            createdAt: new Date("2009-01-01T00:00:00Z"),
+            height: 68
+        })
+        const member = makeUser({
+            email: "real@example.com",
+            first_name: "William",
+            old_id: 900,
+            createdAt: new Date("2015-06-01T00:00:00Z"),
+            height: 74
+        })
+
+        const selection = resolveDefaultSelections(
+            placeholder,
+            member,
+            // Every tiebreak points at the placeholder if left unchecked.
+            makeContext({
+                aUpdatedAt: new Date("2026-01-01T00:00:00Z"),
+                bUpdatedAt: new Date("2020-01-01T00:00:00Z")
+            })
+        )
+
+        expect(selection.email).toBe("b")
+        expect(selection.first_name).toBe("b")
+        expect(selection.old_id).toBe("b")
+        expect(selection.createdAt).toBe("b")
+        expect(selection.height).toBe("b")
+    })
+
+    it("still takes what only the placeholder has", () => {
+        // Nothing is lost by keeping a value the member does not hold at all.
+        const placeholder = makeUser({
+            email: "legacy-roster-9001@bumpsetdrink.com",
+            experience: "Played 2004-2008"
+        })
+        const member = makeUser({
+            email: "real@example.com",
+            experience: null
+        })
+
+        const selection = resolveDefaultSelections(
+            placeholder,
+            member,
+            makeContext()
+        )
+
+        expect(selection.experience).toBe("a")
+        expect(selection.email).toBe("b")
+    })
+
+    it("falls back to the usual rules when both sides are placeholders", () => {
+        const selection = resolveDefaultSelections(
+            makeUser({ email: "legacy-roster-1@bumpsetdrink.com" }),
+            makeUser({ email: "legacy-hoc-2@bumpsetdrink.com" }),
+            makeContext({ aLoginMethodCount: 0, bLoginMethodCount: 1 })
+        )
+
+        expect(selection.email).toBe("b")
+    })
+
     it("falls back to the most recent login when both can sign in", () => {
         const selection = resolveDefaultSelections(
             makeUser({ email: "a@example.com" }),

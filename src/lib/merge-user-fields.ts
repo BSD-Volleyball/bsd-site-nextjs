@@ -16,6 +16,8 @@
  *   - `updatedAt`  — stamped by the merge itself
  */
 
+import { isLegacyEmail } from "./legacy-matching"
+
 export type MergeFieldKey =
     | "old_id"
     | "picture"
@@ -229,15 +231,44 @@ function newer(a: Date | null, b: Date | null): MergeChoice | null {
 }
 
 /**
+ * When exactly one of the two accounts is a `legacy-*` placeholder, the side
+ * holding the real membership. Null when both or neither are placeholders,
+ * which leaves the ordinary rules to decide.
+ */
+function realAccountSide(aEmail: unknown, bEmail: unknown): MergeChoice | null {
+    const aPlaceholder = isLegacyEmail(
+        typeof aEmail === "string" ? aEmail : null
+    )
+    const bPlaceholder = isLegacyEmail(
+        typeof bEmail === "string" ? bEmail : null
+    )
+    if (aPlaceholder === bPlaceholder) {
+        return null
+    }
+    return aPlaceholder ? "b" : "a"
+}
+
+/**
  * Which account should supply the surviving email — and therefore, since the
  * survivor is the account whose address wins, which record survives the merge
  * at all.
  *
- * Logins live on an account, not on an address, so the default is whichever
- * side the person can actually sign in with. Falling back to recency keeps a
- * sensible answer when neither side (or both) has a login.
+ * A `legacy-*` placeholder address is never a real mailbox, so it loses to a
+ * genuine one outright: the archive backfill minted it precisely because it
+ * could not find the member, and keeping it would leave the surviving record
+ * unreachable. Otherwise logins decide, since they live on an account rather
+ * than on an address, and recency breaks the remaining ties.
  */
-function resolveEmailDefault(ctx: MergeDefaultsContext): MergeChoice {
+function resolveEmailDefault(
+    aEmail: unknown,
+    bEmail: unknown,
+    ctx: MergeDefaultsContext
+): MergeChoice {
+    const realSide = realAccountSide(aEmail, bEmail)
+    if (realSide) {
+        return realSide
+    }
+
     if (ctx.aLoginMethodCount !== ctx.bLoginMethodCount) {
         return ctx.aLoginMethodCount > ctx.bLoginMethodCount ? "a" : "b"
     }
@@ -259,6 +290,8 @@ function resolveEmailDefault(ctx: MergeDefaultsContext): MergeChoice {
  *   - old_id -> the side with a photo, else the lower (older) id
  *   - createdAt -> the earlier date, so "member since" survives the merge
  *   - emailVerified / email_status -> follow the email, since they describe it
+ *   - a `legacy-*` placeholder -> loses every contested field to the real
+ *     member, but still supplies anything the member does not have
  *
  * Symmetric in A and B: swapping the two arguments (and the context fields)
  * yields the mirrored selection. Returns only keys where a choice is
@@ -301,7 +334,7 @@ export function resolveDefaultSelections(
     // recency rule. `users.email` is UNIQUE NOT NULL, so the two sides always
     // differ and this key is always present.
     if (selection.email) {
-        selection.email = resolveEmailDefault(ctx)
+        selection.email = resolveEmailDefault(userA.email, userB.email, ctx)
     }
 
     // old_id is a serial, so both accounts always have one and the recency rule
@@ -345,6 +378,27 @@ export function resolveDefaultSelections(
         for (const key of ["emailVerified", "email_status"] as const) {
             if (!sameValue(userA[key], userB[key])) {
                 selection[key] = selection.email
+            }
+        }
+    }
+
+    // A `legacy-*` placeholder is a husk the archive backfill invented for a
+    // player it could not identify: a freshly-issued old_id, a made-up address,
+    // and the short form of a name. Only its records are worth anything, so the
+    // real member wins every contested field -- overriding the rules above,
+    // which have no way to tell a synthetic record from a maintained one. The
+    // placeholder still supplies anything the member simply does not have,
+    // where there is nothing to lose by taking it.
+    const realSide = realAccountSide(userA.email, userB.email)
+    if (realSide) {
+        const placeholderSide = otherChoice(realSide)
+        const realFields = realSide === "a" ? userA : userB
+        for (const key of Object.keys(selection) as MergeFieldKey[]) {
+            if (
+                selection[key] === placeholderSide &&
+                !isEmptyFieldValue(realFields[key])
+            ) {
+                selection[key] = realSide
             }
         }
     }
