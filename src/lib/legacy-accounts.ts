@@ -6,6 +6,7 @@ import {
     LEGACY_EMAIL_PREFIX,
     type LegacyKind,
     type MatchReason,
+    isLegacyEmail,
     legacyKind,
     norm,
     suggestMatch
@@ -16,6 +17,12 @@ export interface MergeTarget {
     id: string
     name: string
     email: string
+    /**
+     * This option is itself a `legacy-*` placeholder rather than a real member.
+     * Two placeholders can be the same historical player recorded twice, so
+     * they are offered as merge targets — but the UI has to say which is which.
+     */
+    isPlaceholder: boolean
 }
 
 export interface LegacyAccount {
@@ -32,16 +39,27 @@ export interface LegacyAccount {
     /** The one real account this looks like, when the match is unambiguous. */
     suggestion: (MergeTarget & { reason: MatchReason }) | null
     /**
-     * Real accounts that share a team with this placeholder. They are never
-     * suggested, and picking one manually raises a warning: appearing on the
-     * same roster means two different people, not one recorded twice.
+     * Accounts that share a team with this placeholder, placeholders included.
+     * They are never suggested, and picking one manually raises a warning:
+     * appearing on the same roster means two different people, not one
+     * recorded twice.
      */
     sameTeamIds: string[]
 }
 
 const legacyPattern = `${LEGACY_EMAIL_PREFIX}%`
 
-/** Every real member account, as combobox options. Excludes the ghost captain. */
+/**
+ * Every account a placeholder may be mapped onto, as combobox options.
+ *
+ * Includes the other placeholders, not just real members: the archive backfill
+ * minted one per spelling it could not resolve, so the same historical player
+ * can hold several — "Bob Vance" and "Robert Vance" on different rosters. Those
+ * duplicates are only fixable by merging one placeholder into another, so they
+ * have to be pickable. Callers are responsible for dropping the row's own id.
+ *
+ * Excludes the ghost captain, which is a stand-in rather than a person.
+ */
 export async function fetchMergeTargets(): Promise<MergeTarget[]> {
     const rows = await db
         .select({
@@ -52,12 +70,7 @@ export async function fetchMergeTargets(): Promise<MergeTarget[]> {
             email: users.email
         })
         .from(users)
-        .where(
-            and(
-                notLike(users.email, legacyPattern),
-                ne(users.id, GHOST_CAPTAIN_ID)
-            )
-        )
+        .where(ne(users.id, GHOST_CAPTAIN_ID))
         .orderBy(asc(users.last_name), asc(users.first_name))
 
     return rows.map((u) => ({
@@ -66,7 +79,8 @@ export async function fetchMergeTargets(): Promise<MergeTarget[]> {
         // deciding which real member a placeholder belongs to, the legal first
         // name and the nickname are both evidence, so show both.
         name: formatPlayerName(u.firstName, u.lastName, u.preferredName),
-        email: u.email
+        email: u.email,
+        isPlaceholder: isLegacyEmail(u.email)
     }))
 }
 
@@ -217,12 +231,16 @@ async function fetchLegacyActivity(): Promise<Map<string, LegacyActivity>> {
 }
 
 /**
- * Legacy account -> real accounts it shared a team with.
+ * Legacy account -> every account it shared a team with.
  *
  * A roster never lists the same person twice, so a shared team is proof the
  * two rows are different people. This is not hypothetical: Fall 2009 B "Team
  * Jimenez" lists Jimmy, James and Jeff Jimenez together, and a surname-plus-
  * nickname heuristic would happily merge the first two.
+ *
+ * Other placeholders count as well as real members: two placeholders on one
+ * roster are two players the backfill failed to identify, not one recorded
+ * twice, and the picker now offers placeholders as merge targets.
  */
 async function fetchSameTeamConflicts(): Promise<Map<string, Set<string>>> {
     const legacyDrafts = db
@@ -239,25 +257,19 @@ async function fetchSameTeamConflicts(): Promise<Map<string, Set<string>>> {
         .with(legacyDrafts)
         .select({
             legacyId: legacyDrafts.user,
-            realId: drafts.user
+            otherId: drafts.user
         })
         .from(legacyDrafts)
         .innerJoin(drafts, eq(drafts.team, legacyDrafts.team))
-        .innerJoin(users, eq(users.id, drafts.user))
-        .where(
-            and(
-                ne(drafts.user, legacyDrafts.user),
-                notLike(users.email, legacyPattern)
-            )
-        )
+        .where(ne(drafts.user, legacyDrafts.user))
 
     const conflicts = new Map<string, Set<string>>()
     for (const row of rows) {
         const existing = conflicts.get(row.legacyId)
         if (existing) {
-            existing.add(row.realId)
+            existing.add(row.otherId)
         } else {
-            conflicts.set(row.legacyId, new Set([row.realId]))
+            conflicts.set(row.legacyId, new Set([row.otherId]))
         }
     }
     return conflicts

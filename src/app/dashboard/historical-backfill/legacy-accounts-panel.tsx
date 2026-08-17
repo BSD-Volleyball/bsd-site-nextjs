@@ -58,17 +58,16 @@ export function LegacyAccountsPanel({
     const [onlySuggested, setOnlySuggested] = useState(false)
     const [page, setPage] = useState(0)
 
-    // ~2,000 member accounts feed the picker, so they are fetched once on
-    // first use rather than shipped with every page load.
+    // Every account feeds the picker -- members and placeholders alike -- so
+    // they are fetched once on first use rather than shipped with every page
+    // load.
     const loadTargets = useCallback(async () => {
         if (targets !== null) return
         const response = await getMergeTargets()
         if (response.status) {
             setTargets(response.data)
         } else {
-            setTargetsError(
-                response.message || "Failed to load member accounts."
-            )
+            setTargetsError(response.message || "Failed to load accounts.")
         }
     }, [targets])
 
@@ -78,6 +77,19 @@ export function LegacyAccountsPanel({
 
     const chosenIdFor = (account: LegacyAccount) =>
         choices[account.id] ?? account.suggestion?.id ?? ""
+
+    // The picker offers real members and the other placeholders alike, so the
+    // label has to say which is which -- mapping onto a placeholder folds two
+    // duplicate historical entries together rather than reuniting someone with
+    // their profile. Built once; each row then drops only its own id, which it
+    // obviously cannot merge with.
+    const options = useMemo(
+        () =>
+            (targets ?? []).map((t) =>
+                t.isPlaceholder ? { ...t, name: `${t.name} — placeholder` } : t
+            ),
+        [targets]
+    )
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase()
@@ -121,11 +133,13 @@ export function LegacyAccountsPanel({
                     real account on an exact name match, so anyone recorded
                     under a nickname or a former surname got a placeholder
                     account instead — and their history never reached their
-                    profile. Pick the member a placeholder belongs to and review
-                    the merge on the Merge Users page, which moves every record
-                    across and deletes the placeholder. Leave the ones who
-                    simply left the league: their records are correct as they
-                    stand.
+                    profile. Pick the account a placeholder belongs to and
+                    review the merge on the Merge Users page, which moves every
+                    record across and deletes the placeholder. The picker offers
+                    the other placeholders as well as real members, so a player
+                    the backfill recorded under two spellings can be folded into
+                    one entry. Leave the ones who simply left the league: their
+                    records are correct as they stand.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -167,7 +181,7 @@ export function LegacyAccountsPanel({
                                 <TableHead>Placeholder</TableHead>
                                 <TableHead>History</TableHead>
                                 <TableHead className="w-96">
-                                    Map to member
+                                    Map to account
                                 </TableHead>
                                 <TableHead className="text-right">
                                     Action
@@ -231,7 +245,9 @@ export function LegacyAccountsPanel({
                                             </TableCell>
                                             <TableCell className="align-top">
                                                 <UserEmailCombobox
-                                                    users={targets ?? []}
+                                                    users={options.filter(
+                                                        (t) => t.id !== row.id
+                                                    )}
                                                     value={chosenId || null}
                                                     onChange={(id) =>
                                                         setChoices((prev) => ({
@@ -242,7 +258,7 @@ export function LegacyAccountsPanel({
                                                     disabled={targets === null}
                                                     placeholder={
                                                         targets === null
-                                                            ? "Loading members..."
+                                                            ? "Loading accounts..."
                                                             : "No match — leave as is"
                                                     }
                                                 />
