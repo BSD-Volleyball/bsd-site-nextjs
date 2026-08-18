@@ -11,6 +11,7 @@ import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { PrintButton } from "@/components/preseason/print-button"
+import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import type { Metadata } from "next"
 import { cn, formatDisplayName } from "@/lib/utils"
 import { listFriendIds } from "@/lib/friends"
@@ -275,6 +276,7 @@ export default async function DraftPreseasonWeek1Page() {
 
             {/* Screen view — hidden when printing */}
             <div className="contents print:hidden">
+                <PlayerHighlightLegend hasFriends={friendIds.length > 0} />
                 {[1, 2].map((sessionNumber) => (
                     <section
                         key={`session-${sessionNumber}`}

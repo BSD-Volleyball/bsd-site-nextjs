@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
+import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { listFriendIds } from "@/lib/friends"
@@ -81,6 +82,7 @@ export default async function CurrentRosterPage() {
                 title={`${result.data.seasonLabel} Rosters`}
                 description="View team rosters by division."
             />
+            <PlayerHighlightLegend hasFriends={friendIds.length > 0} />
             {result.data.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No rosters found for the current season.

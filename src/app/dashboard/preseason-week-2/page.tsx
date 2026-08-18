@@ -12,6 +12,7 @@ import { db } from "@/database/db"
 import { week2Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
 import { PrintButton } from "@/components/preseason/print-button"
+import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import type { Metadata } from "next"
 import { cn, formatDisplayName } from "@/lib/utils"
 import { listFriendIds } from "@/lib/friends"
@@ -266,6 +267,8 @@ export default async function PreseasonWeek2Page() {
                 <h2 className="font-semibold text-xl">
                     Preseason Week 2 - {tryout2DateDisplay}
                 </h2>
+
+                <PlayerHighlightLegend hasFriends={friendIds.length > 0} />
 
                 {divisionGroups.length === 0 ? (
                     <div className="rounded-lg border bg-card p-4 text-muted-foreground text-sm">

@@ -2,6 +2,7 @@ import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { listFriendIds } from "@/lib/friends"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
+import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import { getRosterData } from "./actions"
 import { RosterDivisionSection } from "./roster-division-section"
 import type { Metadata } from "next"
@@ -42,6 +43,7 @@ export default async function RosterPage({
                 title={`${result.data.seasonLabel} Rosters`}
                 description="View team rosters by division."
             />
+            <PlayerHighlightLegend hasFriends={friendIds.length > 0} />
             {result.data.divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No rosters found for this season.
