@@ -4,10 +4,21 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { RiAlertLine, RiCloseLine, RiMailSendLine } from "@remixicon/react"
+import {
+    RiAlertLine,
+    RiArrowDownSLine,
+    RiArrowRightSLine,
+    RiCloseLine,
+    RiMailSendLine
+} from "@remixicon/react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger
+} from "@/components/ui/collapsible"
 import { UserEmailCombobox } from "@/components/user-combobox"
 import { formatEventDate } from "@/lib/season-utils"
 import { roleLabel } from "@/lib/role-display"
@@ -29,13 +40,26 @@ function slotKey(jobId: number, timeSlotId: number | null) {
 }
 
 export function AssignTryoutJobsClient({
-    view
+    view,
+    today
 }: {
     view: AssignTryoutJobsView
+    /** "YYYY-MM-DD" in league time; nights before this start collapsed. */
+    today: string
 }) {
     const router = useRouter()
     const [busy, setBusy] = useState(false)
     const [picks, setPicks] = useState<Record<string, string | null>>({})
+    // Nights that have already happened start collapsed so the next tryout
+    // is what you see first; anything can still be toggled by hand.
+    const [openNights, setOpenNights] = useState<Record<number, boolean>>(() =>
+        Object.fromEntries(
+            view.nights.map((night) => [
+                night.eventId,
+                night.eventDate >= today
+            ])
+        )
+    )
 
     const totalConflicts = view.nights.reduce(
         (nightSum, night) =>
@@ -225,58 +249,102 @@ export function AssignTryoutJobsClient({
                 </Card>
             )}
 
-            {view.nights.map((night) => (
-                <Card key={night.eventId}>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Tryout {night.ordinal} —{" "}
-                            {formatEventDate(night.eventDate)}
-                            {night.label ? ` (${night.label})` : ""}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {night.jobs.length === 0 ? (
-                            <p className="text-muted-foreground text-sm">
-                                No jobs defined for this night.{" "}
-                                <Link
-                                    href="/dashboard/configure-tryout-jobs"
-                                    className="underline"
-                                >
-                                    Configure Tryout Jobs
-                                </Link>
-                                .
-                            </p>
-                        ) : (
-                            night.jobs.map((job) => (
-                                <div key={job.jobId} className="space-y-2">
-                                    <div className="flex flex-wrap items-baseline gap-2">
-                                        <h3 className="font-semibold text-sm">
-                                            {job.name}
-                                        </h3>
-                                        <span className="text-muted-foreground text-sm">
-                                            {TRYOUT_JOB_SCOPE_LABELS[job.scope]}{" "}
-                                            · {job.needed} needed
-                                            {job.scope === "per_session"
-                                                ? " per session"
+            {view.nights.map((night) => {
+                const isOpen = openNights[night.eventId] ?? true
+                const isPast = night.eventDate < today
+                return (
+                    <Collapsible
+                        key={night.eventId}
+                        open={isOpen}
+                        onOpenChange={(open) =>
+                            setOpenNights((prev) => ({
+                                ...prev,
+                                [night.eventId]: open
+                            }))
+                        }
+                    >
+                        <Card>
+                            <CardHeader>
+                                <CollapsibleTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="flex w-full items-center justify-between gap-2 text-left"
+                                    >
+                                        <CardTitle className="text-base">
+                                            Tryout {night.ordinal} —{" "}
+                                            {formatEventDate(night.eventDate)}
+                                            {night.label
+                                                ? ` (${night.label})`
                                                 : ""}
-                                        </span>
-                                    </div>
-                                    {job.notes && (
-                                        <p className="text-muted-foreground text-sm">
-                                            {job.notes}
-                                        </p>
-                                    )}
-                                    <div className="space-y-2">
-                                        {job.slots.map((slot) =>
-                                            renderSlot(job, slot)
+                                            {isPast && (
+                                                <span className="ml-2 font-normal text-muted-foreground text-sm">
+                                                    (past)
+                                                </span>
+                                            )}
+                                        </CardTitle>
+                                        {isOpen ? (
+                                            <RiArrowDownSLine className="h-5 w-5 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                            <RiArrowRightSLine className="h-5 w-5 shrink-0 text-muted-foreground" />
                                         )}
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+                                    </button>
+                                </CollapsibleTrigger>
+                            </CardHeader>
+                            <CollapsibleContent>
+                                <CardContent className="space-y-4">
+                                    {night.jobs.length === 0 ? (
+                                        <p className="text-muted-foreground text-sm">
+                                            No jobs defined for this night.{" "}
+                                            <Link
+                                                href="/dashboard/configure-tryout-jobs"
+                                                className="underline"
+                                            >
+                                                Configure Tryout Jobs
+                                            </Link>
+                                            .
+                                        </p>
+                                    ) : (
+                                        night.jobs.map((job) => (
+                                            <div
+                                                key={job.jobId}
+                                                className="space-y-2"
+                                            >
+                                                <div className="flex flex-wrap items-baseline gap-2">
+                                                    <h3 className="font-semibold text-sm">
+                                                        {job.name}
+                                                    </h3>
+                                                    <span className="text-muted-foreground text-sm">
+                                                        {
+                                                            TRYOUT_JOB_SCOPE_LABELS[
+                                                                job.scope
+                                                            ]
+                                                        }{" "}
+                                                        · {job.needed} needed
+                                                        {job.scope ===
+                                                        "per_session"
+                                                            ? " per session"
+                                                            : ""}
+                                                    </span>
+                                                </div>
+                                                {job.notes && (
+                                                    <p className="text-muted-foreground text-sm">
+                                                        {job.notes}
+                                                    </p>
+                                                )}
+                                                <div className="space-y-2">
+                                                    {job.slots.map((slot) =>
+                                                        renderSlot(job, slot)
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </CardContent>
+                            </CollapsibleContent>
+                        </Card>
+                    </Collapsible>
+                )
+            })}
 
             {view.eligible.length > 0 && (
                 <Card>

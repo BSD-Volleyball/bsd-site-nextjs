@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { PageHeader } from "@/components/layout/page-header"
+import { getLeagueDateString } from "@/lib/date-utils"
 import { requireAdminOrRedirect } from "@/lib/page-guards"
 
 import { getAssignTryoutJobsView } from "./actions"
@@ -30,7 +31,10 @@ export default async function AssignTryoutJobsPage() {
                     Configuration first.
                 </p>
             ) : (
-                <AssignTryoutJobsClient view={data} />
+                <AssignTryoutJobsClient
+                    view={data}
+                    today={getLeagueDateString()}
+                />
             )}
         </div>
     )
