@@ -1,7 +1,14 @@
 import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { seasonEvents, seasons, userUnavailability } from "@/database/schema"
+import {
+    eventTimeSlots,
+    seasonEvents,
+    seasons,
+    tryoutVolunteerAssignments,
+    tryoutVolunteerJobs,
+    userUnavailability
+} from "@/database/schema"
 import { createSignup, seedBaselineSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { getSeasonConfigData, saveSeasonConfig } from "./actions"
@@ -87,7 +94,12 @@ describe("saveSeasonConfig", () => {
                 sort_order: 0,
                 label: null,
                 time_slots: [
-                    { start_time: "18:00", slot_label: null, sort_order: 0 }
+                    {
+                        id: null,
+                        start_time: "18:00",
+                        slot_label: null,
+                        sort_order: 0
+                    }
                 ]
             },
             {
@@ -97,8 +109,18 @@ describe("saveSeasonConfig", () => {
                 sort_order: 0,
                 label: "Week 1",
                 time_slots: [
-                    { start_time: "19:00", slot_label: "Early", sort_order: 0 },
-                    { start_time: "20:00", slot_label: "Late", sort_order: 1 }
+                    {
+                        id: null,
+                        start_time: "19:00",
+                        slot_label: "Early",
+                        sort_order: 0
+                    },
+                    {
+                        id: null,
+                        start_time: "20:00",
+                        slot_label: "Late",
+                        sort_order: 1
+                    }
                 ]
             }
         ])
@@ -121,6 +143,140 @@ describe("saveSeasonConfig", () => {
         expect(events.map((e) => e.id)).toContain(tryoutEvent.id)
     })
 
+    // Regression: time slots used to be deleted and reinserted on every save
+    // (the code said "nothing references them"), but tryout volunteer
+    // assignments reference slot ids with ON DELETE CASCADE — so any Season
+    // Configuration save wiped every per-session volunteer assignment.
+    it("preserves time slot ids and volunteer assignments on an unchanged save", async () => {
+        const { season, tryoutEvent, tryoutSlot } = await seedBaselineSeason()
+        const volunteer = await createUser()
+        const [job] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: tryoutEvent.id,
+                name: "Scorekeeper",
+                needed: 1,
+                scope: "per_session",
+                sort_order: 0
+            })
+            .returning()
+        await db.insert(tryoutVolunteerAssignments).values({
+            job_id: job.id,
+            time_slot_id: tryoutSlot.id,
+            user_id: volunteer.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await saveSeasonConfig(season.id, metadata, [
+            {
+                id: tryoutEvent.id,
+                event_type: "tryout",
+                event_date: tryoutEvent.event_date,
+                sort_order: 0,
+                label: null,
+                time_slots: [
+                    {
+                        id: tryoutSlot.id,
+                        start_time: "18:30",
+                        slot_label: "Renamed",
+                        sort_order: 0
+                    },
+                    {
+                        id: null,
+                        start_time: "20:00",
+                        slot_label: null,
+                        sort_order: 1
+                    }
+                ]
+            }
+        ])
+
+        expect(result.status).toBe(true)
+
+        const slots = await db
+            .select()
+            .from(eventTimeSlots)
+            .where(eq(eventTimeSlots.event_id, tryoutEvent.id))
+            .orderBy(eventTimeSlots.sort_order)
+        expect(slots).toHaveLength(2)
+        expect(slots[0].id).toBe(tryoutSlot.id)
+        expect(slots[0].start_time).toBe("18:30:00")
+        expect(slots[0].slot_label).toBe("Renamed")
+
+        const assignments = await db
+            .select()
+            .from(tryoutVolunteerAssignments)
+            .where(eq(tryoutVolunteerAssignments.job_id, job.id))
+        expect(assignments).toHaveLength(1)
+        expect(assignments[0].time_slot_id).toBe(tryoutSlot.id)
+
+        // Dropping the slot from the payload is a real removal.
+        const removal = await saveSeasonConfig(season.id, metadata, [
+            {
+                id: tryoutEvent.id,
+                event_type: "tryout",
+                event_date: tryoutEvent.event_date,
+                sort_order: 0,
+                label: null,
+                time_slots: [
+                    {
+                        id: slots[1].id,
+                        start_time: "20:00",
+                        slot_label: null,
+                        sort_order: 0
+                    }
+                ]
+            }
+        ])
+        expect(removal.status).toBe(true)
+        expect(
+            await db
+                .select()
+                .from(eventTimeSlots)
+                .where(eq(eventTimeSlots.event_id, tryoutEvent.id))
+        ).toHaveLength(1)
+        expect(
+            await db
+                .select()
+                .from(tryoutVolunteerAssignments)
+                .where(eq(tryoutVolunteerAssignments.job_id, job.id))
+        ).toHaveLength(0)
+    })
+
+    it("refuses a slot id that belongs to a different event", async () => {
+        const { season, tryoutEvent, tryoutSlot } = await seedBaselineSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await saveSeasonConfig(season.id, metadata, [
+            {
+                id: tryoutEvent.id,
+                event_type: "tryout",
+                event_date: tryoutEvent.event_date,
+                sort_order: 0,
+                label: null,
+                time_slots: []
+            },
+            {
+                id: null,
+                event_type: "regular_season",
+                event_date: "2026-09-12",
+                sort_order: 0,
+                label: null,
+                time_slots: [
+                    {
+                        id: tryoutSlot.id,
+                        start_time: "19:00",
+                        slot_label: null,
+                        sort_order: 0
+                    }
+                ]
+            }
+        ])
+        expect(result.status).toBe(false)
+        expect(result.message).toMatch(/time slots changed/)
+    })
+
     // Regression: saveSeasonConfig used to delete every event row and reinsert
     // it, which cascaded away every user_unavailability row for the season.
     // That wiped ~230 rows of Fall 2026 player availability on 2026-08-05.
@@ -140,7 +296,12 @@ describe("saveSeasonConfig", () => {
                 sort_order: 0,
                 label: null,
                 time_slots: [
-                    { start_time: "18:00", slot_label: null, sort_order: 0 }
+                    {
+                        id: null,
+                        start_time: "18:00",
+                        slot_label: null,
+                        sort_order: 0
+                    }
                 ]
             }
         ])

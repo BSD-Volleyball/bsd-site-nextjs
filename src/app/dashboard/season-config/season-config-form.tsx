@@ -28,6 +28,8 @@ import {
 
 interface TimeSlotState {
     key: string
+    /** Existing event_time_slots row, or null for one added in this editing session. */
+    id: number | null
     start_time: string
     slot_label: string
     sort_order: number
@@ -112,6 +114,7 @@ function buildInitialEvents(data: SeasonConfigData): EventState[] {
         unavailable_player_count: e.unavailable_player_count,
         time_slots: e.time_slots.map((ts) => ({
             key: nextKey(),
+            id: ts.id,
             start_time: ts.start_time.slice(0, 5),
             slot_label: ts.slot_label || "",
             sort_order: ts.sort_order
@@ -216,6 +219,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                         ...e.time_slots,
                         {
                             key: nextKey(),
+                            id: null,
                             start_time: "",
                             slot_label: "",
                             sort_order: maxOrder + 1
@@ -283,6 +287,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             typeEvents.forEach((e, idx) => {
                 const timeSlots: TimeSlotData[] = e.time_slots.map(
                     (ts, tsIdx) => ({
+                        id: ts.id,
                         start_time: ts.start_time,
                         slot_label: ts.slot_label || null,
                         sort_order: tsIdx + 1

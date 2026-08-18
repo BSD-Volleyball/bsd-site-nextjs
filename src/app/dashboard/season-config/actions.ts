@@ -23,6 +23,13 @@ export type EventType =
     | "late_date"
 
 export interface TimeSlotData {
+    /**
+     * The existing event_time_slots row, or null for a slot the admin just
+     * added. Load-bearing for the same reason as EventData.id: tryout
+     * volunteer assignments reference slot ids (ON DELETE CASCADE), so a
+     * save must update slots in place rather than delete and reinsert them.
+     */
+    id: number | null
     start_time: string
     slot_label: string | null
     sort_order: number
@@ -252,6 +259,43 @@ export const saveSeasonConfig = withAction(
             .map((e) => e.id)
             .filter((id) => !keptIds.has(id))
 
+        // Same guard for time slots: an id must belong to the event it is
+        // submitted under, and can't be claimed twice.
+        const existingSlots =
+            existingEvents.length > 0
+                ? await db
+                      .select({
+                          id: eventTimeSlots.id,
+                          event_id: eventTimeSlots.event_id
+                      })
+                      .from(eventTimeSlots)
+                      .where(
+                          inArray(
+                              eventTimeSlots.event_id,
+                              existingEvents.map((e) => e.id)
+                          )
+                      )
+                : []
+        const slotEventById = new Map(
+            existingSlots.map((s) => [s.id, s.event_id])
+        )
+        const keptSlotIds = new Set<number>()
+        for (const event of events) {
+            for (const slot of event.time_slots) {
+                if (slot.id === null || slot.id === undefined) continue
+                if (
+                    event.id === null ||
+                    slotEventById.get(slot.id) !== event.id ||
+                    keptSlotIds.has(slot.id)
+                ) {
+                    return fail(
+                        "This season's time slots changed while you were editing. Reload the page and try again."
+                    )
+                }
+                keptSlotIds.add(slot.id)
+            }
+        }
+
         // Deleting an event cascades to user_unavailability, so a removal that
         // would take player-entered availability with it needs explicit intent.
         if (removedIds.length > 0 && !options.confirmDeletions) {
@@ -283,9 +327,11 @@ export const saveSeasonConfig = withAction(
                     })
                     .where(eq(seasons.id, seasonId))
 
-                // Update events in place / insert the new ones. Time slots are
-                // replaced wholesale per event: nothing references them, so
-                // their ids are free to churn.
+                // Update events in place / insert the new ones. Time slots
+                // get the same treatment — tryout volunteer assignments
+                // reference slot ids with ON DELETE CASCADE, so replacing
+                // them wholesale would silently drop every per-session
+                // assignment on an otherwise no-op save.
                 for (const event of events) {
                     let eventId = event.id
                     if (eventId === null) {
@@ -310,20 +356,46 @@ export const saveSeasonConfig = withAction(
                                 label: event.label || null
                             })
                             .where(eq(seasonEvents.id, eventId))
-                        await tx
-                            .delete(eventTimeSlots)
-                            .where(eq(eventTimeSlots.event_id, eventId))
                     }
 
-                    if (event.time_slots.length > 0) {
-                        await tx.insert(eventTimeSlots).values(
-                            event.time_slots.map((slot) => ({
+                    const keptForEvent = new Set<number>()
+                    for (const slot of event.time_slots) {
+                        if (slot.id === null || slot.id === undefined) {
+                            await tx.insert(eventTimeSlots).values({
                                 event_id: eventId,
                                 start_time: slot.start_time,
                                 slot_label: slot.slot_label || null,
                                 sort_order: slot.sort_order
-                            }))
-                        )
+                            })
+                            continue
+                        }
+                        keptForEvent.add(slot.id)
+                        await tx
+                            .update(eventTimeSlots)
+                            .set({
+                                start_time: slot.start_time,
+                                slot_label: slot.slot_label || null,
+                                sort_order: slot.sort_order
+                            })
+                            .where(eq(eventTimeSlots.id, slot.id))
+                    }
+
+                    // Slots the admin removed go away (and take any volunteer
+                    // assignments in that session with them — that IS the
+                    // admin's intent when they delete a session).
+                    if (event.id !== null) {
+                        const staleSlotIds = existingSlots
+                            .filter(
+                                (s) =>
+                                    s.event_id === event.id &&
+                                    !keptForEvent.has(s.id)
+                            )
+                            .map((s) => s.id)
+                        if (staleSlotIds.length > 0) {
+                            await tx
+                                .delete(eventTimeSlots)
+                                .where(inArray(eventTimeSlots.id, staleSlotIds))
+                        }
                     }
                 }
 
