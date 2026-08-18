@@ -8,8 +8,10 @@ import {
     closeInboundEmail,
     getEmailThread,
     markInboundEmailAsSpam,
+    quickReplyInboundEmail,
     reopenInboundEmail,
     sendEmailReply,
+    sendEmailReplyAndClose,
     unmarkInboundEmailAsSpam,
     type AssignableAdmin,
     type ThreadItem,
@@ -321,6 +323,38 @@ function EmailCard({
                 setReplyBody("")
                 refreshThread()
                 setReplyMsg(null)
+            } else {
+                setReplyMsg(result.message)
+            }
+        })
+    }
+
+    // The email leaves the Active section on success, so the parent list
+    // refresh (not a thread refresh) is what reflects the change.
+    function handleSendReplyAndClose() {
+        if (!replyBody.trim()) return
+        setReplyMsg(null)
+        startTransition(async () => {
+            const result = await sendEmailReplyAndClose(email.id, replyBody)
+            if (result.status) {
+                setReplyBody("")
+                onUpdate()
+            } else {
+                setReplyMsg(result.message)
+            }
+        })
+    }
+
+    // New emails only: claim, reply, and close in one step. On success the
+    // email moves straight from New to Closed.
+    function handleQuickReply() {
+        if (!replyBody.trim()) return
+        setReplyMsg(null)
+        startTransition(async () => {
+            const result = await quickReplyInboundEmail(email.id, replyBody)
+            if (result.status) {
+                setReplyBody("")
+                onUpdate()
             } else {
                 setReplyMsg(result.message)
             }
@@ -661,14 +695,69 @@ function EmailCard({
                                             {replyMsg}
                                         </p>
                                     )}
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSendReply}
+                                            disabled={
+                                                isPending || !replyBody.trim()
+                                            }
+                                        >
+                                            {isPending
+                                                ? "Sending…"
+                                                : "Send Reply"}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={handleSendReplyAndClose}
+                                            disabled={
+                                                isPending || !replyBody.trim()
+                                            }
+                                        >
+                                            {isPending
+                                                ? "Sending…"
+                                                : "Send & Close"}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Quick reply — new emails only: assign to me,
+                                send, and close in one step */}
+                            {email.status === "new" && (
+                                <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/20">
+                                    <p className="font-medium text-sm">
+                                        Quick Reply to{" "}
+                                        {email.from_name ?? email.from_address}
+                                    </p>
+                                    <p className="text-muted-foreground text-xs">
+                                        Assigns the email to you, sends the
+                                        reply, and closes it.
+                                    </p>
+                                    <Textarea
+                                        rows={4}
+                                        placeholder="Write your reply…"
+                                        value={replyBody}
+                                        onChange={(e) =>
+                                            setReplyBody(e.target.value)
+                                        }
+                                    />
+                                    {replyMsg && (
+                                        <p className="text-destructive text-sm">
+                                            {replyMsg}
+                                        </p>
+                                    )}
                                     <Button
                                         size="sm"
-                                        onClick={handleSendReply}
+                                        onClick={handleQuickReply}
                                         disabled={
                                             isPending || !replyBody.trim()
                                         }
                                     >
-                                        {isPending ? "Sending…" : "Send Reply"}
+                                        {isPending
+                                            ? "Sending…"
+                                            : "Send, Assign to Me & Close"}
                                     </Button>
                                 </div>
                             )}

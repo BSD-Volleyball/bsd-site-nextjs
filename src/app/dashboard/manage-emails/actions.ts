@@ -593,6 +593,67 @@ export const unmarkInboundEmailAsSpam = withAction(
     }
 )
 
+// Composite reply flows. Each step delegates to the single-purpose action
+// above so the thread and audit log show the same entries a manual
+// assign → reply → close would. The manage permission is checked before
+// anything is sent so a view-only user can't get a reply out the door that
+// then fails to close.
+async function replyAndClose(
+    emailId: number,
+    body: string,
+    assignToSelf: boolean
+): Promise<ActionResult> {
+    const session = await requireSession()
+    const config = await requireSeasonConfig()
+    await requirePermission("admin_emails:manage", {
+        seasonId: config.seasonId
+    })
+    requireNonEmptyString(body, "Reply")
+
+    const [email] = await db
+        .select({ status: inboundEmails.status })
+        .from(inboundEmails)
+        .where(eq(inboundEmails.id, emailId))
+        .limit(1)
+    if (!email) return fail("Email not found.")
+
+    if (assignToSelf) {
+        if (email.status !== "new") {
+            return fail("Quick reply is only available for new emails.")
+        }
+        // Claiming a new email also moves it to active, which the reply
+        // step requires.
+        const assigned = await assignInboundEmail(emailId, session.user.id)
+        if (!assigned.status) return assigned
+    } else if (email.status !== "active") {
+        return fail("Can only reply to active emails.")
+    }
+
+    const sent = await sendEmailReply(emailId, body)
+    if (!sent.status) return sent
+
+    const closed = await closeInboundEmail(emailId)
+    if (!closed.status) return closed
+
+    return ok(undefined, "Reply sent and email closed.")
+}
+
+/** Active emails: send the reply, then close the email. */
+export const sendEmailReplyAndClose = withAction(
+    async (emailId: number, body: string): Promise<ActionResult> => {
+        await requireSession()
+        return replyAndClose(emailId, body, false)
+    }
+)
+
+/** New emails: assign to the caller, send the reply, then close the email. */
+export const quickReplyInboundEmail = withAction(
+    async (emailId: number, body: string): Promise<ActionResult> => {
+        await requireSession()
+        return replyAndClose(emailId, body, true)
+    }
+)
+
 export async function getAssignableAdmins(): Promise<AssignableAdmin[]> {
     const config = await getSeasonConfig()
     const canView = config.seasonId
