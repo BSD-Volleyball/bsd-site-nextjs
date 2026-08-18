@@ -3,7 +3,7 @@ import { cache } from "react"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
-import { sessions, userRoles } from "@/database/schema"
+import { sessions, userRoles, users } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     type Permission,
@@ -310,6 +310,38 @@ export async function getUserRolesForUser(
     userId: string
 ): Promise<UserRoleRow[]> {
     return getUserRoleRows(userId)
+}
+
+/**
+ * Everyone holding a role, deduped by address, shaped for sendMail(). Ids
+ * come along so the send funnel can honour suppressions and dead-address
+ * state for staff too. Used for operational notices to admins/ombudsmen.
+ */
+export async function getRecipientsWithRole(role: Role) {
+    const rows = await db
+        .select({
+            id: users.id,
+            email: users.email,
+            firstName: users.first_name,
+            preferredName: users.preferred_name
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.user_id, users.id))
+        .where(eq(userRoles.role, role))
+
+    const seen = new Set<string>()
+    return rows
+        .filter((r) => {
+            const email = r.email?.toLowerCase()
+            if (!email || seen.has(email)) return false
+            seen.add(email)
+            return true
+        })
+        .map((r) => ({
+            userId: r.id,
+            email: r.email,
+            firstName: r.preferredName || r.firstName
+        }))
 }
 
 // ---------------------------------------------------------------------------

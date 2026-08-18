@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { eq } from "drizzle-orm"
 import { db } from "@/database/db"
-import { notificationOptouts, week2Rosters } from "@/database/schema"
+import {
+    notificationOptouts,
+    userUnavailability,
+    week2Rosters
+} from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
     createDivision,
     createSeason,
+    createSeasonEvent,
     createSignup,
     createTeam
 } from "@/test/factories"
@@ -138,6 +143,82 @@ describe("getEditWeek2Data", () => {
         expect(result.slots).toHaveLength(1)
         expect(result.slots[0].userId).toBe(player.id)
         expect(result.slots[0].teamNumber).toBe(3)
+    })
+
+    it("keeps roster occupants who are no longer eligible, flagged with a reason", async () => {
+        const season = await createSeason()
+        const division = await createDivision()
+        await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-13",
+            sort_order: 1,
+            label: "Tryout #1"
+        })
+        const tryout2 = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-20",
+            sort_order: 2,
+            label: "Tryout #2"
+        })
+
+        const available = await createUser()
+        await createSignup({ season: season.id, player: available.id })
+
+        // Placed, then marked themselves unavailable for the week-2 night.
+        const optedOut = await createUser()
+        const optedOutSignup = await createSignup({
+            season: season.id,
+            player: optedOut.id
+        })
+        await db.insert(userUnavailability).values({
+            user_id: optedOut.id,
+            signup_id: optedOutSignup.id,
+            event_id: tryout2.id
+        })
+
+        // Placed, then their signup was removed entirely.
+        const unsignedUp = await createUser()
+
+        await db.insert(week2Rosters).values([
+            {
+                season: season.id,
+                user: available.id,
+                division: division.id,
+                team_number: 1,
+                is_captain: false
+            },
+            {
+                season: season.id,
+                user: optedOut.id,
+                division: division.id,
+                team_number: 1,
+                is_captain: false
+            },
+            {
+                season: season.id,
+                user: unsignedUp.id,
+                division: division.id,
+                team_number: 2,
+                is_captain: false
+            }
+        ])
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getEditWeek2Data()
+        expect(result.status).toBe(true)
+
+        const byId = new Map(result.players.map((p) => [p.id, p]))
+        expect(byId.get(available.id)?.unavailableReason).toBeNull()
+        expect(byId.get(optedOut.id)?.unavailableReason).toMatch(/Tryout #2/)
+        expect(byId.get(optedOut.id)?.firstName).toBe(optedOut.first_name)
+        expect(byId.get(unsignedUp.id)?.unavailableReason).toMatch(
+            /not signed up/i
+        )
+        expect(byId.get(unsignedUp.id)?.firstName).toBe(unsignedUp.first_name)
+        // Every roster occupant resolves to a name.
+        for (const slot of result.slots) {
+            expect(byId.has(slot.userId)).toBe(true)
+        }
     })
 
     it("rejects non-admins", async () => {

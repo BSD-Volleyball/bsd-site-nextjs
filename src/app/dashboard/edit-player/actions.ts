@@ -10,6 +10,7 @@ import {
     requireSession
 } from "@/lib/action-helpers"
 import {
+    notifyAdminsOfTryoutRosterConflict,
     notifyCaptainsOfAvailabilityChange,
     resolveSeasonEvents,
     selectUnavailableEventIds
@@ -861,11 +862,17 @@ export const saveUserAvailability = withAction(
         })
 
         const nextIds = new Set(eventIds)
+        const becameUnavailable = eventIds.filter((id) => !previousIds.has(id))
         await notifyCaptainsOfAvailabilityChange(
             userId,
             config.seasonId,
-            eventIds.filter((id) => !previousIds.has(id)),
+            becameUnavailable,
             [...previousIds].filter((id) => !nextIds.has(id))
+        )
+        await notifyAdminsOfTryoutRosterConflict(
+            userId,
+            config.seasonId,
+            becameUnavailable
         )
 
         revalidatePath("/dashboard/edit-player")

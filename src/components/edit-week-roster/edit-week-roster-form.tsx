@@ -28,6 +28,12 @@ export interface EditWeekPlayer {
     ratingScore: number | null
     lastDivisionName: string | null
     seasonsPlayedCount: number
+    /**
+     * Set when the player holds a roster slot but is no longer eligible for
+     * it (opted out of the tryout night, or signup removed). Rendered in red;
+     * never offered as a choice for other slots.
+     */
+    unavailableReason: string | null
 }
 
 export interface EditWeekSlot {

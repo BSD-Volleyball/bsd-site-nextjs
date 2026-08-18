@@ -12,6 +12,7 @@ import {
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
 import {
+    notifyAdminsOfTryoutRosterConflict,
     notifyCaptainsOfAvailabilityChange,
     resolveSeasonEvents
 } from "@/lib/availability"
@@ -94,6 +95,11 @@ export const updatePlayerAvailability = withAction(
             signup.season,
             becameUnavailable,
             becameAvailable
+        )
+        await notifyAdminsOfTryoutRosterConflict(
+            session.user.id,
+            signup.season,
+            becameUnavailable
         )
 
         return ok(undefined, "Your availability has been updated.")

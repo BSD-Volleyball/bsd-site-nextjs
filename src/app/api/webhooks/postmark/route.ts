@@ -10,12 +10,12 @@ import {
     inboundEmailReceived,
     inboundEmailReplies,
     users,
-    userRoles,
     emailSuppressions
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getRecipientsWithRole } from "@/lib/rbac"
 import { logger } from "@/lib/logger"
 import { sendMail } from "@/lib/email/send"
 import { isPermanentBounceType } from "@/lib/postmark"
@@ -122,28 +122,6 @@ function parseFromAddress(from: string): {
 }
 
 /**
- * Everyone holding a role, deduped by address. Ids come along so the send
- * funnel can honour suppressions and dead-address state for staff too.
- */
-async function recipientsWithRole(role: "admin" | "ombudsman") {
-    const rows = await db
-        .select({ id: users.id, email: users.email })
-        .from(userRoles)
-        .innerJoin(users, eq(userRoles.user_id, users.id))
-        .where(eq(userRoles.role, role))
-
-    const seen = new Set<string>()
-    return rows
-        .filter((r) => {
-            const email = r.email?.toLowerCase()
-            if (!email || seen.has(email)) return false
-            seen.add(email)
-            return true
-        })
-        .map((r) => ({ userId: r.id, email: r.email }))
-}
-
-/**
  * Staff notifications are best-effort by construction.
  *
  * These run *after* the ticket row is committed, so a throw here used to
@@ -164,7 +142,7 @@ async function notifyQuietly(fn: () => Promise<unknown>, context: string) {
 async function notifyOmbudsmen(appUrl: string) {
     await sendMail({
         mode: { kind: "staff", category: "concern_submitted_by_email" },
-        recipients: await recipientsWithRole("ombudsman"),
+        recipients: await getRecipientsWithRole("ombudsman"),
         subject: "New Concern Submitted via Email",
         htmlBody: buildConcernNotificationHtml(appUrl),
         tag: "concern-notification"
@@ -188,7 +166,7 @@ async function notifyAdmins(opts: {
 }) {
     await sendMail({
         mode: { kind: "staff", category: "inbound_email_received" },
-        recipients: await recipientsWithRole("admin"),
+        recipients: await getRecipientsWithRole("admin"),
         subject: `New Inbound Email ${describeInbound(opts.message)}`,
         htmlBody: buildInboundEmailNotificationHtml({
             appUrl: opts.appUrl,
@@ -232,7 +210,7 @@ async function notifyAssignee(opts: {
         }
     }
     if (recipients.length === 0) {
-        recipients = await recipientsWithRole(
+        recipients = await getRecipientsWithRole(
             opts.ticketType === "email" ? "admin" : "ombudsman"
         )
     }

@@ -5,7 +5,8 @@ import {
     auditLog,
     drafts,
     notificationOptouts,
-    userUnavailability
+    userUnavailability,
+    week2Rosters
 } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
@@ -15,7 +16,8 @@ import {
     createSignup,
     createTeam
 } from "@/test/factories"
-import { createUser, loginAs } from "@/test/session"
+import { sentSingleMessages, sentToAddresses } from "@/test/email"
+import { createUser, createUserWithRoles, loginAs } from "@/test/session"
 import { updatePlayerAvailability } from "./actions"
 
 const mockedSendBatch = vi.mocked(sendBatchEmails)
@@ -217,5 +219,88 @@ describe("updatePlayerAvailability captain notification", () => {
 
         const result = await updatePlayerAvailability(signup.id, [events[1].id])
         expect(result.status).toBe(true)
+    })
+})
+
+describe("updatePlayerAvailability admin tryout-roster notification", () => {
+    async function seedPlacedPlayer() {
+        const season = await createSeason()
+        const division = await createDivision()
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        const player = await createUser()
+        const signup = await createSignup({
+            season: season.id,
+            player: player.id
+        })
+        const tryout1 = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-13",
+            sort_order: 1,
+            label: "Tryout #1"
+        })
+        const tryout2 = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-20",
+            sort_order: 2,
+            label: "Tryout #2"
+        })
+        const tryout3 = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-27",
+            sort_order: 3,
+            label: "Tryout #3"
+        })
+        await db.insert(week2Rosters).values({
+            season: season.id,
+            user: player.id,
+            division: division.id,
+            team_number: 1,
+            is_captain: false
+        })
+        return { season, admin, player, signup, tryout1, tryout2, tryout3 }
+    }
+
+    it("emails admins when a player placed on a tryout roster opts out of that night", async () => {
+        const { admin, player, signup, tryout2 } = await seedPlacedPlayer()
+        loginAs(player)
+
+        const result = await updatePlayerAvailability(signup.id, [tryout2.id])
+        expect(result.status).toBe(true)
+
+        // Staff mail to a single admin takes the 1:1 transport.
+        expect(sentToAddresses()).toEqual([admin.email.toLowerCase()])
+        const [message] = sentSingleMessages()
+        expect(message.subject).toMatch(/Tryout #2/)
+        expect(message.htmlBody).toContain(player.first_name)
+        expect(message.htmlBody).toContain("Week 2")
+        expect(message.tag).toBe("tryout-roster-conflict")
+    })
+
+    it("stays quiet when the newly-unavailable night has no roster placement", async () => {
+        const { player, signup, tryout1, tryout3 } = await seedPlacedPlayer()
+        loginAs(player)
+
+        // Placed on the week-2 roster only; tryouts 1 and 3 have no rows.
+        const result = await updatePlayerAvailability(signup.id, [
+            tryout1.id,
+            tryout3.id
+        ])
+        expect(result.status).toBe(true)
+        expect(sentToAddresses()).toHaveLength(0)
+    })
+
+    it("does not re-notify when the conflicting night was already marked", async () => {
+        const { player, signup, tryout2 } = await seedPlacedPlayer()
+        await db.insert(userUnavailability).values({
+            user_id: player.id,
+            signup_id: signup.id,
+            event_id: tryout2.id
+        })
+        loginAs(player)
+
+        // Re-saving the same unavailability is not a new conflict.
+        const result = await updatePlayerAvailability(signup.id, [tryout2.id])
+        expect(result.status).toBe(true)
+        expect(sentToAddresses()).toHaveLength(0)
     })
 })

@@ -155,13 +155,62 @@ export async function getEditWeekData(
               )
             : new Set<number>()
 
-        const signupPlayers = signupPlayersRaw.filter((player) => {
+        // The pickable pool: signed up and available for this week's tryout
+        // night. Roster rows are not re-validated against it — a player who
+        // opts out of the night (or whose signup is removed) after being
+        // placed stays on the roster until an admin resolves it. Those
+        // occupants are carried into `players` with a reason so the editor
+        // can name them and flag them, instead of rendering an empty slot and
+        // a raw user id in the removal dialog.
+        const eligibleRaw = signupPlayersRaw.filter((player) => {
             if (!tryoutEvent) {
                 return true
             }
 
             return !unavailableSignupIds.has(player.signupId)
         })
+        const eligibleIds = new Set(eligibleRaw.map((p) => p.id))
+        const rosterUserIds = new Set(rosterSlots.map((s) => s.userId))
+        const signedUpIds = new Set(signupPlayersRaw.map((p) => p.id))
+
+        const unavailableReason = tryoutEvent
+            ? `Unavailable for ${tryoutEvent.label || "the tryout"} (${formatEventDate(tryoutEvent.eventDate)})`
+            : "Unavailable"
+        const optedOutOccupants = signupPlayersRaw
+            .filter((p) => !eligibleIds.has(p.id) && rosterUserIds.has(p.id))
+            .map((p) => ({ ...p, unavailableReason }))
+
+        const unsignedOccupantIds = [...rosterUserIds].filter(
+            (id) => !signedUpIds.has(id)
+        )
+        const unsignedOccupants =
+            unsignedOccupantIds.length > 0
+                ? (
+                      await db
+                          .select({
+                              id: users.id,
+                              firstName: users.first_name,
+                              lastName: users.last_name,
+                              preferredName: users.preferred_name,
+                              male: users.male
+                          })
+                          .from(users)
+                          .where(inArray(users.id, unsignedOccupantIds))
+                  ).map((u) => ({
+                      ...u,
+                      pairPick: null,
+                      unavailableReason: "Not signed up for this season"
+                  }))
+                : []
+
+        const signupPlayers = [
+            ...eligibleRaw.map((p) => ({
+                ...p,
+                unavailableReason: null as string | null
+            })),
+            ...optedOutOccupants,
+            ...unsignedOccupants
+        ]
 
         const userIds = signupPlayers.map((p) => p.id)
 
@@ -216,7 +265,9 @@ export async function getEditWeekData(
                 placementScore: scoreByUser.get(player.id) ?? 200,
                 ratingScore: ratingScoreByUser.get(player.id) ?? null,
                 lastDivisionName: lastDivisionByUser.get(player.id) ?? null,
-                seasonsPlayedCount: seasonsCountByUser.get(player.id)?.size ?? 0
+                seasonsPlayedCount:
+                    seasonsCountByUser.get(player.id)?.size ?? 0,
+                unavailableReason: player.unavailableReason
             })),
             slots: rosterSlots
         }

@@ -31,6 +31,12 @@ export interface ComboboxPlayer {
     seasonsPlayedCount: number
     ratingScore?: number | null
     lastDivisionName?: string | null
+    /**
+     * Why this player can no longer hold a slot (opted out of the night,
+     * signup removed). A flagged player renders in red where already
+     * selected and is hidden from the picker everywhere else.
+     */
+    unavailableReason?: string | null
 }
 
 export function getComboboxPlayerLabel(player: ComboboxPlayer) {
@@ -92,7 +98,9 @@ export function PlayerCombobox({
 
     const filteredPlayers = useMemo(() => {
         const available = players.filter(
-            (player) => !excludeIds.includes(player.id) || player.id === value
+            (player) =>
+                player.id === value ||
+                (!excludeIds.includes(player.id) && !player.unavailableReason)
         )
         if (!search) {
             return available
@@ -113,7 +121,9 @@ export function PlayerCombobox({
                 aria-expanded={open}
                 className={cn(
                     "h-9 w-full justify-between gap-1 px-2 font-normal",
-                    selectedPlayer && getGenderClass(selectedPlayer.male)
+                    selectedPlayer && getGenderClass(selectedPlayer.male),
+                    selectedPlayer?.unavailableReason &&
+                        "border-red-500 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-700 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/60"
                 )}
                 disabled={disabled}
             >
@@ -122,7 +132,16 @@ export function PlayerCombobox({
                         <span className="truncate">
                             {getComboboxPlayerLabel(selectedPlayer)}
                         </span>
-                        <PlayerMeta player={selectedPlayer} />
+                        {selectedPlayer.unavailableReason ? (
+                            <span
+                                className="shrink-0 font-semibold text-red-600 text-xs uppercase dark:text-red-400"
+                                title={selectedPlayer.unavailableReason}
+                            >
+                                Unavailable
+                            </span>
+                        ) : (
+                            <PlayerMeta player={selectedPlayer} />
+                        )}
                     </span>
                 ) : (
                     <span className="truncate text-muted-foreground">
@@ -165,6 +184,9 @@ export function PlayerCombobox({
                     <TooltipTrigger asChild>{trigger}</TooltipTrigger>
                     <TooltipContent side="top">
                         {getComboboxPlayerLabel(selectedPlayer)}
+                        {selectedPlayer.unavailableReason
+                            ? ` — ${selectedPlayer.unavailableReason}`
+                            : ""}
                     </TooltipContent>
                 </Tooltip>
             ) : (

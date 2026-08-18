@@ -205,6 +205,41 @@ export function buildAvailabilityChangeHtml(opts: {
 }
 
 /**
+ * Admin heads-up: a player already placed on a tryout roster has just marked
+ * themselves unavailable for that night. One email covers every conflicting
+ * week from a single availability save.
+ */
+export function buildTryoutRosterConflictHtml(opts: {
+    adminFirstName: string
+    playerName: string
+    conflicts: Array<{
+        weekLabel: string
+        eventLabel: string
+        placement: string
+        editUrl: string
+    }>
+}): string {
+    const items = opts.conflicts
+        .map(
+            (c) =>
+                `<li style="margin:0 0 6px;"><strong>${escapeHtml(c.weekLabel)}</strong> — ${escapeHtml(c.eventLabel)}: ${escapeHtml(c.placement)} (<a href="${escapeHtml(c.editUrl)}">edit roster</a>)</li>`
+        )
+        .join("")
+
+    return renderEmailHtml({
+        heading: "Tryout Roster Conflict",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.adminFirstName)},</p>
+            <p>${escapeHtml(opts.playerName)} just marked themselves unavailable for a tryout night they are already rostered for:</p>
+            <ul style="margin:8px 0 12px;padding-left:20px;">${items}</ul>
+            <p>Their slot is still on the roster and will show in red on the edit page until it is reassigned or removed.</p>
+        `,
+        action: "Open Roster Editor",
+        actionUrl: opts.conflicts[0]?.editUrl ?? `${site.url}/dashboard`
+    })
+}
+
+/**
  * Shared body for every sub-request lifecycle email (received, approved,
  * declined, cancelled, locked in) — the states differ only in heading, intro
  * sentence, detail rows, and an optional free-text note.
