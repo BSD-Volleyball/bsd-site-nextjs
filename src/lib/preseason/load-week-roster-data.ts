@@ -121,7 +121,8 @@ export async function loadPreseasonBaseData(
                 .select({
                     divisionId: individual_divisions.division,
                     coaches: individual_divisions.coaches,
-                    genderSplit: individual_divisions.gender_split
+                    genderSplit: individual_divisions.gender_split,
+                    teams: individual_divisions.teams
                 })
                 .from(individual_divisions)
                 .where(eq(individual_divisions.season, config.seasonId)),
@@ -157,19 +158,38 @@ export async function loadPreseasonBaseData(
     const genderSplitByDivision = new Map(
         indivDivRows.map((row) => [row.divisionId, row.genderSplit])
     )
+    const teamCountByDivision = new Map(
+        indivDivRows.map((row) => [row.divisionId, row.teams])
+    )
 
-    const divisionsWithMeta: PreseasonDivision[] = activeDivisions.map(
-        (division, index) => ({
-            ...division,
-            index,
-            teamCount:
-                index === activeDivisions.length - 1
-                    ? LAST_DIVISION_TEAM_COUNT
-                    : STANDARD_DIVISION_TEAM_COUNT,
-            isLast: index === activeDivisions.length - 1,
-            usesCoaches: coachesDivisionIds.has(division.id),
-            ...parseGenderSplit(genderSplitByDivision.get(division.id))
-        })
+    // `individual_divisions` holds exactly the divisions enabled for this
+    // season (saving division selections deletes the season's rows and
+    // reinserts only the enabled ones), so it — not the league-wide `active`
+    // flag — is what the preseason weeks must mirror. Before divisions have
+    // been configured for the season there are no rows at all; fall back to
+    // the active list so the roster builders still open.
+    const configuredDivisions = activeDivisions.filter((division) =>
+        teamCountByDivision.has(division.id)
+    )
+    const seasonDivisions =
+        configuredDivisions.length > 0 ? configuredDivisions : activeDivisions
+
+    const divisionsWithMeta: PreseasonDivision[] = seasonDivisions.map(
+        (division, index) => {
+            const isLast = index === seasonDivisions.length - 1
+            return {
+                ...division,
+                index,
+                teamCount:
+                    teamCountByDivision.get(division.id) ??
+                    (isLast
+                        ? LAST_DIVISION_TEAM_COUNT
+                        : STANDARD_DIVISION_TEAM_COUNT),
+                isLast,
+                usesCoaches: coachesDivisionIds.has(division.id),
+                ...parseGenderSplit(genderSplitByDivision.get(division.id))
+            }
+        }
     )
 
     const captainDivisionByUser = new Map<string, number>()

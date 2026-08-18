@@ -17,7 +17,10 @@ import type {
     Week3Candidate
 } from "./types"
 
-/** All divisions get this many teams… */
+// Team counts come from `individual_divisions.teams` for the season. These are
+// only the fallback for a division with no season config row — i.e. before
+// divisions have been set up for the season.
+/** Fallback team count for any division without a season config row… */
 export const STANDARD_DIVISION_TEAM_COUNT = 6
 /** …except the last (lowest) division. */
 export const LAST_DIVISION_TEAM_COUNT = 4
@@ -68,6 +71,10 @@ export const WEEK3_CONFIG: PreseasonWeekConfig<Week3Candidate> = {
     divisionStrategy: buildContinuityDivisionPlacement,
     teamBuild: {
         newPlayersRequireCaptainedTeam: false,
+        // The back court is a 6-team layout: the trailing 2 of 6. Season
+        // config allows a division to be 4 teams instead, and 2 back teams
+        // out of 4 is not the same feature, so the back court deliberately
+        // stays off unless the top division actually has 6 teams.
         backCourt: {
             divisionIndex: 0,
             requiredTeamCount: STANDARD_DIVISION_TEAM_COUNT,
