@@ -850,45 +850,21 @@ export default async function DashboardPage() {
         .filter((status) => !status.isComplete)
         .map((status) => status.divisionName)
         .join(", ")
-    const shouldShowWeek1TryoutSheetsCard = !!(
-        hasTryoutSheetAccess &&
-        signupStatus &&
-        ["select_captains", "prep_tryout_week_1"].includes(
-            signupStatus.config.phase
-        ) &&
-        hasWeek1RosterData
-    )
-    const shouldShowWeek2TryoutSheetsCard = !!(
-        hasTryoutSheetAccess &&
-        signupStatus &&
-        signupStatus.config.phase === "prep_tryout_week_2" &&
-        hasWeek2RosterData
-    )
-    const shouldShowWeek3TryoutSheetsCard = !!(
-        hasTryoutSheetAccess &&
-        signupStatus &&
-        signupStatus.config.phase === "prep_tryout_week_3" &&
-        hasWeek3RosterData
-    )
-    const shouldShowWeek1NametagCard = !!(
-        isAdmin &&
-        signupStatus &&
-        ["select_captains", "prep_tryout_week_1"].includes(
-            signupStatus.config.phase
-        ) &&
-        hasWeek1RosterData
-    )
-    const shouldShowWeek2NametagCard = !!(
-        isAdmin &&
-        signupStatus &&
-        signupStatus.config.phase === "prep_tryout_week_2" &&
-        hasWeek2RosterData
-    )
-    const shouldShowWeek3NametagCard = !!(
-        isAdmin &&
-        signupStatus &&
-        signupStatus.config.phase === "prep_tryout_week_3" &&
-        hasWeek3RosterData
+    const tryoutMaterialsWeek: 1 | 2 | 3 | null = (() => {
+        if (!signupStatus) return null
+        const phase = signupStatus.config.phase
+        if (
+            ["select_captains", "prep_tryout_week_1"].includes(phase) &&
+            hasWeek1RosterData
+        )
+            return 1
+        if (phase === "prep_tryout_week_2" && hasWeek2RosterData) return 2
+        if (phase === "prep_tryout_week_3" && hasWeek3RosterData) return 3
+        return null
+    })()
+    const shouldShowTryoutMaterialsCard = !!(
+        tryoutMaterialsWeek &&
+        (hasTryoutSheetAccess || isAdmin)
     )
     const shouldShowRatePlayersCard = !!(
         signupStatus &&
@@ -1773,161 +1749,95 @@ export default async function DashboardPage() {
                     </Card>
                 )}
 
-                {shouldShowWeek1TryoutSheetsCard && (
-                    <Card className="min-w-[280px] flex-1 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                {shouldShowTryoutMaterialsCard && tryoutMaterialsWeek && (
+                    <Card
+                        className={cn(
+                            "min-w-[280px] flex-1",
+                            tryoutMaterialsWeek === 1
+                                ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950"
+                                : "border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950"
+                        )}
+                    >
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-blue-700 text-lg dark:text-blue-300">
-                                Week 1 Tryout Sheets
+                            <CardTitle
+                                className={cn(
+                                    "text-lg",
+                                    tryoutMaterialsWeek === 1
+                                        ? "text-blue-700 dark:text-blue-300"
+                                        : "text-indigo-700 dark:text-indigo-300"
+                                )}
+                            >
+                                Week {tryoutMaterialsWeek} Tryout Materials
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-blue-700 text-sm dark:text-blue-300">
-                                Download the latest week 1 tryout sheets PDF for
-                                on-court evaluations.
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-1/tryout-sheets"
-                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                            >
-                                Download Week 1 PDF
-                            </a>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {shouldShowWeek2TryoutSheetsCard && (
-                    <Card className="min-w-[280px] flex-1 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-indigo-700 text-lg dark:text-indigo-300">
-                                Week 2 Tryout Sheets
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-indigo-700 text-sm dark:text-indigo-300">
-                                Download the latest week 2 tryout sheets PDF by
-                                division/session for on-court evaluations.
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-2/tryout-sheets"
-                                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 font-medium text-sm text-white hover:bg-indigo-700"
-                            >
-                                Download Week 2 PDF
-                            </a>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {shouldShowWeek3TryoutSheetsCard && (
-                    <Card className="min-w-[280px] flex-1 border-indigo-200 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-indigo-700 text-lg dark:text-indigo-300">
-                                Week 3 Tryout Sheets
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-indigo-700 text-sm dark:text-indigo-300">
-                                Download the latest week 3 tryout sheets PDF by
-                                division/session for on-court evaluations.
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-3/tryout-sheets"
-                                className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 font-medium text-sm text-white hover:bg-indigo-700"
-                            >
-                                Download Week 3 PDF
-                            </a>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {shouldShowWeek1NametagCard && (
-                    <Card className="min-w-[280px] flex-1">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">
-                                Week 1 Nametag Labels
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-muted-foreground text-sm">
-                                Download Week 1 sessions 1 and 2 Nametags.
-                                Should be printed on{" "}
-                                <a
-                                    href={site.links.avery5164Labels}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary underline hover:text-primary/80"
-                                >
-                                    Avery 5164 labels
-                                </a>
-                                .
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-1/nametags"
-                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                            >
-                                Download Week 1 Nametag PDF
-                            </a>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {shouldShowWeek2NametagCard && (
-                    <Card className="min-w-[280px] flex-1">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">
-                                Week 2 Nametag Labels
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-muted-foreground text-sm">
-                                Download Week 2 sessions 1-3 Nametags. Should be
-                                printed on{" "}
-                                <a
-                                    href={site.links.avery5164Labels}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary underline hover:text-primary/80"
-                                >
-                                    Avery 5164 labels
-                                </a>
-                                .
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-2/nametags"
-                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                            >
-                                Download Week 2 Nametag PDF
-                            </a>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {shouldShowWeek3NametagCard && (
-                    <Card className="min-w-[280px] flex-1">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg">
-                                Week 3 Nametag Labels
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <p className="text-muted-foreground text-sm">
-                                Download Week 3 sessions 1-3 Nametags. Should be
-                                printed on{" "}
-                                <a
-                                    href={site.links.avery5164Labels}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary underline hover:text-primary/80"
-                                >
-                                    Avery 5164 labels
-                                </a>
-                                .
-                            </p>
-                            <a
-                                href="/dashboard/edit-week-3/nametags"
-                                className="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 font-medium text-sm text-white hover:bg-blue-700"
-                            >
-                                Download Week 3 Nametag PDF
-                            </a>
+                        <CardContent className="space-y-4">
+                            {hasTryoutSheetAccess && (
+                                <div className="space-y-2">
+                                    <p
+                                        className={cn(
+                                            "text-sm",
+                                            tryoutMaterialsWeek === 1
+                                                ? "text-blue-700 dark:text-blue-300"
+                                                : "text-indigo-700 dark:text-indigo-300"
+                                        )}
+                                    >
+                                        {tryoutMaterialsWeek === 1
+                                            ? "Download the latest week 1 tryout sheets PDF for on-court evaluations."
+                                            : `Download the latest week ${tryoutMaterialsWeek} tryout sheets PDF by division/session for on-court evaluations.`}
+                                    </p>
+                                    <a
+                                        href={`/dashboard/edit-week-${tryoutMaterialsWeek}/tryout-sheets`}
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                            tryoutMaterialsWeek === 1
+                                                ? "bg-blue-600 hover:bg-blue-700"
+                                                : "bg-indigo-600 hover:bg-indigo-700"
+                                        )}
+                                    >
+                                        Download Week {tryoutMaterialsWeek}{" "}
+                                        Tryout Sheets PDF
+                                    </a>
+                                </div>
+                            )}
+                            {isAdmin && (
+                                <div className="space-y-2">
+                                    <p
+                                        className={cn(
+                                            "text-sm",
+                                            tryoutMaterialsWeek === 1
+                                                ? "text-blue-700 dark:text-blue-300"
+                                                : "text-indigo-700 dark:text-indigo-300"
+                                        )}
+                                    >
+                                        Download Week {tryoutMaterialsWeek}{" "}
+                                        {tryoutMaterialsWeek === 1
+                                            ? "sessions 1 and 2"
+                                            : "sessions 1-3"}{" "}
+                                        Nametags. Should be printed on{" "}
+                                        <a
+                                            href={site.links.avery5164Labels}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="underline hover:opacity-80"
+                                        >
+                                            Avery 5164 labels
+                                        </a>
+                                        .
+                                    </p>
+                                    <a
+                                        href={`/dashboard/edit-week-${tryoutMaterialsWeek}/nametags`}
+                                        className={cn(
+                                            "inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-sm text-white",
+                                            tryoutMaterialsWeek === 1
+                                                ? "bg-blue-600 hover:bg-blue-700"
+                                                : "bg-indigo-600 hover:bg-indigo-700"
+                                        )}
+                                    >
+                                        Download Week {tryoutMaterialsWeek}{" "}
+                                        Nametag PDF
+                                    </a>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}
