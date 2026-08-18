@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function HistoryPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     BumpSetDrink Volleyball League History
@@ -21,7 +21,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Where we started
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             How in the world did we end up with a volleyball
                             league named Bump Set Drink? It&apos;s quite a story
@@ -81,7 +81,7 @@ export default function HistoryPage() {
 
                 <section className="mb-12">
                     <h2 className="mb-4 font-semibold text-2xl">The Venue</h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             How to best describe the Corner Kick? For the
                             playing field, picture a large Quonset hut with
@@ -111,7 +111,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         The Day It All Changed
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             In late 1993, IBM announced its plan to sell its
                             Federal Systems Division to the Loral Corporation in
@@ -145,7 +145,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         The Contest for a New Name
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         In the late 90&apos;s, the decision was made to drop the
                         IBM and LM references in the league title. Since the
                         league was not sponsored in any way by either company,
@@ -164,7 +164,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Changing of the Guard
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         During the Fall 1999 season, Dale Kawamura decided to
                         retire as the League Director for BSD Volleyball and
                         focus on coaching his kids. Andrea Stump took over as
@@ -182,7 +182,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         The Corner Kick Closes
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             The next big change for the BSD league was the
                             sudden closure of the Corner Kick in January 2002.
@@ -220,7 +220,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Bump, Set, Drink, Inc. is formed
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             In late 2006, Mid-Atlantic Volleyball and the league
                             directors of BSD held discussions resulting in the
@@ -247,7 +247,7 @@ export default function HistoryPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         In closing, what are we all about?
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         The prime goal of the Bump Set Drink Volleyball League
                         is to provide a social and enjoyable volleyball
                         experience for players of all skill levels. We continue

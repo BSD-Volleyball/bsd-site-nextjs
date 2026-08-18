@@ -268,7 +268,7 @@ export default async function Home() {
                         </div>
 
                         <div className="prose prose-lg dark:prose-invert mx-auto">
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 Bump Set Drink began as the IBM Company
                                 Volleyball League in the late 1980s and has
                                 evolved into one of the DC area&apos;s premier
@@ -276,7 +276,7 @@ export default async function Home() {
                                 draft system ensures competitive balance and
                                 helps players meet new teammates every season.
                             </p>
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 We offer six skill divisions from AA (advanced)
                                 to BB (beginner), ensuring players of all
                                 abilities can find their perfect competitive

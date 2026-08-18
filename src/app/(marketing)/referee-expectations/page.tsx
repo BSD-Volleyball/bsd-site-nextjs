@@ -5,7 +5,7 @@ export const metadata = {
 
 export default function RefereeExpectationsPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     Referee Expectations
@@ -32,7 +32,7 @@ export default function RefereeExpectationsPage() {
                             <h3 className="mb-2 font-medium text-lg">
                                 Expectation 1
                             </h3>
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 <strong>
                                     Remain professional and objective at all
                                     times.
@@ -55,7 +55,7 @@ export default function RefereeExpectationsPage() {
                             <h3 className="mb-2 font-medium text-lg">
                                 Expectation 2
                             </h3>
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 <strong>Learn the rules.</strong> Referees are
                                 expected to learn the current BSD rules located
                                 on the BSD website.
@@ -65,13 +65,13 @@ export default function RefereeExpectationsPage() {
                 </section>
 
                 <section className="mb-12">
-                    <p className="mb-6 text-muted-foreground leading-relaxed">
+                    <p className="mb-6">
                         It is impossible for one referee to see everything. Here
                         are tips and guidance to help you excel on the stand:
                     </p>
 
                     <h2 className="mb-4 font-semibold text-2xl">Play Format</h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         There will be a 6 minute warm-up period before the start
                         of each match. Warm-ups for the 7:00pm match should take
                         place before 7pm if possible. Please prepare as much as
@@ -116,7 +116,7 @@ export default function RefereeExpectationsPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Player Behavior
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         The captains should be warned during the coin toss that
                         improper behavior will not be tolerated. League
                         officials will review all player ejection and
@@ -132,7 +132,7 @@ export default function RefereeExpectationsPage() {
 
                 <section className="mb-12">
                     <h2 className="mb-4 font-semibold text-2xl">Forfeits</h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         For each match of the evening, a grace period of 10
                         minutes after the scheduled match start time will be
                         allowed before the first game will be forfeited. Each
@@ -178,7 +178,7 @@ export default function RefereeExpectationsPage() {
                             multiple hits, held ball
                         </li>
                     </ul>
-                    <p className="mb-6 text-muted-foreground leading-relaxed">
+                    <p className="mb-6">
                         Unless otherwise stated, all USAV rules should be
                         followed for calling illegal contacts. Since calling
                         hand sets can be challenging and contentious, we will
@@ -190,7 +190,7 @@ export default function RefereeExpectationsPage() {
                             <h3 className="mb-2 font-medium text-lg">
                                 Multiple Hits
                             </h3>
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 These are allowed on a team&apos;s 1st contact
                                 if only one attempt is made to play the ball.
                                 Multiple hits are never allowed on a team&apos;s
@@ -202,7 +202,7 @@ export default function RefereeExpectationsPage() {
                             <h3 className="mb-2 font-medium text-lg">
                                 Held Ball
                             </h3>
-                            <p className="text-muted-foreground leading-relaxed">
+                            <p>
                                 The ball is contacted for too long of a time
                                 (also called &quot;carry&quot; or
                                 &quot;lift&quot; by many people). This applies
@@ -276,7 +276,7 @@ export default function RefereeExpectationsPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         End of Games
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         At end of each game, direct the teams to switch sides
                         and then write down the scores and end time. At the end
                         of the third game, if you are not scheduled to ref but

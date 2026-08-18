@@ -12,13 +12,13 @@ export function RulesIntro() {
             </div>
 
             {/* Referee Expectations preamble */}
-            <div className="mb-12 rounded-lg border border-border bg-muted/40 p-6">
-                <p className="mb-3 text-muted-foreground leading-relaxed">
+            <div className="prose prose-lg dark:prose-invert mb-12 max-w-none rounded-lg border border-border bg-muted/40 p-6">
+                <p>
                     The essence of a good referee lies in the concept of
                     fairness and consistency: to be fair to every participant,
                     and to be viewed as fair by the spectators.
                 </p>
-                <p className="mb-3 text-muted-foreground leading-relaxed">
+                <p>
                     This demands a huge element of trust — the referee must be
                     trusted to officiate a fair match: by being accurate in
                     his/her judgment; by understanding why the rule is written;

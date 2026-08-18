@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./custom.css";
+@plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -36,9 +37,11 @@
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0.9401 0 0);
   --sidebar-ring: oklch(0 0 0);
-  --font-sans: "Plus Jakarta Sans", sans-serif;
-  --font-serif: Lora, serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  /* Fonts are self-hosted via next/font in src/app/layout.tsx; the
+     --font-inter/--font-jakarta/--font-plex-mono variables are set on <html>. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), var(--font-sans);
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
   --radius: 1rem;
   --shadow-x: 0px;
   --shadow-y: 2px;
@@ -54,8 +57,7 @@
   --shadow-lg: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 4px 6px -1px hsl(0 0% 0% / 0.16);
   --shadow-xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 8px 10px -1px hsl(0 0% 0% / 0.16);
   --shadow-2xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.40);
-  --tracking-normal: -0.025em;
-  --spacing: 0.27rem;
+  --tracking-normal: 0em;
 }
 
 .dark {
@@ -91,24 +93,6 @@
   --sidebar-accent-foreground: oklch(0.6132 0.2294 291.7437);
   --sidebar-border: oklch(0.3289 0.0092 268.3843);
   --sidebar-ring: oklch(0.6132 0.2294 291.7437);
-  --font-sans: "Plus Jakarta Sans", sans-serif;
-  --font-serif: Lora, serif;
-  --font-mono: "IBM Plex Mono", monospace;
-  --radius: 1rem;
-  --shadow-x: 0px;
-  --shadow-y: 2px;
-  --shadow-blur: 3px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.16;
-  --shadow-color: hsl(0 0% 0%);
-  --shadow-2xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
-  --shadow-xs: 0px 2px 3px 0px hsl(0 0% 0% / 0.08);
-  --shadow-sm: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
-  --shadow: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 1px 2px -1px hsl(0 0% 0% / 0.16);
-  --shadow-md: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 2px 4px -1px hsl(0 0% 0% / 0.16);
-  --shadow-lg: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 4px 6px -1px hsl(0 0% 0% / 0.16);
-  --shadow-xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.16), 0px 8px 10px -1px hsl(0 0% 0% / 0.16);
-  --shadow-2xl: 0px 2px 3px 0px hsl(0 0% 0% / 0.40);
 }
 
 @theme inline {
@@ -147,7 +131,7 @@
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-  --font-serif: var(--font-serif);
+  --font-heading: var(--font-heading);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -171,19 +155,68 @@
   --tracking-widest: calc(var(--tracking-normal) + 0.1em);
 }
 
-body {
-  letter-spacing: var(--tracking-normal);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
+    letter-spacing: var(--tracking-normal);
+  }
+
+  /* Headings carry the display face; body text stays in the reading face. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+  }
+  h1,
+  h2 {
+    letter-spacing: -0.02em;
   }
 }
 
+/* Map @tailwindcss/typography colors onto the theme tokens so `prose` follows
+   light/dark automatically (invert twins set too, so `dark:prose-invert` stays
+   harmless). Body copy is a reading tone: much stronger than muted, softer than
+   pure foreground. Unlayered on purpose — the plugin's own `.prose` variables
+   live in the utilities layer and would beat an @layer base rule. */
+.prose {
+  --prose-reading: color-mix(
+    in oklch,
+    var(--foreground) 88%,
+    var(--background)
+  );
+  --tw-prose-body: var(--prose-reading);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted-foreground);
+  --tw-prose-links: var(--primary);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--muted-foreground);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+  --tw-prose-invert-body: var(--prose-reading);
+  --tw-prose-invert-headings: var(--foreground);
+  --tw-prose-invert-lead: var(--muted-foreground);
+  --tw-prose-invert-links: var(--primary);
+  --tw-prose-invert-bold: var(--foreground);
+  --tw-prose-invert-counters: var(--muted-foreground);
+  --tw-prose-invert-bullets: var(--muted-foreground);
+  --tw-prose-invert-hr: var(--border);
+  --tw-prose-invert-quotes: var(--foreground);
+  --tw-prose-invert-quote-borders: var(--border);
+  --tw-prose-invert-captions: var(--muted-foreground);
+  --tw-prose-invert-code: var(--foreground);
+  --tw-prose-invert-th-borders: var(--border);
+  --tw-prose-invert-td-borders: var(--border);
+}
 @media print {
   @page {
     size: portrait;

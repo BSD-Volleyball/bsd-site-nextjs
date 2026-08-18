@@ -5,7 +5,7 @@ export function CodeOfConductSection() {
                 1. Spectator/Player Code of Conduct
             </h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="mb-2 font-medium text-foreground text-xl">
                         1.1 I WILL:

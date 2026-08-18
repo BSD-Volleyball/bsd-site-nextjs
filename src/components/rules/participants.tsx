@@ -3,7 +3,7 @@ export function ParticipantsSection() {
         <section id="participants" className="mb-12 scroll-mt-24">
             <h2 className="mb-4 font-semibold text-2xl">4. Participants</h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         4.1 Team Composition

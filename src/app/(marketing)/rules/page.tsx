@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function RulesPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <RulesContent />
         </div>
     )

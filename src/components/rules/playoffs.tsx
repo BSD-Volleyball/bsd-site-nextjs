@@ -5,7 +5,7 @@ export function PlayoffsSection() {
                 3. BSD Overall Information — Playoffs
             </h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         3.1 Team Eligibility

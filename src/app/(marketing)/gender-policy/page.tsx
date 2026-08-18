@@ -5,7 +5,7 @@ export const metadata = {
 
 export default function GenderPolicyPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     Co-rec Play and Gender at BSD
@@ -14,7 +14,7 @@ export default function GenderPolicyPage() {
 
             <div className="prose prose-lg dark:prose-invert max-w-none">
                 <section className="mb-12">
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         At Bump, Set, Drink, we are committed to fostering an
                         inclusive and diverse community within our recreational
                         volleyball league. We believe in the power of sports to
@@ -28,7 +28,7 @@ export default function GenderPolicyPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Our Commitment to Diversity
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         We take diversity and inclusion seriously. Our goal is
                         to create an environment where every participant,
                         regardless of background, feels valued and embraced. We
@@ -41,7 +41,7 @@ export default function GenderPolicyPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Addressing Gender Identity
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         Gender identity is a serious and important aspect of an
                         individual&apos;s identity. We recognize and respect
                         that people may identify outside of traditional gender
@@ -53,7 +53,7 @@ export default function GenderPolicyPage() {
 
                 <section className="mb-12">
                     <h2 className="mb-4 font-semibold text-2xl">Fair Play</h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         We are committed to maintaining the integrity of our
                         sports competitions. We emphasize that gender identity
                         should not be exploited or manipulated for a competitive
@@ -69,7 +69,7 @@ export default function GenderPolicyPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Open to Feedback
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         We understand that navigating the complexities of gender
                         and inclusion can be challenging, especially in an
                         open/co-rec sports league. We may not always get it
@@ -85,7 +85,7 @@ export default function GenderPolicyPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Get Involved
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         We encourage everyone in our community to actively
                         support our commitment to diversity and inclusion, and
                         to a successful volleyball season each and every season.

@@ -118,7 +118,7 @@ export default async function SeasonInfoPage() {
     const detailRows = buildDetailRows(config)
 
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     {heading}
@@ -130,7 +130,7 @@ export default async function SeasonInfoPage() {
 
             <div className="prose prose-lg dark:prose-invert max-w-none">
                 <section className="mb-10">
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             This league is a social but competitive league.
                             Players sign up individually and are drafted by
@@ -156,7 +156,7 @@ export default async function SeasonInfoPage() {
 
                 <section className="mb-10">
                     <h2 className="mb-4 font-semibold text-2xl">Format</h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             The league will be divided into multiple divisions
                             to accommodate up to 36 teams. The number of
@@ -178,7 +178,7 @@ export default async function SeasonInfoPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Age Requirements
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             Players must be 14 years old by the start of
                             preseason. Players 14-15 years must be paired with a
@@ -222,7 +222,7 @@ export default async function SeasonInfoPage() {
                         <h3 className="mb-3 font-semibold text-foreground">
                             Important Disclaimer
                         </h3>
-                        <p className="text-muted-foreground leading-relaxed">
+                        <p>
                             Information that you provide in your registration
                             will be distributed to league commissioners and
                             captains for the purposes of league drafts and
@@ -233,7 +233,7 @@ export default async function SeasonInfoPage() {
 
                 <section className="mb-10">
                     <div className="rounded-lg border border-border bg-muted/50 p-6">
-                        <p className="text-muted-foreground leading-relaxed">
+                        <p>
                             <strong className="text-foreground">NOTE:</strong>{" "}
                             You are not guaranteed to be drafted in any
                             particular division. Everyone who registers to play
@@ -247,7 +247,7 @@ export default async function SeasonInfoPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Need More Information?
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             Send a note to{" "}
                             <Link
@@ -265,7 +265,7 @@ export default async function SeasonInfoPage() {
                         <h3 className="mb-3 font-semibold text-foreground">
                             New to the League?
                         </h3>
-                        <p className="text-muted-foreground leading-relaxed">
+                        <p>
                             It is important for you to provide as much
                             information as possible about your skill level on
                             the registration form (leagues and levels played,

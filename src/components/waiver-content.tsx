@@ -16,7 +16,7 @@ export function WaiverContent({ content, className }: WaiverContentProps) {
     return (
         <div
             className={cn(
-                "max-h-64 overflow-y-auto rounded-lg border p-4 text-muted-foreground text-sm leading-relaxed",
+                "max-h-64 overflow-y-auto rounded-lg border p-4 text-base leading-relaxed",
                 className
             )}
         >

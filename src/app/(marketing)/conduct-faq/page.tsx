@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function ConductCommitteeFAQPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     BSD Conduct Committee Webpage FAQ
@@ -20,7 +20,7 @@ export default function ConductCommitteeFAQPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         How do I report an issue like harassment or misconduct?
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             In many situations, issues can amicably be resolved
                             with a simple face-to-face discussion, but we
@@ -73,7 +73,7 @@ export default function ConductCommitteeFAQPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Is the report form really anonymous?
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         Yes. The form does not collect your email address, name,
                         or any identifying information. Neither your Google
                         account information nor your BSD account information is
@@ -88,7 +88,7 @@ export default function ConductCommitteeFAQPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Who sees my report?
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         Reports are reviewed by the BSD Conduct Committee, a
                         small group of three trusted members of the BSD
                         community. This committee consists of a league director
@@ -105,7 +105,7 @@ export default function ConductCommitteeFAQPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         What happens after I submit a report?
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         The Conduct Committee reviews all submissions and
                         determines appropriate next steps, which may include a
                         private conversation with the individuals involved, a
@@ -122,7 +122,7 @@ export default function ConductCommitteeFAQPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         What kinds of issues can I report?
                     </h2>
-                    <div className="space-y-4 text-muted-foreground leading-relaxed">
+                    <div className="space-y-4">
                         <p>
                             You can report anything that affects your safety or
                             experience in the league. This includes but is not

@@ -5,7 +5,7 @@ export function OverallInformationSection() {
                 2. BSD Overall Information
             </h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         2.1 Facility Information

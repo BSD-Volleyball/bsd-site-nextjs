@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function CaptainExpectationsPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     Captains Expectations
@@ -15,7 +15,7 @@ export default function CaptainExpectationsPage() {
 
             <div className="prose prose-lg dark:prose-invert max-w-none">
                 <section className="mb-12">
-                    <p className="mb-6 text-muted-foreground leading-relaxed">
+                    <p className="mb-6">
                         We all like to play volleyball and have a good time, but
                         if you stop to think about it, that usually only happens
                         on teams that are well run. Being a team captain in this
@@ -24,7 +24,7 @@ export default function CaptainExpectationsPage() {
                         victory! Towards that end, here is a summary of what
                         future team captains should expect.
                     </p>
-                    <p className="mb-4 text-muted-foreground leading-relaxed">
+                    <p className="mb-4">
                         Before we get into expectations, there are some key
                         principles that all players (captains included) should
                         try to remember:
@@ -48,9 +48,7 @@ export default function CaptainExpectationsPage() {
                             everyone a fun experience.
                         </li>
                     </ul>
-                    <p className="text-muted-foreground leading-relaxed">
-                        Now on to the details!
-                    </p>
+                    <p>Now on to the details!</p>
                 </section>
 
                 <section className="mb-12">
@@ -80,7 +78,7 @@ export default function CaptainExpectationsPage() {
 
                 <section className="mb-12">
                     <h2 className="mb-4 font-semibold text-2xl">Plan Ahead</h2>
-                    <p className="mb-4 text-muted-foreground leading-relaxed">
+                    <p className="mb-4">
                         The best way to field a competitive team is to draft a
                         good combination of skills, athleticism and
                         personalities. How do you do that?
@@ -176,14 +174,14 @@ export default function CaptainExpectationsPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         You&apos;ve Drafted Your Team… Now What?
                     </h2>
-                    <p className="mb-4 text-muted-foreground leading-relaxed">
+                    <p className="mb-4">
                         Congratulations! Drafting a team is an intimidating
                         thing for newer captains, and it certainly seems
                         challenging even to a lot of repeat captains who just
                         never seem to win. We won&apos;t name names, that&apos;s
                         not polite!
                     </p>
-                    <p className="mb-4 text-muted-foreground leading-relaxed">
+                    <p className="mb-4">
                         Being on a competitive team is important to many
                         players, but just as important is their{" "}
                         <em>experience</em> on the team. Captains set the tone
@@ -360,7 +358,7 @@ export default function CaptainExpectationsPage() {
                     <h2 className="mb-4 font-semibold text-2xl">
                         Any Questions?
                     </h2>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p>
                         Your league commissioner should always be your primary
                         point of contact for any questions you may have. You can
                         also consult the BSD League directors for general

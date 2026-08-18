@@ -5,7 +5,7 @@ export const metadata = {
 
 export default function FAQPage() {
     return (
-        <div className="container mx-auto max-w-4xl px-4 py-16">
+        <div className="container mx-auto max-w-3xl px-4 py-16">
             <div className="mb-12 text-center">
                 <h1 className="mb-4 font-bold text-4xl tracking-tight">
                     Frequently Asked Questions
@@ -18,7 +18,7 @@ export default function FAQPage() {
                         League Basics
                     </h2>
 
-                    <div className="space-y-6 text-muted-foreground leading-relaxed">
+                    <div className="space-y-6">
                         <div>
                             <h3 className="font-medium text-foreground text-xl">
                                 Where and when would I play?
@@ -105,7 +105,7 @@ export default function FAQPage() {
                         Tryouts &amp; Preseason
                     </h2>
 
-                    <div className="space-y-6 text-muted-foreground leading-relaxed">
+                    <div className="space-y-6">
                         <div>
                             <h3 className="font-medium text-foreground text-xl">
                                 What should I expect during tryouts?
@@ -138,7 +138,7 @@ export default function FAQPage() {
                         Registration and Communication
                     </h2>
 
-                    <div className="space-y-6 text-muted-foreground leading-relaxed">
+                    <div className="space-y-6">
                         <div>
                             <h3 className="font-medium text-foreground text-xl">
                                 How do I register?
@@ -219,7 +219,7 @@ export default function FAQPage() {
                         Reporting &amp; Conduct
                     </h2>
 
-                    <div className="space-y-6 text-muted-foreground leading-relaxed">
+                    <div className="space-y-6">
                         <div>
                             <h3 className="font-medium text-foreground text-xl">
                                 I have a question or feedback. How do I contact

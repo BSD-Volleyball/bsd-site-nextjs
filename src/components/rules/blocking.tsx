@@ -3,7 +3,7 @@ export function BlockingSection() {
         <section id="blocking" className="mb-12 scroll-mt-24">
             <h2 className="mb-4 font-semibold text-2xl">11. Blocking</h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         11.1 Blocking

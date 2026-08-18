@@ -5,7 +5,7 @@ export function InterruptionsSection() {
                 12. Interruptions, Delays and Intervals
             </h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         12.1 Interruptions

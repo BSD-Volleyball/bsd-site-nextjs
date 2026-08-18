@@ -5,7 +5,7 @@ export function RefereeResponsibilitiesSection() {
                 18. Referee Responsibilities
             </h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         18.1 Match Duties

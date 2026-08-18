@@ -3,7 +3,7 @@ export function GameDelaysSection() {
         <section id="game-delays" className="mb-12 scroll-mt-24">
             <h2 className="mb-4 font-semibold text-2xl">13. Game Delays</h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         13.1 Types of Delays

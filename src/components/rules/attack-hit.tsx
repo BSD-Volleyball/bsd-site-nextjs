@@ -3,7 +3,7 @@ export function AttackHitSection() {
         <section id="attack-hit" className="mb-12 scroll-mt-24">
             <h2 className="mb-4 font-semibold text-2xl">10. Attack Hit</h2>
 
-            <div className="space-y-6 text-muted-foreground leading-relaxed">
+            <div className="space-y-6">
                 <div>
                     <h3 className="font-medium text-foreground text-xl">
                         10.1 Characteristics of the Attack Hit
