@@ -9,7 +9,11 @@ import {
 import { sentMessages } from "@/test/email"
 import { createSeason } from "@/test/factories"
 import { createUserWithRoles, logout } from "@/test/session"
-import { quickReplyInboundEmail, sendEmailReplyAndClose } from "./actions"
+import {
+    quickReplyInboundEmail,
+    sendEmailReplyAndAssign,
+    sendEmailReplyAndClose
+} from "./actions"
 
 async function createInboundEmail(
     overrides: Partial<typeof inboundEmails.$inferInsert> = {}
@@ -221,5 +225,75 @@ describe("quickReplyInboundEmail", () => {
         const after = await loadEmail(email.id)
         expect(after.status).toBe("new")
         expect(after.assigned_to).toBeNull()
+    })
+})
+
+describe("sendEmailReplyAndAssign", () => {
+    it("assigns to the caller and sends the reply, leaving the email active", async () => {
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        const email = await createInboundEmail({ status: "new" })
+
+        const result = await sendEmailReplyAndAssign(
+            email.id,
+            "Tryouts are Saturday."
+        )
+        expect(result.status).toBe(true)
+
+        const after = await loadEmail(email.id)
+        expect(after.status).toBe("active")
+        expect(after.assigned_to).toBe(admin.id)
+
+        const replies = await repliesFor(email.id)
+        expect(replies).toHaveLength(1)
+        expect(replies[0].sent_by).toBe(admin.id)
+
+        const sent = sentMessages()
+        expect(sent).toHaveLength(1)
+        expect(sent[0].to).toBe("player@example.test")
+
+        const comments = (await commentsFor(email.id)).map((c) => c.content)
+        expect(comments[0]).toContain("changed status to active")
+        expect(comments.some((c) => c.includes("closed this email"))).toBe(
+            false
+        )
+    })
+
+    it("refuses emails that are not new", async () => {
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        for (const status of ["active", "closed", "spam"] as const) {
+            const email = await createInboundEmail({
+                status,
+                assigned_to: admin.id
+            })
+            const result = await sendEmailReplyAndAssign(email.id, "Hello")
+            expect(result.status).toBe(false)
+            expect((await loadEmail(email.id)).status).toBe(status)
+        }
+        expect(sentMessages()).toHaveLength(0)
+    })
+
+    it("rejects an authenticated non-admin without touching the email", async () => {
+        await createUserWithRoles([{ role: "captain" }])
+        const email = await createInboundEmail({ status: "new" })
+
+        const result = await sendEmailReplyAndAssign(email.id, "Hello")
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+
+        const after = await loadEmail(email.id)
+        expect(after.status).toBe("new")
+        expect(after.assigned_to).toBeNull()
+        expect(sentMessages()).toHaveLength(0)
+    })
+
+    it("rejects an unauthenticated caller", async () => {
+        logout()
+        const email = await createInboundEmail({ status: "new" })
+
+        const result = await sendEmailReplyAndAssign(email.id, "Hello")
+        expect(result).toEqual({
+            status: false,
+            message: "Not authenticated."
+        })
+        expect((await loadEmail(email.id)).status).toBe("new")
     })
 })

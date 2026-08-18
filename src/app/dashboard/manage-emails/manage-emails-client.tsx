@@ -11,6 +11,7 @@ import {
     quickReplyInboundEmail,
     reopenInboundEmail,
     sendEmailReply,
+    sendEmailReplyAndAssign,
     sendEmailReplyAndClose,
     unmarkInboundEmailAsSpam,
     type AssignableAdmin,
@@ -339,6 +340,24 @@ function EmailCard({
             if (result.status) {
                 setReplyBody("")
                 onUpdate()
+            } else {
+                setReplyMsg(result.message)
+            }
+        })
+    }
+
+    // New emails only: claim and reply, keeping the conversation open. The
+    // email moves to Active, so follow it there the same way "Assign to Me"
+    // does.
+    function handleSendReplyAndAssign() {
+        if (!replyBody.trim()) return
+        setReplyMsg(null)
+        startTransition(async () => {
+            const result = await sendEmailReplyAndAssign(email.id, replyBody)
+            if (result.status) {
+                setReplyBody("")
+                onUpdate()
+                onFocusEmail(email.id)
             } else {
                 setReplyMsg(result.message)
             }
@@ -732,8 +751,8 @@ function EmailCard({
                                         {email.from_name ?? email.from_address}
                                     </p>
                                     <p className="text-muted-foreground text-xs">
-                                        Assigns the email to you, sends the
-                                        reply, and closes it.
+                                        Assigns the email to you and sends the
+                                        reply — optionally closing it too.
                                     </p>
                                     <Textarea
                                         rows={4}
@@ -748,17 +767,31 @@ function EmailCard({
                                             {replyMsg}
                                         </p>
                                     )}
-                                    <Button
-                                        size="sm"
-                                        onClick={handleQuickReply}
-                                        disabled={
-                                            isPending || !replyBody.trim()
-                                        }
-                                    >
-                                        {isPending
-                                            ? "Sending…"
-                                            : "Send, Assign to Me & Close"}
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSendReplyAndAssign}
+                                            disabled={
+                                                isPending || !replyBody.trim()
+                                            }
+                                        >
+                                            {isPending
+                                                ? "Sending…"
+                                                : "Send & Assign to Me"}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={handleQuickReply}
+                                            disabled={
+                                                isPending || !replyBody.trim()
+                                            }
+                                        >
+                                            {isPending
+                                                ? "Sending…"
+                                                : "Send, Assign to Me & Close"}
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
 

@@ -597,11 +597,11 @@ export const unmarkInboundEmailAsSpam = withAction(
 // above so the thread and audit log show the same entries a manual
 // assign → reply → close would. The manage permission is checked before
 // anything is sent so a view-only user can't get a reply out the door that
-// then fails to close.
-async function replyAndClose(
+// then fails to assign or close.
+async function composeReply(
     emailId: number,
     body: string,
-    assignToSelf: boolean
+    { assignToSelf, close }: { assignToSelf: boolean; close: boolean }
 ): Promise<ActionResult> {
     const session = await requireSession()
     const config = await requireSeasonConfig()
@@ -631,6 +631,7 @@ async function replyAndClose(
 
     const sent = await sendEmailReply(emailId, body)
     if (!sent.status) return sent
+    if (!close) return ok(undefined, "Reply sent.")
 
     const closed = await closeInboundEmail(emailId)
     if (!closed.status) return closed
@@ -642,7 +643,21 @@ async function replyAndClose(
 export const sendEmailReplyAndClose = withAction(
     async (emailId: number, body: string): Promise<ActionResult> => {
         await requireSession()
-        return replyAndClose(emailId, body, false)
+        return composeReply(emailId, body, {
+            assignToSelf: false,
+            close: true
+        })
+    }
+)
+
+/** New emails: assign to the caller and send the reply (stays active). */
+export const sendEmailReplyAndAssign = withAction(
+    async (emailId: number, body: string): Promise<ActionResult> => {
+        await requireSession()
+        return composeReply(emailId, body, {
+            assignToSelf: true,
+            close: false
+        })
     }
 )
 
@@ -650,7 +665,10 @@ export const sendEmailReplyAndClose = withAction(
 export const quickReplyInboundEmail = withAction(
     async (emailId: number, body: string): Promise<ActionResult> => {
         await requireSession()
-        return replyAndClose(emailId, body, true)
+        return composeReply(emailId, body, {
+            assignToSelf: true,
+            close: true
+        })
     }
 )
 
