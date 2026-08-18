@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { listFriendIds } from "@/lib/friends"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"
 import type { Metadata } from "next"
@@ -55,7 +56,10 @@ export default async function CurrentRosterPage() {
         )
     }
 
-    const result = await getRosterData(config.seasonId)
+    const [result, friendIds] = await Promise.all([
+        getRosterData(config.seasonId),
+        listFriendIds(session.user.id)
+    ])
 
     if (!result.status) {
         return (
@@ -87,6 +91,7 @@ export default async function CurrentRosterPage() {
                         key={division.id}
                         division={division}
                         currentUserId={session.user.id}
+                        friendIds={friendIds}
                     />
                 ))
             )}

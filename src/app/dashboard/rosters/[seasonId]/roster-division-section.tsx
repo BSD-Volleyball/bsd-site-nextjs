@@ -3,6 +3,10 @@
 import { RiStarFill } from "@remixicon/react"
 import { DivisionSection } from "@/components/division-section"
 import { cn } from "@/lib/utils"
+import {
+    getPlayerHighlight,
+    playerHighlightClass
+} from "@/lib/player-highlight"
 
 interface RosterPlayer {
     id: string
@@ -32,10 +36,13 @@ interface DivisionData {
 
 export function RosterDivisionSection({
     division,
-    currentUserId
+    currentUserId,
+    friendIds
 }: {
     division: DivisionData
     currentUserId?: string
+    /** Accepted friends of the viewer, highlighted more softly than the viewer. */
+    friendIds?: string[]
 }) {
     const isUserInDivision =
         !!currentUserId &&
@@ -95,10 +102,14 @@ export function RosterDivisionSection({
                                                 "flex flex-wrap items-center gap-2 rounded-sm px-2 py-1 text-sm",
                                                 player.isSubbedOut
                                                     ? "bg-muted/20 opacity-60"
-                                                    : player.id ===
-                                                        currentUserId
-                                                      ? "bg-primary/15 font-semibold ring-1 ring-primary/50"
-                                                      : "bg-muted/40"
+                                                    : playerHighlightClass(
+                                                          getPlayerHighlight(
+                                                              player.id,
+                                                              currentUserId,
+                                                              friendIds
+                                                          ),
+                                                          "bg-muted/40"
+                                                      )
                                             )}
                                         >
                                             <span

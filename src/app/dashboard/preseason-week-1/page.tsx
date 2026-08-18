@@ -12,7 +12,12 @@ import { week1Rosters, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { PrintButton } from "@/components/preseason/print-button"
 import type { Metadata } from "next"
-import { formatDisplayName } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
+import { listFriendIds } from "@/lib/friends"
+import {
+    getPlayerHighlight,
+    playerHighlightClass
+} from "@/lib/player-highlight"
 
 export const metadata: Metadata = {
     title: "Pre-Season Week 1"
@@ -62,6 +67,8 @@ export default async function DraftPreseasonWeek1Page() {
             ? formatEventTime(tryout1.timeSlots[1].startTime)
             : "Time TBD"
     }
+
+    const friendIds = await listFriendIds(session.user.id)
 
     const rosterRows = await db
         .select({
@@ -312,12 +319,18 @@ export default async function DraftPreseasonWeek1Page() {
                                                 {courtPlayers.map((player) => (
                                                     <li
                                                         key={player.userId}
-                                                        className={
-                                                            player.userId ===
-                                                            session.user.id
-                                                                ? "rounded-sm bg-primary/15 px-2 py-1 font-semibold ring-1 ring-primary/50"
-                                                                : "rounded-sm bg-muted/40 px-2 py-1"
-                                                        }
+                                                        className={cn(
+                                                            "rounded-sm px-2 py-1",
+                                                            playerHighlightClass(
+                                                                getPlayerHighlight(
+                                                                    player.userId,
+                                                                    session.user
+                                                                        .id,
+                                                                    friendIds
+                                                                ),
+                                                                "bg-muted/40"
+                                                            )
+                                                        )}
                                                     >
                                                         {player.displayName}
                                                     </li>
@@ -349,11 +362,17 @@ export default async function DraftPreseasonWeek1Page() {
                             {alternates.map((player) => (
                                 <li
                                     key={`alt-${player.userId}`}
-                                    className={
-                                        player.userId === session.user.id
-                                            ? "break-inside-avoid rounded-sm bg-primary/15 px-2 py-1 font-semibold ring-1 ring-primary/50"
-                                            : "break-inside-avoid rounded-sm bg-muted/40 px-2 py-1"
-                                    }
+                                    className={cn(
+                                        "break-inside-avoid rounded-sm px-2 py-1",
+                                        playerHighlightClass(
+                                            getPlayerHighlight(
+                                                player.userId,
+                                                session.user.id,
+                                                friendIds
+                                            ),
+                                            "bg-muted/40"
+                                        )
+                                    )}
                                 >
                                     {player.displayName}
                                 </li>

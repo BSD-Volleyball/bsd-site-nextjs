@@ -142,6 +142,32 @@ export async function listFriends(userId: string): Promise<FriendEntry[]> {
     }))
 }
 
+/**
+ * Ids of the user's accepted friends (either direction). Cheaper than
+ * listFriends() — no profile join — for pages that only need membership,
+ * such as highlighting friends in a roster.
+ */
+export async function listFriendIds(userId: string): Promise<string[]> {
+    const rows = await db
+        .select({
+            requester: friendships.requester,
+            addressee: friendships.addressee
+        })
+        .from(friendships)
+        .where(
+            and(
+                eq(friendships.status, "accepted"),
+                or(
+                    eq(friendships.requester, userId),
+                    eq(friendships.addressee, userId)
+                )
+            )
+        )
+    return rows.map((row) =>
+        row.requester === userId ? row.addressee : row.requester
+    )
+}
+
 /** The live (pending or accepted) edge between two users, either direction. */
 export async function getLiveFriendshipEdge(a: string, b: string) {
     const [row] = await db

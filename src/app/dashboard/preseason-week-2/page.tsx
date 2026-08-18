@@ -13,7 +13,12 @@ import { week2Rosters, users, divisions } from "@/database/schema"
 import { asc, eq } from "drizzle-orm"
 import { PrintButton } from "@/components/preseason/print-button"
 import type { Metadata } from "next"
-import { formatDisplayName } from "@/lib/utils"
+import { cn, formatDisplayName } from "@/lib/utils"
+import { listFriendIds } from "@/lib/friends"
+import {
+    getPlayerHighlight,
+    playerHighlightClass
+} from "@/lib/player-highlight"
 
 export const metadata: Metadata = {
     title: "Pre-Season Week 2"
@@ -108,6 +113,8 @@ export default async function PreseasonWeek2Page() {
             ? formatEventTime(tryout2.timeSlots[2].startTime)
             : "Time TBD"
     ]
+
+    const friendIds = await listFriendIds(session.user.id)
 
     const rosterRows = await db
         .select({
@@ -306,12 +313,18 @@ export default async function PreseasonWeek2Page() {
                                                 {team.players.map((player) => (
                                                     <li
                                                         key={`${player.userId}-${division.divisionId}-${team.teamNumber}`}
-                                                        className={
-                                                            player.userId ===
-                                                            session.user.id
-                                                                ? "rounded-sm bg-primary/15 px-2 py-1 font-semibold ring-1 ring-primary/50"
-                                                                : "rounded-sm bg-background px-2 py-1"
-                                                        }
+                                                        className={cn(
+                                                            "rounded-sm px-2 py-1",
+                                                            playerHighlightClass(
+                                                                getPlayerHighlight(
+                                                                    player.userId,
+                                                                    session.user
+                                                                        .id,
+                                                                    friendIds
+                                                                ),
+                                                                "bg-background"
+                                                            )
+                                                        )}
                                                     >
                                                         {player.displayName}
                                                         {player.hasAsterisk && (

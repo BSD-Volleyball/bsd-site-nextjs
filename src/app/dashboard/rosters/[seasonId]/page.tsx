@@ -1,4 +1,5 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { listFriendIds } from "@/lib/friends"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { getRosterData } from "./actions"
@@ -19,7 +20,10 @@ export default async function RosterPage({
     const session = await requireSessionOrRedirect()
 
     const { seasonId } = await params
-    const result = await getRosterData(parseInt(seasonId, 10))
+    const [result, friendIds] = await Promise.all([
+        getRosterData(parseInt(seasonId, 10)),
+        listFriendIds(session.user.id)
+    ])
 
     if (!result.status) {
         return (
@@ -48,6 +52,7 @@ export default async function RosterPage({
                         key={division.id}
                         division={division}
                         currentUserId={session.user.id}
+                        friendIds={friendIds}
                     />
                 ))
             )}

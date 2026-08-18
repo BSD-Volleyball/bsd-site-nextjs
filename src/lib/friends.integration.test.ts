@@ -8,7 +8,7 @@ import {
     createSeasonEvent,
     createSignup
 } from "@/test/factories"
-import { getFriendsWithSchedule } from "@/lib/friends"
+import { getFriendsWithSchedule, listFriendIds } from "@/lib/friends"
 import { friendScheduleLine } from "@/lib/friends-display"
 
 async function befriend(a: string, b: string) {
@@ -210,5 +210,43 @@ describe("getFriendsWithSchedule season context", () => {
         const [entry] = await getFriendsWithSchedule(me.id, season.id)
         expect(entry.preseason).toBeNull()
         expect(friendScheduleLine(entry)).toBe("Signed up — not scheduled yet")
+    })
+})
+
+describe("listFriendIds", () => {
+    it("returns accepted friends in either direction and nothing else", async () => {
+        const me = await createUser()
+        const requestedByMe = await createUser()
+        const requestedMe = await createUser()
+        const pending = await createUser()
+        const declined = await createUser()
+        const stranger = await createUser()
+
+        await befriend(me.id, requestedByMe.id)
+        await befriend(requestedMe.id, me.id)
+        await db.insert(friendships).values([
+            { requester: me.id, addressee: pending.id, status: "pending" },
+            {
+                requester: declined.id,
+                addressee: me.id,
+                status: "declined",
+                responded_at: new Date()
+            },
+            // A friendship I'm not part of must not leak in.
+            {
+                requester: pending.id,
+                addressee: stranger.id,
+                status: "accepted",
+                responded_at: new Date()
+            }
+        ])
+
+        const ids = await listFriendIds(me.id)
+        expect(ids.sort()).toEqual([requestedByMe.id, requestedMe.id].sort())
+    })
+
+    it("is empty for a user with no friends", async () => {
+        const me = await createUser()
+        expect(await listFriendIds(me.id)).toEqual([])
     })
 })
