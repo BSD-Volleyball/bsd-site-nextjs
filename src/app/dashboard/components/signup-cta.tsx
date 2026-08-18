@@ -35,11 +35,11 @@ export function SignupCTA({
                         lateDateEvent &&
                         signupStatus.config.lateAmount &&
                         (isLatePricing(signupStatus.config) ? (
-                            <p className="text-amber-600 text-xs dark:text-amber-400">
+                            <p className="text-amber-600 text-sm dark:text-amber-400">
                                 Late registration pricing in effect
                             </p>
                         ) : (
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 Price increases to $
                                 {signupStatus.config.lateAmount} after{" "}
                                 {formatEventDate(lateDateEvent.eventDate)}

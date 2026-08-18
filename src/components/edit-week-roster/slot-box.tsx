@@ -56,7 +56,7 @@ export function SlotBox<TSlot extends SlotBoxSlot>({
                 {slots.map((slot, idx) => (
                     <div key={slot.localKey} className="flex items-end gap-0.5">
                         <div className="min-w-0 flex-1 space-y-1">
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 Slot {idx + 1}
                                 {slotLabelExtras?.(slot)}
                             </p>

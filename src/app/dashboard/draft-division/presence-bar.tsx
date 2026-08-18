@@ -91,7 +91,7 @@ export function PresenceBar({ teamIds, selfEffectiveRole }: PresenceBarProps) {
                     )
                 })}
                 {!self && others.length === 0 && (
-                    <span className="text-muted-foreground text-xs">
+                    <span className="text-muted-foreground text-sm">
                         No one connected
                     </span>
                 )}

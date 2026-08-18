@@ -261,7 +261,7 @@ export function CoverageTable({ coverage }: { coverage: HistoricalCoverage }) {
                             <TableRow key={s.id}>
                                 <TableCell className="whitespace-nowrap font-medium">
                                     {s.code}
-                                    <span className="ml-2 text-muted-foreground text-xs">
+                                    <span className="ml-2 text-muted-foreground text-sm">
                                         {s.season} {s.year}
                                     </span>
                                 </TableCell>
@@ -366,7 +366,7 @@ function SummaryCard({
                     </span>
                 )}
             </div>
-            <div className="text-muted-foreground text-xs">{label}</div>
+            <div className="text-muted-foreground text-sm">{label}</div>
         </div>
     )
 }

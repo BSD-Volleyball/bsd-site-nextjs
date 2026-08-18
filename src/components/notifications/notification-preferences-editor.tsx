@@ -115,7 +115,7 @@ export function NotificationPreferencesEditor({
                                             >
                                                 {typeDef.label}
                                             </Label>
-                                            <p className="text-muted-foreground text-xs">
+                                            <p className="text-muted-foreground text-sm">
                                                 {typeDef.description}
                                             </p>
                                         </div>
@@ -147,7 +147,7 @@ export function NotificationPreferencesEditor({
                                     <Label className="font-normal">
                                         {typeDef.label}
                                     </Label>
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-muted-foreground text-sm">
                                         {typeDef.description}
                                     </p>
                                 </div>

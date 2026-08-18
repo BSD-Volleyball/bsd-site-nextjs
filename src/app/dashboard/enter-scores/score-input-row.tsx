@@ -53,7 +53,7 @@ export function ScoreInputRow({
                     placeholder={optional ? "—" : ""}
                 />
             </td>
-            <td className="py-1.5 text-center text-muted-foreground text-xs">
+            <td className="py-1.5 text-center text-muted-foreground text-sm">
                 -
             </td>
             <td className="py-1.5 text-center">

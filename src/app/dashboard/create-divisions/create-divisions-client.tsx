@@ -414,7 +414,7 @@ export function CreateDivisionsClient({
 
                                         {/* Teams radio */}
                                         <fieldset disabled={!state.enabled}>
-                                            <legend className="mb-1.5 font-medium text-muted-foreground text-xs">
+                                            <legend className="mb-1.5 font-medium text-muted-foreground text-sm">
                                                 Teams
                                             </legend>
                                             <div className="flex gap-3">
@@ -447,7 +447,7 @@ export function CreateDivisionsClient({
 
                                         {/* Gender split radio */}
                                         <fieldset disabled={!state.enabled}>
-                                            <legend className="mb-1.5 font-medium text-muted-foreground text-xs">
+                                            <legend className="mb-1.5 font-medium text-muted-foreground text-sm">
                                                 Gender Split (M/NM)
                                             </legend>
                                             <div className="flex flex-col gap-1">
@@ -506,7 +506,7 @@ export function CreateDivisionsClient({
                                         </label>
 
                                         {/* Per-division placement counts */}
-                                        <div className="space-y-1 border-t pt-2 text-xs">
+                                        <div className="space-y-1 border-t pt-2 text-sm">
                                             <p className="font-medium text-muted-foreground">
                                                 Slots
                                             </p>
@@ -532,7 +532,7 @@ export function CreateDivisionsClient({
                                         {(() => {
                                             const r = returningMap.get(div.id)
                                             return (
-                                                <div className="space-y-1 border-t pt-2 text-xs">
+                                                <div className="space-y-1 border-t pt-2 text-sm">
                                                     <p className="font-medium text-muted-foreground">
                                                         Returning
                                                     </p>
@@ -560,7 +560,7 @@ export function CreateDivisionsClient({
                                         {(() => {
                                             const e = evaluatedMap.get(div.id)
                                             return (
-                                                <div className="space-y-1 border-t pt-2 text-xs">
+                                                <div className="space-y-1 border-t pt-2 text-sm">
                                                     <p className="font-medium text-muted-foreground">
                                                         Evaluated (New)
                                                     </p>

@@ -219,7 +219,7 @@ export function LegacyAccountsPanel({
                                                             : "roster"}
                                                     </Badge>
                                                 </div>
-                                                <span className="text-muted-foreground text-xs">
+                                                <span className="text-muted-foreground text-sm">
                                                     {row.email}
                                                 </span>
                                             </TableCell>
@@ -237,7 +237,7 @@ export function LegacyAccountsPanel({
                                                                 : "s"
                                                         }`}
                                                 </div>
-                                                <span className="text-muted-foreground text-xs">
+                                                <span className="text-muted-foreground text-sm">
                                                     {row.seasonCodes.join(
                                                         ", "
                                                     ) || "no seasons"}
@@ -265,7 +265,7 @@ export function LegacyAccountsPanel({
                                                 {row.suggestion &&
                                                     chosenId ===
                                                         row.suggestion.id && (
-                                                        <span className="mt-1 inline-flex text-muted-foreground text-xs">
+                                                        <span className="mt-1 inline-flex text-muted-foreground text-sm">
                                                             Suggested —{" "}
                                                             {REASON_LABEL[
                                                                 row.suggestion
@@ -277,7 +277,7 @@ export function LegacyAccountsPanel({
                                                         </span>
                                                     )}
                                                 {sharesTeam && (
-                                                    <span className="mt-1 flex items-center gap-1 text-amber-600 text-xs dark:text-amber-400">
+                                                    <span className="mt-1 flex items-center gap-1 text-amber-600 text-sm dark:text-amber-400">
                                                         <RiAlertLine className="h-3.5 w-3.5" />
                                                         Played on the same team
                                                         — likely two different

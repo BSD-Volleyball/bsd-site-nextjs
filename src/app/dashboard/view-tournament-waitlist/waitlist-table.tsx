@@ -95,7 +95,7 @@ export function TournamentWaitlistTable({
                         >
                             <div className="min-w-[220px]">
                                 <div className="font-medium">{w.name}</div>
-                                <div className="text-muted-foreground text-xs">
+                                <div className="text-muted-foreground text-sm">
                                     {w.email} —{" "}
                                     {w.male === true
                                         ? "Male"
@@ -103,7 +103,7 @@ export function TournamentWaitlistTable({
                                           ? "Non-Male"
                                           : "—"}
                                 </div>
-                                <div className="mt-0.5 text-xs">
+                                <div className="mt-0.5 text-sm">
                                     <span className="text-muted-foreground">
                                         Prefers:
                                     </span>{" "}

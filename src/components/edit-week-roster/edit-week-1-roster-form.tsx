@@ -134,7 +134,7 @@ function UnassignedWeek1Players({
                             )}
                         >
                             {getPoolPlayerLabel(player)}
-                            <span className="ml-1.5 text-muted-foreground text-xs">
+                            <span className="ml-1.5 text-muted-foreground text-sm">
                                 {player.seasonsPlayed === 0
                                     ? "new"
                                     : `${player.seasonsPlayed}s`}

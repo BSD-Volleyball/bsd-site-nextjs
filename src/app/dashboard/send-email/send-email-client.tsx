@@ -435,7 +435,7 @@ export function SendEmailClient({
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     Only volunteers assigned to a job
                                     {selectedTryout === ALL_TRYOUTS
                                         ? " on any tryout night"
@@ -530,7 +530,7 @@ export function SendEmailClient({
                                 >
                                     CC Directors
                                 </Label>
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     {directorsForced
                                         ? `Always included on your sends: ${site.mailDirectors}`
                                         : sendToType === "just_me"
@@ -558,7 +558,7 @@ export function SendEmailClient({
                                 placeholder="Email subject line…"
                             />
                         </div>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             Every broadcast subject starts with{" "}
                             {EMAIL_SUBJECT_PREFIX.trim()} — you don't need to
                             type it. If you do, it won't be doubled.
@@ -573,7 +573,7 @@ export function SendEmailClient({
                             content={content}
                             onChange={setContent}
                         />
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             An unsubscribe link is automatically appended to all
                             broadcast emails.
                         </p>
@@ -623,7 +623,7 @@ export function SendEmailClient({
                                         __html: preview.html
                                     }}
                                 />
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     An unsubscribe link is automatically
                                     appended below the body.
                                 </p>
@@ -671,7 +671,7 @@ export function SendEmailClient({
                                             <p className="truncate font-medium text-sm">
                                                 {item.subject}
                                             </p>
-                                            <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+                                            <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
                                                 <span>
                                                     →{" "}
                                                     {sendToLabel(

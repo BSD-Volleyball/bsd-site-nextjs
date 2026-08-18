@@ -260,7 +260,7 @@ export function AddTeamPicturesClient({
                                             className="h-16 w-16 shrink-0 rounded-md border object-cover"
                                         />
                                     ) : (
-                                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground text-xs">
+                                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-dashed text-muted-foreground text-sm">
                                             No photo
                                         </div>
                                     )}
@@ -272,7 +272,7 @@ export function AddTeamPicturesClient({
                                                 : ""}
                                             {team.teamName}
                                         </p>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             {hasPhoto
                                                 ? "Photo uploaded"
                                                 : "No photo yet"}

@@ -1023,7 +1023,7 @@ export function AppSidebar({
                                 <SidebarGroupContent>
                                     {hiddenGroups.map((group) => (
                                         <div key={group.label}>
-                                            <p className="px-2 pt-2 pb-1 text-muted-foreground/50 text-xs">
+                                            <p className="px-2 pt-2 pb-1 text-muted-foreground/50 text-sm">
                                                 {group.label}
                                             </p>
                                             <SidebarMenu>

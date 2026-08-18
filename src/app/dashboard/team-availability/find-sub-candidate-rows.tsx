@@ -55,21 +55,21 @@ export function RegularCandidateRow({
                         </Badge>
                     )}
                 </div>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                     {c.teamName}
                     {c.teamNumber != null ? ` (#${c.teamNumber})` : ""} &mdash;{" "}
                     {c.divisionName}
                 </p>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                     Round {c.round}, Pick {c.overall}
                 </p>
                 {c.matchTime && (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                         Their match: {formatMatchTime(c.matchTime)}
                     </p>
                 )}
                 {c.notes.length > 0 && (
-                    <p className="mt-0.5 text-muted-foreground/70 text-xs">
+                    <p className="mt-0.5 text-muted-foreground/70 text-sm">
                         {c.notes.map((note, i) => (
                             <span key={note}>
                                 {i > 0 && " · "}
@@ -164,17 +164,17 @@ export function PermanentCandidateRow({
                     </button>
                 </div>
                 {c.lastDivisionName ? (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                         Last played: {c.lastDivisionName}
                         {c.lastSeasonLabel ? ` (${c.lastSeasonLabel})` : ""}
                     </p>
                 ) : (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                         No prior season history
                     </p>
                 )}
                 {c.lastRound != null && (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                         Previously drafted: Round {c.lastRound}
                     </p>
                 )}

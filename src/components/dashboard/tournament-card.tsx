@@ -37,7 +37,7 @@ function TournamentMeta({ data }: { data: TournamentDashboardCardData }) {
             ? "Coed Tournament"
             : "Reverse Coed Tournament"
     return (
-        <div className="space-y-0.5 pt-0.5 text-xs">
+        <div className="space-y-0.5 pt-0.5 text-sm">
             <p className="text-muted-foreground">
                 <span className="font-medium">{typeLabel}</span> ·{" "}
                 {fmtDate(data.tournamentDate)}
@@ -111,7 +111,7 @@ export function TournamentDashboardCard({ data }: Props) {
                                     {data.team.nextMatch.opponentName}
                                 </strong>
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 Court {data.team.nextMatch.court ?? "TBD"} ·{" "}
                                 {fmtTime(data.team.nextMatch.startTime)} ·{" "}
                                 {data.team.nextMatch.bracket === "pool"
@@ -130,7 +130,7 @@ export function TournamentDashboardCard({ data }: Props) {
                                 {data.team.nextWork.homeName} vs{" "}
                                 {data.team.nextWork.awayName}
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 Court {data.team.nextWork.court ?? "TBD"} ·{" "}
                                 {fmtTime(data.team.nextWork.startTime)} — enter
                                 scores via Enter Tournament Scores.
@@ -183,7 +183,7 @@ export function TournamentDashboardCard({ data }: Props) {
                         place you on a team.
                     </p>
                     {data.registrationOpen && !data.allDivisionsFull && (
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             Want to captain a team yourself instead? Sign up
                             below.
                         </p>
@@ -200,7 +200,7 @@ export function TournamentDashboardCard({ data }: Props) {
                             tournamentName={data.tournamentName}
                         />
                     </div>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-sm">
                         Changed your mind? You can withdraw any time before a
                         captain adds you to a team.
                     </p>
@@ -244,7 +244,7 @@ export function TournamentDashboardCard({ data }: Props) {
                                 Registration is open. Pick the path that fits
                                 you:
                             </p>
-                            <ul className="ml-4 list-disc space-y-1 text-muted-foreground text-xs">
+                            <ul className="ml-4 list-disc space-y-1 text-muted-foreground text-sm">
                                 <li>
                                     <strong>Sign up a team</strong> if you're a
                                     captain ready to register and pay the team

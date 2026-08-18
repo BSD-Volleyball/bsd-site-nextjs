@@ -50,7 +50,7 @@ function getGenderClass(male: boolean | null) {
 
 function PlayerMeta({ player }: { player: ComboboxPlayer }) {
     return (
-        <span className="shrink-0 text-muted-foreground text-xs">
+        <span className="shrink-0 text-muted-foreground text-sm">
             {player.seasonsPlayedCount === 0 ? (
                 <span className="font-semibold text-green-600 dark:text-green-400">
                     NEW

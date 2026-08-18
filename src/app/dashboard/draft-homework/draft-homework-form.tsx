@@ -232,7 +232,7 @@ export function DraftHomeworkForm({
                                                         {team.captainLastName}
                                                     </span>
                                                     {team.teamName && (
-                                                        <span className="block truncate font-normal text-muted-foreground text-xs">
+                                                        <span className="block truncate font-normal text-muted-foreground text-sm">
                                                             {team.teamName}
                                                         </span>
                                                     )}

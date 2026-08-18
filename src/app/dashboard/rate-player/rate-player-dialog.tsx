@@ -78,7 +78,7 @@ export function RatePlayerDialog({
                                     className="h-40 w-28 rounded-md object-cover"
                                 />
                             ) : (
-                                <div className="flex h-40 w-28 items-center justify-center rounded-md border bg-muted text-muted-foreground text-xs">
+                                <div className="flex h-40 w-28 items-center justify-center rounded-md border bg-muted text-muted-foreground text-sm">
                                     No picture
                                 </div>
                             )}

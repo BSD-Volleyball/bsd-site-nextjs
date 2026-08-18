@@ -253,7 +253,7 @@ export function AssignTryoutJobsClient({
                                         <h3 className="font-semibold text-sm">
                                             {job.name}
                                         </h3>
-                                        <span className="text-muted-foreground text-xs">
+                                        <span className="text-muted-foreground text-sm">
                                             {TRYOUT_JOB_SCOPE_LABELS[job.scope]}{" "}
                                             · {job.needed} needed
                                             {job.scope === "per_session"
@@ -262,7 +262,7 @@ export function AssignTryoutJobsClient({
                                         </span>
                                     </div>
                                     {job.notes && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             {job.notes}
                                         </p>
                                     )}
@@ -292,7 +292,7 @@ export function AssignTryoutJobsClient({
                                 className="rounded-full bg-muted px-3 py-1"
                             >
                                 {person.name}
-                                <span className="ml-1 text-muted-foreground text-xs">
+                                <span className="ml-1 text-muted-foreground text-sm">
                                     {person.roles.map(roleLabel).join(", ")}
                                 </span>
                             </span>

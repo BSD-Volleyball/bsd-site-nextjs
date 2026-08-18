@@ -667,7 +667,7 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                         </span>
                                     ))}
                                 </div>
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     Only captains and their paired partners are
                                     locked for Week {config.week}.
                                 </p>
@@ -1013,7 +1013,7 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                 <h3 className="font-semibold text-sm">
                                                     Team {team.number}
                                                 </h3>
-                                                <span className="text-muted-foreground text-xs">
+                                                <span className="text-muted-foreground text-sm">
                                                     {team.players.length} |{" "}
                                                     {team.maleCount} M /{" "}
                                                     {team.nonMaleCount} NM

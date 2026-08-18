@@ -27,7 +27,7 @@ export function DeletedSignupsCard({
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left text-muted-foreground text-xs">
+                            <tr className="border-b bg-muted/50 text-left text-muted-foreground text-sm">
                                 <th className="px-4 py-2 font-medium">
                                     Player
                                 </th>

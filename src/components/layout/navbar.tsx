@@ -166,7 +166,7 @@ export const Navbar = ({ seasonLabel }: NavbarProps) => {
                                                                 <p className="mb-1 font-semibold text-foreground leading-none group-hover:text-primary">
                                                                     {title}
                                                                 </p>
-                                                                <p className="line-clamp-2 text-muted-foreground text-xs">
+                                                                <p className="line-clamp-2 text-muted-foreground text-sm">
                                                                     {
                                                                         description
                                                                     }

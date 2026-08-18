@@ -120,7 +120,7 @@ export function HomeworkTabContent({
                     <p className="mb-1 font-semibold text-sm">
                         Players To Consider
                     </p>
-                    <p className="mb-3 text-muted-foreground text-xs">
+                    <p className="mb-3 text-muted-foreground text-sm">
                         You are free to select any registered player above. As
                         an aid here are players that based on historical data
                         and captain&apos;s ratings may end up in this division.

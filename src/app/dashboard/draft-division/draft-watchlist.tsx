@@ -67,7 +67,7 @@ function PlayerCard({
                         className="h-18 w-12 rounded object-cover"
                     />
                 ) : (
-                    <div className="flex h-18 w-12 items-center justify-center rounded bg-muted text-muted-foreground text-xs">
+                    <div className="flex h-18 w-12 items-center justify-center rounded bg-muted text-muted-foreground text-sm">
                         No photo
                     </div>
                 )}

@@ -69,7 +69,7 @@ export default async function TournamentWaitlistPage() {
                             can put you on their roster. Otherwise we'll contact
                             you if we can place you on a team.
                         </p>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             Your waiver is on file, so you're cleared to play as
                             soon as a captain adds you.
                         </p>

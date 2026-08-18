@@ -67,7 +67,7 @@ export default async function TournamentPlayoffsPage({
                 <section className="space-y-5">
                     <div className="flex items-center gap-2">
                         <SectionHeading>Brackets</SectionHeading>
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-muted-foreground text-sm">
                             {eliminationFormat === "double"
                                 ? "Double elimination"
                                 : "Single elimination"}

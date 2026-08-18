@@ -130,7 +130,7 @@ export function PhaseControl<P extends string>({
                                         {cfg.label}
                                     </span>
                                     {isCurrent && (
-                                        <span className="ml-auto text-muted-foreground text-xs">
+                                        <span className="ml-auto text-muted-foreground text-sm">
                                             Current
                                         </span>
                                     )}
@@ -174,7 +174,7 @@ export function PhaseControl<P extends string>({
                             <p className="font-medium text-muted-foreground text-sm">
                                 Revert Phase
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 Only use this if you need to go back to a
                                 previous phase.
                             </p>

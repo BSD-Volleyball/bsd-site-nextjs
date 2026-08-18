@@ -1020,7 +1020,7 @@ export default async function DashboardPage() {
                                     </span>
                                 </div>
                             </div>
-                            <p className="text-blue-600 text-xs dark:text-blue-400">
+                            <p className="text-blue-600 text-sm dark:text-blue-400">
                                 {nextMatch.isUnavailable
                                     ? "You've marked this date as unavailable. If you can now make it, "
                                     : "Can't make this match? "}
@@ -1235,7 +1235,7 @@ export default async function DashboardPage() {
                                     </div>
                                 )}
                             </div>
-                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                            <p className="text-orange-600 text-sm dark:text-orange-400">
                                 Please plan to arrive 10 minutes early.
                             </p>
                             <Link
@@ -1577,13 +1577,13 @@ export default async function DashboardPage() {
                                         </span>
                                     </div>
                                     {job.notes && (
-                                        <p className="text-purple-600 text-xs dark:text-purple-400">
+                                        <p className="text-purple-600 text-sm dark:text-purple-400">
                                             {job.notes}
                                         </p>
                                     )}
                                 </div>
                             ))}
-                            <p className="text-purple-600 text-xs dark:text-purple-400">
+                            <p className="text-purple-600 text-sm dark:text-purple-400">
                                 Please plan to arrive 10 minutes early.
                             </p>
                         </CardContent>
@@ -1667,7 +1667,7 @@ export default async function DashboardPage() {
                                     </div>
                                 )}
                             </div>
-                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                            <p className="text-orange-600 text-sm dark:text-orange-400">
                                 Please plan to arrive 10 minutes early.
                             </p>
                             <Link
@@ -1760,7 +1760,7 @@ export default async function DashboardPage() {
                                     </span>
                                 </div>
                             </div>
-                            <p className="text-orange-600 text-xs dark:text-orange-400">
+                            <p className="text-orange-600 text-sm dark:text-orange-400">
                                 Please plan to arrive 10 minutes early.
                             </p>
                             <Link

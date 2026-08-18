@@ -47,7 +47,7 @@ export function SkillSlider({
                     <div key={n} className="h-1.5 w-px bg-border" />
                 ))}
             </div>
-            <div className="grid grid-cols-6 text-center text-muted-foreground text-xs">
+            <div className="grid grid-cols-6 text-center text-muted-foreground text-sm">
                 <span>BB</span>
                 <span>BBB</span>
                 <span>ABB</span>

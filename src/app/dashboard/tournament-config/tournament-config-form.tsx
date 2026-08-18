@@ -508,7 +508,7 @@ export function TournamentConfigForm({
 
                     <div className="space-y-2">
                         <Label htmlFor="t-addl">Additional Information</Label>
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             Shown on the public tournament info page. Blank
                             lines start a new paragraph.
                         </p>
@@ -591,7 +591,7 @@ export function TournamentConfigForm({
                                     </select>
                                     {d.divisionId > 0 &&
                                         !divisionsById.has(d.divisionId) && (
-                                            <p className="text-amber-600 text-xs">
+                                            <p className="text-amber-600 text-sm">
                                                 Stored division is no longer
                                                 active — pick a new one.
                                             </p>

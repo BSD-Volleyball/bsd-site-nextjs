@@ -493,7 +493,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                         className="h-44 w-32 rounded-md border object-cover"
                                     />
                                 ) : (
-                                    <div className="flex h-44 w-32 items-center justify-center rounded-md border text-muted-foreground text-xs">
+                                    <div className="flex h-44 w-32 items-center justify-center rounded-md border text-muted-foreground text-sm">
                                         No picture
                                     </div>
                                 )}

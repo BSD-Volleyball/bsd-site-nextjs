@@ -63,7 +63,7 @@ export function PlayerRatingsSection({
             </h3>
 
             {ratingAverages.seasonLabels.length > 0 && (
-                <p className="mb-3 text-muted-foreground text-xs">
+                <p className="mb-3 text-muted-foreground text-sm">
                     Seasons: {ratingAverages.seasonLabels.join(", ")}
                 </p>
             )}
@@ -170,7 +170,7 @@ export function PlayerRatingsSection({
                                 key={`${note.evaluatorId}-${note.updatedAt}-${index}`}
                             >
                                 <p className="text-sm">{note.note}</p>
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     {note.seasonLabel} • {note.evaluatorName}
                                 </p>
                             </div>

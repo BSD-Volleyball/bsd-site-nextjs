@@ -720,7 +720,7 @@ export function SelectCaptainsForm({
                                             <div className="space-y-2">
                                                 <Label>
                                                     Coach 2{" "}
-                                                    <span className="text-muted-foreground text-xs">
+                                                    <span className="text-muted-foreground text-sm">
                                                         (optional)
                                                     </span>
                                                 </Label>
@@ -756,7 +756,7 @@ export function SelectCaptainsForm({
                                                     htmlFor={`captain-${index}`}
                                                 >
                                                     Captain {index + 1}{" "}
-                                                    <span className="text-muted-foreground text-xs">
+                                                    <span className="text-muted-foreground text-sm">
                                                         (optional)
                                                     </span>
                                                 </Label>
@@ -807,7 +807,7 @@ export function SelectCaptainsForm({
                                         <div className="space-y-2">
                                             <Label>
                                                 Co-Captain{" "}
-                                                <span className="text-muted-foreground text-xs">
+                                                <span className="text-muted-foreground text-sm">
                                                     (optional — assists with
                                                     rating &amp; drafting)
                                                 </span>

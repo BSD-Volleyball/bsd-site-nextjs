@@ -49,7 +49,7 @@ export function SuggestedPlayerList({
                             onOpen={onOpenPlayer}
                         />
                         <div className="flex items-center gap-0.5">
-                            <span className="max-w-16 text-muted-foreground text-xs leading-tight">
+                            <span className="max-w-16 text-muted-foreground text-sm leading-tight">
                                 {displayName}
                             </span>
                             <button

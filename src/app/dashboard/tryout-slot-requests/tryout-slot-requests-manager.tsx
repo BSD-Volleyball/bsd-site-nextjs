@@ -427,7 +427,7 @@ export function TryoutSlotRequestsManager({
                                                             ).join(", ")}
                                                         </p>
                                                         {request.comment && (
-                                                            <p className="text-muted-foreground text-xs italic">
+                                                            <p className="text-muted-foreground text-sm italic">
                                                                 {
                                                                     request.comment
                                                                 }

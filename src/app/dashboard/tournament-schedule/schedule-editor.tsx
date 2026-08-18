@@ -97,7 +97,7 @@ export function ScheduleEditor({ view }: Props) {
                                         {row.homeTeamName ?? "TBD"} vs{" "}
                                         {row.awayTeamName ?? "TBD"}
                                     </div>
-                                    <div className="text-muted-foreground text-xs">
+                                    <div className="text-muted-foreground text-sm">
                                         Match #{row.matchId}
                                     </div>
                                 </div>

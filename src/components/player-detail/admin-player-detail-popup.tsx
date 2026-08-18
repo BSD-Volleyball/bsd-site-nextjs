@@ -272,14 +272,14 @@ export function AdminPlayerDetailPopup({
                                         {isEmailStatusBlocking(
                                             playerDetails.email_status
                                         ) && (
-                                            <span className="ml-2 text-muted-foreground text-xs">
+                                            <span className="ml-2 text-muted-foreground text-sm">
                                                 We are not delivering any email
                                                 to this address.
                                             </span>
                                         )}
                                         {emailSuppressions.length > 0 && (
                                             <div className="mt-2 space-y-2 rounded-md border p-3">
-                                                <p className="font-medium text-xs">
+                                                <p className="font-medium text-sm">
                                                     Suppressed on{" "}
                                                     {emailSuppressions.length}{" "}
                                                     {emailSuppressions.length ===
@@ -291,7 +291,7 @@ export function AdminPlayerDetailPopup({
                                                     (suppression) => (
                                                         <div
                                                             key={`${suppression.streamId}-${suppression.reason}`}
-                                                            className="space-y-0.5 text-xs"
+                                                            className="space-y-0.5 text-sm"
                                                         >
                                                             <div className="flex flex-wrap items-center gap-x-2">
                                                                 <span className="font-medium">
@@ -340,7 +340,7 @@ export function AdminPlayerDetailPopup({
                                         </span>
                                         <div className="mt-2 space-y-1 rounded-md border p-3">
                                             {emailHistory.length === 0 && (
-                                                <p className="text-muted-foreground text-xs">
+                                                <p className="text-muted-foreground text-sm">
                                                     Nothing sent to this player
                                                     in the last{" "}
                                                     {RETENTION_LABEL}.
@@ -349,7 +349,7 @@ export function AdminPlayerDetailPopup({
                                             {emailHistory.map((entry) => (
                                                 <div
                                                     key={entry.id}
-                                                    className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs"
+                                                    className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm"
                                                 >
                                                     <span className="min-w-0 flex-1 truncate">
                                                         {entry.subject}
@@ -370,7 +370,7 @@ export function AdminPlayerDetailPopup({
                                                 </div>
                                             ))}
                                         </div>
-                                        <p className="mt-1 text-muted-foreground text-xs">
+                                        <p className="mt-1 text-muted-foreground text-sm">
                                             {emailHistory.length > 0 && (
                                                 <>
                                                     Last {emailHistory.length}{" "}
@@ -624,7 +624,7 @@ export function AdminPlayerDetailPopup({
                                             ) : r.season_id !== null ? (
                                                 <Badge
                                                     variant="outline"
-                                                    className="text-muted-foreground text-xs"
+                                                    className="text-muted-foreground text-sm"
                                                 >
                                                     league-wide
                                                 </Badge>
@@ -796,17 +796,17 @@ export function AdminPlayerDetailPopup({
                                             {verb} {s.counterpartName}
                                         </span>
                                     </div>
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-muted-foreground text-sm">
                                         {s.teamName} — {s.seasonLabel}
                                         {s.matchDate ? ` (${s.matchDate})` : ""}
                                     </p>
                                     {s.reason && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             Reason: {s.reason}
                                         </p>
                                     )}
                                     {s.notes && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             {s.notes}
                                         </p>
                                     )}

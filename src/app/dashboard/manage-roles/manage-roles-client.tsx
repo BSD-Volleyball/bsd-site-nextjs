@@ -228,7 +228,7 @@ export function ManageRolesClient({
                                             ) : a.season_id !== null ? (
                                                 <Badge
                                                     variant="outline"
-                                                    className="text-muted-foreground text-xs"
+                                                    className="text-muted-foreground text-sm"
                                                 >
                                                     league-wide
                                                 </Badge>
@@ -254,7 +254,7 @@ export function ManageRolesClient({
                         <Label className="text-base">Add Role</Label>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="space-y-1">
-                                <Label className="text-muted-foreground text-xs">
+                                <Label className="text-muted-foreground text-sm">
                                     Role
                                 </Label>
                                 <Select
@@ -284,7 +284,7 @@ export function ManageRolesClient({
 
                             {selectedRoleDef?.seasonal && (
                                 <div className="space-y-1">
-                                    <Label className="text-muted-foreground text-xs">
+                                    <Label className="text-muted-foreground text-sm">
                                         Season
                                     </Label>
                                     <Select
@@ -310,7 +310,7 @@ export function ManageRolesClient({
 
                             {selectedRoleDef?.seasonal && (
                                 <div className="space-y-1">
-                                    <Label className="text-muted-foreground text-xs">
+                                    <Label className="text-muted-foreground text-sm">
                                         Division scope
                                     </Label>
                                     <Select
@@ -340,7 +340,7 @@ export function ManageRolesClient({
                             {selectedRoleDef?.seasonal &&
                                 divisionMode === "specific" && (
                                     <div className="space-y-1">
-                                        <Label className="text-muted-foreground text-xs">
+                                        <Label className="text-muted-foreground text-sm">
                                             Division
                                         </Label>
                                         <Select

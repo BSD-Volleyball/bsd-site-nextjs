@@ -48,7 +48,7 @@ function PairDifferentialRow({
                     {pair.player2DisplayName} {pair.player2LastName}
                 </button>
                 {p2Unrated && (
-                    <span className="ml-1.5 text-muted-foreground text-xs">
+                    <span className="ml-1.5 text-muted-foreground text-sm">
                         (unrated)
                     </span>
                 )}

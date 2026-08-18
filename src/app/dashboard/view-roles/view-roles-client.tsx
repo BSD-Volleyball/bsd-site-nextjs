@@ -124,13 +124,13 @@ export function ViewRolesClient({ playerPicUrl }: ViewRolesClientProps) {
                                 ) : h.season_id !== null ? (
                                     <Badge
                                         variant="outline"
-                                        className="text-muted-foreground text-xs"
+                                        className="text-muted-foreground text-sm"
                                     >
                                         league-wide
                                     </Badge>
                                 ) : null}
                             </div>
-                            <span className="text-muted-foreground text-xs">
+                            <span className="text-muted-foreground text-sm">
                                 granted{" "}
                                 {new Date(h.granted_at).toLocaleDateString(
                                     "en-US"

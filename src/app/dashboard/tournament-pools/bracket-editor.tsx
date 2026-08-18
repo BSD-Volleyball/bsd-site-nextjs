@@ -260,7 +260,7 @@ export function TournamentBracketEditor({ view }: Props) {
                                                     clearSlot(g.matchId, "home")
                                                 }
                                             />
-                                            <p className="text-center text-muted-foreground text-xs">
+                                            <p className="text-center text-muted-foreground text-sm">
                                                 vs
                                             </p>
                                             <SlotPicker
@@ -464,7 +464,7 @@ function TeamGroup({
                         </span>
                     </span>
                     {placedIds.has(t.teamId) && value !== t.teamId && (
-                        <span className="ml-2 shrink-0 text-muted-foreground text-xs">
+                        <span className="ml-2 shrink-0 text-muted-foreground text-sm">
                             placed — will move
                         </span>
                     )}

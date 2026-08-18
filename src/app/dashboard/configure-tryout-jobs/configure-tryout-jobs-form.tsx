@@ -348,7 +348,7 @@ export function ConfigureTryoutJobsForm({
                                     </div>
 
                                     {job.assignmentCount > 0 && (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             {job.assignmentCount} volunteer
                                             {job.assignmentCount === 1
                                                 ? ""

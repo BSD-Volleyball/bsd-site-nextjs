@@ -53,7 +53,7 @@ function PlayerCard({
                 {displayName}
             </span>
             {player.oldId > 0 && (
-                <span className="text-muted-foreground text-xs leading-tight">
+                <span className="text-muted-foreground text-sm leading-tight">
                     #{player.oldId}
                 </span>
             )}

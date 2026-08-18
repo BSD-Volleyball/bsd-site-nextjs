@@ -135,7 +135,7 @@ export function PermanentSubCard({
                                 <p className="mb-2 font-medium text-sm">
                                     Other (full waitlist)
                                 </p>
-                                <p className="mb-2 text-muted-foreground text-xs">
+                                <p className="mb-2 text-muted-foreground text-sm">
                                     Pick any waitlisted player, regardless of
                                     gender or division. Visible to admins and
                                     division commissioners only.

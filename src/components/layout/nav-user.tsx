@@ -125,7 +125,7 @@ export function NavUser() {
                                     {displayName}
                                 </span>
                                 {user.email && (
-                                    <span className="truncate text-muted-foreground text-xs">
+                                    <span className="truncate text-muted-foreground text-sm">
                                         {user.email}
                                     </span>
                                 )}

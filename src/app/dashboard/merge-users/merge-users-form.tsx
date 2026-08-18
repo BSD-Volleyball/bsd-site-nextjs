@@ -66,7 +66,7 @@ interface FieldRow {
 /** The account facts that are the same on both steps. */
 function AccountFacts({ snap }: { snap: MergeAccountSnapshot }) {
     return (
-        <dl className="mt-2 space-y-0.5 text-muted-foreground text-xs">
+        <dl className="mt-2 space-y-0.5 text-muted-foreground text-sm">
             <div>{String(snap.fields.email ?? "—")}</div>
             <div>Created {formatDate(snap.activity.createdAt)}</div>
             <div>Updated {formatDate(snap.activity.updatedAt)}</div>
@@ -532,14 +532,14 @@ export function MergeUsersForm({
                             <button
                                 type="button"
                                 onClick={() => setShowIdentical(!showIdentical)}
-                                className="text-muted-foreground text-xs underline"
+                                className="text-muted-foreground text-sm underline"
                             >
                                 {identicalCount} field
                                 {identicalCount === 1 ? "" : "s"} identical on
                                 both accounts
                             </button>
                             {showIdentical && (
-                                <p className="mt-1 text-muted-foreground text-xs">
+                                <p className="mt-1 text-muted-foreground text-sm">
                                     These need no decision &mdash; both accounts
                                     hold the same value (or neither holds one).
                                 </p>

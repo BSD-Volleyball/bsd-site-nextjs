@@ -66,7 +66,7 @@ export function PickTryoutVolunteersClient({
                     <p className="truncate font-medium text-sm">
                         {candidate.name}
                     </p>
-                    <p className="truncate text-muted-foreground text-xs">
+                    <p className="truncate text-muted-foreground text-sm">
                         {candidate.email}
                     </p>
                 </div>

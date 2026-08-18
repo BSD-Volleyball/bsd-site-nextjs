@@ -57,7 +57,7 @@ export function RegistrationConfirmation({
                         <span className="text-muted-foreground">
                             Dates Unavailable:
                         </span>
-                        <span className="font-medium text-xs">
+                        <span className="font-medium text-sm">
                             {signupStatus.unavailableDates}
                         </span>
                     </div>

@@ -115,7 +115,7 @@ export function MatchBlock({
             )}
         >
             {(meta.length > 0 || match.workTeamName) && (
-                <div className="mb-1.5 flex items-center justify-between gap-2 text-muted-foreground text-xs">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-muted-foreground text-sm">
                     <span className="font-medium">
                         {meta.join(" · ") || "Time TBD"}
                     </span>
@@ -163,7 +163,7 @@ function DivisionRoundRobin({
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-baseline justify-between text-base">
                             <span>{pool.name}</span>
-                            <span className="font-normal text-muted-foreground text-xs">
+                            <span className="font-normal text-muted-foreground text-sm">
                                 {pool.matches.length} match
                                 {pool.matches.length === 1 ? "" : "es"}
                             </span>
@@ -272,7 +272,7 @@ export function ScheduleView({ view }: { view: TournamentScheduleView }) {
                             aria-hidden="true"
                         />
                         <SectionHeading>Playoffs</SectionHeading>
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-muted-foreground text-sm">
                             {view.eliminationFormat === "double"
                                 ? "Double elimination"
                                 : "Single elimination"}

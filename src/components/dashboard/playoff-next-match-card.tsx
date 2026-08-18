@@ -26,7 +26,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                             Your Next Match
                         </CardTitle>
                     </div>
-                    <p className="mt-1 text-blue-700 text-xs dark:text-blue-300">
+                    <p className="mt-1 text-blue-700 text-sm dark:text-blue-300">
                         Playoffs
                         {data.divisionName ? ` · ${data.divisionName}` : ""}
                     </p>
@@ -60,7 +60,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                         Your Next Match
                     </CardTitle>
                 </div>
-                <p className="mt-1 text-blue-700 text-xs dark:text-blue-300">
+                <p className="mt-1 text-blue-700 text-sm dark:text-blue-300">
                     Playoffs Week {data.week}
                     {data.date ? ` · ${formatShortDate(data.date)}` : ""} ·{" "}
                     {data.divisionName}
@@ -74,7 +74,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                             className="rounded-md bg-blue-100 p-3 text-sm dark:bg-blue-900"
                         >
                             {item.condition && (
-                                <p className="mb-1 text-blue-700 text-xs italic dark:text-blue-300">
+                                <p className="mb-1 text-blue-700 text-sm italic dark:text-blue-300">
                                     {item.condition}
                                 </p>
                             )}
@@ -97,7 +97,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                                 <span className="font-semibold text-blue-800 dark:text-blue-200">
                                     Match #{item.matchNum}
                                 </span>
-                                <span className="ml-auto text-blue-700 text-xs dark:text-blue-300">
+                                <span className="ml-auto text-blue-700 text-sm dark:text-blue-300">
                                     {item.time ?? "TBD"}
                                     {item.court !== null
                                         ? ` · Ct ${item.court}`
@@ -136,7 +136,7 @@ export function PlayoffNextMatchCard({ data }: { data: PlayoffNextMatchData }) {
                         </li>
                     ))}
                 </ul>
-                <p className="text-blue-600 text-xs dark:text-blue-400">
+                <p className="text-blue-600 text-sm dark:text-blue-400">
                     Can't make a playoff night?{" "}
                     <Link
                         href="/dashboard/my-availability"

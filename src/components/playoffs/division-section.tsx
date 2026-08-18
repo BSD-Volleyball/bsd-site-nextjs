@@ -90,7 +90,7 @@ function MatchCard({
                 cardHighlight
             )}
         >
-            <div className="flex items-center justify-between gap-2 text-muted-foreground text-xs">
+            <div className="flex items-center justify-between gap-2 text-muted-foreground text-sm">
                 <span>
                     Match {match.matchNum !== null ? `#${match.matchNum}` : "—"}{" "}
                     • Week {match.week}
@@ -168,7 +168,7 @@ function MatchCard({
                 )}
             </div>
 
-            <p className="mt-2 text-muted-foreground text-xs">
+            <p className="mt-2 text-muted-foreground text-sm">
                 Sets: {match.scoresDisplay}
             </p>
         </div>

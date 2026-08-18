@@ -50,7 +50,7 @@ export function FriendsCard({ data }: { data: FriendsCardData }) {
                                     className="h-10 w-8 shrink-0 rounded object-cover"
                                 />
                             ) : (
-                                <div className="flex h-10 w-8 shrink-0 items-center justify-center rounded bg-muted font-medium text-muted-foreground text-xs">
+                                <div className="flex h-10 w-8 shrink-0 items-center justify-center rounded bg-muted font-medium text-muted-foreground text-sm">
                                     {friend.name.charAt(0)}
                                 </div>
                             )}
@@ -58,7 +58,7 @@ export function FriendsCard({ data }: { data: FriendsCardData }) {
                                 <div className="truncate font-medium text-sm">
                                     {friend.name}
                                 </div>
-                                <div className="text-muted-foreground text-xs">
+                                <div className="text-muted-foreground text-sm">
                                     {friendScheduleLine(friend)}
                                 </div>
                             </div>

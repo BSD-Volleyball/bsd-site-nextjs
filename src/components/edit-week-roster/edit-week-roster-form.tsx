@@ -310,13 +310,13 @@ export function EditWeekRosterForm({
                                                     duplicateUserIds.has(
                                                         slot.userId
                                                     ) && (
-                                                        <p className="text-amber-600 text-xs dark:text-amber-400">
+                                                        <p className="text-amber-600 text-sm dark:text-amber-400">
                                                             Playing twice
                                                         </p>
                                                     )}
                                                 {captainMode === "editable" &&
                                                     slot.userId && (
-                                                        <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                                        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
                                                             <Checkbox
                                                                 checked={
                                                                     slot.isCaptain

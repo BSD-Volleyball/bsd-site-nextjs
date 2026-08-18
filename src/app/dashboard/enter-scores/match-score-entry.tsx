@@ -106,7 +106,7 @@ export function MatchScoreEntry({
                                     {homeButtonLabel}
                                 </button>
                             </th>
-                            <th className="w-4 pb-2 text-center font-normal text-muted-foreground text-xs">
+                            <th className="w-4 pb-2 text-center font-normal text-muted-foreground text-sm">
                                 vs
                             </th>
                             <th className="w-24 pb-2 text-center">
@@ -204,7 +204,7 @@ export function MatchScoreEntry({
                     {warnings.map((msg) => (
                         <p
                             key={msg}
-                            className="text-amber-700 text-xs dark:text-amber-400"
+                            className="text-amber-700 text-sm dark:text-amber-400"
                         >
                             ⚠ {msg}
                         </p>

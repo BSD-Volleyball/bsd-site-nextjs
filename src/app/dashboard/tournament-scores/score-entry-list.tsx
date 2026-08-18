@@ -196,7 +196,7 @@ export function ScoreEntryList({
                                                 <CardHeader className="pb-3">
                                                     <CardTitle className="flex items-baseline justify-between text-base">
                                                         <span>{pool.name}</span>
-                                                        <span className="font-normal text-muted-foreground text-xs">
+                                                        <span className="font-normal text-muted-foreground text-sm">
                                                             {countScored(
                                                                 pool.matches
                                                             )}
@@ -316,7 +316,7 @@ function SectionShell({
                         {title}
                     </span>
                     {meta && (
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-muted-foreground text-sm">
                             {meta}
                         </span>
                     )}
@@ -324,7 +324,7 @@ function SectionShell({
                 <div className="flex items-center gap-3">
                     <span
                         className={cn(
-                            "text-xs",
+                            "text-sm",
                             complete
                                 ? "text-muted-foreground"
                                 : "font-medium text-foreground"
@@ -397,7 +397,7 @@ function MatchScoreCard({
                 decided && "border-l-2 border-l-primary"
             )}
         >
-            <div className="mb-2 flex items-center justify-between gap-2 text-muted-foreground text-xs">
+            <div className="mb-2 flex items-center justify-between gap-2 text-muted-foreground text-sm">
                 <span className="font-medium">
                     {meta.join(" · ") || "Time TBD"}
                 </span>

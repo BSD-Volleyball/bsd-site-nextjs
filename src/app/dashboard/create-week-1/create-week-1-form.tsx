@@ -369,12 +369,12 @@ export function CreateWeek1Form({
                                             >
                                                 {displayName(player)}
                                                 {player.oldId !== null && (
-                                                    <span className="ml-2 text-muted-foreground text-xs">
+                                                    <span className="ml-2 text-muted-foreground text-sm">
                                                         [{player.oldId}]
                                                     </span>
                                                 )}
                                             </button>
-                                            <p className="truncate text-muted-foreground text-xs">
+                                            <p className="truncate text-muted-foreground text-sm">
                                                 {cleanGroupLabel(
                                                     player.groupLabel
                                                 )}{" "}
@@ -496,7 +496,7 @@ export function CreateWeek1Form({
                                             <h3 className="font-semibold text-sm">
                                                 {key}
                                             </h3>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {players.length} total |{" "}
                                                 {maleCount} male |{" "}
                                                 {nonMaleCount} non-male
@@ -613,13 +613,13 @@ export function CreateWeek1Form({
                                     <h3 className="font-semibold text-sm">
                                         Court {courtAlternates.courtNumber}
                                     </h3>
-                                    <span className="text-muted-foreground text-xs">
+                                    <span className="text-muted-foreground text-sm">
                                         {courtAlternates.players.length}/2
                                         selected
                                     </span>
                                 </div>
                                 {courtAlternates.players.length === 0 ? (
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-muted-foreground text-sm">
                                         No eligible alternates found in score
                                         range.
                                     </p>
@@ -655,7 +655,7 @@ export function CreateWeek1Form({
                             </div>
                         ))}
                         {!hasFullAlternates && (
-                            <p className="text-amber-700 text-xs dark:text-amber-300">
+                            <p className="text-amber-700 text-sm dark:text-amber-300">
                                 Need 2 alternates per court to save.
                             </p>
                         )}

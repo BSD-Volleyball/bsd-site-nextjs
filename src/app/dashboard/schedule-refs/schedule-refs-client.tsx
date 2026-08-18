@@ -76,7 +76,7 @@ function renderTeamCell(
         <span className="flex flex-col">
             <span className="font-medium italic">{sourceLabel ?? "TBD"}</span>
             {possible.length > 0 && (
-                <span className="text-muted-foreground text-xs">
+                <span className="text-muted-foreground text-sm">
                     Possible: {possible.join(", ")}
                 </span>
             )}
@@ -565,7 +565,7 @@ export function ScheduleRefsClient({
                                                                                 match.homeSourceLabel,
                                                                                 match.homePossibleTeams
                                                                             )}
-                                                                            <span className="text-muted-foreground text-xs">
+                                                                            <span className="text-muted-foreground text-sm">
                                                                                 vs
                                                                             </span>
                                                                             {renderTeamCell(
@@ -614,7 +614,7 @@ export function ScheduleRefsClient({
                                                                                 }
                                                                             />
                                                                         ) : (
-                                                                            <span className="text-muted-foreground text-xs">
+                                                                            <span className="text-muted-foreground text-sm">
                                                                                 —
                                                                             </span>
                                                                         )}
@@ -698,7 +698,7 @@ export function ScheduleRefsClient({
                                                                                             }
                                                                                         </span>
                                                                                         {cell.backup && (
-                                                                                            <span className="text-muted-foreground text-xs">
+                                                                                            <span className="text-muted-foreground text-sm">
                                                                                                 bk:{" "}
                                                                                                 {
                                                                                                     cell.backup
@@ -707,7 +707,7 @@ export function ScheduleRefsClient({
                                                                                         )}
                                                                                     </div>
                                                                                 ) : cell?.backup ? (
-                                                                                    <span className="text-muted-foreground text-xs">
+                                                                                    <span className="text-muted-foreground text-sm">
                                                                                         bk:{" "}
                                                                                         {
                                                                                             cell.backup
@@ -787,12 +787,12 @@ function RefPicker({
                     <SelectItem key={ref.userId} value={ref.userId}>
                         {ref.name}
                         {ref.possibleTeamName && (
-                            <span className="ml-1 text-amber-700 text-xs">
+                            <span className="ml-1 text-amber-700 text-sm">
                                 ({ref.possibleTeamName})
                             </span>
                         )}
                         {ref.isUnavailable && (
-                            <span className="ml-1 text-destructive text-xs">
+                            <span className="ml-1 text-destructive text-sm">
                                 (unavailable)
                             </span>
                         )}

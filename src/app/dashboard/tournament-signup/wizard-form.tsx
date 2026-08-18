@@ -337,7 +337,7 @@ export function TournamentSignupWizard({
                                     </span>{" "}
                                     <strong>${tournament.cost}</strong>
                                 </p>
-                                <p className="text-green-700 text-xs dark:text-green-400">
+                                <p className="text-green-700 text-sm dark:text-green-400">
                                     {discount.percentage}% tournament discount
                                     applied.
                                 </p>
@@ -479,7 +479,7 @@ function RosterSection({
                 {captainReserved && (
                     <div className="flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
                         <span>You (captain)</span>
-                        <span className="text-muted-foreground text-xs">
+                        <span className="text-muted-foreground text-sm">
                             reserved
                         </span>
                     </div>

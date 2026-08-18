@@ -868,13 +868,13 @@ export function WizardForm({
                                             })
                                         ) >= new Date(`${lateDateStr}T00:00:00`)
                                     return isLate ? (
-                                        <p className="text-amber-600 text-xs dark:text-amber-400">
+                                        <p className="text-amber-600 text-sm dark:text-amber-400">
                                             Late registration pricing is in
                                             effect (after{" "}
                                             {formatEventDate(lateDateStr)})
                                         </p>
                                     ) : (
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             Register before{" "}
                                             {formatEventDate(lateDateStr)} to
                                             avoid the late fee of $
@@ -1025,7 +1025,7 @@ export function WizardForm({
                 </Tabs>
             </CardContent>
             <CardFooter>
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground text-sm">
                     Your payment is securely processed by Square. We do not
                     store your card details.
                 </p>

@@ -39,10 +39,10 @@ function CaptainTooltip({
         <div className="rounded-md border bg-popover px-3 py-2 text-popover-foreground shadow-md">
             <p className="font-medium text-sm">{data.captain}</p>
             <p className="text-sm">Players: {data.count}</p>
-            <p className="text-xs" style={{ color: GENDER_COLORS.Male }}>
+            <p className="text-sm" style={{ color: GENDER_COLORS.Male }}>
                 Male: {data.male}
             </p>
-            <p className="text-xs" style={{ color: GENDER_COLORS["Not Male"] }}>
+            <p className="text-sm" style={{ color: GENDER_COLORS["Not Male"] }}>
                 Non-Male: {data.nonMale}
             </p>
         </div>
@@ -63,14 +63,14 @@ function CaptainAvgTooltip({
         <div className="rounded-md border bg-popover px-3 py-2 text-popover-foreground shadow-md">
             <p className="font-medium text-sm">{data.captain}</p>
             <p className="text-sm">Avg per season: {data.avg}</p>
-            <p className="text-muted-foreground text-xs">
+            <p className="text-muted-foreground text-sm">
                 {data.total} total over {data.seasons} season
                 {data.seasons !== 1 ? "s" : ""}
             </p>
-            <p className="text-xs" style={{ color: GENDER_COLORS.Male }}>
+            <p className="text-sm" style={{ color: GENDER_COLORS.Male }}>
                 Male: {data.male}
             </p>
-            <p className="text-xs" style={{ color: GENDER_COLORS["Not Male"] }}>
+            <p className="text-sm" style={{ color: GENDER_COLORS["Not Male"] }}>
                 Non-Male: {data.nonMale}
             </p>
         </div>
@@ -173,7 +173,7 @@ export function AttritionCharts({
                                         male to non-male
                                     </span>
                                 </div>
-                                <p className="mt-1 text-muted-foreground text-xs">
+                                <p className="mt-1 text-muted-foreground text-sm">
                                     <span
                                         className="font-medium"
                                         style={{ color: GENDER_COLORS.Male }}
@@ -209,7 +209,7 @@ export function AttritionCharts({
                                         male to non-male
                                     </span>
                                 </div>
-                                <p className="mt-1 text-muted-foreground text-xs">
+                                <p className="mt-1 text-muted-foreground text-sm">
                                     <span
                                         className="font-medium"
                                         style={{ color: GENDER_COLORS.Male }}

@@ -63,12 +63,12 @@ function MessageBody({ text }: { text: string }) {
                     <button
                         type="button"
                         onClick={() => setShowQuoted((v) => !v)}
-                        className="mt-1 text-muted-foreground text-xs underline hover:text-foreground"
+                        className="mt-1 text-muted-foreground text-sm underline hover:text-foreground"
                     >
                         {showQuoted ? "Hide Quoted Text" : "Show Quoted Text"}
                     </button>
                     {showQuoted && (
-                        <p className="mt-1 whitespace-pre-wrap border-muted-foreground/30 border-l-2 pl-2 text-muted-foreground text-xs">
+                        <p className="mt-1 whitespace-pre-wrap border-muted-foreground/30 border-l-2 pl-2 text-muted-foreground text-sm">
                             {quoted}
                         </p>
                     )}
@@ -273,7 +273,7 @@ function ConcernCard({
                                 {concern.person_involved}
                             </p>
                         </div>
-                        <div className="shrink-0 text-right text-muted-foreground text-xs">
+                        <div className="shrink-0 text-right text-muted-foreground text-sm">
                             <div>{formatTimestamp(concern.created_at)}</div>
                             {concern.assigned_to_name && (
                                 <div className="mt-0.5">
@@ -438,7 +438,7 @@ function ConcernCard({
                         {/* Management controls */}
                         <div className="flex flex-wrap gap-3 border-t pt-2">
                             <div className="space-y-1">
-                                <p className="font-medium text-muted-foreground text-xs">
+                                <p className="font-medium text-muted-foreground text-sm">
                                     Assign To
                                 </p>
                                 <Select
@@ -467,7 +467,7 @@ function ConcernCard({
 
                             {concern.status === "active" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -482,7 +482,7 @@ function ConcernCard({
 
                             {concern.status === "closed" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -497,7 +497,7 @@ function ConcernCard({
 
                             {concern.status !== "spam" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Spam
                                     </p>
                                     <Button
@@ -513,7 +513,7 @@ function ConcernCard({
 
                             {concern.status === "spam" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -546,11 +546,11 @@ function ConcernCard({
                                         <div className="mb-1 flex items-center justify-between gap-2">
                                             <span className="font-medium text-blue-900 dark:text-blue-100">
                                                 ↪ {item.sent_by_name}{" "}
-                                                <span className="font-normal text-xs">
+                                                <span className="font-normal text-sm">
                                                     → {item.sent_to}
                                                 </span>
                                             </span>
-                                            <span className="text-blue-700 text-xs dark:text-blue-300">
+                                            <span className="text-blue-700 text-sm dark:text-blue-300">
                                                 {formatTimestamp(item.sent_at)}
                                             </span>
                                         </div>
@@ -569,13 +569,13 @@ function ConcernCard({
                                                 {item.from_name ??
                                                     item.from_address}
                                             </span>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {formatTimestamp(
                                                     item.received_at
                                                 )}
                                             </span>
                                         </div>
-                                        <p className="mb-1 text-muted-foreground text-xs">
+                                        <p className="mb-1 text-muted-foreground text-sm">
                                             Subject: {item.subject}
                                         </p>
                                         <MessageBody
@@ -591,7 +591,7 @@ function ConcernCard({
                                             <span className="font-medium">
                                                 {item.author_name}
                                             </span>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {formatTimestamp(
                                                     item.created_at
                                                 )}

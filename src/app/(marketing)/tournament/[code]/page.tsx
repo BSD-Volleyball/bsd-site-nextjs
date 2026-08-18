@@ -398,7 +398,7 @@ function FactCard({
                 </p>
                 <p className="mt-0.5 font-semibold text-lg">{value}</p>
                 {hint && (
-                    <p className="mt-0.5 text-muted-foreground text-xs">
+                    <p className="mt-0.5 text-muted-foreground text-sm">
                         {hint}
                     </p>
                 )}

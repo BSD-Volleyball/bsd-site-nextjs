@@ -59,7 +59,7 @@ export function TournamentPoolsManager({ view }: Props) {
                                 </span>
                             </div>
                         ))}
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-muted-foreground text-sm">
                             Use the "Assign to this division" buttons inside
                             each division card below to finalize divisions.
                         </p>

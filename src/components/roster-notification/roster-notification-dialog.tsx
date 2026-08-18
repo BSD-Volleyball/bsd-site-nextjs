@@ -104,7 +104,7 @@ export function RosterNotificationDialog({
                                 <p className="font-medium text-sm leading-tight">
                                     {entry.displayName}
                                 </p>
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-muted-foreground text-sm">
                                     {getChangeSummary(entry, weekNumber)}
                                 </p>
                             </div>

@@ -36,7 +36,7 @@ export function PlayerPic({
             type="button"
             title={displayName}
             onClick={() => onOpen(player.userId)}
-            className="flex shrink-0 cursor-pointer items-center justify-center rounded bg-muted text-muted-foreground text-xs transition-opacity hover:opacity-80"
+            className="flex shrink-0 cursor-pointer items-center justify-center rounded bg-muted text-muted-foreground text-sm transition-opacity hover:opacity-80"
             style={{ height, width: "2.5rem" }}
         >
             {player.firstName[0]}

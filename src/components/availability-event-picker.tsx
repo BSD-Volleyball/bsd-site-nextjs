@@ -51,7 +51,7 @@ function EventToggleRow({
             >
                 {formatEventDate(event.eventDate)}
                 {scheduledTime && (
-                    <span className="ml-1.5 text-muted-foreground text-xs">
+                    <span className="ml-1.5 text-muted-foreground text-sm">
                         {scheduledTime}
                     </span>
                 )}

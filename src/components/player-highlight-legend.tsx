@@ -16,7 +16,7 @@ export function PlayerHighlightLegend({
     return (
         <ul
             className={cn(
-                "flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-xs",
+                "flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground text-sm",
                 className
             )}
             aria-label="Highlight legend"

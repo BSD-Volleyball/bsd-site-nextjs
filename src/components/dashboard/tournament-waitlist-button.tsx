@@ -78,7 +78,7 @@ export function TournamentWaitlistButton({
                                 className="font-medium text-sm"
                             >
                                 Preferred Division{" "}
-                                <span className="font-normal text-muted-foreground text-xs">
+                                <span className="font-normal text-muted-foreground text-sm">
                                     (optional)
                                 </span>
                             </Label>
@@ -99,7 +99,7 @@ export function TournamentWaitlistButton({
                                     </option>
                                 ))}
                             </select>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-muted-foreground text-sm">
                                 We'll share this with admins as a hint when
                                 placing you on a team.
                             </p>

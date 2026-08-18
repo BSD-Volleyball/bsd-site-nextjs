@@ -182,7 +182,7 @@ export function PairsList({
                 onClick={() => handlePlayerClick(userId, context)}
             >
                 <div className="font-medium">{name}</div>
-                <div className="text-muted-foreground text-xs">{email}</div>
+                <div className="text-muted-foreground text-sm">{email}</div>
             </button>
         )
 
@@ -404,7 +404,7 @@ export function PairsList({
                                             </div>
                                             {pair.requested
                                                 .hasDifferentPairRequest && (
-                                                <div className="mt-1 text-muted-foreground text-xs">
+                                                <div className="mt-1 text-muted-foreground text-sm">
                                                     Requested player already has
                                                     a different pair.
                                                 </div>

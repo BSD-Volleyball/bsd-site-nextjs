@@ -100,7 +100,7 @@ function TeamRow({
                             — captain {team.captainName}
                         </span>
                     </div>
-                    <div className="flex items-center gap-3 text-muted-foreground text-xs">
+                    <div className="flex items-center gap-3 text-muted-foreground text-sm">
                         <span>
                             {team.roster.length} players ({males}M / {nonMales}
                             NM)
@@ -177,7 +177,7 @@ function TeamRow({
                                         </span>
                                     )}
                                 </button>
-                                <span className="text-muted-foreground text-xs">
+                                <span className="text-muted-foreground text-sm">
                                     {genderBadge(p.male)}
                                 </span>
                             </div>

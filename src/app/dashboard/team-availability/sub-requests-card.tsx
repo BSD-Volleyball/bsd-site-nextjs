@@ -157,17 +157,17 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
                                                 to cover{" "}
                                                 {request.coveredPlayerName}
                                             </p>
-                                            <p className="text-muted-foreground text-xs">
+                                            <p className="text-muted-foreground text-sm">
                                                 {matchLine(request)} · requested
                                                 by {request.requesterName}
                                             </p>
                                             {request.message && (
-                                                <p className="mt-1 text-muted-foreground text-xs">
+                                                <p className="mt-1 text-muted-foreground text-sm">
                                                     “{request.message}”
                                                 </p>
                                             )}
                                             {request.responseNote && (
-                                                <p className="mt-1 text-muted-foreground text-xs">
+                                                <p className="mt-1 text-muted-foreground text-sm">
                                                     Response:{" "}
                                                     {request.responseNote}
                                                 </p>
@@ -220,7 +220,7 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
                                         <div className="mt-3 space-y-2 border-t pt-3">
                                             <label
                                                 htmlFor={`response-note-${request.id}`}
-                                                className="block font-medium text-xs"
+                                                className="block font-medium text-sm"
                                             >
                                                 {respondingTo.decision ===
                                                 "approve"
@@ -302,11 +302,11 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
                                             ({request.targetTeamName}) to cover{" "}
                                             {request.coveredPlayerName}
                                         </p>
-                                        <p className="text-muted-foreground text-xs">
+                                        <p className="text-muted-foreground text-sm">
                                             {matchLine(request)}
                                         </p>
                                         {request.responseNote && (
-                                            <p className="mt-1 text-muted-foreground text-xs">
+                                            <p className="mt-1 text-muted-foreground text-sm">
                                                 Response: {request.responseNote}
                                             </p>
                                         )}

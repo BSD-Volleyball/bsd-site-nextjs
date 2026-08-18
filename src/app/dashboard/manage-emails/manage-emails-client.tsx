@@ -65,12 +65,12 @@ function MessageBody({ text }: { text: string }) {
                     <button
                         type="button"
                         onClick={() => setShowQuoted((v) => !v)}
-                        className="mt-1 text-muted-foreground text-xs underline hover:text-foreground"
+                        className="mt-1 text-muted-foreground text-sm underline hover:text-foreground"
                     >
                         {showQuoted ? "Hide Quoted Text" : "Show Quoted Text"}
                     </button>
                     {showQuoted && (
-                        <p className="mt-1 whitespace-pre-wrap border-muted-foreground/30 border-l-2 pl-2 text-muted-foreground text-xs">
+                        <p className="mt-1 whitespace-pre-wrap border-muted-foreground/30 border-l-2 pl-2 text-muted-foreground text-sm">
                             {quoted}
                         </p>
                     )}
@@ -421,7 +421,7 @@ function EmailCard({
                                 />
                             </p>
                         </div>
-                        <div className="shrink-0 text-right text-muted-foreground text-xs">
+                        <div className="shrink-0 text-right text-muted-foreground text-sm">
                             <div>{formatTimestamp(email.created_at)}</div>
                             {email.assigned_to_name && (
                                 <div className="mt-0.5">
@@ -504,7 +504,7 @@ function EmailCard({
                         {/* Management controls */}
                         <div className="flex flex-wrap gap-3 border-t pt-2">
                             <div className="space-y-1">
-                                <p className="font-medium text-muted-foreground text-xs">
+                                <p className="font-medium text-muted-foreground text-sm">
                                     Assign To
                                 </p>
                                 <Select
@@ -530,7 +530,7 @@ function EmailCard({
 
                             {email.assigned_to !== currentUserId && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Shortcut
                                     </p>
                                     <Button
@@ -546,7 +546,7 @@ function EmailCard({
 
                             {email.status === "active" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -561,7 +561,7 @@ function EmailCard({
 
                             {email.status === "closed" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -576,7 +576,7 @@ function EmailCard({
 
                             {email.status !== "spam" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Spam
                                     </p>
                                     <Button
@@ -592,7 +592,7 @@ function EmailCard({
 
                             {email.status === "spam" && (
                                 <div className="space-y-1">
-                                    <p className="font-medium text-muted-foreground text-xs">
+                                    <p className="font-medium text-muted-foreground text-sm">
                                         Action
                                     </p>
                                     <Button
@@ -633,11 +633,11 @@ function EmailCard({
                                                 ↪ Reply sent by{" "}
                                                 {item.sent_by_name}
                                             </span>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {formatTimestamp(item.sent_at)}
                                             </span>
                                         </div>
-                                        <p className="mb-1 text-muted-foreground text-xs">
+                                        <p className="mb-1 text-muted-foreground text-sm">
                                             Subject: {item.subject}
                                         </p>
                                         <p className="whitespace-pre-wrap text-foreground">
@@ -655,13 +655,13 @@ function EmailCard({
                                                 {item.from_name ??
                                                     item.from_address}
                                             </span>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {formatTimestamp(
                                                     item.received_at
                                                 )}
                                             </span>
                                         </div>
-                                        <p className="mb-1 text-muted-foreground text-xs">
+                                        <p className="mb-1 text-muted-foreground text-sm">
                                             Subject: {item.subject}
                                         </p>
                                         <MessageBody
@@ -676,11 +676,11 @@ function EmailCard({
                                         <div className="mb-1 flex items-center justify-between gap-2">
                                             <span className="font-medium">
                                                 🔒 {item.author_name}
-                                                <span className="ml-1 font-normal text-muted-foreground text-xs">
+                                                <span className="ml-1 font-normal text-muted-foreground text-sm">
                                                     (internal)
                                                 </span>
                                             </span>
-                                            <span className="text-muted-foreground text-xs">
+                                            <span className="text-muted-foreground text-sm">
                                                 {formatTimestamp(
                                                     item.created_at
                                                 )}
@@ -750,7 +750,7 @@ function EmailCard({
                                         Quick Reply to{" "}
                                         {email.from_name ?? email.from_address}
                                     </p>
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-muted-foreground text-sm">
                                         Assigns the email to you and sends the
                                         reply — optionally closing it too.
                                     </p>

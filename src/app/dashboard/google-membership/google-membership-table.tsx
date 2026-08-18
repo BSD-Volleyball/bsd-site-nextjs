@@ -338,7 +338,7 @@ export function GoogleMembershipTable({
                                                     </Button>
                                                     {statusByUser[user.id] && (
                                                         <p
-                                                            className={`text-xs ${
+                                                            className={`text-sm ${
                                                                 statusByUser[
                                                                     user.id
                                                                 ].type ===

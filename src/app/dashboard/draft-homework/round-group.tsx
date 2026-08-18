@@ -145,7 +145,7 @@ export function RoundGroup({
                             <button
                                 type="button"
                                 onClick={() => setDynamicCount((c) => c + 1)}
-                                className="px-2 py-1 text-left text-muted-foreground text-xs hover:text-foreground"
+                                className="px-2 py-1 text-left text-muted-foreground text-sm hover:text-foreground"
                             >
                                 + Add player
                             </button>

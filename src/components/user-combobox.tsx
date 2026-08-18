@@ -159,7 +159,7 @@ export function UserEmailCombobox({
                                 }}
                             >
                                 <span className="font-medium">{user.name}</span>
-                                <span className="text-muted-foreground text-xs">
+                                <span className="text-muted-foreground text-sm">
                                     {user.email}
                                     {user.phone ? ` · ${user.phone}` : ""}
                                 </span>
@@ -168,7 +168,7 @@ export function UserEmailCombobox({
                     )}
                 </div>
                 {hidden > 0 && (
-                    <p className="border-t p-2 text-center text-muted-foreground text-xs">
+                    <p className="border-t p-2 text-center text-muted-foreground text-sm">
                         {hidden} more match — keep typing to narrow it down.
                     </p>
                 )}

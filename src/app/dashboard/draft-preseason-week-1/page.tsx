@@ -224,7 +224,7 @@ export default async function DraftPreseasonWeek1Page() {
                                         <h3 className="font-semibold text-base">
                                             Court {courtNumber}
                                         </h3>
-                                        <span className="text-muted-foreground text-xs">
+                                        <span className="text-muted-foreground text-sm">
                                             {courtPlayers.length} players
                                         </span>
                                     </div>

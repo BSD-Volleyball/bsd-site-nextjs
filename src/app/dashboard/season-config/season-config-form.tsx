@@ -506,7 +506,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                                     </div>
 
                                     {event.unavailable_player_count > 0 && (
-                                        <p className="ml-9 text-muted-foreground text-xs">
+                                        <p className="ml-9 text-muted-foreground text-sm">
                                             {event.unavailable_player_count}{" "}
                                             {event.unavailable_player_count ===
                                             1
@@ -535,7 +535,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                                                 </Button>
                                             </div>
                                             {event.time_slots.length === 0 && (
-                                                <p className="text-muted-foreground text-xs">
+                                                <p className="text-muted-foreground text-sm">
                                                     No time slots added.
                                                 </p>
                                             )}
