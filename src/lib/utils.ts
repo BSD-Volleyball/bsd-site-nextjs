@@ -51,6 +51,24 @@ export function splitByGender<T extends { male?: boolean | null }>(
     }
 }
 
+/**
+ * Parses an `individual_divisions.gender_split` value ("6-2", "5-3", "4-4")
+ * into per-team male / non-male counts. Unrecognized or missing values fall
+ * back to the league default of 5-3 so callers always get a usable target.
+ */
+export function parseGenderSplit(genderSplit: string | null | undefined): {
+    malePerTeam: number
+    nonMalePerTeam: number
+} {
+    const [male, nonMale] = (genderSplit ?? "").split("-").map(Number)
+
+    if (!Number.isFinite(male) || !Number.isFinite(nonMale)) {
+        return { malePerTeam: 5, nonMalePerTeam: 3 }
+    }
+
+    return { malePerTeam: male, nonMalePerTeam: nonMale }
+}
+
 // ---------------------------------------------------------------------------
 // Player picture URL
 // ---------------------------------------------------------------------------

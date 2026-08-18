@@ -56,6 +56,8 @@ function division(
         teamCount: 2,
         isLast: false,
         usesCoaches: false,
+        malePerTeam: 5,
+        nonMalePerTeam: 3,
         ...overrides
     }
 }

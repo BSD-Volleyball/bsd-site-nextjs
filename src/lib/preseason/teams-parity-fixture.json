@@ -41,7 +41,7 @@
         },
         {
             "number": 2,
-            "scoreSum": 109,
+            "scoreSum": 116,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 0,
@@ -52,12 +52,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p17",
+                    "entryId": "orig:p25",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p30",
+                    "entryId": "orig:p24",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -67,12 +67,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p23",
+                    "entryId": "orig:p16",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p19",
+                    "entryId": "orig:p23",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -158,9 +158,9 @@
         },
         {
             "number": 5,
-            "scoreSum": 110,
-            "maleCount": 4,
-            "nonMaleCount": 1,
+            "scoreSum": 109,
+            "maleCount": 3,
+            "nonMaleCount": 2,
             "newCount": 1,
             "players": [
                 {
@@ -169,7 +169,7 @@
                     "isNew": true
                 },
                 {
-                    "entryId": "orig:p13",
+                    "entryId": "orig:p30",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -179,12 +179,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p12",
+                    "entryId": "orig:p28",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p07",
+                    "entryId": "orig:p12",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -192,9 +192,9 @@
         },
         {
             "number": 6,
-            "scoreSum": 109,
-            "maleCount": 3,
-            "nonMaleCount": 2,
+            "scoreSum": 103,
+            "maleCount": 4,
+            "nonMaleCount": 1,
             "newCount": 0,
             "players": [
                 {
@@ -203,22 +203,22 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p25",
+                    "entryId": "orig:p17",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p28",
+                    "entryId": "orig:p13",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p24",
+                    "entryId": "orig:p19",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p16",
+                    "entryId": "orig:p07",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -264,7 +264,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p08",
+                    "entryId": "dup:p08:1",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -282,7 +282,7 @@
         },
         {
             "number": 2,
-            "scoreSum": 164,
+            "scoreSum": 162,
             "maleCount": 6,
             "nonMaleCount": 3,
             "newCount": 1,
@@ -313,7 +313,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p22",
+                    "entryId": "orig:p18",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -323,12 +323,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p31",
+                    "entryId": "orig:p32",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p27",
+                    "entryId": "orig:p31",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -336,9 +336,9 @@
         },
         {
             "number": 3,
-            "scoreSum": 160,
-            "maleCount": 6,
-            "nonMaleCount": 2,
+            "scoreSum": 162,
+            "maleCount": 5,
+            "nonMaleCount": 3,
             "newCount": 1,
             "players": [
                 {
@@ -357,12 +357,12 @@
                     "isNew": true
                 },
                 {
-                    "entryId": "orig:p32",
+                    "entryId": "orig:p20",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p20",
+                    "entryId": "orig:p27",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -377,7 +377,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "dup:p08:1",
+                    "entryId": "orig:p19",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -386,8 +386,8 @@
         {
             "number": 4,
             "scoreSum": 164,
-            "maleCount": 5,
-            "nonMaleCount": 3,
+            "maleCount": 6,
+            "nonMaleCount": 2,
             "newCount": 0,
             "players": [
                 {
@@ -406,7 +406,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p18",
+                    "entryId": "orig:p22",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -421,7 +421,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p19",
+                    "entryId": "orig:p08",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -436,7 +436,7 @@
     "week3BackCourt": [
         {
             "number": 1,
-            "scoreSum": 112,
+            "scoreSum": 113,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 1,
@@ -447,22 +447,17 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p21",
+                    "entryId": "orig:p09",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p28",
+                    "entryId": "orig:p10",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p20",
-                    "isCaptain": false,
-                    "isNew": false
-                },
-                {
-                    "entryId": "dup:p08:1",
+                    "entryId": "orig:p23",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -470,12 +465,17 @@
                     "entryId": "orig:p04",
                     "isCaptain": false,
                     "isNew": true
+                },
+                {
+                    "entryId": "orig:p11",
+                    "isCaptain": false,
+                    "isNew": false
                 }
             ]
         },
         {
             "number": 2,
-            "scoreSum": 115,
+            "scoreSum": 110,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 1,
@@ -486,27 +486,27 @@
                     "isNew": false
                 },
                 {
+                    "entryId": "orig:p21",
+                    "isCaptain": false,
+                    "isNew": false
+                },
+                {
                     "entryId": "orig:p26",
                     "isCaptain": false,
                     "isNew": true
                 },
                 {
-                    "entryId": "orig:p18",
+                    "entryId": "orig:p20",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p10",
+                    "entryId": "orig:p27",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p24",
-                    "isCaptain": false,
-                    "isNew": false
-                },
-                {
-                    "entryId": "orig:p11",
+                    "entryId": "dup:p08:1",
                     "isCaptain": false,
                     "isNew": false
                 }
@@ -514,7 +514,7 @@
         },
         {
             "number": 3,
-            "scoreSum": 118,
+            "scoreSum": 121,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 1,
@@ -530,7 +530,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p22",
+                    "entryId": "orig:p18",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -540,7 +540,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p27",
+                    "entryId": "orig:p19",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -553,9 +553,9 @@
         },
         {
             "number": 4,
-            "scoreSum": 110,
-            "maleCount": 4,
-            "nonMaleCount": 2,
+            "scoreSum": 113,
+            "maleCount": 5,
+            "nonMaleCount": 1,
             "newCount": 0,
             "players": [
                 {
@@ -574,12 +574,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p09",
+                    "entryId": "orig:p22",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p19",
+                    "entryId": "orig:p28",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -592,7 +592,7 @@
         },
         {
             "number": 5,
-            "scoreSum": 100,
+            "scoreSum": 96,
             "maleCount": 3,
             "nonMaleCount": 2,
             "newCount": 0,
@@ -603,17 +603,17 @@
                     "isNew": false
                 },
                 {
+                    "entryId": "orig:p14",
+                    "isCaptain": false,
+                    "isNew": false
+                },
+                {
                     "entryId": "orig:p06",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p32",
-                    "isCaptain": false,
-                    "isNew": false
-                },
-                {
-                    "entryId": "orig:p23",
+                    "entryId": "orig:p16",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -626,9 +626,9 @@
         },
         {
             "number": 6,
-            "scoreSum": 98,
-            "maleCount": 4,
-            "nonMaleCount": 1,
+            "scoreSum": 100,
+            "maleCount": 3,
+            "nonMaleCount": 2,
             "newCount": 0,
             "players": [
                 {
@@ -642,12 +642,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p14",
+                    "entryId": "orig:p32",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p16",
+                    "entryId": "orig:p24",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -701,7 +701,7 @@
         },
         {
             "number": 2,
-            "scoreSum": 107,
+            "scoreSum": 108,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 1,
@@ -712,7 +712,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p30",
+                    "entryId": "orig:p17",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -722,12 +722,12 @@
                     "isNew": true
                 },
                 {
-                    "entryId": "orig:p18",
+                    "entryId": "orig:p24",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p31",
+                    "entryId": "orig:p27",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -740,7 +740,7 @@
         },
         {
             "number": 3,
-            "scoreSum": 111,
+            "scoreSum": 112,
             "maleCount": 4,
             "nonMaleCount": 2,
             "newCount": 1,
@@ -756,12 +756,12 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p25",
+                    "entryId": "orig:p09",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p27",
+                    "entryId": "orig:p32",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -790,22 +790,22 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p17",
+                    "entryId": "orig:p25",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p09",
+                    "entryId": "orig:p22",
+                    "isCaptain": false,
+                    "isNew": false
+                },
+                {
+                    "entryId": "orig:p18",
                     "isCaptain": false,
                     "isNew": false
                 },
                 {
                     "entryId": "orig:p14",
-                    "isCaptain": false,
-                    "isNew": false
-                },
-                {
-                    "entryId": "orig:p32",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -818,9 +818,9 @@
         },
         {
             "number": 5,
-            "scoreSum": 109,
-            "maleCount": 4,
-            "nonMaleCount": 1,
+            "scoreSum": 107,
+            "maleCount": 3,
+            "nonMaleCount": 2,
             "newCount": 0,
             "players": [
                 {
@@ -829,7 +829,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p22",
+                    "entryId": "orig:p30",
                     "isCaptain": false,
                     "isNew": false
                 },
@@ -853,8 +853,8 @@
         {
             "number": 6,
             "scoreSum": 108,
-            "maleCount": 3,
-            "nonMaleCount": 2,
+            "maleCount": 4,
+            "nonMaleCount": 1,
             "newCount": 0,
             "players": [
                 {
@@ -863,7 +863,7 @@
                     "isNew": false
                 },
                 {
-                    "entryId": "orig:p24",
+                    "entryId": "orig:p31",
                     "isCaptain": false,
                     "isNew": false
                 },

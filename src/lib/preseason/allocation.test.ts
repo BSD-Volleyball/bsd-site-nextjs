@@ -95,6 +95,8 @@ function division(
         teamCount: 2,
         isLast: false,
         usesCoaches: false,
+        malePerTeam: 5,
+        nonMalePerTeam: 3,
         ...overrides
     }
 }
@@ -129,5 +131,94 @@ describe("getDivisionTargets", () => {
 
     it("returns an empty map when there are no teams", () => {
         expect(getDivisionTargets([], buildBalancedPool()).size).toBe(0)
+    })
+
+    it("gives each division the non-male share its configured split asks for", () => {
+        // 48 players, 24 non-male. Three 2-team divisions with different
+        // splits: demand is 6-2 -> 4, 5-3 -> 6, 4-4 -> 8, totalling 18 of the
+        // 24 available, so every division should clear its full demand.
+        const testDivisions = [
+            division({ id: 1, malePerTeam: 6, nonMalePerTeam: 2 }),
+            division({
+                id: 2,
+                name: "A",
+                level: 2,
+                index: 1,
+                malePerTeam: 5,
+                nonMalePerTeam: 3
+            }),
+            division({
+                id: 3,
+                name: "BB",
+                level: 3,
+                index: 2,
+                isLast: true,
+                malePerTeam: 4,
+                nonMalePerTeam: 4
+            })
+        ]
+        const pool = Array.from({ length: 48 }, (_entry, i) => ({
+            male: i % 2 === 0
+        }))
+
+        const targets = getDivisionTargets(testDivisions, pool)
+
+        // The whole point: a 4-4 division must not be handed the same ratio
+        // as a 6-2 one just because they sit in the same pool.
+        expect(targets.get(1)?.nonMale).toBeLessThan(
+            targets.get(2)?.nonMale as number
+        )
+        expect(targets.get(2)?.nonMale).toBeLessThan(
+            targets.get(3)?.nonMale as number
+        )
+
+        // Every seat still gets allocated to exactly one gender.
+        for (const id of [1, 2, 3]) {
+            const target = targets.get(id)
+            expect((target?.male as number) + (target?.nonMale as number)).toBe(
+                target?.size
+            )
+        }
+
+        const allocatedNonMale = [1, 2, 3].reduce(
+            (sum, id) => sum + (targets.get(id)?.nonMale ?? 0),
+            0
+        )
+        expect(allocatedNonMale).toBe(24)
+    })
+
+    it("spreads a non-male shortfall proportionally to configured demand", () => {
+        // Same three divisions, but only 9 non-male players for 18 demanded:
+        // each division should land near half its demand rather than all
+        // divisions being flattened to one league-wide ratio.
+        const testDivisions = [
+            division({ id: 1, malePerTeam: 6, nonMalePerTeam: 2 }),
+            division({
+                id: 2,
+                name: "A",
+                level: 2,
+                index: 1,
+                malePerTeam: 5,
+                nonMalePerTeam: 3
+            }),
+            division({
+                id: 3,
+                name: "BB",
+                level: 3,
+                index: 2,
+                isLast: true,
+                malePerTeam: 4,
+                nonMalePerTeam: 4
+            })
+        ]
+        const pool = Array.from({ length: 48 }, (_entry, i) => ({
+            male: i >= 9
+        }))
+
+        const targets = getDivisionTargets(testDivisions, pool)
+
+        expect(targets.get(1)?.nonMale).toBe(2)
+        expect(targets.get(2)?.nonMale).toBe(3)
+        expect(targets.get(3)?.nonMale).toBe(4)
     })
 })

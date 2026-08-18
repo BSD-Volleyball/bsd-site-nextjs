@@ -273,13 +273,16 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
             0
         )
 
-        const totalMaleForBack = splitByGender(players).males.length
+        // Back-court teams follow the division's configured split, not the
+        // gender mix of whoever landed in the division.
+        const splitTeamSize = division.malePerTeam + division.nonMalePerTeam
         const nonMaleRatioForBack =
-            players.length > 0
-                ? (players.length - totalMaleForBack) / players.length
-                : 0.5
+            splitTeamSize > 0 ? division.nonMalePerTeam / splitTeamSize : 0.5
+        // Cap by the non-males the division actually has: the back court must
+        // not reserve seats that the front teams would then be unable to fill.
         const backNonMaleTarget = Math.min(
             backCourtCapacity,
+            splitByGender(players).nonMales.length,
             Math.round(backCourtCapacity * nonMaleRatioForBack)
         )
         const backMaleTarget = backCourtCapacity - backNonMaleTarget
@@ -551,14 +554,37 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
     const units = buildTeamUnits(remaining)
     const snakeOrder = getSnakeOrder(units.length, teamCount)
 
-    const totalMale = splitByGender(players).males.length
-    const teamMaleTargets = allocateByWeightWithCapacity(
-        totalMale,
-        teamCapacities,
-        teamCapacities.map(() => 1)
+    // Non-male targets drive team gender balance; male targets are the
+    // remainder of each team's capacity. Every team in a division shares one
+    // configured split (6-2 / 5-3 / 4-4), so an even spread of the division's
+    // non-males IS the split — a division handed the 18 non-males a 6-team
+    // 5-3 division asks for gives all six teams a target of 3. The split's
+    // leverage is at the division level (`getDivisionTargets`), which decides
+    // how many non-males each division receives in the first place.
+    const totalNonMale = splitByGender(players).nonMales.length
+
+    // Back-court teams were pre-filled above against their own targets, so
+    // they keep those and the front teams share what is actually left.
+    // Spreading the division total across all teams would double-count the
+    // reserved seats and leave front teams chasing non-males that are gone.
+    const backTargets = Array.from(
+        { length: teamCount },
+        (_entry, index) => backTeamNonMaleTargets.get(index) ?? 0
     )
-    const teamNonMaleTargets = teamCapacities.map(
-        (capacity, index) => capacity - teamMaleTargets[index]
+    const reservedNonMale = backTargets.reduce((sum, value) => sum + value, 0)
+    const frontTeamCount =
+        backCourtActive && backTeamCount > 0 ? backStart : teamCount
+
+    const frontNonMaleTargets = allocateByWeightWithCapacity(
+        Math.max(0, totalNonMale - reservedNonMale),
+        teamCapacities.slice(0, frontTeamCount),
+        Array.from({ length: frontTeamCount }, () => 1)
+    )
+    const teamNonMaleTargets = teamCapacities.map((_capacity, index) =>
+        index < frontTeamCount ? frontNonMaleTargets[index] : backTargets[index]
+    )
+    const teamMaleTargets = teamCapacities.map(
+        (capacity, index) => capacity - teamNonMaleTargets[index]
     )
     const totalNew = divisionPlayers.filter((player) => player.isNew).length
     const teamNewTargets = allocateByWeightWithCapacity(

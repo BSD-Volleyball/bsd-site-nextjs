@@ -694,6 +694,7 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                         </CardTitle>
                                         <p className="text-muted-foreground text-sm">
                                             {config.stepOneTargetLabel}
+                                            {` | split ${division.malePerTeam}-${division.nonMalePerTeam}`}
                                             {bucket
                                                 ? ` | target ${bucket.targetSize} (${bucket.targetMale} male / ${bucket.targetNonMale} non-male) | actual ${actualMaleCount} male / ${actualNonMaleCount} non-male`
                                                 : ""}

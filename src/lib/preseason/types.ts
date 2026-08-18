@@ -10,6 +10,14 @@ export interface PreseasonDivision {
     teamCount: number
     isLast: boolean
     usesCoaches: boolean
+    /**
+     * Per-team gender targets from `individual_divisions.gender_split` for this
+     * season (6-2 / 5-3 / 4-4). Division and team targets are built from these
+     * rather than from the pool-wide mix, so a 4-4 division is not handed the
+     * same ratio as a 6-2 one.
+     */
+    malePerTeam: number
+    nonMalePerTeam: number
 }
 
 export interface PreseasonCandidate {

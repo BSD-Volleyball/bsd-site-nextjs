@@ -130,42 +130,32 @@ export function getDivisionTargets(
     )
 
     const totalNonMale = splitByGender(candidates).nonMales.length
-    const nonMaleRatio = totalPlayers > 0 ? totalNonMale / totalPlayers : 0
-    const nonMaleTargets = sizeTargets.map((size) =>
-        Math.min(size, Math.floor(size * nonMaleRatio))
-    )
 
-    const assignedNonMale = nonMaleTargets.reduce(
+    // Each division's configured split (6-2 / 5-3 / 4-4) sets how many
+    // non-male players it wants; that demand is the allocation weight, so a
+    // 4-4 division draws proportionally more than a 6-2 one. When signups
+    // don't supply the full demand every division comes up short in
+    // proportion rather than the mix being flattened league-wide.
+    const nonMaleDemand = divisions.map(
+        (division) => division.nonMalePerTeam * division.teamCount
+    )
+    const totalNonMaleDemand = nonMaleDemand.reduce(
         (sum, value) => sum + value,
         0
     )
-    let remainingNonMale = totalNonMale - assignedNonMale
 
-    if (remainingNonMale > 0) {
-        const divisionOrder = divisions.map((_division, index) => index)
-
-        while (remainingNonMale > 0) {
-            let placedInPass = false
-
-            for (const index of divisionOrder) {
-                if (remainingNonMale <= 0) {
-                    break
-                }
-
-                if (nonMaleTargets[index] >= sizeTargets[index]) {
-                    continue
-                }
-
-                nonMaleTargets[index] += 1
-                remainingNonMale -= 1
-                placedInPass = true
-            }
-
-            if (!placedInPass) {
-                break
-            }
-        }
-    }
+    const nonMaleTargets =
+        totalNonMaleDemand > 0
+            ? allocateByWeightWithCapacity(
+                  totalNonMale,
+                  sizeTargets,
+                  nonMaleDemand
+              )
+            : allocateByWeightWithCapacity(
+                  totalNonMale,
+                  sizeTargets,
+                  sizeTargets.map(() => 1)
+              )
 
     const targets = new Map<
         number,

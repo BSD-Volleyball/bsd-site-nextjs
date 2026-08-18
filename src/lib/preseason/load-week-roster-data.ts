@@ -24,7 +24,7 @@ import {
     getUnavailableSignupIdsForEvent,
     fetchRatingScoresForReturningPlayers
 } from "@/lib/week-rosters"
-import { formatDisplayName } from "@/lib/utils"
+import { formatDisplayName, parseGenderSplit } from "@/lib/utils"
 import {
     LAST_DIVISION_TEAM_COUNT,
     STANDARD_DIVISION_TEAM_COUNT
@@ -120,7 +120,8 @@ export async function loadPreseasonBaseData(
             db
                 .select({
                     divisionId: individual_divisions.division,
-                    coaches: individual_divisions.coaches
+                    coaches: individual_divisions.coaches,
+                    genderSplit: individual_divisions.gender_split
                 })
                 .from(individual_divisions)
                 .where(eq(individual_divisions.season, config.seasonId)),
@@ -153,6 +154,9 @@ export async function loadPreseasonBaseData(
     const coachesDivisionIds = new Set(
         indivDivRows.filter((row) => row.coaches).map((row) => row.divisionId)
     )
+    const genderSplitByDivision = new Map(
+        indivDivRows.map((row) => [row.divisionId, row.genderSplit])
+    )
 
     const divisionsWithMeta: PreseasonDivision[] = activeDivisions.map(
         (division, index) => ({
@@ -163,7 +167,8 @@ export async function loadPreseasonBaseData(
                     ? LAST_DIVISION_TEAM_COUNT
                     : STANDARD_DIVISION_TEAM_COUNT,
             isLast: index === activeDivisions.length - 1,
-            usesCoaches: coachesDivisionIds.has(division.id)
+            usesCoaches: coachesDivisionIds.has(division.id),
+            ...parseGenderSplit(genderSplitByDivision.get(division.id))
         })
     )
 
