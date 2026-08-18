@@ -508,8 +508,8 @@ export default async function DashboardPage() {
                         "tryout"
                     )
                     const tryout2TimeSlots = tryout2Events[1]?.timeSlots ?? []
-                    const sessionTimes = tryout2TimeSlots.map(
-                        (ts) => ts.startTime
+                    const sessionTimes = tryout2TimeSlots.map((ts) =>
+                        formatEventTime(ts.startTime)
                     )
                     const matchupIndex = Math.floor(
                         (myWeek2Slot.teamNumber - 1) / 2
@@ -628,8 +628,8 @@ export default async function DashboardPage() {
                         "tryout"
                     )
                     const tryout3TimeSlots = tryout3Events[2]?.timeSlots ?? []
-                    const sessionTimes = tryout3TimeSlots.map(
-                        (ts) => ts.startTime
+                    const sessionTimes = tryout3TimeSlots.map((ts) =>
+                        formatEventTime(ts.startTime)
                     )
                     const matchupIndex = Math.floor(
                         (myWeek3Slot.teamNumber - 1) / 2
