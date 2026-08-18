@@ -549,6 +549,41 @@ export async function getSignupForCurrentSeason(
     }
 }
 
+/**
+ * Everyone signed up for the current season, for the Pair Pick picker. Names
+ * only: the list is one season's signups, where a name is enough to tell
+ * players apart.
+ */
+export const getCurrentSeasonPlayers = withAction(
+    async (): Promise<ActionResult<{ id: string; name: string }[]>> => {
+        await requireAdmin()
+        const config = await requireSeasonConfig()
+
+        const rows = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name,
+                preferred_name: users.preferred_name
+            })
+            .from(signups)
+            .innerJoin(users, eq(signups.player, users.id))
+            .where(eq(signups.season, config.seasonId))
+            .orderBy(users.last_name, users.first_name)
+
+        return ok(
+            rows.map((u) => ({
+                id: u.id,
+                name: formatPlayerName(
+                    u.first_name,
+                    u.last_name,
+                    u.preferred_name
+                )
+            }))
+        )
+    }
+)
+
 export const updateSignup = withAction(
     async (
         signupId: number,

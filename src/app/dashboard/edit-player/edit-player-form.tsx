@@ -9,6 +9,7 @@ import {
     getUserDetails,
     updateUser,
     getSignupForCurrentSeason,
+    getCurrentSeasonPlayers,
     updateSignup
 } from "./actions"
 import type { UserDetails, SignupDetails } from "./actions"
@@ -164,6 +165,9 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
     const [formData, setFormData] = useState<FormData | null>(null)
     const [loading, setLoading] = useState(false)
     const [signupData, setSignupData] = useState<SignupFormData | null>(null)
+    const [seasonPlayers, setSeasonPlayers] = useState<
+        { id: string; name: string }[]
+    >([])
     const [isPending, startTransition] = useTransition()
     const [isSignupPending, startSignupTransition] = useTransition()
     const [isPictureUploadPending, startPictureUploadTransition] =
@@ -185,11 +189,14 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         if (!userId) return
 
         setLoading(true)
-        const [userResult, signupResult] = await Promise.all([
+        const [userResult, signupResult, playersResult] = await Promise.all([
             getUserDetails(userId),
-            getSignupForCurrentSeason(userId)
+            getSignupForCurrentSeason(userId),
+            getCurrentSeasonPlayers()
         ])
         setLoading(false)
+
+        setSeasonPlayers(playersResult.status ? playersResult.data : [])
 
         if (userResult.status && userResult.user) {
             setFormData(userToFormData(userResult.user))
@@ -434,6 +441,25 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
         { key: "seasons_list", label: "Seasons List" },
         { key: "notification_list", label: "Notification List" }
     ]
+
+    // Pair picks are limited to this season's signups (minus the player
+    // themself). A stored pick that is no longer signed up still needs a row,
+    // or the combobox would render it as "no pair pick" and a save would drop
+    // it silently.
+    const pairPickOptions = (() => {
+        const options = seasonPlayers.filter((p) => p.id !== selectedUserId)
+        const current = signupData?.pair_pick
+        if (current && !options.some((p) => p.id === current)) {
+            const known = users.find((u) => u.id === current)
+            options.unshift({
+                id: current,
+                name: known
+                    ? `${known.name} (not signed up)`
+                    : `${current} (unknown user)`
+            })
+        }
+        return options
+    })()
 
     return (
         <div className="space-y-6">
@@ -691,17 +717,18 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                                 htmlFor="signup_pair_pick"
                                 className="mb-1 block"
                             >
-                                Pair Pick (User ID)
+                                Pair Pick
                             </Label>
-                            <Input
-                                id="signup_pair_pick"
-                                value={signupData.pair_pick}
-                                onChange={(e) =>
+                            <UserCombobox
+                                users={pairPickOptions}
+                                value={signupData.pair_pick || null}
+                                onChange={(value) =>
                                     handleSignupTextChange(
                                         "pair_pick",
-                                        e.target.value
+                                        value ?? ""
                                     )
                                 }
+                                placeholder="No pair pick"
                             />
                         </div>
                         <div>
