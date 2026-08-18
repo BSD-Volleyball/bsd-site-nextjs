@@ -372,33 +372,66 @@ export function buildConcernNotificationHtml(appUrl: string): string {
     })
 }
 
-export function buildInboundEmailNotificationHtml(opts: {
-    appUrl: string
-    ticketId: number
-}): string {
+/**
+ * Sender + subject of an inbound message, for staff notifications.
+ *
+ * Only Manage Emails notifications carry these. Concern notifications stay
+ * deliberately content-free — the concern inbox is far more sensitive, and
+ * the notification is just a nudge to go look.
+ */
+export type InboundMessageSummary = {
+    fromName?: string | null
+    fromAddress?: string
+    subject?: string
+}
+
+function renderInboundSummary(summary: InboundMessageSummary): string {
+    const rows: string[] = []
+    const name = summary.fromName?.trim()
+    const sender = name
+        ? summary.fromAddress
+            ? `${name} <${summary.fromAddress}>`
+            : name
+        : summary.fromAddress
+    if (sender) rows.push(renderDetailRow("From", sender))
+    if (summary.subject) rows.push(renderDetailRow("Subject", summary.subject))
+    return rows.length > 0 ? renderDetailsBlock(rows) : ""
+}
+
+export function buildInboundEmailNotificationHtml(
+    opts: {
+        appUrl: string
+        ticketId: number
+    } & InboundMessageSummary
+): string {
     return renderEmailHtml({
         heading: "New Inbound Email Received",
-        bodyHtml: `<p>A new email has been received and is awaiting review.</p>`,
+        bodyHtml: `<p>A new email has been received and is awaiting review.</p>${renderInboundSummary(opts)}`,
         action: "View Email",
         actionUrl: `${opts.appUrl}/dashboard/manage-emails?email=${opts.ticketId}`
     })
 }
 
-export function buildThreadReplyNotificationHtml(opts: {
-    appUrl: string
-    ticketType: "email" | "concern"
-    ticketId: number
-}): string {
+export function buildThreadReplyNotificationHtml(
+    opts: {
+        appUrl: string
+        ticketType: "email" | "concern"
+        ticketId: number
+    } & InboundMessageSummary
+): string {
     const pageUrl =
         opts.ticketType === "email"
             ? `${opts.appUrl}/dashboard/manage-emails?email=${opts.ticketId}`
             : `${opts.appUrl}/dashboard/manage-concerns`
 
     const label = opts.ticketType === "email" ? "Email" : "Concern"
+    // Concern threads never expose who wrote in or what about.
+    const summary =
+        opts.ticketType === "email" ? renderInboundSummary(opts) : ""
 
     return renderEmailHtml({
         heading: `New Reply on ${label} #${opts.ticketId}`,
-        bodyHtml: `<p>A reply has been received on ${label} #${opts.ticketId}.</p>`,
+        bodyHtml: `<p>A reply has been received on ${label} #${opts.ticketId}.</p>${summary}`,
         action: `View ${label} Thread`,
         actionUrl: pageUrl
     })

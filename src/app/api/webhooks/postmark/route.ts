@@ -22,7 +22,8 @@ import { isPermanentBounceType } from "@/lib/postmark"
 import {
     buildConcernNotificationHtml,
     buildInboundEmailNotificationHtml,
-    buildThreadReplyNotificationHtml
+    buildThreadReplyNotificationHtml,
+    type InboundMessageSummary
 } from "@/lib/email-html"
 import { recomputeEmailStatus } from "@/lib/notifications/suppressions"
 
@@ -170,12 +171,30 @@ async function notifyOmbudsmen(appUrl: string) {
     })
 }
 
-async function notifyAdmins(appUrl: string, ticketId: number) {
+/**
+ * "Jane Doe: Question about the league" — the sender and subject as they
+ * should read in a notification subject line. Falls back to the address when
+ * the sender has no display name.
+ */
+function describeInbound(message: InboundMessageSummary): string {
+    const sender = message.fromName?.trim() || message.fromAddress || "unknown"
+    return `from ${sender}: ${message.subject ?? "(No subject)"}`
+}
+
+async function notifyAdmins(opts: {
+    appUrl: string
+    ticketId: number
+    message: InboundMessageSummary
+}) {
     await sendMail({
         mode: { kind: "staff", category: "inbound_email_received" },
         recipients: await recipientsWithRole("admin"),
-        subject: "New Inbound Email Received",
-        htmlBody: buildInboundEmailNotificationHtml({ appUrl, ticketId }),
+        subject: `New Inbound Email ${describeInbound(opts.message)}`,
+        htmlBody: buildInboundEmailNotificationHtml({
+            appUrl: opts.appUrl,
+            ticketId: opts.ticketId,
+            ...opts.message
+        }),
         tag: "inbound-email-notification"
     })
 }
@@ -185,12 +204,18 @@ async function notifyAssignee(opts: {
     appUrl: string
     ticketType: "email" | "concern"
     ticketId: number
+    /** Sender + subject; only forwarded for email threads, never concerns. */
+    message?: InboundMessageSummary
 }) {
     const label = opts.ticketType === "email" ? "Email" : "Concern"
+    // Concern notifications stay content-free: the concern inbox is far more
+    // sensitive than general email, so the nudge says only that a reply exists.
+    const message = opts.ticketType === "email" ? opts.message : undefined
     const notifHtml = buildThreadReplyNotificationHtml({
         appUrl: opts.appUrl,
         ticketType: opts.ticketType,
-        ticketId: opts.ticketId
+        ticketId: opts.ticketId,
+        ...message
     })
 
     // The assignee if there is one; otherwise the whole group that owns
@@ -215,7 +240,9 @@ async function notifyAssignee(opts: {
     await sendMail({
         mode: { kind: "staff", category: "thread_reply" },
         recipients,
-        subject: `New Reply on ${label} #${opts.ticketId}`,
+        subject: message
+            ? `New Reply on ${label} #${opts.ticketId} ${describeInbound(message)}`
+            : `New Reply on ${label} #${opts.ticketId}`,
         htmlBody: notifHtml,
         tag: "thread-reply-notification"
     })
@@ -474,8 +501,12 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const messageId = payload.MessageID
     const fromEmail =
         payload.FromFull?.Email ?? parseFromAddress(payload.From).email
+    // Postmark sends the display name both in FromFull and as FromName; either
+    // may be an empty string for a bare address, so treat blanks as missing.
     const fromName =
-        payload.FromFull?.Name ?? parseFromAddress(payload.From).name
+        payload.FromFull?.Name ||
+        payload.FromName ||
+        parseFromAddress(payload.From).name
     const subject = payload.Subject || "(No subject)"
     const bodyText = payload.TextBody || null
     const bodyHtml = payload.HtmlBody || null
@@ -549,7 +580,8 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                         assignedTo: ticket?.assigned_to ?? null,
                         appUrl,
                         ticketType: "email",
-                        ticketId: existingThread.id
+                        ticketId: existingThread.id,
+                        message: { fromName, fromAddress: fromEmail, subject }
                     }),
                 "assignee"
             )
@@ -639,7 +671,15 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 status: "new"
             })
             .returning({ id: inboundEmails.id })
-        await notifyQuietly(() => notifyAdmins(appUrl, created.id), "admins")
+        await notifyQuietly(
+            () =>
+                notifyAdmins({
+                    appUrl,
+                    ticketId: created.id,
+                    message: { fromName, fromAddress: fromEmail, subject }
+                }),
+            "admins"
+        )
     }
 }
 

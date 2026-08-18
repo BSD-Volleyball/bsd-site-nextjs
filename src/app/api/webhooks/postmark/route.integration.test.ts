@@ -61,6 +61,15 @@ function sentHtmlBodies(): string[] {
     return [...single, ...batch]
 }
 
+/** Every notification subject handed to the (mocked) Postmark send layer. */
+function sentSubjects(): string[] {
+    const single = vi.mocked(sendEmail).mock.calls.map(([opts]) => opts.subject)
+    const batch = vi
+        .mocked(sendBatchEmails)
+        .mock.calls.flatMap(([messages]) => messages.map((m) => m.subject))
+    return [...single, ...batch]
+}
+
 beforeEach(() => {
     process.env.POSTMARK_WEBHOOK_USER = WEBHOOK_USER
     process.env.POSTMARK_WEBHOOK_PASSWORD = WEBHOOK_PASSWORD
@@ -316,6 +325,41 @@ describe("inbound ticket notifications", () => {
             `/dashboard/manage-emails?email=${ticket.id}`
         )
     })
+
+    it("names the sender and subject in the new-ticket notification", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+
+        await POST(webhookRequest(inboundEmail()))
+
+        const body = sentHtmlBodies().join("\n")
+        expect(body).toContain("An Outsider")
+        expect(body).toContain("outsider@example.test")
+        expect(body).toContain("Question about the league")
+        expect(sentSubjects().join("\n")).toContain(
+            "New Inbound Email from An Outsider: Question about the league"
+        )
+    })
+
+    it("keeps concern notifications content-free", async () => {
+        process.env.INBOUND_CONCERN_ADDRESS = "concerns@bumpsetdrink.com"
+        await createUserWithRoles([{ role: "ombudsman" }])
+
+        await POST(
+            webhookRequest(
+                inboundEmail({
+                    To: "concerns@bumpsetdrink.com",
+                    Subject: "A sensitive matter"
+                })
+            )
+        )
+        delete process.env.INBOUND_CONCERN_ADDRESS
+
+        const body = sentHtmlBodies().join("\n")
+        expect(body).not.toContain("An Outsider")
+        expect(body).not.toContain("outsider@example.test")
+        expect(body).not.toContain("A sensitive matter")
+        expect(sentSubjects().join("\n")).not.toContain("A sensitive matter")
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -421,6 +465,52 @@ describe("closed thread auto-reopen", () => {
 
         expect(sentHtmlBodies().join("\n")).toContain(
             `/dashboard/manage-emails?email=${ticketId}`
+        )
+    })
+
+    it("names the sender and subject in the email-reply notification", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const ticketId = await seedEmailThread("active")
+
+        await POST(webhookRequest(replyTo(`email-${ticketId}`)))
+
+        const body = sentHtmlBodies().join("\n")
+        expect(body).toContain("An Outsider")
+        expect(body).toContain("outsider@example.test")
+        expect(body).toContain("Re: Question about the league")
+        expect(sentSubjects().join("\n")).toContain(
+            `New Reply on Email #${ticketId} from An Outsider: Re: Question about the league`
+        )
+    })
+
+    it("keeps concern-reply notifications content-free", async () => {
+        await createUserWithRoles([{ role: "ombudsman" }])
+        const [seeded] = await db
+            .insert(concerns)
+            .values({
+                anonymous: false,
+                contact_name: "An Outsider",
+                contact_email: "outsider@example.test",
+                want_followup: false,
+                incident_date: "2026-07-01",
+                location: "Submitted via email",
+                person_involved: "Someone",
+                description: "A concern",
+                status: "active",
+                source: "email",
+                source_email_id: "concern-orig-notify"
+            })
+            .returning({ id: concerns.id })
+
+        await POST(webhookRequest(replyTo(`concern-${seeded.id}`)))
+
+        const body = sentHtmlBodies().join("\n")
+        expect(body).toContain("/dashboard/manage-concerns")
+        expect(body).not.toContain("An Outsider")
+        expect(body).not.toContain("outsider@example.test")
+        expect(body).not.toContain("Question about the league")
+        expect(sentSubjects().join("\n")).toContain(
+            `New Reply on Concern #${seeded.id}`
         )
     })
 
