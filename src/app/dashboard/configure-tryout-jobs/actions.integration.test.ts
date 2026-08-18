@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import { db } from "@/database/db"
 import {
+    seasonEvents,
     tryoutVolunteerAssignments,
     tryoutVolunteerJobs
 } from "@/database/schema"
@@ -27,6 +28,7 @@ function job(overrides: Partial<TryoutJobInput> = {}): TryoutJobInput {
         name: "Scorekeeper",
         needed: 2,
         scope: "per_session",
+        courtScope: "general",
         notes: null,
         ...overrides
     }
@@ -274,6 +276,132 @@ describe("saveTryoutJobs", () => {
         expect(assignments).toHaveLength(0)
     })
 
+    it("drops assignments when a job's court scope changes", async () => {
+        const { season, tryoutEvent, tryoutSlot } = await seedBaselineSeason()
+        const volunteer = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+        await db
+            .update(seasonEvents)
+            .set({ court_numbers: [1, 2] })
+            .where(eq(seasonEvents.id, tryoutEvent.id))
+        const [existing] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: tryoutEvent.id,
+                name: "Line Judge",
+                needed: 1,
+                scope: "per_session",
+                court_scope: "per_court",
+                sort_order: 0
+            })
+            .returning()
+        await db.insert(tryoutVolunteerAssignments).values({
+            job_id: existing.id,
+            time_slot_id: tryoutSlot.id,
+            court_number: 1,
+            user_id: volunteer.id
+        })
+
+        const result = await saveTryoutJobs(tryoutEvent.id, [
+            job({ id: existing.id, name: "Line Judge", courtScope: "general" })
+        ])
+
+        expect(result.status).toBe(true)
+        const assignments = await db.select().from(tryoutVolunteerAssignments)
+        expect(assignments).toHaveLength(0)
+    })
+
+    it("saves the night's court list and rejects bad courts", async () => {
+        const { tryoutEvent } = await seedBaselineSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const saved = await saveTryoutJobs(
+            tryoutEvent.id,
+            [job({ courtScope: "per_court" })],
+            [4, 1, 3, 2, 2]
+        )
+        expect(saved.status).toBe(true)
+        const [event] = await db
+            .select({ courtNumbers: seasonEvents.court_numbers })
+            .from(seasonEvents)
+            .where(eq(seasonEvents.id, tryoutEvent.id))
+        expect(event.courtNumbers).toEqual([1, 2, 3, 4])
+
+        const view = await getConfigureTryoutJobsView()
+        const night = view.status ? view.data?.nights[0] : undefined
+        expect(night?.courtNumbers).toEqual([1, 2, 3, 4])
+        expect(night?.jobs[0].courtScope).toBe("per_court")
+
+        const rejected = await saveTryoutJobs(tryoutEvent.id, [job()], [0, 1])
+        expect(rejected.status).toBe(false)
+        expect(rejected.message).toMatch(/Court numbers/)
+
+        // Omitting the list leaves the stored courts alone.
+        const untouched = await saveTryoutJobs(tryoutEvent.id, [job()])
+        expect(untouched.status).toBe(true)
+        const [after] = await db
+            .select({ courtNumbers: seasonEvents.court_numbers })
+            .from(seasonEvents)
+            .where(eq(seasonEvents.id, tryoutEvent.id))
+        expect(after.courtNumbers).toEqual([1, 2, 3, 4])
+    })
+
+    it("removes per-court assignments for courts dropped from the list", async () => {
+        const { season, tryoutEvent, tryoutSlot } = await seedBaselineSeason()
+        const one = await createUser()
+        const two = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+        await db
+            .update(seasonEvents)
+            .set({ court_numbers: [1, 2] })
+            .where(eq(seasonEvents.id, tryoutEvent.id))
+        const [existing] = await db
+            .insert(tryoutVolunteerJobs)
+            .values({
+                season_id: season.id,
+                event_id: tryoutEvent.id,
+                name: "Line Judge",
+                needed: 1,
+                scope: "per_session",
+                court_scope: "per_court",
+                sort_order: 0
+            })
+            .returning()
+        await db.insert(tryoutVolunteerAssignments).values([
+            {
+                job_id: existing.id,
+                time_slot_id: tryoutSlot.id,
+                court_number: 1,
+                user_id: one.id
+            },
+            {
+                job_id: existing.id,
+                time_slot_id: tryoutSlot.id,
+                court_number: 2,
+                user_id: two.id
+            }
+        ])
+
+        const result = await saveTryoutJobs(
+            tryoutEvent.id,
+            [
+                job({
+                    id: existing.id,
+                    name: "Line Judge",
+                    needed: 1,
+                    courtScope: "per_court"
+                })
+            ],
+            [1]
+        )
+
+        expect(result.status).toBe(true)
+        const assignments = await db.select().from(tryoutVolunteerAssignments)
+        expect(assignments).toHaveLength(1)
+        expect(assignments[0].court_number).toBe(1)
+    })
+
     it("deletes jobs missing from the payload", async () => {
         const { season, tryoutEvent } = await seedBaselineSeason()
         await createUserWithRoles([{ role: "admin" }])
@@ -417,6 +545,48 @@ describe("importJobsFromLastSeason", () => {
             )
             expect(rows[0].notes).toBe(`note ${index + 1}`)
         }
+    })
+
+    it("copies court scope and court lists onto nights without one", async () => {
+        const { previousNights, currentNights } = await seedTwoSeasons(2)
+        await createUserWithRoles([{ role: "admin" }])
+        await db
+            .update(tryoutVolunteerJobs)
+            .set({ court_scope: "per_court" })
+            .where(eq(tryoutVolunteerJobs.id, previousNights[0].jobRow.id))
+        await db
+            .update(seasonEvents)
+            .set({ court_numbers: [1, 2, 3, 4] })
+            .where(eq(seasonEvents.id, previousNights[0].event.id))
+        await db
+            .update(seasonEvents)
+            .set({ court_numbers: [1, 2, 3, 4, 7, 8] })
+            .where(eq(seasonEvents.id, previousNights[1].event.id))
+        // Night 2 already has its own courts this season — those stay.
+        await db
+            .update(seasonEvents)
+            .set({ court_numbers: [5, 6] })
+            .where(eq(seasonEvents.id, currentNights[1].id))
+
+        const result = await importJobsFromLastSeason()
+        expect(result.status).toBe(true)
+
+        const [nightOneJob] = await db
+            .select()
+            .from(tryoutVolunteerJobs)
+            .where(eq(tryoutVolunteerJobs.event_id, currentNights[0].id))
+        expect(nightOneJob.court_scope).toBe("per_court")
+
+        const courts = await db
+            .select({
+                id: seasonEvents.id,
+                courtNumbers: seasonEvents.court_numbers
+            })
+            .from(seasonEvents)
+            .where(eq(seasonEvents.season_id, currentNights[0].season_id))
+            .orderBy(asc(seasonEvents.sort_order))
+        expect(courts[0].courtNumbers).toEqual([1, 2, 3, 4])
+        expect(courts[1].courtNumbers).toEqual([5, 6])
     })
 
     it("is idempotent — a second run imports nothing", async () => {

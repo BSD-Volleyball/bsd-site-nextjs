@@ -6,6 +6,7 @@ import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
     eventTimeSlots,
+    seasonEvents,
     tryoutVolunteerAssignments,
     tryoutVolunteerJobs,
     userRoles,
@@ -38,11 +39,17 @@ import {
 } from "@/lib/season-utils"
 import { getPlayingSlotsBySeason } from "@/lib/tryout-volunteer-conflicts"
 import {
+    assignmentCourtLabel,
     assignmentNightLabel,
     assignmentTimeLabel,
+    getTryoutCourtNumbersByEvent,
     getVolunteerAssignmentsForSeason
 } from "@/lib/tryout-volunteer-schedule"
-import type { TryoutJobScope } from "@/lib/tryout-volunteer-types"
+import {
+    courtLabel,
+    type TryoutJobCourtScope,
+    type TryoutJobScope
+} from "@/lib/tryout-volunteer-types"
 import { formatPlayerName } from "@/lib/utils"
 
 /** Roles that make someone eligible to be assigned a tryout job. */
@@ -68,6 +75,8 @@ export interface JobSlotView {
     /** null for whole-night jobs. */
     timeSlotId: number | null
     timeLabel: string
+    /** null for general jobs; one of the night's courts for per-court jobs. */
+    courtNumber: number | null
     assigned: AssignedVolunteer[]
 }
 
@@ -76,7 +85,12 @@ export interface AssignJobView {
     name: string
     needed: number
     scope: TryoutJobScope
+    courtScope: TryoutJobCourtScope
     notes: string | null
+    /**
+     * Every fillable slot: one per session (or one "All night") for general
+     * jobs, and that × every court for per-court jobs. Ordered court-major.
+     */
     slots: JobSlotView[]
 }
 
@@ -85,6 +99,8 @@ export interface AssignNightView {
     ordinal: number
     eventDate: string
     label: string | null
+    /** Courts configured for the night; per-court jobs fan out over these. */
+    courtNumbers: number[]
     jobs: AssignJobView[]
 }
 
@@ -103,19 +119,21 @@ export const getAssignTryoutJobsView = withAction(
         const tryoutEvents = getEventsByType(config, "tryout")
         if (tryoutEvents.length === 0) return ok(null)
 
-        const [jobs, assignments, playingSlots, eligible] = await Promise.all([
-            db
-                .select()
-                .from(tryoutVolunteerJobs)
-                .where(eq(tryoutVolunteerJobs.season_id, config.seasonId))
-                .orderBy(
-                    asc(tryoutVolunteerJobs.sort_order),
-                    asc(tryoutVolunteerJobs.id)
-                ),
-            getVolunteerAssignmentsForSeason(config.seasonId),
-            getPlayingSlotsBySeason(config),
-            loadEligibleVolunteers(config.seasonId)
-        ])
+        const [jobs, assignments, playingSlots, eligible, courtsByEvent] =
+            await Promise.all([
+                db
+                    .select()
+                    .from(tryoutVolunteerJobs)
+                    .where(eq(tryoutVolunteerJobs.season_id, config.seasonId))
+                    .orderBy(
+                        asc(tryoutVolunteerJobs.sort_order),
+                        asc(tryoutVolunteerJobs.id)
+                    ),
+                getVolunteerAssignmentsForSeason(config.seasonId),
+                getPlayingSlotsBySeason(config),
+                loadEligibleVolunteers(config.seasonId),
+                getTryoutCourtNumbersByEvent(tryoutEvents.map((e) => e.id))
+            ])
 
         const nameById = new Map(eligible.map((e) => [e.id, e.name]))
         // Someone assigned before losing the role still needs a name.
@@ -136,6 +154,7 @@ export const getAssignTryoutJobsView = withAction(
             const slots = [...event.timeSlots].sort(
                 (a, b) => a.sortOrder - b.sortOrder
             )
+            const courtNumbers = courtsByEvent.get(event.id) ?? []
 
             const eventJobs = jobs
                 .filter((job) => job.event_id === event.id)
@@ -146,12 +165,18 @@ export const getAssignTryoutJobsView = withAction(
 
                     const buildSlot = (
                         timeSlotId: number | null,
-                        timeLabel: string
+                        timeLabel: string,
+                        courtNumber: number | null
                     ): JobSlotView => ({
                         timeSlotId,
                         timeLabel,
+                        courtNumber,
                         assigned: jobAssignments
-                            .filter((a) => a.timeSlotId === timeSlotId)
+                            .filter(
+                                (a) =>
+                                    a.timeSlotId === timeSlotId &&
+                                    a.courtNumber === courtNumber
+                            )
                             .map((a) => ({
                                 assignmentId: a.assignmentId,
                                 userId: a.userId,
@@ -170,21 +195,32 @@ export const getAssignTryoutJobsView = withAction(
                             }))
                     })
 
+                    // Session slots for one court (or for the whole night's
+                    // general staffing when courtNumber is null).
+                    const sessionSlots = (courtNumber: number | null) =>
+                        job.scope === "whole_night"
+                            ? [buildSlot(null, "All night", courtNumber)]
+                            : slots.map((slot) =>
+                                  buildSlot(
+                                      slot.id,
+                                      formatEventTime(slot.startTime),
+                                      courtNumber
+                                  )
+                              )
+
                     return {
                         jobId: job.id,
                         name: job.name,
                         needed: job.needed,
                         scope: job.scope,
+                        courtScope: job.court_scope,
                         notes: job.notes,
                         slots:
-                            job.scope === "whole_night"
-                                ? [buildSlot(null, "All night")]
-                                : slots.map((slot) =>
-                                      buildSlot(
-                                          slot.id,
-                                          formatEventTime(slot.startTime)
-                                      )
+                            job.court_scope === "per_court"
+                                ? courtNumbers.flatMap((court) =>
+                                      sessionSlots(court)
                                   )
+                                : sessionSlots(null)
                     }
                 })
 
@@ -193,6 +229,7 @@ export const getAssignTryoutJobsView = withAction(
                 ordinal: index + 1,
                 eventDate: event.eventDate,
                 label: event.label,
+                courtNumbers,
                 jobs: eventJobs
             }
         })
@@ -272,20 +309,24 @@ async function loadEligibleVolunteers(
 
 /**
  * Loads a job and verifies it belongs to the current season, plus that the
- * time slot argument matches the job's scope — a whole-night job must have
- * a null slot and a per-session job must name a slot of its own night.
+ * time slot and court arguments match the job's scopes — a whole-night job
+ * must have a null slot and a per-session job must name a slot of its own
+ * night; a general job must have a null court and a per-court job must name
+ * one of its night's courts.
  */
 type ResolvedJob =
     | { error: string }
     | {
           job: typeof tryoutVolunteerJobs.$inferSelect
           timeSlotId: number | null
+          courtNumber: number | null
       }
 
 async function resolveJobAndSlot(
     seasonId: number,
     jobId: number,
-    timeSlotId: number | null
+    timeSlotId: number | null,
+    courtNumber: number | null
 ): Promise<ResolvedJob> {
     const [job] = await db
         .select()
@@ -296,13 +337,33 @@ async function resolveJobAndSlot(
         return { error: "Job not found in the current season." as const }
     }
 
+    if (job.court_scope === "general") {
+        if (courtNumber !== null) {
+            return { error: "This job is not tied to a court." as const }
+        }
+    } else {
+        if (courtNumber === null) {
+            return { error: "Pick a court for this job." as const }
+        }
+        const [event] = await db
+            .select({ courtNumbers: seasonEvents.court_numbers })
+            .from(seasonEvents)
+            .where(eq(seasonEvents.id, job.event_id))
+            .limit(1)
+        if (!event?.courtNumbers.includes(courtNumber)) {
+            return {
+                error: "That court is not part of this tryout date." as const
+            }
+        }
+    }
+
     if (job.scope === "whole_night") {
         if (timeSlotId !== null) {
             return {
                 error: "This job is staffed for the whole night." as const
             }
         }
-        return { job, timeSlotId: null }
+        return { job, timeSlotId: null, courtNumber }
     }
 
     if (timeSlotId === null) {
@@ -325,14 +386,15 @@ async function resolveJobAndSlot(
         }
     }
 
-    return { job, timeSlotId }
+    return { job, timeSlotId, courtNumber }
 }
 
 export const assignVolunteer = withAction(
     async (
         jobId: number,
         timeSlotId: number | null,
-        userId: string
+        userId: string,
+        courtNumber: number | null = null
     ): Promise<ActionResult<void>> => {
         const session = await requireSession()
         await requireAdmin()
@@ -343,9 +405,18 @@ export const assignVolunteer = withAction(
             timeSlotId === null || timeSlotId === undefined
                 ? null
                 : requirePositiveInt(timeSlotId, "session ID")
+        const court =
+            courtNumber === null || courtNumber === undefined
+                ? null
+                : requirePositiveInt(courtNumber, "court number")
         const targetId = requireNonEmptyString(userId, "User")
 
-        const resolved = await resolveJobAndSlot(config.seasonId, jid, slotId)
+        const resolved = await resolveJobAndSlot(
+            config.seasonId,
+            jid,
+            slotId,
+            court
+        )
         if ("error" in resolved) return fail(resolved.error)
 
         const [target] = await db
@@ -367,6 +438,7 @@ export const assignVolunteer = withAction(
             .values({
                 job_id: jid,
                 time_slot_id: resolved.timeSlotId,
+                court_number: resolved.courtNumber,
                 user_id: targetId,
                 assigned_by: session.user.id
             })
@@ -377,7 +449,11 @@ export const assignVolunteer = withAction(
             action: "assign_tryout_volunteer",
             entityType: "tryout_volunteer_assignments",
             entityId: jid,
-            summary: `Assigned ${formatPlayerName(target.firstName, target.lastName, target.preferredName)} to "${resolved.job.name}"`
+            summary: `Assigned ${formatPlayerName(target.firstName, target.lastName, target.preferredName)} to "${resolved.job.name}"${
+                resolved.courtNumber === null
+                    ? ""
+                    : ` (${courtLabel(resolved.courtNumber)})`
+            }`
         })
 
         revalidatePath("/dashboard/assign-tryout-jobs")
@@ -458,6 +534,7 @@ export const sendVolunteerAssignmentEmails = withAction(
                 nightLabel: assignmentNightLabel(assignment),
                 jobName: assignment.jobName,
                 timeLabel: assignmentTimeLabel(assignment),
+                courtLabel: assignmentCourtLabel(assignment),
                 notes: assignment.jobNotes
             }
 

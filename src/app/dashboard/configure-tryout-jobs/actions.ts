@@ -1,7 +1,17 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm"
+import {
+    and,
+    asc,
+    desc,
+    eq,
+    inArray,
+    isNotNull,
+    lt,
+    notInArray,
+    sql
+} from "drizzle-orm"
 
 import { db } from "@/database/db"
 import {
@@ -24,8 +34,13 @@ import {
 } from "@/lib/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatSeasonLabel, getEventsByType } from "@/lib/season-utils"
+import { getTryoutCourtNumbersByEvent } from "@/lib/tryout-volunteer-schedule"
 import {
+    isTryoutJobCourtScope,
     isTryoutJobScope,
+    MAX_COURT_NUMBER,
+    MAX_COURTS_PER_NIGHT,
+    type TryoutJobCourtScope,
     type TryoutJobScope
 } from "@/lib/tryout-volunteer-types"
 
@@ -34,6 +49,7 @@ export interface TryoutJobRow {
     name: string
     needed: number
     scope: TryoutJobScope
+    courtScope: TryoutJobCourtScope
     notes: string | null
     sortOrder: number
     /** How many people are currently assigned to any slot of this job. */
@@ -47,6 +63,8 @@ export interface TryoutNightView {
     /** Ordinal for display, e.g. 1 for the first tryout night. */
     ordinal: number
     timeSlots: { id: number; startTime: string; slotLabel: string | null }[]
+    /** Courts in use this night; per-court jobs fan out over these. */
+    courtNumbers: number[]
     jobs: TryoutJobRow[]
 }
 
@@ -63,10 +81,39 @@ export interface TryoutJobInput {
     name: string
     needed: number
     scope: TryoutJobScope
+    courtScope: TryoutJobCourtScope
     notes: string | null
 }
 
 const MAX_NEEDED = 50
+
+/**
+ * Validates an admin-supplied court list: whole numbers within range, no
+ * duplicates, not absurdly long. Returns the sorted list.
+ */
+function cleanCourtNumbers(input: unknown): number[] {
+    if (!Array.isArray(input)) throw new ActionError("Invalid court list.")
+    const courts = new Set<number>()
+    for (const value of input) {
+        if (
+            typeof value !== "number" ||
+            !Number.isInteger(value) ||
+            value < 1 ||
+            value > MAX_COURT_NUMBER
+        ) {
+            throw new ActionError(
+                `Court numbers must be whole numbers between 1 and ${MAX_COURT_NUMBER}.`
+            )
+        }
+        courts.add(value)
+    }
+    if (courts.size > MAX_COURTS_PER_NIGHT) {
+        throw new ActionError(
+            `A tryout night can list at most ${MAX_COURTS_PER_NIGHT} courts.`
+        )
+    }
+    return [...courts].sort((a, b) => a - b)
+}
 
 /**
  * Loads the season's tryout nights with their jobs. Returns null data when
@@ -81,14 +128,17 @@ export const getConfigureTryoutJobsView = withAction(
         const tryoutEvents = getEventsByType(config, "tryout")
         if (tryoutEvents.length === 0) return ok(null)
 
-        const jobs = await db
-            .select()
-            .from(tryoutVolunteerJobs)
-            .where(eq(tryoutVolunteerJobs.season_id, config.seasonId))
-            .orderBy(
-                asc(tryoutVolunteerJobs.sort_order),
-                asc(tryoutVolunteerJobs.id)
-            )
+        const [jobs, courtsByEvent] = await Promise.all([
+            db
+                .select()
+                .from(tryoutVolunteerJobs)
+                .where(eq(tryoutVolunteerJobs.season_id, config.seasonId))
+                .orderBy(
+                    asc(tryoutVolunteerJobs.sort_order),
+                    asc(tryoutVolunteerJobs.id)
+                ),
+            getTryoutCourtNumbersByEvent(tryoutEvents.map((e) => e.id))
+        ])
 
         const counts = new Map<number, number>()
         if (jobs.length > 0) {
@@ -120,6 +170,7 @@ export const getConfigureTryoutJobsView = withAction(
                     startTime: s.startTime,
                     slotLabel: s.slotLabel
                 })),
+            courtNumbers: courtsByEvent.get(event.id) ?? [],
             jobs: jobs
                 .filter((j) => j.event_id === event.id)
                 .map((j) => ({
@@ -127,6 +178,7 @@ export const getConfigureTryoutJobsView = withAction(
                     name: j.name,
                     needed: j.needed,
                     scope: j.scope,
+                    courtScope: j.court_scope,
                     notes: j.notes,
                     sortOrder: j.sort_order,
                     assignmentCount: counts.get(j.id) ?? 0
@@ -142,16 +194,18 @@ export const getConfigureTryoutJobsView = withAction(
 )
 
 /**
- * Replaces one tryout night's job list. Rows arriving with an id are
- * updated in place and rows without one are inserted; jobs missing from the
- * payload are deleted (which cascades to their assignments). Updating in
- * place rather than delete-and-reinsert is deliberate — a full replace
- * would silently drop every assignment on an otherwise no-op save.
+ * Replaces one tryout night's job list (and, when `courtNumbers` is given,
+ * the night's court list). Rows arriving with an id are updated in place
+ * and rows without one are inserted; jobs missing from the payload are
+ * deleted (which cascades to their assignments). Updating in place rather
+ * than delete-and-reinsert is deliberate — a full replace would silently
+ * drop every assignment on an otherwise no-op save.
  */
 export const saveTryoutJobs = withAction(
     async (
         eventId: number,
-        jobs: TryoutJobInput[]
+        jobs: TryoutJobInput[],
+        courtNumbers?: number[]
     ): Promise<ActionResult<void>> => {
         const session = await requireSession()
         await requireAdmin()
@@ -172,6 +226,8 @@ export const saveTryoutJobs = withAction(
         }
 
         if (!Array.isArray(jobs)) return fail("Invalid job list.")
+        const courts =
+            courtNumbers === undefined ? null : cleanCourtNumbers(courtNumbers)
 
         const cleaned = jobs.map((job, index) => {
             const name = requireNonEmptyString(job.name, "Job name")
@@ -189,6 +245,9 @@ export const saveTryoutJobs = withAction(
             if (!isTryoutJobScope(job.scope)) {
                 throw new ActionError(`"${name}" has an invalid scope.`)
             }
+            if (!isTryoutJobCourtScope(job.courtScope)) {
+                throw new ActionError(`"${name}" has an invalid court scope.`)
+            }
             return {
                 id:
                     job.id === null
@@ -197,6 +256,7 @@ export const saveTryoutJobs = withAction(
                 name,
                 needed,
                 scope: job.scope,
+                courtScope: job.courtScope,
                 notes: job.notes?.trim() ? job.notes.trim() : null,
                 sortOrder: index
             }
@@ -233,6 +293,13 @@ export const saveTryoutJobs = withAction(
         const removedIds = [...existingIds].filter((id) => !keptIds.has(id))
 
         await db.transaction(async (tx) => {
+            if (courts !== null) {
+                await tx
+                    .update(seasonEvents)
+                    .set({ court_numbers: courts })
+                    .where(eq(seasonEvents.id, eid))
+            }
+
             for (const job of cleaned) {
                 if (job.id === null) {
                     await tx.insert(tryoutVolunteerJobs).values({
@@ -241,17 +308,23 @@ export const saveTryoutJobs = withAction(
                         name: job.name,
                         needed: job.needed,
                         scope: job.scope,
+                        court_scope: job.courtScope,
                         notes: job.notes,
                         sort_order: job.sortOrder
                     })
                     continue
                 }
 
-                // Switching scope invalidates existing assignments: a
-                // whole-night job's rows carry a null time_slot_id that a
-                // per-session job can never mean, and vice versa.
+                // Switching either scope invalidates existing assignments:
+                // a whole-night job's rows carry a null time_slot_id that a
+                // per-session job can never mean (and vice versa), and a
+                // general job's rows carry a null court_number that a
+                // per-court job can never mean (and vice versa).
                 const [previous] = await tx
-                    .select({ scope: tryoutVolunteerJobs.scope })
+                    .select({
+                        scope: tryoutVolunteerJobs.scope,
+                        courtScope: tryoutVolunteerJobs.court_scope
+                    })
                     .from(tryoutVolunteerJobs)
                     .where(eq(tryoutVolunteerJobs.id, job.id))
                     .limit(1)
@@ -262,12 +335,17 @@ export const saveTryoutJobs = withAction(
                         name: job.name,
                         needed: job.needed,
                         scope: job.scope,
+                        court_scope: job.courtScope,
                         notes: job.notes,
                         sort_order: job.sortOrder
                     })
                     .where(eq(tryoutVolunteerJobs.id, job.id))
 
-                if (previous && previous.scope !== job.scope) {
+                if (
+                    previous &&
+                    (previous.scope !== job.scope ||
+                        previous.courtScope !== job.courtScope)
+                ) {
                     await tx
                         .delete(tryoutVolunteerAssignments)
                         .where(eq(tryoutVolunteerAssignments.job_id, job.id))
@@ -278,6 +356,33 @@ export const saveTryoutJobs = withAction(
                 await tx
                     .delete(tryoutVolunteerJobs)
                     .where(inArray(tryoutVolunteerJobs.id, removedIds))
+            }
+
+            // A court dropped from the night's list takes its per-court
+            // assignments with it — otherwise they'd linger invisibly and
+            // still count toward the volunteer's email.
+            if (courts !== null) {
+                const nightJobIds = tx
+                    .select({ id: tryoutVolunteerJobs.id })
+                    .from(tryoutVolunteerJobs)
+                    .where(eq(tryoutVolunteerJobs.event_id, eid))
+                await tx
+                    .delete(tryoutVolunteerAssignments)
+                    .where(
+                        and(
+                            inArray(
+                                tryoutVolunteerAssignments.job_id,
+                                nightJobIds
+                            ),
+                            isNotNull(tryoutVolunteerAssignments.court_number),
+                            courts.length === 0
+                                ? undefined
+                                : notInArray(
+                                      tryoutVolunteerAssignments.court_number,
+                                      courts
+                                  )
+                        )
+                    )
             }
         })
 
@@ -332,7 +437,10 @@ export const importJobsFromLastSeason = withAction(
             return fail("There is no previous season to import from.")
 
         const previousTryouts = await db
-            .select({ id: seasonEvents.id })
+            .select({
+                id: seasonEvents.id,
+                courtNumbers: seasonEvents.court_numbers
+            })
             .from(seasonEvents)
             .where(
                 and(
@@ -381,6 +489,22 @@ export const importJobsFromLastSeason = withAction(
             if (target) targetBySourceEvent.set(event.id, target.id)
         })
 
+        // Court lists ride along too, but only onto nights that don't have
+        // one yet — an admin's edits here always win over last season.
+        const currentCourts = await getTryoutCourtNumbersByEvent(
+            thisSeasonTryouts.map((e) => e.id)
+        )
+        const courtUpdates: { eventId: number; courts: number[] }[] = []
+        for (const source of previousTryouts) {
+            const targetEventId = targetBySourceEvent.get(source.id)
+            if (!targetEventId || source.courtNumbers.length === 0) continue
+            if ((currentCourts.get(targetEventId) ?? []).length > 0) continue
+            courtUpdates.push({
+                eventId: targetEventId,
+                courts: source.courtNumbers
+            })
+        }
+
         const toInsert: (typeof tryoutVolunteerJobs.$inferInsert)[] = []
         let skipped = 0
 
@@ -403,13 +527,24 @@ export const importJobsFromLastSeason = withAction(
                 name: job.name,
                 needed: job.needed,
                 scope: job.scope,
+                court_scope: job.court_scope,
                 notes: job.notes,
                 sort_order: job.sort_order
             })
         }
 
-        if (toInsert.length > 0) {
-            await db.insert(tryoutVolunteerJobs).values(toInsert)
+        if (toInsert.length > 0 || courtUpdates.length > 0) {
+            await db.transaction(async (tx) => {
+                if (toInsert.length > 0) {
+                    await tx.insert(tryoutVolunteerJobs).values(toInsert)
+                }
+                for (const update of courtUpdates) {
+                    await tx
+                        .update(seasonEvents)
+                        .set({ court_numbers: update.courts })
+                        .where(eq(seasonEvents.id, update.eventId))
+                }
+            })
         }
 
         await logAuditEntry({

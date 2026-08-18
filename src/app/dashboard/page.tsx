@@ -71,6 +71,7 @@ import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
 import {
+    assignmentCourtLabel,
     assignmentNightLabel,
     assignmentTimeLabel,
     getVolunteerAssignmentsForSeason
@@ -160,6 +161,7 @@ export default async function DashboardPage() {
         notes: string | null
         nightLabel: string
         timeLabel: string
+        courtLabel: string | null
     }[] = []
     let assignedActiveConcernsCount = 0
     let refUpcomingMatches: {
@@ -683,7 +685,8 @@ export default async function DashboardPage() {
                 jobName: a.jobName,
                 notes: a.jobNotes,
                 nightLabel: assignmentNightLabel(a),
-                timeLabel: assignmentTimeLabel(a)
+                timeLabel: assignmentTimeLabel(a),
+                courtLabel: assignmentCourtLabel(a)
             }))
     }
 
@@ -1552,6 +1555,16 @@ export default async function DashboardPage() {
                                             {job.timeLabel}
                                         </span>
                                     </div>
+                                    {job.courtLabel && (
+                                        <div className="flex justify-between gap-2">
+                                            <span className="text-purple-700 dark:text-purple-300">
+                                                Where:
+                                            </span>
+                                            <span className="text-right font-semibold text-purple-800 dark:text-purple-200">
+                                                {job.courtLabel}
+                                            </span>
+                                        </div>
+                                    )}
                                     {job.notes && (
                                         <p className="text-purple-600 text-sm dark:text-purple-400">
                                             {job.notes}

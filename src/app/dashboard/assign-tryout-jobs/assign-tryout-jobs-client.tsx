@@ -22,7 +22,10 @@ import {
 import { UserEmailCombobox } from "@/components/user-combobox"
 import { formatEventDate } from "@/lib/season-utils"
 import { roleLabel } from "@/lib/role-display"
-import { TRYOUT_JOB_SCOPE_LABELS } from "@/lib/tryout-volunteer-types"
+import {
+    courtLabel,
+    TRYOUT_JOB_SCOPE_LABELS
+} from "@/lib/tryout-volunteer-types"
 import { cn } from "@/lib/utils"
 
 import {
@@ -30,13 +33,59 @@ import {
     sendVolunteerAssignmentEmails,
     unassignVolunteer,
     type AssignJobView,
+    type AssignNightView,
     type AssignTryoutJobsView,
     type JobSlotView
 } from "./actions"
 
-/** Key identifying one job+slot picker, since slot ids can be null. */
-function slotKey(jobId: number, timeSlotId: number | null) {
-    return `${jobId}:${timeSlotId ?? "all"}`
+/** Key identifying one job+slot+court picker, since slot/court can be null. */
+function slotKey(
+    jobId: number,
+    timeSlotId: number | null,
+    courtNumber: number | null
+) {
+    return `${jobId}:${timeSlotId ?? "all"}:${courtNumber ?? "any"}`
+}
+
+/**
+ * One sub-section of a night on the board: the general jobs, or one
+ * court's share of the per-court jobs. Each entry pairs a job with just
+ * the slots that belong in this group.
+ */
+interface JobGroup {
+    key: string
+    title: string | null
+    entries: { job: AssignJobView; slots: JobSlotView[] }[]
+}
+
+/** General jobs first, then one group per court (in court order). */
+function groupNightJobs(night: AssignNightView): JobGroup[] {
+    const general = night.jobs.filter((job) => job.courtScope === "general")
+    const perCourt = night.jobs.filter((job) => job.courtScope === "per_court")
+
+    const groups: JobGroup[] = []
+    if (general.length > 0) {
+        groups.push({
+            key: "general",
+            // Only worth a heading when there are court groups to tell it
+            // apart from.
+            title: perCourt.length > 0 ? "General" : null,
+            entries: general.map((job) => ({ job, slots: job.slots }))
+        })
+    }
+    if (perCourt.length > 0) {
+        for (const court of night.courtNumbers) {
+            groups.push({
+                key: `court-${court}`,
+                title: courtLabel(court),
+                entries: perCourt.map((job) => ({
+                    job,
+                    slots: job.slots.filter((s) => s.courtNumber === court)
+                }))
+            })
+        }
+    }
+    return groups
 }
 
 export function AssignTryoutJobsClient({
@@ -102,7 +151,7 @@ export function AssignTryoutJobsClient({
     }
 
     function renderSlot(job: AssignJobView, slot: JobSlotView) {
-        const key = slotKey(job.jobId, slot.timeSlotId)
+        const key = slotKey(job.jobId, slot.timeSlotId, slot.courtNumber)
         const filled = slot.assigned.length
         const under = filled < job.needed
 
@@ -186,7 +235,8 @@ export function AssignTryoutJobsClient({
                                 assignVolunteer(
                                     job.jobId,
                                     slot.timeSlotId,
-                                    userId
+                                    userId,
+                                    slot.courtNumber
                                 )
                             )
                             if (okResult) {
@@ -196,6 +246,27 @@ export function AssignTryoutJobsClient({
                     >
                         Assign
                     </Button>
+                </div>
+            </div>
+        )
+    }
+
+    function renderJob(job: AssignJobView, slots: JobSlotView[]) {
+        return (
+            <div key={job.jobId} className="space-y-2">
+                <div className="flex flex-wrap items-baseline gap-2">
+                    <h4 className="font-semibold text-sm">{job.name}</h4>
+                    <span className="text-muted-foreground text-sm">
+                        {TRYOUT_JOB_SCOPE_LABELS[job.scope]} · {job.needed}{" "}
+                        needed
+                        {job.scope === "per_session" ? " per session" : ""}
+                    </span>
+                </div>
+                {job.notes && (
+                    <p className="text-muted-foreground text-sm">{job.notes}</p>
+                )}
+                <div className="space-y-2">
+                    {slots.map((slot) => renderSlot(job, slot))}
                 </div>
             </div>
         )
@@ -252,6 +323,10 @@ export function AssignTryoutJobsClient({
             {view.nights.map((night) => {
                 const isOpen = openNights[night.eventId] ?? true
                 const isPast = night.eventDate < today
+                const groups = groupNightJobs(night)
+                const perCourtWithoutCourts =
+                    night.courtNumbers.length === 0 &&
+                    night.jobs.some((job) => job.courtScope === "per_court")
                 return (
                     <Collapsible
                         key={night.eventId}
@@ -304,40 +379,43 @@ export function AssignTryoutJobsClient({
                                             .
                                         </p>
                                     ) : (
-                                        night.jobs.map((job) => (
-                                            <div
-                                                key={job.jobId}
-                                                className="space-y-2"
-                                            >
-                                                <div className="flex flex-wrap items-baseline gap-2">
-                                                    <h3 className="font-semibold text-sm">
-                                                        {job.name}
-                                                    </h3>
-                                                    <span className="text-muted-foreground text-sm">
-                                                        {
-                                                            TRYOUT_JOB_SCOPE_LABELS[
-                                                                job.scope
-                                                            ]
-                                                        }{" "}
-                                                        · {job.needed} needed
-                                                        {job.scope ===
-                                                        "per_session"
-                                                            ? " per session"
-                                                            : ""}
-                                                    </span>
-                                                </div>
-                                                {job.notes && (
-                                                    <p className="text-muted-foreground text-sm">
-                                                        {job.notes}
-                                                    </p>
-                                                )}
-                                                <div className="space-y-2">
-                                                    {job.slots.map((slot) =>
-                                                        renderSlot(job, slot)
+                                        <>
+                                            {perCourtWithoutCourts && (
+                                                <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-700 dark:bg-amber-950">
+                                                    This night has per-court
+                                                    jobs but no courts listed.
+                                                    Add its courts on{" "}
+                                                    <Link
+                                                        href="/dashboard/configure-tryout-jobs"
+                                                        className="underline"
+                                                    >
+                                                        Configure Tryout Jobs
+                                                    </Link>
+                                                    .
+                                                </p>
+                                            )}
+                                            {groups.map((group) => (
+                                                <section
+                                                    key={group.key}
+                                                    className="space-y-3"
+                                                >
+                                                    {group.title && (
+                                                        <h3 className="border-b pb-1 font-semibold text-sm uppercase tracking-wide">
+                                                            {group.title}
+                                                        </h3>
                                                     )}
-                                                </div>
-                                            </div>
-                                        ))
+                                                    <div className="space-y-4">
+                                                        {group.entries.map(
+                                                            (entry) =>
+                                                                renderJob(
+                                                                    entry.job,
+                                                                    entry.slots
+                                                                )
+                                                        )}
+                                                    </div>
+                                                </section>
+                                            ))}
+                                        </>
                                     )}
                                 </CardContent>
                             </CollapsibleContent>

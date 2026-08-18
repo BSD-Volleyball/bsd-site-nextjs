@@ -306,6 +306,8 @@ export interface VolunteerJobBlock {
     nightLabel: string
     jobName: string
     timeLabel: string
+    /** "Court 3" for per-court jobs; null when the job isn't tied to a court. */
+    courtLabel: string | null
     notes: string | null
 }
 
@@ -317,6 +319,9 @@ function renderVolunteerJobBlocks(jobs: VolunteerJobBlock[]): string {
                     renderDetailRow("When:", job.nightLabel),
                     renderDetailRow("Job:", job.jobName),
                     renderDetailRow("Time:", job.timeLabel),
+                    job.courtLabel
+                        ? renderDetailRow("Where:", job.courtLabel)
+                        : "",
                     job.notes ? renderDetailRow("Notes:", job.notes) : ""
                 ].filter(Boolean)
             )

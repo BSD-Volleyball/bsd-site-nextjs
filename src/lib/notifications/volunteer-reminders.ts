@@ -12,6 +12,7 @@ import {
     type VolunteerJobBlock
 } from "@/lib/email-html"
 import {
+    assignmentCourtLabel,
     assignmentNightLabel,
     assignmentTimeLabel,
     getVolunteerAssignmentsForDate
@@ -48,6 +49,7 @@ export async function sendVolunteerJobRemindersForDate(
             nightLabel: assignmentNightLabel(assignment),
             jobName: assignment.jobName,
             timeLabel: assignmentTimeLabel(assignment),
+            courtLabel: assignmentCourtLabel(assignment),
             notes: assignment.jobNotes
         }
 

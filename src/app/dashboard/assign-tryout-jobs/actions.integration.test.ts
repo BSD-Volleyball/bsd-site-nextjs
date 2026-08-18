@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { db } from "@/database/db"
 import {
+    seasonEvents,
     tryoutVolunteerAssignments,
     tryoutVolunteerJobs,
     userRoles,
@@ -68,6 +69,34 @@ async function seedTryoutNight() {
         .returning()
 
     return { season, event, slots, wholeNightJob, perSessionJob }
+}
+
+/**
+ * Adds a court list to the seeded night plus a per-court, per-session job
+ * — the "3 people × 3 sessions × 2 courts = 18 slots" case.
+ */
+async function addPerCourtJob(
+    seasonId: number,
+    eventId: number,
+    courtNumbers = [1, 2]
+) {
+    await db
+        .update(seasonEvents)
+        .set({ court_numbers: courtNumbers })
+        .where(eq(seasonEvents.id, eventId))
+    const [perCourtJob] = await db
+        .insert(tryoutVolunteerJobs)
+        .values({
+            season_id: seasonId,
+            event_id: eventId,
+            name: "Line Judge",
+            needed: 3,
+            scope: "per_session",
+            court_scope: "per_court",
+            sort_order: 2
+        })
+        .returning()
+    return perCourtJob
 }
 
 async function makeVolunteer(seasonId: number, lastName = "Volunteer") {
@@ -327,6 +356,61 @@ describe("getAssignTryoutJobsView", () => {
         const nightTwo = nights[1].jobs.find((j) => j.name === "Scorekeeper")
         expect(nightTwo?.slots[1].assigned[0].conflict).toBe(true)
     })
+
+    it("fans a per-court job out over every court × session", async () => {
+        const { season, event, slots } = await seedTryoutNight()
+        const perCourtJob = await addPerCourtJob(season.id, event.id, [1, 4])
+        const volunteer = await createUser()
+        await db.insert(tryoutVolunteerAssignments).values({
+            job_id: perCourtJob.id,
+            time_slot_id: slots[1].id,
+            court_number: 4,
+            user_id: volunteer.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getAssignTryoutJobsView()
+
+        expect(result.status).toBe(true)
+        const night = result.status ? result.data?.nights[0] : undefined
+        expect(night?.courtNumbers).toEqual([1, 4])
+        const job = night?.jobs.find((j) => j.name === "Line Judge")
+        expect(job?.courtScope).toBe("per_court")
+        // 2 courts × 3 sessions; court-major so the board can group by court.
+        expect(job?.slots).toHaveLength(6)
+        expect(job?.slots.map((s) => s.courtNumber)).toEqual([1, 1, 1, 4, 4, 4])
+        expect(job?.slots.map((s) => s.timeLabel).slice(0, 3)).toEqual([
+            "6:00 PM",
+            "7:00 PM",
+            "8:00 PM"
+        ])
+        // The assignment lands only in its own court's slot.
+        const court4Session2 = job?.slots.find(
+            (s) => s.courtNumber === 4 && s.timeSlotId === slots[1].id
+        )
+        expect(court4Session2?.assigned).toHaveLength(1)
+        const court1Session2 = job?.slots.find(
+            (s) => s.courtNumber === 1 && s.timeSlotId === slots[1].id
+        )
+        expect(court1Session2?.assigned).toHaveLength(0)
+        // General jobs carry no court.
+        const general = night?.jobs.find((j) => j.name === "Scorekeeper")
+        expect(general?.slots.every((s) => s.courtNumber === null)).toBe(true)
+    })
+
+    it("gives a per-court job no slots when the night lists no courts", async () => {
+        const { season, event } = await seedTryoutNight()
+        await addPerCourtJob(season.id, event.id, [])
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getAssignTryoutJobsView()
+
+        const night = result.status ? result.data?.nights[0] : undefined
+        expect(night?.courtNumbers).toEqual([])
+        expect(night?.jobs.find((j) => j.name === "Line Judge")?.slots).toEqual(
+            []
+        )
+    })
 })
 
 describe("assignVolunteer", () => {
@@ -506,6 +590,82 @@ describe("assignVolunteer", () => {
             1
         )
     })
+
+    it("stores the court for a per-court job and validates it", async () => {
+        const { season, event, slots } = await seedTryoutNight()
+        const perCourtJob = await addPerCourtJob(season.id, event.id, [1, 2])
+        const volunteer = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const noCourt = await assignVolunteer(
+            perCourtJob.id,
+            slots[0].id,
+            volunteer.id
+        )
+        expect(noCourt).toEqual({
+            status: false,
+            message: "Pick a court for this job."
+        })
+
+        const wrongCourt = await assignVolunteer(
+            perCourtJob.id,
+            slots[0].id,
+            volunteer.id,
+            3
+        )
+        expect(wrongCourt).toEqual({
+            status: false,
+            message: "That court is not part of this tryout date."
+        })
+
+        const ok = await assignVolunteer(
+            perCourtJob.id,
+            slots[0].id,
+            volunteer.id,
+            2
+        )
+        expect(ok.status).toBe(true)
+        const rows = await db.select().from(tryoutVolunteerAssignments)
+        expect(rows).toHaveLength(1)
+        expect(rows[0].court_number).toBe(2)
+
+        // Same person can cover the same session on the other court — the
+        // unique key includes the court — but not the same court twice.
+        const otherCourt = await assignVolunteer(
+            perCourtJob.id,
+            slots[0].id,
+            volunteer.id,
+            1
+        )
+        expect(otherCourt.status).toBe(true)
+        const again = await assignVolunteer(
+            perCourtJob.id,
+            slots[0].id,
+            volunteer.id,
+            2
+        )
+        expect(again.status).toBe(true)
+        expect(await db.select().from(tryoutVolunteerAssignments)).toHaveLength(
+            2
+        )
+    })
+
+    it("refuses a court on a general job", async () => {
+        const { slots, perSessionJob } = await seedTryoutNight()
+        const volunteer = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await assignVolunteer(
+            perSessionJob.id,
+            slots[0].id,
+            volunteer.id,
+            1
+        )
+        expect(result).toEqual({
+            status: false,
+            message: "This job is not tied to a court."
+        })
+    })
 })
 
 describe("unassignVolunteer", () => {
@@ -610,5 +770,27 @@ describe("sendVolunteerAssignmentEmails", () => {
         expect(messages[0].htmlBody).toContain("Scorekeeper")
         expect(messages[0].htmlBody).toContain("All night")
         expect(messages[0].htmlBody).toContain("6:00 PM")
+    })
+
+    it("names the court for per-court assignments", async () => {
+        process.env.NOTIFICATION_UNSUB_SECRET = "test-secret"
+        const { season, event, slots } = await seedTryoutNight()
+        const perCourtJob = await addPerCourtJob(season.id, event.id, [1, 2])
+        const volunteer = await makeVolunteer(season.id)
+        await db.insert(tryoutVolunteerAssignments).values({
+            job_id: perCourtJob.id,
+            time_slot_id: slots[2].id,
+            court_number: 2,
+            user_id: volunteer.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await sendVolunteerAssignmentEmails()
+
+        expect(result.status).toBe(true)
+        const messages = mockedSendBatch.mock.calls.flatMap((call) => call[0])
+        expect(messages[0].htmlBody).toContain("Line Judge")
+        expect(messages[0].htmlBody).toContain("Court 2")
+        expect(messages[0].htmlBody).toContain("8:00 PM")
     })
 })

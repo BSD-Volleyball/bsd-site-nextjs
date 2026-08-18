@@ -152,7 +152,13 @@ export const seasonEvents = pgTable(
         event_type: eventTypeEnum("event_type").notNull(),
         event_date: date("event_date", { mode: "string" }).notNull(),
         sort_order: integer("sort_order").notNull(),
-        label: text("label")
+        label: text("label"),
+        // Court numbers in use on this night (tryouts only; e.g. {1,2,3,4}
+        // or {1,2,3,4,7,8}). Per-court volunteer jobs fan out over these.
+        court_numbers: integer("court_numbers")
+            .array()
+            .notNull()
+            .default(sql`'{}'::integer[]`)
     },
     (table) => ({
         seasonEventsSeasonIdx: index("season_events_season_idx").on(
@@ -353,6 +359,14 @@ export const tryoutJobScopeEnum = pgEnum("tryout_job_scope", [
     "per_session"
 ])
 
+// "general" jobs are staffed once (per session or per night); "per_court"
+// jobs are duplicated for every court on the night's court list, so the
+// slot count is courts × sessions (× needed people each).
+export const tryoutJobCourtScopeEnum = pgEnum("tryout_job_court_scope", [
+    "general",
+    "per_court"
+])
+
 export const tryoutVolunteerJobs = pgTable(
     "tryout_volunteer_jobs",
     {
@@ -366,6 +380,9 @@ export const tryoutVolunteerJobs = pgTable(
         name: text("name").notNull(),
         needed: integer("needed").notNull().default(1),
         scope: tryoutJobScopeEnum("scope").notNull(),
+        court_scope: tryoutJobCourtScopeEnum("court_scope")
+            .notNull()
+            .default("general"),
         notes: text("notes"),
         sort_order: integer("sort_order").notNull().default(0),
         created_at: timestamp("created_at").defaultNow().notNull()
@@ -378,7 +395,9 @@ export const tryoutVolunteerJobs = pgTable(
 )
 
 // One person filling one slot of a job. time_slot_id is NULL for
-// whole-night jobs and references the session for per-session jobs.
+// whole-night jobs and references the session for per-session jobs;
+// court_number is NULL for general jobs and one of the night's courts for
+// per-court jobs.
 export const tryoutVolunteerAssignments = pgTable(
     "tryout_volunteer_assignments",
     {
@@ -390,6 +409,7 @@ export const tryoutVolunteerAssignments = pgTable(
             () => eventTimeSlots.id,
             { onDelete: "cascade" }
         ),
+        court_number: integer("court_number"),
         user_id: text("user_id")
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
@@ -405,12 +425,17 @@ export const tryoutVolunteerAssignments = pgTable(
         tryoutVolunteerAssignmentsUserIdx: index(
             "tryout_volunteer_assignments_user_idx"
         ).on(table.user_id),
-        // NULLS NOT DISTINCT so a whole-night job (null time_slot_id)
-        // still blocks assigning the same person twice.
+        // NULLS NOT DISTINCT so a whole-night / general job (null slot or
+        // court) still blocks assigning the same person twice.
         tryoutVolunteerAssignmentsUniq: unique(
             "tryout_volunteer_assignments_uniq"
         )
-            .on(table.job_id, table.time_slot_id, table.user_id)
+            .on(
+                table.job_id,
+                table.time_slot_id,
+                table.court_number,
+                table.user_id
+            )
             .nullsNotDistinct()
     })
 )

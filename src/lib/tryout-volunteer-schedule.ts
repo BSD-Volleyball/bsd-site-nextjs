@@ -19,7 +19,11 @@ import {
     users
 } from "@/database/schema"
 import { formatEventDate, formatEventTime } from "@/lib/season-utils"
-import type { TryoutJobScope } from "@/lib/tryout-volunteer-types"
+import {
+    courtLabel,
+    type TryoutJobCourtScope,
+    type TryoutJobScope
+} from "@/lib/tryout-volunteer-types"
 
 export interface VolunteerAssignmentDetail {
     assignmentId: number
@@ -32,6 +36,9 @@ export interface VolunteerAssignmentDetail {
     jobName: string
     jobNotes: string | null
     scope: TryoutJobScope
+    courtScope: TryoutJobCourtScope
+    /** Which court a per-court assignment covers; null for general jobs. */
+    courtNumber: number | null
     eventId: number
     eventDate: string
     eventLabel: string | null
@@ -59,6 +66,8 @@ async function loadAssignments(
             jobName: tryoutVolunteerJobs.name,
             jobNotes: tryoutVolunteerJobs.notes,
             scope: tryoutVolunteerJobs.scope,
+            courtScope: tryoutVolunteerJobs.court_scope,
+            courtNumber: tryoutVolunteerAssignments.court_number,
             jobSortOrder: tryoutVolunteerJobs.sort_order,
             eventId: seasonEvents.id,
             eventDate: seasonEvents.event_date,
@@ -85,6 +94,7 @@ async function loadAssignments(
         .orderBy(
             asc(seasonEvents.sort_order),
             asc(tryoutVolunteerJobs.sort_order),
+            asc(tryoutVolunteerAssignments.court_number),
             asc(eventTimeSlots.sort_order),
             asc(users.last_name)
         )
@@ -100,6 +110,8 @@ async function loadAssignments(
         jobName: row.jobName,
         jobNotes: row.jobNotes,
         scope: row.scope,
+        courtScope: row.courtScope,
+        courtNumber: row.courtNumber,
         eventId: row.eventId,
         eventDate: row.eventDate,
         eventLabel: row.eventLabel,
@@ -107,6 +119,26 @@ async function loadAssignments(
         timeSlotId: row.timeSlotId,
         startTime: row.startTime
     }))
+}
+
+/**
+ * Court numbers configured for each of the given tryout nights, keyed by
+ * event id. Nights with no courts listed map to an empty array.
+ */
+export async function getTryoutCourtNumbersByEvent(
+    eventIds: number[]
+): Promise<Map<number, number[]>> {
+    if (eventIds.length === 0) return new Map()
+    const rows = await db
+        .select({
+            id: seasonEvents.id,
+            courtNumbers: seasonEvents.court_numbers
+        })
+        .from(seasonEvents)
+        .where(inArray(seasonEvents.id, eventIds))
+    return new Map(
+        rows.map((row) => [row.id, [...row.courtNumbers].sort((a, b) => a - b)])
+    )
 }
 
 /** Every volunteer assignment across the season's tryout nights. */
@@ -214,4 +246,13 @@ export function assignmentNightLabel(
     const prefix =
         assignment.ordinal > 0 ? `Tryout ${assignment.ordinal} — ` : ""
     return `${prefix}${formatEventDate(assignment.eventDate)}`
+}
+
+/** "Court 3" for a per-court assignment, or null for a general one. */
+export function assignmentCourtLabel(
+    assignment: Pick<VolunteerAssignmentDetail, "courtNumber">
+): string | null {
+    return assignment.courtNumber === null
+        ? null
+        : courtLabel(assignment.courtNumber)
 }

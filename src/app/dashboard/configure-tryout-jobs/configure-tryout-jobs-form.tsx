@@ -21,7 +21,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { formatEventDate, formatEventTime } from "@/lib/season-utils"
-import type { TryoutJobScope } from "@/lib/tryout-volunteer-types"
+import {
+    formatCourtNumbers,
+    parseCourtNumbers,
+    type TryoutJobCourtScope,
+    type TryoutJobScope
+} from "@/lib/tryout-volunteer-types"
 
 import {
     importJobsFromLastSeason,
@@ -37,6 +42,7 @@ interface JobState {
     name: string
     needed: string
     scope: TryoutJobScope
+    courtScope: TryoutJobCourtScope
     notes: string
     assignmentCount: number
 }
@@ -54,9 +60,28 @@ function toState(night: TryoutNightView): JobState[] {
         name: job.name,
         needed: String(job.needed),
         scope: job.scope,
+        courtScope: job.courtScope,
         notes: job.notes ?? "",
         assignmentCount: job.assignmentCount
     }))
+}
+
+/**
+ * How many people a job needs across the whole night: `needed`, times the
+ * session count for per-session jobs, times the court count for per-court
+ * jobs. Returns null when a multiplier is zero (nothing to fill yet).
+ */
+function totalPeople(
+    needed: number,
+    scope: TryoutJobScope,
+    courtScope: TryoutJobCourtScope,
+    sessionCount: number,
+    courtCount: number
+): number | null {
+    const sessions = scope === "per_session" ? sessionCount : 1
+    const courts = courtScope === "per_court" ? courtCount : 1
+    if (sessions === 0 || courts === 0) return null
+    return needed * sessions * courts
 }
 
 export function ConfigureTryoutJobsForm({
@@ -70,6 +95,17 @@ export function ConfigureTryoutJobsForm({
         () =>
             Object.fromEntries(
                 view.nights.map((night) => [night.eventId, toState(night)])
+            )
+    )
+    // The court list is edited as free text ("1, 2, 3, 4") and parsed on
+    // save, so a half-typed value never snaps back under the admin.
+    const [courtsByEvent, setCourtsByEvent] = useState<Record<number, string>>(
+        () =>
+            Object.fromEntries(
+                view.nights.map((night) => [
+                    night.eventId,
+                    formatCourtNumbers(night.courtNumbers)
+                ])
             )
     )
     const [pendingRemoval, setPendingRemoval] = useState<{
@@ -99,6 +135,7 @@ export function ConfigureTryoutJobsForm({
                     name: "",
                     needed: "1",
                     scope: "whole_night",
+                    courtScope: "general",
                     notes: "",
                     assignmentCount: 0
                 }
@@ -128,6 +165,15 @@ export function ConfigureTryoutJobsForm({
 
     async function save(night: TryoutNightView) {
         const jobs = jobsByEvent[night.eventId] ?? []
+        const courtNumbers = parseCourtNumbers(
+            courtsByEvent[night.eventId] ?? ""
+        )
+        if (courtNumbers === null) {
+            toast.error(
+                "Courts must be a list of whole numbers, e.g. 1, 2, 3, 4."
+            )
+            return
+        }
         for (const job of jobs) {
             if (!job.name.trim()) {
                 toast.error("Every job needs a name.")
@@ -148,8 +194,10 @@ export function ConfigureTryoutJobsForm({
                 name: job.name.trim(),
                 needed: Number(job.needed),
                 scope: job.scope,
+                courtScope: job.courtScope,
                 notes: job.notes.trim() || null
-            }))
+            })),
+            courtNumbers
         )
         setBusy(false)
 
@@ -194,6 +242,14 @@ export function ConfigureTryoutJobsForm({
             {view.nights.map((night) => {
                 const jobs = jobsByEvent[night.eventId] ?? []
                 const sessionCount = night.timeSlots.length
+                // Live court count from the text box, so the people math
+                // updates as the admin types (invalid text counts as 0).
+                const courtCount =
+                    parseCourtNumbers(courtsByEvent[night.eventId] ?? "")
+                        ?.length ?? 0
+                const hasPerCourtJobs = jobs.some(
+                    (job) => job.courtScope === "per_court"
+                )
 
                 return (
                     <Card key={night.eventId}>
@@ -214,6 +270,34 @@ export function ConfigureTryoutJobsForm({
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            <div className="flex flex-wrap items-end gap-3">
+                                <div className="w-64 space-y-1">
+                                    <Label htmlFor={`courts-${night.eventId}`}>
+                                        Courts in use
+                                    </Label>
+                                    <Input
+                                        id={`courts-${night.eventId}`}
+                                        value={
+                                            courtsByEvent[night.eventId] ?? ""
+                                        }
+                                        placeholder="e.g. 1, 2, 3, 4"
+                                        onChange={(e) =>
+                                            setCourtsByEvent((prev) => ({
+                                                ...prev,
+                                                [night.eventId]: e.target.value
+                                            }))
+                                        }
+                                    />
+                                </div>
+                                <p className="max-w-md pb-2 text-muted-foreground text-sm">
+                                    Per-court jobs are repeated for every court
+                                    listed here.
+                                    {hasPerCourtJobs && courtCount === 0
+                                        ? " This night has per-court jobs but no courts, so they have nowhere to go."
+                                        : ""}
+                                </p>
+                            </div>
+
                             {jobs.length === 0 && (
                                 <p className="text-muted-foreground text-sm">
                                     No jobs defined for this night yet.
@@ -284,52 +368,112 @@ export function ConfigureTryoutJobsForm({
                                         </Button>
                                     </div>
 
-                                    <RadioGroup
-                                        value={job.scope}
-                                        onValueChange={(value) =>
-                                            update(night.eventId, job.key, {
-                                                scope: value as TryoutJobScope
-                                            })
-                                        }
-                                        className="flex flex-wrap gap-4"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <RadioGroupItem
-                                                value="whole_night"
-                                                id={`whole-${job.key}`}
-                                            />
-                                            <Label
-                                                htmlFor={`whole-${job.key}`}
-                                                className="font-normal"
-                                            >
-                                                Whole night
-                                            </Label>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <RadioGroupItem
-                                                value="per_session"
-                                                id={`session-${job.key}`}
-                                            />
-                                            <Label
-                                                htmlFor={`session-${job.key}`}
-                                                className="font-normal"
-                                            >
-                                                Per session
-                                                {sessionCount > 0 && (
-                                                    <span className="ml-1 text-muted-foreground">
-                                                        (
-                                                        {Number(job.needed) ||
-                                                            0}{" "}
-                                                        × {sessionCount} ={" "}
-                                                        {(Number(job.needed) ||
-                                                            0) *
-                                                            sessionCount}{" "}
-                                                        people)
-                                                    </span>
-                                                )}
-                                            </Label>
-                                        </div>
-                                    </RadioGroup>
+                                    <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                                        <RadioGroup
+                                            value={job.scope}
+                                            onValueChange={(value) =>
+                                                update(night.eventId, job.key, {
+                                                    scope: value as TryoutJobScope
+                                                })
+                                            }
+                                            className="flex flex-wrap gap-4"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem
+                                                    value="whole_night"
+                                                    id={`whole-${job.key}`}
+                                                />
+                                                <Label
+                                                    htmlFor={`whole-${job.key}`}
+                                                    className="font-normal"
+                                                >
+                                                    Whole night
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem
+                                                    value="per_session"
+                                                    id={`session-${job.key}`}
+                                                />
+                                                <Label
+                                                    htmlFor={`session-${job.key}`}
+                                                    className="font-normal"
+                                                >
+                                                    Per session
+                                                </Label>
+                                            </div>
+                                        </RadioGroup>
+
+                                        <RadioGroup
+                                            value={job.courtScope}
+                                            onValueChange={(value) =>
+                                                update(night.eventId, job.key, {
+                                                    courtScope:
+                                                        value as TryoutJobCourtScope
+                                                })
+                                            }
+                                            className="flex flex-wrap gap-4"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem
+                                                    value="general"
+                                                    id={`general-${job.key}`}
+                                                />
+                                                <Label
+                                                    htmlFor={`general-${job.key}`}
+                                                    className="font-normal"
+                                                >
+                                                    General
+                                                </Label>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <RadioGroupItem
+                                                    value="per_court"
+                                                    id={`court-${job.key}`}
+                                                />
+                                                <Label
+                                                    htmlFor={`court-${job.key}`}
+                                                    className="font-normal"
+                                                >
+                                                    Per court
+                                                </Label>
+                                            </div>
+                                        </RadioGroup>
+
+                                        {(() => {
+                                            const needed =
+                                                Number(job.needed) || 0
+                                            const total = totalPeople(
+                                                needed,
+                                                job.scope,
+                                                job.courtScope,
+                                                sessionCount,
+                                                courtCount
+                                            )
+                                            if (total === null) return null
+                                            const factors = [
+                                                String(needed),
+                                                job.scope === "per_session"
+                                                    ? `${sessionCount} session${sessionCount === 1 ? "" : "s"}`
+                                                    : null,
+                                                job.courtScope === "per_court"
+                                                    ? `${courtCount} court${courtCount === 1 ? "" : "s"}`
+                                                    : null
+                                            ].filter(Boolean)
+                                            return (
+                                                <span className="text-muted-foreground text-sm">
+                                                    {factors.length > 1
+                                                        ? `${factors.join(" × ")} = `
+                                                        : ""}
+                                                    {total}{" "}
+                                                    {total === 1
+                                                        ? "person"
+                                                        : "people"}{" "}
+                                                    total
+                                                </span>
+                                            )
+                                        })()}
+                                    </div>
 
                                     <div className="space-y-1">
                                         <Label htmlFor={`notes-${job.key}`}>
