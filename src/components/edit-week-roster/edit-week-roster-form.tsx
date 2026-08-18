@@ -352,6 +352,14 @@ export function EditWeekRosterForm({
                 >
                     {editor.isSaving ? "Saving..." : `Save Week ${weekNumber}`}
                 </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={editor.handleNotifyAll}
+                    disabled={editor.isSaving}
+                >
+                    Email All Saved Assignments
+                </Button>
             </div>
 
             <AdminPlayerDetailPopup
