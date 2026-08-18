@@ -40,8 +40,10 @@ describe("playerHighlightClass", () => {
         expect(playerHighlightClass(null, "base")).toBe("base")
     })
 
-    it("keeps friend visibly weaker than self", () => {
+    it("keeps self bold and friend regular, in distinct hues", () => {
         expect(PLAYER_HIGHLIGHT_CLASSES.self).toContain("font-semibold")
         expect(PLAYER_HIGHLIGHT_CLASSES.friend).not.toContain("font-semibold")
+        expect(PLAYER_HIGHLIGHT_CLASSES.self).toContain("bg-orange-")
+        expect(PLAYER_HIGHLIGHT_CLASSES.friend).toContain("bg-primary/")
     })
 })
