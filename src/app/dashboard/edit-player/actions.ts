@@ -6,8 +6,16 @@ import {
     ok,
     fail,
     requireAdmin,
+    requireSeasonConfig,
     requireSession
 } from "@/lib/action-helpers"
+import {
+    notifyCaptainsOfAvailabilityChange,
+    resolveSeasonEvents,
+    selectUnavailableEventIds
+} from "@/lib/availability"
+import { logAvailabilityChange } from "@/lib/availability-audit"
+import type { SeasonConfig } from "@/lib/season-types"
 import { syncCategoryOptouts } from "@/lib/notifications/postmark-sync"
 import {
     getOptedOutTypes,
@@ -34,9 +42,11 @@ import {
     evaluations,
     sessions,
     accounts,
-    userRoles
+    userRoles,
+    seasonEvents,
+    userUnavailability
 } from "@/database/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -687,5 +697,143 @@ export const saveUserNotificationSettings = withAction(
 
         revalidatePath("/dashboard/edit-player")
         return ok(undefined, "Notification settings updated.")
+    }
+)
+
+// ---------------------------------------------------------------------------
+// Availability (admin view/edit of a player's current-season responses)
+// ---------------------------------------------------------------------------
+
+export interface AdminAvailabilityView {
+    config: SeasonConfig
+    /** The player's current-season signup, or null for refs/non-players. */
+    signupId: number | null
+    unavailableEventIds: number[]
+    isReturningPlayer: boolean
+}
+
+/**
+ * The player's current-season signup id, if any. Rows written by the admin
+ * editor hang off the signup when one exists so they look identical to rows
+ * the player entered themselves; otherwise they hang off the user alone, the
+ * same shape the ref availability path writes.
+ */
+async function findCurrentSignupId(
+    userId: string,
+    seasonId: number
+): Promise<number | null> {
+    const [signup] = await db
+        .select({ id: signups.id })
+        .from(signups)
+        .where(and(eq(signups.season, seasonId), eq(signups.player, userId)))
+        .limit(1)
+    return signup?.id ?? null
+}
+
+export const getUserAvailabilityForCurrentSeason = withAction(
+    async (userId: string): Promise<ActionResult<AdminAvailabilityView>> => {
+        await requireAdmin()
+        const config = await requireSeasonConfig()
+
+        const [signupId, unavailableEventIds, draftRow] = await Promise.all([
+            findCurrentSignupId(userId, config.seasonId),
+            selectUnavailableEventIds(userId, config.seasonId),
+            db
+                .select({ user: drafts.user })
+                .from(drafts)
+                .where(eq(drafts.user, userId))
+                .limit(1)
+                .then((r) => r[0] ?? null)
+        ])
+
+        return ok({
+            config,
+            signupId,
+            unavailableEventIds,
+            isReturningPlayer: draftRow !== null
+        })
+    }
+)
+
+export const saveUserAvailability = withAction(
+    async (
+        userId: string,
+        unavailableEventIds: number[]
+    ): Promise<ActionResult> => {
+        await requireAdmin()
+        const session = await requireSession()
+        const config = await requireSeasonConfig()
+
+        const [user] = await db
+            .select({
+                id: users.id,
+                first_name: users.first_name,
+                last_name: users.last_name
+            })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+        if (!user) return fail("User not found.")
+
+        const eventIds = [...new Set(unavailableEventIds)]
+        const savedEvents = await resolveSeasonEvents(eventIds, config.seasonId)
+        if (!savedEvents) {
+            return fail(
+                "Those dates are no longer part of this season. Reload the page and try again."
+            )
+        }
+
+        const signupId = await findCurrentSignupId(userId, config.seasonId)
+        const previousIds = new Set(
+            await selectUnavailableEventIds(userId, config.seasonId)
+        )
+
+        // Replace only this season's rows: prior seasons' responses are history
+        // and must survive an admin correcting the current one.
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(userUnavailability)
+                .where(
+                    and(
+                        eq(userUnavailability.user_id, userId),
+                        inArray(
+                            userUnavailability.event_id,
+                            tx
+                                .select({ id: seasonEvents.id })
+                                .from(seasonEvents)
+                                .where(
+                                    eq(seasonEvents.season_id, config.seasonId)
+                                )
+                        )
+                    )
+                )
+            if (eventIds.length > 0) {
+                await tx.insert(userUnavailability).values(
+                    eventIds.map((eventId) => ({
+                        user_id: userId,
+                        signup_id: signupId,
+                        event_id: eventId
+                    }))
+                )
+            }
+        })
+
+        await logAvailabilityChange({
+            userId: session.user.id,
+            entityId: signupId ?? userId,
+            events: savedEvents,
+            context: `Admin edit for ${user.first_name} ${user.last_name}`
+        })
+
+        const nextIds = new Set(eventIds)
+        await notifyCaptainsOfAvailabilityChange(
+            userId,
+            config.seasonId,
+            eventIds.filter((id) => !previousIds.has(id)),
+            [...previousIds].filter((id) => !nextIds.has(id))
+        )
+
+        revalidatePath("/dashboard/edit-player")
+        return ok(undefined, "Availability updated.")
     }
 )

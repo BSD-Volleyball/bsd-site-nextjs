@@ -26,6 +26,7 @@ import {
 import { compressImageForUpload } from "@/lib/image-compression"
 import { formatFullTimestamp } from "@/lib/date-utils"
 import { googleMembershipOptions } from "@/lib/google-membership"
+import { AvailabilityCard } from "./availability-card"
 import { NotificationSettingsCard } from "./notification-settings-card"
 
 interface EditPlayerFormProps {
@@ -801,6 +802,15 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                     >
                         {isSignupPending ? "Saving..." : "Save Signup Changes"}
                     </Button>
+                </div>
+            )}
+
+            {selectedUserId && (
+                <div className="space-y-4 border-t pt-6">
+                    <h2 className="font-semibold text-lg">
+                        Availability (Current Season)
+                    </h2>
+                    <AvailabilityCard userId={selectedUserId} />
                 </div>
             )}
 

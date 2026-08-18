@@ -1,8 +1,6 @@
 import { db } from "@/database/db"
 import {
     signups,
-    userUnavailability,
-    seasonEvents,
     week1Rosters,
     week2Rosters,
     week3Rosters,
@@ -12,6 +10,7 @@ import {
     seasonRefs
 } from "@/database/schema"
 import { eq, and, or } from "drizzle-orm"
+import { selectUnavailableEventIds } from "@/lib/availability"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -28,27 +27,6 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = "force-dynamic"
-
-/**
- * The user's unavailable dates for one season. Scoped by season on purpose:
- * rows can outlive the season they were entered for, and an unscoped read
- * feeds prior-season ids straight back into the form, which then submits them.
- */
-async function selectUnavailableEventIds(userId: string, seasonId: number) {
-    return db
-        .select({ eventId: userUnavailability.event_id })
-        .from(userUnavailability)
-        .innerJoin(
-            seasonEvents,
-            eq(seasonEvents.id, userUnavailability.event_id)
-        )
-        .where(
-            and(
-                eq(userUnavailability.user_id, userId),
-                eq(seasonEvents.season_id, seasonId)
-            )
-        )
-}
 
 export default async function MyAvailabilityPage() {
     const session = await requireSessionOrRedirect()
@@ -128,7 +106,7 @@ export default async function MyAvailabilityPage() {
                 <AvailabilityForm
                     signupId={null}
                     config={config}
-                    initialUnavailableIds={unavailRows.map((r) => r.eventId)}
+                    initialUnavailableIds={unavailRows}
                     scheduledTimesByEventId={{}}
                     isReturningPlayer={refReturningRow !== null}
                 />
@@ -194,7 +172,7 @@ export default async function MyAvailabilityPage() {
                 .then((r) => r[0] ?? null)
         ])
 
-    const initialUnavailableIds = unavailRows.map((r) => r.eventId)
+    const initialUnavailableIds = unavailRows
 
     // Build map of eventId → scheduled time string for this player
     const scheduledTimesByEventId: Record<number, string> = {}
