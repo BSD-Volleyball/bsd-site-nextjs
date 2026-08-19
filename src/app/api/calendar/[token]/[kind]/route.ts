@@ -24,6 +24,12 @@ function parseKind(segment: string): CalendarKind | null {
  * Public iCalendar subscription feed. The token in the path is the whole
  * credential — calendar apps fetch with no session — so every failure is a
  * bare 404 and nothing distinguishes "bad token" from "bad path".
+ *
+ * Infra note: the fetchers (Google-Calendar-Importer, Apple dataaccessd,
+ * Outlook) are not browsers and cannot pass a JS challenge, so the Vercel
+ * WAF has a custom "Calendar feeds bypass" rule (GET /api/calendar/*) placed
+ * above the geo rule and the Bot Protection managed ruleset. Without it the
+ * feed is 429-challenged and subscribed calendars silently stay empty.
  */
 export async function GET(
     _request: NextRequest,
