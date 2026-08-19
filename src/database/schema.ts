@@ -1619,6 +1619,23 @@ export const notificationOptouts = pgTable(
 )
 
 /**
+ * Per-user secret for the iCalendar subscription feeds
+ * (/api/calendar/[token]/personal.ics and friends.ics). The URL is the only
+ * credential a calendar app presents, so the token lives in its own table
+ * rather than on `users` — several admin actions return whole user rows to
+ * the client, and a bearer secret must never ride along. One row per user,
+ * created lazily; "Reset link" rotates the token in place.
+ */
+export const calendarTokens = pgTable("calendar_tokens", {
+    user_id: text("user_id")
+        .primaryKey()
+        .references(() => users.id, { onDelete: "cascade" }),
+    token: text("token").notNull().unique(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    rotated_at: timestamp("rotated_at")
+})
+
+/**
  * Record of every notification email handed to Postmark by the dispatcher
  * (src/lib/notifications/dispatch.ts). Doubles as the idempotency ledger for
  * scheduled sends: cron jobs pass a dedupe_key, and the partial unique index

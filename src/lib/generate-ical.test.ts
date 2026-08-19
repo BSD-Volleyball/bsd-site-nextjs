@@ -84,4 +84,24 @@ describe("buildICalendar", () => {
             expect(line.length).toBeLessThanOrEqual(75)
         }
     })
+
+    it("keeps the default calendar name and a fresh DTSTAMP", () => {
+        const ics = buildICalendar([event()])
+        expect(ics).toContain("X-WR-CALNAME:BSD Volleyball Schedule")
+        expect(ics).not.toContain("X-PUBLISHED-TTL")
+        expect(ics).toMatch(/DTSTAMP:\d{8}T\d{6}Z/)
+    })
+
+    it("uses a custom calendar name, TTL hint and stable DTSTAMP for feeds", () => {
+        const opts = {
+            calName: "BSD Volleyball — Josh, friends",
+            dtstamp: new Date(Date.UTC(2026, 0, 1))
+        }
+        const a = buildICalendar([event()], opts)
+        const b = buildICalendar([event()], opts)
+        expect(a).toBe(b)
+        expect(a).toContain("X-WR-CALNAME:BSD Volleyball — Josh\\, friends")
+        expect(a).toContain("X-PUBLISHED-TTL:PT1H")
+        expect(a).toContain("DTSTAMP:20260101T000000Z")
+    })
 })

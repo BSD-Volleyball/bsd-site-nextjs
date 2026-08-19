@@ -6,6 +6,11 @@
 const VENUE_LOCATION =
     "Adventist HealthCare Fieldhouse, 18031 Central Park Circle, Boyds, MD 20841"
 
+/** Assumed length of a match / tryout session when no natural end exists. */
+export const MATCH_DURATION_MINUTES = 90
+/** Start time assumed for matches whose time is not yet set. */
+export const DEFAULT_START_TIME = "19:00"
+
 export interface CalendarEvent {
     uid: string
     summary: string
@@ -41,8 +46,7 @@ function escapeText(text: string): string {
         .replace(/\n/g, "\\n")
 }
 
-function formatDtstamp(): string {
-    const now = new Date()
+function formatDtstamp(now: Date): string {
     const pad = (n: number) => String(n).padStart(2, "0")
     return `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`
 }
@@ -57,15 +61,32 @@ export function parseTime(time: string): { hour: number; minute: number } {
     return { hour, minute }
 }
 
-export function buildICalendar(events: CalendarEvent[]): string {
+export interface BuildICalendarOptions {
+    /** X-WR-CALNAME shown by calendar apps for a subscribed feed. */
+    calName?: string
+    /**
+     * Fixed DTSTAMP for every VEVENT. Subscription feeds pass a stable value
+     * so a refresh that changes nothing doesn't look like an edit to the
+     * client; downloads default to "now".
+     */
+    dtstamp?: Date
+}
+
+export function buildICalendar(
+    events: CalendarEvent[],
+    options: BuildICalendarOptions = {}
+): string {
     const lines: string[] = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
         "PRODID:-//BSD Volleyball//Schedule//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        "X-WR-CALNAME:BSD Volleyball Schedule",
+        foldLine(
+            `X-WR-CALNAME:${escapeText(options.calName ?? "BSD Volleyball Schedule")}`
+        ),
         "X-WR-TIMEZONE:America/New_York",
+        ...(options.calName ? ["X-PUBLISHED-TTL:PT1H"] : []),
         // VTIMEZONE – America/New_York (DST rules since 2007)
         "BEGIN:VTIMEZONE",
         "TZID:America/New_York",
@@ -86,7 +107,7 @@ export function buildICalendar(events: CalendarEvent[]): string {
         "END:VTIMEZONE"
     ]
 
-    const dtstamp = formatDtstamp()
+    const dtstamp = formatDtstamp(options.dtstamp ?? new Date())
 
     for (const event of events) {
         const pad2 = (n: number) => String(n).padStart(2, "0")

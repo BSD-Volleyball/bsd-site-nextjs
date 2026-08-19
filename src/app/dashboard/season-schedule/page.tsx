@@ -8,7 +8,7 @@ import {
     type CurrentSeasonScheduleDivision,
     getCurrentSeasonScheduleData
 } from "./actions"
-import { AddToCalendarButton } from "./add-to-calendar-button"
+import { CalendarLinksDialog } from "@/components/calendar/calendar-links-dialog"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import type { Metadata } from "next"
 
@@ -89,7 +89,7 @@ export default async function SeasonSchedulePage() {
                     title={`${seasonLabel} Season`}
                     description="Standings, schedule, and results by division."
                 />
-                {userTeamId !== null && <AddToCalendarButton />}
+                <CalendarLinksDialog triggerLabel="Add to Calendar" />
             </div>
             {divisions.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">

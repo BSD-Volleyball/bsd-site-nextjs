@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { CalendarLinksDialog } from "@/components/calendar/calendar-links-dialog"
 import {
     Card,
     CardContent,
@@ -176,9 +177,12 @@ export function FriendsPageClient({ data }: { data: FriendsPageData }) {
                                 Click a friend's name to see their analytics.
                             </CardDescription>
                         </div>
-                        <Button onClick={() => setAddOpen(true)}>
-                            Add a Friend
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <CalendarLinksDialog triggerLabel="Friends calendar" />
+                            <Button onClick={() => setAddOpen(true)}>
+                                Add a Friend
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
