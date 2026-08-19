@@ -52,6 +52,7 @@ export default async function RatePlayerPage() {
                 tryout3Divisions={result.tryout3Divisions}
                 byTeamDivisions={result.byTeamDivisions}
                 captainTeam={result.captainTeam}
+                defaultLookupType={result.defaultLookupType}
                 initialRatings={result.ratingsByPlayer}
                 playerPicUrl={playerPicBaseUrl()}
             />

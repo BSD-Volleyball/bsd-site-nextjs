@@ -36,6 +36,7 @@ interface RatePlayerClientProps {
     tryout3Divisions: TryoutDivisionGroup[]
     byTeamDivisions: SeasonTeamDivisionGroup[]
     captainTeam: CaptainTeamRef | null
+    defaultLookupType: LookupType
     initialRatings: Record<string, PlayerRatingValues>
     playerPicUrl: string
 }
@@ -47,19 +48,25 @@ export function RatePlayerClient({
     tryout3Divisions,
     byTeamDivisions,
     captainTeam,
+    defaultLookupType,
     initialRatings,
     playerPicUrl
 }: RatePlayerClientProps) {
-    // A captain lands directly on the "By Team" view, pre-expanded to their
-    // own team; everyone else starts on the Direct lookup.
-    const [lookupType, setLookupType] = useState<LookupType>(
-        captainTeam ? "byTeam" : "direct"
-    )
-    const [tryoutSessionValue, setTryoutSessionValue] = useState<string>(
-        tryout1Sessions.length > 0
+    // The server picks the starting lookup from the season timeline (see
+    // resolveDefaultLookupType); a captain's own team is pre-expanded
+    // whenever the By Team view is shown.
+    const [lookupType, setLookupType] = useState<LookupType>(defaultLookupType)
+    const [tryoutSessionValue, setTryoutSessionValue] = useState<string>(() => {
+        if (defaultLookupType === "tryout2") {
+            return tryout2Divisions[0]?.divisionName ?? "none"
+        }
+        if (defaultLookupType === "tryout3") {
+            return tryout3Divisions[0]?.divisionName ?? "none"
+        }
+        return tryout1Sessions.length > 0
             ? String(tryout1Sessions[0].sessionNumber)
             : "none"
-    )
+    })
     const [search, setSearch] = useState("")
     const dialog = useRatePlayerDialog(initialRatings)
     const { openRateDialog } = dialog

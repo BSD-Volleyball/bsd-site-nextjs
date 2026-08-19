@@ -13,7 +13,8 @@ import {
     week3Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig } from "@/lib/site-config"
+import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
+import { getLeagueDateString } from "@/lib/date-utils"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getTeamRosterWithSubs } from "@/lib/roster"
 import { getSessionUserId, hasCaptainPagesAccessBySession } from "@/lib/rbac"
@@ -26,6 +27,7 @@ import {
     requirePermission
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
+import { resolveDefaultLookupType } from "./rate-player-helpers"
 
 export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3" | "byTeam"
 
@@ -259,6 +261,7 @@ export async function getRatePlayerData(): Promise<{
     tryout3Divisions: TryoutDivisionGroup[]
     byTeamDivisions: SeasonTeamDivisionGroup[]
     captainTeam: CaptainTeamRef | null
+    defaultLookupType: LookupType
     ratingsByPlayer: Record<string, PlayerRatingValues>
 }> {
     const hasAccess = await hasCaptainPagesAccessBySession()
@@ -273,6 +276,7 @@ export async function getRatePlayerData(): Promise<{
             tryout3Divisions: [],
             byTeamDivisions: [],
             captainTeam: null,
+            defaultLookupType: "direct",
             ratingsByPlayer: {}
         }
     }
@@ -289,6 +293,7 @@ export async function getRatePlayerData(): Promise<{
             tryout3Divisions: [],
             byTeamDivisions: [],
             captainTeam: null,
+            defaultLookupType: "direct",
             ratingsByPlayer: {}
         }
     }
@@ -306,6 +311,7 @@ export async function getRatePlayerData(): Promise<{
                 tryout3Divisions: [],
                 byTeamDivisions: [],
                 captainTeam: null,
+                defaultLookupType: "direct",
                 ratingsByPlayer: {}
             }
         }
@@ -340,6 +346,7 @@ export async function getRatePlayerData(): Promise<{
                 tryout3Divisions: [],
                 byTeamDivisions: [],
                 captainTeam: null,
+                defaultLookupType: "direct",
                 ratingsByPlayer: {}
             }
         }
@@ -541,9 +548,11 @@ export async function getRatePlayerData(): Promise<{
 
         const byTeamDivisions: SeasonTeamDivisionGroup[] = []
         let captainTeam: CaptainTeamRef | null = null
+        let draftStarted = false
 
         if (teamRows.length > 0) {
             const rosterEntries = await getTeamRosterWithSubs(config.seasonId)
+            draftStarted = rosterEntries.length > 0
             const activeUserIdsByTeam = new Map<number, Set<string>>()
             for (const entry of rosterEntries) {
                 const ids =
@@ -614,6 +623,15 @@ export async function getRatePlayerData(): Promise<{
             tryout3Divisions,
             byTeamDivisions,
             captainTeam,
+            defaultLookupType: resolveDefaultLookupType({
+                phase: config.phase,
+                tryoutDates: getEventsByType(config, "tryout").map(
+                    (event) => event.eventDate
+                ),
+                today: getLeagueDateString(),
+                draftStarted,
+                byTeamAvailable: byTeamDivisions.length > 0
+            }),
             ratingsByPlayer
         }
     } catch (error) {
@@ -628,6 +646,7 @@ export async function getRatePlayerData(): Promise<{
             tryout3Divisions: [],
             byTeamDivisions: [],
             captainTeam: null,
+            defaultLookupType: "direct",
             ratingsByPlayer: {}
         }
     }
