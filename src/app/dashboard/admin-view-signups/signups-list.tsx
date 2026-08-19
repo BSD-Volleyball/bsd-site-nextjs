@@ -14,17 +14,17 @@ import {
 import {
     logAdminCsvDownload,
     type SignupEntry,
-    type DeletedSignupEntry
+    type SignupDropEntry
 } from "./actions"
 import { AccountingCard } from "./accounting-card"
-import { DeletedSignupsCard } from "./deleted-signups-card"
-import { SignupDeleteDialog } from "./signup-delete-dialog"
+import { DroppedSignupsCard } from "./dropped-signups-card"
+import { SignupDropDialog } from "./signup-drop-dialog"
 import { UndraftedSignupsTable, DraftedSignupsTable } from "./signup-tables"
 import { generateCsvContent } from "./signups-csv"
 
 interface SignupsListProps {
     signups: SignupEntry[]
-    deletedSignups: DeletedSignupEntry[]
+    drops: SignupDropEntry[]
     playerPicUrl: string
     seasonLabel: string
     lateAmount: string
@@ -32,7 +32,7 @@ interface SignupsListProps {
 
 export function SignupsList({
     signups,
-    deletedSignups,
+    drops,
     playerPicUrl,
     seasonLabel,
     lateAmount
@@ -40,10 +40,8 @@ export function SignupsList({
     const router = useRouter()
     const [search, setSearch] = useState("")
     const [selectedEntry, setSelectedEntry] = useState<SignupEntry | null>(null)
-    const [signupToDelete, setSignupToDelete] = useState<SignupEntry | null>(
-        null
-    )
-    const [deleteResult, setDeleteResult] = useState<{
+    const [signupToDrop, setSignupToDrop] = useState<SignupEntry | null>(null)
+    const [dropResult, setDropResult] = useState<{
         status: boolean
         message: string
     } | null>(null)
@@ -125,13 +123,13 @@ export function SignupsList({
         logAdminCsvDownload()
     }
 
-    const handleDeleteClick = (entry: SignupEntry) => {
-        setDeleteResult(null)
-        setSignupToDelete(entry)
+    const handleDropClick = (entry: SignupEntry) => {
+        setDropResult(null)
+        setSignupToDrop(entry)
     }
 
-    const handleDeleted = (deleted: SignupEntry) => {
-        if (selectedEntry?.signupId === deleted.signupId) {
+    const handleDropped = (dropped: SignupEntry) => {
+        if (selectedEntry?.signupId === dropped.signupId) {
             handleCloseModal()
         }
         router.refresh()
@@ -181,16 +179,16 @@ export function SignupsList({
                 </div>
             </div>
 
-            {deleteResult && (
+            {dropResult && (
                 <div
                     className={cn(
                         "rounded-md p-4 text-sm",
-                        deleteResult.status
+                        dropResult.status
                             ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
                             : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
                     )}
                 >
-                    {deleteResult.message}
+                    {dropResult.message}
                 </div>
             )}
 
@@ -199,14 +197,14 @@ export function SignupsList({
                     entries={undraftedSignups}
                     signupNumberById={signupNumberById}
                     onPlayerClick={handlePlayerClick}
-                    onDeleteClick={handleDeleteClick}
+                    onDropClick={handleDropClick}
                 />
 
                 <DraftedSignupsTable
                     entries={draftedSignups}
                     signupNumberById={signupNumberById}
                     onPlayerClick={handlePlayerClick}
-                    onDeleteClick={handleDeleteClick}
+                    onDropClick={handleDropClick}
                 />
             </div>
 
@@ -230,16 +228,16 @@ export function SignupsList({
                 viewerRating={modal.viewerRating}
             />
 
-            <SignupDeleteDialog
-                signupToDelete={signupToDelete}
-                setSignupToDelete={setSignupToDelete}
-                deleteResult={deleteResult}
-                setDeleteResult={setDeleteResult}
+            <SignupDropDialog
+                signupToDrop={signupToDrop}
+                setSignupToDrop={setSignupToDrop}
+                dropResult={dropResult}
+                setDropResult={setDropResult}
                 seasonLabel={seasonLabel}
-                onDeleted={handleDeleted}
+                onDropped={handleDropped}
             />
 
-            <DeletedSignupsCard deletedSignups={deletedSignups} />
+            <DroppedSignupsCard drops={drops} />
         </div>
     )
 }

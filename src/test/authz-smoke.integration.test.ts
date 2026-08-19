@@ -138,14 +138,17 @@ const cases: SmokeCase[] = [
     c("adminViewSignups.getSeasonSignups", "fail", () =>
         adminViewSignups.getSeasonSignups()
     ),
-    c("adminViewSignups.deleteSignupEntry", "fail", () =>
-        adminViewSignups.deleteSignupEntry(1, "dup")
+    c("adminViewSignups.dropSignup", "fail", () =>
+        adminViewSignups.dropSignup(1, "other", "dup")
+    ),
+    c("adminViewSignups.restoreDrop", "fail", () =>
+        adminViewSignups.restoreDrop(1)
     ),
     c("adminViewSignups.logAdminCsvDownload", "void", () =>
         adminViewSignups.logAdminCsvDownload()
     ),
-    c("adminViewSignups.getDeletedSignups", "fail", () =>
-        adminViewSignups.getDeletedSignups()
+    c("adminViewSignups.getSeasonDrops", "fail", () =>
+        adminViewSignups.getSeasonDrops()
     ),
     // attrition / audit-log / captain-pairing
     c("attrition.getAttritionData", "fail", () => attrition.getAttritionData()),

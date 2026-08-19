@@ -4,7 +4,7 @@ import {
     concernComments,
     concernReplies,
     concerns,
-    deletedSignups,
+    signupDrops,
     discounts,
     draftCaptRounds,
     draftHomework,
@@ -161,15 +161,19 @@ export async function mergeUserRecords(
                 )
             )
 
-        // deleted_signups
+        // signup_drops
         await tx
-            .update(deletedSignups)
+            .update(signupDrops)
             .set({ player: newUserId })
-            .where(eq(deletedSignups.player, oldUserId))
+            .where(eq(signupDrops.player, oldUserId))
         await tx
-            .update(deletedSignups)
-            .set({ deleted_by: newUserId })
-            .where(eq(deletedSignups.deleted_by, oldUserId))
+            .update(signupDrops)
+            .set({ dropped_by: newUserId })
+            .where(eq(signupDrops.dropped_by, oldUserId))
+        await tx
+            .update(signupDrops)
+            .set({ restored_by: newUserId })
+            .where(eq(signupDrops.restored_by, oldUserId))
 
         // teams
         await tx

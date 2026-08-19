@@ -12,36 +12,51 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+    DROP_CATEGORY_LABELS,
+    SIGNUP_DROP_CATEGORIES,
+    type SignupDropCategory
+} from "@/lib/signup-drops-display"
 import { createDiscount } from "../manage-discounts/actions"
-import { deleteSignupEntry, type SignupEntry } from "./actions"
+import { dropSignup, type SignupEntry } from "./actions"
 import { getDisplayName } from "./signup-display-name"
 
-interface DeleteResult {
+interface DropResult {
     status: boolean
     message: string
 }
 
-interface SignupDeleteDialogProps {
-    signupToDelete: SignupEntry | null
-    setSignupToDelete: (entry: SignupEntry | null) => void
-    deleteResult: DeleteResult | null
-    setDeleteResult: (result: DeleteResult | null) => void
+interface SignupDropDialogProps {
+    signupToDrop: SignupEntry | null
+    setSignupToDrop: (entry: SignupEntry | null) => void
+    dropResult: DropResult | null
+    setDropResult: (result: DropResult | null) => void
     seasonLabel: string
-    onDeleted: (deleted: SignupEntry) => void
+    onDropped: (dropped: SignupEntry) => void
 }
 
-export function SignupDeleteDialog({
-    signupToDelete,
-    setSignupToDelete,
-    deleteResult,
-    setDeleteResult,
+export function SignupDropDialog({
+    signupToDrop,
+    setSignupToDrop,
+    dropResult,
+    setDropResult,
     seasonLabel,
-    onDeleted
-}: SignupDeleteDialogProps) {
-    const [isDeleting, setIsDeleting] = useState(false)
-    const [deleteReason, setDeleteReason] = useState("")
-    const [postDeleteUser, setPostDeleteUser] = useState<{
+    onDropped
+}: SignupDropDialogProps) {
+    const [isDropping, setIsDropping] = useState(false)
+    const [dropCategory, setDropCategory] = useState<SignupDropCategory | "">(
+        ""
+    )
+    const [dropNote, setDropNote] = useState("")
+    const [postDropUser, setPostDropUser] = useState<{
         userId: string
         name: string
     } | null>(null)
@@ -50,24 +65,27 @@ export function SignupDeleteDialog({
     const [discountReason, setDiscountReason] = useState("")
     const [isCreatingDiscount, setIsCreatingDiscount] = useState(false)
     const [discountCreateResult, setDiscountCreateResult] =
-        useState<DeleteResult | null>(null)
+        useState<DropResult | null>(null)
 
-    const handleDeleteSignup = async () => {
-        if (!signupToDelete) {
+    const isDrafted = Boolean(signupToDrop?.draftedIn)
+
+    const handleDropSignup = async () => {
+        if (!signupToDrop || !dropCategory) {
             return
         }
 
-        setIsDeleting(true)
+        setIsDropping(true)
 
-        const result = await deleteSignupEntry(
-            signupToDelete.signupId,
-            deleteReason
+        const result = await dropSignup(
+            signupToDrop.signupId,
+            dropCategory,
+            dropNote
         )
-        setDeleteResult({
+        setDropResult({
             status: result.status,
             message: result.message ?? ""
         })
-        setIsDeleting(false)
+        setIsDropping(false)
 
         if (result.status) {
             const expirationDate = new Date()
@@ -78,21 +96,22 @@ export function SignupDeleteDialog({
             setDiscountExpiration(expirationStr)
             setDiscountReason(`Credit from Season ${seasonLabel}`)
             setDiscountCreateResult(null)
-            setPostDeleteUser({
-                userId: signupToDelete.userId,
-                name: getDisplayName(signupToDelete)
+            setPostDropUser({
+                userId: signupToDrop.userId,
+                name: getDisplayName(signupToDrop)
             })
-            setDeleteReason("")
-            onDeleted(signupToDelete)
-            setSignupToDelete(null)
+            setDropCategory("")
+            setDropNote("")
+            onDropped(signupToDrop)
+            setSignupToDrop(null)
         }
     }
 
     const handleCreateDiscount = async () => {
-        if (!postDeleteUser) return
+        if (!postDropUser) return
         setIsCreatingDiscount(true)
         const result = await createDiscount({
-            userId: postDeleteUser.userId,
+            userId: postDropUser.userId,
             percentage: discountPercentage,
             expiration: discountExpiration || null,
             reason: discountReason || null,
@@ -104,32 +123,34 @@ export function SignupDeleteDialog({
         })
         setIsCreatingDiscount(false)
         if (result.status) {
-            setPostDeleteUser(null)
+            setPostDropUser(null)
         }
     }
 
     const handleSkipDiscount = () => {
-        setPostDeleteUser(null)
+        setPostDropUser(null)
     }
 
     return (
         <Dialog
-            open={signupToDelete !== null || postDeleteUser !== null}
+            open={signupToDrop !== null || postDropUser !== null}
             onOpenChange={(open) => {
-                if (!open && !isDeleting && !isCreatingDiscount) {
-                    setSignupToDelete(null)
-                    setPostDeleteUser(null)
-                    setDeleteReason("")
+                if (!open && !isDropping && !isCreatingDiscount) {
+                    setSignupToDrop(null)
+                    setPostDropUser(null)
+                    setDropCategory("")
+                    setDropNote("")
                 }
             }}
         >
             <DialogContent>
-                {signupToDelete && (
+                {signupToDrop && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Confirm Signup Deletion</DialogTitle>
+                            <DialogTitle>Confirm Player Drop</DialogTitle>
                             <DialogDescription>
-                                This action cannot be undone.
+                                The drop is recorded with its reason and can be
+                                restored later.
                             </DialogDescription>
                         </DialogHeader>
 
@@ -139,56 +160,101 @@ export function SignupDeleteDialog({
                                     Warning
                                 </p>
                                 <div className="mt-2 space-y-1 text-red-700 text-sm dark:text-red-300">
-                                    <p>
-                                        This will make it as if this player
-                                        never signed up.
-                                    </p>
+                                    {isDrafted ? (
+                                        <p>
+                                            This player is drafted, so their
+                                            signup and roster slot are kept. A
+                                            "Dropped" badge shows until a
+                                            permanent sub is locked in.
+                                        </p>
+                                    ) : (
+                                        <p>
+                                            This removes the player&apos;s
+                                            signup for the season. It can be
+                                            restored from the Dropped Players
+                                            list below.
+                                        </p>
+                                    )}
                                     <p>
                                         This will not refund their payment.
                                         Refunds must be done manually and
                                         separately.
                                     </p>
-                                    <p>This action cannot be reversed.</p>
                                 </div>
                             </div>
 
                             <div className="rounded-md border p-3 text-sm">
                                 <p>
                                     <span className="font-medium">Player:</span>{" "}
-                                    {getDisplayName(signupToDelete)}
+                                    {getDisplayName(signupToDrop)}
                                 </p>
                                 <p>
                                     <span className="font-medium">Email:</span>{" "}
-                                    {signupToDelete.email}
+                                    {signupToDrop.email}
                                 </p>
                                 <p>
                                     <span className="font-medium">
                                         Signup ID:
                                     </span>{" "}
-                                    {signupToDelete.signupId}
+                                    {signupToDrop.signupId}
                                 </p>
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label htmlFor="delete-reason">
-                                    Reason for deletion{" "}
+                                <Label htmlFor="drop-category">
+                                    Reason{" "}
                                     <span className="text-red-600">*</span>
                                 </Label>
-                                <Textarea
-                                    id="delete-reason"
-                                    value={deleteReason}
-                                    onChange={(e) =>
-                                        setDeleteReason(e.target.value)
+                                <Select
+                                    value={dropCategory}
+                                    onValueChange={(value) =>
+                                        setDropCategory(
+                                            value as SignupDropCategory
+                                        )
                                     }
-                                    placeholder="e.g. Player withdrew from the season"
+                                    disabled={isDropping}
+                                >
+                                    <SelectTrigger id="drop-category">
+                                        <SelectValue placeholder="Select a reason" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {SIGNUP_DROP_CATEGORIES.map(
+                                            (category) => (
+                                                <SelectItem
+                                                    key={category}
+                                                    value={category}
+                                                >
+                                                    {
+                                                        DROP_CATEGORY_LABELS[
+                                                            category
+                                                        ]
+                                                    }
+                                                </SelectItem>
+                                            )
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="drop-note">
+                                    Note (optional)
+                                </Label>
+                                <Textarea
+                                    id="drop-note"
+                                    value={dropNote}
+                                    onChange={(e) =>
+                                        setDropNote(e.target.value)
+                                    }
+                                    placeholder="e.g. Emailed 8/12, out with a knee injury"
                                     rows={2}
-                                    disabled={isDeleting}
+                                    disabled={isDropping}
                                 />
                             </div>
 
-                            {deleteResult && !deleteResult.status && (
+                            {dropResult && !dropResult.status && (
                                 <div className="rounded-md bg-red-50 p-3 text-red-800 text-sm dark:bg-red-950 dark:text-red-200">
-                                    {deleteResult.message}
+                                    {dropResult.message}
                                 </div>
                             )}
                         </div>
@@ -197,33 +263,34 @@ export function SignupDeleteDialog({
                             <Button
                                 variant="outline"
                                 onClick={() => {
-                                    setSignupToDelete(null)
-                                    setDeleteReason("")
-                                    setDeleteResult(null)
+                                    setSignupToDrop(null)
+                                    setDropCategory("")
+                                    setDropNote("")
+                                    setDropResult(null)
                                 }}
-                                disabled={isDeleting}
+                                disabled={isDropping}
                             >
                                 Cancel
                             </Button>
                             <Button
                                 variant="destructive"
-                                onClick={handleDeleteSignup}
-                                disabled={isDeleting || !deleteReason.trim()}
+                                onClick={handleDropSignup}
+                                disabled={isDropping || !dropCategory}
                             >
-                                {isDeleting ? "Deleting..." : "Confirm Delete"}
+                                {isDropping ? "Dropping..." : "Confirm Drop"}
                             </Button>
                         </DialogFooter>
                     </>
                 )}
 
-                {postDeleteUser && (
+                {postDropUser && (
                     <>
                         <DialogHeader>
                             <DialogTitle>
-                                Create Discount for {postDeleteUser.name}?
+                                Create Discount for {postDropUser.name}?
                             </DialogTitle>
                             <DialogDescription>
-                                The signup was deleted. Would you like to issue
+                                The player was dropped. Would you like to issue
                                 a discount credit for this player?
                             </DialogDescription>
                         </DialogHeader>

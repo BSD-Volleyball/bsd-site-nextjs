@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { dropCategoryLabel } from "@/lib/signup-drops-display"
 import type {
     PlayerAnalyticsResult,
     PlayerDetails,
@@ -658,6 +659,14 @@ export function AdminPlayerDetailPopup({
                                     <span className="ml-2 font-normal text-muted-foreground text-sm">
                                         (ID: {signup.seasonId})
                                     </span>
+                                    {signup.dropped && (
+                                        <Badge
+                                            variant="destructive"
+                                            className="ml-2"
+                                        >
+                                            Dropped
+                                        </Badge>
+                                    )}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -751,6 +760,34 @@ export function AdminPlayerDetailPopup({
                                             <span className="ml-2 font-medium font-mono text-xs">
                                                 {signup.orderId}
                                             </span>
+                                        </div>
+                                    )}
+                                    {signup.dropped && (
+                                        <div className="col-span-2">
+                                            <span className="text-muted-foreground">
+                                                Dropped:
+                                            </span>
+                                            <span className="ml-2 font-medium">
+                                                {dropCategoryLabel(
+                                                    signup.dropCategory ??
+                                                        "other"
+                                                )}
+                                                {signup.dropNote
+                                                    ? ` \u2014 ${signup.dropNote}`
+                                                    : ""}
+                                            </span>
+                                            {signup.droppedAt && (
+                                                <span className="ml-2 text-muted-foreground text-xs">
+                                                    {new Date(
+                                                        signup.droppedAt
+                                                    ).toLocaleDateString(
+                                                        "en-US"
+                                                    )}
+                                                    {signup.droppedByName
+                                                        ? ` by ${signup.droppedByName}`
+                                                        : ""}
+                                                </span>
+                                            )}
                                         </div>
                                     )}
                                 </div>

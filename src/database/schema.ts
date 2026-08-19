@@ -17,6 +17,10 @@ import {
     index,
     check
 } from "drizzle-orm/pg-core"
+import type {
+    SignupDropCategory,
+    SignupDropStage
+} from "../lib/signup-drops-display"
 
 export const users = pgTable("users", {
     id: text("id").primaryKey(),
@@ -251,16 +255,26 @@ export const signups = pgTable(
     })
 )
 
-export const deletedSignups = pgTable(
-    "deleted_signups",
+/**
+ * A player dropping out of a season. Pre-draft drops archive the signup row
+ * here and delete it from signups (reversible via the snapshot columns);
+ * post-draft drops keep the signup and drafts rows and only record the drop.
+ * restored_at IS NULL means the drop is still in effect.
+ */
+export const signupDrops = pgTable(
+    "signup_drops",
     {
-        id: integer("id").primaryKey(),
+        id: serial("id").primaryKey(),
+        // Original signups.id. No FK: pre-draft drops reference a deleted row.
+        signup_id: integer("signup_id").notNull(),
+        stage: text("stage").$type<SignupDropStage>().notNull(),
         season: integer("season")
             .notNull()
             .references(() => seasons.id, { onDelete: "restrict" }),
         player: text("player")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
+        // Mirror of the signup row at drop time.
         age: text("age"),
         captain: text("captain"),
         pair: boolean("pair"),
@@ -271,19 +285,45 @@ export const deletedSignups = pgTable(
         order_id: text("order_id"),
         amount_paid: numeric("amount_paid"),
         created_at: timestamp("created_at").defaultNow().notNull(),
-        deleted_at: timestamp("deleted_at").defaultNow().notNull(),
-        deleted_by: text("deleted_by")
+        // Drop metadata.
+        reason_category: text("reason_category")
+            .$type<SignupDropCategory>()
+            .notNull(),
+        reason_note: text("reason_note"),
+        // Pre-draft restore payloads.
+        unavailability_event_ids: jsonb("unavailability_event_ids").$type<
+            number[]
+        >(),
+        draft_homework_snapshot: jsonb("draft_homework_snapshot").$type<
+            Record<string, unknown>[]
+        >(),
+        // Discount redemption that pointed at this signup (captured before the
+        // delete nulls discounts.used_signup_id).
+        discount_id: integer("discount_id").references(() => discounts.id, {
+            onDelete: "set null"
+        }),
+        // Post-draft display snapshot.
+        team_name: text("team_name"),
+        division_name: text("division_name"),
+        dropped_at: timestamp("dropped_at").defaultNow().notNull(),
+        dropped_by: text("dropped_by")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
-        reason: text("reason")
+        restored_at: timestamp("restored_at"),
+        restored_by: text("restored_by").references(() => users.id, {
+            onDelete: "restrict"
+        })
     },
     (table) => ({
-        deletedSignupsSeasonIdx: index("deleted_signups_season_idx").on(
-            table.season
+        signupDropsSeasonIdx: index("signup_drops_season_idx").on(table.season),
+        signupDropsPlayerIdx: index("signup_drops_player_idx").on(table.player),
+        signupDropsSignupIdx: index("signup_drops_signup_idx").on(
+            table.signup_id
         ),
-        deletedSignupsPlayerIdx: index("deleted_signups_player_idx").on(
-            table.player
-        )
+        // One un-restored drop per player per season.
+        signupDropsActiveUniq: uniqueIndex("signup_drops_active_uniq")
+            .on(table.season, table.player)
+            .where(sql`${table.restored_at} IS NULL`)
     })
 )
 

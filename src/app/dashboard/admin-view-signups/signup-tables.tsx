@@ -15,14 +15,14 @@ interface SignupTableProps {
     entries: SignupEntry[]
     signupNumberById: Map<number, number>
     onPlayerClick: (entry: SignupEntry) => void
-    onDeleteClick: (entry: SignupEntry) => void
+    onDropClick: (entry: SignupEntry) => void
 }
 
 export function UndraftedSignupsTable({
     entries,
     signupNumberById,
     onPlayerClick,
-    onDeleteClick
+    onDropClick
 }: SignupTableProps) {
     return (
         <div className="space-y-2">
@@ -141,10 +141,10 @@ export function UndraftedSignupsTable({
                                         size="sm"
                                         onClick={(event) => {
                                             event.stopPropagation()
-                                            onDeleteClick(entry)
+                                            onDropClick(entry)
                                         }}
                                     >
-                                        Delete
+                                        Drop
                                     </Button>
                                 </td>
                             </tr>
@@ -170,7 +170,7 @@ export function DraftedSignupsTable({
     entries,
     signupNumberById,
     onPlayerClick,
-    onDeleteClick
+    onDropClick
 }: SignupTableProps) {
     return (
         <div className="space-y-2">
@@ -245,6 +245,12 @@ export function DraftedSignupsTable({
                                                 new
                                             </span>
                                         )}
+                                        {entry.droppedAt &&
+                                            !entry.subbedOut && (
+                                                <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-red-700 text-xs dark:bg-red-900 dark:text-red-300">
+                                                    dropped
+                                                </span>
+                                            )}
                                     </div>
                                 </td>
                                 <td className="px-4 py-2">
@@ -291,17 +297,19 @@ export function DraftedSignupsTable({
                                     ).toLocaleDateString("en-US")}
                                 </td>
                                 <td className="px-4 py-2">
-                                    <Button
-                                        type="button"
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={(event) => {
-                                            event.stopPropagation()
-                                            onDeleteClick(entry)
-                                        }}
-                                    >
-                                        Delete
-                                    </Button>
+                                    {!entry.droppedAt && (
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                onDropClick(entry)
+                                            }}
+                                        >
+                                            Drop
+                                        </Button>
+                                    )}
                                 </td>
                             </tr>
                         ))}

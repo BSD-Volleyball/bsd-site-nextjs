@@ -12,9 +12,10 @@ import {
     matches,
     waitlist,
     seasons,
-    substitutions
+    substitutions,
+    signupDrops
 } from "@/database/schema"
-import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
+import { eq, and, inArray, or, asc, desc, isNull } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -912,6 +913,63 @@ export async function lockInPermanentSub(input: {
                 })
                 .returning({ id: substitutions.id })
             await tx.delete(waitlist).where(eq(waitlist.id, waitlistRow.id))
+
+            // Record the departure as a signup drop unless one already exists
+            // (e.g. an admin dropped the player before finding the sub). A
+            // chained sub who never signed up has nothing to drop.
+            const [existingDrop] = await tx
+                .select({ id: signupDrops.id })
+                .from(signupDrops)
+                .where(
+                    and(
+                        eq(signupDrops.season, config.seasonId),
+                        eq(signupDrops.player, slot.activeUser.id),
+                        isNull(signupDrops.restored_at)
+                    )
+                )
+                .limit(1)
+            if (!existingDrop) {
+                const [outgoingSignup] = await tx
+                    .select()
+                    .from(signups)
+                    .where(
+                        and(
+                            eq(signups.season, config.seasonId),
+                            eq(signups.player, slot.activeUser.id)
+                        )
+                    )
+                    .limit(1)
+                if (outgoingSignup) {
+                    const [divisionRow] = await tx
+                        .select({ name: divisions.name })
+                        .from(divisions)
+                        .where(eq(divisions.id, teamRow.division))
+                        .limit(1)
+                    await tx.insert(signupDrops).values({
+                        signup_id: outgoingSignup.id,
+                        stage: "post_draft",
+                        season: outgoingSignup.season,
+                        player: outgoingSignup.player,
+                        age: outgoingSignup.age,
+                        captain: outgoingSignup.captain,
+                        pair: outgoingSignup.pair,
+                        pair_pick: outgoingSignup.pair_pick,
+                        pair_reason: outgoingSignup.pair_reason,
+                        ref_interest: outgoingSignup.ref_interest,
+                        tryout_help: outgoingSignup.tryout_help,
+                        order_id: outgoingSignup.order_id,
+                        amount_paid: outgoingSignup.amount_paid,
+                        created_at: outgoingSignup.created_at,
+                        reason_category: "other",
+                        reason_note:
+                            reason?.trim() || "Replaced by permanent sub",
+                        team_name: teamRow.name,
+                        division_name: divisionRow?.name ?? null,
+                        dropped_by: sessionUser.id
+                    })
+                }
+            }
+
             return inserted[0].id
         })
     } catch (err) {

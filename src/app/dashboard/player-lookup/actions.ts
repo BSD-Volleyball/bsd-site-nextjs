@@ -6,6 +6,7 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
+    signupDrops,
     seasons,
     teams,
     userUnavailability,
@@ -17,7 +18,7 @@ import {
     divisions,
     notificationLog
 } from "@/database/schema"
-import { eq, desc, ne, or } from "drizzle-orm"
+import { eq, desc, ne, or, and, isNull, inArray } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
@@ -146,6 +147,13 @@ export interface PlayerSignup {
     orderId: string | null
     amountPaid: string | null
     createdAt: Date
+    /** True when the player dropped out (drop not yet restored). */
+    dropped: boolean
+    dropStage: "pre_draft" | "post_draft" | null
+    dropCategory: string | null
+    dropNote: string | null
+    droppedAt: Date | null
+    droppedByName: string | null
 }
 
 /** Draft placement plus that season's record — see getSeasonHistoryForUser. */
@@ -318,10 +326,123 @@ export const getPlayerDetails = withAction(
                 return {
                     ...signup,
                     pairPickName,
-                    unavailableDates
+                    unavailableDates,
+                    dropped: false as boolean,
+                    dropStage: null as "pre_draft" | "post_draft" | null,
+                    dropCategory: null as string | null,
+                    dropNote: null as string | null,
+                    droppedAt: null as Date | null,
+                    droppedByName: null as string | null
                 }
             })
         )
+
+        // Merge in un-restored drops: post-draft drops annotate their live
+        // signup; pre-draft drops no longer have a signups row, so the entry
+        // is synthesized from the drop's snapshot columns.
+        const droppedByUser = alias(users, "dropped_by_user")
+        const dropRows = await db
+            .select({
+                signupId: signupDrops.signup_id,
+                stage: signupDrops.stage,
+                category: signupDrops.reason_category,
+                note: signupDrops.reason_note,
+                droppedAt: signupDrops.dropped_at,
+                droppedByName: droppedByUser.name,
+                seasonId: signupDrops.season,
+                seasonCode: seasons.code,
+                seasonYear: seasons.year,
+                seasonName: seasons.season,
+                age: signupDrops.age,
+                captain: signupDrops.captain,
+                pair: signupDrops.pair,
+                pairPickId: signupDrops.pair_pick,
+                pairReason: signupDrops.pair_reason,
+                orderId: signupDrops.order_id,
+                amountPaid: signupDrops.amount_paid,
+                createdAt: signupDrops.created_at,
+                unavailabilityEventIds: signupDrops.unavailability_event_ids
+            })
+            .from(signupDrops)
+            .innerJoin(seasons, eq(signupDrops.season, seasons.id))
+            .innerJoin(
+                droppedByUser,
+                eq(signupDrops.dropped_by, droppedByUser.id)
+            )
+            .where(
+                and(
+                    eq(signupDrops.player, playerId),
+                    isNull(signupDrops.restored_at)
+                )
+            )
+
+        const liveById = new Map(signupHistory.map((s) => [s.id, s]))
+        for (const drop of dropRows) {
+            const live = liveById.get(drop.signupId)
+            if (live) {
+                live.dropped = true
+                live.dropStage = drop.stage
+                live.dropCategory = drop.category
+                live.dropNote = drop.note
+                live.droppedAt = drop.droppedAt
+                live.droppedByName = drop.droppedByName
+                continue
+            }
+
+            // Pre-draft drop: synthesize the history entry.
+            let pairPickName: string | null = null
+            if (drop.pairPickId) {
+                const [pairUser] = await db
+                    .select({
+                        first_name: users.first_name,
+                        last_name: users.last_name
+                    })
+                    .from(users)
+                    .where(eq(users.id, drop.pairPickId))
+                    .limit(1)
+                if (pairUser) {
+                    pairPickName = `${pairUser.first_name} ${pairUser.last_name}`
+                }
+            }
+
+            const eventIds = drop.unavailabilityEventIds ?? []
+            let unavailableDates: string | null = null
+            if (eventIds.length > 0) {
+                const eventRows = await db
+                    .select({ eventDate: seasonEvents.event_date })
+                    .from(seasonEvents)
+                    .where(inArray(seasonEvents.id, eventIds))
+                unavailableDates =
+                    eventRows
+                        .map((e) => formatEventDate(e.eventDate))
+                        .join(", ") || null
+            }
+
+            signupHistory.push({
+                id: drop.signupId,
+                seasonId: drop.seasonId,
+                seasonCode: drop.seasonCode,
+                seasonYear: drop.seasonYear,
+                seasonName: drop.seasonName,
+                age: drop.age,
+                captain: drop.captain,
+                pair: drop.pair,
+                pairPickId: drop.pairPickId,
+                pairPickName,
+                pairReason: drop.pairReason,
+                unavailableDates,
+                orderId: drop.orderId,
+                amountPaid: drop.amountPaid,
+                createdAt: drop.createdAt,
+                dropped: true,
+                dropStage: drop.stage,
+                dropCategory: drop.category,
+                dropNote: drop.note,
+                droppedAt: drop.droppedAt,
+                droppedByName: drop.droppedByName
+            })
+        }
+        signupHistory.sort((a, b) => b.seasonId - a.seasonId)
 
         // Fetch draft history
         const draftData = await getSeasonHistoryForUser(playerId)
