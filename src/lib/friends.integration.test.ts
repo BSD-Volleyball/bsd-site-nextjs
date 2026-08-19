@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { friendships, week1Rosters } from "@/database/schema"
+import { friendships, week1Rosters, week2Rosters } from "@/database/schema"
 import { createUser } from "@/test/session"
 import {
+    createDivision,
     createEventTimeSlot,
     createSeason,
     createSeasonEvent,
@@ -192,6 +193,64 @@ describe("getFriendsWithSchedule season context", () => {
             courtNumber: null
         })
         expect(friendScheduleLine(entry)).toContain("Alternate")
+    })
+
+    it("gives week 2 sessions 1, 2, and 3 their own time slots", async () => {
+        const me = await createUser()
+        const season = await createSeason({ phase: "prep_tryout_week_2" })
+        const division = await createDivision({ name: "BB", level: 5 })
+        // Week 1 must exist so week 2 resolves as the second tryout event.
+        await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-13",
+            sort_order: 0
+        })
+        const tryout2 = await createSeasonEvent(season.id, {
+            event_type: "tryout",
+            event_date: "2026-08-20",
+            sort_order: 1
+        })
+        for (const [i, start] of ["19:00", "20:00", "21:00"].entries()) {
+            await createEventTimeSlot(tryout2.id, {
+                start_time: start,
+                sort_order: i
+            })
+        }
+
+        const friends = [] as Awaited<ReturnType<typeof createUser>>[]
+        for (const teamNumber of [1, 3, 5]) {
+            const friend = await createUser()
+            await befriend(me.id, friend.id)
+            await createSignup({ season: season.id, player: friend.id })
+            await db.insert(week2Rosters).values({
+                season: season.id,
+                user: friend.id,
+                division: division.id,
+                team_number: teamNumber
+            })
+            friends.push(friend)
+        }
+
+        const entries = await getFriendsWithSchedule(me.id, season.id)
+        const byId = new Map(entries.map((e) => [e.userId, e.preseason]))
+        expect(byId.get(friends[0].id)).toMatchObject({
+            week: 2,
+            sessionLabel: "Session 1",
+            time: "7:00 PM",
+            sortKey: "2026-08-20T19:00:00"
+        })
+        expect(byId.get(friends[1].id)).toMatchObject({
+            sessionLabel: "Session 2",
+            time: "8:00 PM",
+            sortKey: "2026-08-20T20:00:00"
+        })
+        expect(byId.get(friends[2].id)).toMatchObject({
+            sessionLabel: "Session 3",
+            time: "9:00 PM",
+            sortKey: "2026-08-20T21:00:00"
+        })
+        // Soonest session first.
+        expect(entries.map((e) => e.userId)).toEqual(friends.map((f) => f.id))
     })
 
     it("ignores preseason rosters outside the tryout phases", async () => {

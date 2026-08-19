@@ -60,8 +60,13 @@ export async function getPreseasonAssignmentsForUsers(
     const date = tryoutEvent?.eventDate ?? null
     const slots = tryoutEvent?.timeSlots ?? []
 
+    /**
+     * Weeks 2/3 run three playing sessions; week 1 runs two, and its
+     * "session 3" is the alternate list, which rides along with the last
+     * real slot for sorting. Never clamp a real session onto another's slot.
+     */
     function sessionSlot(sessionNumber: number) {
-        return slots[Math.min(sessionNumber, 2) - 1]
+        return slots[sessionNumber - 1] ?? slots[slots.length - 1]
     }
 
     function sessionTime(sessionNumber: number): string | null {
