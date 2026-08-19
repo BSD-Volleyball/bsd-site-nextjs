@@ -18,7 +18,9 @@ export function generateCalendarToken(): string {
 }
 
 /** Returns the user's feed token, creating one on first use (race-safe). */
-export async function getOrCreateCalendarToken(userId: string): Promise<string> {
+export async function getOrCreateCalendarToken(
+    userId: string
+): Promise<string> {
     const [existing] = await db
         .select({ token: calendarTokens.token })
         .from(calendarTokens)
