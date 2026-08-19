@@ -84,8 +84,8 @@ export const CALENDAR_PLATFORMS: readonly CalendarPlatform[] = [
 ]
 
 export const CALENDAR_PLATFORM_LABELS: Record<CalendarPlatform, string> = {
-    apple: "Apple Calendar",
-    google: "Google Calendar",
+    apple: "Apple",
+    google: "Google",
     outlook: "Outlook.com",
     ms365: "Microsoft 365"
 }
