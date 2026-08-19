@@ -22,6 +22,13 @@ export interface CalendarEvent {
     startTime: string
     /** HH:mm (24-hour) */
     endTime: string
+    /**
+     * RFC 5545 SEQUENCE. Set for events that revise in place under a stable
+     * UID (placeholders narrowing as the schedule firms up) so clients that
+     * compare SEQUENCE/DTSTAMP still pick the change up despite the feed's
+     * deliberately frozen DTSTAMP. Must only ever increase for a given UID.
+     */
+    sequence?: number
 }
 
 /** Fold lines longer than 75 octets per RFC 5545 §3.1 */
@@ -125,6 +132,9 @@ export function buildICalendar(
             foldLine(`SUMMARY:${escapeText(event.summary)}`),
             foldLine(`LOCATION:${escapeText(event.location)}`),
             foldLine(`DESCRIPTION:${escapeText(event.description)}`),
+            ...(event.sequence !== undefined
+                ? [`SEQUENCE:${event.sequence}`]
+                : []),
             "STATUS:CONFIRMED",
             "TRANSP:OPAQUE",
             "END:VEVENT"

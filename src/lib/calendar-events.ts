@@ -21,8 +21,8 @@ import {
     parseTime
 } from "@/lib/generate-ical"
 import type {
+    EventPlaceholder,
     MatchScheduleItem,
-    PlayoffPlaceholder,
     ScheduleItem,
     SchedulePerson,
     UserScheduleBundle
@@ -118,14 +118,29 @@ function courtLine(court: number | null): string[] {
     return court !== null ? [`Court ${court}`] : []
 }
 
+/** "Tryout 2" / "Week 4" / "Playoff Week 1". */
+function placeholderName(ph: Pick<EventPlaceholder, "eventType" | "ordinal">) {
+    switch (ph.eventType) {
+        case "tryout":
+            return `Tryout ${ph.ordinal}`
+        case "regular_season":
+            return `Week ${ph.ordinal}`
+        case "playoff":
+            return `Playoff Week ${ph.ordinal}`
+    }
+}
+
+function placeholderTbd(eventType: EventPlaceholder["eventType"]): string {
+    return eventType === "tryout" ? "Exact session TBD" : "Exact match time TBD"
+}
+
 // ---------------------------------------------------------------------------
 // Personal calendar
 // ---------------------------------------------------------------------------
 
 export function personalCalendarEvents(
     bundle: UserScheduleBundle,
-    userId: string,
-    seasonId: number
+    userId: string
 ): CalendarEvent[] {
     const person = bundle.people.get(userId)
     const name = person ? (shortNamesFor([person]).get(userId) ?? "") : ""
@@ -210,23 +225,31 @@ export function personalCalendarEvents(
         }
     }
 
-    for (const ph of bundle.playoffPlaceholders) {
+    for (const ph of bundle.placeholders) {
         if (ph.userId !== userId) continue
+        const what = placeholderName(ph)
+        const context =
+            ph.eventType === "tryout"
+                ? `${season} Tryouts`
+                : ph.eventType === "playoff"
+                  ? `${season} Playoffs${ph.divisionName ? ` – ${ph.divisionName}` : ""}`
+                  : `${season}${ph.divisionName ? ` – ${ph.divisionName}` : ""}`
         events.push({
-            uid: `bsd-playoff-wk${ph.playoffWeek}-s${seasonId}@${UID_DOMAIN}`,
-            summary: `BSD: Playoff Week ${ph.playoffWeek} (${name})`,
+            uid: `bsd-ph-${ph.eventId}-${userId}@${UID_DOMAIN}`,
+            summary: `BSD: ${what}${ph.eventType === "regular_season" ? " Game" : ""}${ph.divisionName ? ` (${ph.divisionName})` : ""}`,
             description: [
-                `${season} Playoffs – ${ph.divisionName}`,
-                `Playoff Week ${ph.playoffWeek}`,
+                context,
+                what,
                 ph.label ?? "",
-                "Exact match time TBD"
+                placeholderTbd(ph.eventType)
             ]
                 .filter(Boolean)
                 .join("\n"),
             location: VENUE_LOCATION,
             dateStr: toDateStr(ph.date),
             startTime: ph.startTime,
-            endTime: ph.endTime
+            endTime: ph.endTime,
+            sequence: ph.stage
         })
     }
 
@@ -399,10 +422,10 @@ export function friendsCalendarEvents(
         })
     }
 
-    // Playoff placeholders: one per playoff night, listing the people whose
-    // playoff match isn't scheduled yet.
-    const byEvent = new Map<number, PlayoffPlaceholder[]>()
-    for (const ph of bundle.playoffPlaceholders) {
+    // Placeholders: one per unresolved season night, listing the people who
+    // are expected there but have no concrete assignment yet.
+    const byEvent = new Map<number, EventPlaceholder[]>()
+    for (const ph of bundle.placeholders) {
         if (!bundle.people.has(ph.userId)) continue
         const list = byEvent.get(ph.eventId) ?? []
         list.push(ph)
@@ -418,19 +441,26 @@ export function friendsCalendarEvents(
         const people = Array.from(
             new Set(sorted.map((p) => names.get(p.userId) ?? "?"))
         )
+        const sample = sorted[0]
+        const what = placeholderName(sample)
+        const gamesSuffix =
+            sample.eventType === "regular_season" ? " Games" : ""
         events.push({
-            uid: `bsd-friends-playoff-${ownerId}-${eventId}@${UID_DOMAIN}`,
-            summary: `BSD: Playoffs TBD — ${people.join(", ")}`,
+            uid: `bsd-friends-ph-${ownerId}-${eventId}@${UID_DOMAIN}`,
+            summary: `BSD: ${what}${gamesSuffix} TBD — ${people.join(", ")}`,
             description: sorted
                 .map(
                     (p) =>
-                        `${names.get(p.userId) ?? "?"} — Playoff Week ${p.playoffWeek} (${p.divisionName}) — time TBD`
+                        `${names.get(p.userId) ?? "?"} — ${placeholderName(p)}${
+                            p.divisionName ? ` (${p.divisionName})` : ""
+                        } — time TBD`
                 )
                 .join("\n"),
             location: VENUE_LOCATION,
-            dateStr: toDateStr(sorted[0].date),
+            dateStr: toDateStr(sample.date),
             startTime: start,
-            endTime: end
+            endTime: end,
+            sequence: Math.max(...sorted.map((p) => p.stage))
         })
     }
 

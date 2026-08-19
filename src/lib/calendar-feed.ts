@@ -57,7 +57,7 @@ export async function buildCalendar(
 
     const name = owner.preferredName || owner.firstName
     return {
-        ics: buildICalendar(personalCalendarEvents(bundle, userId, seasonId), {
+        ics: buildICalendar(personalCalendarEvents(bundle, userId), {
             calName: `BSD Volleyball — ${name}`,
             dtstamp
         }),

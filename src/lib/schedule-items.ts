@@ -26,12 +26,18 @@ import {
     playoffMatchesMeta,
     seasonEvents,
     seasons,
+    signups,
     teams,
+    userUnavailability,
     users,
     week1Rosters,
     week2Rosters,
     week3Rosters
 } from "@/database/schema"
+import {
+    FOUR_TEAM_TIMES,
+    SIX_TEAM_TIMES
+} from "@/app/dashboard/create-schedule/schedule-constants"
 import {
     LEGACY_COURT_BY_DIVISION,
     getSessionNumberFromTeam
@@ -45,7 +51,7 @@ import { getTeamRosterWithSubs } from "@/lib/roster"
 import { formatSeasonLabel } from "@/lib/season-utils"
 import {
     EMPTY_SCHEDULE_BUNDLE,
-    type PlayoffPlaceholder,
+    type EventPlaceholder,
     type ScheduleItem,
     type SchedulePerson,
     type UserScheduleBundle
@@ -57,8 +63,8 @@ import {
 
 export {
     EMPTY_SCHEDULE_BUNDLE,
+    type EventPlaceholder,
     type MatchScheduleItem,
-    type PlayoffPlaceholder,
     type RefScheduleItem,
     type ScheduleItem,
     type SchedulePerson,
@@ -76,10 +82,9 @@ function teamLabel(name: string | null, number: number | null): string {
 }
 
 /**
- * Start/end window for a playoff-night placeholder: the night's time slots
- * narrowed to the division's regular-season playing window (so a 6pm
- * division doesn't get an 8:30pm placeholder). Falls back to all slots, then
- * to a single default match.
+ * Start/end window for a placeholder night: the night's time slots narrowed
+ * to the division's playing window (so a 6pm division doesn't get an 8:30pm
+ * placeholder). Falls back to all slots, then to a single default match.
  */
 export function placeholderWindow(
     slotStartTimes: string[],
@@ -115,6 +120,35 @@ export function placeholderWindow(
     }
 }
 
+/** Fallback whole-night window when an event has no time slots configured. */
+const DEFAULT_NIGHT_WINDOW = { startTime: "19:00", endTime: "22:30" }
+
+/**
+ * The minutes-of-day a division's matches will occupy once the schedule is
+ * generated, predicted from the generator's slot-selection convention
+ * (buildRegularSeasonMatches): 4-team divisions play seasonTimes[1..2],
+ * 6-team divisions play seasonTimes[0..2], with static fallbacks. Lets a
+ * placeholder narrow post-draft before any matches exist.
+ */
+export function predictedDivisionMinutes(
+    teamCount: number,
+    seasonSlotTimes: string[]
+): number[] {
+    const four = teamCount <= 4
+    const fallback = four ? FOUR_TEAM_TIMES : SIX_TEAM_TIMES
+    const out: number[] = []
+    for (let m = 0; m < fallback.length; m++) {
+        const t = four
+            ? seasonSlotTimes[m + 1] || fallback[m]
+            : seasonSlotTimes[m] || fallback[m]
+        if (!t) continue
+        const { hour, minute } = parseTime(t)
+        const mins = hour * 60 + minute
+        if (mins > 0) out.push(mins)
+    }
+    return out
+}
+
 export async function getScheduleForUsers(
     userIds: string[],
     seasonId: number
@@ -141,7 +175,9 @@ export async function getScheduleForUsers(
         w1Rows,
         w2Rows,
         w3Rows,
-        volunteerAssignments
+        volunteerAssignments,
+        signupRows,
+        unavailRows
     ] = await Promise.all([
         db
             .select({
@@ -258,12 +294,7 @@ export async function getScheduleForUsers(
                 court: week1Rosters.court_number
             })
             .from(week1Rosters)
-            .where(
-                and(
-                    eq(week1Rosters.season, seasonId),
-                    inArray(week1Rosters.user, ids)
-                )
-            ),
+            .where(eq(week1Rosters.season, seasonId)),
         db
             .select({
                 userId: week2Rosters.user,
@@ -273,12 +304,7 @@ export async function getScheduleForUsers(
             })
             .from(week2Rosters)
             .innerJoin(divisions, eq(week2Rosters.division, divisions.id))
-            .where(
-                and(
-                    eq(week2Rosters.season, seasonId),
-                    inArray(week2Rosters.user, ids)
-                )
-            ),
+            .where(eq(week2Rosters.season, seasonId)),
         db
             .select({
                 userId: week3Rosters.user,
@@ -288,13 +314,30 @@ export async function getScheduleForUsers(
             })
             .from(week3Rosters)
             .innerJoin(divisions, eq(week3Rosters.division, divisions.id))
+            .where(eq(week3Rosters.season, seasonId)),
+        getVolunteerAssignmentsForSeason(seasonId),
+        db
+            .select({ userId: signups.player })
+            .from(signups)
+            .where(
+                and(eq(signups.season, seasonId), inArray(signups.player, ids))
+            ),
+        db
+            .select({
+                userId: userUnavailability.user_id,
+                eventId: userUnavailability.event_id
+            })
+            .from(userUnavailability)
+            .innerJoin(
+                seasonEvents,
+                eq(userUnavailability.event_id, seasonEvents.id)
+            )
             .where(
                 and(
-                    eq(week3Rosters.season, seasonId),
-                    inArray(week3Rosters.user, ids)
+                    eq(seasonEvents.season_id, seasonId),
+                    inArray(userUnavailability.user_id, ids)
                 )
-            ),
-        getVolunteerAssignmentsForSeason(seasonId)
+            )
     ])
 
     const people = new Map<string, SchedulePerson>(
@@ -321,7 +364,11 @@ export async function getScheduleForUsers(
     const tryoutEvents = eventRows.filter((e) => e.eventType === "tryout")
     const playoffEvents = eventRows.filter((e) => e.eventType === "playoff")
 
-    const slotEventIds = [...tryoutEvents, ...playoffEvents].map((e) => e.id)
+    const slotEventIds = [
+        ...tryoutEvents,
+        ...playoffEvents,
+        ...regularEvents
+    ].map((e) => e.id)
     const slotRows = slotEventIds.length
         ? await db
               .select({
@@ -480,12 +527,16 @@ export async function getScheduleForUsers(
             sublabel
         })
     }
-    for (const r of w1Rows) pushTryout(r.userId, 0, r.session, r.court, null)
+    for (const r of w1Rows) {
+        if (!idSet.has(r.userId)) continue
+        pushTryout(r.userId, 0, r.session, r.court, null)
+    }
     for (const [weekIndex, rows] of [
         [1, w2Rows],
         [2, w3Rows]
     ] as const) {
         for (const r of rows) {
+            if (!idSet.has(r.userId)) continue
             pushTryout(
                 r.userId,
                 weekIndex,
@@ -534,10 +585,31 @@ export async function getScheduleForUsers(
         })
     }
 
-    // Playoff placeholders: one per playoff night per rostered person, unless
-    // a real playoff match for that person already exists on that date.
-    const playoffPlaceholders: PlayoffPlaceholder[] = []
-    if (playoffEvents.length > 0 && teamByUser.size > 0) {
+    // Placeholders: one tentative hold per known season night (tryouts,
+    // regular-season weeks, playoff weeks) for every signed-up person,
+    // suppressed as real assignments, posted rosters, the draft, or the
+    // person's own unavailability resolve each night. See EventPlaceholder.
+    const placeholders: EventPlaceholder[] = []
+    const signedUp = new Set(signupRows.map((r) => r.userId))
+    if (signedUp.size > 0) {
+        const unavailable = new Set(
+            unavailRows.map((r) => `${r.userId}|${r.eventId}`)
+        )
+        // Any team roster for the season means the draft has happened:
+        // signed-up players without a team no longer expect game nights.
+        const teamsExist = roster.length > 0
+        const rosterPostedByWeek = [
+            w1Rows.length > 0,
+            w2Rows.length > 0,
+            w3Rows.length > 0
+        ]
+        const seasonSlots = regularEvents.length
+            ? (slotsByEvent.get(regularEvents[0].id) ?? [])
+            : []
+
+        // Minutes-of-day each division actually plays (posted matches) and
+        // is predicted to play (generator convention + team count), unioned
+        // so narrowing works both before and after schedule generation.
         const divisionMinutes = new Map<number, number[]>()
         for (const m of matchRows) {
             if (m.playoff || !m.time) continue
@@ -548,31 +620,143 @@ export async function getScheduleForUsers(
             list.push(mins)
             divisionMinutes.set(m.divisionId, list)
         }
-        const resolvedDates = new Set(
-            items
-                .filter((i) => i.kind === "match" && i.playoff)
-                .map((i) => `${i.userId}|${i.date}`)
-        )
-        for (const [idx, event] of playoffEvents.entries()) {
-            const slots = slotsByEvent.get(event.id) ?? []
-            for (const [userId, teamId] of teamByUser) {
-                if (resolvedDates.has(`${userId}|${event.eventDate}`)) continue
-                const team = teamById.get(teamId)
-                if (!team) continue
-                const window = placeholderWindow(
-                    slots,
-                    divisionMinutes.get(team.divisionId) ?? []
+        const teamCountByDivision = new Map<number, number>()
+        for (const t of teamRows) {
+            teamCountByDivision.set(
+                t.divisionId,
+                (teamCountByDivision.get(t.divisionId) ?? 0) + 1
+            )
+        }
+        const minutesForDivision = (divisionId: number): number[] => [
+            ...(divisionMinutes.get(divisionId) ?? []),
+            ...predictedDivisionMinutes(
+                teamCountByDivision.get(divisionId) ?? 6,
+                seasonSlots
+            )
+        ]
+
+        // Nights already resolved by real items.
+        const playoffResolved = new Set<string>()
+        const regularPlayDates = new Set<string>()
+        const volunteerEvents = new Set<string>()
+        const weeksByTeam = new Map<number, Set<number>>()
+        for (const i of items) {
+            if (i.kind === "match") {
+                if (i.playoff) playoffResolved.add(`${i.userId}|${i.date}`)
+                else if (i.role === "play")
+                    regularPlayDates.add(`${i.userId}|${i.date}`)
+            } else if (i.kind === "volunteer") {
+                volunteerEvents.add(`${i.userId}|${i.eventId}`)
+            }
+        }
+        for (const m of matchRows) {
+            if (m.playoff) continue
+            for (const teamId of [m.homeTeamId, m.awayTeamId]) {
+                if (teamId === null) continue
+                const set = weeksByTeam.get(teamId) ?? new Set()
+                set.add(m.week)
+                weeksByTeam.set(teamId, set)
+            }
+        }
+
+        const wholeNight = (slots: string[]) => {
+            if (slots.length === 0) return DEFAULT_NIGHT_WINDOW
+            const last = parseTime(slots[slots.length - 1])
+            return {
+                startTime: hhmm(parseTime(slots[0])),
+                endTime: hhmm(
+                    addMinutes(last.hour, last.minute, MATCH_DURATION_MINUTES)
                 )
-                playoffPlaceholders.push({
+            }
+        }
+
+        for (const userId of signedUp) {
+            const teamId = teamByUser.get(userId)
+            const team =
+                teamId !== undefined ? (teamById.get(teamId) ?? null) : null
+
+            // Tryout nights: held until that week's roster is posted (roster
+            // members get their real session as an item instead; everyone
+            // else is not playing that night).
+            for (const [idx, event] of tryoutEvents.entries()) {
+                if (unavailable.has(`${userId}|${event.id}`)) continue
+                if (rosterPostedByWeek[idx]) continue
+                if (volunteerEvents.has(`${userId}|${event.id}`)) continue
+                const window = wholeNight(slotsByEvent.get(event.id) ?? [])
+                placeholders.push({
                     userId,
                     eventId: event.id,
                     date: event.eventDate,
-                    playoffWeek: idx + 1,
-                    startTime: window.startTime,
-                    endTime: window.endTime,
-                    divisionId: team.divisionId,
-                    divisionName: team.divisionName,
-                    label: event.label
+                    eventType: "tryout",
+                    ordinal: idx + 1,
+                    ...window,
+                    divisionId: null,
+                    divisionName: null,
+                    label: event.label,
+                    stage: 0
+                })
+            }
+
+            // Regular-season nights. Suppression is by the team's scheduled
+            // week (not date) so subbed-out and rescheduled matches don't
+            // resurrect the night; pickups suppress by date.
+            for (const [idx, event] of regularEvents.entries()) {
+                if (unavailable.has(`${userId}|${event.id}`)) continue
+                if (teamsExist && !team) continue
+                if (
+                    teamId !== undefined &&
+                    weeksByTeam.get(teamId)?.has(idx + 1)
+                )
+                    continue
+                if (regularPlayDates.has(`${userId}|${event.eventDate}`))
+                    continue
+                const window = seasonSlots.length
+                    ? placeholderWindow(
+                          seasonSlots,
+                          team ? minutesForDivision(team.divisionId) : []
+                      )
+                    : DEFAULT_NIGHT_WINDOW
+                placeholders.push({
+                    userId,
+                    eventId: event.id,
+                    date: event.eventDate,
+                    eventType: "regular_season",
+                    ordinal: idx + 1,
+                    ...window,
+                    divisionId: team?.divisionId ?? null,
+                    divisionName: team?.divisionName ?? null,
+                    label: event.label,
+                    stage: team ? 1 : 0
+                })
+            }
+
+            // Playoff nights: as before, cleared by a real playoff match
+            // (play or work) on that date. Playoff events often have no time
+            // slots of their own, so borrow the shared regular-season list.
+            for (const [idx, event] of playoffEvents.entries()) {
+                if (unavailable.has(`${userId}|${event.id}`)) continue
+                if (teamsExist && !team) continue
+                if (playoffResolved.has(`${userId}|${event.eventDate}`))
+                    continue
+                const eventSlots = slotsByEvent.get(event.id) ?? []
+                const basis = eventSlots.length ? eventSlots : seasonSlots
+                const window = basis.length
+                    ? placeholderWindow(
+                          basis,
+                          team ? minutesForDivision(team.divisionId) : []
+                      )
+                    : DEFAULT_NIGHT_WINDOW
+                placeholders.push({
+                    userId,
+                    eventId: event.id,
+                    date: event.eventDate,
+                    eventType: "playoff",
+                    ordinal: idx + 1,
+                    ...window,
+                    divisionId: team?.divisionId ?? null,
+                    divisionName: team?.divisionName ?? null,
+                    label: event.label,
+                    stage: team ? 1 : 0
                 })
             }
         }
@@ -580,7 +764,7 @@ export async function getScheduleForUsers(
 
     return {
         items,
-        playoffPlaceholders,
+        placeholders,
         people,
         seasonLabel,
         seasonYear: seasonRow?.year ?? null

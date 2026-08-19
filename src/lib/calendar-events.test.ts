@@ -6,8 +6,8 @@ import {
     shortNamesFor
 } from "./calendar-events"
 import type {
+    EventPlaceholder,
     MatchScheduleItem,
-    PlayoffPlaceholder,
     ScheduleItem,
     SchedulePerson,
     UserScheduleBundle
@@ -29,11 +29,11 @@ const pat = person("u-pat", "Pat", "Quinn")
 function bundle(
     people: SchedulePerson[],
     items: ScheduleItem[],
-    playoffPlaceholders: PlayoffPlaceholder[] = []
+    placeholders: EventPlaceholder[] = []
 ): UserScheduleBundle {
     return {
         items,
-        playoffPlaceholders,
+        placeholders,
         people: new Map(people.map((p) => [p.userId, p])),
         seasonLabel: "Fall 2026",
         seasonYear: 2026
@@ -117,8 +117,7 @@ describe("personalCalendarEvents", () => {
     it("formats a regular-season match like the legacy download", () => {
         const [ev] = personalCalendarEvents(
             bundle([josh], [match("u-josh")]),
-            "u-josh",
-            7
+            "u-josh"
         )
         expect(ev.uid).toBe("bsd-match-10@bsd-volleyball.com")
         expect(ev.summary).toBe("BSD: Spikers vs Diggers (Josh)")
@@ -184,11 +183,7 @@ describe("personalCalendarEvents", () => {
                 courtNumber: null
             }
         ]
-        const events = personalCalendarEvents(
-            bundle([josh], items),
-            "u-josh",
-            7
-        )
+        const events = personalCalendarEvents(bundle([josh], items), "u-josh")
         expect(events.map((e) => e.summary)).toEqual([
             "BSD: Scorekeeper — Tryout 1",
             "BSD: Tryout 2 — Session 1",
@@ -209,29 +204,96 @@ describe("personalCalendarEvents", () => {
         expect(events[1].endTime).toBe("19:30")
     })
 
-    it("emits playoff placeholders with the legacy UID and ignores other users", () => {
-        const ph: PlayoffPlaceholder = {
+    it("emits playoff placeholders with a per-event UID and ignores other users", () => {
+        const ph: EventPlaceholder = {
             userId: "u-josh",
             eventId: 90,
             date: "2026-11-11",
-            playoffWeek: 2,
+            eventType: "playoff",
+            ordinal: 2,
             startTime: "18:00",
             endTime: "21:00",
             divisionId: 1,
             divisionName: "Rec",
-            label: "Playoffs night 2"
+            label: "Playoffs night 2",
+            stage: 1
         }
         const events = personalCalendarEvents(
             bundle([josh, sam], [match("u-sam")], [ph]),
-            "u-josh",
-            7
+            "u-josh"
         )
         expect(events).toHaveLength(1)
-        expect(events[0].uid).toBe("bsd-playoff-wk2-s7@bsd-volleyball.com")
-        expect(events[0].summary).toBe("BSD: Playoff Week 2 (Josh)")
+        expect(events[0].uid).toBe("bsd-ph-90-u-josh@bsd-volleyball.com")
+        expect(events[0].summary).toBe("BSD: Playoff Week 2 (Rec)")
         expect(events[0].description).toBe(
             "Fall 2026 Playoffs – Rec\nPlayoff Week 2\nPlayoffs night 2\nExact match time TBD"
         )
+        expect(events[0].sequence).toBe(1)
+    })
+
+    it("renders tryout and game placeholders, omitting unknown divisions", () => {
+        const ph = (o: Partial<EventPlaceholder>): EventPlaceholder => ({
+            userId: "u-josh",
+            eventId: 40,
+            date: "2026-09-02",
+            eventType: "tryout",
+            ordinal: 1,
+            startTime: "19:00",
+            endTime: "22:00",
+            divisionId: null,
+            divisionName: null,
+            label: null,
+            stage: 0,
+            ...o
+        })
+        const events = personalCalendarEvents(
+            bundle(
+                [josh],
+                [],
+                [
+                    ph({}),
+                    ph({
+                        eventId: 60,
+                        date: "2026-10-07",
+                        eventType: "regular_season",
+                        ordinal: 4
+                    }),
+                    ph({
+                        eventId: 61,
+                        date: "2026-10-14",
+                        eventType: "regular_season",
+                        ordinal: 5,
+                        divisionId: 1,
+                        divisionName: "Rec",
+                        stage: 1,
+                        startTime: "20:10",
+                        endTime: "22:50"
+                    })
+                ]
+            ),
+            "u-josh"
+        )
+        expect(events.map((e) => e.summary)).toEqual([
+            "BSD: Tryout 1",
+            "BSD: Week 4 Game",
+            "BSD: Week 5 Game (Rec)"
+        ])
+        expect(events.map((e) => e.uid)).toEqual([
+            "bsd-ph-40-u-josh@bsd-volleyball.com",
+            "bsd-ph-60-u-josh@bsd-volleyball.com",
+            "bsd-ph-61-u-josh@bsd-volleyball.com"
+        ])
+        expect(events[0].description).toBe(
+            "Fall 2026 Tryouts\nTryout 1\nExact session TBD"
+        )
+        expect(events[1].description).toBe(
+            "Fall 2026\nWeek 4\nExact match time TBD"
+        )
+        expect(events[2].description).toBe(
+            "Fall 2026 – Rec\nWeek 5\nExact match time TBD"
+        )
+        expect(events.map((e) => e.sequence)).toEqual([0, 0, 1])
+        expect(events[2].startTime).toBe("20:10")
     })
 })
 
@@ -403,19 +465,27 @@ describe("friendsCalendarEvents", () => {
         expect(ev.endTime).toBe("21:30")
     })
 
-    it("collapses playoff placeholders into one event per night", () => {
-        const ph = (userId: string, divisionName: string, startTime: string) =>
+    it("collapses placeholders into one event per night", () => {
+        const ph = (
+            userId: string,
+            divisionName: string | null,
+            startTime: string,
+            overrides: Partial<EventPlaceholder> = {}
+        ) =>
             ({
                 userId,
                 eventId: 90,
                 date: "2026-11-11",
-                playoffWeek: 2,
+                eventType: "playoff",
+                ordinal: 2,
                 startTime,
                 endTime: "21:00",
-                divisionId: 1,
+                divisionId: divisionName ? 1 : null,
                 divisionName,
-                label: null
-            }) satisfies PlayoffPlaceholder
+                label: null,
+                stage: divisionName ? 1 : 0,
+                ...overrides
+            }) satisfies EventPlaceholder
         const events = friendsCalendarEvents(
             bundle(
                 [josh, sam, alex],
@@ -425,14 +495,98 @@ describe("friendsCalendarEvents", () => {
             "u-josh"
         )
         expect(events).toHaveLength(1)
-        expect(events[0].summary).toBe("BSD: Playoffs TBD — Josh, Sam")
+        expect(events[0].summary).toBe("BSD: Playoff Week 2 TBD — Josh, Sam")
         expect(events[0].uid).toBe(
-            "bsd-friends-playoff-u-josh-90@bsd-volleyball.com"
+            "bsd-friends-ph-u-josh-90@bsd-volleyball.com"
         )
         expect(events[0].startTime).toBe("18:00")
         expect(events[0].description).toBe(
             "Josh — Playoff Week 2 (Rec) — time TBD\nSam — Playoff Week 2 (Comp) — time TBD"
         )
+        expect(events[0].sequence).toBe(1)
+    })
+
+    it("keeps tryout and game placeholder nights separate, omitting unknown divisions", () => {
+        const base: EventPlaceholder = {
+            userId: "u-josh",
+            eventId: 40,
+            date: "2026-09-02",
+            eventType: "tryout",
+            ordinal: 1,
+            startTime: "19:00",
+            endTime: "22:00",
+            divisionId: null,
+            divisionName: null,
+            label: null,
+            stage: 0
+        }
+        const events = friendsCalendarEvents(
+            bundle(
+                [josh, sam],
+                [],
+                [
+                    base,
+                    { ...base, userId: "u-sam" },
+                    {
+                        ...base,
+                        eventId: 60,
+                        date: "2026-10-07",
+                        eventType: "regular_season",
+                        ordinal: 4
+                    }
+                ]
+            ),
+            "u-josh"
+        )
+        expect(events.map((e) => e.summary)).toEqual([
+            "BSD: Tryout 1 TBD — Josh, Sam",
+            "BSD: Week 4 Games TBD — Josh"
+        ])
+        expect(events.map((e) => e.uid)).toEqual([
+            "bsd-friends-ph-u-josh-40@bsd-volleyball.com",
+            "bsd-friends-ph-u-josh-60@bsd-volleyball.com"
+        ])
+        expect(events[0].description).toBe(
+            "Josh — Tryout 1 — time TBD\nSam — Tryout 1 — time TBD"
+        )
+        expect(events[1].description).toBe("Josh — Week 4 — time TBD")
+        expect(events.map((e) => e.sequence)).toEqual([0, 0])
+    })
+
+    it("emits a real slot event and a placeholder side by side on the same night", () => {
+        const tryoutItem: ScheduleItem = {
+            kind: "tryout",
+            userId: "u-sam",
+            date: "2026-09-02",
+            startTime: "19:00:00",
+            endTime: "20:00:00",
+            court: 1,
+            eventId: 40,
+            tryoutNumber: 1,
+            session: 1,
+            sublabel: null
+        }
+        const ph: EventPlaceholder = {
+            userId: "u-josh",
+            eventId: 40,
+            date: "2026-09-02",
+            eventType: "tryout",
+            ordinal: 1,
+            startTime: "19:00",
+            endTime: "22:00",
+            divisionId: null,
+            divisionName: null,
+            label: null,
+            stage: 0
+        }
+        const events = friendsCalendarEvents(
+            bundle([josh, sam], [tryoutItem], [ph]),
+            "u-josh"
+        )
+        expect(events.map((e) => e.summary)).toEqual([
+            "BSD: Tryout 1 TBD — Josh",
+            "BSD: Sam"
+        ])
     })
 
     it("is order-independent and uses disambiguated names everywhere", () => {

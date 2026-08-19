@@ -73,22 +73,34 @@ export type ScheduleItem =
     | TryoutScheduleItem
     | VolunteerScheduleItem
 
-export interface PlayoffPlaceholder {
+/**
+ * A tentative hold for a season night the person is expected to play but has
+ * no concrete assignment for yet: every tryout, regular-season and playoff
+ * night gets one as soon as the person has a signup, and each is suppressed
+ * (in schedule-items) once a real item resolves the night, the person marks
+ * themselves unavailable, or a posted roster/draft excludes them.
+ */
+export interface EventPlaceholder {
     userId: string
     eventId: number
     date: string
-    playoffWeek: number
-    /** "HH:mm", already narrowed to the division's regular-season window. */
+    eventType: "tryout" | "regular_season" | "playoff"
+    /** Tryout N / Week N / Playoff Week N (1-based). */
+    ordinal: number
+    /** "HH:mm", already narrowed as far as current knowledge allows. */
     startTime: string
     endTime: string
-    divisionId: number
-    divisionName: string
+    /** null until the person is on a drafted team. */
+    divisionId: number | null
+    divisionName: string | null
     label: string | null
+    /** 0 = full-night block, 1 = division-narrowed. Drives ICS SEQUENCE. */
+    stage: 0 | 1
 }
 
 export interface UserScheduleBundle {
     items: ScheduleItem[]
-    playoffPlaceholders: PlayoffPlaceholder[]
+    placeholders: EventPlaceholder[]
     /** The requested userIds that exist. */
     people: Map<string, SchedulePerson>
     seasonLabel: string
@@ -97,7 +109,7 @@ export interface UserScheduleBundle {
 
 export const EMPTY_SCHEDULE_BUNDLE: UserScheduleBundle = {
     items: [],
-    playoffPlaceholders: [],
+    placeholders: [],
     people: new Map(),
     seasonLabel: "",
     seasonYear: null

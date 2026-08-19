@@ -85,6 +85,16 @@ describe("buildICalendar", () => {
         }
     })
 
+    it("emits SEQUENCE only when the event sets one", () => {
+        const ics = buildICalendar([
+            event({ sequence: 1 }),
+            event({ uid: "match-2@bsd" })
+        ])
+        const vevents = ics.split("BEGIN:VEVENT").slice(1)
+        expect(vevents[0]).toContain("SEQUENCE:1")
+        expect(vevents[1]).not.toContain("SEQUENCE")
+    })
+
     it("keeps the default calendar name and a fresh DTSTAMP", () => {
         const ics = buildICalendar([event()])
         expect(ics).toContain("X-WR-CALNAME:BSD Volleyball Schedule")
