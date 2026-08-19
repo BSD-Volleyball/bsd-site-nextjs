@@ -29,9 +29,9 @@ import {
     GROUP_ORDER,
     type Week1Candidate,
     type Week1GroupSummary,
-    type Week1PriorityGroup,
     type Week1RosterAssignment
 } from "./week1-types"
+import { getWeek1PriorityGroup } from "./week1-priority"
 
 interface DraftSeasonRecord {
     seasonId: number
@@ -48,52 +48,6 @@ function getDisplayName(candidate: Week1Candidate) {
         candidate.lastName,
         candidate.preferredName
     )
-}
-
-function getGroupForUser({
-    hasAnyDraft,
-    playFirstWeek,
-    missesTryout2Or3,
-    mostRecentDraft,
-    secondMostRecentDraft,
-    currentSeasonId
-}: {
-    hasAnyDraft: boolean
-    playFirstWeek: boolean
-    missesTryout2Or3: boolean
-    mostRecentDraft: DraftSeasonRecord | null
-    secondMostRecentDraft: DraftSeasonRecord | null
-    currentSeasonId: number
-}): Week1PriorityGroup | null {
-    if (!hasAnyDraft) {
-        return "new_users"
-    }
-
-    if (!playFirstWeek) {
-        return null
-    }
-
-    const seasonGap = mostRecentDraft
-        ? currentSeasonId - mostRecentDraft.seasonId
-        : null
-
-    if (seasonGap !== null && seasonGap > 4) {
-        return "week1_long_gap"
-    }
-
-    if (missesTryout2Or3) {
-        return "week1_missing_tryout"
-    }
-
-    if (
-        mostRecentDraft &&
-        secondMostRecentDraft &&
-        mostRecentDraft.divisionLevel > secondMostRecentDraft.divisionLevel
-    ) {
-        return "week1_dropped_division"
-    }
-
-    return "week1_other"
 }
 
 export async function getCreateWeek1Data(): Promise<{
@@ -327,7 +281,7 @@ export async function getCreateWeek1Data(): Promise<{
                 (tryout2Event ? unavailEvents.has(tryout2Event.id) : false) ||
                 (tryout3Event ? unavailEvents.has(tryout3Event.id) : false)
 
-            const group = getGroupForUser({
+            const group = getWeek1PriorityGroup({
                 hasAnyDraft,
                 playFirstWeek,
                 missesTryout2Or3,

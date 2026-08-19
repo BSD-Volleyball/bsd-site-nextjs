@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { AvailabilityEventPicker } from "@/components/availability-event-picker"
 import { Button } from "@/components/ui/button"
 import type { SeasonConfig } from "@/lib/season-types"
+import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
 import {
     getUserAvailabilityForCurrentSeason,
     saveUserAvailability
@@ -22,7 +23,7 @@ interface AvailabilityCardProps {
 export function AvailabilityCard({ userId }: AvailabilityCardProps) {
     const [config, setConfig] = useState<SeasonConfig | null>(null)
     const [signupId, setSignupId] = useState<number | null>(null)
-    const [isReturningPlayer, setIsReturningPlayer] = useState(false)
+    const [week1Audience, setWeek1Audience] = useState<Week1Audience>("new")
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(new Set())
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
@@ -33,7 +34,7 @@ export function AvailabilityCard({ userId }: AvailabilityCardProps) {
         if (result.status) {
             setConfig(result.data.config)
             setSignupId(result.data.signupId)
-            setIsReturningPlayer(result.data.isReturningPlayer)
+            setWeek1Audience(result.data.week1Audience)
             setSelectedEvents(new Set(result.data.unavailableEventIds))
         } else {
             setConfig(null)
@@ -111,7 +112,7 @@ export function AvailabilityCard({ userId }: AvailabilityCardProps) {
                 config={config}
                 selectedEvents={selectedEvents}
                 onToggle={toggleEvent}
-                isReturningPlayer={isReturningPlayer}
+                week1Audience={week1Audience}
             />
 
             <Button onClick={handleSave} disabled={isSaving}>

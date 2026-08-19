@@ -3,11 +3,13 @@ import type { ReactNode } from "react"
 interface Week1TryoutCalloutProps {
     dateLabel: string
     /**
-     * Tailors the copy when the viewer's draft history is known: "new" and
-     * "returning" address that player directly; "all" (default) addresses
-     * both, for surfaces that don't know who is viewing.
+     * Tailors the copy when the viewer's draft history is known: "new",
+     * "likely" (a returning player who will almost certainly be scheduled
+     * into week 1) and "returning" address that player directly; "all"
+     * (default) addresses everyone, for surfaces that don't know who is
+     * viewing.
      */
-    audience?: "new" | "returning" | "all"
+    audience?: "new" | "likely" | "returning" | "all"
     children?: ReactNode
 }
 
@@ -26,7 +28,19 @@ export function Week1TryoutCallout({
                     <p>
                         The Week 1 tryout is primarily focused on evaluating
                         players who are new to the league. Since this is your
-                        first season, please make every effort to attend.
+                        first season, attending all three tryouts is important
+                        &mdash; and the Week 1 tryout is especially important.
+                        Please make every effort to attend.
+                    </p>
+                )}
+                {audience === "likely" && (
+                    <p>
+                        The Week 1 tryout is focused on evaluating players who
+                        are new to the league and returning players whose
+                        placement needs another look. Based on your league
+                        history, you will likely be scheduled for the Week 1
+                        tryout &mdash; please plan to attend, and only mark
+                        yourself unavailable below if you can&apos;t make it.
                     </p>
                 )}
                 {audience === "returning" && (

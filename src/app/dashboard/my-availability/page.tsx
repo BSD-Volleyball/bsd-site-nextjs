@@ -11,6 +11,7 @@ import {
 } from "@/database/schema"
 import { eq, and, or } from "drizzle-orm"
 import { selectUnavailableEventIds } from "@/lib/availability"
+import { loadWeek1Audience } from "@/lib/week1-audience"
 import { requireSessionOrRedirect } from "@/lib/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -87,14 +88,9 @@ export default async function MyAvailabilityPage() {
         }
 
         // Ref without a player signup — show availability form with no scheduled times
-        const [unavailRows, refReturningRow] = await Promise.all([
+        const [unavailRows, refWeek1Audience] = await Promise.all([
             selectUnavailableEventIds(session.user.id, config.seasonId),
-            db
-                .select({ user: drafts.user })
-                .from(drafts)
-                .where(eq(drafts.user, session.user.id))
-                .limit(1)
-                .then((r) => r[0] ?? null)
+            loadWeek1Audience(session.user.id, config.seasonId)
         ])
 
         return (
@@ -108,14 +104,14 @@ export default async function MyAvailabilityPage() {
                     config={config}
                     initialUnavailableIds={unavailRows}
                     scheduledTimesByEventId={{}}
-                    isReturningPlayer={refReturningRow !== null}
+                    week1Audience={refWeek1Audience}
                 />
             </div>
         )
     }
 
     // Fetch unavailability + roster placements + team assignment in parallel
-    const [unavailRows, week1Row, week2Row, week3Row, draftRow, returningRow] =
+    const [unavailRows, week1Row, week2Row, week3Row, draftRow, week1Audience] =
         await Promise.all([
             selectUnavailableEventIds(session.user.id, config.seasonId),
             db
@@ -163,13 +159,7 @@ export default async function MyAvailabilityPage() {
                 )
                 .limit(1)
                 .then((r) => r[0] ?? null),
-            // Returning player = has ever been drafted (any season)
-            db
-                .select({ user: drafts.user })
-                .from(drafts)
-                .where(eq(drafts.user, session.user.id))
-                .limit(1)
-                .then((r) => r[0] ?? null)
+            loadWeek1Audience(session.user.id, config.seasonId)
         ])
 
     const initialUnavailableIds = unavailRows
@@ -255,7 +245,7 @@ export default async function MyAvailabilityPage() {
                 config={config}
                 initialUnavailableIds={initialUnavailableIds}
                 scheduledTimesByEventId={scheduledTimesByEventId}
-                isReturningPlayer={returningRow !== null}
+                week1Audience={week1Audience}
             />
         </div>
     )

@@ -5,6 +5,10 @@ import { Week1TryoutCallout } from "@/components/week1-tryout-callout"
 import type { SeasonConfig, SeasonEvent } from "@/lib/season-types"
 import { formatEventDate, getEventsByType } from "@/lib/season-utils"
 import { cn } from "@/lib/utils"
+import {
+    effectiveWeek1Audience,
+    type Week1Audience
+} from "@/app/dashboard/create-week-1/week1-priority"
 
 function EventToggleRow({
     event,
@@ -101,8 +105,11 @@ export interface AvailabilityEventPickerProps {
     onToggle: (eventId: number) => void
     /** Optional per-event scheduled time shown beside the date. */
     scheduledTimesByEventId?: Record<number, string>
-    /** Drives the week 1 tryout callout wording and tone. */
-    isReturningPlayer: boolean
+    /**
+     * Drives the week 1 tryout callout wording and tone. Upgraded live to
+     * "likely" when a returning player marks tryout 2 or 3 unavailable.
+     */
+    week1Audience: Week1Audience
 }
 
 /**
@@ -115,19 +122,24 @@ export function AvailabilityEventPicker({
     selectedEvents,
     onToggle,
     scheduledTimesByEventId = {},
-    isReturningPlayer
+    week1Audience
 }: AvailabilityEventPickerProps) {
     const tryoutEvents = getEventsByType(config, "tryout")
     const seasonEvents = getEventsByType(config, "regular_season")
     const playoffEvents = getEventsByType(config, "playoff")
     const week1Tryout = tryoutEvents[0] ?? null
     const laterTryouts = tryoutEvents.slice(1)
+    const audience = effectiveWeek1Audience(
+        week1Audience,
+        laterTryouts.slice(0, 2).some((event) => selectedEvents.has(event.id))
+    )
+    const isOptInAudience = audience === "returning"
 
     return (
         <div className="space-y-6">
             {week1Tryout && (
                 <Week1TryoutCallout
-                    audience={isReturningPlayer ? "returning" : "new"}
+                    audience={audience}
                     dateLabel={formatEventDate(week1Tryout.eventDate)}
                 >
                     <EventToggleRow
@@ -135,7 +147,7 @@ export function AvailabilityEventPicker({
                         unavailable={selectedEvents.has(week1Tryout.id)}
                         scheduledTime={scheduledTimesByEventId[week1Tryout.id]}
                         onToggle={() => onToggle(week1Tryout.id)}
-                        unavailableTone={isReturningPlayer ? "amber" : "red"}
+                        unavailableTone={isOptInAudience ? "amber" : "red"}
                     />
                 </Week1TryoutCallout>
             )}

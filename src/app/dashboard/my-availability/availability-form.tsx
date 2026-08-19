@@ -14,13 +14,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { AvailabilityEventPicker } from "@/components/availability-event-picker"
 import type { SeasonConfig } from "@/lib/season-types"
+import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
 
 interface AvailabilityFormProps {
     signupId: number | null
     config: SeasonConfig
     initialUnavailableIds: number[]
     scheduledTimesByEventId: Record<number, string>
-    isReturningPlayer: boolean
+    week1Audience: Week1Audience
 }
 
 export function AvailabilityForm({
@@ -28,7 +29,7 @@ export function AvailabilityForm({
     config,
     initialUnavailableIds,
     scheduledTimesByEventId,
-    isReturningPlayer
+    week1Audience
 }: AvailabilityFormProps) {
     const router = useRouter()
     const [selectedEvents, setSelectedEvents] = useState<Set<number>>(
@@ -87,7 +88,7 @@ export function AvailabilityForm({
                     selectedEvents={selectedEvents}
                     onToggle={toggleEvent}
                     scheduledTimesByEventId={scheduledTimesByEventId}
-                    isReturningPlayer={isReturningPlayer}
+                    week1Audience={week1Audience}
                 />
 
                 <div className="pt-2">

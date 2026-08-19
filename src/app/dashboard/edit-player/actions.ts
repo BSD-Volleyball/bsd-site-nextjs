@@ -49,6 +49,8 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { loadWeek1Audience } from "@/lib/week1-audience"
+import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     isAdminOrDirectorBySession,
@@ -745,7 +747,7 @@ export interface AdminAvailabilityView {
     /** The player's current-season signup, or null for refs/non-players. */
     signupId: number | null
     unavailableEventIds: number[]
-    isReturningPlayer: boolean
+    week1Audience: Week1Audience
 }
 
 /**
@@ -771,22 +773,18 @@ export const getUserAvailabilityForCurrentSeason = withAction(
         await requireAdmin()
         const config = await requireSeasonConfig()
 
-        const [signupId, unavailableEventIds, draftRow] = await Promise.all([
-            findCurrentSignupId(userId, config.seasonId),
-            selectUnavailableEventIds(userId, config.seasonId),
-            db
-                .select({ user: drafts.user })
-                .from(drafts)
-                .where(eq(drafts.user, userId))
-                .limit(1)
-                .then((r) => r[0] ?? null)
-        ])
+        const [signupId, unavailableEventIds, week1Audience] =
+            await Promise.all([
+                findCurrentSignupId(userId, config.seasonId),
+                selectUnavailableEventIds(userId, config.seasonId),
+                loadWeek1Audience(userId, config.seasonId)
+            ])
 
         return ok({
             config,
             signupId,
             unavailableEventIds,
-            isReturningPlayer: draftRow !== null
+            week1Audience
         })
     }
 )

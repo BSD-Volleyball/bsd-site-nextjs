@@ -14,9 +14,11 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { getActiveWaiver } from "@/lib/waivers"
 import { db } from "@/database/db"
-import { drafts, signups } from "@/database/schema"
+import { signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { hasRecordedAdultAge } from "@/lib/signup-age"
+import { loadWeek1Audience } from "@/lib/week1-audience"
+import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
@@ -37,18 +39,13 @@ export default async function PaySeasonPage() {
         discount = await getActiveDiscountForUser(session.user.id, "season")
     }
 
-    // Returning player = has ever been drafted. Drives the week 1 tryout
-    // default on the schedule step (returning players opt in, new players
-    // are expected to attend).
-    let isReturningPlayer = false
-    if (session) {
-        const [draftRow] = await db
-            .select({ user: drafts.user })
-            .from(drafts)
-            .where(eq(drafts.user, session.user.id))
-            .limit(1)
-        isReturningPlayer = draftRow !== undefined
-    }
+    // Drives the week 1 tryout wording and default on the schedule step:
+    // new players and "likely scheduled" returning players are expected to
+    // attend; other returning players opt in.
+    const week1Audience: Week1Audience =
+        session && config.seasonId
+            ? await loadWeek1Audience(session.user.id, config.seasonId)
+            : "new"
 
     // A player who has already told us they were "20 or older" isn't asked
     // again — the wizard hides the question and submits the same answer.
@@ -102,7 +99,7 @@ export default async function PaySeasonPage() {
                 config={config}
                 discount={discount}
                 activeWaiver={activeWaiver}
-                isReturningPlayer={isReturningPlayer}
+                week1Audience={week1Audience}
                 isKnownAdult={isKnownAdult}
                 seasonLabel={seasonLabel}
                 existingSignup={existingSignup}

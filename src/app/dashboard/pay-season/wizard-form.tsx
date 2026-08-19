@@ -56,6 +56,11 @@ import {
     isMissingManyDates
 } from "./availability-warnings"
 import { SubListOffer } from "./sub-list-offer"
+import {
+    defaultWeek1Unavailable,
+    effectiveWeek1Audience,
+    type Week1Audience
+} from "@/app/dashboard/create-week-1/week1-priority"
 
 interface User {
     id: string
@@ -68,7 +73,8 @@ interface WizardFormProps {
     config: SeasonConfig
     discount: { id: number; percentage: string } | null
     activeWaiver: { id: number; content: string } | null
-    isReturningPlayer: boolean
+    // Which week 1 callout/default this player gets (see week1-priority.ts).
+    week1Audience: Week1Audience
     // True when a past signup already recorded "20 or older" for this player.
     // The age question is skipped entirely and DEFAULT_AGE_GROUP is submitted.
     isKnownAdult: boolean
@@ -89,7 +95,7 @@ export function WizardForm({
     config,
     discount,
     activeWaiver,
-    isReturningPlayer,
+    week1Audience,
     isKnownAdult,
     seasonLabel,
     existingSignup
@@ -103,11 +109,15 @@ export function WizardForm({
     const seasonEvents = getEventsByType(config, "regular_season")
     const playoffEvents = getEventsByType(config, "playoff")
     const week1Tryout = tryoutEvents[0] ?? null
+    const laterTryoutIds = tryoutEvents.slice(1, 3).map((event) => event.id)
 
-    // Returning players default to sitting out week 1 (they opt in via the
-    // "Opt-in to Evaluations" checkbox); new players default to attending.
+    // Plain returning players default to sitting out week 1 (they opt in via
+    // the "Opt-in to Evaluations" checkbox); new and likely-scheduled players
+    // default to attending.
     const initialUnavailableIds =
-        isReturningPlayer && week1Tryout ? [week1Tryout.id] : []
+        defaultWeek1Unavailable(week1Audience) && week1Tryout
+            ? [week1Tryout.id]
+            : []
 
     const [formData, setFormData] = useState<SignupFormData>({
         age: DEFAULT_AGE_GROUP,
@@ -123,6 +133,19 @@ export function WizardForm({
         () => new Set(initialUnavailableIds)
     )
     const [waiverAgreed, setWaiverAgreed] = useState(false)
+    // Set once the player has made their own week 1 choice; until then the
+    // week 1 default follows the audience as it changes live (below).
+    const [week1Touched, setWeek1Touched] = useState(false)
+
+    // Missing tryout 2 or 3 moves a plain returning player into a week 1
+    // priority bucket, so the callout upgrades them to "likely" live.
+    const missesTryout2Or3 = (events: Set<number>) =>
+        laterTryoutIds.some((id) => events.has(id))
+    const audience = effectiveWeek1Audience(
+        week1Audience,
+        missesTryout2Or3(selectedEvents)
+    )
+    const isOptInAudience = audience === "returning"
 
     // Schedule-tab warnings. Any one of them also surfaces the sub-list offer,
     // which renders once below them rather than per-warning.
@@ -136,12 +159,29 @@ export function WizardForm({
         missingAllTryouts || missingManyDates || missingAllPlayoffs
 
     const toggleEvent = (eventId: number) => {
+        const isWeek1 = week1Tryout?.id === eventId
+        if (isWeek1) {
+            setWeek1Touched(true)
+        }
         setSelectedEvents((prev) => {
             const newSet = new Set(prev)
             if (newSet.has(eventId)) {
                 newSet.delete(eventId)
             } else {
                 newSet.add(eventId)
+            }
+            // Toggling tryout 2/3 can change the audience; keep the week 1
+            // default in step unless the player already chose for themselves.
+            if (week1Tryout && !isWeek1 && !week1Touched) {
+                const nextAudience = effectiveWeek1Audience(
+                    week1Audience,
+                    missesTryout2Or3(newSet)
+                )
+                if (defaultWeek1Unavailable(nextAudience)) {
+                    newSet.add(week1Tryout.id)
+                } else {
+                    newSet.delete(week1Tryout.id)
+                }
             }
             // Update formData with array of event IDs
             setFormData((f) => ({
@@ -188,14 +228,15 @@ export function WizardForm({
     const isFreeRegistration = discount && discountPercentage >= 100
 
     // Rendered above the "dates you will NOT be able to play" heading for
-    // returning players (whose control is a positive opt-in) and below it
-    // for new players (whose control matches the heading's semantics).
+    // opt-in returning players (whose control is a positive opt-in) and
+    // below it for new / likely-scheduled players (whose control matches
+    // the heading's semantics).
     const week1CalloutBlock = week1Tryout && (
         <Week1TryoutCallout
-            audience={isReturningPlayer ? "returning" : "new"}
+            audience={audience}
             dateLabel={formatEventDate(week1Tryout.eventDate)}
         >
-            {isReturningPlayer ? (
+            {isOptInAudience ? (
                 <div className="flex items-center gap-2">
                     <Checkbox
                         id={`event-${week1Tryout.id}`}
@@ -606,14 +647,14 @@ export function WizardForm({
                     <TabsContent value="schedule" className="space-y-8 pt-4">
                         {/* Section 1: Dates Missing */}
                         <div className="space-y-4">
-                            {isReturningPlayer && week1CalloutBlock}
+                            {isOptInAudience && week1CalloutBlock}
 
                             <h3 className="font-medium text-base">
                                 Select which dates you will <strong>NOT</strong>{" "}
                                 be able to play this season:
                             </h3>
 
-                            {!isReturningPlayer && week1CalloutBlock}
+                            {!isOptInAudience && week1CalloutBlock}
 
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                                 {tryoutEvents.length > 1 && (

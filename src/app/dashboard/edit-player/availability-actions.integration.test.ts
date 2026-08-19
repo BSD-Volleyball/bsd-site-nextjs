@@ -69,7 +69,7 @@ describe("admin availability editing", () => {
         expect(result.data.config.seasonId).toBe(season.id)
         expect(result.data.signupId).toBe(signup.id)
         expect(result.data.unavailableEventIds).toEqual([events[1].id])
-        expect(result.data.isReturningPlayer).toBe(false)
+        expect(result.data.week1Audience).toBe("new")
     })
 
     it("replaces the player's rows, ties them to the signup, and audits", async () => {
