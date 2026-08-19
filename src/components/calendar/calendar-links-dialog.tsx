@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
     RiCalendarCheckLine,
     RiDownloadLine,
@@ -34,7 +34,20 @@ import {
     DialogTrigger
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import type { CalendarKind, CalendarLinks } from "@/lib/calendar-links"
+import {
+    type CalendarDevice,
+    type DevicePlan,
+    detectCalendarDevice,
+    devicePlan,
+    deviceSignalsFromNavigator
+} from "@/lib/calendar-device"
+import {
+    CALENDAR_PLATFORM_LABELS,
+    type CalendarKind,
+    type CalendarLinks,
+    platformSubscribeUrl
+} from "@/lib/calendar-links"
+import { cn } from "@/lib/utils"
 
 /**
  * Fetches a one-off .ics and saves it via a blob: URL so Safari treats it as
@@ -84,12 +97,14 @@ function CalendarSection({
     kind,
     title,
     description,
-    link
+    link,
+    plan
 }: {
     kind: CalendarKind
     title: string
     description: string
     link: CalendarLinks[CalendarKind] | null
+    plan: DevicePlan
 }) {
     const [downloading, setDownloading] = useState(false)
 
@@ -120,6 +135,67 @@ function CalendarSection({
                 <h3 className="font-medium text-sm">{title}</h3>
                 <p className="text-muted-foreground text-xs">{description}</p>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground text-xs">
+                    <RiRssLine className="mr-1 inline h-3.5 w-3.5" />
+                    Subscribe in
+                </span>
+                {plan.order.map((platform, idx) => {
+                    const recommended = idx === 0
+                    const label = CALENDAR_PLATFORM_LABELS[platform]
+                    // No webcal:// handler here (Android, non-Safari iOS):
+                    // a dead link is worse than nothing, so Apple becomes a
+                    // copy-the-link hint instead.
+                    const dead = platform === "apple" && plan.webcalUnsupported
+                    if (!link || dead) {
+                        return (
+                            <Button
+                                key={platform}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled
+                                title={
+                                    dead
+                                        ? "Copy the link below and add it in your calendar app's settings"
+                                        : undefined
+                                }
+                            >
+                                {label}
+                            </Button>
+                        )
+                    }
+                    return (
+                        <Button
+                            key={platform}
+                            type="button"
+                            variant={recommended ? "default" : "outline"}
+                            size="sm"
+                            asChild
+                        >
+                            <a
+                                href={platformSubscribeUrl(platform, link)}
+                                target={
+                                    platform === "apple" ? undefined : "_blank"
+                                }
+                                rel="noreferrer"
+                            >
+                                {label}
+                                {recommended ? (
+                                    <span
+                                        className={cn(
+                                            "ml-1.5 rounded-full px-1.5 py-px text-[10px]",
+                                            "bg-primary-foreground/20"
+                                        )}
+                                    >
+                                        for this device
+                                    </span>
+                                ) : null}
+                            </a>
+                        </Button>
+                    )
+                })}
+            </div>
             <div className="flex flex-wrap gap-2">
                 <Button
                     type="button"
@@ -129,21 +205,8 @@ function CalendarSection({
                     disabled={downloading}
                 >
                     <RiDownloadLine className="mr-2 h-4 w-4" />
-                    {downloading ? "Preparing…" : "Download .ics"}
+                    {downloading ? "Preparing…" : "Download .ics (one-time)"}
                 </Button>
-                {link ? (
-                    <Button type="button" variant="outline" size="sm" asChild>
-                        <a href={link.webcalUrl}>
-                            <RiRssLine className="mr-2 h-4 w-4" />
-                            Subscribe
-                        </a>
-                    </Button>
-                ) : (
-                    <Button type="button" variant="outline" size="sm" disabled>
-                        <RiRssLine className="mr-2 h-4 w-4" />
-                        Subscribe
-                    </Button>
-                )}
             </div>
             <div className="flex gap-2">
                 <Input
@@ -187,6 +250,13 @@ export function CalendarLinksDialog({
     const [links, setLinks] = useState<CalendarLinks | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [resetting, setResetting] = useState(false)
+    // Detect after mount so server and client render the same first paint;
+    // the default ("other") plan shows every platform in a neutral order.
+    const [device, setDevice] = useState<CalendarDevice>("other")
+    useEffect(() => {
+        setDevice(detectCalendarDevice(deviceSignalsFromNavigator(navigator)))
+    }, [])
+    const plan = devicePlan(device)
 
     async function loadLinks() {
         setError(null)
@@ -250,14 +320,12 @@ export function CalendarLinksDialog({
                             title={s.title}
                             description={s.description}
                             link={links ? links[s.kind] : null}
+                            plan={plan}
                         />
                     ))}
                 </div>
 
-                <p className="text-muted-foreground text-xs">
-                    Google Calendar: Other calendars → “+” → From URL, then
-                    paste the link. Apple Calendar and Outlook: click Subscribe.
-                </p>
+                <p className="text-muted-foreground text-xs">{plan.hint}</p>
 
                 <DialogFooter className="sm:justify-between">
                     <AlertDialog>
