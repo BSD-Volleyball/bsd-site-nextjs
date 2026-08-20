@@ -234,16 +234,15 @@ export function EditWeekRosterForm({
         }
     })
 
-    const duplicateUserIds = useMemo(() => {
+    // userId -> number of slots held, for players holding more than one.
+    const multiSlotCounts = useMemo(() => {
         const counts = new Map<string, number>()
         for (const slot of editor.slotAssignments) {
             if (slot.userId) {
                 counts.set(slot.userId, (counts.get(slot.userId) || 0) + 1)
             }
         }
-        return new Set(
-            [...counts.entries()].filter(([, n]) => n > 1).map(([id]) => id)
-        )
+        return new Map([...counts.entries()].filter(([, n]) => n > 1))
     }, [editor.slotAssignments])
 
     const groupedSlots = useMemo(() => {
@@ -313,11 +312,15 @@ export function EditWeekRosterForm({
                                         belowCombobox={(slot) => (
                                             <>
                                                 {slot.userId &&
-                                                    duplicateUserIds.has(
+                                                    multiSlotCounts.has(
                                                         slot.userId
                                                     ) && (
                                                         <p className="text-amber-600 text-sm dark:text-amber-400">
-                                                            Playing twice
+                                                            {multiSlotCounts.get(
+                                                                slot.userId
+                                                            ) === 2
+                                                                ? "Playing twice"
+                                                                : `Playing ${multiSlotCounts.get(slot.userId)} times`}
                                                         </p>
                                                     )}
                                                 {captainMode === "editable" &&
