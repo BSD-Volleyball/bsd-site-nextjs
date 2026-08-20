@@ -56,6 +56,14 @@ interface PairConfirmDialogState {
     onConfirm: () => void
 }
 
+function PairRequiredBadge() {
+    return (
+        <span className="ml-1.5 inline-block rounded bg-red-600 px-1.5 py-0.5 align-middle font-semibold text-white text-xs dark:bg-red-700">
+            14–15
+        </span>
+    )
+}
+
 export function PairsList({
     matched,
     unmatched,
@@ -225,6 +233,7 @@ export function PairsList({
         name: string,
         email: string,
         context: SelectedPairContext,
+        pairRequired = false,
         highlight = false
     ) => {
         const content = (
@@ -233,7 +242,16 @@ export function PairsList({
                 className="text-left hover:underline"
                 onClick={() => handlePlayerClick(userId, context)}
             >
-                <div className="font-medium">{name}</div>
+                <div
+                    className={
+                        pairRequired
+                            ? "font-medium text-red-600 dark:text-red-400"
+                            : "font-medium"
+                    }
+                >
+                    {name}
+                    {pairRequired && <PairRequiredBadge />}
+                </div>
                 <div className="text-muted-foreground text-sm">{email}</div>
             </button>
         )
@@ -251,6 +269,23 @@ export function PairsList({
 
     return (
         <div className="space-y-8">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border px-4 py-3 text-sm">
+                <span className="font-medium">Legend:</span>
+                <div className="flex items-center gap-2">
+                    <PairRequiredBadge />
+                    <span className="text-muted-foreground">
+                        Aged 14–15 — must be paired with a registered
+                        parent/guardian.
+                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="inline-block h-4 w-8 rounded bg-red-100 dark:bg-red-900" />
+                    <span className="text-muted-foreground">
+                        Requested player has not requested the pair back.
+                    </span>
+                </div>
+            </div>
+
             {actionMessage && (
                 <div
                     className={
@@ -314,7 +349,8 @@ export function PairsList({
                                                         pair.userB.name,
                                                     pairReason:
                                                         pair.userA.pairReason
-                                                }
+                                                },
+                                                pair.userA.pairRequired
                                             )}
                                         </td>
                                         <td className="px-4 py-2">
@@ -330,7 +366,8 @@ export function PairsList({
                                                         pair.userA.name,
                                                     pairReason:
                                                         pair.userB.pairReason
-                                                }
+                                                },
+                                                pair.userB.pairRequired
                                             )}
                                         </td>
                                         <td className="px-4 py-2">
@@ -406,7 +443,8 @@ export function PairsList({
                                                     pairReason:
                                                         pair.requester
                                                             .pairReason
-                                                }
+                                                },
+                                                pair.requester.pairRequired
                                             )}
                                         </td>
                                         <td className="px-4 py-2">
@@ -421,6 +459,7 @@ export function PairsList({
                                                     pairPickName: null,
                                                     pairReason: null
                                                 },
+                                                pair.requested.pairRequired,
                                                 true
                                             )}
                                         </td>
@@ -487,7 +526,8 @@ export function PairsList({
                                                         pairPickName: null,
                                                         pairReason:
                                                             requester.pairReason
-                                                    }
+                                                    },
+                                                    requester.pairRequired
                                                 )}
                                             </td>
                                             <td className="px-4 py-2">
@@ -504,7 +544,9 @@ export function PairsList({
                                                             )
                                                             .map((c) => ({
                                                                 id: c.userId,
-                                                                name: c.name
+                                                                name: c.pairRequired
+                                                                    ? `${c.name} (14–15)`
+                                                                    : c.name
                                                             }))}
                                                         value={selectedId}
                                                         onChange={(userId) =>

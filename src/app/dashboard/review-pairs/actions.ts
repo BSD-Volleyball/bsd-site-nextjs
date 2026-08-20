@@ -7,6 +7,7 @@ import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
 import { eq, and, or, isNull, isNotNull, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
+import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/lib/rbac"
 import { revalidatePath } from "next/cache"
@@ -16,6 +17,8 @@ export interface PairUser {
     name: string
     email: string
     pairReason: string | null
+    // League rules require 14-15 year olds to be paired.
+    pairRequired: boolean
 }
 
 export interface MatchedPair {
@@ -30,6 +33,7 @@ export interface UnmatchedPair {
         name: string
         email: string
         hasDifferentPairRequest: boolean
+        pairRequired: boolean
     }
 }
 
@@ -37,6 +41,7 @@ export interface PairCandidate {
     userId: string
     name: string
     email: string
+    pairRequired: boolean
 }
 
 export async function getSeasonPairs(): Promise<{
@@ -85,6 +90,7 @@ export async function getSeasonPairs(): Promise<{
         const seasonRows = await db
             .select({
                 userId: signups.player,
+                age: signups.age,
                 pair: signups.pair,
                 pairPickId: signups.pair_pick,
                 pairReason: signups.pair_reason,
@@ -115,7 +121,8 @@ export async function getSeasonPairs(): Promise<{
                     row.preferredName
                 ),
                 email: row.email,
-                pairReason: row.pairReason
+                pairReason: row.pairReason,
+                pairRequired: row.age === PAIR_REQUIRED_AGE_GROUP
             }))
             .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -123,6 +130,7 @@ export async function getSeasonPairs(): Promise<{
         const candidateRows = await db
             .select({
                 userId: signups.player,
+                age: signups.age,
                 firstName: users.first_name,
                 lastName: users.last_name,
                 preferredName: users.preferred_name,
@@ -145,9 +153,25 @@ export async function getSeasonPairs(): Promise<{
                     row.lastName,
                     row.preferredName
                 ),
-                email: row.email
+                email: row.email,
+                pairRequired: row.age === PAIR_REQUIRED_AGE_GROUP
             }))
             .sort((a, b) => a.name.localeCompare(b.name))
+
+        // Every signed-up player shown on this page appears in seasonRows or
+        // candidateRows, so between them we know who is in the pair-required
+        // (14-15) age group. Requested players with no signup stay unflagged.
+        const pairRequiredIds = new Set<string>()
+        for (const row of seasonRows) {
+            if (row.age === PAIR_REQUIRED_AGE_GROUP) {
+                pairRequiredIds.add(row.userId)
+            }
+        }
+        for (const row of candidateRows) {
+            if (row.age === PAIR_REQUIRED_AGE_GROUP) {
+                pairRequiredIds.add(row.userId)
+            }
+        }
 
         // Build a map of userId -> their pair pick info
         const pairMap = new Map<
@@ -237,13 +261,15 @@ export async function getSeasonPairs(): Promise<{
                         userId,
                         name: data.name,
                         email: data.email,
-                        pairReason: data.pairReason
+                        pairReason: data.pairReason,
+                        pairRequired: pairRequiredIds.has(userId)
                     },
                     userB: {
                         userId: data.pairPickId,
                         name: reciprocal.name,
                         email: reciprocal.email,
-                        pairReason: reciprocal.pairReason
+                        pairReason: reciprocal.pairReason,
+                        pairRequired: pairRequiredIds.has(data.pairPickId)
                     }
                 })
             } else {
@@ -253,7 +279,8 @@ export async function getSeasonPairs(): Promise<{
                         userId,
                         name: data.name,
                         email: data.email,
-                        pairReason: data.pairReason
+                        pairReason: data.pairReason,
+                        pairRequired: pairRequiredIds.has(userId)
                     },
                     requested: {
                         userId: data.pairPickId,
@@ -263,7 +290,8 @@ export async function getSeasonPairs(): Promise<{
                         email: pairPickEmailMap.get(data.pairPickId) ?? "—",
                         hasDifferentPairRequest:
                             reciprocal !== undefined &&
-                            reciprocal.pairPickId !== userId
+                            reciprocal.pairPickId !== userId,
+                        pairRequired: pairRequiredIds.has(data.pairPickId)
                     }
                 })
             }
