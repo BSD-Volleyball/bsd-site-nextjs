@@ -13,7 +13,11 @@ import {
     week3Rosters
 } from "@/database/schema"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
+import {
+    getSeasonConfig,
+    getEventsByType,
+    formatEventTime
+} from "@/lib/site-config"
 import { getLeagueDateString } from "@/lib/date-utils"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getTeamRosterWithSubs } from "@/lib/roster"
@@ -27,9 +31,21 @@ import {
     requirePermission
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
-import { resolveDefaultLookupType } from "./rate-player-helpers"
+import {
+    buildTryoutTimeSlotGroups,
+    resolveDefaultLookupType,
+    sortPlayers
+} from "./rate-player-helpers"
+import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 
-export type LookupType = "direct" | "tryout1" | "tryout2" | "tryout3" | "byTeam"
+export type LookupType =
+    | "direct"
+    | "tryout1"
+    | "tryout2"
+    | "tryout2Times"
+    | "tryout3"
+    | "tryout3Times"
+    | "byTeam"
 
 export interface RatePlayerEntry {
     id: string
@@ -125,23 +141,6 @@ const validNoteTypes = new Set<RatingNoteType>(["shared", "private"])
 
 function buildSeasonLabel(seasonName: string, seasonYear: number): string {
     return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
-}
-
-function sortPlayers(
-    a: RatePlayerEntry,
-    b: RatePlayerEntry,
-    hasHistoryFn: (entry: RatePlayerEntry) => boolean
-): number {
-    // New players (no draft history) before returning players
-    const aNew = hasHistoryFn(a) ? 1 : 0
-    const bNew = hasHistoryFn(b) ? 1 : 0
-    if (aNew !== bNew) return aNew - bNew
-    // Male players before non-male
-    const aMale = a.male === true ? 0 : 1
-    const bMale = b.male === true ? 0 : 1
-    if (aMale !== bMale) return aMale - bMale
-    // Alphabetical by last name
-    return a.lastName.localeCompare(b.lastName)
 }
 
 function buildDivisionGroups(
@@ -259,6 +258,8 @@ export async function getRatePlayerData(): Promise<{
     tryout1Sessions: TryoutSessionGroup[]
     tryout2Divisions: TryoutDivisionGroup[]
     tryout3Divisions: TryoutDivisionGroup[]
+    tryout2TimeSlots: TryoutTimeSlotGroup[]
+    tryout3TimeSlots: TryoutTimeSlotGroup[]
     byTeamDivisions: SeasonTeamDivisionGroup[]
     captainTeam: CaptainTeamRef | null
     defaultLookupType: LookupType
@@ -274,6 +275,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            tryout2TimeSlots: [],
+            tryout3TimeSlots: [],
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",
@@ -291,6 +294,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            tryout2TimeSlots: [],
+            tryout3TimeSlots: [],
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",
@@ -309,6 +314,8 @@ export async function getRatePlayerData(): Promise<{
                 tryout1Sessions: [],
                 tryout2Divisions: [],
                 tryout3Divisions: [],
+                tryout2TimeSlots: [],
+                tryout3TimeSlots: [],
                 byTeamDivisions: [],
                 captainTeam: null,
                 defaultLookupType: "direct",
@@ -344,6 +351,8 @@ export async function getRatePlayerData(): Promise<{
                 tryout1Sessions: [],
                 tryout2Divisions: [],
                 tryout3Divisions: [],
+                tryout2TimeSlots: [],
+                tryout3TimeSlots: [],
                 byTeamDivisions: [],
                 captainTeam: null,
                 defaultLookupType: "direct",
@@ -528,6 +537,26 @@ export async function getRatePlayerData(): Promise<{
             lastDivisionByPlayerId
         )
 
+        // "Tryout (times)" lookups: the same week 2/3 rosters re-grouped by
+        // time slot (teams 1-2 play session 1, 3-4 session 2, 5-6 session 3).
+        const tryoutEvents = getEventsByType(config, "tryout")
+        const sessionTimeLabelsForWeek = (week: 2 | 3): string[] =>
+            (tryoutEvents[week - 1]?.timeSlots ?? []).map((slot) =>
+                formatEventTime(slot.startTime)
+            )
+        const tryout2TimeSlots = buildTryoutTimeSlotGroups(
+            week2RosterRows,
+            playersById,
+            lastDivisionByPlayerId,
+            sessionTimeLabelsForWeek(2)
+        )
+        const tryout3TimeSlots = buildTryoutTimeSlotGroups(
+            week3RosterRows,
+            playersById,
+            lastDivisionByPlayerId,
+            sessionTimeLabelsForWeek(3)
+        )
+
         // "By Team" — actual drafted season teams. Each team's roster is the
         // captain(s) plus drafted players with the permanent-sub chain resolved
         // to the currently-active player. Members are filtered through
@@ -621,13 +650,13 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions,
             tryout2Divisions,
             tryout3Divisions,
+            tryout2TimeSlots,
+            tryout3TimeSlots,
             byTeamDivisions,
             captainTeam,
             defaultLookupType: resolveDefaultLookupType({
                 phase: config.phase,
-                tryoutDates: getEventsByType(config, "tryout").map(
-                    (event) => event.eventDate
-                ),
+                tryoutDates: tryoutEvents.map((event) => event.eventDate),
                 today: getLeagueDateString(),
                 draftStarted,
                 byTeamAvailable: byTeamDivisions.length > 0
@@ -644,6 +673,8 @@ export async function getRatePlayerData(): Promise<{
             tryout1Sessions: [],
             tryout2Divisions: [],
             tryout3Divisions: [],
+            tryout2TimeSlots: [],
+            tryout3TimeSlots: [],
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",

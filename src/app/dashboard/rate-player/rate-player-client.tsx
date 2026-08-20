@@ -22,11 +22,13 @@ import type {
 import {
     ByTeamAccordion,
     TryoutDivisionAccordion,
-    TryoutSessionAccordion
+    TryoutSessionAccordion,
+    TryoutTimeSlotAccordion
 } from "./lookup-accordions"
 import { PlayerTable } from "./player-table"
 import { RatePlayerDialog } from "./rate-player-dialog"
 import { getDisplayName } from "./rate-player-helpers"
+import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 import { useRatePlayerDialog } from "./use-rate-player-dialog"
 
 interface RatePlayerClientProps {
@@ -34,6 +36,8 @@ interface RatePlayerClientProps {
     tryout1Sessions: TryoutSessionGroup[]
     tryout2Divisions: TryoutDivisionGroup[]
     tryout3Divisions: TryoutDivisionGroup[]
+    tryout2TimeSlots: TryoutTimeSlotGroup[]
+    tryout3TimeSlots: TryoutTimeSlotGroup[]
     byTeamDivisions: SeasonTeamDivisionGroup[]
     captainTeam: CaptainTeamRef | null
     defaultLookupType: LookupType
@@ -46,6 +50,8 @@ export function RatePlayerClient({
     tryout1Sessions,
     tryout2Divisions,
     tryout3Divisions,
+    tryout2TimeSlots,
+    tryout3TimeSlots,
     byTeamDivisions,
     captainTeam,
     defaultLookupType,
@@ -90,8 +96,25 @@ export function RatePlayerClient({
                 label: d.divisionName
             }))
         }
+        if (lookupType === "tryout2Times" || lookupType === "tryout3Times") {
+            const slots =
+                lookupType === "tryout2Times"
+                    ? tryout2TimeSlots
+                    : tryout3TimeSlots
+            return slots.map((slot) => ({
+                value: String(slot.sessionNumber),
+                label: slot.timeLabel
+            }))
+        }
         return []
-    }, [lookupType, tryout1Sessions, tryout2Divisions, tryout3Divisions])
+    }, [
+        lookupType,
+        tryout1Sessions,
+        tryout2Divisions,
+        tryout3Divisions,
+        tryout2TimeSlots,
+        tryout3TimeSlots
+    ])
 
     useEffect(() => {
         if (lookupType === "direct" || lookupType === "byTeam") return
@@ -158,6 +181,19 @@ export function RatePlayerClient({
         return null
     }, [lookupType, tryout2Divisions, tryout3Divisions, tryoutSessionValue])
 
+    const selectedTimeSlot = useMemo(() => {
+        if (lookupType !== "tryout2Times" && lookupType !== "tryout3Times") {
+            return null
+        }
+        const slots =
+            lookupType === "tryout2Times" ? tryout2TimeSlots : tryout3TimeSlots
+        return (
+            slots.find(
+                (slot) => String(slot.sessionNumber) === tryoutSessionValue
+            ) || null
+        )
+    }, [lookupType, tryout2TimeSlots, tryout3TimeSlots, tryoutSessionValue])
+
     return (
         <div className="space-y-5">
             <div className="grid gap-4 md:grid-cols-3">
@@ -176,7 +212,13 @@ export function RatePlayerClient({
                             <SelectItem value="direct">Direct</SelectItem>
                             <SelectItem value="tryout1">Tryout 1</SelectItem>
                             <SelectItem value="tryout2">Tryout 2</SelectItem>
+                            <SelectItem value="tryout2Times">
+                                Tryout (times) 2
+                            </SelectItem>
                             <SelectItem value="tryout3">Tryout 3</SelectItem>
+                            <SelectItem value="tryout3Times">
+                                Tryout (times) 3
+                            </SelectItem>
                             {byTeamDivisions.length > 0 && (
                                 <SelectItem value="byTeam">By Team</SelectItem>
                             )}
@@ -187,7 +229,12 @@ export function RatePlayerClient({
                 {lookupType !== "direct" && lookupType !== "byTeam" && (
                     <div className="space-y-2">
                         <Label htmlFor="session_number">
-                            {lookupType === "tryout1" ? "Session" : "Division"}
+                            {lookupType === "tryout1"
+                                ? "Session"
+                                : lookupType === "tryout2Times" ||
+                                    lookupType === "tryout3Times"
+                                  ? "Time"
+                                  : "Division"}
                         </Label>
                         <Select
                             value={tryoutSessionValue}
@@ -248,6 +295,17 @@ export function RatePlayerClient({
                 <TryoutDivisionAccordion
                     lookupType={lookupType}
                     selectedTryoutDivision={selectedTryoutDivision}
+                    filteredPlayerIds={filteredPlayerIds}
+                    onRate={openRateDialog}
+                    playerPicUrl={playerPicUrl}
+                />
+            )}
+
+            {(lookupType === "tryout2Times" ||
+                lookupType === "tryout3Times") && (
+                <TryoutTimeSlotAccordion
+                    lookupType={lookupType}
+                    selectedTimeSlot={selectedTimeSlot}
                     filteredPlayerIds={filteredPlayerIds}
                     onRate={openRateDialog}
                     playerPicUrl={playerPicUrl}

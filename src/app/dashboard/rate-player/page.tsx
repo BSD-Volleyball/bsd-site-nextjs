@@ -50,6 +50,8 @@ export default async function RatePlayerPage() {
                 tryout1Sessions={result.tryout1Sessions}
                 tryout2Divisions={result.tryout2Divisions}
                 tryout3Divisions={result.tryout3Divisions}
+                tryout2TimeSlots={result.tryout2TimeSlots}
+                tryout3TimeSlots={result.tryout3TimeSlots}
                 byTeamDivisions={result.byTeamDivisions}
                 captainTeam={result.captainTeam}
                 defaultLookupType={result.defaultLookupType}

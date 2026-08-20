@@ -13,6 +13,7 @@ import type {
     TryoutDivisionGroup,
     TryoutSessionGroup
 } from "./actions"
+import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 import { PlayerTable } from "./player-table"
 
 interface TryoutSessionAccordionProps {
@@ -114,6 +115,107 @@ export function TryoutDivisionAccordion({
                                         onRate={onRate}
                                         playerPicUrl={playerPicUrl}
                                     />
+                                </AccordionContent>
+                            </AccordionItem>
+                        )
+                    })}
+                </Accordion>
+            )}
+        </div>
+    )
+}
+
+interface TryoutTimeSlotAccordionProps {
+    lookupType: "tryout2Times" | "tryout3Times"
+    selectedTimeSlot: TryoutTimeSlotGroup | null
+    filteredPlayerIds: Set<string>
+    onRate: (player: RatePlayerEntry) => void
+    playerPicUrl: string
+}
+
+export function TryoutTimeSlotAccordion({
+    lookupType,
+    selectedTimeSlot,
+    filteredPlayerIds,
+    onRate,
+    playerPicUrl
+}: TryoutTimeSlotAccordionProps) {
+    return (
+        <div className="space-y-3">
+            {!selectedTimeSlot ? (
+                <div className="rounded-md border bg-muted/50 p-5 text-muted-foreground text-sm">
+                    No {lookupType === "tryout2Times" ? "Tryout 2" : "Tryout 3"}{" "}
+                    time slot data found for the active season.
+                </div>
+            ) : (
+                <Accordion type="multiple" className="w-full">
+                    {selectedTimeSlot.divisions.map((division) => {
+                        const divisionPlayerCount = division.teams.reduce(
+                            (sum, team) =>
+                                sum +
+                                team.players.filter((player) =>
+                                    filteredPlayerIds.has(player.id)
+                                ).length,
+                            0
+                        )
+                        const divisionLabel =
+                            division.courtNumber > 0
+                                ? `${division.divisionName} — Court ${division.courtNumber}`
+                                : division.divisionName
+
+                        return (
+                            <AccordionItem
+                                key={division.divisionName}
+                                value={`division-${division.divisionName}`}
+                            >
+                                <AccordionTrigger>
+                                    <span>
+                                        {divisionLabel} ({divisionPlayerCount})
+                                    </span>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                    <Accordion
+                                        type="multiple"
+                                        className="w-full"
+                                    >
+                                        {division.teams.map((team) => {
+                                            const filteredTeamPlayers =
+                                                team.players.filter((player) =>
+                                                    filteredPlayerIds.has(
+                                                        player.id
+                                                    )
+                                                )
+
+                                            return (
+                                                <AccordionItem
+                                                    key={team.teamNumber}
+                                                    value={`team-${team.teamNumber}`}
+                                                >
+                                                    <AccordionTrigger>
+                                                        <span>
+                                                            Team{" "}
+                                                            {team.teamNumber} (
+                                                            {
+                                                                filteredTeamPlayers.length
+                                                            }
+                                                            )
+                                                        </span>
+                                                    </AccordionTrigger>
+                                                    <AccordionContent>
+                                                        <PlayerTable
+                                                            players={
+                                                                filteredTeamPlayers
+                                                            }
+                                                            onRate={onRate}
+                                                            playerPicUrl={
+                                                                playerPicUrl
+                                                            }
+                                                        />
+                                                    </AccordionContent>
+                                                </AccordionItem>
+                                            )
+                                        })}
+                                    </Accordion>
                                 </AccordionContent>
                             </AccordionItem>
                         )
