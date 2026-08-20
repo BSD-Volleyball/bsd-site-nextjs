@@ -5,7 +5,7 @@ import { withAction, ok, fail } from "@/lib/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
-import { eq, and, isNotNull, inArray } from "drizzle-orm"
+import { eq, and, or, isNull, isNotNull, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/lib/rbac"
@@ -33,11 +33,19 @@ export interface UnmatchedPair {
     }
 }
 
+export interface PairCandidate {
+    userId: string
+    name: string
+    email: string
+}
+
 export async function getSeasonPairs(): Promise<{
     status: boolean
     message?: string
     matched: MatchedPair[]
     unmatched: UnmatchedPair[]
+    incomplete: PairUser[]
+    candidates: PairCandidate[]
     seasonLabel: string
 }> {
     const hasAccess = await isAdminOrDirectorBySession()
@@ -47,6 +55,8 @@ export async function getSeasonPairs(): Promise<{
             message: "Unauthorized",
             matched: [],
             unmatched: [],
+            incomplete: [],
+            candidates: [],
             seasonLabel: ""
         }
     }
@@ -60,16 +70,22 @@ export async function getSeasonPairs(): Promise<{
                 message: "No current season found.",
                 matched: [],
                 unmatched: [],
+                incomplete: [],
+                candidates: [],
                 seasonLabel: ""
             }
         }
 
         const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        // Fetch all signups that have a pair_pick
-        const pairRows = await db
+        // Fetch all signups for the season. Rows with a pair_pick feed the
+        // matched/unmatched buckets; rows with pair = true but no pick feed
+        // the incomplete bucket; rows with no pick at all are candidates an
+        // admin may assign as a partner.
+        const seasonRows = await db
             .select({
                 userId: signups.player,
+                pair: signups.pair,
                 pairPickId: signups.pair_pick,
                 pairReason: signups.pair_reason,
                 firstName: users.first_name,
@@ -82,9 +98,56 @@ export async function getSeasonPairs(): Promise<{
             .where(
                 and(
                     eq(signups.season, config.seasonId),
-                    isNotNull(signups.pair_pick)
+                    or(eq(signups.pair, true), isNotNull(signups.pair_pick))
                 )
             )
+
+        const pairRows = seasonRows.filter((row) => row.pairPickId !== null)
+
+        // Signed-up players who want to pair but never named a partner.
+        const incomplete: PairUser[] = seasonRows
+            .filter((row) => row.pair === true && row.pairPickId === null)
+            .map((row) => ({
+                userId: row.userId,
+                name: formatPlayerName(
+                    row.firstName,
+                    row.lastName,
+                    row.preferredName
+                ),
+                email: row.email,
+                pairReason: row.pairReason
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+
+        // Every signed-up player with no outgoing pair pick is assignable.
+        const candidateRows = await db
+            .select({
+                userId: signups.player,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name,
+                email: users.email
+            })
+            .from(signups)
+            .innerJoin(users, eq(signups.player, users.id))
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    isNull(signups.pair_pick)
+                )
+            )
+
+        const candidates: PairCandidate[] = candidateRows
+            .map((row) => ({
+                userId: row.userId,
+                name: formatPlayerName(
+                    row.firstName,
+                    row.lastName,
+                    row.preferredName
+                ),
+                email: row.email
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name))
 
         // Build a map of userId -> their pair pick info
         const pairMap = new Map<
@@ -210,6 +273,8 @@ export async function getSeasonPairs(): Promise<{
             status: true,
             matched,
             unmatched,
+            incomplete,
+            candidates,
             seasonLabel
         }
     } catch (error) {
@@ -219,6 +284,8 @@ export async function getSeasonPairs(): Promise<{
             message: "Something went wrong.",
             matched: [],
             unmatched: [],
+            incomplete: [],
+            candidates: [],
             seasonLabel: ""
         }
     }
@@ -432,6 +499,119 @@ export const completeUnmatchedPair = withAction(
         } catch (error) {
             console.error("Error completing unmatched pair:", error)
             return fail("Failed to complete pair.")
+        }
+    }
+)
+
+export const assignPairPartner = withAction(
+    async (requesterId: string, partnerId: string): Promise<ActionResult> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
+
+        if (
+            !isValidUserId(requesterId) ||
+            !isValidUserId(partnerId) ||
+            requesterId === partnerId
+        ) {
+            return fail("Invalid pair selection.")
+        }
+
+        try {
+            const actorId = await getSessionUserId()
+            if (!actorId) {
+                return fail("Not authenticated.")
+            }
+
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No current season found.")
+            }
+
+            const [requesterSignup] = await db
+                .select({
+                    pair: signups.pair,
+                    pairPickId: signups.pair_pick
+                })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requesterId)
+                    )
+                )
+                .limit(1)
+
+            const [partnerSignup] = await db
+                .select({
+                    pairPickId: signups.pair_pick
+                })
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, partnerId)
+                    )
+                )
+                .limit(1)
+
+            if (!requesterSignup || !partnerSignup) {
+                return fail(
+                    "Both players must have signup records for the current season."
+                )
+            }
+
+            if (requesterSignup.pairPickId !== null) {
+                return fail(
+                    "Requester already has a pair pick. Refresh and try again."
+                )
+            }
+
+            if (partnerSignup.pairPickId !== null) {
+                return fail(
+                    "Selected player already has a pair request. Refresh and try again."
+                )
+            }
+
+            await db
+                .update(signups)
+                .set({
+                    pair: true,
+                    pair_pick: partnerId
+                })
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, requesterId)
+                    )
+                )
+
+            await db
+                .update(signups)
+                .set({
+                    pair: true,
+                    pair_pick: requesterId
+                })
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, partnerId)
+                    )
+                )
+
+            await logAuditEntry({
+                userId: actorId,
+                action: "update",
+                entityType: "signups",
+                summary: `Assigned pair partner (${requesterId} <-> ${partnerId}) for season ${config.seasonId}`
+            })
+
+            revalidatePath("/dashboard/review-pairs")
+            return ok(undefined, "Pair has been assigned.")
+        } catch (error) {
+            console.error("Error assigning pair partner:", error)
+            return fail("Failed to assign pair.")
         }
     }
 )

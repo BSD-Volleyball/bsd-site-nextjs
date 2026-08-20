@@ -15,17 +15,23 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
+import { UserCombobox } from "@/components/user-combobox"
 import {
+    assignPairPartner,
     bustMatchedPair,
     bustUnmatchedPair,
     completeUnmatchedPair,
     type MatchedPair,
+    type PairCandidate,
+    type PairUser,
     type UnmatchedPair
 } from "./actions"
 
 interface PairsListProps {
     matched: MatchedPair[]
     unmatched: UnmatchedPair[]
+    incomplete: PairUser[]
+    candidates: PairCandidate[]
     playerPicUrl: string
 }
 
@@ -53,6 +59,8 @@ interface PairConfirmDialogState {
 export function PairsList({
     matched,
     unmatched,
+    incomplete,
+    candidates,
     playerPicUrl
 }: PairsListProps) {
     const router = useRouter()
@@ -63,6 +71,9 @@ export function PairsList({
         useState<SelectedPairContext | null>(null)
     const [confirmDialog, setConfirmDialog] =
         useState<PairConfirmDialogState | null>(null)
+    const [assignSelections, setAssignSelections] = useState<
+        Record<string, string | null>
+    >({})
 
     const modal = usePlayerDetailModal()
 
@@ -155,6 +166,47 @@ export function PairsList({
                         pair.requester.userId,
                         pair.requested.userId
                     )
+                )
+        })
+    }
+
+    const handleBustIncomplete = (requester: PairUser) => {
+        setConfirmDialog({
+            title: "Confirm Bust Pair",
+            description:
+                "This action will remove the requester's pair request.",
+            confirmLabel: "Bust Pair",
+            confirmVariant: "destructive",
+            details: {
+                leftLabel: "Requester (will be updated)",
+                leftName: requester.name,
+                leftEmail: requester.email,
+                rightLabel: "Requested",
+                rightName: "No partner selected",
+                rightEmail: "—"
+            },
+            onConfirm: () =>
+                runAction(() => bustUnmatchedPair(requester.userId))
+        })
+    }
+
+    const handleAssignPair = (requester: PairUser, partner: PairCandidate) => {
+        setConfirmDialog({
+            title: "Confirm Assign Pair",
+            description: "This action will pair both players with each other.",
+            confirmLabel: "Assign Pair",
+            confirmVariant: "default",
+            details: {
+                leftLabel: "Requester (will be updated)",
+                leftName: requester.name,
+                leftEmail: requester.email,
+                rightLabel: "Partner (will be updated)",
+                rightName: partner.name,
+                rightEmail: partner.email
+            },
+            onConfirm: () =>
+                runAction(() =>
+                    assignPairPartner(requester.userId, partner.userId)
                 )
         })
     }
@@ -310,11 +362,11 @@ export function PairsList({
                 <div className="mb-3 flex items-center gap-2">
                     <h2 className="font-semibold text-lg">Unmatched Pairs</h2>
                     <span className="rounded-md bg-red-100 px-2.5 py-1 font-medium text-red-700 text-sm dark:bg-red-900 dark:text-red-300">
-                        {unmatched.length}
+                        {unmatched.length + incomplete.length}
                     </span>
                 </div>
 
-                {unmatched.length === 0 ? (
+                {unmatched.length === 0 && incomplete.length === 0 ? (
                     <div className="rounded-lg border px-4 py-6 text-center text-muted-foreground">
                         No unmatched pairs found.
                     </div>
@@ -412,6 +464,106 @@ export function PairsList({
                                         </td>
                                     </tr>
                                 ))}
+                                {incomplete.map((requester) => {
+                                    const selectedId =
+                                        assignSelections[requester.userId] ??
+                                        null
+                                    const selectedPartner =
+                                        candidates.find(
+                                            (c) => c.userId === selectedId
+                                        ) ?? null
+
+                                    return (
+                                        <tr
+                                            key={`incomplete-${requester.userId}`}
+                                            className="border-b last:border-0"
+                                        >
+                                            <td className="px-4 py-2">
+                                                {renderPlayerCell(
+                                                    requester.userId,
+                                                    requester.name,
+                                                    requester.email,
+                                                    {
+                                                        pairPickName: null,
+                                                        pairReason:
+                                                            requester.pairReason
+                                                    }
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                {requester.pairReason || "—"}
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="max-w-64">
+                                                    <UserCombobox
+                                                        users={candidates
+                                                            .filter(
+                                                                (c) =>
+                                                                    c.userId !==
+                                                                    requester.userId
+                                                            )
+                                                            .map((c) => ({
+                                                                id: c.userId,
+                                                                name: c.name
+                                                            }))}
+                                                        value={selectedId}
+                                                        onChange={(userId) =>
+                                                            setAssignSelections(
+                                                                (prev) => ({
+                                                                    ...prev,
+                                                                    [requester.userId]:
+                                                                        userId
+                                                                })
+                                                            )
+                                                        }
+                                                        placeholder="Select a partner..."
+                                                    />
+                                                </div>
+                                                <div className="mt-1 text-muted-foreground text-sm">
+                                                    Wants to pair but didn't
+                                                    pick a partner.
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2">
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        disabled={isPending}
+                                                        onClick={() =>
+                                                            handleBustIncomplete(
+                                                                requester
+                                                            )
+                                                        }
+                                                    >
+                                                        Bust Pair
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        disabled={
+                                                            isPending ||
+                                                            !selectedPartner
+                                                        }
+                                                        onClick={() => {
+                                                            if (
+                                                                selectedPartner
+                                                            ) {
+                                                                handleAssignPair(
+                                                                    requester,
+                                                                    selectedPartner
+                                                                )
+                                                            }
+                                                        }}
+                                                    >
+                                                        Assign Pair
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>

@@ -40,6 +40,8 @@ export default async function ReviewPairsPage() {
             <PairsList
                 matched={result.matched}
                 unmatched={result.unmatched}
+                incomplete={result.incomplete}
+                candidates={result.candidates}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>
