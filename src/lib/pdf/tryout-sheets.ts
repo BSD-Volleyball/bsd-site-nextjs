@@ -338,7 +338,7 @@ export async function generateTryoutSheetsPdf(
         )
 
         const lsWidth = Math.min(
-            24,
+            26,
             getColumnWidth({
                 header: "LS",
                 values: Array.from(latestDraftByUser.values()).map(
