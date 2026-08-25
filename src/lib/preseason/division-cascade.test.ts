@@ -20,6 +20,8 @@ function candidate(overrides: Partial<Week2Candidate> = {}): Week2Candidate {
         captainDivisionId: null,
         captainDivisionName: null,
         isCaptain: false,
+        isCoach: false,
+        coachDivisionName: null,
         lastDivisionName: null,
         ...overrides
     }

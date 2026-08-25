@@ -25,6 +25,8 @@ function candidate(overrides: Partial<Week3Candidate> = {}): Week3Candidate {
         captainDivisionId: null,
         captainDivisionName: null,
         isCaptain: false,
+        isCoach: false,
+        coachDivisionName: null,
         week2DivisionId: null,
         forcedMoveDirection: null,
         recommendationUpCount: 0,
@@ -124,6 +126,27 @@ describe("buildContinuityDivisionPlacement", () => {
         )
         expect(divisionOne).toContain("locked-captain")
         expect(lockedUserIds.has("locked-captain")).toBe(true)
+    })
+
+    it("places a coach by week-2 continuity, not as a locked captain", () => {
+        const pool = buildBalancedPool()
+        pool[23] = candidate({
+            userId: "coach",
+            placementScore: 24,
+            male: false,
+            isCoach: true,
+            coachDivisionName: "BB",
+            week2DivisionId: 2
+        })
+
+        const { placement, reasonByUser, lockedUserIds } =
+            buildContinuityDivisionPlacement(divisions, pool)
+        const divisionTwo = (placement.get(2)?.units ?? []).flatMap((unit) =>
+            unit.players.map((p) => p.userId)
+        )
+        expect(divisionTwo).toContain("coach")
+        expect(reasonByUser.get("coach")).toBe("tryout2_same_division")
+        expect(lockedUserIds.has("coach")).toBe(false)
     })
 
     it("assigns a placement reason to every player", () => {

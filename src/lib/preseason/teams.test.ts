@@ -28,6 +28,8 @@ function candidate(
         captainDivisionId: null,
         captainDivisionName: null,
         isCaptain: false,
+        isCoach: false,
+        coachDivisionName: null,
         ...overrides
     }
 }
@@ -180,6 +182,37 @@ describe("buildTeamsForDivision", () => {
         for (const team of teams) {
             expect(team.players.filter((p) => p.isCaptain)).toHaveLength(0)
         }
+    })
+
+    it("places a coach in a regular division on a slot-3 team without a captain flag", () => {
+        const pool = Array.from({ length: 18 }, (_, i) =>
+            candidate({
+                userId: `t${String(i).padStart(2, "0")}`,
+                placementScore: i + 1,
+                isCaptain: i < 6
+            })
+        )
+        pool[10] = candidate({
+            userId: "coach",
+            placementScore: 11,
+            isCoach: true,
+            coachDivisionName: "BB",
+            availableSlots: [3]
+        })
+
+        const teams = buildTeamsForDivision(
+            division({ teamCount: 6 }),
+            pool.map(toOriginalPlacedPlayer),
+            WEEK3_OPTIONS
+        )
+
+        const home = teams.find((team) =>
+            team.players.some((p) => p.entryId === "orig:coach")
+        )
+        expect(home?.number).toBeGreaterThanOrEqual(5)
+        const coach = home?.players.find((p) => p.entryId === "orig:coach")
+        expect(coach?.isCaptain).toBe(false)
+        expect(getSlotViolationEntryIds(teams).has("orig:coach")).toBe(false)
     })
 
     describe("back-court split", () => {

@@ -18,9 +18,6 @@ export function buildContinuityDivisionPlacement(
     candidates: Week3Candidate[]
 ): DivisionPlacementResult<Week3Candidate> {
     const units = buildPlacementUnits(candidates)
-    const coachesDivisionIds = new Set(
-        divisions.filter((d) => d.usesCoaches).map((d) => d.id)
-    )
     const placement = initDivisionBuckets(divisions, candidates)
     const tracker = createPlacementTracker(placement)
     const divisionIndexById = new Map(
@@ -120,14 +117,6 @@ export function buildContinuityDivisionPlacement(
 
     for (const unit of units) {
         if (!unit.hasCaptain) {
-            continue
-        }
-
-        // In coaches divisions the "captains" are coaches — treat as normal players
-        if (
-            unit.captainDivisionId &&
-            coachesDivisionIds.has(unit.captainDivisionId)
-        ) {
             continue
         }
 

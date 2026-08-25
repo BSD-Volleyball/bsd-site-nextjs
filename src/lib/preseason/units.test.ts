@@ -26,6 +26,8 @@ function candidate(
         captainDivisionId: null,
         captainDivisionName: null,
         isCaptain: false,
+        isCoach: false,
+        coachDivisionName: null,
         ...overrides
     }
 }

@@ -39,6 +39,8 @@ export interface TeamPlayer {
     ratingScore: number | null
     consecutiveSeasonsInTopDiv: number
     isCaptain: boolean
+    isCoach: boolean
+    coachDivisionName: string | null
     isNew: boolean
     pairEntryId: string | null
     pairName: string | null
@@ -195,8 +197,12 @@ export function buildTeamsForDivision<C extends PreseasonCandidate>(
         placementScore: player.placementScore,
         ratingScore: player.ratingScore,
         consecutiveSeasonsInTopDiv: player.consecutiveSeasonsInTopDiv ?? 0,
-        // Coaches are treated as regular players in team building
+        // Coaches never arrive flagged as captains (the loader strips them);
+        // this guard also keeps a regular-division captain who lands in the
+        // coaches division from being seeded as its captain.
         isCaptain: division.usesCoaches ? false : player.isCaptain,
+        isCoach: player.isCoach,
+        coachDivisionName: player.coachDivisionName,
         isNew: player.overallMostRecent === null,
         pairEntryId: null,
         pairName: null,

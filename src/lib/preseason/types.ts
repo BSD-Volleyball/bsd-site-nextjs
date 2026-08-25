@@ -35,6 +35,14 @@ export interface PreseasonCandidate {
     captainDivisionId: number | null
     captainDivisionName: string | null
     isCaptain: boolean
+    /**
+     * Captains a coaches division this season (their `teams.captain` row is a
+     * coach, not a captain). Coaches place as regular players and prefer the
+     * late tryout slot so they can watch their division; a user who also
+     * captains a regular division is still that division's captain.
+     */
+    isCoach: boolean
+    coachDivisionName: string | null
     // Week-3-only inputs; optional in the base so shared unit building can
     // read them uniformly (absent ≡ null/0 for week 2).
     week2DivisionId?: number | null

@@ -827,6 +827,15 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                                                 captain)
                                                                             </span>
                                                                         )}
+                                                                    {player.isCoach &&
+                                                                        !player.isCaptain && (
+                                                                            <span className="ml-2 font-semibold text-muted-foreground">
+                                                                                COACH
+                                                                                {player.coachDivisionName
+                                                                                    ? ` (${player.coachDivisionName})`
+                                                                                    : ""}
+                                                                            </span>
+                                                                        )}
                                                                 </>
                                                             )}
                                                             {duplicateCount >
@@ -1074,6 +1083,15 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                                                     Captain
                                                                 </span>
                                                             )}
+                                                            {player.isCoach &&
+                                                                !player.isCaptain && (
+                                                                    <span className="ml-2 font-semibold text-muted-foreground">
+                                                                        Coach
+                                                                        {player.coachDivisionName
+                                                                            ? ` (${player.coachDivisionName})`
+                                                                            : ""}
+                                                                    </span>
+                                                                )}
                                                             {playsTwiceAssignmentUserIds.has(
                                                                 player.assignmentUserId
                                                             ) && (

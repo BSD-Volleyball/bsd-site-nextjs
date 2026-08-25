@@ -5,6 +5,7 @@ import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
+import { resolveAvailableSlots } from "@/lib/preseason/slots"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import type {
     ExcludedPlayer,
@@ -43,8 +44,7 @@ export async function getCreateWeek2Data(): Promise<CreateWeek2Data> {
 
     try {
         const result = await loadPreseasonBaseData({
-            tryoutEventIndex: 1,
-            coachCaptainHandling: "exclude"
+            tryoutEventIndex: 1
         })
 
         if (!result.ok) {
@@ -62,7 +62,10 @@ export async function getCreateWeek2Data(): Promise<CreateWeek2Data> {
                     lastDivisionName:
                         base.draftsByUser.get(candidate.userId)?.[0]
                             ?.divisionName ?? null,
-                    availableSlots: slotRequest?.availableSlots ?? null,
+                    availableSlots: resolveAvailableSlots(
+                        candidate,
+                        slotRequest
+                    ),
                     slotRequestComment: slotRequest?.comment ?? null
                 }
             }

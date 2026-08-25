@@ -62,15 +62,6 @@ export type PreseasonLoadResult =
 export interface LoadPreseasonBaseDataOptions {
     /** Index into the season's tryout events (week 2 → 1, week 3 → 2). */
     tryoutEventIndex: number
-    /**
-     * How captains of coaches divisions are treated:
-     * - "exclude" (week 2): they are not captains at all — dropped from the
-     *   captain maps so they place as regular players.
-     * - "preferRegular" (week 3): kept, but a user captaining both a coaches
-     *   and a regular division resolves to the regular one; the placement
-     *   engine neutralizes coaches-division captains itself.
-     */
-    coachCaptainHandling: "exclude" | "preferRegular"
 }
 
 function compareBaseCandidates(
@@ -192,21 +183,16 @@ export async function loadPreseasonBaseData(
         }
     )
 
+    // A `teams.captain` row in a coaches division is a coach, not a captain:
+    // coaches never enter the captain maps (they place as regular players and
+    // are steered to the late slot downstream). A user who also captains a
+    // regular division is that division's captain as usual.
     const captainDivisionByUser = new Map<string, number>()
     const captainDivisionNameByUser = new Map<string, string>()
+    const coachDivisionNameByUser = new Map<string, string>()
     for (const row of captainRows) {
-        if (options.coachCaptainHandling === "exclude") {
-            if (!coachesDivisionIds.has(row.divisionId)) {
-                captainDivisionByUser.set(row.userId, row.divisionId)
-                captainDivisionNameByUser.set(row.userId, row.divisionName)
-            }
-            continue
-        }
-
-        // "preferRegular": if we already have a non-coaches captain entry,
-        // keep it; only overwrite if the stored entry is a coaches division
-        const existing = captainDivisionByUser.get(row.userId)
-        if (existing && !coachesDivisionIds.has(existing)) {
+        if (coachesDivisionIds.has(row.divisionId)) {
+            coachDivisionNameByUser.set(row.userId, row.divisionName)
             continue
         }
         captainDivisionByUser.set(row.userId, row.divisionId)
@@ -366,7 +352,9 @@ export async function loadPreseasonBaseData(
             captainDivisionId: captainDivisionByUser.get(row.userId) || null,
             captainDivisionName:
                 captainDivisionNameByUser.get(row.userId) || null,
-            isCaptain: captainDivisionByUser.has(row.userId)
+            isCaptain: captainDivisionByUser.has(row.userId),
+            isCoach: coachDivisionNameByUser.has(row.userId),
+            coachDivisionName: coachDivisionNameByUser.get(row.userId) || null
         }
     })
 

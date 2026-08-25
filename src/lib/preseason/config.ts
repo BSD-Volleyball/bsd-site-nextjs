@@ -31,6 +31,12 @@ export const LAST_DIVISION_TEAM_COUNT = 4
  */
 export const SCORE_BAND_WIDTH = 50
 
+/**
+ * Tryout slot (1-based, = ceil(teamNumber / 2)) coaches are steered into so
+ * they can observe their coaches division: the late 9pm slot.
+ */
+export const COACH_OBSERVATION_SLOT = 3
+
 export type DivisionPlacementStrategy<C extends PreseasonCandidate> = (
     divisions: PreseasonDivision[],
     candidates: C[]

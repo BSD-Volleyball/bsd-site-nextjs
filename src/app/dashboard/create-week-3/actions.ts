@@ -10,6 +10,7 @@ import {
     loadWeek2DivisionByUser
 } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
+import { resolveAvailableSlots } from "@/lib/preseason/slots"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import type {
     ExcludedPlayer,
@@ -48,8 +49,7 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
 
     try {
         const result = await loadPreseasonBaseData({
-            tryoutEventIndex: 2,
-            coachCaptainHandling: "preferRegular"
+            tryoutEventIndex: 2
         })
 
         if (!result.ok) {
@@ -94,7 +94,10 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                         ) ?? 0,
                     recommendationUpCount: recommendations.up,
                     recommendationDownCount: recommendations.down,
-                    availableSlots: slotRequest?.availableSlots ?? null,
+                    availableSlots: resolveAvailableSlots(
+                        candidate,
+                        slotRequest
+                    ),
                     slotRequestComment: slotRequest?.comment ?? null
                 }
             }
