@@ -10,6 +10,7 @@
 import { splitByGender } from "@/lib/utils"
 import { allocateByWeightWithCapacity, getSnakeOrder } from "./allocation"
 import { getDisplayName } from "./units"
+import { getTeamNumberSlot } from "./slots"
 import type {
     PlacedPlayer,
     PreseasonCandidate,
@@ -66,11 +67,6 @@ export interface TeamUnit {
     newCount: number
     size: number
     averageScore: number
-}
-
-/** Time slot a team plays in (teams 1-2 → 1, 3-4 → 2, 5-6 → 3). */
-function getTeamNumberSlot(teamNumber: number) {
-    return Math.floor((teamNumber - 1) / 2) + 1
 }
 
 function compareTuples(a: readonly number[], b: readonly number[]) {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDisplayName } from "@/lib/utils"
+import { findSameTimeConflicts } from "@/lib/preseason/slots"
 
 import {
     usePlayerDetailModal,
@@ -246,6 +247,13 @@ export function EditWeekRosterForm({
         return new Map([...counts.entries()].filter(([, n]) => n > 1))
     }, [editor.slotAssignments])
 
+    // userId -> time slots where the player holds more than one team (all
+    // teams in a slot play at once, so this is a double booking).
+    const sameTimeConflicts = useMemo(
+        () => findSameTimeConflicts(editor.slotAssignments),
+        [editor.slotAssignments]
+    )
+
     const groupedSlots = useMemo(() => {
         const divisionMap = new Map<
             number,
@@ -324,6 +332,40 @@ export function EditWeekRosterForm({
                                                                 : `Playing ${multiSlotCounts.get(slot.userId)} times`}
                                                         </p>
                                                     )}
+                                                {slot.userId &&
+                                                    sameTimeConflicts
+                                                        .get(slot.userId)
+                                                        ?.filter((c) =>
+                                                            c.teams.some(
+                                                                (t) =>
+                                                                    t.divisionName ===
+                                                                        slot.divisionName &&
+                                                                    t.teamNumber ===
+                                                                        slot.teamNumber
+                                                            )
+                                                        )
+                                                        .map((c) => (
+                                                            <p
+                                                                key={`conflict-${c.slot}`}
+                                                                className="font-semibold text-red-600 text-sm dark:text-red-500"
+                                                            >
+                                                                Double booked
+                                                                (same time):{" "}
+                                                                {c.teams
+                                                                    .filter(
+                                                                        (t) =>
+                                                                            t.divisionName !==
+                                                                                slot.divisionName ||
+                                                                            t.teamNumber !==
+                                                                                slot.teamNumber
+                                                                    )
+                                                                    .map(
+                                                                        (t) =>
+                                                                            `${t.divisionName} Team ${formatTryoutTeamLabel(t.divisionName, t.teamNumber)}`
+                                                                    )
+                                                                    .join(", ")}
+                                                            </p>
+                                                        ))}
                                                 {captainMode === "editable" &&
                                                     slot.userId && (
                                                         <label className="flex cursor-pointer items-center gap-1.5 text-sm">
