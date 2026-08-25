@@ -15,7 +15,11 @@ export interface FriendsPageData {
     friends: FriendListEntry[]
     incoming: PendingRequestEntry[]
     outgoing: PendingRequestEntry[]
-    /** Members addable as friends: everyone except self and live edges. */
+    /**
+     * Members addable as friends: everyone except self, current friends and
+     * outgoing requests. Players with a pending request TO us stay in the
+     * list — picking them auto-accepts via sendFriendRequest.
+     */
     members: { id: string; name: string }[]
     playerPicUrl: string
 }
@@ -36,7 +40,6 @@ export async function getFriendsPageData(
     const excluded = new Set<string>([
         userId,
         ...friends.map((f) => f.userId),
-        ...incoming.map((r) => r.userId),
         ...outgoing.map((r) => r.userId)
     ])
 
