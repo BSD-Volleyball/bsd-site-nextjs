@@ -4,7 +4,8 @@
  * "Bump Set Drink" historically named preseason teams after drinks
  * (2015–2023). Names run alphabetically from AA-1 through BB-4:
  * single-word names with unique first letters A–X cover AA, A, ABA and
- * ABB; BBB and BB use two-word names (alphabetical within each division).
+ * ABB; BBB uses two-word mixed drinks and BB two-word bourbons (alphabetical
+ * within each division, first letters unique across both).
  *
  * The `AA-1` code is never stored — it is `division.name + "-" + team_number`
  * — so these names are a pure lookup keyed the same way.
@@ -15,14 +16,14 @@ export const TRYOUT_TEAM_NAMES: Record<string, readonly string[]> = {
     ABA: ["Margarita", "Negroni", "Ouzo", "Paloma", "Quaff", "Rum"],
     ABB: ["Sazerac", "Tequila", "Ultra", "Vodka", "Whiskey", "XO"],
     BBB: [
-        "Bloody Mary",
-        "Eagle Rare",
+        "Cuba Libre",
         "Hot Toddy",
         "Long Island",
-        "Moscow Mule",
-        "Old Fashioned"
+        "Old Fashioned",
+        "Rusty Nail",
+        "Tom Collins"
     ],
-    BB: ["Piña Colada", "Rusty Nail", "Sea Breeze", "White Russian"]
+    BB: ["Buffalo Trace", "Four Roses", "Makers Mark", "Wild Turkey"]
 }
 
 /** Drink name for a tryout team, or null when none is defined. */

@@ -30,14 +30,16 @@ describe("TRYOUT_TEAM_NAMES", () => {
         expect(letters).toEqual(expected)
     })
 
-    it("two-word names are alphabetical with unique first letters within BBB and BB", () => {
+    it("two-word names are alphabetical within BBB and BB with unique first letters across both", () => {
         for (const d of TWO_WORD_DIVISIONS) {
             const names = TRYOUT_TEAM_NAMES[d]
             expect(names.every((n) => n.includes(" "))).toBe(true)
-            const letters = names.map((n) => n[0])
-            expect(new Set(letters).size).toBe(letters.length)
             expect([...names].sort()).toEqual([...names])
         }
+        const letters = TWO_WORD_DIVISIONS.flatMap((d) =>
+            TRYOUT_TEAM_NAMES[d].map((n) => n[0])
+        )
+        expect(new Set(letters).size).toBe(letters.length)
     })
 })
 
@@ -46,7 +48,7 @@ describe("label helpers", () => {
         expect(getTryoutTeamName("AA", 1)).toBe("Absinthe")
         expect(tryoutTeamCode("AA", 1)).toBe("AA-1")
         expect(formatTryoutTeamLabel("AA", 1)).toBe("Absinthe (AA-1)")
-        expect(formatTryoutTeamLabel("BB", 4)).toBe("White Russian (BB-4)")
+        expect(formatTryoutTeamLabel("BB", 4)).toBe("Wild Turkey (BB-4)")
         expect(formatTryoutMatchLabel("AA", 1, 2)).toBe(
             "Absinthe vs. Bourbon (AA-1 vs. AA-2)"
         )
