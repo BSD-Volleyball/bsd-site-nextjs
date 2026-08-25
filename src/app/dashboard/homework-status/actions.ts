@@ -318,9 +318,12 @@ export const getHomeworkStatusData = withAction(
             draftHomeworkCountMap.get(row.captain)!.set(row.division, row.cnt)
         }
 
-        // 6. Determine division min/max levels (top/bottom division logic)
+        // 6. Determine division min/max levels (top/bottom division logic).
+        // Use the season's full division list, not teamsData: teamsData is
+        // filtered to the selected division, which would make every division
+        // look like both top and bottom.
         const divisionLevels = [
-            ...new Set(teamsData.map((t) => t.divisionLevel))
+            ...new Set(seasonDivisionRows.map((d) => d.divisionLevel))
         ]
         const minLevel =
             divisionLevels.length > 0 ? Math.min(...divisionLevels) : null
