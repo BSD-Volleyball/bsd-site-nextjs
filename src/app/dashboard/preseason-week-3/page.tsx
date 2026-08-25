@@ -1,4 +1,8 @@
 import { requireSessionOrRedirect } from "@/lib/page-guards"
+import {
+    formatTryoutMatchLabel,
+    formatTryoutTeamLabel
+} from "@/lib/tryout-team-names"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
@@ -74,7 +78,7 @@ function buildDivisionSchedule(
     return matchups.map(([homeTeam, awayTeam], index) => ({
         time: sessionTimes[index] || "Time TBD",
         courtNumber,
-        matchLabel: `${divisionName}-${homeTeam} vs. ${divisionName}-${awayTeam}`
+        matchLabel: formatTryoutMatchLabel(divisionName, homeTeam, awayTeam)
     }))
 }
 
@@ -354,8 +358,11 @@ export default async function PreseasonWeek3Page() {
                                             className="rounded-lg border bg-muted/20 p-4"
                                         >
                                             <h3 className="mb-3 font-semibold text-base">
-                                                Team {division.divisionName}-
-                                                {team.teamNumber}
+                                                Team{" "}
+                                                {formatTryoutTeamLabel(
+                                                    division.divisionName,
+                                                    team.teamNumber
+                                                )}
                                             </h3>
                                             <ol className="space-y-1.5 text-sm">
                                                 {team.players.map((player) => (
@@ -508,8 +515,11 @@ export default async function PreseasonWeek3Page() {
                                         className="pw3-team"
                                     >
                                         <div className="pw3-team-name">
-                                            Team {division.divisionName}-
-                                            {team.teamNumber}
+                                            Team{" "}
+                                            {formatTryoutTeamLabel(
+                                                division.divisionName,
+                                                team.teamNumber
+                                            )}
                                         </div>
                                         <ol style={{ margin: 0, padding: 0 }}>
                                             {team.players.map((player) => (

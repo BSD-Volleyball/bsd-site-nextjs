@@ -1,4 +1,5 @@
 "use client"
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 
 import { useEffect, useState } from "react"
 import {
@@ -35,7 +36,7 @@ function getChangeSummary(
     }
     if (entry.divisionAssignments && entry.divisionAssignments.length > 0) {
         return entry.divisionAssignments
-            .map((a) => `${a.divisionName} — Team ${a.teamNumber}`)
+            .map((a) => formatTryoutTeamLabel(a.divisionName, a.teamNumber))
             .join("; ")
     }
     return ""

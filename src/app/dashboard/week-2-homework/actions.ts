@@ -1,5 +1,6 @@
 "use server"
 
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, ok, fail } from "@/lib/action-helpers"
 import { and, asc, count, eq, or } from "drizzle-orm"
@@ -770,7 +771,7 @@ export const submitCoachWeek2Homework = withAction(
         }
 
         const [divisionInfo] = await db
-            .select({ level: divisions.level })
+            .select({ level: divisions.level, name: divisions.name })
             .from(divisions)
             .where(eq(divisions.id, coachTeamEntry.divisionId))
             .limit(1)
@@ -804,7 +805,7 @@ export const submitCoachWeek2Homework = withAction(
             for (const { teamNumber } of divisionTeamNumbers) {
                 if (!providedTeamNumbers.has(teamNumber)) {
                     return fail(
-                        `Please select a player to move up from Team ${teamNumber}`
+                        `Please select a player to move up from Team ${formatTryoutTeamLabel(divisionInfo?.name ?? "", teamNumber)}`
                     )
                 }
             }

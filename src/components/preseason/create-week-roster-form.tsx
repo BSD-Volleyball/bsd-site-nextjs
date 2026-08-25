@@ -1,4 +1,5 @@
 "use client"
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 
 // Shared roster builder for the week-2 and week-3 create pages. All
 // week-specific behavior comes in through PreseasonWeekConfig
@@ -1011,7 +1012,11 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                                         >
                                             <div className="flex items-center justify-between">
                                                 <h3 className="font-semibold text-sm">
-                                                    Team {team.number}
+                                                    Team{" "}
+                                                    {formatTryoutTeamLabel(
+                                                        division.name,
+                                                        team.number
+                                                    )}
                                                 </h3>
                                                 <span className="text-muted-foreground text-sm">
                                                     {team.players.length} |{" "}

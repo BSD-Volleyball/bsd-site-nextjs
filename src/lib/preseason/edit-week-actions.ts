@@ -1,4 +1,5 @@
 // Shared implementations for the edit-week-2/3 roster actions. The route
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 // actions.ts files are thin "use server" wrappers that enforce authorization
 // and delegate here with their week's config. Server-only.
 
@@ -356,7 +357,7 @@ export async function updateEditWeekRosters(
                             divisionNameById.get(slot.divisionId) ??
                             `Division ${slot.divisionId}`
                         return fail(
-                            `Captain slot in ${slotDivisionName} Team ${slot.teamNumber} does not contain a captain assigned to that division.`
+                            `Captain slot in ${formatTryoutTeamLabel(slotDivisionName, slot.teamNumber)} does not contain a captain assigned to that division.`
                         )
                     }
                 }
@@ -561,7 +562,10 @@ export async function sendEditWeekRosterNotifications(
                 renderDetailRow("Time:", sessionTime),
                 renderDetailRow("Court:", `Court ${courtNumber}`),
                 renderDetailRow("Division:", a.divisionName),
-                renderDetailRow("Team:", `Team ${a.teamNumber}`),
+                renderDetailRow(
+                    "Team:",
+                    formatTryoutTeamLabel(a.divisionName, a.teamNumber)
+                ),
                 captainName ? renderDetailRow("Captain:", captainName) : ""
             ].filter(Boolean)
 

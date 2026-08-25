@@ -1,5 +1,6 @@
 "use client"
 
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import {
     Accordion,
     AccordionContent,
@@ -105,8 +106,12 @@ export function TryoutDivisionAccordion({
                             >
                                 <AccordionTrigger>
                                     <span>
-                                        Team {team.teamNumber} (
-                                        {filteredTeamPlayers.length})
+                                        Team{" "}
+                                        {formatTryoutTeamLabel(
+                                            selectedTryoutDivision.divisionName,
+                                            team.teamNumber
+                                        )}{" "}
+                                        ({filteredTeamPlayers.length})
                                     </span>
                                 </AccordionTrigger>
                                 <AccordionContent>
@@ -194,7 +199,11 @@ export function TryoutTimeSlotAccordion({
                                                     <AccordionTrigger>
                                                         <span>
                                                             Team{" "}
-                                                            {team.teamNumber} (
+                                                            {formatTryoutTeamLabel(
+                                                                division.divisionName,
+                                                                team.teamNumber
+                                                            )}{" "}
+                                                            (
                                                             {
                                                                 filteredTeamPlayers.length
                                                             }

@@ -12,6 +12,7 @@
  * Performs NO authorization checks: callers must gate access.
  */
 
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import "server-only"
 
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm"
@@ -542,7 +543,7 @@ export async function getScheduleForUsers(
                 weekIndex,
                 getSessionNumberFromTeam(r.teamNumber),
                 LEGACY_COURT_BY_DIVISION[r.divisionName] ?? null,
-                `${r.divisionName} Team ${r.teamNumber}${r.isCaptain ? " (captain)" : ""}`
+                `${formatTryoutTeamLabel(r.divisionName, r.teamNumber)}${r.isCaptain ? " (captain)" : ""}`
             )
         }
     }

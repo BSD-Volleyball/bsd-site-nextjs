@@ -1,3 +1,4 @@
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import { Suspense } from "react"
 import { PageHeader } from "@/components/layout/page-header"
 import type { Metadata } from "next"
@@ -1200,7 +1201,11 @@ export default async function DashboardPage() {
                                         Team:
                                     </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        Team {userWeek3Roster.teamNumber}
+                                        Team{" "}
+                                        {formatTryoutTeamLabel(
+                                            userWeek3Roster.divisionName,
+                                            userWeek3Roster.teamNumber
+                                        )}
                                     </span>
                                 </div>
                                 {userWeek3Roster.captainName && (
@@ -1642,7 +1647,11 @@ export default async function DashboardPage() {
                                         Team:
                                     </span>
                                     <span className="font-semibold text-orange-800 dark:text-orange-200">
-                                        Team {userWeek2Roster.teamNumber}
+                                        Team{" "}
+                                        {formatTryoutTeamLabel(
+                                            userWeek2Roster.divisionName,
+                                            userWeek2Roster.teamNumber
+                                        )}
                                     </span>
                                 </div>
                                 {userWeek2Roster.captainName && (

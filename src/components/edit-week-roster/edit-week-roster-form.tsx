@@ -1,4 +1,5 @@
 "use client"
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 
 import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
@@ -282,7 +283,7 @@ export function EditWeekRosterForm({
                                 ([teamNumber, teamSlots]) => (
                                     <SlotBox
                                         key={`division-${divisionId}-team-${teamNumber}`}
-                                        title={`Team ${teamNumber}`}
+                                        title={`Team ${formatTryoutTeamLabel(divisionData.divisionName, teamNumber)}`}
                                         slots={teamSlots}
                                         players={players}
                                         onChangeSlot={editor.changeSlotUser}
