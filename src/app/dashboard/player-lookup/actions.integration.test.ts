@@ -432,7 +432,7 @@ describe("getPlayerSchedule", () => {
             timeLabel: "7:45 PM",
             court: 2,
             label: "Tryout 2 — Session 2",
-            sublabel: "A Team 3 (captain)"
+            sublabel: "IPA (A-3) (captain)"
         })
     })
 
