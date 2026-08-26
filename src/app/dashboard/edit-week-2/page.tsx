@@ -45,6 +45,7 @@ export default async function EditWeek2Page() {
                 <EditWeek2Form
                     players={result.players}
                     slots={result.slots}
+                    slotLabels={result.slotLabels}
                     playerPicUrl={playerPicBaseUrl()}
                     seasonLabel={result.seasonLabel}
                 />

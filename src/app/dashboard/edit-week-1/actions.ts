@@ -32,6 +32,8 @@ import {
 } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { getUnavailableSignupIdsForEvent } from "@/lib/week-rosters"
+import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
+import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
 
@@ -45,6 +47,9 @@ export interface Week1EditablePlayer {
     playFirstWeek: boolean
     seasonsPlayed: number
     hasPairPick: boolean
+    /** Tryout sessions (1-2) the player asked to play in; null = no request. */
+    requestedSlots: number[] | null
+    slotRequestComment: string | null
 }
 
 export interface Week1EditableSlot {
@@ -67,6 +72,8 @@ export async function getEditWeek1Data(): Promise<{
     seasonLabel: string
     players: Week1EditablePlayer[]
     slots: Week1EditableSlot[]
+    /** Labels for sessions 1-2 (e.g. "7:00 PM"). */
+    slotLabels: string[]
 }> {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
@@ -76,7 +83,8 @@ export async function getEditWeek1Data(): Promise<{
             seasonId: 0,
             seasonLabel: "",
             players: [],
-            slots: []
+            slots: [],
+            slotLabels: []
         }
     }
 
@@ -89,7 +97,8 @@ export async function getEditWeek1Data(): Promise<{
                 seasonId: 0,
                 seasonLabel: "",
                 players: [],
-                slots: []
+                slots: [],
+                slotLabels: []
             }
         }
 
@@ -151,7 +160,10 @@ export async function getEditWeek1Data(): Promise<{
             seasonsPlayedByUser.set(row.userId, played)
         }
 
-        const scoreByUser = await fetchPlayerScores(userIds, config.seasonId)
+        const [scoreByUser, slotRequestByUser] = await Promise.all([
+            fetchPlayerScores(userIds, config.seasonId),
+            loadTryoutSlotRequests(config.seasonId, 1)
+        ])
 
         const tryouts = getEventsByType(config, "tryout")
         const tryout1Event = tryouts[0] ?? null
@@ -172,7 +184,10 @@ export async function getEditWeek1Data(): Promise<{
                     !tryout1Event || !unavailableForTryout1.has(p.signupId),
                 seasonsPlayed: seasonsPlayedByUser.get(p.id)?.size ?? 0,
                 placementScore: scoreByUser.get(p.id) ?? 200,
-                hasPairPick: !!p.pairPick
+                hasPairPick: !!p.pairPick,
+                requestedSlots:
+                    slotRequestByUser.get(p.id)?.availableSlots ?? null,
+                slotRequestComment: slotRequestByUser.get(p.id)?.comment ?? null
             })
         )
 
@@ -181,7 +196,8 @@ export async function getEditWeek1Data(): Promise<{
             seasonId: config.seasonId,
             seasonLabel,
             players: signupPlayers,
-            slots: rosterSlots
+            slots: rosterSlots,
+            slotLabels: getTryoutSlotLabels(config, 1)
         }
     } catch (error) {
         console.error("Error loading edit week 1 data:", error)
@@ -191,7 +207,8 @@ export async function getEditWeek1Data(): Promise<{
             seasonId: 0,
             seasonLabel: "",
             players: [],
-            slots: []
+            slots: [],
+            slotLabels: []
         }
     }
 }

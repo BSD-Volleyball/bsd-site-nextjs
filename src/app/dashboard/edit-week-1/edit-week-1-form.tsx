@@ -11,6 +11,7 @@ import {
 interface EditWeek1FormProps {
     players: Week1EditablePlayer[]
     slots: Week1EditableSlot[]
+    slotLabels: string[]
     playerPicUrl: string
     seasonLabel: string
 }
@@ -18,6 +19,7 @@ interface EditWeek1FormProps {
 export function EditWeek1Form({
     players,
     slots,
+    slotLabels,
     playerPicUrl,
     seasonLabel
 }: EditWeek1FormProps) {
@@ -25,6 +27,7 @@ export function EditWeek1Form({
         <EditWeek1RosterForm
             players={players}
             slots={slots}
+            slotLabels={slotLabels}
             playerPicUrl={playerPicUrl}
             seasonLabel={seasonLabel}
             updateRosters={updateWeek1Rosters}

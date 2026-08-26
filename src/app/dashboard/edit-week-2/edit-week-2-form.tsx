@@ -11,6 +11,7 @@ import {
 interface EditWeek2FormProps {
     players: Week2EditablePlayer[]
     slots: Week2EditableSlot[]
+    slotLabels: string[]
     playerPicUrl: string
     seasonLabel: string
 }
@@ -18,6 +19,7 @@ interface EditWeek2FormProps {
 export function EditWeek2Form({
     players,
     slots,
+    slotLabels,
     playerPicUrl,
     seasonLabel
 }: EditWeek2FormProps) {
@@ -27,6 +29,7 @@ export function EditWeek2Form({
             captainMode="locked"
             players={players}
             slots={slots}
+            slotLabels={slotLabels}
             playerPicUrl={playerPicUrl}
             seasonLabel={seasonLabel}
             updateRosters={updateWeek2Rosters}

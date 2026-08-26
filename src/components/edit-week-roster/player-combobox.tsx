@@ -37,6 +37,8 @@ export interface ComboboxPlayer {
      * selected and is hidden from the picker everywhere else.
      */
     unavailableReason?: string | null
+    /** 1-based tryout slots the player asked to play in (null = any). */
+    requestedSlots?: number[] | null
 }
 
 export function getComboboxPlayerLabel(player: ComboboxPlayer) {
@@ -65,6 +67,14 @@ function PlayerMeta({ player }: { player: ComboboxPlayer }) {
                 <span>{player.lastDivisionName}</span>
             ) : null}
             <span className="ml-1">{Math.round(player.placementScore)}</span>
+            {player.requestedSlots && player.requestedSlots.length > 0 && (
+                <span
+                    className="ml-1 text-sky-700 dark:text-sky-400"
+                    title={`Requested tryout slot${player.requestedSlots.length === 1 ? "" : "s"} ${player.requestedSlots.join(", ")}`}
+                >
+                    S{player.requestedSlots.join("/")}
+                </span>
+            )}
             {player.seasonsPlayedCount > 0 &&
                 typeof player.ratingScore === "number" && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
@@ -80,13 +90,16 @@ export function PlayerCombobox({
     value,
     onChange,
     excludeIds = [],
-    disabled = false
+    disabled = false,
+    warn = false
 }: {
     players: ComboboxPlayer[]
     value: string
     onChange: (userId: string) => void
     excludeIds?: string[]
     disabled?: boolean
+    /** Outline the trigger in red (e.g. slot doesn't match the request). */
+    warn?: boolean
 }) {
     const [open, setOpen] = useState(false)
     const [search, setSearch] = useState("")
@@ -122,6 +135,7 @@ export function PlayerCombobox({
                 className={cn(
                     "h-9 w-full justify-between gap-1 px-2 font-normal",
                     selectedPlayer && getGenderClass(selectedPlayer.male),
+                    warn && selectedPlayer && "border-2 border-red-500",
                     selectedPlayer?.unavailableReason &&
                         "border-red-500 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-700 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-950/60"
                 )}

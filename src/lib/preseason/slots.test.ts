@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest"
 import { COACH_OBSERVATION_SLOT } from "./config"
 import {
     findSameTimeConflicts,
+    formatSlotList,
     getTeamNumberSlot,
-    resolveAvailableSlots
+    resolveAvailableSlots,
+    slotFitsRequest
 } from "./slots"
 
 describe("resolveAvailableSlots", () => {
@@ -65,5 +67,26 @@ describe("findSameTimeConflicts", () => {
                 { userId: "u1", divisionName: "A", teamNumber: 5 }
             ]).size
         ).toBe(0)
+    })
+})
+
+describe("slotFitsRequest", () => {
+    it("treats a missing or empty request as unrestricted", () => {
+        expect(slotFitsRequest(3, null)).toBe(true)
+        expect(slotFitsRequest(3, undefined)).toBe(true)
+        expect(slotFitsRequest(3, [])).toBe(true)
+    })
+
+    it("only accepts slots the player asked for", () => {
+        expect(slotFitsRequest(1, [1, 2])).toBe(true)
+        expect(slotFitsRequest(3, [1, 2])).toBe(false)
+    })
+})
+
+describe("formatSlotList", () => {
+    it("maps slot numbers to labels, falling back to Slot N", () => {
+        expect(formatSlotList([1, 3], ["7:00 PM", "8:00 PM"])).toBe(
+            "7:00 PM, Slot 3"
+        )
     })
 })

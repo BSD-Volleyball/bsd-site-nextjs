@@ -1,8 +1,8 @@
 import { requireAdminOrRedirect } from "@/lib/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
-import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
-import { formatEventTime } from "@/lib/season-utils"
+import { getSeasonConfig } from "@/lib/site-config"
+import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
 import { TryoutSlotRequestsManager } from "./tryout-slot-requests-manager"
 import { getTryoutSlotRequests, getUsers } from "./actions"
 import type { Metadata } from "next"
@@ -15,26 +15,11 @@ export const dynamic = "force-dynamic"
 
 async function getSlotLabelsByWeek(): Promise<Record<number, string[]>> {
     const config = await getSeasonConfig()
-    const tryouts = config.seasonId ? getEventsByType(config, "tryout") : []
-
-    const result: Record<number, string[]> = {}
-    for (const week of [1, 2, 3]) {
-        const slotCount = week === 1 ? 2 : 3
-        const timeSlots = tryouts[week - 1]?.timeSlots ?? []
-        result[week] = Array.from({ length: slotCount }, (_, index) => {
-            const slot = timeSlots[index]
-            const timeLabel = slot?.startTime
-                ? formatEventTime(slot.startTime)
-                : null
-            return (
-                slot?.slotLabel ??
-                (timeLabel
-                    ? `Slot ${index + 1} (${timeLabel})`
-                    : `Slot ${index + 1}`)
-            )
-        })
+    return {
+        1: getTryoutSlotLabels(config, 1),
+        2: getTryoutSlotLabels(config, 2),
+        3: getTryoutSlotLabels(config, 3)
     }
-    return result
 }
 
 export default async function TryoutSlotRequestsPage() {

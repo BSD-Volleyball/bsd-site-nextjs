@@ -20,6 +20,8 @@ import {
 } from "@/components/roster-notification"
 import type { ComboboxPlayer } from "./player-combobox"
 import { SlotBox } from "./slot-box"
+import { SlotRequestNote } from "./slot-request-note"
+import { slotFitsRequest } from "@/lib/preseason/slots"
 import { useRosterEditor } from "./use-roster-editor"
 
 export interface Week1RosterPlayer {
@@ -32,6 +34,9 @@ export interface Week1RosterPlayer {
     playFirstWeek: boolean
     seasonsPlayed: number
     hasPairPick: boolean
+    /** Tryout sessions (1-2) the player asked to play in; null = no request. */
+    requestedSlots: number[] | null
+    slotRequestComment: string | null
 }
 
 export interface Week1RosterSlot {
@@ -56,6 +61,8 @@ export interface Week1NotificationAssignment {
 interface EditWeek1RosterFormProps {
     players: Week1RosterPlayer[]
     slots: Week1RosterSlot[]
+    /** Labels for sessions 1-2 (e.g. "7:00 PM"). */
+    slotLabels: string[]
     playerPicUrl: string
     seasonLabel: string
     updateRosters: (
@@ -219,6 +226,7 @@ function computeWeek1Diff(
 export function EditWeek1RosterForm({
     players,
     slots,
+    slotLabels,
     playerPicUrl,
     seasonLabel,
     updateRosters,
@@ -236,10 +244,24 @@ export function EditWeek1RosterForm({
                 male: player.male,
                 hasPairPick: player.hasPairPick,
                 placementScore: player.placementScore,
-                seasonsPlayedCount: player.seasonsPlayed
+                seasonsPlayedCount: player.seasonsPlayed,
+                requestedSlots: player.requestedSlots
             })),
         [players]
     )
+
+    const playerById = useMemo(
+        () => new Map(players.map((p) => [p.id, p])),
+        [players]
+    )
+    // Alternates aren't tied to a session, so a request can't mismatch there.
+    const slotMismatch = (slot: LocalSlot) =>
+        !!slot.userId &&
+        slot.sessionNumber !== ALTERNATE_SESSION &&
+        !slotFitsRequest(
+            slot.sessionNumber,
+            playerById.get(slot.userId)?.requestedSlots
+        )
 
     const initialSlots = useMemo(
         () =>
@@ -321,6 +343,22 @@ export function EditWeek1RosterForm({
                     }
                     onOpenDetail={modal.openPlayerDetail}
                     excludeIdsFor={excludeIdsFor}
+                    comboboxWarn={slotMismatch}
+                    belowCombobox={(slot) =>
+                        slot.userId && sessionNumber !== ALTERNATE_SESSION ? (
+                            <SlotRequestNote
+                                placedSlot={sessionNumber}
+                                requestedSlots={
+                                    playerById.get(slot.userId)?.requestedSlots
+                                }
+                                comment={
+                                    playerById.get(slot.userId)
+                                        ?.slotRequestComment
+                                }
+                                slotLabels={slotLabels}
+                            />
+                        ) : null
+                    }
                 />
             ))}
         </div>

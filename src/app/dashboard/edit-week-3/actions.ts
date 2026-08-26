@@ -30,7 +30,8 @@ export async function getEditWeek3Data(): Promise<EditWeekData> {
             seasonId: 0,
             seasonLabel: "",
             players: [],
-            slots: []
+            slots: [],
+            slotLabels: []
         }
     }
 

@@ -62,6 +62,25 @@ export function findSameTimeConflicts(
     return result
 }
 
+/**
+ * Whether a placement in `slot` honors the player's tryout slot request.
+ * No request (null/empty) means unrestricted.
+ */
+export function slotFitsRequest(
+    slot: number,
+    requestedSlots: number[] | null | undefined
+): boolean {
+    if (!requestedSlots || requestedSlots.length === 0) {
+        return true
+    }
+    return requestedSlots.includes(slot)
+}
+
+/** "7:00 PM, 8:00 PM" from slot numbers + the week's slot labels. */
+export function formatSlotList(slots: number[], slotLabels: string[]) {
+    return slots.map((n) => slotLabels[n - 1] ?? `Slot ${n}`).join(", ")
+}
+
 export function resolveAvailableSlots(
     candidate: Pick<PreseasonCandidate, "isCoach">,
     slotRequest: { availableSlots: number[] } | null | undefined

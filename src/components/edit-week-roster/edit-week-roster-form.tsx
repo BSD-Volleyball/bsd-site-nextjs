@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatDisplayName } from "@/lib/utils"
-import { findSameTimeConflicts } from "@/lib/preseason/slots"
+import {
+    findSameTimeConflicts,
+    getTeamNumberSlot,
+    slotFitsRequest
+} from "@/lib/preseason/slots"
+import { SlotRequestNote } from "./slot-request-note"
 
 import {
     usePlayerDetailModal,
@@ -36,6 +41,9 @@ export interface EditWeekPlayer {
      * never offered as a choice for other slots.
      */
     unavailableReason: string | null
+    /** Tryout slots (1-3) the player asked to play in; null = no request. */
+    requestedSlots: number[] | null
+    slotRequestComment: string | null
 }
 
 export interface EditWeekSlot {
@@ -70,6 +78,8 @@ interface EditWeekRosterFormProps {
     captainMode: "locked" | "editable"
     players: EditWeekPlayer[]
     slots: EditWeekSlot[]
+    /** Labels for time slots 1-3 (e.g. "7:00 PM"). */
+    slotLabels: string[]
     playerPicUrl: string
     seasonLabel: string
     updateRosters: (
@@ -180,6 +190,7 @@ export function EditWeekRosterForm({
     captainMode,
     players,
     slots,
+    slotLabels,
     playerPicUrl,
     seasonLabel,
     updateRosters,
@@ -254,6 +265,17 @@ export function EditWeekRosterForm({
         [editor.slotAssignments]
     )
 
+    const playerById = useMemo(
+        () => new Map(players.map((p) => [p.id, p])),
+        [players]
+    )
+    const slotMismatch = (slot: LocalSlot) =>
+        !!slot.userId &&
+        !slotFitsRequest(
+            getTeamNumberSlot(slot.teamNumber),
+            playerById.get(slot.userId)?.requestedSlots
+        )
+
     const groupedSlots = useMemo(() => {
         const divisionMap = new Map<
             number,
@@ -310,6 +332,7 @@ export function EditWeekRosterForm({
                                             captainMode === "locked" &&
                                             slot.isCaptain
                                         }
+                                        comboboxWarn={slotMismatch}
                                         slotLabelExtras={(slot) =>
                                             captainMode === "locked" &&
                                             slot.isCaptain ? (
@@ -320,6 +343,25 @@ export function EditWeekRosterForm({
                                         }
                                         belowCombobox={(slot) => (
                                             <>
+                                                {slot.userId && (
+                                                    <SlotRequestNote
+                                                        placedSlot={getTeamNumberSlot(
+                                                            slot.teamNumber
+                                                        )}
+                                                        requestedSlots={
+                                                            playerById.get(
+                                                                slot.userId
+                                                            )?.requestedSlots
+                                                        }
+                                                        comment={
+                                                            playerById.get(
+                                                                slot.userId
+                                                            )
+                                                                ?.slotRequestComment
+                                                        }
+                                                        slotLabels={slotLabels}
+                                                    />
+                                                )}
                                                 {slot.userId &&
                                                     multiSlotCounts.has(
                                                         slot.userId

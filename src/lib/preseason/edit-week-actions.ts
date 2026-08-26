@@ -45,6 +45,8 @@ import {
     fetchRatingScoresForReturningPlayers
 } from "@/lib/week-rosters"
 import { formatDisplayName } from "@/lib/utils"
+import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
+import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import type {
     EditWeekAssignment,
@@ -90,6 +92,8 @@ export interface EditWeekData {
     seasonLabel: string
     players: EditWeekPlayer[]
     slots: EditWeekSlot[]
+    /** Labels for time slots 1-3 (e.g. "7:00 PM"). */
+    slotLabels: string[]
 }
 
 /** Data loader shared by the edit pages. Caller must be authorized. */
@@ -107,7 +111,8 @@ export async function getEditWeekData(
                 seasonId: 0,
                 seasonLabel: "",
                 players: [],
-                slots: []
+                slots: [],
+                slotLabels: []
             }
         }
 
@@ -235,11 +240,14 @@ export async function getEditWeekData(
                 : Promise.resolve(new Map<string, number>())
         ])
 
-        const ratingScoreByUser = await fetchRatingScoresForReturningPlayers(
-            userIds,
-            (id) => draftRows.some((r) => r.userId === id),
-            config.seasonId
-        )
+        const [ratingScoreByUser, slotRequestByUser] = await Promise.all([
+            fetchRatingScoresForReturningPlayers(
+                userIds,
+                (id) => draftRows.some((r) => r.userId === id),
+                config.seasonId
+            ),
+            loadTryoutSlotRequests(config.seasonId, actionConfig.week)
+        ])
 
         const lastDivisionByUser = new Map<string, string>()
         const seasonsCountByUser = new Map<string, Set<number>>()
@@ -268,9 +276,14 @@ export async function getEditWeekData(
                 lastDivisionName: lastDivisionByUser.get(player.id) ?? null,
                 seasonsPlayedCount:
                     seasonsCountByUser.get(player.id)?.size ?? 0,
-                unavailableReason: player.unavailableReason
+                unavailableReason: player.unavailableReason,
+                requestedSlots:
+                    slotRequestByUser.get(player.id)?.availableSlots ?? null,
+                slotRequestComment:
+                    slotRequestByUser.get(player.id)?.comment ?? null
             })),
-            slots: rosterSlots
+            slots: rosterSlots,
+            slotLabels: getTryoutSlotLabels(config, actionConfig.week)
         }
     } catch (error) {
         console.error(
@@ -283,7 +296,8 @@ export async function getEditWeekData(
             seasonId: 0,
             seasonLabel: "",
             players: [],
-            slots: []
+            slots: [],
+            slotLabels: []
         }
     }
 }

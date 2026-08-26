@@ -11,6 +11,7 @@ import {
 interface EditWeek3FormProps {
     players: Week3EditablePlayer[]
     slots: Week3EditableSlot[]
+    slotLabels: string[]
     playerPicUrl: string
     seasonLabel: string
 }
@@ -18,6 +19,7 @@ interface EditWeek3FormProps {
 export function EditWeek3Form({
     players,
     slots,
+    slotLabels,
     playerPicUrl,
     seasonLabel
 }: EditWeek3FormProps) {
@@ -27,6 +29,7 @@ export function EditWeek3Form({
             captainMode="editable"
             players={players}
             slots={slots}
+            slotLabels={slotLabels}
             playerPicUrl={playerPicUrl}
             seasonLabel={seasonLabel}
             updateRosters={updateWeek3Rosters}

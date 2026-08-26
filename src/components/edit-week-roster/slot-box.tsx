@@ -33,6 +33,8 @@ interface SlotBoxProps<TSlot extends SlotBoxSlot> {
     /** Content rendered under the combobox (warnings, captain toggle). */
     belowCombobox?: (slot: TSlot) => ReactNode
     comboboxDisabled?: (slot: TSlot) => boolean
+    /** Outline the combobox in red (e.g. slot doesn't match the request). */
+    comboboxWarn?: (slot: TSlot) => boolean
     excludeIdsFor?: (slot: TSlot) => string[]
 }
 
@@ -47,6 +49,7 @@ export function SlotBox<TSlot extends SlotBoxSlot>({
     slotLabelExtras,
     belowCombobox,
     comboboxDisabled,
+    comboboxWarn,
     excludeIdsFor
 }: SlotBoxProps<TSlot>) {
     return (
@@ -67,6 +70,7 @@ export function SlotBox<TSlot extends SlotBoxSlot>({
                                     onChangeSlot(slot.localKey, userId)
                                 }
                                 disabled={comboboxDisabled?.(slot) ?? false}
+                                warn={comboboxWarn?.(slot) ?? false}
                                 excludeIds={excludeIdsFor?.(slot)}
                             />
                             {belowCombobox?.(slot)}
