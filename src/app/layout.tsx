@@ -69,7 +69,7 @@ export default function RootLayout({
             <body className="flex min-h-svh flex-col antialiased">
                 <Providers>{children}</Providers>
                 <Analytics />
-                <SpeedInsights />
+                <SpeedInsights sampleRate={0.25} />
             </body>
         </html>
     )
