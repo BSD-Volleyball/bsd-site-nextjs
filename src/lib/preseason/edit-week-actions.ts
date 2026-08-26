@@ -46,6 +46,8 @@ import {
 } from "@/lib/week-rosters"
 import { formatDisplayName } from "@/lib/utils"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
+import { loadDraftNightLeavers } from "./load-week-roster-data"
+import { DRAFT_NIGHT_SLOT } from "./config"
 import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import type {
@@ -240,14 +242,52 @@ export async function getEditWeekData(
                 : Promise.resolve(new Map<string, number>())
         ])
 
-        const [ratingScoreByUser, slotRequestByUser] = await Promise.all([
-            fetchRatingScoresForReturningPlayers(
-                userIds,
-                (id) => draftRows.some((r) => r.userId === id),
-                config.seasonId
-            ),
-            loadTryoutSlotRequests(config.seasonId, actionConfig.week)
-        ])
+        // Week 3: the top division's captains/commissioners leave after the
+        // first slot for their draft, so they're held to it (see
+        // DRAFT_NIGHT_SLOT) whatever they requested.
+        const topDivision =
+            actionConfig.week === 3
+                ? ((
+                      await db
+                          .select({ id: divisions.id, name: divisions.name })
+                          .from(individual_divisions)
+                          .innerJoin(
+                              divisions,
+                              eq(individual_divisions.division, divisions.id)
+                          )
+                          .where(
+                              eq(individual_divisions.season, config.seasonId)
+                          )
+                          .orderBy(divisions.level)
+                          .limit(1)
+                  )[0] ?? null)
+                : null
+        const [ratingScoreByUser, slotRequestByUser, draftNightLeavers] =
+            await Promise.all([
+                fetchRatingScoresForReturningPlayers(
+                    userIds,
+                    (id) => draftRows.some((r) => r.userId === id),
+                    config.seasonId
+                ),
+                loadTryoutSlotRequests(config.seasonId, actionConfig.week),
+                loadDraftNightLeavers(config.seasonId, topDivision?.id ?? null)
+            ])
+        const draftLeaverComment = `Leaves after slot ${DRAFT_NIGHT_SLOT} for the ${topDivision?.name ?? "top division"} draft`
+        const requestFor = (userId: string) => {
+            const request = slotRequestByUser.get(userId)
+            if (!draftNightLeavers.has(userId)) {
+                return {
+                    requestedSlots: request?.availableSlots ?? null,
+                    slotRequestComment: request?.comment ?? null
+                }
+            }
+            return {
+                requestedSlots: [DRAFT_NIGHT_SLOT],
+                slotRequestComment: [draftLeaverComment, request?.comment]
+                    .filter(Boolean)
+                    .join(" — ")
+            }
+        }
 
         const lastDivisionByUser = new Map<string, string>()
         const seasonsCountByUser = new Map<string, Set<number>>()
@@ -277,10 +317,7 @@ export async function getEditWeekData(
                 seasonsPlayedCount:
                     seasonsCountByUser.get(player.id)?.size ?? 0,
                 unavailableReason: player.unavailableReason,
-                requestedSlots:
-                    slotRequestByUser.get(player.id)?.availableSlots ?? null,
-                slotRequestComment:
-                    slotRequestByUser.get(player.id)?.comment ?? null
+                ...requestFor(player.id)
             })),
             slots: rosterSlots,
             slotLabels: getTryoutSlotLabels(config, actionConfig.week)

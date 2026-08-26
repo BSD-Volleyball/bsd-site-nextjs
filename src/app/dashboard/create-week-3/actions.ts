@@ -5,12 +5,14 @@ import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import {
     loadConsecutiveTopDivSeasons,
+    loadDraftNightLeavers,
     loadMovingDayInputs,
     loadPreseasonBaseData,
     loadWeek2DivisionByUser
 } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
 import { resolveAvailableSlots } from "@/lib/preseason/slots"
+import { DRAFT_NIGHT_SLOT } from "@/lib/preseason/config"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import type {
     ExcludedPlayer,
@@ -63,7 +65,8 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
             week2DivisionByUser,
             { forcedMoveByUser, recommendationCountByUser },
             consecutiveSeasonsInTopDivByUser,
-            slotRequests
+            slotRequests,
+            draftNightLeavers
         ] = await Promise.all([
             loadWeek2DivisionByUser(base.seasonId),
             loadMovingDayInputs(base.seasonId),
@@ -72,8 +75,10 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                 base.userIds,
                 topDivisionId
             ),
-            loadTryoutSlotRequests(base.seasonId, 3)
+            loadTryoutSlotRequests(base.seasonId, 3),
+            loadDraftNightLeavers(base.seasonId, topDivisionId)
         ])
+        const draftLeaverComment = `Leaves after slot ${DRAFT_NIGHT_SLOT} for the ${base.divisions[0]?.name ?? "top division"} draft`
 
         const candidates: Week3Candidate[] = base.candidates.map(
             (candidate) => {
@@ -81,9 +86,11 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                     candidate.userId
                 ) || { up: 0, down: 0 }
                 const slotRequest = slotRequests.get(candidate.userId)
+                const leavesForDraft = draftNightLeavers.has(candidate.userId)
+                const withDraft = { ...candidate, leavesForDraft }
 
                 return {
-                    ...candidate,
+                    ...withDraft,
                     week2DivisionId:
                         week2DivisionByUser.get(candidate.userId) || null,
                     forcedMoveDirection:
@@ -95,10 +102,14 @@ export async function getCreateWeek3Data(): Promise<CreateWeek3Data> {
                     recommendationUpCount: recommendations.up,
                     recommendationDownCount: recommendations.down,
                     availableSlots: resolveAvailableSlots(
-                        candidate,
+                        withDraft,
                         slotRequest
                     ),
-                    slotRequestComment: slotRequest?.comment ?? null
+                    slotRequestComment: leavesForDraft
+                        ? [draftLeaverComment, slotRequest?.comment]
+                              .filter(Boolean)
+                              .join(" — ")
+                        : (slotRequest?.comment ?? null)
                 }
             }
         )

@@ -1,14 +1,9 @@
 // Resolves the tryout slot availability the placement engine sees for a
 // candidate. Client-safe (pure).
 
-import { COACH_OBSERVATION_SLOT } from "./config"
+import { COACH_OBSERVATION_SLOT, DRAFT_NIGHT_SLOT } from "./config"
 import type { PreseasonCandidate } from "./types"
 
-/**
- * Coaches are steered to the late slot so they can watch their coaches
- * division; that rule wins over any slot request they submitted. Everyone
- * else gets their request (null = unrestricted).
- */
 /** Time slot a team plays in (teams 1-2 → 1, 3-4 → 2, 5-6 → 3). */
 export function getTeamNumberSlot(teamNumber: number) {
     return Math.floor((teamNumber - 1) / 2) + 1
@@ -81,10 +76,20 @@ export function formatSlotList(slots: number[], slotLabels: string[]) {
     return slots.map((n) => slotLabels[n - 1] ?? `Slot ${n}`).join(", ")
 }
 
+/**
+ * Week-3 draft-night leavers (top-division captains/commissioners) are held
+ * to the first slot — they physically leave after it, so this wins over
+ * everything. Coaches are steered to the late slot so they can watch their
+ * coaches division; that rule wins over any slot request they submitted.
+ * Everyone else gets their request (null = unrestricted).
+ */
 export function resolveAvailableSlots(
-    candidate: Pick<PreseasonCandidate, "isCoach">,
+    candidate: Pick<PreseasonCandidate, "isCoach" | "leavesForDraft">,
     slotRequest: { availableSlots: number[] } | null | undefined
 ): number[] | null {
+    if (candidate.leavesForDraft) {
+        return [DRAFT_NIGHT_SLOT]
+    }
     if (candidate.isCoach) {
         return [COACH_OBSERVATION_SLOT]
     }

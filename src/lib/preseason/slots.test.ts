@@ -90,3 +90,23 @@ describe("formatSlotList", () => {
         )
     })
 })
+
+describe("resolveAvailableSlots (draft night)", () => {
+    it("holds week-3 draft leavers to the first slot, over requests and coaching", () => {
+        expect(
+            resolveAvailableSlots(
+                { isCoach: false, leavesForDraft: true },
+                { availableSlots: [2, 3] }
+            )
+        ).toEqual([1])
+        expect(
+            resolveAvailableSlots({ isCoach: true, leavesForDraft: true }, null)
+        ).toEqual([1])
+        expect(
+            resolveAvailableSlots(
+                { isCoach: false, leavesForDraft: false },
+                { availableSlots: [2, 3] }
+            )
+        ).toEqual([2, 3])
+    })
+})

@@ -43,6 +43,13 @@ export interface PreseasonCandidate {
      */
     isCoach: boolean
     coachDivisionName: string | null
+    /**
+     * Week 3 only: captains and commissioners of the top division leave
+     * after the first slot to run their draft, so they are held to
+     * DRAFT_NIGHT_SLOT regardless of any request (and ahead of the coach
+     * steer). Absent ≡ false (week 2).
+     */
+    leavesForDraft?: boolean
     // Week-3-only inputs; optional in the base so shared unit building can
     // read them uniformly (absent ≡ null/0 for week 2).
     week2DivisionId?: number | null

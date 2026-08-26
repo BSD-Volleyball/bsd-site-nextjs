@@ -37,6 +37,13 @@ export const SCORE_BAND_WIDTH = 50
  */
 export const COACH_OBSERVATION_SLOT = 3
 
+/**
+ * Tryout slot the top division's captains and commissioners are held to in
+ * week 3: they leave after the first (7pm) slot to run their draft, so they
+ * may play in any division but only in this slot.
+ */
+export const DRAFT_NIGHT_SLOT = 1
+
 export type DivisionPlacementStrategy<C extends PreseasonCandidate> = (
     divisions: PreseasonDivision[],
     candidates: C[]

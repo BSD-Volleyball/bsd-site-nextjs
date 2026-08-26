@@ -15,9 +15,10 @@ import {
     individual_divisions,
     movingDay,
     week2Rosters,
-    week3Rosters
+    week3Rosters,
+    userRoles
 } from "@/database/schema"
-import { and, desc, eq, inArray, lt } from "drizzle-orm"
+import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import {
@@ -372,6 +373,52 @@ export async function loadPreseasonBaseData(
             userIds
         }
     }
+}
+
+/**
+ * Users who leave week 3 after the first slot to run the top division's
+ * draft: that division's captains (`teams.captain`) plus its commissioners
+ * (season-scoped `commissioner` roles for the division, or league-wide ones
+ * with no division, since they run every draft).
+ */
+export async function loadDraftNightLeavers(
+    seasonId: number,
+    topDivisionId: number | null
+): Promise<Set<string>> {
+    if (topDivisionId === null) {
+        return new Set()
+    }
+
+    const [captainRows, commissionerRows] = await Promise.all([
+        db
+            .select({ userId: teams.captain })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.season, seasonId),
+                    eq(teams.division, topDivisionId)
+                )
+            ),
+        db
+            .select({ userId: userRoles.user_id })
+            .from(userRoles)
+            .where(
+                and(
+                    eq(userRoles.role, "commissioner"),
+                    eq(userRoles.season_id, seasonId),
+                    or(
+                        eq(userRoles.division_id, topDivisionId),
+                        isNull(userRoles.division_id)
+                    )
+                )
+            )
+    ])
+
+    return new Set(
+        [...captainRows, ...commissionerRows]
+            .map((row) => row.userId)
+            .filter((id): id is string => !!id)
+    )
 }
 
 /** Division each user actually played in week 2 (first roster row wins). */
