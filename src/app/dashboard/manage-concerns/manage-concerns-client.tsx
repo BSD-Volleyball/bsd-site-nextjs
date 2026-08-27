@@ -29,7 +29,12 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
-import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
+import {
+    RiArrowDownSLine,
+    RiArrowRightSLine,
+    RiAttachment2
+} from "@remixicon/react"
+import { AttachmentList } from "@/components/attachment-list"
 import { formatTimestamp } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import {
@@ -232,6 +237,16 @@ function ConcernCard({
                                     #{concern.id}
                                 </span>
                                 <StatusBadge status={concern.status} />
+                                {concern.attachments.length > 0 && (
+                                    <Badge
+                                        variant="outline"
+                                        className="gap-1 text-xs"
+                                        title={`${concern.attachments.length} attachment(s)`}
+                                    >
+                                        <RiAttachment2 size={12} />
+                                        {concern.attachments.length}
+                                    </Badge>
+                                )}
                                 {concern.anonymous && (
                                     <Badge
                                         variant="outline"
@@ -433,6 +448,7 @@ function ConcernCard({
                             <p className="whitespace-pre-wrap text-foreground">
                                 {concern.description}
                             </p>
+                            <AttachmentList attachments={concern.attachments} />
                         </div>
 
                         {/* Management controls */}
@@ -580,6 +596,9 @@ function ConcernCard({
                                         </p>
                                         <MessageBody
                                             text={item.body_text ?? "(No body)"}
+                                        />
+                                        <AttachmentList
+                                            attachments={item.attachments}
                                         />
                                     </div>
                                 ) : (

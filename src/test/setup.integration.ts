@@ -96,7 +96,9 @@ vi.mock("@/lib/r2", () => ({
     createPlayerPictureUploadPresignedUrl: vi.fn(
         async () => "https://r2.test/presigned-upload"
     ),
-    deleteR2Object: vi.fn(async () => {})
+    deleteR2Object: vi.fn(async () => {}),
+    putR2Object: vi.fn(async () => {}),
+    getR2Object: vi.fn(async () => null)
 }))
 
 // ---------------------------------------------------------------------------

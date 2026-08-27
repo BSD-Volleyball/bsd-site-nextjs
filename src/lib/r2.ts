@@ -1,6 +1,7 @@
 import "server-only"
 import {
     DeleteObjectCommand,
+    GetObjectCommand,
     PutObjectCommand,
     S3Client
 } from "@aws-sdk/client-s3"
@@ -99,4 +100,49 @@ export async function deleteR2Object(key: string): Promise<void> {
     })
 
     await getR2Client().send(command)
+}
+
+/**
+ * Server-side upload. Used for bytes the app already holds (e.g. inbound
+ * email attachments decoded from a webhook) as opposed to the presigned flow
+ * where the browser uploads directly.
+ */
+export async function putR2Object(params: {
+    key: string
+    body: Buffer
+    contentType: string
+}): Promise<void> {
+    const command = new PutObjectCommand({
+        Bucket: getR2Bucket(),
+        Key: params.key,
+        Body: params.body,
+        ContentType: params.contentType,
+        ContentLength: params.body.length
+    })
+
+    await getR2Client().send(command)
+}
+
+export interface R2ObjectStream {
+    body: ReadableStream
+    contentType: string | null
+    contentLength: number | null
+}
+
+/** Fetch an object as a web stream, or null when the key doesn't exist. */
+export async function getR2Object(key: string): Promise<R2ObjectStream | null> {
+    const command = new GetObjectCommand({ Bucket: getR2Bucket(), Key: key })
+
+    try {
+        const result = await getR2Client().send(command)
+        if (!result.Body) return null
+        return {
+            body: result.Body.transformToWebStream(),
+            contentType: result.ContentType ?? null,
+            contentLength: result.ContentLength ?? null
+        }
+    } catch (error) {
+        if ((error as { name?: string }).name === "NoSuchKey") return null
+        throw error
+    }
 }

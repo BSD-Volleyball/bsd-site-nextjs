@@ -1196,6 +1196,42 @@ export const inboundEmailReceived = pgTable(
     })
 )
 
+export type AttachmentParentType =
+    | "email"
+    | "email_received"
+    | "concern"
+    | "concern_received"
+
+/**
+ * Files attached to inbound Postmark messages. Bytes live in R2 under
+ * `r2_key`; this row is the metadata the UI lists and the download route
+ * authorises against. `parent_type`/`parent_id` point at whichever message
+ * carried the file — a ticket or a follow-up on either the email or concern
+ * side — since all four are "a message in a ticket" and nothing deletes them.
+ */
+export const emailAttachments = pgTable(
+    "email_attachments",
+    {
+        id: serial("id").primaryKey(),
+        parent_type: text("parent_type")
+            .$type<AttachmentParentType>()
+            .notNull(),
+        parent_id: integer("parent_id").notNull(),
+        filename: text("filename").notNull(),
+        content_type: text("content_type").notNull(),
+        size_bytes: integer("size_bytes").notNull(),
+        r2_key: text("r2_key").notNull().unique(),
+        content_id: text("content_id"),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        emailAttachmentsParentIdx: index("email_attachments_parent_idx").on(
+            table.parent_type,
+            table.parent_id
+        )
+    })
+)
+
 export const draftCaptRounds = pgTable(
     "draft_capt_rounds",
     {

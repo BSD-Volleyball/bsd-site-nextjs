@@ -26,6 +26,10 @@ import {
     type InboundMessageSummary
 } from "@/lib/email-html"
 import { recomputeEmailStatus } from "@/lib/notifications/suppressions"
+import {
+    type PostmarkAttachment,
+    storeInboundAttachments
+} from "@/lib/email-attachments"
 
 // ---------------------------------------------------------------------------
 // Postmark Inbound Email Payload (subset of fields we use)
@@ -52,6 +56,8 @@ interface PostmarkInboundPayload {
     Headers: PostmarkHeader[]
     /** Base64-encoded raw RFC 2822 email. Present when "Include raw email" is enabled on the inbound stream. */
     RawEmail?: string
+    /** Base64-inline attachments; empty array when the message has none. */
+    Attachments?: PostmarkAttachment[]
 }
 
 // ---------------------------------------------------------------------------
@@ -528,14 +534,23 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 .where(eq(inboundEmails.id, existingThread.id))
                 .limit(1)
 
-            await db.insert(inboundEmailReceived).values({
-                email_id: existingThread.id,
-                from_address: fromEmail,
-                from_name: fromName,
-                subject,
-                body_text: bodyText,
-                body_html: bodyHtml,
-                postmark_message_id: messageId
+            const [received] = await db
+                .insert(inboundEmailReceived)
+                .values({
+                    email_id: existingThread.id,
+                    from_address: fromEmail,
+                    from_name: fromName,
+                    subject,
+                    body_text: bodyText,
+                    body_html: bodyHtml,
+                    postmark_message_id: messageId
+                })
+                .returning({ id: inboundEmailReceived.id })
+            await storeInboundAttachments({
+                parentType: "email_received",
+                parentId: received.id,
+                messageId,
+                attachments: payload.Attachments
             })
 
             // A reply to a closed thread reopens it so it resurfaces in the
@@ -578,14 +593,23 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 .where(eq(concerns.id, existingThread.id))
                 .limit(1)
 
-            await db.insert(concernReceived).values({
-                concern_id: existingThread.id,
-                from_address: fromEmail,
-                from_name: fromName,
-                subject,
-                body_text: bodyText,
-                body_html: bodyHtml,
-                postmark_message_id: messageId
+            const [received] = await db
+                .insert(concernReceived)
+                .values({
+                    concern_id: existingThread.id,
+                    from_address: fromEmail,
+                    from_name: fromName,
+                    subject,
+                    body_text: bodyText,
+                    body_html: bodyHtml,
+                    postmark_message_id: messageId
+                })
+                .returning({ id: concernReceived.id })
+            await storeInboundAttachments({
+                parentType: "concern_received",
+                parentId: received.id,
+                messageId,
+                attachments: payload.Attachments
             })
 
             if (ticket?.status === "closed") {
@@ -619,20 +643,29 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     }
 
     if (isConcern) {
-        await db.insert(concerns).values({
-            user_id: null,
-            anonymous: false,
-            contact_name: fromName,
-            contact_email: fromEmail,
-            contact_phone: null,
-            want_followup: false,
-            incident_date: new Date().toISOString().split("T")[0],
-            location: "Submitted via email",
-            person_involved: subject,
-            description: bodyText || bodyHtml || "(No email body)",
-            status: "new",
-            source: "email",
-            source_email_id: messageId
+        const [createdConcern] = await db
+            .insert(concerns)
+            .values({
+                user_id: null,
+                anonymous: false,
+                contact_name: fromName,
+                contact_email: fromEmail,
+                contact_phone: null,
+                want_followup: false,
+                incident_date: new Date().toISOString().split("T")[0],
+                location: "Submitted via email",
+                person_involved: subject,
+                description: bodyText || bodyHtml || "(No email body)",
+                status: "new",
+                source: "email",
+                source_email_id: messageId
+            })
+            .returning({ id: concerns.id })
+        await storeInboundAttachments({
+            parentType: "concern",
+            parentId: createdConcern.id,
+            messageId,
+            attachments: payload.Attachments
         })
         await notifyQuietly(() => notifyOmbudsmen(appUrl), "ombudsmen")
     } else {
@@ -649,6 +682,12 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 status: "new"
             })
             .returning({ id: inboundEmails.id })
+        await storeInboundAttachments({
+            parentType: "email",
+            parentId: created.id,
+            messageId,
+            attachments: payload.Attachments
+        })
         await notifyQuietly(
             () =>
                 notifyAdmins({

@@ -5,11 +5,14 @@ import { db } from "@/database/db"
 import {
     auditLog,
     concerns,
+    emailAttachments,
     emailSuppressions,
     inboundEmails,
+    inboundEmailReceived,
     users
 } from "@/database/schema"
 import { sendBatchEmails, sendEmail } from "@/lib/postmark"
+import { putR2Object } from "@/lib/r2"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { POST } from "./route"
 
@@ -525,5 +528,164 @@ describe("closed thread auto-reopen", () => {
             .from(inboundEmails)
             .where(eq(inboundEmails.id, ticketId))
         expect(ticket.status).toBe("new")
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Attachments — Postmark inlines them as base64; bytes go to R2 and a
+// metadata row is recorded against whichever message carried the file.
+// ---------------------------------------------------------------------------
+
+describe("inbound attachments", () => {
+    const PNG_BYTES = Buffer.from("fake-png-bytes")
+    const attachments = [
+        {
+            Name: "court map.png",
+            Content: PNG_BYTES.toString("base64"),
+            ContentType: "image/png",
+            ContentLength: PNG_BYTES.length,
+            ContentID: "map@mail"
+        },
+        {
+            Name: "../notes.txt",
+            Content: Buffer.from("hello").toString("base64"),
+            ContentType: "text/plain",
+            ContentLength: 5,
+            ContentID: ""
+        }
+    ]
+
+    function inboundWithAttachments(overrides: Record<string, unknown> = {}) {
+        return {
+            MessageID: "attach-1",
+            From: "outsider@example.test",
+            FromName: "An Outsider",
+            To: "info@bumpsetdrink.com",
+            Subject: "See attached",
+            TextBody: "Attached.",
+            HtmlBody: '<p>Attached.</p><img src="cid:map@mail">',
+            Attachments: attachments,
+            ...overrides
+        }
+    }
+
+    it("stores each attachment against the new ticket", async () => {
+        await createUser()
+
+        const response = await POST(webhookRequest(inboundWithAttachments()))
+        expect(response.status).toBe(200)
+
+        const [ticket] = await db
+            .select({ id: inboundEmails.id })
+            .from(inboundEmails)
+        const rows = await db
+            .select()
+            .from(emailAttachments)
+            .orderBy(emailAttachments.id)
+        expect(rows).toHaveLength(2)
+        expect(rows[0]).toMatchObject({
+            parent_type: "email",
+            parent_id: ticket.id,
+            filename: "court map.png",
+            content_type: "image/png",
+            size_bytes: PNG_BYTES.length,
+            content_id: "map@mail"
+        })
+        // Path separators are stripped from sender-supplied names.
+        expect(rows[1]).toMatchObject({
+            filename: "_notes.txt",
+            content_id: null
+        })
+        expect(rows[1].r2_key).toMatch(/^email-attachments\/attach-1\/1-/)
+
+        expect(vi.mocked(putR2Object)).toHaveBeenCalledTimes(2)
+        const [firstUpload] = vi.mocked(putR2Object).mock.calls[0]
+        expect(firstUpload.contentType).toBe("image/png")
+        expect(Buffer.compare(firstUpload.body, PNG_BYTES)).toBe(0)
+        expect(firstUpload.key).toBe(rows[0].r2_key)
+    })
+
+    it("attaches files on a thread reply to the received message", async () => {
+        await createUser()
+        const [ticket] = await db
+            .insert(inboundEmails)
+            .values({
+                email_id: "orig-attach",
+                from_address: "outsider@example.test",
+                to_address: "info@bumpsetdrink.com",
+                subject: "See attached",
+                status: "active"
+            })
+            .returning({ id: inboundEmails.id })
+
+        await POST(
+            webhookRequest(
+                inboundWithAttachments({
+                    MessageID: "attach-reply",
+                    Headers: [
+                        { Name: "X-BSD-Ticket-ID", Value: `email-${ticket.id}` }
+                    ]
+                })
+            )
+        )
+
+        const [received] = await db
+            .select({ id: inboundEmailReceived.id })
+            .from(inboundEmailReceived)
+        const rows = await db.select().from(emailAttachments)
+        expect(rows).toHaveLength(2)
+        for (const row of rows) {
+            expect(row.parent_type).toBe("email_received")
+            expect(row.parent_id).toBe(received.id)
+        }
+    })
+
+    it("attaches files to a concern created from email", async () => {
+        process.env.INBOUND_CONCERN_ADDRESS = "concerns@bumpsetdrink.com"
+        try {
+            await createUser()
+            await POST(
+                webhookRequest(
+                    inboundWithAttachments({
+                        MessageID: "attach-concern",
+                        To: "concerns@bumpsetdrink.com"
+                    })
+                )
+            )
+
+            const [concern] = await db
+                .select({ id: concerns.id })
+                .from(concerns)
+            const rows = await db.select().from(emailAttachments)
+            expect(rows).toHaveLength(2)
+            expect(rows[0]).toMatchObject({
+                parent_type: "concern",
+                parent_id: concern.id
+            })
+        } finally {
+            delete process.env.INBOUND_CONCERN_ADDRESS
+        }
+    })
+
+    it("still acknowledges and keeps the ticket when an upload fails", async () => {
+        await createUser()
+        vi.mocked(putR2Object).mockRejectedValueOnce(new Error("r2 down"))
+
+        const response = await POST(webhookRequest(inboundWithAttachments()))
+
+        // A non-2xx here would make Postmark redeliver and duplicate the ticket.
+        expect(response.status).toBe(200)
+        expect(await db.select().from(inboundEmails)).toHaveLength(1)
+        // The failed file is skipped; the second one still lands.
+        const rows = await db.select().from(emailAttachments)
+        expect(rows).toHaveLength(1)
+        expect(rows[0].filename).toBe("_notes.txt")
+    })
+
+    it("records nothing for a message without attachments", async () => {
+        await createUser()
+        await POST(webhookRequest(inboundWithAttachments({ Attachments: [] })))
+        expect(await db.select().from(emailAttachments)).toHaveLength(0)
+        expect(vi.mocked(putR2Object)).not.toHaveBeenCalled()
     })
 })

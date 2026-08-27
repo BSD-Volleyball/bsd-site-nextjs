@@ -27,6 +27,10 @@ import {
     requireNonEmptyString
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
+import {
+    type AttachmentMeta,
+    listAttachmentsFor
+} from "@/lib/email-attachments"
 
 // Repliers/commenters may hold either permission; status changes need manage.
 async function requireEmailViewOrManage(): Promise<void> {
@@ -51,6 +55,7 @@ export interface InboundEmailRow {
     assigned_to_name: string | null
     created_at: Date
     updated_at: Date
+    attachments: AttachmentMeta[]
 }
 
 export interface InboundEmailComment {
@@ -82,6 +87,7 @@ export interface InboundEmailReceived {
     body_text: string | null
     body_html: string | null
     received_at: Date
+    attachments: AttachmentMeta[]
 }
 
 export type ThreadItem =
@@ -140,6 +146,11 @@ export const getInboundEmails = withAction(
             }
         }
 
+        const attachmentsByEmail = await listAttachmentsFor(
+            "email",
+            rows.map((r) => r.id)
+        )
+
         const result: InboundEmailRow[] = rows.map((r) => ({
             id: r.id,
             email_id: r.email_id,
@@ -156,7 +167,8 @@ export const getInboundEmails = withAction(
                 ? (assigneeMap.get(r.assigned_to) ?? r.assigned_to)
                 : null,
             created_at: r.created_at,
-            updated_at: r.updated_at
+            updated_at: r.updated_at,
+            attachments: attachmentsByEmail.get(r.id) ?? []
         }))
 
         return ok(result)
@@ -237,6 +249,11 @@ export const getEmailThread = withAction(
             sent_at: r.sent_at
         }))
 
+        const attachmentsByReceived = await listAttachmentsFor(
+            "email_received",
+            receivedRows.map((r) => r.id)
+        )
+
         const received: ThreadItem[] = receivedRows.map((r) => ({
             type: "received" as const,
             id: r.id,
@@ -246,7 +263,8 @@ export const getEmailThread = withAction(
             subject: r.subject,
             body_text: r.body_text,
             body_html: r.body_html,
-            received_at: r.received_at
+            received_at: r.received_at,
+            attachments: attachmentsByReceived.get(r.id) ?? []
         }))
 
         // Merge and sort chronologically

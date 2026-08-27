@@ -33,7 +33,13 @@ import {
     CollapsibleContent,
     CollapsibleTrigger
 } from "@/components/ui/collapsible"
-import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
+import {
+    RiArrowDownSLine,
+    RiArrowRightSLine,
+    RiAttachment2
+} from "@remixicon/react"
+import { AttachmentList } from "@/components/attachment-list"
+import { rewriteCidImages } from "@/lib/email-attachments-client"
 import { formatTimestamp } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
@@ -404,6 +410,16 @@ function EmailCard({
                                 <Badge variant="outline" className="text-xs">
                                     Email
                                 </Badge>
+                                {email.attachments.length > 0 && (
+                                    <Badge
+                                        variant="outline"
+                                        className="gap-1 text-xs"
+                                        title={`${email.attachments.length} attachment(s)`}
+                                    >
+                                        <RiAttachment2 size={12} />
+                                        {email.attachments.length}
+                                    </Badge>
+                                )}
                             </div>
                             <p className="mt-1 truncate font-medium text-sm">
                                 {email.subject}
@@ -472,7 +488,10 @@ function EmailCard({
                                     className="prose prose-sm dark:prose-invert mt-1 max-w-none"
                                     dangerouslySetInnerHTML={{
                                         __html: DOMPurify.sanitize(
-                                            email.body_html,
+                                            rewriteCidImages(
+                                                email.body_html,
+                                                email.attachments
+                                            ),
                                             {
                                                 FORBID_TAGS: [
                                                     "script",
@@ -499,6 +518,7 @@ function EmailCard({
                                     {email.body_text || "(No body)"}
                                 </p>
                             )}
+                            <AttachmentList attachments={email.attachments} />
                         </div>
 
                         {/* Management controls */}
@@ -666,6 +686,9 @@ function EmailCard({
                                         </p>
                                         <MessageBody
                                             text={item.body_text ?? "(No body)"}
+                                        />
+                                        <AttachmentList
+                                            attachments={item.attachments}
                                         />
                                     </div>
                                 ) : (

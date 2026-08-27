@@ -27,6 +27,10 @@ import {
     requireNonEmptyString
 } from "@/lib/action-helpers"
 import type { ActionResult } from "@/lib/action-helpers"
+import {
+    type AttachmentMeta,
+    listAttachmentsFor
+} from "@/lib/email-attachments"
 
 // Repliers/commenters may hold either permission; status changes need manage.
 async function requireConcernViewOrManage(): Promise<void> {
@@ -58,6 +62,7 @@ export interface ConcernRow {
     source: string
     created_at: Date
     updated_at: Date
+    attachments: AttachmentMeta[]
 }
 
 export interface ConcernComment {
@@ -89,6 +94,7 @@ export interface ConcernReceived {
     body_text: string | null
     body_html: string | null
     received_at: Date
+    attachments: AttachmentMeta[]
 }
 
 export type ConcernThreadItem =
@@ -155,6 +161,11 @@ export const getConcerns = withAction(
             }
         }
 
+        const attachmentsByConcern = await listAttachmentsFor(
+            "concern",
+            rows.map((r) => r.id)
+        )
+
         const result: ConcernRow[] = rows.map((r) => ({
             id: r.id,
             user_id: r.user_id,
@@ -178,7 +189,8 @@ export const getConcerns = withAction(
             submitter_email: r.anonymous ? null : (r.submitter_email ?? null),
             source: r.source,
             created_at: r.created_at,
-            updated_at: r.updated_at
+            updated_at: r.updated_at,
+            attachments: attachmentsByConcern.get(r.id) ?? []
         }))
 
         return ok(result)
@@ -268,6 +280,11 @@ export const getConcernThread = withAction(
                 .where(eq(concernReceived.concern_id, concernId))
         ])
 
+        const attachmentsByReceived = await listAttachmentsFor(
+            "concern_received",
+            receivedRows.map((r) => r.id)
+        )
+
         const items: ConcernThreadItem[] = [
             ...commentRows.map((r) => ({
                 type: "comment" as const,
@@ -298,7 +315,8 @@ export const getConcernThread = withAction(
                 subject: r.subject,
                 body_text: r.body_text,
                 body_html: r.body_html,
-                received_at: r.received_at
+                received_at: r.received_at,
+                attachments: attachmentsByReceived.get(r.id) ?? []
             }))
         ]
 
