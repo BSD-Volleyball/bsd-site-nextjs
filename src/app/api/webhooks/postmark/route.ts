@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { timingSafeEqual } from "node:crypto"
 import { db } from "@/database/db"
 import {
+    type AttachmentParentType,
     concerns,
     concernReceived,
     concernReplies,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/email-html"
 import { recomputeEmailStatus } from "@/lib/notifications/suppressions"
 import {
+    listAttachmentsFor,
     type PostmarkAttachment,
     storeInboundAttachments
 } from "@/lib/email-attachments"
@@ -481,8 +483,77 @@ async function detectExistingThread(
 // Inbound email handling
 // ---------------------------------------------------------------------------
 
+/**
+ * Locate the row a Postmark MessageID was already recorded against, if any.
+ * Postmark retries and manual redeliveries carry the same MessageID, so this
+ * is what keeps a redelivery from minting a duplicate ticket.
+ */
+async function findRecordedMessage(
+    messageId: string
+): Promise<{ parentType: AttachmentParentType; parentId: number } | null> {
+    const [email] = await db
+        .select({ id: inboundEmails.id })
+        .from(inboundEmails)
+        .where(eq(inboundEmails.email_id, messageId))
+        .limit(1)
+    if (email) return { parentType: "email", parentId: email.id }
+
+    const [emailReceived] = await db
+        .select({ id: inboundEmailReceived.id })
+        .from(inboundEmailReceived)
+        .where(eq(inboundEmailReceived.postmark_message_id, messageId))
+        .limit(1)
+    if (emailReceived) {
+        return { parentType: "email_received", parentId: emailReceived.id }
+    }
+
+    const [concern] = await db
+        .select({ id: concerns.id })
+        .from(concerns)
+        .where(eq(concerns.source_email_id, messageId))
+        .limit(1)
+    if (concern) return { parentType: "concern", parentId: concern.id }
+
+    const [concernRecv] = await db
+        .select({ id: concernReceived.id })
+        .from(concernReceived)
+        .where(eq(concernReceived.postmark_message_id, messageId))
+        .limit(1)
+    if (concernRecv) {
+        return { parentType: "concern_received", parentId: concernRecv.id }
+    }
+
+    return null
+}
+
 async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const messageId = payload.MessageID
+
+    // Redelivery of a message we already hold: don't create anything new.
+    // The one useful thing a redelivery can carry is attachments that were
+    // dropped the first time (before attachment capture existed), so store
+    // those if the message has none on record yet.
+    const recorded = await findRecordedMessage(messageId)
+    if (recorded) {
+        const existing = await listAttachmentsFor(recorded.parentType, [
+            recorded.parentId
+        ])
+        const backfill = (existing.get(recorded.parentId) ?? []).length === 0
+        if (backfill) {
+            await storeInboundAttachments({
+                ...recorded,
+                messageId,
+                attachments: payload.Attachments
+            })
+        }
+        logger.info("[postmark-webhook] Ignored redelivery of known message", {
+            ...recorded,
+            attachmentsBackfilled: backfill
+                ? (payload.Attachments?.length ?? 0)
+                : 0
+        })
+        return
+    }
     const fromEmail =
         payload.FromFull?.Email ?? parseFromAddress(payload.From).email
     // Postmark sends the display name both in FromFull and as FromName; either

@@ -682,6 +682,31 @@ describe("inbound attachments", () => {
         expect(rows[0].filename).toBe("_notes.txt")
     })
 
+    it("treats a redelivered MessageID as a backfill, not a new ticket", async () => {
+        await createUser()
+        // First delivery predates attachment capture: ticket exists, no files.
+        await POST(webhookRequest(inboundWithAttachments({ Attachments: [] })))
+        expect(await db.select().from(emailAttachments)).toHaveLength(0)
+
+        // Postmark redelivers the same MessageID, now with attachments.
+        const response = await POST(webhookRequest(inboundWithAttachments()))
+        expect(response.status).toBe(200)
+
+        const tickets = await db.select().from(inboundEmails)
+        expect(tickets).toHaveLength(1)
+        const rows = await db.select().from(emailAttachments)
+        expect(rows).toHaveLength(2)
+        expect(rows[0]).toMatchObject({
+            parent_type: "email",
+            parent_id: tickets[0].id
+        })
+
+        // A third delivery must not duplicate the files either.
+        await POST(webhookRequest(inboundWithAttachments()))
+        expect(await db.select().from(emailAttachments)).toHaveLength(2)
+        expect(await db.select().from(inboundEmails)).toHaveLength(1)
+    })
+
     it("records nothing for a message without attachments", async () => {
         await createUser()
         await POST(webhookRequest(inboundWithAttachments({ Attachments: [] })))
