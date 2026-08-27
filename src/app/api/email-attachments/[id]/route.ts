@@ -73,11 +73,15 @@ export async function GET(
         request.nextUrl.searchParams.get("inline") === "1" &&
         mayInline(row.content_type)
 
-    return new NextResponse(object.body, {
+    // Buffer rather than stream: attachments are small (Postmark caps a
+    // message at 35 MB) and a fully materialised body lets the platform set
+    // Content-Length/encoding itself, so nothing can disagree about length.
+    const bytes = await new Response(object.body).arrayBuffer()
+
+    return new NextResponse(bytes, {
         status: 200,
         headers: {
             "Content-Type": row.content_type,
-            "Content-Length": String(object.contentLength ?? row.size_bytes),
             "Content-Disposition": contentDisposition(
                 inline ? "inline" : "attachment",
                 row.filename
