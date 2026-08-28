@@ -9,16 +9,25 @@ import type { SeasonSignupStatus } from "../queries"
 
 export function SignupCTA({
     signupStatus,
-    seasonLabel
+    seasonLabel,
+    approvedFromWaitlist = false
 }: {
     signupStatus: SeasonSignupStatus
     seasonLabel: string | null
+    approvedFromWaitlist?: boolean
 }) {
     return (
         <div className="space-y-3">
-            <p className="text-muted-foreground">
-                You haven't signed up for the {seasonLabel} season yet.
-            </p>
+            {approvedFromWaitlist ? (
+                <p className="text-muted-foreground">
+                    A spot opened up! You've been approved from the waitlist and
+                    can now sign up for the {seasonLabel} season.
+                </p>
+            ) : (
+                <p className="text-muted-foreground">
+                    You haven't signed up for the {seasonLabel} season yet.
+                </p>
+            )}
             <div className="space-y-1 rounded-lg bg-muted p-3">
                 <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Season Fee:</span>

@@ -139,7 +139,7 @@ export function isLatePricing(config: SeasonConfig): boolean {
 export async function checkSignupEligibility(userId: string): Promise<boolean> {
     const config = await getSeasonConfig()
 
-    if (!isSeasonRegistrationOpen(config.phase) || !config.seasonId) {
+    if (!config.seasonId || config.phase === "complete") {
         return false
     }
 
@@ -155,6 +155,14 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
         return false
     }
 
+    // Once registration closes, the only way in is an admin approving the
+    // player off the waitlist (e.g. a drop-out during tryouts or the draft).
+    // The pay-season action already honors that approval; this keeps the
+    // sidebar link and dashboard CTA in step with it.
+    if (!isSeasonRegistrationOpen(config.phase)) {
+        return isApprovedWaitlister(config.seasonId, userId)
+    }
+
     const maxPlayers = config.maxPlayers
     if (maxPlayers > 0) {
         const [result] = await db
@@ -163,20 +171,22 @@ export async function checkSignupEligibility(userId: string): Promise<boolean> {
             .where(eq(signups.season, config.seasonId))
 
         if (result && result.total >= maxPlayers) {
-            const [waitlistEntry] = await db
-                .select({ approved: waitlist.approved })
-                .from(waitlist)
-                .where(
-                    and(
-                        eq(waitlist.season, config.seasonId),
-                        eq(waitlist.user, userId)
-                    )
-                )
-                .limit(1)
-
-            return waitlistEntry?.approved ?? false
+            return isApprovedWaitlister(config.seasonId, userId)
         }
     }
 
     return true
+}
+
+async function isApprovedWaitlister(
+    seasonId: number,
+    userId: string
+): Promise<boolean> {
+    const [waitlistEntry] = await db
+        .select({ approved: waitlist.approved })
+        .from(waitlist)
+        .where(and(eq(waitlist.season, seasonId), eq(waitlist.user, userId)))
+        .limit(1)
+
+    return waitlistEntry?.approved ?? false
 }

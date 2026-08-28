@@ -1971,6 +1971,18 @@ export default async function DashboardPage() {
                                         seasonLabel={seasonLabel}
                                     />
                                 )
+                            ) : signupStatus.waitlistApproved &&
+                              signupStatus.config.phase !== "complete" ? (
+                                /* Registration is closed, but an admin has
+                                   approved this player off the waitlist —
+                                   give them the signup CTA instead of the
+                                   phase's "closed" message. (waitlistApproved
+                                   is only ever set when there's no signup.) */
+                                <SignupCTA
+                                    signupStatus={signupStatus}
+                                    seasonLabel={seasonLabel}
+                                    approvedFromWaitlist
+                                />
                             ) : signupStatus.config.phase ===
                                   "prep_tryout_week_1" ||
                               signupStatus.config.phase ===
