@@ -221,12 +221,20 @@ describe("getDraftWatchlistData (commissioner view)", () => {
         const season = await createSeason({ phase: "draft" })
         const divAA = await createDivision({ name: "AA", level: 1 })
         const divB = await createDivision({ name: "B", level: 8 })
-        await db.insert(individual_divisions).values({
-            season: season.id,
-            division: divAA.id,
-            gender_split: "5-3",
-            teams: 2
-        })
+        await db.insert(individual_divisions).values([
+            {
+                season: season.id,
+                division: divAA.id,
+                gender_split: "5-3",
+                teams: 2
+            },
+            {
+                season: season.id,
+                division: divB.id,
+                gender_split: "5-3",
+                teams: 2
+            }
+        ])
         const captain = await createUser()
         await createTeam({
             season: season.id,
@@ -359,5 +367,90 @@ describe("getDraftWatchlistData (commissioner view)", () => {
             ...scoreOnly.slice(0, 10).map((u) => u.id)
         ])
         expect(ids).not.toContain(noSignal.id)
+    })
+
+    it("does not let players drafted earlier this season consume riser slots", async () => {
+        const { season, divAA, priorBTeam } = await seedWatchlistSeason()
+
+        // A division drafted before this one (higher level number irrelevant;
+        // what matters is the drafts row in the current season)
+        const divDoneCaptain = await createUser()
+        const divDone = await createDivision({ name: "Done", level: 0 })
+        const divDoneTeam = await createTeam({
+            season: season.id,
+            captain: divDoneCaptain.id,
+            division: divDone.id
+        })
+        const alreadyDrafted = await createUser({ male: true })
+        await createSignup({ season: season.id, player: alreadyDrafted.id })
+        await db.insert(drafts).values({
+            team: divDoneTeam.id,
+            user: alreadyDrafted.id,
+            round: 1,
+            overall: 1 // best score in the pool
+        })
+
+        // 11 undrafted score-only players (overalls 60..70)
+        const scoreOnly = []
+        for (let i = 0; i < 11; i++) {
+            const user = await createUser({ male: true })
+            await createSignup({ season: season.id, player: user.id })
+            await db.insert(drafts).values({
+                team: priorBTeam.id,
+                user: user.id,
+                round: 1,
+                overall: 60 + i
+            })
+            scoreOnly.push(user)
+        }
+
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await getDraftWatchlistData(season.id, divAA.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        const ids = result.data.malePlayers.map((p) => p.userId)
+        expect(ids).not.toContain(alreadyDrafted.id)
+        expect(ids).toEqual(scoreOnly.slice(0, 10).map((u) => u.id))
+    })
+
+    it("does not cap suggestions for the last division", async () => {
+        const { season, divAA, priorBTeam } = await seedWatchlistSeason()
+
+        // Configure a lowest division; it becomes the season's last division
+        const divLast = await createDivision({ name: "Last", level: 9 })
+        await db.insert(individual_divisions).values({
+            season: season.id,
+            division: divLast.id,
+            gender_split: "5-3",
+            teams: 2
+        })
+        const lastCaptain = await createUser()
+        await createTeam({
+            season: season.id,
+            captain: lastCaptain.id,
+            division: divLast.id
+        })
+
+        // 12 score-only players — none with signal in the last division
+        const scoreOnly = []
+        for (let i = 0; i < 12; i++) {
+            const user = await createUser({ male: true })
+            await createSignup({ season: season.id, player: user.id })
+            await db.insert(drafts).values({
+                team: priorBTeam.id,
+                user: user.id,
+                round: 1,
+                overall: 60 + i
+            })
+            scoreOnly.push(user)
+        }
+
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await getDraftWatchlistData(season.id, divLast.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        expect(result.data.malePlayers.map((p) => p.userId)).toEqual(
+            scoreOnly.map((u) => u.id)
+        )
     })
 })

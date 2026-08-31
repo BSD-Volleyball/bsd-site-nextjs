@@ -754,7 +754,8 @@ async function buildCommissionerWatchlist(
         .limit(1)
     const roundMaps = buildHomeworkRoundMaps(indivDiv?.genderSplit)
 
-    const [homeworkRows, signupRows, priorSeasonRows] = await Promise.all([
+    const [homeworkRows, signupRows, priorSeasonRows, divisionLevelRows] =
+        await Promise.all([
         db
             .select({
                 captainId: draftHomework.captain,
@@ -785,8 +786,22 @@ async function buildCommissionerWatchlist(
             .from(seasons)
             .where(lt(seasons.id, seasonId))
             .orderBy(desc(seasons.id))
-            .limit(3)
+            .limit(3),
+        db
+            .select({ divisionId: individual_divisions.division })
+            .from(individual_divisions)
+            .innerJoin(
+                divisions,
+                eq(individual_divisions.division, divisions.id)
+            )
+            .where(eq(individual_divisions.season, seasonId))
+            .orderBy(desc(divisions.level))
+            .limit(1)
     ])
+
+    // In the season's last division every remaining player is draftable, so
+    // score-only suggestions are not capped there.
+    const isLastDivision = divisionLevelRows[0]?.divisionId === divisionId
 
     const priorSeasonIds = priorSeasonRows.map((r) => r.id)
     const playerIds = signupRows.map((r) => r.userId)
@@ -865,8 +880,11 @@ async function buildCommissionerWatchlist(
     const scoreByUser = await fetchPlayerScores(playerIds, seasonId)
 
     // How many players with no division signal to suggest per gender, ranked
-    // purely by score (top players from the division below).
+    // purely by score (top players from the division below). Players already
+    // drafted this season can never be suggestions, so they are excluded
+    // before the cap. The last division is uncapped.
     const EXTRA_SUGGESTIONS = 10
+    const draftedSet = new Set(draftedUserIds)
 
     const rankedPlayers = signupRows.map((player) => {
         const captainRounds = playerCaptainRoundsAgg.get(player.userId) ?? []
@@ -910,9 +928,11 @@ async function buildCommissionerWatchlist(
         const pool = rankedPlayers.filter((p) => p.isMale === isMale)
         const withSignal = pool.filter((p) => p.hasDivisionSignal)
         const extras = pool
-            .filter((p) => !p.hasDivisionSignal)
+            .filter(
+                (p) => !p.hasDivisionSignal && !draftedSet.has(p.userId)
+            )
             .sort((a, b) => a.score - b.score)
-            .slice(0, EXTRA_SUGGESTIONS)
+            .slice(0, isLastDivision ? pool.length : EXTRA_SUGGESTIONS)
         return [...withSignal, ...extras]
             .sort((a, b) => a.round - b.round || a.score - b.score)
             .map(({ userId, displayName, round }) => ({
