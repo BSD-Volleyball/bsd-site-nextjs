@@ -454,3 +454,133 @@ describe("getDraftWatchlistData (commissioner view)", () => {
         )
     })
 })
+
+describe("getDraftWatchlistData (captain view)", () => {
+    async function seedCaptainSeason() {
+        const season = await createSeason({ phase: "draft" })
+        const divAA = await createDivision({ name: "AA", level: 1 })
+        await db.insert(individual_divisions).values({
+            season: season.id,
+            division: divAA.id,
+            gender_split: "5-3",
+            teams: 2
+        })
+        return { season, divAA }
+    }
+
+    it("orders suggestions by the captain's own slot ranking within a round", async () => {
+        const { season, divAA } = await seedCaptainSeason()
+        const captain = await createUserWithRoles([
+            { role: "captain", seasonId: season.id }
+        ])
+        await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: divAA.id
+        })
+
+        const playerA = await createUser({ male: true })
+        const playerB = await createUser({ male: true })
+        const playerC = await createUser({ male: true })
+        // Insert slot 1 before slot 0 so query order can't mask ranking
+        await db.insert(draftHomework).values([
+            {
+                season: season.id,
+                captain: captain.id,
+                division: divAA.id,
+                round: 1,
+                slot: 1,
+                player: playerB.id,
+                is_male_tab: true
+            },
+            {
+                season: season.id,
+                captain: captain.id,
+                division: divAA.id,
+                round: 1,
+                slot: 0,
+                player: playerA.id,
+                is_male_tab: true
+            },
+            {
+                season: season.id,
+                captain: captain.id,
+                division: divAA.id,
+                round: 2,
+                slot: 0,
+                player: playerC.id,
+                is_male_tab: true
+            }
+        ])
+
+        const result = await getDraftWatchlistData(season.id, divAA.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        expect(result.data.view).toBe("captain")
+        expect(result.data.malePlayers.map((p) => p.userId)).toEqual([
+            playerA.id,
+            playerB.id,
+            playerC.id
+        ])
+        expect(result.data.malePlayers.map((p) => p.round)).toEqual([1, 1, 2])
+    })
+
+    it("merges both co-captains' homework for a shared team", async () => {
+        const { season, divAA } = await seedCaptainSeason()
+        const captain1 = await createUser()
+        const captain2 = await createUserWithRoles([
+            { role: "captain", seasonId: season.id }
+        ])
+        await createTeam({
+            season: season.id,
+            captain: captain1.id,
+            captain2: captain2.id,
+            division: divAA.id
+        })
+
+        const player1 = await createUser({ male: true })
+        const player2 = await createUser({ male: true })
+        await db.insert(draftHomework).values([
+            // captain1's homework
+            {
+                season: season.id,
+                captain: captain1.id,
+                division: divAA.id,
+                round: 1,
+                slot: 0,
+                player: player1.id,
+                is_male_tab: true
+            },
+            {
+                season: season.id,
+                captain: captain1.id,
+                division: divAA.id,
+                round: 2,
+                slot: 0,
+                player: player2.id,
+                is_male_tab: true
+            },
+            // captain2 ranks player2 higher — the better round wins
+            {
+                season: season.id,
+                captain: captain2.id,
+                division: divAA.id,
+                round: 1,
+                slot: 1,
+                player: player2.id,
+                is_male_tab: true
+            }
+        ])
+
+        // Logged in as captain2, who only placed one player themselves
+        const result = await getDraftWatchlistData(season.id, divAA.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        expect(result.data.view).toBe("captain")
+        expect(result.data.malePlayers.map((p) => p.userId)).toEqual([
+            player1.id,
+            player2.id
+        ])
+        expect(result.data.malePlayers.map((p) => p.round)).toEqual([1, 1])
+    })
+})

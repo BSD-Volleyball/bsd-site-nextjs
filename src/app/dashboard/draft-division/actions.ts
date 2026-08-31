@@ -608,7 +608,11 @@ export const getDraftWatchlistData = withAction(
         // Check if user is a captain in this specific division (captain view takes priority)
         const [[captainTeam], draftedRows] = await Promise.all([
             db
-                .select({ id: teams.id })
+                .select({
+                    id: teams.id,
+                    captain: teams.captain,
+                    captain2: teams.captain2
+                })
                 .from(teams)
                 .where(
                     and(
@@ -631,9 +635,14 @@ export const getDraftWatchlistData = withAction(
         const draftedUserIds = [...new Set(draftedRows.map((r) => r.userId))]
 
         if (captainTeam) {
+            // Include both co-captains' homework for a shared team
+            const captainIds = [
+                captainTeam.captain,
+                captainTeam.captain2
+            ].filter((id): id is string => id !== null)
             return ok(
                 await buildCaptainWatchlist(
-                    userId,
+                    captainIds,
                     seasonId,
                     divisionId,
                     draftedUserIds
@@ -651,7 +660,7 @@ export const getDraftWatchlistData = withAction(
 )
 
 async function buildCaptainWatchlist(
-    captainId: string,
+    captainIds: string[],
     seasonId: number,
     divisionId: number,
     draftedUserIds: string[]
@@ -672,6 +681,7 @@ async function buildCaptainWatchlist(
         .select({
             playerId: draftHomework.player,
             round: draftHomework.round,
+            slot: draftHomework.slot,
             isMaleTab: draftHomework.is_male_tab,
             firstName: users.first_name,
             lastName: users.last_name,
@@ -684,14 +694,14 @@ async function buildCaptainWatchlist(
             and(
                 eq(draftHomework.season, seasonId),
                 eq(draftHomework.division, divisionId),
-                eq(draftHomework.captain, captainId)
+                inArray(draftHomework.captain, captainIds)
             )
         )
 
-    // Deduplicate: keep lowest mapped round per player
+    // Deduplicate: keep lowest mapped round (then lowest slot) per player
     const playerBest = new Map<
         string,
-        { displayName: string; round: number; isMale: boolean }
+        { displayName: string; round: number; slot: number; isMale: boolean }
     >()
     for (const row of homeworkRows) {
         const isMale = row.male === true
@@ -701,18 +711,24 @@ async function buildCaptainWatchlist(
             ? (roundMaps.male[row.round] ?? 9)
             : (roundMaps.nonMale[row.round] ?? 9)
         const existing = playerBest.get(row.playerId)
-        if (!existing || mappedRound < existing.round) {
+        if (
+            !existing ||
+            mappedRound < existing.round ||
+            (mappedRound === existing.round && row.slot < existing.slot)
+        ) {
             playerBest.set(row.playerId, {
                 displayName: row.preferredName ?? row.firstName,
                 round: mappedRound,
+                slot: row.slot,
                 isMale
             })
         }
     }
 
+    // Order by expected draft round, then by the captain's own slot ranking
     const sorted = Array.from(playerBest.entries())
         .map(([uid, data]) => ({ userId: uid, ...data }))
-        .sort((a, b) => a.round - b.round)
+        .sort((a, b) => a.round - b.round || a.slot - b.slot)
 
     const malePlayers = sorted
         .filter((p) => p.isMale)
