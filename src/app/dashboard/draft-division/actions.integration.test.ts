@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
-import { drafts, individual_divisions } from "@/database/schema"
+import { draftHomework, drafts, individual_divisions } from "@/database/schema"
 import {
     createDivision,
     createSeason,
@@ -8,7 +8,11 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getDraftDivisionData, submitDraft } from "./actions"
+import {
+    getDraftDivisionData,
+    getDraftWatchlistData,
+    submitDraft
+} from "./actions"
 
 async function seedDraftSeason() {
     const season = await createSeason()
@@ -208,5 +212,152 @@ describe("submitDraft", () => {
         // round 2 (even): position = 3 - teamNumber → team1: 54, team2: 53
         expect(overallFor(players[2].id)).toBe(54)
         expect(overallFor(players[3].id)).toBe(53)
+    })
+})
+
+describe("getDraftWatchlistData (commissioner view)", () => {
+    async function seedWatchlistSeason() {
+        const priorSeason = await createSeason()
+        const season = await createSeason({ phase: "draft" })
+        const divAA = await createDivision({ name: "AA", level: 1 })
+        const divB = await createDivision({ name: "B", level: 8 })
+        await db.insert(individual_divisions).values({
+            season: season.id,
+            division: divAA.id,
+            gender_split: "5-3",
+            teams: 2
+        })
+        const captain = await createUser()
+        await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: divAA.id
+        })
+        const priorCaptain = await createUser()
+        const priorAATeam = await createTeam({
+            season: priorSeason.id,
+            captain: priorCaptain.id,
+            division: divAA.id
+        })
+        const priorBTeam = await createTeam({
+            season: priorSeason.id,
+            captain: priorCaptain.id,
+            division: divB.id
+        })
+        return { season, divAA, captain, priorAATeam, priorBTeam }
+    }
+
+    it("ranks criteria players first, then division-below risers by score", async () => {
+        const { season, divAA, captain, priorAATeam, priorBTeam } =
+            await seedWatchlistSeason()
+
+        const noSignal = await createUser({ male: true })
+        const riser = await createUser({ male: true })
+        const considering = await createUser({ male: true })
+        const history = await createUser({ male: true })
+        const placed = await createUser({ male: true })
+
+        // Scrambled signup order so insertion order can't mask ranking
+        for (const player of [noSignal, riser, considering, history, placed]) {
+            await createSignup({ season: season.id, player: player.id })
+        }
+
+        await db.insert(draftHomework).values([
+            {
+                season: season.id,
+                captain: captain.id,
+                division: divAA.id,
+                round: 1,
+                slot: 0,
+                player: placed.id,
+                is_male_tab: true
+            },
+            {
+                season: season.id,
+                captain: captain.id,
+                division: divAA.id,
+                round: 9,
+                slot: 0,
+                player: considering.id,
+                is_male_tab: true
+            }
+        ])
+        await db.insert(drafts).values([
+            // AA history → criteria; blended round = 9*0.6 + 3*0.4 = 6.6 → 7
+            {
+                team: priorAATeam.id,
+                user: history.id,
+                round: 3,
+                overall: 10
+            },
+            // division-below draft history only → score signal, no AA criteria
+            { team: priorBTeam.id, user: riser.id, round: 1, overall: 55 },
+            {
+                team: priorBTeam.id,
+                user: considering.id,
+                round: 5,
+                overall: 120
+            }
+        ])
+
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await getDraftWatchlistData(season.id, divAA.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        expect(result.data.view).toBe("commissioner")
+        expect(result.data.malePlayers.map((p) => p.userId)).toEqual([
+            placed.id, // homework round 1
+            history.id, // AA history, blended round 7
+            riser.id, // score 55 — best remaining by score
+            considering.id, // score 120
+            noSignal.id // default score 200
+        ])
+        expect(result.data.malePlayers.map((p) => p.round)).toEqual([
+            1, 7, 9, 9, 9
+        ])
+    })
+
+    it("caps score-only suggestions at the 10 best per gender", async () => {
+        const { season, divAA, captain, priorBTeam } =
+            await seedWatchlistSeason()
+
+        const placed = await createUser({ male: true })
+        await createSignup({ season: season.id, player: placed.id })
+        await db.insert(draftHomework).values({
+            season: season.id,
+            captain: captain.id,
+            division: divAA.id,
+            round: 2,
+            slot: 0,
+            player: placed.id,
+            is_male_tab: true
+        })
+
+        // 12 score-only players (overalls 60..71) plus one with no signal at all
+        const scoreOnly = []
+        for (let i = 0; i < 12; i++) {
+            const user = await createUser({ male: true })
+            await createSignup({ season: season.id, player: user.id })
+            await db.insert(drafts).values({
+                team: priorBTeam.id,
+                user: user.id,
+                round: 1,
+                overall: 60 + i
+            })
+            scoreOnly.push(user)
+        }
+        const noSignal = await createUser({ male: true })
+        await createSignup({ season: season.id, player: noSignal.id })
+
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await getDraftWatchlistData(season.id, divAA.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected data")
+        const ids = result.data.malePlayers.map((p) => p.userId)
+        expect(ids).toEqual([
+            placed.id,
+            ...scoreOnly.slice(0, 10).map((u) => u.id)
+        ])
+        expect(ids).not.toContain(noSignal.id)
     })
 })

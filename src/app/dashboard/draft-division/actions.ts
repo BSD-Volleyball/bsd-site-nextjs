@@ -26,6 +26,7 @@ import {
 } from "@/lib/notifications/dispatch"
 import { formatDisplayName } from "@/lib/utils"
 import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
+import { fetchPlayerScores } from "@/lib/player-score"
 import {
     isAdminOrDirector,
     isCommissionerBySession,
@@ -853,58 +854,76 @@ async function buildCommissionerWatchlist(
 
     const WEIGHTS = [3, 2, 1]
 
-    const rankedPlayers = signupRows
-        .map((player) => {
-            const captainRounds =
-                playerCaptainRoundsAgg.get(player.userId) ?? []
-            const captainAvg =
-                captainRounds.length > 0
-                    ? captainRounds.reduce((sum, r) => sum + r, 0) /
-                      captainRounds.length
-                    : 9
+    // Division signal: the player appears in some captain's homework for this
+    // division (any round, including "Considering"), or has draft history in
+    // this division within the 3 prior seasons.
+    const homeworkPlacedIds = new Set(homeworkRows.map((hw) => hw.playerId))
 
-            const playerHistory = draftHistMap.get(player.userId)
-            let weightedSum = 0
-            let totalWeight = 0
-            if (playerHistory) {
-                for (let i = 0; i < priorSeasonIds.length; i++) {
-                    const round = playerHistory.get(priorSeasonIds[i])
-                    if (round !== undefined) {
-                        weightedSum += round * WEIGHTS[i]
-                        totalWeight += WEIGHTS[i]
-                    }
+    // Placement score (lower = better; a virtual overall pick number) — the
+    // same ranking the Create Week pages and homework suggestions use. It
+    // orders players within a round and surfaces division-below risers.
+    const scoreByUser = await fetchPlayerScores(playerIds, seasonId)
+
+    // How many players with no division signal to suggest per gender, ranked
+    // purely by score (top players from the division below).
+    const EXTRA_SUGGESTIONS = 10
+
+    const rankedPlayers = signupRows.map((player) => {
+        const captainRounds = playerCaptainRoundsAgg.get(player.userId) ?? []
+        const captainAvg =
+            captainRounds.length > 0
+                ? captainRounds.reduce((sum, r) => sum + r, 0) /
+                  captainRounds.length
+                : 9
+
+        const playerHistory = draftHistMap.get(player.userId)
+        let weightedSum = 0
+        let totalWeight = 0
+        if (playerHistory) {
+            for (let i = 0; i < priorSeasonIds.length; i++) {
+                const round = playerHistory.get(priorSeasonIds[i])
+                if (round !== undefined) {
+                    weightedSum += round * WEIGHTS[i]
+                    totalWeight += WEIGHTS[i]
                 }
             }
-            const historyAvg =
-                totalWeight > 0 ? weightedSum / totalWeight : null
-            const recommendedRound =
-                historyAvg !== null
-                    ? captainAvg * 0.6 + historyAvg * 0.4
-                    : captainAvg
+        }
+        const historyAvg = totalWeight > 0 ? weightedSum / totalWeight : null
+        const recommendedRound =
+            historyAvg !== null
+                ? captainAvg * 0.6 + historyAvg * 0.4
+                : captainAvg
 
-            return {
-                userId: player.userId,
-                displayName: player.preferredName ?? player.firstName,
-                isMale: player.male === true,
-                round: Math.round(recommendedRound)
-            }
-        })
-        .sort((a, b) => a.round - b.round)
+        return {
+            userId: player.userId,
+            displayName: player.preferredName ?? player.firstName,
+            isMale: player.male === true,
+            round: Math.round(recommendedRound),
+            score: scoreByUser.get(player.userId) ?? 200,
+            hasDivisionSignal:
+                homeworkPlacedIds.has(player.userId) ||
+                draftHistMap.has(player.userId)
+        }
+    })
 
-    const malePlayers = rankedPlayers
-        .filter((p) => p.isMale)
-        .map(({ userId, displayName, round }) => ({
-            userId,
-            displayName,
-            round
-        }))
-    const nonMalePlayers = rankedPlayers
-        .filter((p) => !p.isMale)
-        .map(({ userId, displayName, round }) => ({
-            userId,
-            displayName,
-            round
-        }))
+    const selectForGender = (isMale: boolean): WatchlistPlayer[] => {
+        const pool = rankedPlayers.filter((p) => p.isMale === isMale)
+        const withSignal = pool.filter((p) => p.hasDivisionSignal)
+        const extras = pool
+            .filter((p) => !p.hasDivisionSignal)
+            .sort((a, b) => a.score - b.score)
+            .slice(0, EXTRA_SUGGESTIONS)
+        return [...withSignal, ...extras]
+            .sort((a, b) => a.round - b.round || a.score - b.score)
+            .map(({ userId, displayName, round }) => ({
+                userId,
+                displayName,
+                round
+            }))
+    }
+
+    const malePlayers = selectForGender(true)
+    const nonMalePlayers = selectForGender(false)
 
     return {
         malePlayers,
