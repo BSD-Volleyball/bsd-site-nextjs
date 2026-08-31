@@ -34,12 +34,8 @@ import {
 } from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
 import { logAuditEntry } from "@/lib/audit-log"
-import { formatDisplayName } from "@/lib/utils"
-
-// Maps homework round number → actual draft round number
-const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
-const NON_MALE_ROUND_MAP: Record<number, number> = { 1: 3, 2: 5, 3: 8 }
-// Any round not in these maps (including "Considering") → 9
+import { formatDisplayName, parseGenderSplit } from "@/lib/utils"
+import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
 
 export interface CaptainInfo {
     userId: string
@@ -259,11 +255,12 @@ export async function getPrepareForDraftData(
             )
             .where(eq(individual_divisions.season, seasonId))
             .orderBy(asc(divisions.level)),
-        // numTeams determines completion threshold: 5 male rounds + 3 non-male rounds = 8 slots per team
+        // numTeams × total homework rounds (from gender_split) determines the completion threshold
         db
             .select({
                 numTeams: individual_divisions.teams,
-                coaches: individual_divisions.coaches
+                coaches: individual_divisions.coaches,
+                genderSplit: individual_divisions.gender_split
             })
             .from(individual_divisions)
             .where(
@@ -347,12 +344,17 @@ export async function getPrepareForDraftData(
             : null
 
     const usesCoaches = indivDiv?.coaches ?? false
-    const completionThreshold = (indivDiv?.numTeams ?? 0) * 8
+    const { malePerTeam, nonMalePerTeam } = parseGenderSplit(
+        indivDiv?.genderSplit
+    )
+    const roundMaps = buildHomeworkRoundMaps(indivDiv?.genderSplit)
+    const completionThreshold =
+        (indivDiv?.numTeams ?? 0) * (malePerTeam + nonMalePerTeam)
 
     // Build homework lookup: `${captainId}:${playerId}` → { round, isMaleTab }
     // Use the first entry per captain+player pair
     const homeworkMap = new Map<string, { round: number; isMaleTab: boolean }>()
-    // Count raw rows per captain to determine completion (8 × numTeams slots total)
+    // Count raw rows per captain to determine completion (homework rounds × numTeams slots total)
     const captainRowCount = new Map<string, number>()
     for (const row of homeworkRows) {
         const key = `${row.captainId}:${row.playerId}`
@@ -503,8 +505,8 @@ export async function getPrepareForDraftData(
         const key = `${captainUserId}:${playerUserId}`
         const hw = homeworkMap.get(key)
         if (!hw) return 9
-        if (isMale && hw.isMaleTab) return MALE_ROUND_MAP[hw.round] ?? 9
-        if (!isMale && !hw.isMaleTab) return NON_MALE_ROUND_MAP[hw.round] ?? 9
+        if (isMale && hw.isMaleTab) return roundMaps.male[hw.round] ?? 9
+        if (!isMale && !hw.isMaleTab) return roundMaps.nonMale[hw.round] ?? 9
         return 9
     }
 

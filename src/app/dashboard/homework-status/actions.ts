@@ -11,6 +11,7 @@ import {
     movingDay,
     draftHomework
 } from "@/database/schema"
+import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
 import { eq, and, notInArray, desc, count, inArray, or } from "drizzle-orm"
 import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
@@ -588,8 +589,6 @@ export const getMovingDayDetail = withAction(
 
 // ─── Draft Homework Detail ────────────────────────────────────────────────────
 
-const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
-const NON_MALE_ROUND_MAP: Record<number, number> = { 1: 3, 2: 5, 3: 8 }
 const CONSIDERING_ROUND = 9
 
 export interface DraftHomeworkDetailPlayer {
@@ -746,12 +745,13 @@ export const getDraftHomeworkDetail = withAction(
         const splitParts = divConfig.genderSplit.split("-").map(Number)
         const maleRounds = splitParts[0] ?? 0
         const nonMaleRounds = splitParts[1] ?? 0
+        const roundMaps = buildHomeworkRoundMaps(divConfig.genderSplit)
 
         // 7. Build interleaved rounds and considering buckets
         const roundMap = new Map<number, DraftHomeworkDetailRound>()
 
         for (let mHw = 1; mHw <= maleRounds; mHw++) {
-            const draftRound = MALE_ROUND_MAP[mHw]
+            const draftRound = roundMaps.male[mHw]
             if (draftRound === undefined) continue
             roundMap.set(draftRound, {
                 draftRound,
@@ -762,7 +762,7 @@ export const getDraftHomeworkDetail = withAction(
         }
 
         for (let fHw = 1; fHw <= nonMaleRounds; fHw++) {
-            const draftRound = NON_MALE_ROUND_MAP[fHw]
+            const draftRound = roundMaps.nonMale[fHw]
             if (draftRound === undefined) continue
             roundMap.set(draftRound, {
                 draftRound,
@@ -793,8 +793,8 @@ export const getDraftHomeworkDetail = withAction(
 
             // Map homework round → draft round using the correct map
             const draftRound = row.isMaleTab
-                ? MALE_ROUND_MAP[row.round]
-                : NON_MALE_ROUND_MAP[row.round]
+                ? roundMaps.male[row.round]
+                : roundMaps.nonMale[row.round]
 
             if (draftRound === undefined) continue
 

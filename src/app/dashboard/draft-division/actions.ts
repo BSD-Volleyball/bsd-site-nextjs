@@ -25,6 +25,7 @@ import {
     type NotificationRecipient
 } from "@/lib/notifications/dispatch"
 import { formatDisplayName } from "@/lib/utils"
+import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
 import {
     isAdminOrDirector,
     isCommissionerBySession,
@@ -569,10 +570,6 @@ export const getDraftInitData = withAction(
     }
 )
 
-// Maps homework round number → actual draft round number (same as prepare-for-draft)
-const MALE_ROUND_MAP: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 6, 5: 7 }
-const NON_MALE_ROUND_MAP: Record<number, number> = { 1: 3, 2: 5, 3: 8 }
-
 export interface WatchlistPlayer {
     userId: string
     displayName: string
@@ -658,6 +655,18 @@ async function buildCaptainWatchlist(
     divisionId: number,
     draftedUserIds: string[]
 ): Promise<WatchlistData> {
+    const [indivDiv] = await db
+        .select({ genderSplit: individual_divisions.gender_split })
+        .from(individual_divisions)
+        .where(
+            and(
+                eq(individual_divisions.season, seasonId),
+                eq(individual_divisions.division, divisionId)
+            )
+        )
+        .limit(1)
+    const roundMaps = buildHomeworkRoundMaps(indivDiv?.genderSplit)
+
     const homeworkRows = await db
         .select({
             playerId: draftHomework.player,
@@ -688,8 +697,8 @@ async function buildCaptainWatchlist(
         // Skip cross-gender entries (player gender must match the tab)
         if ((isMale && !row.isMaleTab) || (!isMale && row.isMaleTab)) continue
         const mappedRound = row.isMaleTab
-            ? (MALE_ROUND_MAP[row.round] ?? 9)
-            : (NON_MALE_ROUND_MAP[row.round] ?? 9)
+            ? (roundMaps.male[row.round] ?? 9)
+            : (roundMaps.nonMale[row.round] ?? 9)
         const existing = playerBest.get(row.playerId)
         if (!existing || mappedRound < existing.round) {
             playerBest.set(row.playerId, {
@@ -732,6 +741,18 @@ async function buildCommissionerWatchlist(
     divisionId: number,
     draftedUserIds: string[]
 ): Promise<WatchlistData> {
+    const [indivDiv] = await db
+        .select({ genderSplit: individual_divisions.gender_split })
+        .from(individual_divisions)
+        .where(
+            and(
+                eq(individual_divisions.season, seasonId),
+                eq(individual_divisions.division, divisionId)
+            )
+        )
+        .limit(1)
+    const roundMaps = buildHomeworkRoundMaps(indivDiv?.genderSplit)
+
     const [homeworkRows, signupRows, priorSeasonRows] = await Promise.all([
         db
             .select({
@@ -807,8 +828,8 @@ async function buildCommissionerWatchlist(
         const isMale = playerGenderMap.get(hw.playerId) ?? false
         if ((isMale && !hw.isMaleTab) || (!isMale && hw.isMaleTab)) continue
         const mappedRound = hw.isMaleTab
-            ? (MALE_ROUND_MAP[hw.round] ?? 9)
-            : (NON_MALE_ROUND_MAP[hw.round] ?? 9)
+            ? (roundMaps.male[hw.round] ?? 9)
+            : (roundMaps.nonMale[hw.round] ?? 9)
         if (!captainPlayerBest.has(hw.captainId)) {
             captainPlayerBest.set(hw.captainId, new Map())
         }
