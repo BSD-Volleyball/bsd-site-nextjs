@@ -756,48 +756,48 @@ async function buildCommissionerWatchlist(
 
     const [homeworkRows, signupRows, priorSeasonRows, divisionLevelRows] =
         await Promise.all([
-        db
-            .select({
-                captainId: draftHomework.captain,
-                playerId: draftHomework.player,
-                round: draftHomework.round,
-                isMaleTab: draftHomework.is_male_tab
-            })
-            .from(draftHomework)
-            .where(
-                and(
-                    eq(draftHomework.season, seasonId),
-                    eq(draftHomework.division, divisionId)
+            db
+                .select({
+                    captainId: draftHomework.captain,
+                    playerId: draftHomework.player,
+                    round: draftHomework.round,
+                    isMaleTab: draftHomework.is_male_tab
+                })
+                .from(draftHomework)
+                .where(
+                    and(
+                        eq(draftHomework.season, seasonId),
+                        eq(draftHomework.division, divisionId)
+                    )
+                ),
+            db
+                .select({
+                    userId: users.id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name,
+                    male: users.male
+                })
+                .from(signups)
+                .innerJoin(users, eq(signups.player, users.id))
+                .where(eq(signups.season, seasonId)),
+            db
+                .select({ id: seasons.id })
+                .from(seasons)
+                .where(lt(seasons.id, seasonId))
+                .orderBy(desc(seasons.id))
+                .limit(3),
+            db
+                .select({ divisionId: individual_divisions.division })
+                .from(individual_divisions)
+                .innerJoin(
+                    divisions,
+                    eq(individual_divisions.division, divisions.id)
                 )
-            ),
-        db
-            .select({
-                userId: users.id,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name,
-                male: users.male
-            })
-            .from(signups)
-            .innerJoin(users, eq(signups.player, users.id))
-            .where(eq(signups.season, seasonId)),
-        db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(lt(seasons.id, seasonId))
-            .orderBy(desc(seasons.id))
-            .limit(3),
-        db
-            .select({ divisionId: individual_divisions.division })
-            .from(individual_divisions)
-            .innerJoin(
-                divisions,
-                eq(individual_divisions.division, divisions.id)
-            )
-            .where(eq(individual_divisions.season, seasonId))
-            .orderBy(desc(divisions.level))
-            .limit(1)
-    ])
+                .where(eq(individual_divisions.season, seasonId))
+                .orderBy(desc(divisions.level))
+                .limit(1)
+        ])
 
     // In the season's last division every remaining player is draftable, so
     // score-only suggestions are not capped there.
@@ -928,9 +928,7 @@ async function buildCommissionerWatchlist(
         const pool = rankedPlayers.filter((p) => p.isMale === isMale)
         const withSignal = pool.filter((p) => p.hasDivisionSignal)
         const extras = pool
-            .filter(
-                (p) => !p.hasDivisionSignal && !draftedSet.has(p.userId)
-            )
+            .filter((p) => !p.hasDivisionSignal && !draftedSet.has(p.userId))
             .sort((a, b) => a.score - b.score)
             .slice(0, isLastDivision ? pool.length : EXTRA_SUGGESTIONS)
         return [...withSignal, ...extras]

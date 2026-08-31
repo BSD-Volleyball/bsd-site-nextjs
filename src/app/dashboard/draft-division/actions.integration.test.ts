@@ -414,7 +414,7 @@ describe("getDraftWatchlistData (commissioner view)", () => {
     })
 
     it("does not cap suggestions for the last division", async () => {
-        const { season, divAA, priorBTeam } = await seedWatchlistSeason()
+        const { season, priorBTeam } = await seedWatchlistSeason()
 
         // Configure a lowest division; it becomes the season's last division
         const divLast = await createDivision({ name: "Last", level: 9 })
