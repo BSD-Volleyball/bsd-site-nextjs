@@ -444,7 +444,9 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                         gte(seasonEvents.event_date, today)
                     )
                 )
-                .orderBy(asc(seasonEvents.sort_order))
+                // Order by date, not sort_order: playoff events restart
+                // sort_order at 1 and would tie with the first weeks.
+                .orderBy(asc(seasonEvents.event_date))
                 .limit(1)
 
             if (nextEvent && members.length > 0) {

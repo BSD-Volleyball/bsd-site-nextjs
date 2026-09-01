@@ -320,7 +320,10 @@ export const getTeamAvailabilityData = withAction(
                     ])
                 )
             )
-            .orderBy(asc(seasonEvents.sort_order))
+            // Playoff events restart sort_order at 1, so ordering by
+            // sort_order alone interleaves them into the first weeks —
+            // order chronologically instead.
+            .orderBy(asc(seasonEvents.event_date), asc(seasonEvents.sort_order))
 
         // Get unavailability for all roster signups (active players + subbed-out
         // originals so historical unavailability is still visible if needed).
