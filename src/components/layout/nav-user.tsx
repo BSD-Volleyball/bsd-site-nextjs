@@ -183,7 +183,7 @@ export function NavUser() {
                             <span>History</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <Link href="/">
+                        <Link href="/?stay=1">
                             <DropdownMenuItem className="gap-3 px-1">
                                 <RiHomeLine
                                     size={20}

@@ -122,7 +122,7 @@ export const Navbar = ({ seasonLabel }: NavbarProps) => {
                 <div className="flex items-center justify-between px-4 py-3 lg:px-6">
                     {/* Logo */}
                     <Link
-                        href="/"
+                        href="/?stay=1"
                         className="group flex items-center gap-2 font-bold"
                     >
                         <div className="relative">
@@ -268,7 +268,7 @@ export const Navbar = ({ seasonLabel }: NavbarProps) => {
                                     <SheetHeader className="pb-4">
                                         <SheetTitle>
                                             <Link
-                                                href="/"
+                                                href="/?stay=1"
                                                 className="flex items-center gap-2"
                                                 onClick={() => setIsOpen(false)}
                                             >

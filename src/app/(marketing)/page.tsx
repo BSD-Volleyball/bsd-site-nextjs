@@ -10,6 +10,7 @@ import {
 } from "@/lib/site-config"
 import Link from "next/link"
 import { headers } from "next/headers"
+import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
     Card,
@@ -107,8 +108,20 @@ const quickLinks = [
     }
 ]
 
-export default async function Home() {
+export default async function Home({
+    searchParams
+}: {
+    searchParams: Promise<{ stay?: string }>
+}) {
     const session = await auth.api.getSession({ headers: await headers() })
+
+    // Signed-in users land on their dashboard instead of the marketing page.
+    // Brand/logo links pass ?stay=1 so they can still view the homepage.
+    const { stay } = await searchParams
+    if (session?.user && stay !== "1") {
+        redirect("/dashboard")
+    }
+
     const tournament = await getTournamentConfig()
     const seasonConfig = await getSeasonConfig()
     const seasonLabel = formatSeasonLabel(seasonConfig)

@@ -90,7 +90,7 @@ export const FooterSection = async () => {
                                 {/* Brand Section */}
                                 <div className="col-span-2">
                                     <Link
-                                        href="/"
+                                        href="/?stay=1"
                                         className="group mb-4 flex gap-2 font-bold"
                                     >
                                         <Image
@@ -194,7 +194,7 @@ export const FooterSection = async () => {
                                 {/* Brand Section Mobile */}
                                 <div className="mb-8">
                                     <Link
-                                        href="/"
+                                        href="/?stay=1"
                                         className="group mb-4 flex gap-2 font-bold"
                                     >
                                         <div className="relative">
