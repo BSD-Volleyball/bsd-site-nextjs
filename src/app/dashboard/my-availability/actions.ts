@@ -1,8 +1,8 @@
 "use server"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
-import { signups, userUnavailability } from "@/database/schema"
+import { seasonEvents, signups, userUnavailability } from "@/database/schema"
 import {
     withAction,
     ok,
@@ -14,7 +14,8 @@ import type { ActionResult } from "@/lib/action-helpers"
 import {
     notifyAdminsOfTryoutRosterConflict,
     notifyCaptainsOfAvailabilityChange,
-    resolveSeasonEvents
+    resolveSeasonEvents,
+    selectUnavailableEventIds
 } from "@/lib/availability"
 import { logAvailabilityChange } from "@/lib/availability-audit"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -56,28 +57,43 @@ export const updatePlayerAvailability = withAction(
         }
 
         // Snapshot before the destructive replace so the captain notification
-        // can report an actual diff instead of "something changed".
-        const previousRows = await db
-            .select({ eventId: userUnavailability.event_id })
-            .from(userUnavailability)
-            .where(eq(userUnavailability.user_id, session.user.id))
-        const previousIds = new Set(previousRows.map((r) => r.eventId))
+        // can report an actual diff instead of "something changed". Season-
+        // scoped: an unscoped read once diffed against a leftover Spring row
+        // and told the captain the player was "now available" for a date from
+        // the previous season.
+        const previousIds = new Set(
+            await selectUnavailableEventIds(session.user.id, signup.season)
+        )
 
-        // Delete all existing unavailability rows for this user
-        await db
-            .delete(userUnavailability)
-            .where(eq(userUnavailability.user_id, session.user.id))
-
-        // Insert new unavailability rows
-        if (eventIds.length > 0) {
-            await db.insert(userUnavailability).values(
-                eventIds.map((eventId) => ({
-                    user_id: session.user.id,
-                    signup_id: signupId,
-                    event_id: eventId
-                }))
-            )
-        }
+        // Replace only this season's rows: prior seasons' responses are history
+        // and must survive the player's first save of a new season.
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(userUnavailability)
+                .where(
+                    and(
+                        eq(userUnavailability.user_id, session.user.id),
+                        inArray(
+                            userUnavailability.event_id,
+                            tx
+                                .select({ id: seasonEvents.id })
+                                .from(seasonEvents)
+                                .where(
+                                    eq(seasonEvents.season_id, signup.season)
+                                )
+                        )
+                    )
+                )
+            if (eventIds.length > 0) {
+                await tx.insert(userUnavailability).values(
+                    eventIds.map((eventId) => ({
+                        user_id: session.user.id,
+                        signup_id: signupId,
+                        event_id: eventId
+                    }))
+                )
+            }
+        })
 
         await logAvailabilityChange({
             userId: session.user.id,
@@ -124,20 +140,33 @@ export const updateRefAvailability = withAction(
             )
         }
 
-        // Delete all existing unavailability rows for this user
-        await db
-            .delete(userUnavailability)
-            .where(eq(userUnavailability.user_id, session.user.id))
-
-        // Insert new unavailability rows
-        if (eventIds.length > 0) {
-            await db.insert(userUnavailability).values(
-                eventIds.map((eventId) => ({
-                    user_id: session.user.id,
-                    event_id: eventId
-                }))
-            )
-        }
+        // Replace only this season's rows, as above.
+        await db.transaction(async (tx) => {
+            await tx
+                .delete(userUnavailability)
+                .where(
+                    and(
+                        eq(userUnavailability.user_id, session.user.id),
+                        inArray(
+                            userUnavailability.event_id,
+                            tx
+                                .select({ id: seasonEvents.id })
+                                .from(seasonEvents)
+                                .where(
+                                    eq(seasonEvents.season_id, config.seasonId)
+                                )
+                        )
+                    )
+                )
+            if (eventIds.length > 0) {
+                await tx.insert(userUnavailability).values(
+                    eventIds.map((eventId) => ({
+                        user_id: session.user.id,
+                        event_id: eventId
+                    }))
+                )
+            }
+        })
 
         await logAvailabilityChange({
             userId: session.user.id,

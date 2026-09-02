@@ -138,13 +138,18 @@ describe("updatePlayerAvailability captain notification", () => {
         expect(rows).toHaveLength(0)
     })
 
-    // Regression: the page used to hand the form every row the user had, from
-    // any season, and the form submitted them straight back — silently
-    // reattaching last season's dates to this season's signup.
-    it("clears stale rows from other seasons when saving", async () => {
+    // Regression (2026-09-01): a player's first Fall save wiped their leftover
+    // Spring rows and the captain email listed "Week 2 — Thursday, April 9,
+    // 2026" under "Now available for". Prior seasons are history: the save
+    // must neither delete them nor diff against them.
+    it("leaves prior-season rows alone and out of the captain email", async () => {
         const { player, signup, events } = await seedPlayerOnTeam()
         const otherSeason = await createSeason()
-        const otherEvent = await createSeasonEvent(otherSeason.id)
+        const otherEvent = await createSeasonEvent(otherSeason.id, {
+            event_type: "regular_season",
+            event_date: "2026-04-09",
+            label: "Week 2 (last season)"
+        })
         await db.insert(userUnavailability).values({
             user_id: player.id,
             event_id: otherEvent.id
@@ -158,7 +163,15 @@ describe("updatePlayerAvailability captain notification", () => {
             .select()
             .from(userUnavailability)
             .where(eq(userUnavailability.user_id, player.id))
-        expect(rows.map((r) => r.event_id)).toEqual([events[0].id])
+        expect(rows.map((r) => r.event_id).sort()).toEqual(
+            [otherEvent.id, events[0].id].sort()
+        )
+
+        expect(mockedSendBatch).toHaveBeenCalledTimes(1)
+        const [message] = mockedSendBatch.mock.calls[0][0]
+        expect(message.htmlBody).toContain("Now unavailable for:")
+        expect(message.htmlBody).not.toContain("Now available for:")
+        expect(message.htmlBody).not.toContain("April 9")
     })
 
     // The 2026-08-05 wipe was unrecoverable partly because nothing recorded
