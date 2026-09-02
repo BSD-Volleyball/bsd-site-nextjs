@@ -105,7 +105,9 @@ function NavItems({ items, pathname }: { items: NavItem[]; pathname: string }) {
     return (
         <>
             {items.map((item) => {
-                const isActive = pathname === item.url
+                const isActive = item.activePrefix
+                    ? pathname.startsWith(item.activePrefix)
+                    : pathname === item.url
 
                 return (
                     <SidebarMenuItem key={item.title}>
@@ -381,10 +383,7 @@ export function AppSidebar({
                   item.url === "/dashboard/select-captains"
               )
                   return inRange("select_commissioners", "prep_tryout_week_1")
-              if (
-                  item.url === "/dashboard/prepare-for-draft" ||
-                  item.url === "/dashboard/draft-day"
-              )
+              if (item.url === "/dashboard/draft-setup/rounds")
                   return inRange("prep_tryout_week_3", "draft")
               return true // Homework Status: unchanged
           })

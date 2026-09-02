@@ -3,7 +3,7 @@
 import { useState, useCallback, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import type { PrepareForDraftData } from "./actions"
-import { setCaptainRound, setPairDiff } from "./actions"
+import { lockDraftRounds, setCaptainRound, setPairDiff } from "./actions"
 import type { DraftHomeworkDetailResult } from "@/app/dashboard/homework-status/actions"
 import { getDraftHomeworkDetail } from "@/app/dashboard/homework-status/actions"
 import { CaptainHomeworkPopup } from "@/components/captain-homework-popup"
@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { CaptainEmailModal } from "./captain-email-modal"
 import { ConsideredUndraftedSection } from "./considered-undrafted-section"
-import { clampRound } from "./draft-round-utils"
+import { clampRound, resolveCaptainRound } from "./draft-round-utils"
 import { PairRoundsSection } from "./pair-rounds-section"
 import { PlayerRoundTable } from "./player-round-table"
 
@@ -45,6 +45,7 @@ export function PrepareForDraftTable({
     const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">(
         "idle"
     )
+    const [saveError, setSaveError] = useState<string | null>(null)
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [homeworkPopupOpen, setHomeworkPopupOpen] = useState(false)
     const [homeworkData, setHomeworkData] =
@@ -85,20 +86,26 @@ export function PrepareForDraftTable({
     async function handleSave() {
         setSaving(true)
         setSaveStatus("idle")
+        setSaveError(null)
         try {
-            const captainSaves = data.players
-                .filter((p) => captainIds.has(p.userId))
-                .map((p) => {
-                    const round =
-                        captainRoundOverrides[p.userId] ??
-                        data.savedCaptainRounds[p.userId] ??
-                        clampRound(p.recommendedRound)
-                    return setCaptainRound({
-                        captainId: p.userId,
-                        round,
-                        divisionId: data.divisionId
-                    })
+            // Iterate every captain, not only those who appear in the
+            // homework-ranked player list — a captain nobody ranked still
+            // needs a seat or the live draft board leaves their slot empty.
+            const recommendedById = new Map(
+                data.players.map((p) => [p.userId, p.recommendedRound])
+            )
+            const captainSaves = data.captains.map((cap) =>
+                setCaptainRound({
+                    captainId: cap.userId,
+                    round: resolveCaptainRound(
+                        cap.userId,
+                        captainRoundOverrides,
+                        data.savedCaptainRounds,
+                        recommendedById.get(cap.userId)
+                    ),
+                    divisionId: data.divisionId
                 })
+            )
 
             const pairSaves = data.pairDifferentials.map((pair) => {
                 const pairKey = `${pair.player1UserId}:${pair.player2UserId}`
@@ -121,11 +128,22 @@ export function PrepareForDraftTable({
                 })
             })
 
-            await Promise.all([...captainSaves, ...pairSaves])
+            const results = await Promise.all([...captainSaves, ...pairSaves])
+            const failed = results.find((r) => !r.status)
+            if (failed) {
+                throw new Error(failed.message || "Save failed")
+            }
+
+            const lock = await lockDraftRounds({ divisionId: data.divisionId })
+            if (!lock.status) {
+                throw new Error(lock.message || "Lock failed")
+            }
+
             setSaveStatus("saved")
             router.refresh()
-        } catch {
+        } catch (err) {
             setSaveStatus("error")
+            setSaveError(err instanceof Error ? err.message : null)
         } finally {
             setSaving(false)
         }
@@ -139,35 +157,33 @@ export function PrepareForDraftTable({
         setShowEmailModal(false)
     }, [])
 
+    const canSave = data.teams.length > 0 || data.pairDifferentials.length > 0
+
+    const saveControls = canSave && (
+        <div className="flex flex-wrap items-center gap-4 pt-2">
+            <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-lg bg-primary px-8 py-3 font-semibold text-base text-primary-foreground shadow transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+                {saving ? "Saving…" : "Lock In Picks"}
+            </button>
+            {saveStatus === "saved" && (
+                <span className="font-medium text-green-700 text-sm">
+                    Saved and locked — Step 2 is now open
+                </span>
+            )}
+            {saveStatus === "error" && (
+                <span className="font-medium text-red-700 text-sm">
+                    {saveError ?? "Save failed — please try again"}
+                </span>
+            )}
+        </div>
+    )
+
     return (
         <div className="space-y-4">
-            {data.isLeagueWide && data.availableDivisions.length > 1 && (
-                <div className="flex items-center gap-2">
-                    <label
-                        htmlFor="division-select"
-                        className="font-medium text-sm"
-                    >
-                        Division
-                    </label>
-                    <select
-                        id="division-select"
-                        value={data.divisionId}
-                        onChange={(e) =>
-                            router.push(
-                                `/dashboard/prepare-for-draft?divisionId=${e.target.value}`
-                            )
-                        }
-                        className="rounded border bg-background px-2 py-1 text-sm"
-                    >
-                        {data.availableDivisions.map((div) => (
-                            <option key={div.id} value={div.id}>
-                                {div.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
             {!hasHomework && (
                 <div className="rounded-md bg-muted p-4 text-muted-foreground text-sm">
                     No draft homework has been submitted yet for this division.
@@ -185,28 +201,7 @@ export function PrepareForDraftTable({
                 onOpenDetail={modal.openPlayerDetail}
             />
 
-            {(data.teams.length > 0 || data.pairDifferentials.length > 0) && (
-                <div className="flex items-center gap-4 pt-2">
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="rounded-lg bg-primary px-8 py-3 font-semibold text-base text-primary-foreground shadow transition-opacity hover:opacity-90 disabled:opacity-50"
-                    >
-                        {saving ? "Saving…" : "Lock In Picks"}
-                    </button>
-                    {saveStatus === "saved" && (
-                        <span className="font-medium text-green-700 text-sm">
-                            Saved successfully
-                        </span>
-                    )}
-                    {saveStatus === "error" && (
-                        <span className="font-medium text-red-700 text-sm">
-                            Save failed — please try again
-                        </span>
-                    )}
-                </div>
-            )}
+            {saveControls}
 
             <PairRoundsSection
                 data={data}
@@ -215,28 +210,7 @@ export function PrepareForDraftTable({
                 onOpenDetail={modal.openPlayerDetail}
             />
 
-            {(data.teams.length > 0 || data.pairDifferentials.length > 0) && (
-                <div className="flex items-center gap-4 pt-2">
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="rounded-lg bg-primary px-8 py-3 font-semibold text-base text-primary-foreground shadow transition-opacity hover:opacity-90 disabled:opacity-50"
-                    >
-                        {saving ? "Saving…" : "Lock In Picks"}
-                    </button>
-                    {saveStatus === "saved" && (
-                        <span className="font-medium text-green-700 text-sm">
-                            Saved successfully
-                        </span>
-                    )}
-                    {saveStatus === "error" && (
-                        <span className="font-medium text-red-700 text-sm">
-                            Save failed — please try again
-                        </span>
-                    )}
-                </div>
-            )}
+            {saveControls}
 
             {data.captains.length > 0 && data.emailTemplate && (
                 <div className="flex items-center gap-4 pt-2">

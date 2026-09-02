@@ -36,6 +36,8 @@ export type NavItem = {
     title: string
     url: string
     icon: typeof RiSpeedUpLine
+    /** When set, the item is active for any pathname under this prefix. */
+    activePrefix?: string
 }
 
 export const myAvailabilityNavItem: NavItem = {
@@ -443,14 +445,10 @@ export const commissionerNavItems: NavItem[] = [
         icon: RiTeamLine
     },
     {
-        title: "Prepare for Draft",
-        url: "/dashboard/prepare-for-draft",
-        icon: RiFileList3Line
-    },
-    {
-        title: "Draft Day",
-        url: "/dashboard/draft-day",
-        icon: RiFileList3Line
+        title: "Draft Setup",
+        url: "/dashboard/draft-setup/rounds",
+        icon: RiFileList3Line,
+        activePrefix: "/dashboard/draft-setup"
     }
 ]
 

@@ -26,6 +26,7 @@ import {
 } from "@/lib/notifications/dispatch"
 import { formatDisplayName } from "@/lib/utils"
 import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
+import { getDraftSetupStatus, type DraftSetupStatus } from "@/lib/draft-setup"
 import { fetchPlayerScores } from "@/lib/player-score"
 import {
     isAdminOrDirector,
@@ -391,6 +392,8 @@ export interface DraftInitData {
     teams: TeamOption[]
     initialPicks: Record<string, string>
     pairMap: PairEntry[]
+    /** Draft Setup readiness — the board must not open until `ready`. */
+    setupStatus: DraftSetupStatus
 }
 
 export const getDraftInitData = withAction(
@@ -411,7 +414,7 @@ export const getDraftInitData = withAction(
             return fail("You don't have permission to access this division.")
         }
 
-        const [teamsList, captRounds, pairDiffs, signupPairs] =
+        const [teamsList, captRounds, pairDiffs, signupPairs, setupStatus] =
             await Promise.all([
                 db
                     .select({
@@ -464,7 +467,8 @@ export const getDraftInitData = withAction(
                             eq(signups.season, seasonId),
                             eq(signups.pair, true)
                         )
-                    )
+                    ),
+                getDraftSetupStatus(seasonId, divisionId)
             ])
 
         const DRAFT_ROUNDS = 8
@@ -566,7 +570,8 @@ export const getDraftInitData = withAction(
                 number
             })),
             initialPicks,
-            pairMap: Array.from(pairMapEntries.values())
+            pairMap: Array.from(pairMapEntries.values()),
+            setupStatus
         })
     }
 )

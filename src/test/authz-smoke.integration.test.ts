@@ -37,7 +37,7 @@ import * as captainPairing from "@/app/dashboard/captain-pairing/actions"
 import * as createWeek1 from "@/app/dashboard/create-week-1/actions"
 import * as createWeek2 from "@/app/dashboard/create-week-2/actions"
 import * as createWeek3 from "@/app/dashboard/create-week-3/actions"
-import * as draftDay from "@/app/dashboard/draft-day/actions"
+import * as draftDay from "@/app/dashboard/draft-setup/order/actions"
 import * as draftHistory from "@/app/dashboard/draft-history/actions"
 import * as draftHomework from "@/app/dashboard/draft-homework/actions"
 import * as editEmails from "@/app/dashboard/edit-emails/actions"
@@ -175,9 +175,9 @@ const cases: SmokeCase[] = [
     c("createWeek3.saveWeek3Rosters", "fail", () =>
         createWeek3.saveWeek3Rosters([])
     ),
-    // draft-day
+    // draft-setup/order (formerly draft-day)
     c("draftDay.getDraftDayData", "fail", () => draftDay.getDraftDayData()),
-    c("draftDay.saveDraftOrder", "fail", () => draftDay.saveDraftOrder([])),
+    c("draftDay.saveDraftOrder", "fail", () => draftDay.saveDraftOrder(1, [])),
     c("draftDay.getDraftSheetData", "fail", () => draftDay.getDraftSheetData()),
     // draft-history — admin-only getters return [] unauth
     c("draftHistory.getAvailableYears", "emptyArray", () =>

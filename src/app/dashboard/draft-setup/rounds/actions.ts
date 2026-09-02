@@ -36,6 +36,7 @@ import { isGhostCaptain } from "@/lib/ghost-captain"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatDisplayName, parseGenderSplit } from "@/lib/utils"
 import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
+import { getDraftSetupStatus } from "@/lib/draft-setup"
 
 export interface CaptainInfo {
     userId: string
@@ -1045,6 +1046,75 @@ export const setCaptainRound = withAction(
         })
 
         return ok(undefined, "Saved")
+    }
+)
+
+/**
+ * Step 1 lock. Called after every setCaptainRound/setPairDiff save has
+ * resolved. Refuses to lock if any non-ghost captain still lacks a round so
+ * the lock can never be born stale — the live draft board seeds captains
+ * from draft_capt_rounds and a missing row means an empty seat.
+ */
+export const lockDraftRounds = withAction(
+    async (input: { divisionId: number }): Promise<ActionResult> => {
+        if (!(await isCommissionerBySession())) {
+            return fail("Not authorized")
+        }
+        if (!Number.isInteger(input.divisionId) || input.divisionId <= 0) {
+            return fail("Invalid divisionId")
+        }
+
+        const session = await auth.api.getSession({ headers: await headers() })
+        const userId = session!.user.id
+
+        const config = await getSeasonConfig()
+        const seasonId = config.seasonId!
+
+        if (
+            !(await commissionerCanWriteDivision(
+                userId,
+                seasonId,
+                input.divisionId
+            ))
+        ) {
+            return fail("You don't have permission for this division.")
+        }
+
+        const status = await getDraftSetupStatus(seasonId, input.divisionId)
+        if (status.rounds.missingCaptains.length > 0) {
+            return fail(
+                `Cannot lock: no draft round saved for ${status.rounds.missingCaptains.join(", ")}.`
+            )
+        }
+
+        const now = new Date()
+        const updated = await db
+            .update(individual_divisions)
+            .set({
+                draft_rounds_locked_at: now,
+                draft_rounds_locked_by: userId
+            })
+            .where(
+                and(
+                    eq(individual_divisions.season, seasonId),
+                    eq(individual_divisions.division, input.divisionId)
+                )
+            )
+            .returning({ id: individual_divisions.id })
+
+        if (updated.length === 0) {
+            return fail("Division is not configured for this season.")
+        }
+
+        await logAuditEntry({
+            userId,
+            action: "lock_draft_rounds",
+            entityType: "individual_division",
+            entityId: String(updated[0].id),
+            summary: `Locked captain draft rounds (division ${input.divisionId}, season ${seasonId})`
+        })
+
+        return ok(undefined, "Draft rounds locked")
     }
 )
 

@@ -2,8 +2,7 @@ import { redirect } from "next/navigation"
 
 export const dynamic = "force-dynamic"
 
-/** Legacy route — Prepare for Draft is now Draft Setup, Step 1. */
-export default async function LegacyPrepareForDraftPage({
+export default async function DraftSetupIndexPage({
     searchParams
 }: {
     searchParams: Promise<{ divisionId?: string }>

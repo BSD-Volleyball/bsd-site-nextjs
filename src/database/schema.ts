@@ -212,7 +212,19 @@ export const individual_divisions = pgTable(
             .references(() => divisions.id, { onDelete: "restrict" }),
         coaches: boolean("coaches").default(false).notNull(),
         gender_split: text("gender_split").notNull(),
-        teams: integer("teams").notNull()
+        teams: integer("teams").notNull(),
+        // Draft Setup step locks — explicit "the commissioner did this step"
+        // markers; see docs/superpowers/specs/2026-09-01-draft-setup-design.md
+        draft_rounds_locked_at: timestamp("draft_rounds_locked_at"),
+        draft_rounds_locked_by: text("draft_rounds_locked_by").references(
+            () => users.id,
+            { onDelete: "set null" }
+        ),
+        draft_order_locked_at: timestamp("draft_order_locked_at"),
+        draft_order_locked_by: text("draft_order_locked_by").references(
+            () => users.id,
+            { onDelete: "set null" }
+        )
     },
     (table) => ({
         individualDivisionsSeasonDivisionUniq: uniqueIndex(

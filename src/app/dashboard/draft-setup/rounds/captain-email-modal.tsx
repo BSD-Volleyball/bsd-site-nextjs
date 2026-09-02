@@ -16,7 +16,7 @@ import {
     resolveSubjectVariables
 } from "@/lib/email-template-variables"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
-import { clampRound } from "./draft-round-utils"
+import { clampRound, resolveCaptainRound } from "./draft-round-utils"
 
 function formatEmailList(captains: CaptainInfo[]): string {
     return captains
@@ -62,10 +62,12 @@ export function CaptainEmailModal({
         const captainRoundsLines = data.captains
             .map((cap) => {
                 const player = data.players.find((p) => p.userId === cap.userId)
-                const round =
-                    captainRoundOverrides[cap.userId] ??
-                    data.savedCaptainRounds[cap.userId] ??
-                    (player ? clampRound(player.recommendedRound) : 1)
+                const round = resolveCaptainRound(
+                    cap.userId,
+                    captainRoundOverrides,
+                    data.savedCaptainRounds,
+                    player?.recommendedRound
+                )
                 return `\u2022 ${cap.displayName} ${cap.lastName} \u2014 Round ${round}`
             })
             .join("\n")

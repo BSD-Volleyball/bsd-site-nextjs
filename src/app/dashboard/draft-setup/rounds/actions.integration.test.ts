@@ -6,9 +6,14 @@ import {
     draftPairDiffs,
     individual_divisions
 } from "@/database/schema"
-import { createDivision, createSeason } from "@/test/factories"
+import { createDivision, createSeason, createTeam } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getPrepareForDraftData, setCaptainRound, setPairDiff } from "./actions"
+import {
+    getPrepareForDraftData,
+    lockDraftRounds,
+    setCaptainRound,
+    setPairDiff
+} from "./actions"
 
 async function seedSeasonWithDivisions() {
     const season = await createSeason()
@@ -213,5 +218,92 @@ describe("setPairDiff", () => {
             diff: 4,
             division: divA.id
         })
+    })
+})
+
+describe("lockDraftRounds", () => {
+    it("rejects unauthenticated callers", async () => {
+        const result = await lockDraftRounds({ divisionId: 1 })
+        expect(result).toEqual({ status: false, message: "Not authorized" })
+    })
+
+    it("rejects a division-scoped commissioner locking another division", async () => {
+        const { season, divA, divBB } = await seedSeasonWithDivisions()
+        await createUserWithRoles([
+            {
+                role: "commissioner",
+                seasonId: season.id,
+                divisionId: divBB.id
+            }
+        ])
+        const result = await lockDraftRounds({ divisionId: divA.id })
+        expect(result).toEqual({
+            status: false,
+            message: "You don't have permission for this division."
+        })
+    })
+
+    it("refuses to lock while a captain has no saved round", async () => {
+        const { season, divA } = await seedSeasonWithDivisions()
+        const seated = await createUser({ first_name: "Ann", last_name: "A" })
+        const unseated = await createUser({
+            first_name: "Bob",
+            last_name: "Beta"
+        })
+        await createTeam({
+            season: season.id,
+            division: divA.id,
+            captain: seated.id
+        })
+        await createTeam({
+            season: season.id,
+            division: divA.id,
+            captain: unseated.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+        await setCaptainRound({
+            captainId: seated.id,
+            round: 1,
+            divisionId: divA.id
+        })
+
+        const result = await lockDraftRounds({ divisionId: divA.id })
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("Bob Beta")
+
+        const [row] = await db
+            .select({ lockedAt: individual_divisions.draft_rounds_locked_at })
+            .from(individual_divisions)
+            .where(eq(individual_divisions.division, divA.id))
+        expect(row.lockedAt).toBeNull()
+    })
+
+    it("stamps the lock once every captain is seated", async () => {
+        const { season, divA } = await seedSeasonWithDivisions()
+        const captain = await createUser()
+        await createTeam({
+            season: season.id,
+            division: divA.id,
+            captain: captain.id
+        })
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        await setCaptainRound({
+            captainId: captain.id,
+            round: 3,
+            divisionId: divA.id
+        })
+
+        const result = await lockDraftRounds({ divisionId: divA.id })
+        expect(result.status).toBe(true)
+
+        const [row] = await db
+            .select({
+                lockedAt: individual_divisions.draft_rounds_locked_at,
+                lockedBy: individual_divisions.draft_rounds_locked_by
+            })
+            .from(individual_divisions)
+            .where(eq(individual_divisions.division, divA.id))
+        expect(row.lockedAt).toBeInstanceOf(Date)
+        expect(row.lockedBy).toBe(admin.id)
     })
 })

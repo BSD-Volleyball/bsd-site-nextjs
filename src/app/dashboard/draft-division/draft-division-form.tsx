@@ -35,6 +35,8 @@ import {
 import { DraftRoomProvider } from "./draft-room-provider"
 import { DraftBoard } from "./draft-board"
 import { DraftWatchlist } from "./draft-watchlist"
+import { DraftSetupGate } from "./draft-setup-gate"
+import type { DraftSetupStatus } from "@/lib/draft-setup"
 
 interface DraftDivisionFormProps {
     currentSeasonId: number
@@ -71,6 +73,9 @@ export function DraftDivisionForm({
     const [teamsList, setTeamsList] = useState<TeamOption[]>([])
     const [initialPicks, setInitialPicks] = useState<Record<string, string>>({})
     const [pairMap, setPairMap] = useState<PairEntry[]>([])
+    const [setupStatus, setSetupStatus] = useState<DraftSetupStatus | null>(
+        null
+    )
     const [watchlistData, setWatchlistData] = useState<WatchlistData | null>(
         null
     )
@@ -98,6 +103,10 @@ export function DraftDivisionForm({
             ? (captainTeamIdsByDivision[selectedDivisionId] ?? [])
             : []
 
+    // Hard gate: the Liveblocks board only mounts once Draft Setup is done,
+    // otherwise it would seed an empty room with no captains in their seats.
+    const setupReady = setupStatus?.ready === true
+
     const divisionSplitsMap = useMemo(
         () => new Map(divisionSplits.map((d) => [d.divisionId, d.genderSplit])),
         [divisionSplits]
@@ -119,6 +128,7 @@ export function DraftDivisionForm({
         setTeamsList([])
         setInitialPicks({})
         setPairMap([])
+        setSetupStatus(null)
         setWatchlistData(null)
         picksRef.current = {}
 
@@ -137,6 +147,7 @@ export function DraftDivisionForm({
             setTeamsList(result.data.teams)
             setInitialPicks(result.data.initialPicks)
             setPairMap(result.data.pairMap)
+            setSetupStatus(result.data.setupStatus)
         } else {
             toast.error(result.message || "Failed to load teams.")
         }
@@ -298,7 +309,18 @@ export function DraftDivisionForm({
                             </p>
                         )}
 
-                        {teamsList.length > 0 && divisionId && (
+                        {teamsList.length > 0 &&
+                            divisionId &&
+                            setupStatus &&
+                            !setupStatus.ready && (
+                                <DraftSetupGate
+                                    status={setupStatus}
+                                    divisionId={parseInt(divisionId, 10)}
+                                    role={currentRole}
+                                />
+                            )}
+
+                        {teamsList.length > 0 && divisionId && setupReady && (
                             <div className="border-t pt-6">
                                 <h3 className="mb-4 font-semibold">
                                     Draft Board
@@ -365,7 +387,7 @@ export function DraftDivisionForm({
                                 </p>
                             )}
                     </CardContent>
-                    {currentRole === "commissioner" && (
+                    {currentRole === "commissioner" && setupReady && (
                         <CardFooter className="border-t pt-6">
                             <Button
                                 type="submit"

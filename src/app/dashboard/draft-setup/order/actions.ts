@@ -17,7 +17,11 @@ import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getSeasonConfig } from "@/lib/site-config"
-import { getCommissionerDivisionScope } from "@/lib/rbac"
+import {
+    commissionerCanWriteDivision,
+    getCommissionerDivisionScope
+} from "@/lib/rbac"
+import { getDraftSetupStatus } from "@/lib/draft-setup"
 import { logAuditEntry } from "@/lib/audit-log"
 import { isGhostCaptain, getGhostDisplayName } from "@/lib/ghost-captain"
 import { formatDisplayName } from "@/lib/utils"
@@ -221,14 +225,23 @@ export async function getDraftDayData(
     }
 }
 
+/**
+ * Step 2 save + lock. Writes `teams.number` for every team in the division
+ * and stamps `draft_order_locked_at/by`. Gated on Step 1 being locked so the
+ * order can never be "done" while captains are unseated.
+ */
 export const saveDraftOrder = withAction(
     async (
+        divisionId: number,
         assignments: { teamId: number; number: number }[]
     ): Promise<ActionResult> => {
         const hasAccess = await getIsCommissioner()
 
         if (!hasAccess) {
             return fail("Unauthorized")
+        }
+        if (!Number.isInteger(divisionId) || divisionId <= 0) {
+            return fail("Invalid divisionId")
         }
 
         try {
@@ -247,58 +260,86 @@ export const saveDraftOrder = withAction(
                 return fail("Unauthorized")
             }
 
-            const divisionAccess = await getCommissionerDivisionScope(
-                session.user.id,
-                seasonId
-            )
-
-            if (divisionAccess.type === "denied") {
-                return fail("Unauthorized")
+            if (
+                !(await commissionerCanWriteDivision(
+                    session.user.id,
+                    seasonId,
+                    divisionId
+                ))
+            ) {
+                return fail("You don't have permission for this division.")
             }
 
-            // Security: validate all teamIds belong to accessible divisions for this season
-            const teamIds = assignments.map((a) => a.teamId)
+            const setup = await getDraftSetupStatus(seasonId, divisionId)
+            if (setup.rounds.state !== "locked") {
+                return fail(
+                    "Step 1 (seat the captains) must be locked before the draft order."
+                )
+            }
 
-            const validTeams = await db
+            // Every team in the division must be assigned exactly one
+            // number 1..n — a partial order would leave stale numbers behind.
+            const divisionTeams = await db
                 .select({ id: teams.id })
                 .from(teams)
                 .where(
                     and(
                         eq(teams.season, seasonId),
-                        inArray(teams.id, teamIds),
-                        divisionAccess.type === "division_specific"
-                            ? inArray(
-                                  teams.division,
-                                  divisionAccess.divisionIds
-                              )
-                            : undefined
+                        eq(teams.division, divisionId)
                     )
                 )
-
-            const validTeamIds = new Set(validTeams.map((t) => t.id))
-
-            for (const assignment of assignments) {
-                if (!validTeamIds.has(assignment.teamId)) {
-                    return fail("One or more teams are not accessible.")
+            const expectedIds = new Set(divisionTeams.map((t) => t.id))
+            const seenIds = new Set<number>()
+            const seenNumbers = new Set<number>()
+            for (const a of assignments) {
+                if (!expectedIds.has(a.teamId) || seenIds.has(a.teamId)) {
+                    return fail("One or more teams are not in this division.")
                 }
+                if (
+                    !Number.isInteger(a.number) ||
+                    a.number < 1 ||
+                    a.number > expectedIds.size ||
+                    seenNumbers.has(a.number)
+                ) {
+                    return fail("Draft order numbers must be unique 1..n.")
+                }
+                seenIds.add(a.teamId)
+                seenNumbers.add(a.number)
+            }
+            if (seenIds.size !== expectedIds.size) {
+                return fail("Every team in the division must be ordered.")
             }
 
-            // Update each team's draft number
-            for (const assignment of assignments) {
-                await db
-                    .update(teams)
-                    .set({ number: assignment.number })
-                    .where(eq(teams.id, assignment.teamId))
-            }
+            const now = new Date()
+            await db.transaction(async (tx) => {
+                for (const assignment of assignments) {
+                    await tx
+                        .update(teams)
+                        .set({ number: assignment.number })
+                        .where(eq(teams.id, assignment.teamId))
+                }
+                await tx
+                    .update(individual_divisions)
+                    .set({
+                        draft_order_locked_at: now,
+                        draft_order_locked_by: session.user.id
+                    })
+                    .where(
+                        and(
+                            eq(individual_divisions.season, seasonId),
+                            eq(individual_divisions.division, divisionId)
+                        )
+                    )
+            })
 
             await logAuditEntry({
                 userId: session.user.id,
-                action: "update",
+                action: "lock_draft_order",
                 entityType: "teams",
-                summary: `Saved draft order for ${assignments.length} teams in season ${seasonId}`
+                summary: `Locked draft order for ${assignments.length} teams (division ${divisionId}, season ${seasonId})`
             })
 
-            return ok(undefined, "Draft order saved successfully.")
+            return ok(undefined, "Draft order locked.")
         } catch (error) {
             console.error("Error saving draft order:", error)
             return fail("Something went wrong.")

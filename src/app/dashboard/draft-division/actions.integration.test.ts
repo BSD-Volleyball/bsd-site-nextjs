@@ -9,7 +9,13 @@ import {
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import {
+    lockDraftRounds,
+    setCaptainRound
+} from "@/app/dashboard/draft-setup/rounds/actions"
+import { saveDraftOrder } from "@/app/dashboard/draft-setup/order/actions"
+import {
     getDraftDivisionData,
+    getDraftInitData,
     getDraftWatchlistData,
     submitDraft
 } from "./actions"
@@ -582,5 +588,45 @@ describe("getDraftWatchlistData (captain view)", () => {
             player2.id
         ])
         expect(result.data.malePlayers.map((p) => p.round)).toEqual([1, 1])
+    })
+})
+
+describe("getDraftInitData setup gate", () => {
+    it("reports not ready for an unconfigured division, then ready once both steps lock", async () => {
+        const { season, divA } = await seedDraftSeason()
+        const captain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            division: divA.id,
+            captain: captain.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const before = await getDraftInitData(season.id, divA.id)
+        expect(before.status).toBe(true)
+        if (!before.status) return
+        expect(before.data.setupStatus).toMatchObject({
+            rounds: { state: "unlocked" },
+            order: { state: "unlocked" },
+            ready: false
+        })
+        // No captain seat is seeded until Step 1 runs
+        expect(before.data.initialPicks).toEqual({})
+
+        await setCaptainRound({
+            captainId: captain.id,
+            round: 2,
+            divisionId: divA.id
+        })
+        await lockDraftRounds({ divisionId: divA.id })
+        await saveDraftOrder(divA.id, [{ teamId: team.id, number: 1 }])
+
+        const after = await getDraftInitData(season.id, divA.id)
+        expect(after.status).toBe(true)
+        if (!after.status) return
+        expect(after.data.setupStatus.ready).toBe(true)
+        expect(after.data.initialPicks).toEqual({
+            [`2-${team.id}`]: captain.id
+        })
     })
 })

@@ -21,9 +21,9 @@ import {
 } from "./pdf-sheets"
 
 interface DraftDayFormProps {
-    divisions: DivisionData[]
-    commissionerDivisionId: number | null
+    division: DivisionData
     seasonLabel: string
+    orderLocked: boolean
 }
 
 function reorder<T>(items: T[], fromIndex: number, toIndex: number): T[] {
@@ -46,34 +46,19 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 export function DraftDayForm({
-    divisions,
-    commissionerDivisionId,
-    seasonLabel
+    division,
+    seasonLabel,
+    orderLocked
 }: DraftDayFormProps) {
     const router = useRouter()
 
-    const defaultDivisionId =
-        commissionerDivisionId ?? divisions[0]?.divisionId ?? null
-
-    const [selectedDivisionId, setSelectedDivisionId] = useState<number | null>(
-        defaultDivisionId
-    )
-    const [captains, setCaptains] = useState<CaptainRow[]>(() => {
-        const div = divisions.find((d) => d.divisionId === defaultDivisionId)
-        return div?.captains ?? []
-    })
+    const [captains, setCaptains] = useState<CaptainRow[]>(division.captains)
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
     const [isAnimating, setIsAnimating] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isGenerating, setIsGenerating] = useState<
         "blank" | "prefilled" | null
     >(null)
-
-    const handleDivisionChange = (divId: number) => {
-        setSelectedDivisionId(divId)
-        const div = divisions.find((d) => d.divisionId === divId)
-        setCaptains(div?.captains ?? [])
-    }
 
     const handleDrop = (dropIndex: number) => {
         if (draggedIndex === null) return
@@ -111,12 +96,12 @@ export function DraftDayForm({
             number: i + 1
         }))
 
-        const result = await saveDraftOrder(assignments)
+        const result = await saveDraftOrder(division.divisionId, assignments)
 
         setIsSaving(false)
 
         if (result.status) {
-            toast.success(result.message ?? "Draft order saved.")
+            toast.success(result.message ?? "Draft order locked.")
             router.refresh()
         } else {
             toast.error(result.message ?? "Failed to save draft order.")
@@ -137,7 +122,7 @@ export function DraftDayForm({
 
     const handleBlankSheet = async () => {
         setIsGenerating("blank")
-        const result = await getDraftSheetData(selectedDivisionId ?? undefined)
+        const result = await getDraftSheetData(division.divisionId)
         if (!result.status) {
             toast.error(result.message ?? "Failed to load sheet data.")
             setIsGenerating(null)
@@ -150,7 +135,7 @@ export function DraftDayForm({
 
     const handlePrefilledSheet = async () => {
         setIsGenerating("prefilled")
-        const result = await getDraftSheetData(selectedDivisionId ?? undefined)
+        const result = await getDraftSheetData(division.divisionId)
         if (!result.status) {
             toast.error(result.message ?? "Failed to load sheet data.")
             setIsGenerating(null)
@@ -163,39 +148,19 @@ export function DraftDayForm({
 
     return (
         <div className="space-y-6">
-            {commissionerDivisionId === null && divisions.length > 1 && (
-                <div className="flex items-center gap-3">
-                    <label
-                        htmlFor="division-select"
-                        className="font-medium text-sm"
-                    >
-                        Division:
-                    </label>
-                    <select
-                        id="division-select"
-                        className="rounded-md border bg-background px-3 py-1.5 text-sm shadow-sm"
-                        value={selectedDivisionId ?? ""}
-                        onChange={(e) =>
-                            handleDivisionChange(Number(e.target.value))
-                        }
-                    >
-                        {divisions.map((div) => (
-                            <option key={div.divisionId} value={div.divisionId}>
-                                {div.divisionName}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            )}
-
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between gap-4">
                         <div>
-                            <CardTitle>Draft Order — {seasonLabel}</CardTitle>
+                            <CardTitle>
+                                Draft Order — {seasonLabel} —{" "}
+                                {division.divisionName}
+                            </CardTitle>
                             <CardDescription className="mt-1">
                                 Drag and drop rows to set the pick order, then
-                                click Save Order.
+                                click Lock In Order.
+                                {orderLocked &&
+                                    " Locking again replaces the saved order."}
                             </CardDescription>
                         </div>
                         <div className="flex gap-2">
@@ -212,7 +177,11 @@ export function DraftDayForm({
                                 onClick={handleSave}
                                 disabled={isSaving || isAnimating}
                             >
-                                {isSaving ? "Saving…" : "Save Order"}
+                                {isSaving
+                                    ? "Saving…"
+                                    : orderLocked
+                                      ? "Re-lock Order"
+                                      : "Lock In Order"}
                             </Button>
                         </div>
                     </div>
