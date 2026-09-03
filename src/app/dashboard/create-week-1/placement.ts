@@ -5,6 +5,8 @@
 import { formatDisplayName } from "@/lib/utils"
 import type { Week1Candidate, Week1RosterAssignment } from "./week1-types"
 
+export { reorder } from "@/lib/utils"
+
 export interface CandidateWithIndex extends Week1Candidate {
     sourceIndex: number
 }
@@ -59,21 +61,6 @@ export function displayName(player: Week1Candidate | AssignmentView) {
 
 export function cleanGroupLabel(label: string) {
     return label.replace(/^\d+\)\s*/, "")
-}
-
-export function reorder<T>(
-    items: T[],
-    fromIndex: number,
-    toIndex: number
-): T[] {
-    if (fromIndex === toIndex) {
-        return items
-    }
-
-    const updated = [...items]
-    const [moved] = updated.splice(fromIndex, 1)
-    updated.splice(toIndex, 0, moved)
-    return updated
 }
 
 export function buildPairCandidates(ranked: Week1Candidate[]) {

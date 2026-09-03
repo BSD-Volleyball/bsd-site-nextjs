@@ -50,12 +50,19 @@ export default async function DraftHomeworkPage() {
                         each round of the draft.
                     </li>
                     <li>
-                        Each round has {result.data.numTeams} slots. Order
-                        within a round does not matter.
+                        Each round has {result.data.numTeams} slots. Slots are
+                        ranked top to bottom and feed your live draft board.
+                        Drag the handle to reorder.
                     </li>
                     <li>
                         Use the <strong>Considering</strong> group at the bottom
                         of each tab for players you&apos;re watching.
+                    </li>
+                    <li>
+                        If a player on your board gets drafted, use{" "}
+                        <strong>Remove drafted &amp; shift up</strong>. Everyone
+                        below moves up a slot and you can add a new player at
+                        the bottom.
                     </li>
                     <li>
                         Saving replaces all previous selections. You can update

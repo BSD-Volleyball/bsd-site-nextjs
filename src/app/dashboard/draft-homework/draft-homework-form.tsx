@@ -58,6 +58,10 @@ export function DraftHomeworkForm({
         setSelections((prev) => ({ ...prev, [key]: userId }))
     }
 
+    const handleBulkChange = (patch: Selections) => {
+        setSelections((prev) => ({ ...prev, ...patch }))
+    }
+
     const handleSave = async () => {
         const hasInvalid = Object.values(selections).some(
             (uid) => uid && draftedSet.has(uid)
@@ -316,6 +320,7 @@ export function DraftHomeworkForm({
                             draftedIds={draftedIds}
                             playerPicUrl={playerPicUrl}
                             onChange={handleChange}
+                            onBulkChange={handleBulkChange}
                             onOpenPlayer={modal.openPlayerDetail}
                         />
                     </TabsContent>
@@ -331,6 +336,7 @@ export function DraftHomeworkForm({
                             draftedIds={draftedIds}
                             playerPicUrl={playerPicUrl}
                             onChange={handleChange}
+                            onBulkChange={handleBulkChange}
                             onOpenPlayer={modal.openPlayerDetail}
                         />
                     </TabsContent>

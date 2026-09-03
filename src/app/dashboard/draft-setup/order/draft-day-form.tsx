@@ -12,7 +12,7 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, reorder } from "@/lib/utils"
 import type { CaptainRow, DivisionData } from "./actions"
 import { saveDraftOrder, getDraftSheetData } from "./actions"
 import {
@@ -24,16 +24,6 @@ interface DraftDayFormProps {
     division: DivisionData
     seasonLabel: string
     orderLocked: boolean
-}
-
-function reorder<T>(items: T[], fromIndex: number, toIndex: number): T[] {
-    if (fromIndex === toIndex) {
-        return items
-    }
-    const updated = [...items]
-    const [moved] = updated.splice(fromIndex, 1)
-    updated.splice(toIndex, 0, moved)
-    return updated
 }
 
 function shuffle<T>(items: T[]): T[] {

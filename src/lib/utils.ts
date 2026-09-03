@@ -101,3 +101,21 @@ export function serializeCsvField(value: unknown): string {
     }
     return str
 }
+
+/**
+ * Move `items[fromIndex]` to `toIndex`, shifting everything in between by
+ * one. Returns a new array; the input is never mutated.
+ */
+export function reorder<T>(
+    items: T[],
+    fromIndex: number,
+    toIndex: number
+): T[] {
+    if (fromIndex === toIndex) {
+        return items
+    }
+    const updated = [...items]
+    const [moved] = updated.splice(fromIndex, 1)
+    updated.splice(toIndex, 0, moved)
+    return updated
+}

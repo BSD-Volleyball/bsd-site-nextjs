@@ -31,10 +31,14 @@ export function PlayerCombobox({
 }: PlayerComboboxProps) {
     const selectablePlayers = useMemo(
         () =>
+            // The current value always stays visible (even once drafted, so
+            // the red slot still shows who it was); everyone else must be
+            // unselected elsewhere and not yet drafted.
             players.filter(
                 (p) =>
-                    (!excludeIds.includes(p.userId) || p.userId === value) &&
-                    !draftedIds.includes(p.userId)
+                    p.userId === value ||
+                    (!excludeIds.includes(p.userId) &&
+                        !draftedIds.includes(p.userId))
             ),
         [players, excludeIds, draftedIds, value]
     )
