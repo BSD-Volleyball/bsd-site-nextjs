@@ -130,22 +130,22 @@ export default function CaptainExpectationsPage() {
                                     attention to the next-lower division! If you
                                     want to be a winning captain, recognize that
                                     sometimes players (especially newer players)
-                                    get placed too low and it&apos;ll help the
-                                    league as a whole (and your team in
-                                    particular) if you spot that talent for the
-                                    next season&apos;s draft.
+                                    get placed too low and it'll help the league
+                                    as a whole (and your team in particular) if
+                                    you spot that talent for the next season's
+                                    draft.
                                 </li>
                                 <li>
                                     <strong>And of course–</strong> go to the
                                     tryouts! We hold these solely for captains
                                     to see players demonstrate their skills and
-                                    team-playing abilities. And don&apos;t just
-                                    focus on newer, unknown players – even
-                                    seasoned players change. Sometimes they take
-                                    clinics or start playing more often and it
-                                    will reflect in their skills. Tryouts can be
+                                    team-playing abilities. And don't just focus
+                                    on newer, unknown players – even seasoned
+                                    players change. Sometimes they take clinics
+                                    or start playing more often and it will
+                                    reflect in their skills. Tryouts can be
                                     chaotic, you will find it challenging to
-                                    mentally keep track of players &amp; your
+                                    mentally keep track of players & your
                                     evaluations of them, so be prepared to take
                                     a lot of notes.
                                 </li>
@@ -185,9 +185,8 @@ export default function CaptainExpectationsPage() {
                         Being on a competitive team is important to many
                         players, but just as important is their{" "}
                         <em>experience</em> on the team. Captains set the tone
-                        for their team and it&apos;s up to you make their
-                        experience a positive one. We recommend a few things
-                        below to help:
+                        for their team and it's up to you make their experience
+                        a positive one. We recommend a few things below to help:
                     </p>
                     <ul className="list-disc space-y-4 pl-6 text-muted-foreground">
                         <li>
@@ -267,11 +266,11 @@ export default function CaptainExpectationsPage() {
                                     effective play. Why do we say this? Because
                                     there have been complaints about exactly
                                     this type of thing in the past, and you
-                                    would <em>think</em> it wouldn&apos;t need
-                                    to be said explicitly, but yet it still
-                                    seems to occur every so often. Every person
-                                    pays the same amount of money and deserves a
-                                    fair share of the plays. Please keep this in
+                                    would <em>think</em> it wouldn't need to be
+                                    said explicitly, but yet it still seems to
+                                    occur every so often. Every person pays the
+                                    same amount of money and deserves a fair
+                                    share of the plays. Please keep this in
                                     mind.
                                 </li>
                                 <li>
@@ -297,9 +296,9 @@ export default function CaptainExpectationsPage() {
                                     hitters on the front row, leaving the
                                     front-row women with very little chance to
                                     play and contribute. You would{" "}
-                                    <em>think</em> this wouldn&apos;t need to be
-                                    said explicitly, but yet it still seems to
-                                    occur every so often.
+                                    <em>think</em> this wouldn't need to be said
+                                    explicitly, but yet it still seems to occur
+                                    every so often.
                                 </li>
                             </ul>
                         </li>

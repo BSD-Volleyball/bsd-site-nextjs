@@ -42,9 +42,9 @@ export function ParticipantsSection() {
                         of the 1st referee, he/she may choose to protest against
                         such decision and immediately indicates to the referee
                         that he/she wishes to call over a league official to
-                        protest. The league officials will rule on the
-                        referee&apos;s application or interpretation of the
-                        Rules but not the referee&apos;s judgment.
+                        protest. The league officials will rule on the referee's
+                        application or interpretation of the Rules but not the
+                        referee's judgment.
                     </p>
                 </div>
             </div>

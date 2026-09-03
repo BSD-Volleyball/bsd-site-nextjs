@@ -56,7 +56,7 @@ export default async function DraftHomeworkPage() {
                     </li>
                     <li>
                         Use the <strong>Considering</strong> group at the bottom
-                        of each tab for players you&apos;re watching.
+                        of each tab for players you're watching.
                     </li>
                     <li>
                         If a player on your board gets drafted, use{" "}
