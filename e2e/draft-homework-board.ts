@@ -27,7 +27,6 @@ export interface Seeded {
     userIds: string[]
 }
 
-
 export function playerName(i: number) {
     return `Homework Player${i}`
 }
