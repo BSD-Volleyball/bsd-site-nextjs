@@ -2,7 +2,11 @@ import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { sponsorships } from "@/database/schema"
-import { createSeason, createSponsor, createSponsorship } from "@/test/factories"
+import {
+    createSeason,
+    createSponsor,
+    createSponsorship
+} from "@/test/factories"
 import { sentMessages } from "@/test/email"
 import { createUser, createUserWithRoles } from "@/test/session"
 import {

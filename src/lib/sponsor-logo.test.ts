@@ -30,7 +30,9 @@ describe("sponsor logo helpers", () => {
     })
 
     it("derives the object key and DB path from the filename", () => {
-        expect(getSponsorLogoObjectKey("12-1.png")).toBe("sponsorlogos/12-1.png")
+        expect(getSponsorLogoObjectKey("12-1.png")).toBe(
+            "sponsorlogos/12-1.png"
+        )
         expect(getSponsorLogoDbPath("12-1.png")).toBe("/sponsorlogos/12-1.png")
         expect(objectKeyFromLogoPath("/sponsorlogos/12-1.png")).toBe(
             "sponsorlogos/12-1.png"

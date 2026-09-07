@@ -11,6 +11,7 @@ import {
     RiGroupLine,
     RiTimeLine,
     RiCoupon3Line,
+    RiHandHeartLine,
     RiStarLine,
     RiCalendarLine,
     RiMergeCellsHorizontal,
@@ -209,6 +210,11 @@ export const adminNavItems: NavItem[] = [
         title: "Manage Discounts",
         url: "/dashboard/manage-discounts",
         icon: RiCoupon3Line
+    },
+    {
+        title: "Manage Sponsors",
+        url: "/dashboard/manage-sponsors",
+        icon: RiHandHeartLine
     },
     {
         title: "Evaluate New Players",
