@@ -18,7 +18,7 @@ import {
     requirePositiveInt,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 
 describe("ok / fail", () => {
     it("builds success results with optional data and message", () => {

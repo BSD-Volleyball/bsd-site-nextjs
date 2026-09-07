@@ -1,16 +1,10 @@
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
-import {
-    isAdminOrDirectorBySession,
-    hasCaptainPagesAccessBySession,
-    hasPermissionBySession
-} from "@/lib/rbac"
-import type { Permission } from "@/lib/permissions"
 import { logger } from "@/lib/logger"
 
 // ---------------------------------------------------------------------------
-// Standardised server-action result type
+// Standardised action result type and helpers. Framework-independent: lib
+// code and client components may import from here. The session/authorization
+// guards that pair with these live in src/next/action-helpers.ts.
 // ---------------------------------------------------------------------------
 
 export type ActionResult<T = void> =
@@ -25,54 +19,6 @@ export function ok<T>(data?: T, message?: string): ActionResult<T> {
 
 export function fail(message: string): ActionResult<never> {
     return { status: false, message }
-}
-
-// ---------------------------------------------------------------------------
-// Session helpers
-// ---------------------------------------------------------------------------
-
-export async function requireSession() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        throw new ActionError("Not authenticated.")
-    }
-    return session
-}
-
-// ---------------------------------------------------------------------------
-// Authorization helpers — throw on failure so callers stay clean
-// ---------------------------------------------------------------------------
-
-export async function requireAdmin(): Promise<void> {
-    const allowed = await isAdminOrDirectorBySession()
-    if (!allowed) throw new ActionError("Unauthorized.")
-}
-
-export async function requireCaptainAccess(): Promise<void> {
-    const allowed = await hasCaptainPagesAccessBySession()
-    if (!allowed) throw new ActionError("Unauthorized.")
-}
-
-export async function requirePermission(
-    permission: Permission,
-    context?: { seasonId?: number; divisionId?: number }
-): Promise<void> {
-    const allowed = await hasPermissionBySession(permission, context)
-    if (!allowed) throw new ActionError("Unauthorized.")
-}
-
-/**
- * Passes when the caller holds ANY of the given permissions (checked in
- * order). Throws ActionError("Unauthorized.") when none match.
- */
-export async function requireAnyPermission(
-    permissions: Permission[],
-    context?: { seasonId?: number; divisionId?: number }
-): Promise<void> {
-    for (const permission of permissions) {
-        if (await hasPermissionBySession(permission, context)) return
-    }
-    throw new ActionError("Unauthorized.")
 }
 
 // ---------------------------------------------------------------------------

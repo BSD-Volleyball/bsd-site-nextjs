@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
 import { users, signups } from "@/database/schema"
@@ -9,7 +9,7 @@ import { eq, and, or, isNull, isNotNull, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUserId, isAdminOrDirectorBySession } from "@/lib/rbac"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { revalidatePath } from "next/cache"
 
 export interface PairUser {

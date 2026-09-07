@@ -1,4 +1,4 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { hasPermission, isAdminOrDirector } from "@/lib/rbac"

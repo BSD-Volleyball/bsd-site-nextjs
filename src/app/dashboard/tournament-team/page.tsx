@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getCaptainTeamView } from "./actions"
 import { CaptainTeamEditor } from "./captain-team-editor"
 

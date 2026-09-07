@@ -5,8 +5,8 @@
 import "server-only"
 
 import { and, eq, inArray } from "drizzle-orm"
-import type { ActionResult } from "@/lib/action-helpers"
-import { ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-result"
+import { ok, fail } from "@/lib/action-result"
 import { db } from "@/database/db"
 import {
     signups,

@@ -11,7 +11,7 @@ import {
     userRoles
 } from "@/database/schema"
 import { eq, desc, or } from "drizzle-orm"
-import { hasPermissionBySession } from "@/lib/rbac"
+import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import { sendMail } from "@/lib/email/send"
@@ -25,8 +25,8 @@ import {
     requirePermission,
     requireAnyPermission,
     requireNonEmptyString
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import {
     type AttachmentMeta,
     listAttachmentsFor

@@ -3,8 +3,8 @@
 import { db } from "@/database/db"
 import { users, auditLog } from "@/database/schema"
 import { eq, desc, sql } from "drizzle-orm"
-import { withAction, ok, requireAdmin } from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, requireAdmin } from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export interface AuditLogEntry {
     id: number

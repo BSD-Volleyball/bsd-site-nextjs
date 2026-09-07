@@ -11,13 +11,13 @@ import {
     ok,
     requireSeasonConfig,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { withTransientRetry } from "@/lib/db-retry"
 import { buildSponsorshipReceiptHtml } from "@/lib/email-html"
 import { sendMail } from "@/lib/email/send"
 import { logger } from "@/lib/logger"
-import { getSessionUser } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
 import { formatSeasonLabel, getSeasonConfig } from "@/lib/site-config"
 import {
     finalizeSponsorLogo,

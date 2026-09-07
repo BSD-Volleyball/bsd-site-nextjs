@@ -24,7 +24,7 @@ import {
     isCommissionerBySession,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import type { SeasonPhase } from "@/lib/season-phases"
 
 export interface SeasonNavDivision {

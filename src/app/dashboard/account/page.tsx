@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card"
 import { getAccountProfile } from "../settings/actions"
 import { AccountForm } from "./account-form"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 
 export const metadata = {
     title: "Account"

@@ -1,4 +1,4 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { listFriendIds } from "@/lib/friends"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"

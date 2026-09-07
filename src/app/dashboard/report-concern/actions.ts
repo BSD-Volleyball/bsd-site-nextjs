@@ -11,8 +11,8 @@ import {
     ok,
     requireSession,
     requireNonEmptyString
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export interface SubmitConcernInput {
     anonymous: boolean

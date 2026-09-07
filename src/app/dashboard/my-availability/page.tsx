@@ -12,7 +12,7 @@ import {
 import { eq, and, or } from "drizzle-orm"
 import { selectUnavailableEventIds } from "@/lib/availability"
 import { loadWeek1Audience } from "@/lib/week1-audience"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     getEventsByType,

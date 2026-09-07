@@ -5,7 +5,7 @@ import {
     ok,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { type CalendarLinks, buildCalendarLinks } from "@/lib/calendar-links"
 import { eq } from "drizzle-orm"

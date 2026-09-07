@@ -1,16 +1,13 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
 import { desc, eq, asc } from "drizzle-orm"
-import {
-    isAdminOrDirectorBySession,
-    grantRole,
-    invalidateAllSessionsForUser
-} from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
+import { grantRole, invalidateAllSessionsForUser } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"

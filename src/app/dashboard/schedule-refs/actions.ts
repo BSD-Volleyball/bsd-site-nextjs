@@ -26,9 +26,9 @@ import {
     requireSeasonConfig,
     requirePermission,
     ActionError
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
-import { getSessionUserId } from "@/lib/rbac"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { getSessionUserId } from "@/next/session"
 import { formatEventDate, formatMatchTime } from "@/lib/date-utils"
 import { formatPlayerName } from "@/lib/utils"
 import {

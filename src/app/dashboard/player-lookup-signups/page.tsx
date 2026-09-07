@@ -3,7 +3,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PlayerLookupSignupsForm } from "./player-lookup-form"
 import { getSignedUpPlayers } from "./actions"
-import { requireCaptainAccessOrRedirect } from "@/lib/page-guards"
+import { requireCaptainAccessOrRedirect } from "@/next/page-guards"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

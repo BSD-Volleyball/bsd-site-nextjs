@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -19,10 +19,10 @@ import { eq, and, inArray, asc, ne, isNotNull } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getIsCommissioner } from "@/app/dashboard/access-actions"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
+import { getSessionUserId } from "@/next/session"
 import {
     commissionerCanWriteDivision,
     getCommissionerDivisionAccess,
-    getSessionUserId,
     grantRole,
     revokeRole
 } from "@/lib/rbac"

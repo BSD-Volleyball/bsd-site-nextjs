@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 import { PageHeader } from "@/components/layout/page-header"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 
 import { getPickTryoutVolunteersView } from "./actions"
 import { PickTryoutVolunteersClient } from "./pick-tryout-volunteers-client"

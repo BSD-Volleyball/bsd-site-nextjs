@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -18,7 +18,7 @@ import {
     scoreSheets
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
-import { hasPermissionBySession } from "@/lib/rbac"
+import { hasPermissionBySession } from "@/next/session"
 import {
     createPlayerPictureUploadPresignedUrl,
     deleteR2Object,

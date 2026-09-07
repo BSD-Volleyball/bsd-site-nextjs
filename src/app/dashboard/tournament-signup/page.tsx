@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditEmailsForm } from "./edit-emails-form"
 import { getEmailTemplates } from "./actions"

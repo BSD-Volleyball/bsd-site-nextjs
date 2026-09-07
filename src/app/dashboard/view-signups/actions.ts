@@ -21,7 +21,7 @@ import {
     hasCaptainPagesAccessBySession,
     getSessionUserId,
     isCommissionerBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     type ActionResult,
@@ -31,7 +31,7 @@ import {
     requireSeasonConfig,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import type {
     PlayerRatingAverages,
     PlayerRatingPrivateNote,

@@ -1,6 +1,6 @@
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getEditWeek2Data } from "./actions"
 import { EditWeek2Form } from "./edit-week-2-form"

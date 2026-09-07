@@ -19,7 +19,7 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     getTournamentAvailability,
     getTournamentConfig,

@@ -17,7 +17,7 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
-import type { ActionResult } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-result"
 import type { PreseasonWeekConfig } from "@/lib/preseason/config"
 import { getScoreBandLevel } from "@/lib/preseason/allocation"
 import {

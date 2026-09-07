@@ -1,6 +1,6 @@
 "use server"
 
-import { getSessionUser } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
@@ -11,8 +11,8 @@ import {
     fail,
     requireSession,
     requireNonEmptyString
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export interface VolleyballProfileData {
     experience: string | null

@@ -4,7 +4,7 @@ import { db } from "@/database/db"
 import { userRoles, users, seasons, divisions } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { isValidRole } from "@/lib/permissions"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 
 export interface RoleHolder {

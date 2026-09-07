@@ -1,4 +1,4 @@
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { playerPicBaseUrl } from "@/config/env"
 import { ViewRolesClient } from "./view-roles-client"

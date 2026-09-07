@@ -16,9 +16,9 @@ import {
     requirePositiveInt,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { getTournamentConfig } from "@/lib/tournament-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { progressTournamentMatch } from "@/lib/tournament-brackets"
 import { logAuditEntry } from "@/lib/audit-log"
 import {

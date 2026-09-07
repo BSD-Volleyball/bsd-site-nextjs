@@ -29,7 +29,7 @@ import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasCaptainPagesAccessBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import { formatMatchTime } from "@/lib/season-utils"
 
 export type { NextMatch } from "@/lib/next-match"

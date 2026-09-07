@@ -1,7 +1,7 @@
 "use server"
 
 import { randomUUID } from "node:crypto"
-import { getSessionUser } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
 import { signups, users, waitlist, userUnavailability } from "@/database/schema"
 import { eq, and, count } from "drizzle-orm"

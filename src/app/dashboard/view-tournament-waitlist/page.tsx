@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getTournamentWaitlist } from "./actions"
 import { TournamentWaitlistTable } from "./waitlist-table"
 

@@ -30,7 +30,7 @@ import {
     requireSeasonConfig,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     formatEventDate,

@@ -4,7 +4,7 @@ import { db } from "@/database/db"
 import { type AttachmentParentType, emailAttachments } from "@/database/schema"
 import type { Permission } from "@/lib/permissions"
 import { getR2Object } from "@/lib/r2"
-import { hasPermissionBySession } from "@/lib/rbac"
+import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export const runtime = "nodejs"

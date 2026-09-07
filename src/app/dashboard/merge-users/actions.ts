@@ -13,14 +13,14 @@ import {
 } from "@/database/schema"
 import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
-import type { ActionResult } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import {
     fail,
     ok,
     requireNonEmptyString,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import type {
@@ -37,7 +37,8 @@ import {
     resolveDefaultSelections
 } from "@/lib/merge-user-fields"
 import { mergeUserRecords } from "@/lib/merge-users"
-import { getSessionUser, isAdminOrDirector } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
+import { isAdminOrDirector } from "@/lib/rbac"
 import { formatDisplayName } from "@/lib/utils"
 
 export interface UserOption {

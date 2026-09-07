@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@/lib/rbac"
+import { getSessionUserId } from "@/next/session"
 import { generateTryoutSheetsPdf } from "@/lib/pdf/tryout-sheets"
 
 export const runtime = "nodejs"

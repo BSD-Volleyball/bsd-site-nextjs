@@ -14,7 +14,7 @@ import {
     requireSeasonConfig,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { buildSponsorshipPaymentDueHtml } from "@/lib/email-html"
 import { dispatchNotification } from "@/lib/notifications/dispatch"

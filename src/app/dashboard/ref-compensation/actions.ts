@@ -16,9 +16,12 @@ import {
     ok,
     requireSession,
     requireSeasonConfig
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
-import { hasPermissionBySession, isAdminOrDirectorBySession } from "@/lib/rbac"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import {
+    hasPermissionBySession,
+    isAdminOrDirectorBySession
+} from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 
 type MatchWorked = {

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import type { ActionResult } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-result"
 import { SPONSOR_LOGO_ACCEPT, SPONSOR_LOGO_MAX_BYTES } from "@/lib/sponsor-logo"
 
 interface Props {

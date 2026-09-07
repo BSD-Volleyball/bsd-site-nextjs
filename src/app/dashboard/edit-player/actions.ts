@@ -1,6 +1,6 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import {
     withAction,
     ok,
@@ -8,7 +8,7 @@ import {
     requireAdmin,
     requireSeasonConfig,
     requireSession
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     notifyAdminsOfTryoutRosterConflict,
     notifyCaptainsOfAvailabilityChange,
@@ -52,10 +52,8 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { loadWeek1Audience } from "@/lib/week1-audience"
 import type { Week1Audience } from "@/lib/week1-priority"
 import { logAuditEntry } from "@/lib/audit-log"
-import {
-    isAdminOrDirectorBySession,
-    invalidateAllSessionsForUser
-} from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
+import { invalidateAllSessionsForUser } from "@/lib/rbac"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES

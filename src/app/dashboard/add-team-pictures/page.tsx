@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
-import { hasPermissionBySession } from "@/lib/rbac"
+import { hasPermissionBySession } from "@/next/session"
 import { getSeasonOptionsForPictures, getTeamsForPicturePage } from "./actions"
 import { AddTeamPicturesClient } from "./add-team-pictures-client"
 

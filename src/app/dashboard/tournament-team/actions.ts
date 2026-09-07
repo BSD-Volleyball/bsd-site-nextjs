@@ -18,7 +18,7 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { getTournamentConfig, isRosterLocked } from "@/lib/tournament-config"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logAuditEntry } from "@/lib/audit-log"

@@ -1,4 +1,4 @@
-import { requirePermissionOrRedirect } from "@/lib/page-guards"
+import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { getSeasonConfig } from "@/lib/site-config"

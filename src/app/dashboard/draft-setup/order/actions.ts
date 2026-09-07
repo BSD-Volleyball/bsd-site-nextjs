@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { db } from "@/database/db"
 import {
     users,

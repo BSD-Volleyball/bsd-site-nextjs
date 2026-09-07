@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -9,7 +9,7 @@ import { db } from "@/database/db"
 import { users, seasons, divisions, teams, userRoles } from "@/database/schema"
 import { desc } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 
 export interface SeasonOption {
     id: number

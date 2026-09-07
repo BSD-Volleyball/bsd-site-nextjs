@@ -17,8 +17,8 @@ import {
     requireAdmin,
     requirePositiveInt,
     withAction
-} from "@/lib/action-helpers"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+} from "@/next/action-helpers"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 import { eq, inArray } from "drizzle-orm"
 import {

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { listFriendIds } from "@/lib/friends"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import { getSeasonConfig } from "@/lib/site-config"

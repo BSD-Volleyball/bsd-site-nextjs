@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"

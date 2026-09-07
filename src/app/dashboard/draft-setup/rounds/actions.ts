@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm"
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
@@ -26,11 +26,10 @@ import {
     extractPlainTextFromEmailTemplateContent
 } from "@/lib/email-template-content"
 import { fetchPlayerScores } from "@/lib/player-score"
+import { getSessionUser, isCommissionerBySession } from "@/next/session"
 import {
     commissionerCanWriteDivision,
-    getCommissionerDivisionScope,
-    getSessionUser,
-    isCommissionerBySession
+    getCommissionerDivisionScope
 } from "@/lib/rbac"
 import { isGhostCaptain } from "@/lib/ghost-captain"
 import { logAuditEntry } from "@/lib/audit-log"

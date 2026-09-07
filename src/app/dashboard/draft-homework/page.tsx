@@ -1,4 +1,4 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import { getDraftHomeworkData } from "./actions"

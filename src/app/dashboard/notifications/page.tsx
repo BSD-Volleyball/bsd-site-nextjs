@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getNotificationSettings } from "./actions"
 import { NotificationsForm } from "./notifications-form"
 

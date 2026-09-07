@@ -4,8 +4,8 @@ import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { withAction, ok, fail, requireSession } from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export interface AccountProfileData {
     first_name: string | null

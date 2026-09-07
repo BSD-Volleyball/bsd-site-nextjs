@@ -14,8 +14,8 @@ import {
     requireNonEmptyString,
     requirePermission,
     ActionError
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import { grantRole, revokeRole } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 

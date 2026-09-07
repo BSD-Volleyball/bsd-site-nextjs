@@ -1,8 +1,11 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { isAdminOrDirectorBySession, hasPermissionBySession } from "@/lib/rbac"
+import {
+    isAdminOrDirectorBySession,
+    hasPermissionBySession
+} from "@/next/session"
 import { getScheduleRefsData, getMatchesAndRefsForDate } from "./actions"
 import { ScheduleRefsClient } from "./schedule-refs-client"
 import type { Metadata } from "next"

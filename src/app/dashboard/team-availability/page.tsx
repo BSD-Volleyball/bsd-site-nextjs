@@ -1,4 +1,4 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { getTeamAvailabilityData } from "./actions"
 import { AvailabilityMatrix } from "./availability-matrix"

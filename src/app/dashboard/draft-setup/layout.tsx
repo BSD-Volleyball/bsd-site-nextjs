@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getIsCommissioner } from "@/app/dashboard/access-actions"
 
 export const dynamic = "force-dynamic"

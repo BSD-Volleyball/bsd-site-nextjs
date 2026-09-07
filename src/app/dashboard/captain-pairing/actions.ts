@@ -9,8 +9,8 @@ import {
     fail,
     requireSession,
     requirePositiveInt
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 import { logAuditEntry } from "@/lib/audit-log"

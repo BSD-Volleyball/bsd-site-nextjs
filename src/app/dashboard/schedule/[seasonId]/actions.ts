@@ -18,7 +18,7 @@ import {
     requirePositiveInt,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     computeStandings,
     getSetScores,

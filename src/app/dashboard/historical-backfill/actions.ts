@@ -5,7 +5,7 @@ import {
     ok,
     requireAdmin,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     type HistoricalCoverage,
     fetchHistoricalCoverage

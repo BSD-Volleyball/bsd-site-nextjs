@@ -10,14 +10,14 @@ import {
     users
 } from "@/database/schema"
 import { eq, and, asc, desc, inArray } from "drizzle-orm"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import {
     withAction,
     ok,
     requireAdmin,
     requirePositiveInt
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export async function getAvailableYears(): Promise<number[]> {
     const isAdmin = await isAdminOrDirectorBySession()

@@ -45,10 +45,9 @@ import { WelcomeTeamCard } from "./captain-info-card"
 import {
     hasCaptainPagesAccessBySession,
     hasPermissionBySession,
-    isAdminOrDirectorBySession,
-    isCommissionerForSeason,
-    getUserRolesForUser
-} from "@/lib/rbac"
+    isAdminOrDirectorBySession
+} from "@/next/session"
+import { isCommissionerForSeason, getUserRolesForUser } from "@/lib/rbac"
 import {
     getCaptainWelcomeData,
     getPlayerTeamAssignment,

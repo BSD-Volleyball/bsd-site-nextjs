@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -14,7 +14,7 @@ import {
     individual_divisions
 } from "@/database/schema"
 import { eq, asc } from "drizzle-orm"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import {

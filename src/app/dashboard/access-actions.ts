@@ -8,7 +8,7 @@ import {
     isCommissionerBySession,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import type { SeasonPhase } from "@/lib/season-phases"
 
 export async function getSignupEligibility(): Promise<boolean> {

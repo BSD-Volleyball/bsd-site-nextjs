@@ -19,8 +19,8 @@ import {
     fail,
     requireSession,
     requirePositiveInt
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import {
     computeStandings,
     getSetScores,

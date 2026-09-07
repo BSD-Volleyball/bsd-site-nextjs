@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getInsuranceReportYears } from "./actions"
 import { InsuranceReportClient } from "./insurance-report-client"
 

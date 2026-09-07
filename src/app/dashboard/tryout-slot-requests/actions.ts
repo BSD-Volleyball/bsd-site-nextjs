@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -10,7 +10,7 @@ import { db } from "@/database/db"
 import { users, tryoutSlotRequests } from "@/database/schema"
 import { and, asc, eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface TryoutSlotRequestEntry {

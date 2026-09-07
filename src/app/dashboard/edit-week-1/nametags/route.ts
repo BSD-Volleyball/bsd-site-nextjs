@@ -1,4 +1,4 @@
-import { getSessionUserId } from "@/lib/rbac"
+import { getSessionUserId } from "@/next/session"
 import { generateWeekNametagsPdf } from "@/lib/pdf/nametags"
 
 export const runtime = "nodejs"

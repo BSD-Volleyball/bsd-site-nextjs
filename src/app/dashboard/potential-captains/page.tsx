@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { PotentialCaptainsList } from "./potential-captains-list"
 import { getPotentialCaptainsData } from "./actions"

@@ -11,7 +11,7 @@ import {
     ok,
     fail,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { areFriends, getLiveFriendshipEdge } from "@/lib/friends"
 import {
     getPersonalAnalytics,

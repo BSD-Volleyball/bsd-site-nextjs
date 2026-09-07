@@ -1,12 +1,12 @@
 "use server"
 
-import { getSessionUser } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import { eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { withAction, ok, requireSession } from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, ok, requireSession } from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 
 export interface OnboardingAccountData {
     preferred_name: string | null

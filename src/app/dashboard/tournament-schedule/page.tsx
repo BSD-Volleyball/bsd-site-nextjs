@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getScheduleView } from "./actions"
 import { ScheduleEditor } from "./schedule-editor"
 

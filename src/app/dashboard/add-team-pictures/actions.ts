@@ -12,8 +12,8 @@ import {
     requirePermission,
     requirePositiveInt,
     requireSeasonConfig
-} from "@/lib/action-helpers"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+} from "@/next/action-helpers"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES

@@ -1,7 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm"
 import { cache } from "react"
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import { sessions, userRoles, users } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
@@ -11,22 +9,6 @@ import {
     ROLE_PERMISSIONS,
     isValidRole
 } from "@/lib/permissions"
-
-export async function getSessionUserId(): Promise<string | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    return session?.user?.id ?? null
-}
-
-/**
- * Returns the authenticated session user, or null when unauthenticated.
- * Recognized by the authz regression checker as a session guard — use this
- * (with an early return on null) in actions that keep legacy response shapes
- * instead of a bare auth.api.getSession() fetch.
- */
-export async function getSessionUser() {
-    const session = await auth.api.getSession({ headers: await headers() })
-    return session?.user ?? null
-}
 
 // ---------------------------------------------------------------------------
 // Core: load all role assignments for a user (cached per request)
@@ -93,25 +75,12 @@ export async function hasPermission(
     return false
 }
 
-export async function hasPermissionBySession(
-    permission: Permission,
-    context?: { seasonId?: number; divisionId?: number }
-): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) return false
-    return hasPermission(userId, permission, context)
-}
-
 // ---------------------------------------------------------------------------
 // Backward-compatible helpers (signatures unchanged — zero action changes needed)
 // ---------------------------------------------------------------------------
 
 export async function isAdminOrDirector(userId: string): Promise<boolean> {
     return hasPermission(userId, "season:control")
-}
-
-export async function isAdminOrDirectorBySession(): Promise<boolean> {
-    return hasPermissionBySession("season:control")
 }
 
 export async function isCommissionerForSeason(
@@ -157,23 +126,11 @@ export async function isCommissioner(userId: string): Promise<boolean> {
     return isCommissionerForSeason(userId, config.seasonId)
 }
 
-export async function isCommissionerBySession(): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) return false
-    return isCommissioner(userId)
-}
-
 /** May view the captain pages (signups, tryout sheets) for the current season. */
 export async function hasCaptainPagesAccess(userId: string): Promise<boolean> {
     const config = await getSeasonConfig()
     if (!config.seasonId) return false
     return hasPermission(userId, "signups:view", { seasonId: config.seasonId })
-}
-
-export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) return false
-    return hasCaptainPagesAccess(userId)
 }
 
 // ---------------------------------------------------------------------------

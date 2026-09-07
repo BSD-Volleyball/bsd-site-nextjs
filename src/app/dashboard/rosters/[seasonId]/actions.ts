@@ -17,11 +17,11 @@ import {
     requirePositiveInt,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { getTeamRosterWithSubs } from "@/lib/roster"
 import { getSeasonConfig } from "@/lib/site-config"
 import { SEASON_PHASES } from "@/lib/season-phases"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { formatDisplayName } from "@/lib/utils"
 
 interface RosterPlayer {

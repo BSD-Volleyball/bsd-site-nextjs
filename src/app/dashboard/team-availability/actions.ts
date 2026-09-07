@@ -8,7 +8,7 @@ import {
     ok,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     teams,
     signups,
@@ -20,10 +20,8 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray, or, asc, desc } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
-import {
-    isAdminOrDirectorBySession,
-    getCommissionerDivisionScope
-} from "@/lib/rbac"
+import { isAdminOrDirectorBySession } from "@/next/session"
+import { getCommissionerDivisionScope } from "@/lib/rbac"
 import {
     getTeamRosterWithSubs,
     getMatchSubsForTeamSeason,

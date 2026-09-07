@@ -12,15 +12,15 @@ import {
     seasonEvents
 } from "@/database/schema"
 import { and, asc, eq, desc } from "drizzle-orm"
-import { withAction, requireSession, ok, fail } from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+import { withAction, requireSession, ok, fail } from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
-    getCommissionerDivisionScope,
     getSessionUserId
-} from "@/lib/rbac"
+} from "@/next/session"
+import { getCommissionerDivisionScope } from "@/lib/rbac"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import {

@@ -1,4 +1,4 @@
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { redirect } from "next/navigation"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"

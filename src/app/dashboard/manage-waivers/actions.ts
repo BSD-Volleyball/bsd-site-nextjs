@@ -11,7 +11,7 @@ import {
     ok,
     fail,
     ActionError
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     createWaiverVersion as createWaiverVersionLib,
     publishWaiver

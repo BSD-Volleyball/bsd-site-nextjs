@@ -1,4 +1,4 @@
-import { requireAdminOrCommissionerOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { SendEmailClient } from "./send-email-client"
 import { getEmailFormData, getBroadcastHistory } from "./actions"

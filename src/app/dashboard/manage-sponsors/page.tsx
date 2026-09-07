@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requirePermissionOrRedirect } from "@/lib/page-guards"
+import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { getUsers } from "@/app/dashboard/manage-discounts/actions"
 import { getSponsorships } from "./actions"
 import { SponsorsManager } from "./sponsors-manager"

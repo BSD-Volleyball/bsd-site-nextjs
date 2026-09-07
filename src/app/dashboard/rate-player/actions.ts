@@ -21,7 +21,10 @@ import {
 import { getLeagueDateString } from "@/lib/date-utils"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getTeamRosterWithSubs } from "@/lib/roster"
-import { getSessionUserId, hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import {
+    getSessionUserId,
+    hasCaptainPagesAccessBySession
+} from "@/next/session"
 import {
     withAction,
     ok,
@@ -29,8 +32,8 @@ import {
     requireSession,
     requireSeasonConfig,
     requirePermission
-} from "@/lib/action-helpers"
-import type { ActionResult } from "@/lib/action-helpers"
+} from "@/next/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import {
     buildTryoutTimeSlotGroups,
     resolveDefaultLookupType,

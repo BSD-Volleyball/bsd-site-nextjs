@@ -14,8 +14,8 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+} from "@/next/action-helpers"
+import { isAdminOrDirectorBySession } from "@/next/session"
 import { getTournamentConfig } from "@/lib/tournament-config"
 import {
     buildTournamentScheduleView,

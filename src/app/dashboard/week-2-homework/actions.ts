@@ -1,12 +1,12 @@
 "use server"
 
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { and, asc, count, eq, or } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUser } from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
 import {
     divisions,

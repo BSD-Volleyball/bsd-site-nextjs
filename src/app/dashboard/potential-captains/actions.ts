@@ -19,17 +19,15 @@ import {
     ok,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     type LexicalEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,
     normalizeEmailTemplateContent
 } from "@/lib/email-template-content"
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
-import {
-    getCommissionerDivisionAccess,
-    isCommissionerBySession
-} from "@/lib/rbac"
+import { isCommissionerBySession } from "@/next/session"
+import { getCommissionerDivisionAccess } from "@/lib/rbac"
 import { getSeasonHistoryForUser } from "@/lib/player-season-history"
 
 export interface PotentialCaptainPlayerDetails {

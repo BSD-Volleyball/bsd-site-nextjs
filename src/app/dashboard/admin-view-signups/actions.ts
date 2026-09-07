@@ -1,7 +1,12 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import {
+    withAction,
+    ok,
+    fail,
+    requireSeasonConfig
+} from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -20,7 +25,7 @@ import {
 import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
-import { getSessionUser, isAdminOrDirectorBySession } from "@/lib/rbac"
+import { getSessionUser, isAdminOrDirectorBySession } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     SIGNUP_DROP_CATEGORIES,

@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, users, userRoles } from "@/database/schema"

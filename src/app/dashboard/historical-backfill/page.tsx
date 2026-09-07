@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireAdminOrRedirect } from "@/lib/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getHistoricalCoverage, getLegacyAccounts } from "./actions"
 import { CoverageTable } from "./coverage-table"
 import { LegacyAccountsPanel } from "./legacy-accounts-panel"

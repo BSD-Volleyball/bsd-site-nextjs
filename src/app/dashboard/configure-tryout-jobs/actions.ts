@@ -31,7 +31,7 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { formatSeasonLabel, getEventsByType } from "@/lib/season-utils"
 import { getTryoutCourtNumbersByEvent } from "@/lib/tryout-volunteer-schedule"

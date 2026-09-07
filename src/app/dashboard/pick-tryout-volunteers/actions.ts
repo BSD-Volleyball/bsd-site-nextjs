@@ -14,7 +14,7 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import { grantRole, revokeRole } from "@/lib/rbac"
 import { formatSeasonLabel } from "@/lib/season-utils"

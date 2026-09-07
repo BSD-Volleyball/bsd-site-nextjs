@@ -1,8 +1,8 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
 import { playerPicBaseUrl } from "@/config/env"
-import { withAction, ok, fail, requireSession } from "@/lib/action-helpers"
+import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -28,7 +28,7 @@ import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasCaptainPagesAccessBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import {
     normalizeEmailTemplateContent,
     extractPlainTextFromEmailTemplateContent,

@@ -18,13 +18,10 @@ import {
 import { eq, and, inArray, or, asc, desc, isNull } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
-import {
-    getSessionUser,
-    isAdminOrDirector,
-    getCommissionerDivisionScope
-} from "@/lib/rbac"
+import { getSessionUser } from "@/next/session"
+import { isAdminOrDirector, getCommissionerDivisionScope } from "@/lib/rbac"
 import { getTeamRosterWithSubs, formatPlayerSummaryName } from "@/lib/roster"
-import { ok, fail, type ActionResult } from "@/lib/action-helpers"
+import { ok, fail, type ActionResult } from "@/next/action-helpers"
 import { insertMatchSubstitution } from "@/lib/match-substitutions"
 import { canAccessTeam } from "@/lib/team-access"
 import { formatDisplayName } from "@/lib/utils"

@@ -20,7 +20,7 @@ import {
     requireSession,
     withAction,
     type ActionResult
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { getTournamentConfig } from "@/lib/tournament-config"
 import { isValidSetsFormat, type SetsMode } from "@/lib/tournament-sets"
 

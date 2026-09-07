@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, ok, fail, requirePositiveInt } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -11,7 +11,7 @@ import {
     userUnavailability
 } from "@/database/schema"
 import { and, eq, asc, desc, inArray } from "drizzle-orm"
-import { isAdminOrDirectorBySession, getSessionUserId } from "@/lib/rbac"
+import { isAdminOrDirectorBySession, getSessionUserId } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 
 export type EventType =

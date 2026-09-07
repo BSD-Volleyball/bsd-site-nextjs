@@ -18,7 +18,7 @@ import {
     hasCoverage,
     type SeasonCoverage
 } from "@/lib/historical-coverage"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { formatEventDate, formatSeasonLabel } from "@/lib/season-utils"
 import { getSeasonConfig } from "@/lib/site-config"
 import { db } from "@/database/db"

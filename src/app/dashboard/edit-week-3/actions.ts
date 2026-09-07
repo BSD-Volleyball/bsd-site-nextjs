@@ -1,9 +1,9 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { withAction, fail } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { withAction, fail } from "@/next/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { getSessionUserId } from "@/lib/rbac"
+import { getSessionUserId } from "@/next/session"
 import {
     EDIT_WEEK_3,
     getEditWeekData,

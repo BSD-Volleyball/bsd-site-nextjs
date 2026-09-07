@@ -1,7 +1,7 @@
 "use server"
 
-import type { ActionResult } from "@/lib/action-helpers"
-import { fail, ok, requireSession, withAction } from "@/lib/action-helpers"
+import type { ActionResult } from "@/next/action-helpers"
+import { fail, ok, requireSession, withAction } from "@/next/action-helpers"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     reactivateStreamSuppression,

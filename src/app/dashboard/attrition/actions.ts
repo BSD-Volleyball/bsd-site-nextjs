@@ -8,7 +8,7 @@ import {
     ok,
     requireAdmin,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import { formatDisplayName } from "@/lib/utils"
 
 export interface GenderAttritionData {

@@ -1,13 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-// rbac transitively imports @/lib/auth (boots better-auth at module load) and
-// @/database/db. Stub both so these tests exercise the pure decision logic of
+// rbac imports @/database/db. Stub it so these tests exercise the pure decision logic of
 // commissionerCanWriteDivision over a controlled user_roles read.
 const { whereMock } = vi.hoisted(() => ({ whereMock: vi.fn() }))
 
-vi.mock("@/lib/auth", () => ({
-    auth: { api: { getSession: vi.fn(async () => null) } }
-}))
 vi.mock("@/database/db", () => ({
     db: {
         select: () => ({ from: () => ({ where: whereMock }) })

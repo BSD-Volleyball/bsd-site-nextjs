@@ -8,7 +8,7 @@ import {
     isCommissionerBySession,
     hasPermissionBySession,
     hasCaptainPagesAccessBySession
-} from "@/lib/rbac"
+} from "@/next/session"
 import type { Permission } from "@/lib/permissions"
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import { requireSessionOrRedirect } from "@/lib/page-guards"
+import { requireSessionOrRedirect } from "@/next/page-guards"
 import { formatSeasonLabel, getSeasonConfig } from "@/lib/site-config"
 import { getSponsorshipForUser } from "@/lib/sponsors"
 import { SponsorshipView } from "./sponsorship-view"

@@ -28,9 +28,9 @@ import { formatDisplayName } from "@/lib/utils"
 import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
 import { getDraftSetupStatus, type DraftSetupStatus } from "@/lib/draft-setup"
 import { fetchPlayerScores } from "@/lib/player-score"
+import { isCommissionerBySession } from "@/next/session"
 import {
     isAdminOrDirector,
-    isCommissionerBySession,
     isCommissionerForCurrentSeason,
     isCaptainForSeason,
     getCommissionerDivisionScope
@@ -42,7 +42,7 @@ import {
     requirePositiveInt,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 
 export interface DivisionSplitConfig {
     divisionId: number

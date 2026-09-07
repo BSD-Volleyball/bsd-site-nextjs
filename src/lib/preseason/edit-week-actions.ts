@@ -7,8 +7,8 @@ import "server-only"
 
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import { and, desc, eq, inArray } from "drizzle-orm"
-import type { ActionResult } from "@/lib/action-helpers"
-import { ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
+import type { ActionResult } from "@/lib/action-result"
+import { ok, fail, requireSeasonConfig } from "@/lib/action-result"
 import {
     dispatchNotification,
     type NotificationRecipient

@@ -12,7 +12,7 @@ import {
     requireSeasonConfig,
     requireSession,
     withAction
-} from "@/lib/action-helpers"
+} from "@/next/action-helpers"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
