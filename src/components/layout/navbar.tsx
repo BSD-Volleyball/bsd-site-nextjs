@@ -83,6 +83,11 @@ const infoPages: InfoPageProps[] = [
         title: "Gender Policy",
         href: "/gender-policy",
         description: "Co-rec play and inclusion policies"
+    },
+    {
+        title: "Our Sponsors",
+        href: "/sponsors",
+        description: "Local businesses supporting the league"
     }
 ]
 

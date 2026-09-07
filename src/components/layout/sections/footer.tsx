@@ -26,7 +26,8 @@ const footerSections: FooterSectionProps[] = [
             { href: "/faq", label: "FAQ" },
             { href: "/history", label: "League History" },
             { href: "/player-experience", label: "Skill Levels" },
-            { href: "/gender-policy", label: "Gender Policy" }
+            { href: "/gender-policy", label: "Gender Policy" },
+            { href: "/sponsors", label: "Our Sponsors" }
         ]
     },
     {

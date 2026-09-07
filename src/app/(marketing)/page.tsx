@@ -1,4 +1,5 @@
 import { HeroSection } from "@/components/layout/sections/hero"
+import { SponsorsStrip } from "@/components/layout/sections/sponsors-strip"
 import { site } from "@/config/site"
 import { auth } from "@/lib/auth"
 import { getTournamentConfig } from "@/lib/tournament-config"
@@ -309,6 +310,9 @@ export default async function Home({
                     </div>
                 </div>
             </section>
+
+            {/* Sponsor logos — only once at least one sponsorship is paid */}
+            <SponsorsStrip />
 
             {/* CTA Section */}
             {!session && (
