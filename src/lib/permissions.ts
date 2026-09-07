@@ -52,6 +52,8 @@ export type Permission =
     // Admin inbound emails
     | "admin_emails:view"
     | "admin_emails:manage"
+    // Sponsors
+    | "sponsors:manage"
 
 // All permissions — used for admin wildcard.
 // Keep in sync with the Permission type above.
@@ -79,7 +81,8 @@ const ALL_PERMISSIONS: Permission[] = [
     "google:manage",
     "attrition:view",
     "admin_emails:view",
-    "admin_emails:manage"
+    "admin_emails:manage",
+    "sponsors:manage"
     // concerns:view and concerns:manage are intentionally omitted — only ombudsman role has access
 ]
 

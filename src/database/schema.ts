@@ -855,6 +855,76 @@ export const discounts = pgTable(
     })
 )
 
+// ---------------------------------------------------------------------------
+// Sponsors — local businesses that pay to sponsor a season. `sponsors` is the
+// reusable business record; `sponsorships` is one row per sponsor per season
+// carrying the amount owed and the payment record, so a returning sponsor is
+// renewed without re-entering its details.
+// ---------------------------------------------------------------------------
+
+export const sponsors = pgTable(
+    "sponsors",
+    {
+        id: serial("id").primaryKey(),
+        name: text("name").notNull(),
+        website: text("website"),
+        blurb: text("blurb"),
+        // R2 object path ("/sponsorlogos/<file>"), served via PLAYER_PIC_URL
+        // like player pictures.
+        logo_path: text("logo_path"),
+        // The account that can view, edit, and pay for this sponsor.
+        contact_user: text("contact_user")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        sponsorsContactUserIdx: index("sponsors_contact_user_idx").on(
+            table.contact_user
+        )
+    })
+)
+
+export const sponsorships = pgTable(
+    "sponsorships",
+    {
+        id: serial("id").primaryKey(),
+        sponsor_id: integer("sponsor_id")
+            .notNull()
+            .references(() => sponsors.id, { onDelete: "restrict" }),
+        season: integer("season")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "restrict" }),
+        // What the admin asked for; amount_paid records what was received.
+        amount: numeric("amount").notNull(),
+        // "pending" | "paid"
+        status: text("status").default("pending").notNull(),
+        // "square" | "manual" — set alongside status = "paid"
+        payment_method: text("payment_method"),
+        // Square payment id (column name mirrors signups.order_id)
+        order_id: text("order_id"),
+        amount_paid: numeric("amount_paid"),
+        receipt_url: text("receipt_url"),
+        paid_at: timestamp("paid_at"),
+        // Free text for manual payments, e.g. "check #1042"
+        paid_note: text("paid_note"),
+        marked_paid_by: text("marked_paid_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_by: text("created_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        sponsorshipsSponsorSeasonUniq: uniqueIndex(
+            "sponsorships_sponsor_season_uniq"
+        ).on(table.sponsor_id, table.season),
+        sponsorshipsSeasonIdx: index("sponsorships_season_idx").on(table.season)
+    })
+)
+
 export const evaluations = pgTable(
     "evaluations",
     {
@@ -2169,7 +2239,27 @@ export const seasonsRelations = relations(seasons, ({ many }) => ({
     signups: many(signups),
     teams: many(teams),
     matches: many(matches),
-    events: many(seasonEvents)
+    events: many(seasonEvents),
+    sponsorships: many(sponsorships)
+}))
+
+export const sponsorsRelations = relations(sponsors, ({ one, many }) => ({
+    contactUser: one(users, {
+        fields: [sponsors.contact_user],
+        references: [users.id]
+    }),
+    sponsorships: many(sponsorships)
+}))
+
+export const sponsorshipsRelations = relations(sponsorships, ({ one }) => ({
+    sponsor: one(sponsors, {
+        fields: [sponsorships.sponsor_id],
+        references: [sponsors.id]
+    }),
+    season: one(seasons, {
+        fields: [sponsorships.season],
+        references: [seasons.id]
+    })
 }))
 
 export const divisionsRelations = relations(divisions, ({ many }) => ({

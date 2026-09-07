@@ -1,7 +1,7 @@
 "use server"
 
 import { formatPlayerName } from "@/lib/utils"
-import { SquareClient, SquareEnvironment } from "square"
+import { getSquareClient } from "@/lib/square"
 import { randomUUID } from "node:crypto"
 import { db } from "@/database/db"
 import {
@@ -34,15 +34,6 @@ import {
     getActiveDiscountForUser,
     markDiscountAsUsed
 } from "@/lib/discount"
-
-const getSquareClient = () =>
-    new SquareClient({
-        token: process.env.SQUARE_ACCESS_TOKEN,
-        environment:
-            process.env.SQUARE_ENVIRONMENT === "production"
-                ? SquareEnvironment.Production
-                : SquareEnvironment.Sandbox
-    })
 
 export interface TournamentSignupFormData {
     teamName: string

@@ -134,6 +134,13 @@
       "when": 1788315140913,
       "tag": "0018_draft_setup_locks",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788796575256,
+      "tag": "0019_sponsors",
+      "breakpoints": true
     }
   ]
 }

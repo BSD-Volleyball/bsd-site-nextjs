@@ -42,6 +42,15 @@ describe("ROLE_PERMISSIONS", () => {
         }
     })
 
+    it("grants sponsors:manage to admins only", () => {
+        for (const role of ALL_ROLES) {
+            expect(
+                ROLE_PERMISSIONS[role].includes("sponsors:manage"),
+                `${role} sponsors:manage`
+            ).toBe(role === "admin")
+        }
+    })
+
     it("keeps privileged season controls away from non-admin roles", () => {
         for (const role of ALL_ROLES) {
             if (role === "admin") continue

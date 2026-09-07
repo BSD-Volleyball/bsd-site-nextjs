@@ -1,6 +1,5 @@
 "use server"
 
-import { SquareClient, SquareEnvironment } from "square"
 import { randomUUID } from "node:crypto"
 import { getSessionUser } from "@/lib/rbac"
 import { db } from "@/database/db"
@@ -21,6 +20,8 @@ import { sendMail } from "@/lib/email/send"
 import { buildSignupConfirmationHtml } from "@/lib/email-html"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logger } from "@/lib/logger"
+import { getSquareClient } from "@/lib/square"
+import { withTransientRetry } from "@/lib/db-retry"
 import { AGE_GROUPS, PAIR_REQUIRED_AGE_GROUP } from "@/lib/age-groups"
 
 export interface SignupFormData {
@@ -32,16 +33,6 @@ export interface SignupFormData {
     refInterest: boolean
     tryoutHelp: boolean
     unavailableEventIds: number[]
-}
-
-const getSquareClient = () => {
-    return new SquareClient({
-        token: process.env.SQUARE_ACCESS_TOKEN,
-        environment:
-            process.env.SQUARE_ENVIRONMENT === "production"
-                ? SquareEnvironment.Production
-                : SquareEnvironment.Sandbox
-    })
 }
 
 async function sendSignupConfirmationEmail(
@@ -183,55 +174,6 @@ async function validateSignupFormData(
         }
     }
     return null
-}
-
-// Retries a database operation on transient failures: deadlocks (e.g. a
-// concurrent migration holding exclusive locks), serialization conflicts,
-// and dropped pooler connections — the failure modes that can strand a
-// player who has already been charged. Non-transient errors rethrow
-// immediately.
-const TRANSIENT_PG_CODES = new Set([
-    "40001",
-    "40P01",
-    "57P01",
-    "08003",
-    "08006"
-])
-
-function isTransientDbError(error: unknown): boolean {
-    if (!error || typeof error !== "object") return false
-    const e = error as { code?: string; message?: string; cause?: unknown }
-    if (e.code && TRANSIENT_PG_CODES.has(e.code)) return true
-    if (
-        typeof e.message === "string" &&
-        (e.message.includes("Connection terminated") ||
-            e.message.includes("ECONNRESET"))
-    ) {
-        return true
-    }
-    return e.cause ? isTransientDbError(e.cause) : false
-}
-
-async function withTransientRetry<T>(
-    fn: () => Promise<T>,
-    attempts = 3
-): Promise<T> {
-    let lastError: unknown
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-        try {
-            return await fn()
-        } catch (error) {
-            lastError = error
-            if (attempt === attempts || !isTransientDbError(error)) {
-                throw error
-            }
-            logger.warn("Transient DB error — retrying transaction", {
-                attempt
-            })
-            await new Promise((resolve) => setTimeout(resolve, attempt * 300))
-        }
-    }
-    throw lastError
 }
 
 export async function submitSeasonPayment(
