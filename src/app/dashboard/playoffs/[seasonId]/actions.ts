@@ -22,10 +22,7 @@ import {
     requireSession,
     withAction
 } from "@/lib/action-helpers"
-import {
-    FOUR_TEAM_PLAYOFF,
-    SIX_TEAM_PLAYOFF
-} from "@/app/dashboard/create-schedule/schedule-constants"
+import { FOUR_TEAM_PLAYOFF, SIX_TEAM_PLAYOFF } from "@/lib/schedule-constants"
 import {
     formatSourceShortLabel,
     isWinnerLoserReset,

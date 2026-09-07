@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { AvailabilityEventPicker } from "@/components/availability-event-picker"
 import type { SeasonConfig } from "@/lib/season-types"
-import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
+import type { Week1Audience } from "@/lib/week1-priority"
 
 interface AvailabilityFormProps {
     signupId: number | null

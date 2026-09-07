@@ -19,7 +19,10 @@ import {
     writePlayoffSchedule,
     writeRegularSeasonSchedule
 } from "./actions"
-import { FOUR_TEAM_PLAYOFF, REGULAR_SEASON_WEEKS } from "./schedule-constants"
+import {
+    FOUR_TEAM_PLAYOFF,
+    REGULAR_SEASON_WEEKS
+} from "@/lib/schedule-constants"
 
 const REGULAR_DATES = [
     "2026-09-12",

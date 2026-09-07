@@ -35,10 +35,7 @@ import {
     week2Rosters,
     week3Rosters
 } from "@/database/schema"
-import {
-    FOUR_TEAM_TIMES,
-    SIX_TEAM_TIMES
-} from "@/app/dashboard/create-schedule/schedule-constants"
+import { FOUR_TEAM_TIMES, SIX_TEAM_TIMES } from "@/lib/schedule-constants"
 import {
     LEGACY_COURT_BY_DIVISION,
     getSessionNumberFromTeam

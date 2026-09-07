@@ -23,7 +23,7 @@ import {
 import { ROLE_BADGE_COLORS, roleLabel } from "@/lib/role-display"
 import { CareerStatTiles } from "@/components/analytics/career-stat-tiles"
 import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
-import { formatHeight } from "./format-height"
+import { formatHeight } from "@/lib/format-height"
 import { PlayerImageModal } from "./player-image-modal"
 import { DraftPickChart } from "./draft-pick-chart"
 import { PlayerRatingsSection } from "./player-ratings-section"

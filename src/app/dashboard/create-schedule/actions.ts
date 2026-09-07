@@ -28,8 +28,8 @@ import {
     REGULAR_SEASON_WEEKS,
     getPlayoffMatchTime,
     getPairedCourt
-} from "./schedule-constants"
-import type { PlayoffMatchTemplate } from "./schedule-constants"
+} from "@/lib/schedule-constants"
+import type { PlayoffMatchTemplate } from "@/lib/schedule-constants"
 
 export interface DivisionWithTeams {
     divisionId: number

@@ -7,7 +7,7 @@ import {
     resolveWeek1Audience,
     type Week1Audience,
     type Week1DraftSeason
-} from "@/app/dashboard/create-week-1/week1-priority"
+} from "@/lib/week1-priority"
 
 /**
  * Which week 1 callout a player should see, from their own draft history.

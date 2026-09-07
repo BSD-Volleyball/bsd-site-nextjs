@@ -17,7 +17,7 @@ import {
 } from "@/lib/site-config"
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
-import { formatHeight } from "@/components/player-detail/format-height"
+import { formatHeight } from "@/lib/format-height"
 import {
     capitalize,
     formatGeneratedTimestamp,

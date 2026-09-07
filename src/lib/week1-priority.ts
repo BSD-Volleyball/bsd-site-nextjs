@@ -1,4 +1,11 @@
-import type { Week1PriorityGroup } from "./week1-types"
+export type Week1PriorityGroup =
+    | "new_users"
+    | "week1_long_gap"
+    | "week1_missing_tryout"
+    | "week1_dropped_division"
+    | "week1_paired_with_higher"
+    | "week1_bubble_players"
+    | "week1_other"
 
 /**
  * Pure week 1 tryout priority rules, shared by the admin Create Week 1 page

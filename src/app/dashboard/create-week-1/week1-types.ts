@@ -1,11 +1,6 @@
-export type Week1PriorityGroup =
-    | "new_users"
-    | "week1_long_gap"
-    | "week1_missing_tryout"
-    | "week1_dropped_division"
-    | "week1_paired_with_higher"
-    | "week1_bubble_players"
-    | "week1_other"
+import type { Week1PriorityGroup } from "@/lib/week1-priority"
+
+export type { Week1PriorityGroup }
 
 export interface Week1Candidate {
     userId: string

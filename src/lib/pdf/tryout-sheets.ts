@@ -19,7 +19,7 @@ import {
 import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
-import { formatHeight } from "@/components/player-detail/format-height"
+import { formatHeight } from "@/lib/format-height"
 import {
     capitalize,
     fitTextToCell,

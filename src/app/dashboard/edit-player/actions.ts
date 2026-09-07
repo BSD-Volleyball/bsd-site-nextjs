@@ -50,7 +50,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { loadWeek1Audience } from "@/lib/week1-audience"
-import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
+import type { Week1Audience } from "@/lib/week1-priority"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     isAdminOrDirectorBySession,

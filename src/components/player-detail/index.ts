@@ -1,4 +1,4 @@
-export { formatHeight } from "./format-height"
+export { formatHeight } from "@/lib/format-height"
 export { PlayerImageModal } from "./player-image-modal"
 export {
     usePlayerDetailModal,

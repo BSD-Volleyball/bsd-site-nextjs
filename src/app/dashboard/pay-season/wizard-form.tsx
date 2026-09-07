@@ -60,7 +60,7 @@ import {
     defaultWeek1Unavailable,
     effectiveWeek1Audience,
     type Week1Audience
-} from "@/app/dashboard/create-week-1/week1-priority"
+} from "@/lib/week1-priority"
 
 interface User {
     id: string

@@ -24,10 +24,7 @@ import {
     type PlayoffNode,
     type ResolutionContext
 } from "@/lib/playoff-resolution"
-import {
-    FOUR_TEAM_PLAYOFF,
-    SIX_TEAM_PLAYOFF
-} from "@/app/dashboard/create-schedule/schedule-constants"
+import { FOUR_TEAM_PLAYOFF, SIX_TEAM_PLAYOFF } from "@/lib/schedule-constants"
 import {
     isAdminOrDirectorBySession,
     isCommissionerBySession,

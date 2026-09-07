@@ -31,7 +31,7 @@ import {
     type Week1GroupSummary,
     type Week1RosterAssignment
 } from "./week1-types"
-import { getWeek1PriorityGroup } from "./week1-priority"
+import { getWeek1PriorityGroup } from "@/lib/week1-priority"
 
 interface DraftSeasonRecord {
     seasonId: number

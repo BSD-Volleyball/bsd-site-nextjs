@@ -55,7 +55,7 @@ import type {
     EditWeekPlayer,
     EditWeekRosterEntry,
     EditWeekSlot
-} from "@/components/edit-week-roster/edit-week-roster-form"
+} from "@/lib/preseason/edit-week-types"
 
 export interface EditWeekActionConfig {
     week: 2 | 3

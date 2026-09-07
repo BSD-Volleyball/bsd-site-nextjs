@@ -18,7 +18,7 @@ import { signups } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import { hasRecordedAdultAge } from "@/lib/signup-age"
 import { loadWeek1Audience } from "@/lib/week1-audience"
-import type { Week1Audience } from "@/app/dashboard/create-week-1/week1-priority"
+import type { Week1Audience } from "@/lib/week1-priority"
 
 export const metadata: Metadata = {
     title: "Sign-up for Season"
