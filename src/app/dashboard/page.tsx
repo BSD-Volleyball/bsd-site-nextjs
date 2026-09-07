@@ -33,7 +33,9 @@ import {
     getEventsByType,
     formatEventDate,
     formatShortDate,
-    formatEventTime
+    formatEventTime,
+    getSeasonConfig,
+    formatSeasonLabel
 } from "@/lib/site-config"
 import { isSeasonRegistrationOpen } from "@/lib/season-phases"
 import { getActiveDiscountForUser } from "@/lib/discount"
@@ -71,6 +73,8 @@ import { TournamentWaiverCard } from "@/components/dashboard/tournament-waiver-c
 import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
+import { getSponsorshipForUser } from "@/lib/sponsors"
+import { SponsorshipCard } from "@/components/dashboard/sponsorship-card"
 import {
     assignmentCourtLabel,
     assignmentNightLabel,
@@ -114,6 +118,15 @@ export default async function DashboardPage() {
     const tournamentCard = session?.user
         ? await getTournamentDashboardCard(session.user.id)
         : null
+    // Sponsor contacts get a pay/manage card; getSeasonConfig is request-cached.
+    const sponsorshipSeason = session?.user ? await getSeasonConfig() : null
+    const sponsorship =
+        session?.user && sponsorshipSeason?.seasonId
+            ? await getSponsorshipForUser(
+                  session.user.id,
+                  sponsorshipSeason.seasonId
+              )
+            : null
     const [hasTryoutSheetAccess, isAdmin] = session?.user
         ? await Promise.all([
               hasCaptainPagesAccessBySession(),
@@ -923,6 +936,12 @@ export default async function DashboardPage() {
                 )}
                 {tournamentCard && (
                     <TournamentDashboardCard data={tournamentCard} />
+                )}
+                {sponsorship && sponsorshipSeason && (
+                    <SponsorshipCard
+                        sponsorship={sponsorship}
+                        seasonLabel={formatSeasonLabel(sponsorshipSeason)}
+                    />
                 )}
                 {playoffNextMatches && (
                     <PlayoffNextMatchCard data={playoffNextMatches} />
