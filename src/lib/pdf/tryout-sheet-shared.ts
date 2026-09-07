@@ -3,7 +3,6 @@
 // move checkboxes; weeks 2/3: three division groups × two team tables), but
 // the text formatting, roster enrichment, and response plumbing are common.
 
-import { NextResponse } from "next/server"
 import { desc, eq, inArray } from "drizzle-orm"
 import type { PDFFont } from "pdf-lib"
 import { db } from "@/database/db"
@@ -255,12 +254,16 @@ export function seasonFileSlug(seasonName: string): string {
 export function pdfDownloadResponse(
     pdfBytes: Uint8Array,
     fileName: string
-): NextResponse {
-    return new NextResponse(Buffer.from(pdfBytes), {
+): Response {
+    return new Response(Buffer.from(pdfBytes), {
         headers: {
             "Content-Type": "application/pdf",
             "Content-Disposition": `attachment; filename="${fileName}"`,
             "Cache-Control": "no-store"
         }
     })
+}
+
+export function pdfErrorResponse(message: string, status: number): Response {
+    return Response.json({ error: message }, { status })
 }

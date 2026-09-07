@@ -66,7 +66,7 @@ export default async function CaptainPairingPage() {
         )
     }
 
-    const users = await listUserNames()
+    const users = await listUserNames(session.user.id)
 
     return (
         <div className="space-y-6">

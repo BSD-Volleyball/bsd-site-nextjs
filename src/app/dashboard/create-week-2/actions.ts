@@ -3,6 +3,7 @@
 import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+import { getSessionUserId } from "@/lib/rbac"
 import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
 import { resolveAvailableSlots } from "@/lib/preseason/slots"
@@ -92,6 +93,11 @@ export const saveWeek2Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        return savePreseasonWeekRosters(2, assignments)
+        const userId = await getSessionUserId()
+        if (!userId) {
+            return fail("Not authenticated.")
+        }
+
+        return savePreseasonWeekRosters(2, assignments, userId)
     }
 )

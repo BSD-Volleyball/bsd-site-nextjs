@@ -1,15 +1,14 @@
 // Shared implementations for the edit-week-2/3 roster actions. The route
-import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
-// actions.ts files are thin "use server" wrappers that enforce authorization
-// and delegate here with their week's config. Server-only.
+// actions.ts files are thin "use server" wrappers that enforce authorization,
+// resolve the acting user, and delegate here with their week's config.
+// Server-only.
 
 import "server-only"
 
-import { headers } from "next/headers"
+import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import type { ActionResult } from "@/lib/action-helpers"
 import { ok, fail, requireSeasonConfig } from "@/lib/action-helpers"
-import { auth } from "@/lib/auth"
 import {
     dispatchNotification,
     type NotificationRecipient
@@ -342,7 +341,8 @@ export async function getEditWeekData(
 /** Roster replacement shared by the edit pages. Caller must be authorized. */
 export async function updateEditWeekRosters(
     actionConfig: EditWeekActionConfig,
-    slots: EditWeekRosterEntry[]
+    slots: EditWeekRosterEntry[],
+    actorUserId: string
 ): Promise<ActionResult> {
     const rosterTable = rosterTableFor(actionConfig.week)
     const config = await requireSeasonConfig()
@@ -435,17 +435,12 @@ export async function updateEditWeekRosters(
             }
         })
 
-        const session = await auth.api.getSession({
-            headers: await headers()
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "update",
+            entityType: `week${actionConfig.week}_rosters`,
+            summary: `Replaced week ${actionConfig.week} rosters for season ${config.seasonId} (${filledSlots.length} slots)`
         })
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: `week${actionConfig.week}_rosters`,
-                summary: `Replaced week ${actionConfig.week} rosters for season ${config.seasonId} (${filledSlots.length} slots)`
-            })
-        }
 
         return ok(
             undefined,
@@ -464,7 +459,8 @@ export async function sendEditWeekRosterNotifications(
     actionConfig: EditWeekActionConfig,
     assignments: EditWeekAssignment[],
     removedUserIds: string[],
-    seasonLabel: string
+    seasonLabel: string,
+    actorUserId: string
 ): Promise<ActionResult> {
     const rosterTable = rosterTableFor(actionConfig.week)
     const weekLabel = `Week ${actionConfig.week}`
@@ -660,16 +656,13 @@ export async function sendEditWeekRosterNotifications(
 
     // Mass mail to players is attributable everywhere else (send-email logs
     // email_broadcast); this path should be no different.
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (session?.user) {
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "send_roster_notifications",
-            entityType: `week${actionConfig.week}_rosters`,
-            entityId: config.seasonId ?? undefined,
-            summary: `Sent ${weekLabel} roster emails for ${seasonLabel}: ${assignmentRecipients.length} assignment, ${removalRecipients.length} removal (${sent} sent, ${skipped} skipped)`
-        })
-    }
+    await logAuditEntry({
+        userId: actorUserId,
+        action: "send_roster_notifications",
+        entityType: `week${actionConfig.week}_rosters`,
+        entityId: config.seasonId ?? undefined,
+        summary: `Sent ${weekLabel} roster emails for ${seasonLabel}: ${assignmentRecipients.length} assignment, ${removalRecipients.length} removal (${sent} sent, ${skipped} skipped)`
+    })
 
     return ok(
         undefined,

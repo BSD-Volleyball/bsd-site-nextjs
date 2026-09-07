@@ -29,12 +29,14 @@ export const dynamic = "force-dynamic"
 export default async function PaySeasonPage() {
     const config = await getSeasonConfig()
     const seasonLabel = formatSeasonLabel(config)
-    const users = await listUserNames()
     const activeWaiver = await getActiveWaiver()
+
+    const session = await auth.api.getSession({ headers: await headers() })
+    // The pair-pick directory is only for signed-in players.
+    const users = session ? await listUserNames(session.user.id) : []
 
     // Get user's discount if logged in
     let discount: { id: number; percentage: string } | null = null
-    const session = await auth.api.getSession({ headers: await headers() })
     if (session) {
         discount = await getActiveDiscountForUser(session.user.id, "season")
     }

@@ -1,14 +1,12 @@
 // Shared save path for the week-2/3 roster builders. Callers (the route
-// actions) are responsible for authorization; this module validates the
-// payload and writes it. Server-only: never import from client components.
+// actions) are responsible for authorization and pass the acting user's id;
+// this module validates the payload and writes it. Server-only: never import from client components.
 
 import "server-only"
 
-import { headers } from "next/headers"
 import { and, eq, inArray } from "drizzle-orm"
 import type { ActionResult } from "@/lib/action-helpers"
 import { ok, fail } from "@/lib/action-helpers"
-import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import {
     signups,
@@ -24,7 +22,8 @@ import type { SavedAssignment } from "./types"
 
 export async function savePreseasonWeekRosters(
     week: 2 | 3,
-    assignments: SavedAssignment[]
+    assignments: SavedAssignment[],
+    actorUserId: string
 ): Promise<ActionResult> {
     if (assignments.length === 0) {
         return fail("No roster assignments provided.")
@@ -146,18 +145,12 @@ export async function savePreseasonWeekRosters(
             )
         })
 
-        const session = await auth.api.getSession({
-            headers: await headers()
+        await logAuditEntry({
+            userId: actorUserId,
+            action: "create",
+            entityType: `week_rosters`,
+            summary: `Created week  rosters for season `
         })
-
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: `week${week}_rosters`,
-                summary: `Created week ${week} rosters for season ${config.seasonId}`
-            })
-        }
 
         return ok(undefined, `Week ${week} rosters saved successfully.`)
     } catch (error) {

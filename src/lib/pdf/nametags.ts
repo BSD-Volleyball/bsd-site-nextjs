@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server"
 import { and, eq, inArray } from "drizzle-orm"
 import {
     PDFDocument,
@@ -7,8 +6,6 @@ import {
     StandardFonts,
     rgb
 } from "pdf-lib"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -22,7 +19,8 @@ import {
     getEventsByType,
     formatEventTime
 } from "@/lib/site-config"
-import { isAdminOrDirectorBySession } from "@/lib/rbac"
+import { isAdminOrDirector } from "@/lib/rbac"
+import { pdfDownloadResponse, pdfErrorResponse } from "./tryout-sheet-shared"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     LEGACY_COURT_BY_DIVISION,
@@ -522,20 +520,18 @@ async function fetchDivisionWeekNametagEntries(
  * differs (week 1: stored directly; weeks 2/3: derived from team/division).
  */
 export async function generateWeekNametagsPdf(
-    week: 1 | 2 | 3
-): Promise<NextResponse> {
-    const hasAccess = await isAdminOrDirectorBySession()
+    week: 1 | 2 | 3,
+    userId: string
+): Promise<Response> {
+    const hasAccess = await isAdminOrDirector(userId)
     if (!hasAccess) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 })
+        return pdfErrorResponse("Access denied", 403)
     }
 
     try {
         const config = await getSeasonConfig()
         if (!config.seasonId) {
-            return NextResponse.json(
-                { error: "No current season found." },
-                { status: 400 }
-            )
+            return pdfErrorResponse("No current season found.", 400)
         }
 
         const entries =
@@ -589,12 +585,7 @@ export async function generateWeekNametagsPdf(
         }
 
         if (normalizedRows.length === 0) {
-            return NextResponse.json(
-                {
-                    error: `No week ${week} roster rows found.`
-                },
-                { status: 404 }
-            )
+            return pdfErrorResponse(`No week ${week} roster rows found.`, 404)
         }
 
         const pdfDoc = await PDFDocument.create()
@@ -678,28 +669,16 @@ export async function generateWeekNametagsPdf(
             .replace(/[^a-z0-9-]/g, "")
         const downloadFileName = `bsd-week${week}-nametags-${seasonSlug}-${config.seasonYear}.pdf`
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "read",
-                entityType: `week${week}_rosters`,
-                summary: `Downloaded week ${week} nametag labels PDF for season ${config.seasonId}`
-            })
-        }
-
-        return new NextResponse(Buffer.from(pdfBytes), {
-            headers: {
-                "Content-Type": "application/pdf",
-                "Content-Disposition": `attachment; filename="${downloadFileName}"`,
-                "Cache-Control": "no-store"
-            }
+        await logAuditEntry({
+            userId,
+            action: "read",
+            entityType: `week${week}_rosters`,
+            summary: `Downloaded week ${week} nametag labels PDF for season ${config.seasonId}`
         })
+
+        return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
         console.error(`Error creating week ${week} nametag labels PDF:`, error)
-        return NextResponse.json(
-            { error: "Failed to generate nametag labels PDF." },
-            { status: 500 }
-        )
+        return pdfErrorResponse("Failed to generate nametag labels PDF.", 500)
     }
 }

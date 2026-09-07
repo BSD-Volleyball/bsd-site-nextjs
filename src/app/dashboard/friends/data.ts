@@ -34,7 +34,7 @@ export async function getFriendsPageData(
         getFriendsWithSchedule(userId, seasonId),
         listIncomingRequests(userId),
         listOutgoingRequests(userId),
-        listUserNames()
+        listUserNames(userId)
     ])
 
     const excluded = new Set<string>([

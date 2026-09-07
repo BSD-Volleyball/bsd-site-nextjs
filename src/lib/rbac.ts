@@ -145,11 +145,11 @@ export async function isCaptainForSeason(
     return rows.some((r) => r.role === "captain" && r.season_id === seasonId)
 }
 
-export async function isCommissionerBySession(): Promise<boolean> {
-    const userId = await getSessionUserId()
-    if (!userId) return false
-
-    // Admins are implicitly commissioners
+/**
+ * Admins are implicitly commissioners; otherwise the user must hold the
+ * commissioner role for the current season.
+ */
+export async function isCommissioner(userId: string): Promise<boolean> {
     if (await isAdminOrDirector(userId)) return true
 
     const config = await getSeasonConfig()
@@ -157,10 +157,23 @@ export async function isCommissionerBySession(): Promise<boolean> {
     return isCommissionerForSeason(userId, config.seasonId)
 }
 
-export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
+export async function isCommissionerBySession(): Promise<boolean> {
+    const userId = await getSessionUserId()
+    if (!userId) return false
+    return isCommissioner(userId)
+}
+
+/** May view the captain pages (signups, tryout sheets) for the current season. */
+export async function hasCaptainPagesAccess(userId: string): Promise<boolean> {
     const config = await getSeasonConfig()
     if (!config.seasonId) return false
-    return hasPermissionBySession("signups:view", { seasonId: config.seasonId })
+    return hasPermission(userId, "signups:view", { seasonId: config.seasonId })
+}
+
+export async function hasCaptainPagesAccessBySession(): Promise<boolean> {
+    const userId = await getSessionUserId()
+    if (!userId) return false
+    return hasCaptainPagesAccess(userId)
 }
 
 // ---------------------------------------------------------------------------

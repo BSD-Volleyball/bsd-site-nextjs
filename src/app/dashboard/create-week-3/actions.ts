@@ -3,6 +3,7 @@
 import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+import { getSessionUserId } from "@/lib/rbac"
 import {
     loadConsecutiveTopDivSeasons,
     loadDraftNightLeavers,
@@ -135,6 +136,11 @@ export const saveWeek3Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        return savePreseasonWeekRosters(3, assignments)
+        const userId = await getSessionUserId()
+        if (!userId) {
+            return fail("Not authenticated.")
+        }
+
+        return savePreseasonWeekRosters(3, assignments, userId)
     }
 )

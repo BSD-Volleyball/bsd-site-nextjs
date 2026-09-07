@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server"
 import { and, eq } from "drizzle-orm"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -16,7 +13,7 @@ import {
     getEventsByType,
     formatEventTime
 } from "@/lib/site-config"
-import { hasCaptainPagesAccessBySession } from "@/lib/rbac"
+import { hasCaptainPagesAccess } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
 import { LEGACY_COURT_BY_DIVISION } from "@/lib/courts"
 import { formatHeight } from "@/lib/format-height"
@@ -29,6 +26,7 @@ import {
     getSheetDisplayName,
     loadTryoutSheetEnrichment,
     pdfDownloadResponse,
+    pdfErrorResponse,
     seasonFileSlug,
     truncateToFit
 } from "./tryout-sheet-shared"
@@ -89,11 +87,12 @@ function getSessionMatchup(sessionNumber: 1 | 2 | 3): {
  * event index, and labels differ.
  */
 export async function generateTryoutSheetsPdf(
-    week: 2 | 3
-): Promise<NextResponse> {
-    const hasAccess = await hasCaptainPagesAccessBySession()
+    week: 2 | 3,
+    userId: string
+): Promise<Response> {
+    const hasAccess = await hasCaptainPagesAccess(userId)
     if (!hasAccess) {
-        return NextResponse.json({ error: "Access denied" }, { status: 403 })
+        return pdfErrorResponse("Access denied", 403)
     }
 
     // The two tables are structurally identical; the cast keeps the query
@@ -107,18 +106,13 @@ export async function generateTryoutSheetsPdf(
     try {
         const config = await getSeasonConfig()
         if (!config.seasonId) {
-            return NextResponse.json(
-                { error: "No current season found." },
-                { status: 400 }
-            )
+            return pdfErrorResponse("No current season found.", 400)
         }
 
         if (config.phase !== requiredPhase) {
-            return NextResponse.json(
-                {
-                    error: `Week ${week} tryout sheets are only available during Prepare for Tryout Week ${week}.`
-                },
-                { status: 403 }
+            return pdfErrorResponse(
+                `Week ${week} tryout sheets are only available during Prepare for Tryout Week ${week}.`,
+                403
             )
         }
 
@@ -129,11 +123,9 @@ export async function generateTryoutSheetsPdf(
             .limit(1)
 
         if (!rosterRow) {
-            return NextResponse.json(
-                {
-                    error: `Week ${week} tryout sheets are unavailable until week ${week} roster records exist for this season.`
-                },
-                { status: 404 }
+            return pdfErrorResponse(
+                `Week ${week} tryout sheets are unavailable until week ${week} roster records exist for this season.`,
+                404
             )
         }
 
@@ -167,11 +159,9 @@ export async function generateTryoutSheetsPdf(
             .orderBy(divisions.level, rosterTable.team_number, users.last_name)
 
         if (rosterRows.length === 0) {
-            return NextResponse.json(
-                {
-                    error: `No week ${week} tryout roster rows found for current season.`
-                },
-                { status: 404 }
+            return pdfErrorResponse(
+                `No week ${week} tryout roster rows found for current season.`,
+                404
             )
         }
 
@@ -709,22 +699,19 @@ export async function generateTryoutSheetsPdf(
         const pdfBytes = await pdfDoc.save()
         const downloadFileName = `bsd-week${week}-${seasonFileSlug(config.seasonName)}-${config.seasonYear}.pdf`
 
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session?.user) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "read",
-                entityType: `week${week}_rosters`,
-                summary: `Downloaded week ${week} tryout sheets PDF for season ${config.seasonId}`
-            })
-        }
+        await logAuditEntry({
+            userId,
+            action: "read",
+            entityType: `week${week}_rosters`,
+            summary: `Downloaded week ${week} tryout sheets PDF for season ${config.seasonId}`
+        })
 
         return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
         console.error(`Error creating week ${week} tryout sheets PDF:`, error)
-        return NextResponse.json(
-            { error: `Failed to generate week ${week} tryout sheets PDF.` },
-            { status: 500 }
+        return pdfErrorResponse(
+            `Failed to generate week ${week} tryout sheets PDF.`,
+            500
         )
     }
 }

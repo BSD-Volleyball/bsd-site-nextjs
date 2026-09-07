@@ -3,6 +3,7 @@
 import type { ActionResult } from "@/lib/action-helpers"
 import { withAction, fail } from "@/lib/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+import { getSessionUserId } from "@/lib/rbac"
 import {
     EDIT_WEEK_2,
     getEditWeekData,
@@ -45,7 +46,12 @@ export const updateWeek2Rosters = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
-        return updateEditWeekRosters(EDIT_WEEK_2, slots)
+        const userId = await getSessionUserId()
+        if (!userId) {
+            return fail("Not authenticated.")
+        }
+
+        return updateEditWeekRosters(EDIT_WEEK_2, slots, userId)
     }
 )
 
@@ -60,11 +66,17 @@ export const sendWeek2RosterNotifications = withAction(
             return fail("You don't have permission to perform this action.")
         }
 
+        const userId = await getSessionUserId()
+        if (!userId) {
+            return fail("Not authenticated.")
+        }
+
         return sendEditWeekRosterNotifications(
             EDIT_WEEK_2,
             assignments,
             removedUserIds,
-            seasonLabel
+            seasonLabel,
+            userId
         )
     }
 )

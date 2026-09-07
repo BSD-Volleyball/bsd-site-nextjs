@@ -67,14 +67,14 @@ describe("generateWeekNametagsPdf", () => {
     beforeEach(seedWeek2Fixture)
 
     it("denies non-admin users", async () => {
-        await createUserWithRoles([{ role: "captain" }])
-        const response = await generateWeekNametagsPdf(2)
+        const actor = await createUserWithRoles([{ role: "captain" }])
+        const response = await generateWeekNametagsPdf(2, actor.id)
         expect(response.status).toBe(403)
     })
 
     it("produces a parseable PDF for admins", async () => {
-        await createUserWithRoles([{ role: "admin" }])
-        await expectPdfResponse(await generateWeekNametagsPdf(2))
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        await expectPdfResponse(await generateWeekNametagsPdf(2, actor.id))
     })
 })
 
@@ -107,14 +107,14 @@ describe("generateWeekNametagsPdf (week 1)", () => {
     beforeEach(seedWeek1Fixture)
 
     it("denies non-admin users", async () => {
-        await createUserWithRoles([{ role: "captain" }])
-        const response = await generateWeekNametagsPdf(1)
+        const actor = await createUserWithRoles([{ role: "captain" }])
+        const response = await generateWeekNametagsPdf(1, actor.id)
         expect(response.status).toBe(403)
     })
 
     it("produces a PDF for sessions 1-2 only, excluding alternates", async () => {
-        await createUserWithRoles([{ role: "admin" }])
-        const response = await generateWeekNametagsPdf(1)
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        const response = await generateWeekNametagsPdf(1, actor.id)
         expect(response.status).toBe(200)
         const bytes = new Uint8Array(await response.arrayBuffer())
         const doc = await PDFDocument.load(bytes)
@@ -124,14 +124,14 @@ describe("generateWeekNametagsPdf (week 1)", () => {
     })
 
     it("generateWeek1TryoutSheetsPdf produces a parseable PDF in phase", async () => {
-        await createUserWithRoles([{ role: "admin" }])
-        await expectPdfResponse(await generateWeek1TryoutSheetsPdf())
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        await expectPdfResponse(await generateWeek1TryoutSheetsPdf(actor.id))
     })
 
     it("generateWeek1TryoutSheetsPdf rejects the wrong phase", async () => {
         await createSeason({ phase: "draft", year: 2027 })
-        await createUserWithRoles([{ role: "admin" }])
-        const response = await generateWeek1TryoutSheetsPdf()
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        const response = await generateWeek1TryoutSheetsPdf(actor.id)
         expect(response.status).toBeGreaterThanOrEqual(400)
     })
 })
@@ -140,21 +140,21 @@ describe("generateTryoutSheetsPdf", () => {
     beforeEach(seedWeek2Fixture)
 
     it("denies users without captain-pages access", async () => {
-        await createUserWithRoles([])
-        const response = await generateTryoutSheetsPdf(2)
+        const actor = await createUserWithRoles([])
+        const response = await generateTryoutSheetsPdf(2, actor.id)
         expect(response.status).toBe(403)
     })
 
     it("rejects requests outside the matching prep phase", async () => {
         // A newer season in the wrong phase becomes current
         await createSeason({ phase: "draft", year: 2027 })
-        await createUserWithRoles([{ role: "admin" }])
-        const response = await generateTryoutSheetsPdf(2)
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        const response = await generateTryoutSheetsPdf(2, actor.id)
         expect(response.status).toBeGreaterThanOrEqual(400)
     })
 
     it("produces a parseable PDF during prep_tryout_week_2", async () => {
-        await createUserWithRoles([{ role: "admin" }])
-        await expectPdfResponse(await generateTryoutSheetsPdf(2))
+        const actor = await createUserWithRoles([{ role: "admin" }])
+        await expectPdfResponse(await generateTryoutSheetsPdf(2, actor.id))
     })
 })

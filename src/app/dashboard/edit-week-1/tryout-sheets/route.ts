@@ -1,7 +1,12 @@
+import { getSessionUserId } from "@/lib/rbac"
 import { generateWeek1TryoutSheetsPdf } from "@/lib/pdf/tryout-sheets-week1"
 
 export const runtime = "nodejs"
 
 export async function GET() {
-    return generateWeek1TryoutSheetsPdf()
+    const userId = await getSessionUserId()
+    if (!userId) {
+        return Response.json({ error: "Access denied" }, { status: 403 })
+    }
+    return generateWeek1TryoutSheetsPdf(userId)
 }
