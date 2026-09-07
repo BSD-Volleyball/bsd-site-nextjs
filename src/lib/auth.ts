@@ -10,9 +10,16 @@ import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
 
-const logoBase64 = readFileSync(
-    join(process.cwd(), "public", "logo.png")
-).toString("base64")
+// Read lazily (first password-reset send), not at module load: this module
+// is imported by every session check, and a filesystem read at import time
+// is the one thing here that would not survive a runtime without node:fs.
+let logoBase64: string | null = null
+function getLogoBase64(): string {
+    logoBase64 ??= readFileSync(
+        join(process.cwd(), "public", "logo.png")
+    ).toString("base64")
+    return logoBase64
+}
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_BASE_URL,
@@ -133,7 +140,7 @@ export const auth = betterAuth({
                 attachments: [
                     {
                         name: "logo.png",
-                        content: logoBase64,
+                        content: getLogoBase64(),
                         contentType: "image/png",
                         contentId: "cid:logo"
                     }
