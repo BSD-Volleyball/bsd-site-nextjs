@@ -15,6 +15,8 @@ import type {
     LookupType,
     PlayerRatingValues,
     RatePlayerEntry,
+    RatedPlayerEntry,
+    RatedSeasonOption,
     SeasonTeamDivisionGroup,
     TryoutDivisionGroup,
     TryoutSessionGroup
@@ -27,9 +29,28 @@ import {
 } from "./lookup-accordions"
 import { PlayerTable } from "./player-table"
 import { RatePlayerDialog } from "./rate-player-dialog"
-import { getDisplayName } from "./rate-player-helpers"
+import { RatedPlayerTable } from "./rated-player-table"
+import { getDisplayName, sortRatedPlayers } from "./rate-player-helpers"
 import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 import { useRatePlayerDialog } from "./use-rate-player-dialog"
+
+// Radix Select rejects "" as an item value, so the season filter's
+// "All" option uses a sentinel.
+const ALL_SEASONS = "all"
+
+// Search box predicate: old ID, display name, or "first last".
+function matchesSearch(player: RatePlayerEntry, search: string): boolean {
+    const lowerSearch = search.trim().toLowerCase()
+    if (!lowerSearch) return true
+    const oldIdText = player.oldId?.toString() || ""
+    const nameText = getDisplayName(player).toLowerCase()
+    const fullNameText = `${player.firstName} ${player.lastName}`.toLowerCase()
+    return (
+        oldIdText.includes(lowerSearch) ||
+        nameText.includes(lowerSearch) ||
+        fullNameText.includes(lowerSearch)
+    )
+}
 
 interface RatePlayerClientProps {
     players: RatePlayerEntry[]
@@ -42,6 +63,10 @@ interface RatePlayerClientProps {
     captainTeam: CaptainTeamRef | null
     defaultLookupType: LookupType
     initialRatings: Record<string, PlayerRatingValues>
+    ratedPlayers: RatedPlayerEntry[]
+    ratedSeasons: RatedSeasonOption[]
+    currentSeasonId: number
+    currentSeasonLabel: string
     playerPicUrl: string
 }
 
@@ -56,6 +81,10 @@ export function RatePlayerClient({
     captainTeam,
     defaultLookupType,
     initialRatings,
+    ratedPlayers,
+    ratedSeasons,
+    currentSeasonId,
+    currentSeasonLabel,
     playerPicUrl
 }: RatePlayerClientProps) {
     // The server picks the starting lookup from the season timeline (see
@@ -73,9 +102,10 @@ export function RatePlayerClient({
             ? String(tryout1Sessions[0].sessionNumber)
             : "none"
     })
+    const [ratedSeasonValue, setRatedSeasonValue] = useState(ALL_SEASONS)
     const [search, setSearch] = useState("")
     const dialog = useRatePlayerDialog(initialRatings)
-    const { openRateDialog } = dialog
+    const { openRateDialog, ratingsByPlayer, lastSavedAtByPlayer } = dialog
 
     const activeGroupOptions = useMemo(() => {
         if (lookupType === "tryout1") {
@@ -117,7 +147,13 @@ export function RatePlayerClient({
     ])
 
     useEffect(() => {
-        if (lookupType === "direct" || lookupType === "byTeam") return
+        if (
+            lookupType === "direct" ||
+            lookupType === "byTeam" ||
+            lookupType === "ratedPlayers"
+        ) {
+            return
+        }
         const validValues = new Set(activeGroupOptions.map((o) => o.value))
         if (!validValues.has(tryoutSessionValue)) {
             setTryoutSessionValue(
@@ -128,31 +164,83 @@ export function RatePlayerClient({
         }
     }, [lookupType, activeGroupOptions, tryoutSessionValue])
 
-    const filteredPlayers = useMemo(() => {
-        if (!search.trim()) {
-            return players
-        }
-
-        const lowerSearch = search.toLowerCase()
-
-        return players.filter((player) => {
-            const oldIdText = player.oldId?.toString() || ""
-            const nameText = getDisplayName(player).toLowerCase()
-            const fullNameText =
-                `${player.firstName} ${player.lastName}`.toLowerCase()
-
-            return (
-                oldIdText.includes(lowerSearch) ||
-                nameText.includes(lowerSearch) ||
-                fullNameText.includes(lowerSearch)
-            )
-        })
-    }, [players, search])
+    const filteredPlayers = useMemo(
+        () => players.filter((player) => matchesSearch(player, search)),
+        [players, search]
+    )
 
     const filteredPlayerIds = useMemo(
         () => new Set(filteredPlayers.map((player) => player.id)),
         [filteredPlayers]
     )
+
+    // "Players I've Rated": fold in saves made this session so current-season
+    // rows show the latest overall/date and newly rated signups appear.
+    const visibleRatedPlayers = useMemo(() => {
+        const merged = ratedPlayers.map((entry) => {
+            if (entry.seasonId !== currentSeasonId) return entry
+            const live = ratingsByPlayer[entry.player.id]
+            const savedAt = lastSavedAtByPlayer[entry.player.id]
+            if (!live && !savedAt) return entry
+            return {
+                ...entry,
+                overall: live ? live.overall : entry.overall,
+                ratedAt: savedAt ?? entry.ratedAt
+            }
+        })
+
+        const listedCurrent = new Set(
+            merged
+                .filter((entry) => entry.seasonId === currentSeasonId)
+                .map((entry) => entry.player.id)
+        )
+        for (const [playerId, savedAt] of Object.entries(lastSavedAtByPlayer)) {
+            if (listedCurrent.has(playerId)) continue
+            const player = players.find((p) => p.id === playerId)
+            if (!player) continue
+            merged.push({
+                player,
+                seasonId: currentSeasonId,
+                seasonLabel: currentSeasonLabel,
+                overall: ratingsByPlayer[playerId]?.overall ?? null,
+                ratedAt: savedAt,
+                canRate: true
+            })
+        }
+
+        return merged
+            .filter(
+                (entry) =>
+                    (ratedSeasonValue === ALL_SEASONS ||
+                        String(entry.seasonId) === ratedSeasonValue) &&
+                    matchesSearch(entry.player, search)
+            )
+            .sort(sortRatedPlayers)
+    }, [
+        ratedPlayers,
+        players,
+        currentSeasonId,
+        currentSeasonLabel,
+        ratingsByPlayer,
+        lastSavedAtByPlayer,
+        ratedSeasonValue,
+        search
+    ])
+
+    // Season filter options: seasons with saved ratings, plus the current
+    // season once the first rating of this session lands.
+    const ratedSeasonOptions = useMemo(() => {
+        const hasCurrent = ratedSeasons.some(
+            (season) => season.seasonId === currentSeasonId
+        )
+        if (hasCurrent || Object.keys(lastSavedAtByPlayer).length === 0) {
+            return ratedSeasons
+        }
+        return [
+            { seasonId: currentSeasonId, label: currentSeasonLabel },
+            ...ratedSeasons
+        ]
+    }, [ratedSeasons, currentSeasonId, currentSeasonLabel, lastSavedAtByPlayer])
 
     const selectedTryoutSession = useMemo(
         () =>
@@ -222,46 +310,76 @@ export function RatePlayerClient({
                             {byTeamDivisions.length > 0 && (
                                 <SelectItem value="byTeam">By Team</SelectItem>
                             )}
+                            <SelectItem value="ratedPlayers">
+                                Players I've Rated
+                            </SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
 
-                {lookupType !== "direct" && lookupType !== "byTeam" && (
+                {lookupType === "ratedPlayers" && (
                     <div className="space-y-2">
-                        <Label htmlFor="session_number">
-                            {lookupType === "tryout1"
-                                ? "Session"
-                                : lookupType === "tryout2Times" ||
-                                    lookupType === "tryout3Times"
-                                  ? "Time"
-                                  : "Division"}
-                        </Label>
+                        <Label htmlFor="rated_season">Season</Label>
                         <Select
-                            value={tryoutSessionValue}
-                            onValueChange={setTryoutSessionValue}
+                            value={ratedSeasonValue}
+                            onValueChange={setRatedSeasonValue}
                         >
-                            <SelectTrigger id="session_number">
+                            <SelectTrigger id="rated_season">
                                 <SelectValue placeholder="Select..." />
                             </SelectTrigger>
                             <SelectContent>
-                                {activeGroupOptions.length === 0 ? (
-                                    <SelectItem value="none" disabled>
-                                        No data available
+                                <SelectItem value={ALL_SEASONS}>All</SelectItem>
+                                {ratedSeasonOptions.map((season) => (
+                                    <SelectItem
+                                        key={season.seasonId}
+                                        value={String(season.seasonId)}
+                                    >
+                                        {season.label}
                                     </SelectItem>
-                                ) : (
-                                    activeGroupOptions.map((option) => (
-                                        <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))
-                                )}
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
                 )}
+
+                {lookupType !== "direct" &&
+                    lookupType !== "byTeam" &&
+                    lookupType !== "ratedPlayers" && (
+                        <div className="space-y-2">
+                            <Label htmlFor="session_number">
+                                {lookupType === "tryout1"
+                                    ? "Session"
+                                    : lookupType === "tryout2Times" ||
+                                        lookupType === "tryout3Times"
+                                      ? "Time"
+                                      : "Division"}
+                            </Label>
+                            <Select
+                                value={tryoutSessionValue}
+                                onValueChange={setTryoutSessionValue}
+                            >
+                                <SelectTrigger id="session_number">
+                                    <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {activeGroupOptions.length === 0 ? (
+                                        <SelectItem value="none" disabled>
+                                            No data available
+                                        </SelectItem>
+                                    ) : (
+                                        activeGroupOptions.map((option) => (
+                                            <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                            >
+                                                {option.label}
+                                            </SelectItem>
+                                        ))
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
 
                 <div className="space-y-2 md:col-span-1">
                     <Label htmlFor="player_search">Search</Label>
@@ -307,6 +425,19 @@ export function RatePlayerClient({
                     lookupType={lookupType}
                     selectedTimeSlot={selectedTimeSlot}
                     filteredPlayerIds={filteredPlayerIds}
+                    onRate={openRateDialog}
+                    playerPicUrl={playerPicUrl}
+                />
+            )}
+
+            {lookupType === "ratedPlayers" && (
+                <RatedPlayerTable
+                    rows={visibleRatedPlayers}
+                    emptyMessage={
+                        ratedSeasonValue === ALL_SEASONS
+                            ? "You haven't rated any players yet."
+                            : "You haven't rated any players in this season."
+                    }
                     onRate={openRateDialog}
                     playerPicUrl={playerPicUrl}
                 />

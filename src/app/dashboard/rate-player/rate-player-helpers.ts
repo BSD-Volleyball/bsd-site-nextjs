@@ -4,7 +4,12 @@ import {
     getSessionNumberFromTeam
 } from "@/lib/courts"
 import type { SeasonPhase } from "@/lib/season-phases"
-import type { LookupType, PlayerRatingValues, RatePlayerEntry } from "./actions"
+import type {
+    LookupType,
+    PlayerRatingValues,
+    RatePlayerEntry,
+    RatedPlayerEntry
+} from "./actions"
 
 export function getDisplayName(player: RatePlayerEntry): string {
     return formatDisplayName(
@@ -107,6 +112,25 @@ export function sortPlayers(
     if (aMale !== bMale) return aMale - bMale
     // Alphabetical by last name
     return a.lastName.localeCompare(b.lastName)
+}
+
+/**
+ * Orders the "Players I've Rated" list: most recently rated first, with rows
+ * that have no rating date (or share one) falling back to alphabetical by
+ * last name, then first name.
+ */
+export function sortRatedPlayers(
+    a: RatedPlayerEntry,
+    b: RatedPlayerEntry
+): number {
+    if (a.ratedAt !== b.ratedAt) {
+        if (a.ratedAt === null) return 1
+        if (b.ratedAt === null) return -1
+        return b.ratedAt.localeCompare(a.ratedAt)
+    }
+    const byLast = a.player.lastName.localeCompare(b.player.lastName)
+    if (byLast !== 0) return byLast
+    return a.player.firstName.localeCompare(b.player.firstName)
 }
 
 export interface TryoutTimeSlotDivision {

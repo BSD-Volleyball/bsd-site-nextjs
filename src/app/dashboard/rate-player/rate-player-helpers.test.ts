@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { resolveDefaultLookupType } from "./rate-player-helpers"
+import type { RatedPlayerEntry } from "./actions"
+import {
+    resolveDefaultLookupType,
+    sortRatedPlayers
+} from "./rate-player-helpers"
 
 const tryoutDates = ["2026-09-12", "2026-09-19", "2026-09-26"]
 
@@ -258,5 +262,61 @@ describe("buildTryoutTimeSlotGroups", () => {
         expect(
             groups[0].divisions[0].teams[0].players.map((p) => p.id)
         ).toEqual(["new-z", "new-f", "ret-a"])
+    })
+})
+
+describe("sortRatedPlayers", () => {
+    const entry = (
+        lastName: string,
+        ratedAt: string | null,
+        firstName = "Alex"
+    ): RatedPlayerEntry => ({
+        player: {
+            id: `${firstName}-${lastName}`,
+            oldId: null,
+            firstName,
+            lastName,
+            preferredName: null,
+            male: null,
+            height: null,
+            lastDivisionName: null,
+            picture: null
+        },
+        seasonId: 1,
+        seasonLabel: "Fall 2026",
+        overall: null,
+        ratedAt,
+        canRate: true
+    })
+
+    it("puts the most recently rated player first", () => {
+        const older = entry("Zed", "2026-01-01T00:00:00.000Z")
+        const newer = entry("Abel", "2026-02-01T00:00:00.000Z")
+        const sorted = [older, newer].sort(sortRatedPlayers)
+        expect(sorted.map((e) => e.player.lastName)).toEqual(["Abel", "Zed"])
+    })
+
+    it("puts rows without a rating date after dated rows, alphabetically", () => {
+        const dated = entry("Zed", "2026-01-01T00:00:00.000Z")
+        const undatedB = entry("Brown", null)
+        const undatedA = entry("Adams", null)
+        const sorted = [undatedB, dated, undatedA].sort(sortRatedPlayers)
+        expect(sorted.map((e) => e.player.lastName)).toEqual([
+            "Zed",
+            "Adams",
+            "Brown"
+        ])
+    })
+
+    it("breaks equal rating dates by last name, then first name", () => {
+        const stamp = "2026-03-01T00:00:00.000Z"
+        const sorted = [
+            entry("Smith", stamp, "Pat"),
+            entry("Jones", stamp, "Sam"),
+            entry("Smith", stamp, "Casey")
+        ].sort(sortRatedPlayers)
+        expect(
+            sorted.map((e) => `${e.player.firstName} ${e.player.lastName}`)
+        ).toEqual(["Sam Jones", "Casey Smith", "Pat Smith"])
     })
 })

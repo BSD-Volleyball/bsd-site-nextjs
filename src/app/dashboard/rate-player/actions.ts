@@ -5,6 +5,7 @@ import {
     divisions,
     drafts,
     playerRatings,
+    seasons,
     signups,
     teams,
     users,
@@ -37,7 +38,8 @@ import type { ActionResult } from "@/next/action-helpers"
 import {
     buildTryoutTimeSlotGroups,
     resolveDefaultLookupType,
-    sortPlayers
+    sortPlayers,
+    sortRatedPlayers
 } from "./rate-player-helpers"
 import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 
@@ -49,6 +51,7 @@ export type LookupType =
     | "tryout3"
     | "tryout3Times"
     | "byTeam"
+    | "ratedPlayers"
 
 export interface RatePlayerEntry {
     id: string
@@ -71,6 +74,24 @@ export interface PlayerRatingValues {
     blocking: number | null
     sharedNotes: string | null
     privateNotes: string | null
+}
+
+// "Players I've Rated" lookup: one row per (player, season) the viewing
+// evaluator has saved a rating or note for. ratedAt is the last save time.
+export interface RatedPlayerEntry {
+    player: RatePlayerEntry
+    seasonId: number
+    seasonLabel: string
+    overall: number | null
+    ratedAt: string | null
+    // True when the player is a current-season signup, so the Rate dialog
+    // (which always writes to the current season) can be opened for them.
+    canRate: boolean
+}
+
+export interface RatedSeasonOption {
+    seasonId: number
+    label: string
 }
 
 export interface TryoutCourt {
@@ -267,6 +288,9 @@ export async function getRatePlayerData(): Promise<{
     captainTeam: CaptainTeamRef | null
     defaultLookupType: LookupType
     ratingsByPlayer: Record<string, PlayerRatingValues>
+    ratedPlayers: RatedPlayerEntry[]
+    ratedSeasons: RatedSeasonOption[]
+    currentSeasonId: number
 }> {
     const hasAccess = await hasCaptainPagesAccessBySession()
     if (!hasAccess) {
@@ -283,7 +307,10 @@ export async function getRatePlayerData(): Promise<{
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",
-            ratingsByPlayer: {}
+            ratingsByPlayer: {},
+            ratedPlayers: [],
+            ratedSeasons: [],
+            currentSeasonId: 0
         }
     }
 
@@ -302,7 +329,10 @@ export async function getRatePlayerData(): Promise<{
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",
-            ratingsByPlayer: {}
+            ratingsByPlayer: {},
+            ratedPlayers: [],
+            ratedSeasons: [],
+            currentSeasonId: 0
         }
     }
 
@@ -322,7 +352,10 @@ export async function getRatePlayerData(): Promise<{
                 byTeamDivisions: [],
                 captainTeam: null,
                 defaultLookupType: "direct",
-                ratingsByPlayer: {}
+                ratingsByPlayer: {},
+                ratedPlayers: [],
+                ratedSeasons: [],
+                currentSeasonId: 0
             }
         }
 
@@ -346,6 +379,101 @@ export async function getRatePlayerData(): Promise<{
             .innerJoin(users, eq(signups.player, users.id))
             .where(eq(signups.season, config.seasonId))
 
+        const playerIds = signupRows.map((row) => row.id)
+        const signupIdSet = new Set(playerIds)
+
+        // Every (player, season) this evaluator has rated, across all
+        // seasons, for the "Players I've Rated" lookup. Rated players need
+        // not be current-season signups, so their ids join the draft-history
+        // lookup below.
+        const ratedRows = await db
+            .select({
+                seasonId: playerRatings.season,
+                seasonName: seasons.season,
+                seasonYear: seasons.year,
+                overall: playerRatings.overall,
+                ratedAt: playerRatings.updated_at,
+                id: users.id,
+                oldId: users.old_id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name,
+                male: users.male,
+                height: users.height,
+                picture: users.picture
+            })
+            .from(playerRatings)
+            .innerJoin(seasons, eq(playerRatings.season, seasons.id))
+            .innerJoin(users, eq(playerRatings.player, users.id))
+            .where(eq(playerRatings.evaluator, evaluatorId))
+            .orderBy(desc(playerRatings.updated_at))
+
+        const historyIds = [
+            ...new Set([...playerIds, ...ratedRows.map((row) => row.id)])
+        ]
+
+        const draftRows =
+            historyIds.length === 0
+                ? []
+                : await db
+                      .select({
+                          userId: drafts.user,
+                          divisionName: divisions.name,
+                          draftId: drafts.id
+                      })
+                      .from(drafts)
+                      .innerJoin(teams, eq(drafts.team, teams.id))
+                      .innerJoin(divisions, eq(teams.division, divisions.id))
+                      .where(inArray(drafts.user, historyIds))
+                      .orderBy(desc(teams.season), desc(drafts.id))
+
+        const lastDivisionByPlayerId = new Map<string, string>()
+        for (const row of draftRows) {
+            if (!lastDivisionByPlayerId.has(row.userId)) {
+                lastDivisionByPlayerId.set(row.userId, row.divisionName)
+            }
+        }
+
+        const ratedPlayers = ratedRows
+            .map(
+                (row): RatedPlayerEntry => ({
+                    player: {
+                        id: row.id,
+                        oldId: row.oldId,
+                        firstName: row.firstName,
+                        lastName: row.lastName,
+                        preferredName: row.preferredName,
+                        male: row.male,
+                        height: row.height,
+                        picture: row.picture,
+                        lastDivisionName:
+                            lastDivisionByPlayerId.get(row.id) || null
+                    },
+                    seasonId: row.seasonId,
+                    seasonLabel: buildSeasonLabel(
+                        row.seasonName,
+                        row.seasonYear
+                    ),
+                    overall: row.overall,
+                    ratedAt: row.ratedAt ? row.ratedAt.toISOString() : null,
+                    canRate: signupIdSet.has(row.id) && row.id !== evaluatorId
+                })
+            )
+            .sort(sortRatedPlayers)
+
+        const ratedSeasonsById = new Map<number, RatedSeasonOption>()
+        for (const entry of ratedPlayers) {
+            if (!ratedSeasonsById.has(entry.seasonId)) {
+                ratedSeasonsById.set(entry.seasonId, {
+                    seasonId: entry.seasonId,
+                    label: entry.seasonLabel
+                })
+            }
+        }
+        const ratedSeasons = [...ratedSeasonsById.values()].sort(
+            (a, b) => b.seasonId - a.seasonId
+        )
+
         if (signupRows.length === 0) {
             return {
                 status: true,
@@ -359,28 +487,10 @@ export async function getRatePlayerData(): Promise<{
                 byTeamDivisions: [],
                 captainTeam: null,
                 defaultLookupType: "direct",
-                ratingsByPlayer: {}
-            }
-        }
-
-        const playerIds = signupRows.map((row) => row.id)
-
-        const draftRows = await db
-            .select({
-                userId: drafts.user,
-                divisionName: divisions.name,
-                draftId: drafts.id
-            })
-            .from(drafts)
-            .innerJoin(teams, eq(drafts.team, teams.id))
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(inArray(drafts.user, playerIds))
-            .orderBy(desc(teams.season), desc(drafts.id))
-
-        const lastDivisionByPlayerId = new Map<string, string>()
-        for (const row of draftRows) {
-            if (!lastDivisionByPlayerId.has(row.userId)) {
-                lastDivisionByPlayerId.set(row.userId, row.divisionName)
+                ratingsByPlayer: {},
+                ratedPlayers,
+                ratedSeasons,
+                currentSeasonId: config.seasonId
             }
         }
 
@@ -664,7 +774,10 @@ export async function getRatePlayerData(): Promise<{
                 draftStarted,
                 byTeamAvailable: byTeamDivisions.length > 0
             }),
-            ratingsByPlayer
+            ratingsByPlayer,
+            ratedPlayers,
+            ratedSeasons,
+            currentSeasonId: config.seasonId
         }
     } catch (error) {
         console.error("Error loading rate player data:", error)
@@ -681,7 +794,10 @@ export async function getRatePlayerData(): Promise<{
             byTeamDivisions: [],
             captainTeam: null,
             defaultLookupType: "direct",
-            ratingsByPlayer: {}
+            ratingsByPlayer: {},
+            ratedPlayers: [],
+            ratedSeasons: [],
+            currentSeasonId: 0
         }
     }
 }

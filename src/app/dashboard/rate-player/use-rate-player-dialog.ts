@@ -21,6 +21,11 @@ export function useRatePlayerDialog(
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [ratingsByPlayer, setRatingsByPlayer] =
         useState<Record<string, PlayerRatingValues>>(initialRatings)
+    // ISO timestamp of the last successful save per player this session, so
+    // the "Players I've Rated" list can re-order without a reload.
+    const [lastSavedAtByPlayer, setLastSavedAtByPlayer] = useState<
+        Record<string, string>
+    >({})
     const [overall, setOverall] = useState(0)
     const [passing, setPassing] = useState(0)
     const [setting, setSetting] = useState(0)
@@ -142,6 +147,10 @@ export function useRatePlayerDialog(
                 }
             }
         })
+        setLastSavedAtByPlayer((prev) => ({
+            ...prev,
+            [playerId]: new Date().toISOString()
+        }))
     }
 
     const handleSkillChange = (skill: RatingSkill, value: number) => {
@@ -237,6 +246,8 @@ export function useRatePlayerDialog(
 
     return {
         selectedPlayer,
+        ratingsByPlayer,
+        lastSavedAtByPlayer,
         isDialogOpen,
         setIsDialogOpen,
         overall,

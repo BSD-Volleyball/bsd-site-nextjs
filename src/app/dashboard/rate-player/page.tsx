@@ -56,6 +56,10 @@ export default async function RatePlayerPage() {
                 captainTeam={result.captainTeam}
                 defaultLookupType={result.defaultLookupType}
                 initialRatings={result.ratingsByPlayer}
+                ratedPlayers={result.ratedPlayers}
+                ratedSeasons={result.ratedSeasons}
+                currentSeasonId={result.currentSeasonId}
+                currentSeasonLabel={result.seasonLabel}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>
