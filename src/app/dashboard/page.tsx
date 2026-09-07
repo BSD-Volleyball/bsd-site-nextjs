@@ -74,6 +74,7 @@ import { TournamentDashboardCard } from "@/components/dashboard/tournament-card"
 import { getTournamentWaiverGate } from "@/lib/tournament-config"
 import { getTournamentDashboardCard } from "@/lib/tournament-dashboard"
 import { getSponsorshipForUser } from "@/lib/sponsors"
+import { logger } from "@/lib/logger"
 import { SponsorshipCard } from "@/components/dashboard/sponsorship-card"
 import {
     assignmentCourtLabel,
@@ -119,13 +120,22 @@ export default async function DashboardPage() {
         ? await getTournamentDashboardCard(session.user.id)
         : null
     // Sponsor contacts get a pay/manage card; getSeasonConfig is request-cached.
+    // Fail-soft: a sponsor lookup problem (e.g. code deployed ahead of its
+    // migration) must never take the whole dashboard down.
     const sponsorshipSeason = session?.user ? await getSeasonConfig() : null
     const sponsorship =
         session?.user && sponsorshipSeason?.seasonId
             ? await getSponsorshipForUser(
                   session.user.id,
                   sponsorshipSeason.seasonId
-              )
+              ).catch((error) => {
+                  logger.error(
+                      "Dashboard sponsorship lookup failed",
+                      { userId: session.user.id },
+                      error
+                  )
+                  return null
+              })
             : null
     const [hasTryoutSheetAccess, isAdmin] = session?.user
         ? await Promise.all([
