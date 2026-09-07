@@ -63,7 +63,8 @@ npx @better-auth/cli generate
 - `src/components/layout/`: app layout and navigation components.
 - `src/database/schema.ts`: Drizzle schema source of truth.
 - `src/database/db.ts`: database client.
-- `src/lib/`: auth, site config, shared server utilities.
+- `src/lib/`: framework-independent business logic, auth instance, site config, shared utilities. Must not import `next/*`, `@/next/*`, `@/app/*`, or `@/components/*` (lint-enforced; see Layering).
+- `src/next/`: Next.js request glue: `session.ts` (session lookup + `*BySession` wrappers), `action-helpers.ts` (server action guards), `page-guards.ts` (redirecting page guards).
 - `migrations/`: SQL migrations generated/applied by Drizzle.
 - `scripts/`: one-off maintenance/import scripts.
 
@@ -75,16 +76,25 @@ npx @better-auth/cli generate
 - After successful mutations, call `router.refresh()` in client components to resync server-rendered data.
 - Keep auth and RBAC checks explicit in actions/components.
 - Prefer centralized authorization helpers in `src/lib/rbac.ts` instead of duplicating role checks in each file.
-- **Server action helpers**: Use `requireSession()`, `requireAdmin()`, `requirePermission()`, `requireCaptainAccess()`, `requireSeasonConfig()`, and `withAction()` from `src/lib/action-helpers.ts` to reduce boilerplate. Return `ok(data)` / `fail(message)` for consistent `ActionResult<T>` response shapes (`ok(undefined, message)` for message-only mutations).
-- **Page guards**: In server `page.tsx` files, use `requireSessionOrRedirect()`, `requireAdminOrRedirect()`, `requireCaptainAccessOrRedirect()`, or `requirePermissionOrRedirect()` from `src/lib/page-guards.ts` instead of hand-rolling the session-fetch + role-check + redirect stanza.
+- **Server action helpers**: Use `requireSession()`, `requireAdmin()`, `requirePermission()`, `requireCaptainAccess()`, `requireSeasonConfig()`, and `withAction()` from `src/next/action-helpers.ts` to reduce boilerplate. Return `ok(data)` / `fail(message)` for consistent `ActionResult<T>` response shapes (`ok(undefined, message)` for message-only mutations). `ActionResult`, `ok`, `fail`, `ActionError`, `withAction`, and the `require*` input validators are defined in `src/lib/action-result.ts` (framework-free) and re-exported by `action-helpers.ts`; lib code and client components import them from `action-result` directly.
+- **Page guards**: In server `page.tsx` files, use `requireSessionOrRedirect()`, `requireAdminOrRedirect()`, `requireCaptainAccessOrRedirect()`, or `requirePermissionOrRedirect()` from `src/next/page-guards.ts` instead of hand-rolling the session-fetch + role-check + redirect stanza.
 - **Shared utilities**: Use `formatPlayerName()`, `buildPlayerPictureUrl()`, `serializeCsvField()`, `splitByGender()` from `src/lib/utils.ts` instead of defining local copies.
 - **Shared components**: Use `UserCombobox` from `src/components/user-combobox.tsx` instead of local copies.
 - Use `auth.api.getSession({ headers: await headers() })` directly only when session data is needed for action payloads/logging.
-- Authorization uses a permission-based system: roles are stored in the `user_roles` table and permissions are defined in `src/lib/permissions.ts`. Use `hasPermissionBySession(permission)` or `hasPermission(userId, permission, context?)` for new checks.
+- Authorization uses a permission-based system: roles are stored in the `user_roles` table and permissions are defined in `src/lib/permissions.ts`. Use `hasPermissionBySession(permission)` (from `src/next/session.ts`) in actions/pages, or `hasPermission(userId, permission, context?)` (from `src/lib/rbac.ts`) when the user id is already in hand or the code lives in lib.
 - Backward-compatible helpers (`isAdminOrDirectorBySession`, `isCommissionerBySession`, `hasCaptainPagesAccessBySession`) remain available and route through the new system.
 - To add a new role: add it to the `Role` type and `ROLE_PERMISSIONS` map in `src/lib/permissions.ts`. No server action changes needed.
 - Assign/revoke roles via the admin UI at `/dashboard/manage-roles/` or programmatically via `grantRole()`/`revokeRole()` from `src/lib/rbac.ts`.
 - Administrative mutations should log audit entries through `logAuditEntry` when appropriate.
+
+## Layering
+
+- `src/lib`, `src/database`, and `src/config` are framework-independent: they may use React (`cache()`), Drizzle, and npm packages, but never `next/*`, `@/next/*`, `@/app/*`, or `@/components/*`. A Biome `noRestrictedImports` override in `biome.json` enforces this (tests are exempt).
+- Lib functions that need to know who is acting take a `userId` parameter and keep their own authorization check (for example `isAdminOrDirector(userId)`); the route handler or server action resolves the session via `src/next/session.ts` and passes the id down.
+- Lib code that builds HTTP responses returns web-standard `Response`, not `NextResponse`.
+- `src/database/db.ts` exports a lazy Proxy: the pg Pool is created on first query, so importing `db` has no side effects.
+- Known remaining framework ties inside lib, deliberately left for a later pass: `import "server-only"` markers (protect client bundles today; Vitest stubs them) and React `cache()` for per-request memoization in `rbac.ts`, `site-config.ts`, `tournament-config.ts`, `player-elo-data.ts`.
+- Purpose: a future move to another framework or host should only need to rewrite `src/app`, `src/components`, and `src/next`.
 
 ## Security Patterns
 

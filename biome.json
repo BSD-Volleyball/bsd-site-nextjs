@@ -93,6 +93,38 @@
                     }
                 }
             }
+        },
+        {
+            "includes": [
+                "src/lib/**",
+                "src/database/**",
+                "src/config/**",
+                "!**/*.test.ts",
+                "!**/*.integration.test.ts"
+            ],
+            "linter": {
+                "rules": {
+                    "style": {
+                        "noRestrictedImports": {
+                            "level": "error",
+                            "options": {
+                                "patterns": [
+                                    {
+                                        "group": [
+                                            "next",
+                                            "next/**",
+                                            "@/next/**",
+                                            "@/app/**",
+                                            "@/components/**"
+                                        ],
+                                        "message": "src/lib, src/database and src/config are framework-independent. Next.js glue belongs in src/next; app and components depend on lib, never the reverse."
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
         }
     ]
 }
