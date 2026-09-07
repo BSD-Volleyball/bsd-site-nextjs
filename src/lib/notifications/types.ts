@@ -38,6 +38,7 @@ export type NotificationType =
     | "sub_request_cancelled"
     | "friend_request_received"
     | "friend_request_accepted"
+    | "sponsorship_payment_due"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -195,6 +196,14 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             stream: "outbound",
             label: "Friend request accepted",
             description: "When someone accepts your friend request."
+        },
+        sponsorship_payment_due: {
+            category: null,
+            stream: "outbound",
+            label: "Sponsorship payment requests",
+            description:
+                "When the league sets up a season sponsorship for your business and it is ready to pay.",
+            mandatory: true
         },
         transactional: {
             category: null,

@@ -403,6 +403,92 @@ export function buildVolunteerJobReminderHtml(opts: {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Sponsorship emails
+// ---------------------------------------------------------------------------
+
+/** To the sponsor contact when an admin sets up a sponsorship to be paid. */
+export function buildSponsorshipPaymentDueHtml(opts: {
+    firstName: string
+    sponsorName: string
+    amount: string
+    seasonLabel: string
+    payUrl: string
+}): string {
+    return renderEmailHtml({
+        heading: "Your Sponsorship Is Ready to Pay",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>Thank you for supporting the league! We've set up <strong>${escapeHtml(opts.sponsorName)}</strong> as a sponsor for the ${escapeHtml(opts.seasonLabel)} season.</p>
+            ${renderDetailsBlock([
+                renderDetailRow("Sponsor", opts.sponsorName),
+                renderDetailRow("Season", opts.seasonLabel),
+                renderDetailRow("Amount due", `$${opts.amount}`)
+            ])}
+            <p>You can pay by card from your dashboard, where you can also update your business name, website, blurb, and logo for our sponsors page and the championship t-shirt.</p>
+            <p>Paying by check instead? Reply to this email or reach us at <a href="mailto:${escapeHtml(site.mailSupport)}">${escapeHtml(site.mailSupport)}</a> and we'll mark it paid for you.</p>
+        `,
+        action: "Pay Sponsorship",
+        actionUrl: opts.payUrl
+    })
+}
+
+/** To admins when a sponsorship is paid (by card or marked manually). */
+export function buildSponsorshipPaidHtml(opts: {
+    adminFirstName: string
+    sponsorName: string
+    contactName: string
+    amount: string
+    method: "square" | "manual"
+    note?: string | null
+    manageUrl: string
+}): string {
+    const rows = [
+        renderDetailRow("Sponsor", opts.sponsorName),
+        renderDetailRow("Contact", opts.contactName),
+        renderDetailRow("Amount", `$${opts.amount}`),
+        renderDetailRow(
+            "Paid via",
+            opts.method === "square" ? "Card (Square)" : "Marked paid manually"
+        )
+    ]
+    if (opts.note) {
+        rows.push(renderDetailRow("Note", opts.note))
+    }
+
+    return renderEmailHtml({
+        heading: "Sponsorship Paid",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.adminFirstName)},</p>
+            <p><strong>${escapeHtml(opts.sponsorName)}</strong> has paid their season sponsorship.</p>
+            ${renderDetailsBlock(rows)}
+        `,
+        action: "Manage Sponsors",
+        actionUrl: opts.manageUrl
+    })
+}
+
+/** Receipt to the payer after a card payment succeeds. */
+export function buildSponsorshipReceiptHtml(opts: {
+    firstName: string
+    sponsorName: string
+    seasonLabel: string
+    amountPaid: string
+    receiptUrl?: string
+}): string {
+    return renderEmailHtml({
+        heading: "Sponsorship Payment Received",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>Thank you! Your payment of $${escapeHtml(opts.amountPaid)} for <strong>${escapeHtml(opts.sponsorName)}</strong>'s ${escapeHtml(opts.seasonLabel)} sponsorship has been received.</p>
+            <p>Your business will appear on our sponsors page and the championship t-shirt. You can update your logo and details from your dashboard at any time.</p>
+            <p>If you have any questions, feel free to reach out to us at <a href="mailto:${escapeHtml(site.mailSupport)}">${escapeHtml(site.mailSupport)}</a>.</p>
+        `,
+        action: opts.receiptUrl ? "View Receipt" : "Go to Dashboard",
+        actionUrl: opts.receiptUrl ?? `${site.url}/dashboard/sponsorship`
+    })
+}
+
 export function buildConcernNotificationHtml(appUrl: string): string {
     return renderEmailHtml({
         heading: "New Concern Submitted",

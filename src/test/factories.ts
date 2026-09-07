@@ -7,6 +7,8 @@ import {
     seasonEvents,
     seasons,
     signups,
+    sponsors,
+    sponsorships,
     teams,
     tournamentDivisions,
     tournamentRoster,
@@ -232,4 +234,33 @@ export async function seedBaselineSeason() {
     const tryoutEvent = await createSeasonEvent(season.id)
     const tryoutSlot = await createEventTimeSlot(tryoutEvent.id)
     return { season, division, tryoutEvent, tryoutSlot }
+}
+
+export async function createSponsor(
+    overrides: Partial<typeof sponsors.$inferInsert> & { contact_user: string }
+) {
+    const [row] = await db
+        .insert(sponsors)
+        .values({
+            name: "Test Sponsor",
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createSponsorship(
+    overrides: Partial<typeof sponsorships.$inferInsert> & {
+        sponsor_id: number
+        season: number
+    }
+) {
+    const [row] = await db
+        .insert(sponsorships)
+        .values({
+            amount: "500.00",
+            ...overrides
+        })
+        .returning()
+    return row
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 import {
     buildInboundEmailNotificationHtml,
+    buildSponsorshipPaidHtml,
+    buildSponsorshipPaymentDueHtml,
+    buildSponsorshipReceiptHtml,
     buildThreadReplyNotificationHtml
 } from "./email-html"
 
@@ -99,5 +102,65 @@ describe("buildThreadReplyNotificationHtml", () => {
         expect(html).not.toContain("Jane Doe")
         expect(html).not.toContain("jane@example.test")
         expect(html).not.toContain("sensitive matter")
+    })
+})
+
+describe("sponsorship emails", () => {
+    it("payment-due email names the amount, season, and pay link", () => {
+        const html = buildSponsorshipPaymentDueHtml({
+            firstName: "Pat",
+            sponsorName: "Bravo Bakery",
+            amount: "500.00",
+            seasonLabel: "Fall 2026",
+            payUrl: `${APP_URL}/dashboard/sponsorship`
+        })
+        expect(html).toContain("Pat")
+        expect(html).toContain("Bravo Bakery")
+        expect(html).toContain("$500.00")
+        expect(html).toContain("Fall 2026")
+        expect(html).toContain(`${APP_URL}/dashboard/sponsorship`)
+    })
+
+    it("admin paid email describes the payment method and note", () => {
+        const html = buildSponsorshipPaidHtml({
+            adminFirstName: "Casey",
+            sponsorName: "Bravo Bakery",
+            contactName: "Pat Player",
+            amount: "500.00",
+            method: "manual",
+            note: "check #1042",
+            manageUrl: `${APP_URL}/dashboard/manage-sponsors`
+        })
+        expect(html).toContain("Casey")
+        expect(html).toContain("Bravo Bakery")
+        expect(html).toContain("Pat Player")
+        expect(html).toContain("$500.00")
+        expect(html).toContain("check #1042")
+        expect(html).toContain(`${APP_URL}/dashboard/manage-sponsors`)
+    })
+
+    it("admin paid email escapes sponsor-supplied text", () => {
+        const html = buildSponsorshipPaidHtml({
+            adminFirstName: "Casey",
+            sponsorName: "<script>alert(1)</script>",
+            contactName: "Pat",
+            amount: "1.00",
+            method: "square",
+            manageUrl: APP_URL
+        })
+        expect(html).not.toContain("<script>")
+        expect(html).toContain("&lt;script&gt;")
+    })
+
+    it("sponsor receipt links to the Square receipt when present", () => {
+        const html = buildSponsorshipReceiptHtml({
+            firstName: "Pat",
+            sponsorName: "Bravo Bakery",
+            seasonLabel: "Fall 2026",
+            amountPaid: "500.00",
+            receiptUrl: "https://square.test/r/1"
+        })
+        expect(html).toContain("$500.00")
+        expect(html).toContain("https://square.test/r/1")
     })
 })

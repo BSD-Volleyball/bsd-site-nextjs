@@ -72,6 +72,10 @@ describe("notification type registry", () => {
     it("optOutableTypes excludes mandatory types", () => {
         const optOutable = optOutableTypes()
         expect(optOutable).not.toContain("transactional")
+        // A sponsorship payment request is effectively an invoice; a sponsor
+        // must never be able to silence it.
+        expect(NOTIFICATION_TYPES.sponsorship_payment_due.mandatory).toBe(true)
+        expect(optOutable).not.toContain("sponsorship_payment_due")
         expect(optOutable).not.toContain("in_season_updates")
         expect(optOutable).toContain("league_announcements")
     })
