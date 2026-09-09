@@ -11,6 +11,9 @@ import {
 } from "@/database/schema"
 import { eq, desc, inArray, and } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
+import { getCurrentSeasonAmount, isLatePricing } from "@/lib/site-config"
+import { buildWaitlistApprovedHtml } from "@/lib/email-html"
+import { dispatchNotification } from "@/lib/notifications/dispatch"
 import {
     withAction,
     ok,
@@ -106,9 +109,13 @@ export const setWaitlistApproval = withAction(
         const [entry] = await db
             .select({
                 id: waitlist.id,
-                userId: waitlist.user
+                userId: waitlist.user,
+                email: users.email,
+                firstName: users.first_name,
+                preferredName: users.preferred_name
             })
             .from(waitlist)
+            .innerJoin(users, eq(waitlist.user, users.id))
             .where(
                 and(
                     eq(waitlist.id, waitlistId),
@@ -133,6 +140,36 @@ export const setWaitlistApproval = withAction(
             entityId: waitlistId.toString(),
             summary: `${approved ? "Approved" : "Unapproved"} waitlist entry for user ${entry.userId}`
         })
+
+        // Approval is the answer to a request the player made, and it is the
+        // only signal that a spot opened — without it they only find out by
+        // happening to log in. dispatchNotification never throws, so a mail
+        // outage cannot fail the approval itself.
+        if (approved && entry.email) {
+            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const firstName =
+                entry.preferredName ||
+                entry.firstName ||
+                entry.email.split("@")[0]
+
+            await dispatchNotification({
+                type: "waitlist_approved",
+                recipients: [
+                    { userId: entry.userId, email: entry.email, firstName }
+                ],
+                subject: `A spot opened up — sign up for ${seasonLabel}`,
+                htmlBody: buildWaitlistApprovedHtml({
+                    firstName,
+                    seasonLabel,
+                    amount: getCurrentSeasonAmount(config),
+                    isLatePricing: isLatePricing(config)
+                }),
+                tag: "waitlist-approved",
+                // One "you're off the waitlist" email per player per season,
+                // so toggling approval off and on cannot double-send.
+                dedupeKey: `waitlist-approved-s${config.seasonId}-u${entry.userId}`
+            })
+        }
 
         return ok(
             undefined,

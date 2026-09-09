@@ -178,6 +178,38 @@ export function buildDraftResultHtml(opts: {
     })
 }
 
+/**
+ * A spot opened up and an admin approved this player off the waitlist. The
+ * only thing standing between them and a roster spot is paying, so the CTA
+ * goes straight to the signup wizard.
+ */
+export function buildWaitlistApprovedHtml(opts: {
+    firstName: string
+    seasonLabel: string
+    amount: string
+    isLatePricing: boolean
+}): string {
+    const detailRows = [
+        renderDetailRow("Season:", opts.seasonLabel),
+        renderDetailRow(
+            "Season fee:",
+            `$${opts.amount}${opts.isLatePricing ? " (late registration pricing)" : ""}`
+        )
+    ]
+
+    return renderEmailHtml({
+        heading: "A Spot Opened Up!",
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>Good news — a spot has opened up for the ${escapeHtml(opts.seasonLabel)} season and you've been approved off the waitlist.</p>
+            ${renderDetailsBlock(detailRows)}
+            <p>Your spot isn't reserved until you complete your signup, and spots can fill quickly, so please sign up as soon as you can.</p>
+        `,
+        action: "Complete Your Signup",
+        actionUrl: `${site.url}/dashboard/pay-season`
+    })
+}
+
 export function buildAvailabilityChangeHtml(opts: {
     captainFirstName: string
     playerName: string

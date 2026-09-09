@@ -39,6 +39,7 @@ export type NotificationType =
     | "friend_request_received"
     | "friend_request_accepted"
     | "sponsorship_payment_due"
+    | "waitlist_approved"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -203,6 +204,14 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Sponsorship payment requests",
             description:
                 "When the league sets up a season sponsorship for your business and it is ready to pay.",
+            mandatory: true
+        },
+        waitlist_approved: {
+            category: null,
+            stream: "outbound",
+            label: "Waitlist approvals",
+            description:
+                "When a spot opens up and you're approved off the waitlist to sign up for a season.",
             mandatory: true
         },
         transactional: {
