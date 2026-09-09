@@ -415,9 +415,7 @@ const cases: SmokeCase[] = [
     c("findSub.getSubContactDetails", "fail", () =>
         findSub.getSubContactDetails("u", 1)
     ),
-    c("findSub.getWaitlistOptions", "fail", () =>
-        findSub.getWaitlistOptions(1)
-    ),
+    c("findSub.getSubPoolOptions", "fail", () => findSub.getSubPoolOptions(1)),
     c("findSub.lockInPermanentSub", "fail", () =>
         findSub.lockInPermanentSub({} as never)
     ),

@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type {
     RegularSubCandidate,
-    PermanentSubCandidate
+    PermanentSubCandidate,
+    SubPoolSource
 } from "./find-sub-actions"
 import { formatMatchTime, genderLabel } from "./find-sub-helpers"
 import { formatDisplayName } from "@/lib/utils"
@@ -131,6 +132,18 @@ export function RegularCandidateRow({
     )
 }
 
+export function SubSourceBadge({ source }: { source: SubPoolSource }) {
+    return source === "waitlist" ? (
+        <Badge variant="secondary" className="text-xs">
+            Waitlist
+        </Badge>
+    ) : (
+        <Badge variant="outline" className="text-xs">
+            Signed up, undrafted
+        </Badge>
+    )
+}
+
 export function PermanentCandidateRow({
     candidate: c,
     rank,
@@ -162,6 +175,7 @@ export function PermanentCandidateRow({
                         {name}
                         {genderLabel(c.male) ? ` (${genderLabel(c.male)})` : ""}
                     </button>
+                    <SubSourceBadge source={c.source} />
                 </div>
                 {c.lastDivisionName ? (
                     <p className="text-muted-foreground text-sm">

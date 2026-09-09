@@ -43,12 +43,107 @@ export type RegularSubCandidate = {
     notes: string[]
 }
 
+/**
+ * Where a permanent-sub candidate came from: the season waitlist, or a
+ * season signup that never turned into a draft pick.
+ */
+export type SubPoolSource = "waitlist" | "undrafted_signup"
+
+type SubPoolMember = {
+    userId: string
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    male: boolean | null
+    source: SubPoolSource
+}
+
+/**
+ * Everyone eligible to be pulled in as a permanent sub this season: the
+ * season waitlist plus anyone who signed up but was never drafted.
+ *
+ * Excluded from both sources: players already active on a roster this season
+ * (draftee or an earlier permanent sub). Excluded from the signup source
+ * only: players with an un-restored signup drop — a waitlist row is a fresh
+ * statement of availability that outranks an older drop.
+ *
+ * A user present in both sources appears once, labeled "waitlist", so the
+ * lock-in still consumes their waitlist row.
+ */
+async function getPermanentSubPool(seasonId: number): Promise<SubPoolMember[]> {
+    const waitlistRows = await db
+        .select({
+            userId: waitlist.user,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name,
+            male: users.male
+        })
+        .from(waitlist)
+        .innerJoin(users, eq(waitlist.user, users.id))
+        .where(eq(waitlist.season, seasonId))
+
+    const signupRows = await db
+        .select({
+            userId: signups.player,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name,
+            male: users.male
+        })
+        .from(signups)
+        .innerJoin(users, eq(signups.player, users.id))
+        .where(eq(signups.season, seasonId))
+
+    const draftedRows = await db
+        .select({ userId: drafts.user })
+        .from(drafts)
+        .innerJoin(teams, eq(drafts.team, teams.id))
+        .where(eq(teams.season, seasonId))
+    const draftedIds = new Set(draftedRows.map((r) => r.userId))
+
+    const droppedRows = await db
+        .select({ player: signupDrops.player })
+        .from(signupDrops)
+        .where(
+            and(
+                eq(signupDrops.season, seasonId),
+                isNull(signupDrops.restored_at)
+            )
+        )
+    const droppedIds = new Set(droppedRows.map((r) => r.player))
+
+    const roster = await getTeamRosterWithSubs(seasonId)
+    const onTeamIds = new Set(roster.map((slot) => slot.activeUser.id))
+
+    const byUser = new Map<string, SubPoolMember>()
+    for (const r of waitlistRows) {
+        if (onTeamIds.has(r.userId)) continue
+        if (byUser.has(r.userId)) continue
+        byUser.set(r.userId, { ...r, source: "waitlist" })
+    }
+    for (const r of signupRows) {
+        if (onTeamIds.has(r.userId)) continue
+        if (draftedIds.has(r.userId)) continue
+        if (droppedIds.has(r.userId)) continue
+        if (byUser.has(r.userId)) continue
+        byUser.set(r.userId, { ...r, source: "undrafted_signup" })
+    }
+
+    return [...byUser.values()].sort(
+        (a, b) =>
+            a.lastName.localeCompare(b.lastName) ||
+            a.firstName.localeCompare(b.firstName)
+    )
+}
+
 export type PermanentSubCandidate = {
     userId: string
     firstName: string
     lastName: string
     preferredName: string | null
     male: boolean | null
+    source: SubPoolSource
     lastDivisionName: string | null
     lastSeasonLabel: string | null
     lastRound: number | null
@@ -494,23 +589,11 @@ export async function getPermanentSubCandidates(
         playerRow.preferredName
     )
 
-    // Get all waitlist entries for this season
-    const waitlistRows = await db
-        .select({
-            waitlistId: waitlist.id,
-            userId: waitlist.user,
-            approved: waitlist.approved,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male
-        })
-        .from(waitlist)
-        .innerJoin(users, eq(waitlist.user, users.id))
-        .where(eq(waitlist.season, config.seasonId))
+    // Waitlisted players plus signed-up-but-undrafted players
+    const poolRows = await getPermanentSubPool(config.seasonId)
 
     // Filter to same gender
-    const sameGenderRows = waitlistRows.filter((r) => r.male === playerRow.male)
+    const sameGenderRows = poolRows.filter((r) => r.male === playerRow.male)
 
     if (sameGenderRows.length === 0) {
         return { status: true, candidates: [], replacedPlayerName }
@@ -527,8 +610,8 @@ export async function getPermanentSubCandidates(
     )
     const playerDivLevel = divisionLevelMap.get(playerRow.divisionId) ?? null
 
-    // Get historical draft data for waitlist players to find their most recent division
-    const waitlistUserIds = sameGenderRows.map((r) => r.userId)
+    // Get historical draft data for pool players to find their most recent division
+    const poolUserIds = sameGenderRows.map((r) => r.userId)
     const draftHistoryRows = await db
         .select({
             userId: drafts.user,
@@ -544,7 +627,7 @@ export async function getPermanentSubCandidates(
         .innerJoin(teams, eq(drafts.team, teams.id))
         .innerJoin(seasons, eq(teams.season, seasons.id))
         .innerJoin(divisions, eq(teams.division, divisions.id))
-        .where(inArray(drafts.user, waitlistUserIds))
+        .where(inArray(drafts.user, poolUserIds))
         .orderBy(desc(seasons.id))
 
     // Keep most-recent season's data per user
@@ -606,6 +689,7 @@ export async function getPermanentSubCandidates(
             lastName: r.lastName,
             preferredName: r.preferredName,
             male: r.male,
+            source: r.source,
             lastDivisionName: history?.lastDivisionName ?? null,
             lastSeasonLabel: history?.lastSeasonLabel ?? null,
             lastRound: history?.lastRound ?? null,
@@ -693,25 +777,27 @@ async function findUserName(userId: string): Promise<string> {
     return formatDisplayName(u.firstName, u.lastName, u.preferredName)
 }
 
-export type WaitlistOption = {
+export type SubPoolOption = {
     userId: string
     firstName: string
     lastName: string
     preferredName: string | null
     male: boolean | null
+    source: SubPoolSource
     lastDivisionName: string | null
     lastSeasonLabel: string | null
 }
 
 /**
- * Full waitlist for the season (no gender filter), excluding anyone who is
- * already on a team this season as a draftee or active permanent sub.
+ * The whole permanent-sub pool for the season (no gender filter): waitlisted
+ * players plus signed-up-but-undrafted players. Backs the "Other" dropdown,
+ * so anyone eligible can be picked manually.
  *
  * Authorization: admin or commissioner only — captains do not see this list.
  */
-export async function getWaitlistOptions(
+export async function getSubPoolOptions(
     teamId: number
-): Promise<ActionResult<WaitlistOption[]>> {
+): Promise<ActionResult<SubPoolOption[]>> {
     const sessionUser = await getSessionUser()
     if (!sessionUser) return fail("Not authenticated.")
 
@@ -728,30 +814,11 @@ export async function getWaitlistOptions(
         return fail("Not authorized.")
     }
 
-    const waitlistRows = await db
-        .select({
-            userId: waitlist.user,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            male: users.male
-        })
-        .from(waitlist)
-        .innerJoin(users, eq(waitlist.user, users.id))
-        .where(eq(waitlist.season, config.seasonId))
-        .orderBy(asc(users.last_name), asc(users.first_name))
+    const poolRows = await getPermanentSubPool(config.seasonId)
+    if (poolRows.length === 0) return ok([])
 
-    if (waitlistRows.length === 0) return ok([])
-
-    // Exclude users currently on any team this season (draftee or active sub).
-    const seasonRoster = await getTeamRosterWithSubs(config.seasonId)
-    const onTeamUserIds = new Set<string>()
-    for (const slot of seasonRoster) {
-        onTeamUserIds.add(slot.activeUser.id)
-    }
-
-    // Pull each waitlist user's most-recent draft division for context display.
-    const waitlistUserIds = waitlistRows.map((r) => r.userId)
+    // Pull each pool member's most-recent draft division for context display.
+    const poolUserIds = poolRows.map((r) => r.userId)
     const historyRows = await db
         .select({
             userId: drafts.user,
@@ -764,7 +831,7 @@ export async function getWaitlistOptions(
         .innerJoin(teams, eq(drafts.team, teams.id))
         .innerJoin(seasons, eq(teams.season, seasons.id))
         .innerJoin(divisions, eq(teams.division, divisions.id))
-        .where(inArray(drafts.user, waitlistUserIds))
+        .where(inArray(drafts.user, poolUserIds))
         .orderBy(desc(seasons.id))
 
     const historyByUser = new Map<
@@ -781,20 +848,19 @@ export async function getWaitlistOptions(
         }
     }
 
-    const options: WaitlistOption[] = waitlistRows
-        .filter((r) => !onTeamUserIds.has(r.userId))
-        .map((r) => {
-            const h = historyByUser.get(r.userId)
-            return {
-                userId: r.userId,
-                firstName: r.firstName,
-                lastName: r.lastName,
-                preferredName: r.preferredName,
-                male: r.male,
-                lastDivisionName: h?.divisionName ?? null,
-                lastSeasonLabel: h?.seasonLabel ?? null
-            }
-        })
+    const options: SubPoolOption[] = poolRows.map((r) => {
+        const h = historyByUser.get(r.userId)
+        return {
+            userId: r.userId,
+            firstName: r.firstName,
+            lastName: r.lastName,
+            preferredName: r.preferredName,
+            male: r.male,
+            source: r.source,
+            lastDivisionName: h?.divisionName ?? null,
+            lastSeasonLabel: h?.seasonLabel ?? null
+        }
+    })
 
     return ok(options)
 }
@@ -862,7 +928,9 @@ export async function lockInPermanentSub(input: {
             "Player is not currently active on this team's roster (they may already have been subbed)."
         )
 
-    // Sub-in user must be on the season's waitlist.
+    // Sub-in user must be in the permanent-sub pool: on the season waitlist,
+    // or signed up for the season. (Signed up *and* drafted is rejected by
+    // the already-drafted guard below.)
     const [waitlistRow] = await db
         .select({ id: waitlist.id })
         .from(waitlist)
@@ -873,8 +941,22 @@ export async function lockInPermanentSub(input: {
             )
         )
         .limit(1)
-    if (!waitlistRow)
-        return fail("Sub user is not on the waitlist for this season.")
+    if (!waitlistRow) {
+        const [signupRow] = await db
+            .select({ id: signups.id })
+            .from(signups)
+            .where(
+                and(
+                    eq(signups.season, config.seasonId),
+                    eq(signups.player, subUserId)
+                )
+            )
+            .limit(1)
+        if (!signupRow)
+            return fail(
+                "Sub user is not on the waitlist and did not sign up for this season."
+            )
+    }
 
     // Sub-in user must not be on any team this season already.
     const onTeam = roster.some((s) => s.activeUser.id === subUserId)
@@ -909,7 +991,10 @@ export async function lockInPermanentSub(input: {
                     notes: notes?.trim() || null
                 })
                 .returning({ id: substitutions.id })
-            await tx.delete(waitlist).where(eq(waitlist.id, waitlistRow.id))
+            // An undrafted signup has no waitlist row to consume.
+            if (waitlistRow) {
+                await tx.delete(waitlist).where(eq(waitlist.id, waitlistRow.id))
+            }
 
             // Record the departure as a signup drop unless one already exists
             // (e.g. an admin dropped the player before finding the sub). A

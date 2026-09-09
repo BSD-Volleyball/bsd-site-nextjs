@@ -14,12 +14,12 @@ import {
     logSubContactViewed,
     lockInPermanentSub,
     lockInRegularSub,
-    getWaitlistOptions
+    getSubPoolOptions
 } from "./find-sub-actions"
 import type {
     PermanentSubCandidate,
     SubContactDetails,
-    WaitlistOption
+    SubPoolOption
 } from "./find-sub-actions"
 import type {
     RosterPlayer,
@@ -53,7 +53,7 @@ type FindSubPanelProps = {
     teamMatchTimeByEventDate: Record<string, string | null>
     dateMatchInfo: Record<string, DateMatchInfo>
     canLockInPermanent: boolean
-    canSeeFullWaitlist: boolean
+    canSeeFullPool: boolean
     eventDateById: Record<number, string>
 }
 
@@ -66,7 +66,7 @@ export function FindSubPanel({
     teamMatchTimeByEventDate,
     dateMatchInfo,
     canLockInPermanent,
-    canSeeFullWaitlist,
+    canSeeFullPool,
     eventDateById
 }: FindSubPanelProps) {
     const router = useRouter()
@@ -131,23 +131,21 @@ export function FindSubPanel({
     const [permanentError, setPermanentError] = useState<string | null>(null)
     const [isPendingPermanent, startPermanentTransition] = useTransition()
 
-    // Full waitlist (Other dropdown) — only fetched for elevated viewers.
-    const [waitlistOptions, setWaitlistOptions] = useState<
-        WaitlistOption[] | null
-    >(null)
-    const [otherWaitlistUserId, setOtherWaitlistUserId] = useState<string>("")
+    // Full sub pool (Other dropdown) — only fetched for elevated viewers.
+    const [poolOptions, setPoolOptions] = useState<SubPoolOption[] | null>(null)
+    const [otherPoolUserId, setOtherPoolUserId] = useState<string>("")
 
     useEffect(() => {
-        if (!canSeeFullWaitlist) return
+        if (!canSeeFullPool) return
         let cancelled = false
         ;(async () => {
-            const result = await getWaitlistOptions(teamId)
-            if (!cancelled && result.status) setWaitlistOptions(result.data)
+            const result = await getSubPoolOptions(teamId)
+            if (!cancelled && result.status) setPoolOptions(result.data)
         })()
         return () => {
             cancelled = true
         }
-    }, [canSeeFullWaitlist, teamId])
+    }, [canSeeFullPool, teamId])
 
     // Sub-request state
     const [requestTarget, setRequestTarget] = useState<SubRequestTarget | null>(
@@ -264,10 +262,10 @@ export function FindSubPanel({
         setLockReason("")
         setSelectedPlayerId("")
         setPermanentResult(null)
-        setOtherWaitlistUserId("")
-        // Refresh waitlist options (sub-in user just consumed their row).
-        const refresh = await getWaitlistOptions(teamId)
-        if (refresh.status) setWaitlistOptions(refresh.data)
+        setOtherPoolUserId("")
+        // Refresh the pool (the sub-in user is now on a roster).
+        const refresh = await getSubPoolOptions(teamId)
+        if (refresh.status) setPoolOptions(refresh.data)
         router.refresh()
     }
 
@@ -314,10 +312,10 @@ export function FindSubPanel({
                 error={permanentError}
                 result={permanentResult}
                 canLockInPermanent={canLockInPermanent}
-                canSeeFullWaitlist={canSeeFullWaitlist}
-                waitlistOptions={waitlistOptions}
-                otherWaitlistUserId={otherWaitlistUserId}
-                onOtherWaitlistChange={setOtherWaitlistUserId}
+                canSeeFullPool={canSeeFullPool}
+                poolOptions={poolOptions}
+                otherPoolUserId={otherPoolUserId}
+                onOtherPoolChange={setOtherPoolUserId}
                 onOpenDetail={modal.openPlayerDetail}
                 onOpenContact={handleOpenContactWarning}
                 onOpenLock={handleOpenPermanentLock}

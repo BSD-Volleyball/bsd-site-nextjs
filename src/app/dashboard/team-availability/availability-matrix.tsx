@@ -52,7 +52,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
         teamMatchTimeByEventDate,
         dateMatchInfo,
         canLockInPermanent,
-        canSeeFullWaitlist
+        canSeeFullPool
     } = data
 
     function handleTeamChange(teamIdStr: string) {
@@ -332,7 +332,7 @@ export function AvailabilityMatrix({ initialData }: AvailabilityMatrixProps) {
                         teamMatchTimeByEventDate={teamMatchTimeByEventDate}
                         dateMatchInfo={dateMatchInfo}
                         canLockInPermanent={canLockInPermanent}
-                        canSeeFullWaitlist={canSeeFullWaitlist}
+                        canSeeFullPool={canSeeFullPool}
                         eventDateById={eventDateById}
                     />
                 </div>

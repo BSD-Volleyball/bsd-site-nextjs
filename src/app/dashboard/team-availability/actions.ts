@@ -95,7 +95,7 @@ export type TeamAvailabilityData = {
     canLockInPermanent: boolean
     // True when viewer can see the full waitlist dropdown — same gate as
     // canLockInPermanent. Captains do not see it.
-    canSeeFullWaitlist: boolean
+    canSeeFullPool: boolean
 }
 
 export const getAllSeasonTeams = withAction(
@@ -432,7 +432,7 @@ export const getTeamAvailabilityData = withAction(
                     allTeamRows.find((t) => t.id === selectedTeam.id)
                         ?.division ?? -1
                 ))
-        const canSeeFullWaitlist = canLockInPermanent
+        const canSeeFullPool = canLockInPermanent
 
         return ok({
             isAdmin,
@@ -445,7 +445,7 @@ export const getTeamAvailabilityData = withAction(
             teamMatchTimeByEventDate,
             dateMatchInfo,
             canLockInPermanent,
-            canSeeFullWaitlist
+            canSeeFullPool
         })
     }
 )
