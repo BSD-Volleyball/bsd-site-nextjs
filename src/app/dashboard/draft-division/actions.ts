@@ -389,6 +389,8 @@ export const getTeamsForSeasonAndDivision = withAction(
 )
 
 export interface DraftInitData {
+    /** True once any drafts rows exist for this division's teams. */
+    alreadySubmitted: boolean
     teams: TeamOption[]
     initialPicks: Record<string, string>
     pairMap: PairEntry[]
@@ -472,6 +474,20 @@ export const getDraftInitData = withAction(
             ])
 
         const DRAFT_ROUNDS = 8
+
+        const existingDrafts =
+            teamsList.length > 0
+                ? await db
+                      .select({ id: drafts.id })
+                      .from(drafts)
+                      .where(
+                          inArray(
+                              drafts.team,
+                              teamsList.map((t) => t.id)
+                          )
+                      )
+                      .limit(1)
+                : []
 
         const captainRoundMap = new Map(
             captRounds.map((r) => [r.captain, r.round])
@@ -564,6 +580,7 @@ export const getDraftInitData = withAction(
         }
 
         return ok({
+            alreadySubmitted: existingDrafts.length > 0,
             teams: teamsList.map(({ id, name, number }) => ({
                 id,
                 name,
@@ -1024,24 +1041,52 @@ export const submitDraft = withAction(
                 )
             }
 
-            // Calculate overall for each pick and insert
-            // Snake draft: odd rounds go 1-N, even rounds go N-1
-            await db.insert(drafts).values(
-                picks.map((pick) => {
-                    const isOddRound = pick.round % 2 === 1
-                    const baseValue =
-                        (divisionLevel - 1) * 50 + (pick.round - 1) * numTeams
-                    const positionValue = isOddRound
-                        ? pick.teamNumber
-                        : numTeams + 1 - pick.teamNumber
-                    return {
-                        team: pick.teamId,
-                        user: pick.userId,
-                        round: pick.round,
-                        overall: baseValue + positionValue
-                    }
-                })
-            )
+            // A division's draft is submitted exactly once. Lock the team
+            // rows so two commissioners pressing Submit at the same moment are
+            // serialized: the second one waits, then sees the first one's
+            // picks and is refused instead of doubling every roster.
+            const inserted = await db.transaction(async (tx) => {
+                await tx
+                    .select({ id: teams.id })
+                    .from(teams)
+                    .where(inArray(teams.id, teamIds))
+                    .for("update")
+                const existing = await tx
+                    .select({ id: drafts.id })
+                    .from(drafts)
+                    .where(inArray(drafts.team, teamIds))
+                    .limit(1)
+                if (existing.length > 0) {
+                    return false
+                }
+
+                // Calculate overall for each pick and insert
+                // Snake draft: odd rounds go 1-N, even rounds go N-1
+                await tx.insert(drafts).values(
+                    picks.map((pick) => {
+                        const isOddRound = pick.round % 2 === 1
+                        const baseValue =
+                            (divisionLevel - 1) * 50 +
+                            (pick.round - 1) * numTeams
+                        const positionValue = isOddRound
+                            ? pick.teamNumber
+                            : numTeams + 1 - pick.teamNumber
+                        return {
+                            team: pick.teamId,
+                            user: pick.userId,
+                            round: pick.round,
+                            overall: baseValue + positionValue
+                        }
+                    })
+                )
+                return true
+            })
+
+            if (!inserted) {
+                return fail(
+                    "This division's draft has already been submitted. Reload the page to see the final board."
+                )
+            }
 
             const session = await auth.api.getSession({
                 headers: await headers()
@@ -1071,7 +1116,7 @@ export const submitDraft = withAction(
                 }
             }
 
-            await sendDraftResultNotifications(picks, config)
+            await sendDraftResultNotifications(picks, config, divisionIds[0])
 
             return ok(
                 undefined,
@@ -1093,7 +1138,8 @@ export const submitDraft = withAction(
  */
 async function sendDraftResultNotifications(
     picks: DraftPick[],
-    config: Awaited<ReturnType<typeof getSeasonConfig>>
+    config: Awaited<ReturnType<typeof getSeasonConfig>>,
+    divisionId: number
 ): Promise<void> {
     const draftedTeamIds = [...new Set(picks.map((p) => p.teamId))]
     const draftedUserIds = [...new Set(picks.map((p) => p.userId))]
@@ -1181,6 +1227,11 @@ async function sendDraftResultNotifications(
         recipients,
         subject: `You've been drafted — ${seasonLabel}`,
         htmlBody: (r) => htmlByUserId.get(r.userId) ?? "",
-        tag: "draft-results"
+        tag: "draft-results",
+        // One "you've been drafted" email per player per division draft, even
+        // if the dispatch is ever repeated for the same division.
+        dedupeKey: config.seasonId
+            ? `draft-results-s${config.seasonId}-d${divisionId}`
+            : undefined
     })
 }

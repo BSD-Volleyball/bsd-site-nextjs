@@ -219,6 +219,40 @@ describe("submitDraft", () => {
         expect(overallFor(players[2].id)).toBe(54)
         expect(overallFor(players[3].id)).toBe(53)
     })
+
+    it("rejects a second submission for teams that already have picks", async () => {
+        // Regression: on 2026-09-08 two BBB commissioners each pressed Submit
+        // 35 seconds apart and every player landed on their roster twice.
+        const { season, divA } = await seedDraftSeason()
+        const captain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: divA.id,
+            name: "One",
+            number: 1
+        })
+        const player = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+        const picks = [
+            { teamId: team.id, teamNumber: 1, userId: player.id, round: 1 }
+        ]
+
+        const first = await submitDraft(2, picks)
+        expect(first.status).toBe(true)
+
+        const second = await submitDraft(2, picks)
+        expect(second.status).toBe(false)
+        expect(second.message).toMatch(/already been submitted/i)
+
+        const rows = await db.select().from(drafts)
+        expect(rows).toHaveLength(1)
+
+        const init = await getDraftInitData(season.id, divA.id)
+        expect(init.status).toBe(true)
+        if (!init.status) return
+        expect(init.data.alreadySubmitted).toBe(true)
+    })
 })
 
 describe("getDraftWatchlistData (commissioner view)", () => {
@@ -628,5 +662,6 @@ describe("getDraftInitData setup gate", () => {
         expect(after.data.initialPicks).toEqual({
             [`2-${team.id}`]: captain.id
         })
+        expect(after.data.alreadySubmitted).toBe(false)
     })
 })

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
-import { drafts } from "@/database/schema"
+import { drafts, notificationLog } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
 import { createDivision, createSeason, createTeam } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
@@ -44,6 +44,16 @@ describe("submitDraft draft-result notifications", () => {
         )
         expect(messages[0].tag).toBe("draft-results")
         expect(messages[0].htmlBody).toContain("Sets on the Beach")
+
+        // Each division's draft claims a dedupe key per recipient, so a
+        // repeated dispatch for the same division can never double-email.
+        const logRows = await db.select().from(notificationLog)
+        expect(logRows).toHaveLength(2)
+        for (const row of logRows) {
+            expect(row.dedupe_key).toBe(
+                `draft-results-s${season.id}-d${division.id}`
+            )
+        }
     })
 
     it("draft submission succeeds even when email dispatch blows up", async () => {

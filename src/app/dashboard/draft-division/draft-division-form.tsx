@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import {
     Card,
@@ -33,6 +33,11 @@ import {
     type WatchlistData
 } from "./actions"
 import { DraftRoomProvider } from "./draft-room-provider"
+import {
+    useBroadcastEvent,
+    useEventListener,
+    useSelf
+} from "@/lib/liveblocks.config"
 import { DraftBoard } from "./draft-board"
 import { DraftWatchlist } from "./draft-watchlist"
 import { DraftSetupGate } from "./draft-setup-gate"
@@ -79,9 +84,15 @@ export function DraftDivisionForm({
     const [watchlistData, setWatchlistData] = useState<WatchlistData | null>(
         null
     )
+    // Set once this division's picks are in the database — by this browser,
+    // by another commissioner (via the DRAFT_SUBMITTED room event), or before
+    // the page loaded. Hides the Submit button so nobody can double-submit.
+    const [alreadySubmitted, setAlreadySubmitted] = useState(false)
 
     // Picks snapshot maintained by DraftBoard via onPicksChange callback
     const picksRef = useRef<Record<string, string | null>>({})
+    // Filled in by DraftBoardWithBroadcast once the Liveblocks room is live
+    const broadcastSubmittedRef = useRef<(() => void) | null>(null)
 
     const selectedDivision = useMemo(
         () => divisions.find((d) => d.id.toString() === divisionId),
@@ -130,6 +141,7 @@ export function DraftDivisionForm({
         setPairMap([])
         setSetupStatus(null)
         setWatchlistData(null)
+        setAlreadySubmitted(false)
         picksRef.current = {}
 
         if (value) {
@@ -148,6 +160,7 @@ export function DraftDivisionForm({
             setInitialPicks(result.data.initialPicks)
             setPairMap(result.data.pairMap)
             setSetupStatus(result.data.setupStatus)
+            setAlreadySubmitted(result.data.alreadySubmitted)
         } else {
             toast.error(result.message || "Failed to load teams.")
         }
@@ -197,18 +210,40 @@ export function DraftDivisionForm({
             return
         }
 
+        if (alreadySubmitted) {
+            toast.error("This division's draft has already been submitted.")
+            return
+        }
+
         setIsLoading(true)
 
         const result = await submitDraft(selectedDivision.level, picks)
 
         if (result.status) {
             toast.success(result.message ?? "Draft submitted.")
+            setAlreadySubmitted(true)
+            broadcastSubmittedRef.current?.()
         } else {
             toast.error(result.message)
+            if (/already been submitted/i.test(result.message ?? "")) {
+                setAlreadySubmitted(true)
+            }
         }
 
         setIsLoading(false)
     }
+
+    const handleRemoteSubmit = useCallback(
+        (submittedBy: string) => {
+            setAlreadySubmitted(true)
+            if (currentRole === "commissioner") {
+                toast.info(
+                    `${submittedBy || "Another commissioner"} submitted this draft.`
+                )
+            }
+        },
+        [currentRole]
+    )
 
     return (
         <div
@@ -341,6 +376,8 @@ export function DraftDivisionForm({
                                         onPicksChange={handlePicksChange}
                                         initialPicks={initialPicks}
                                         pairMap={pairMap}
+                                        broadcastRef={broadcastSubmittedRef}
+                                        onRemoteSubmit={handleRemoteSubmit}
                                     />
                                     {watchlistData && (
                                         <div className="mt-6 border-t pt-6">
@@ -389,13 +426,25 @@ export function DraftDivisionForm({
                     </CardContent>
                     {currentRole === "commissioner" && setupReady && (
                         <CardFooter className="border-t pt-6">
-                            <Button
-                                type="submit"
-                                disabled={isLoading || teamsList.length === 0}
-                                className="ml-auto"
-                            >
-                                {isLoading ? "Submitting..." : "Submit Draft"}
-                            </Button>
+                            {alreadySubmitted ? (
+                                <p className="ml-auto text-muted-foreground text-sm">
+                                    This division's draft has been submitted.
+                                    Contact an admin if the picks need to
+                                    change.
+                                </p>
+                            ) : (
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        isLoading || teamsList.length === 0
+                                    }
+                                    className="ml-auto"
+                                >
+                                    {isLoading
+                                        ? "Submitting..."
+                                        : "Submit Draft"}
+                                </Button>
+                            )}
                         </CardFooter>
                     )}
                 </Card>
@@ -404,9 +453,15 @@ export function DraftDivisionForm({
     )
 }
 
-// Inner wrapper that has access to Liveblocks context (inside RoomProvider)
-// Broadcasts DRAFT_SUBMITTED when submit succeeds
-function DraftBoardWithBroadcast(props: {
+// Inner wrapper that has access to Liveblocks context (inside RoomProvider).
+// The form's Submit button lives outside the room, so this bridges the two:
+// it hands the form a broadcaster for DRAFT_SUBMITTED and relays the event
+// when another commissioner submits first.
+function DraftBoardWithBroadcast({
+    broadcastRef,
+    onRemoteSubmit,
+    ...props
+}: {
     teams: TeamOption[]
     users: UserOption[]
     playerPicUrl: string
@@ -417,6 +472,26 @@ function DraftBoardWithBroadcast(props: {
     onPicksChange: (picks: Record<string, string | null>) => void
     initialPicks: Record<string, string>
     pairMap: PairEntry[]
+    broadcastRef: React.MutableRefObject<(() => void) | null>
+    onRemoteSubmit: (submittedBy: string) => void
 }) {
+    const broadcast = useBroadcastEvent()
+    const self = useSelf()
+    const selfName = self?.info?.name ?? ""
+
+    useEffect(() => {
+        broadcastRef.current = () =>
+            broadcast({ type: "DRAFT_SUBMITTED", submittedBy: selfName })
+        return () => {
+            broadcastRef.current = null
+        }
+    }, [broadcast, selfName, broadcastRef])
+
+    useEventListener(({ event }) => {
+        if (event.type === "DRAFT_SUBMITTED") {
+            onRemoteSubmit(event.submittedBy)
+        }
+    })
+
     return <DraftBoard {...props} />
 }
