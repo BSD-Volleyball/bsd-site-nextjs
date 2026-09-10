@@ -4,7 +4,13 @@ import { db } from "@/database/db"
 import { auditLog, seasonRefs, userRoles } from "@/database/schema"
 import { createDivision, createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { addSeasonRef, removeSeasonRef, updateSeasonRef } from "./actions"
+import {
+    addSeasonRef,
+    addSeasonRefs,
+    getSelectRefsData,
+    removeSeasonRef,
+    updateSeasonRef
+} from "./actions"
 
 async function refereeRoleRows(userId: string, seasonId: number) {
     return db
@@ -229,5 +235,160 @@ describe("updateSeasonRef", () => {
             .from(seasonRefs)
             .where(eq(seasonRefs.id, row.id))
         expect(after.is_certified).toBe(false)
+    })
+})
+
+describe("getSelectRefsData previous-season quick add", () => {
+    it("lists last season's active refs who aren't reffing this season", async () => {
+        const prevSeason = await createSeason({ season: "spring", year: 2026 })
+        const returning = await createUser()
+        const inactiveLastSeason = await createUser()
+        const alreadyAdded = await createUser()
+
+        await db.insert(seasonRefs).values([
+            {
+                season_id: prevSeason.id,
+                user_id: returning.id,
+                max_division_level: 4,
+                is_active: true
+            },
+            {
+                season_id: prevSeason.id,
+                user_id: inactiveLastSeason.id,
+                max_division_level: 4,
+                is_active: false
+            },
+            {
+                season_id: prevSeason.id,
+                user_id: alreadyAdded.id,
+                max_division_level: 4,
+                is_active: true
+            }
+        ])
+
+        const currentSeason = await createSeason({ season: "fall", year: 2026 })
+        await createDivision({ level: 6 })
+        await db.insert(seasonRefs).values({
+            season_id: currentSeason.id,
+            user_id: alreadyAdded.id,
+            max_division_level: 6
+        })
+        await createUserWithRoles([
+            { role: "referee_coordinator", seasonId: currentSeason.id }
+        ])
+
+        const data = await getSelectRefsData()
+
+        expect(data.previousSeasonLabel).toBe("spring 2026")
+        expect(data.previousSeasonRefs.map((r) => r.id)).toEqual([returning.id])
+    })
+
+    it("returns no quick-add pool when there is no prior season with refs", async () => {
+        const season = await createSeason()
+        await createDivision({ level: 6 })
+        await createUserWithRoles([
+            { role: "referee_coordinator", seasonId: season.id }
+        ])
+
+        const data = await getSelectRefsData()
+
+        expect(data.previousSeasonLabel).toBeNull()
+        expect(data.previousSeasonRefs).toEqual([])
+    })
+})
+
+describe("addSeasonRefs", () => {
+    it("rejects unauthenticated callers", async () => {
+        const result = await addSeasonRefs(["some-user"])
+        expect(result).toEqual({
+            status: false,
+            message: "Not authenticated."
+        })
+    })
+
+    it("rejects authenticated users without schedule:manage", async () => {
+        const target = await createUser()
+        await createUserWithRoles([{ role: "captain" }])
+        const result = await addSeasonRefs([target.id])
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+        expect(await db.select().from(seasonRefs)).toHaveLength(0)
+    })
+
+    it("adds several refs at once, skipping duplicates and existing refs", async () => {
+        const season = await createSeason()
+        await createDivision({ level: 6 })
+        const first = await createUser()
+        const second = await createUser()
+        const existing = await createUser()
+        await db.insert(seasonRefs).values({
+            season_id: season.id,
+            user_id: existing.id,
+            max_division_level: 6
+        })
+        const coordinator = await createUserWithRoles([
+            { role: "referee_coordinator", seasonId: season.id }
+        ])
+
+        const result = await addSeasonRefs([
+            first.id,
+            second.id,
+            first.id,
+            existing.id
+        ])
+
+        expect(result).toEqual({ status: true, data: 2 })
+        const rows = await db
+            .select()
+            .from(seasonRefs)
+            .where(eq(seasonRefs.season_id, season.id))
+        expect(rows).toHaveLength(3)
+        expect(await refereeRoleRows(first.id, season.id)).toHaveLength(1)
+        expect(await refereeRoleRows(second.id, season.id)).toHaveLength(1)
+
+        const audit = await db
+            .select()
+            .from(auditLog)
+            .where(eq(auditLog.user, coordinator.id))
+        expect(audit).toHaveLength(1)
+        expect(audit[0].summary).toContain("2 ref(s)")
+    })
+
+    it("fails when every selected user is already a ref", async () => {
+        const season = await createSeason()
+        await createDivision({ level: 6 })
+        const existing = await createUser()
+        await db.insert(seasonRefs).values({
+            season_id: season.id,
+            user_id: existing.id,
+            max_division_level: 6
+        })
+        await createUserWithRoles([
+            { role: "referee_coordinator", seasonId: season.id }
+        ])
+
+        const result = await addSeasonRefs([existing.id])
+
+        expect(result).toEqual({
+            status: false,
+            message: "Those users are already refs for this season."
+        })
+    })
+
+    it("rejects an empty selection and unknown users", async () => {
+        const season = await createSeason()
+        await createDivision({ level: 6 })
+        await createUserWithRoles([
+            { role: "referee_coordinator", seasonId: season.id }
+        ])
+
+        expect(await addSeasonRefs([])).toEqual({
+            status: false,
+            message: "Select at least one referee to add."
+        })
+        expect(await addSeasonRefs(["not-a-real-user"])).toEqual({
+            status: false,
+            message: "One or more selected users no longer exist."
+        })
+        expect(await db.select().from(seasonRefs)).toHaveLength(0)
     })
 })

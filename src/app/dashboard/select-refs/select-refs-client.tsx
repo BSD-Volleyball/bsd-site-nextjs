@@ -20,10 +20,11 @@ import {
     RiAddLine,
     RiUserLine,
     RiToggleLine,
-    RiToggleFill
+    RiToggleFill,
+    RiCheckLine
 } from "@remixicon/react"
 import { toast } from "sonner"
-import { formatPlayerName } from "@/lib/utils"
+import { cn, formatPlayerName } from "@/lib/utils"
 import type {
     SelectRefsData,
     SeasonRefRow,
@@ -32,6 +33,7 @@ import type {
 import {
     searchUsersForRef,
     addSeasonRef,
+    addSeasonRefs,
     removeSeasonRef,
     updateSeasonRef,
     getSelectRefsData
@@ -48,11 +50,15 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
         []
     )
     const [isSearching, setIsSearching] = useState(false)
+    const [selectedQuickAdd, setSelectedQuickAdd] = useState<Set<string>>(
+        new Set()
+    )
     const [isPending, startTransition] = useTransition()
 
     const refreshData = useCallback(async () => {
         const updated = await getSelectRefsData()
         setData(updated)
+        setSelectedQuickAdd(new Set())
     }, [])
 
     async function handleSearch(query: string) {
@@ -81,6 +87,35 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
             if (result.status) {
                 toast.success(
                     `Added ${formatPlayerName(user.firstName, user.lastName, user.preferredName)} as a ref`
+                )
+                await refreshData()
+            } else {
+                toast.error(result.message)
+            }
+        })
+    }
+
+    function toggleQuickAdd(userId: string) {
+        setSelectedQuickAdd((prev) => {
+            const next = new Set(prev)
+            if (next.has(userId)) {
+                next.delete(userId)
+            } else {
+                next.add(userId)
+            }
+            return next
+        })
+    }
+
+    function handleQuickAddSelected() {
+        const userIds = [...selectedQuickAdd]
+        if (userIds.length === 0) return
+
+        startTransition(async () => {
+            const result = await addSeasonRefs(userIds)
+            if (result.status) {
+                toast.success(
+                    `Added ${result.data} ref${result.data !== 1 ? "s" : ""}`
                 )
                 await refreshData()
             } else {
@@ -293,6 +328,97 @@ export function SelectRefsClient({ initialData }: SelectRefsClientProps) {
                         </p>
                     )}
             </div>
+
+            {/* Quick add: returning refs from the previous season */}
+            {data.previousSeasonRefs.length > 0 && (
+                <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 className="font-semibold text-base">
+                                Quick Add from {data.previousSeasonLabel}
+                            </h2>
+                            <p className="text-muted-foreground text-sm">
+                                {data.previousSeasonRefs.length} referee
+                                {data.previousSeasonRefs.length !== 1
+                                    ? "s"
+                                    : ""}{" "}
+                                from last season not yet reffing this season.
+                                Click to select, then add.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isPending}
+                                onClick={() =>
+                                    setSelectedQuickAdd(
+                                        selectedQuickAdd.size ===
+                                            data.previousSeasonRefs.length
+                                            ? new Set()
+                                            : new Set(
+                                                  data.previousSeasonRefs.map(
+                                                      (u) => u.id
+                                                  )
+                                              )
+                                    )
+                                }
+                            >
+                                {selectedQuickAdd.size ===
+                                data.previousSeasonRefs.length
+                                    ? "Clear all"
+                                    : "Select all"}
+                            </Button>
+                            <Button
+                                size="sm"
+                                disabled={
+                                    isPending || selectedQuickAdd.size === 0
+                                }
+                                onClick={handleQuickAddSelected}
+                            >
+                                <RiAddLine className="mr-1 h-4 w-4" />
+                                Add{" "}
+                                {selectedQuickAdd.size > 0
+                                    ? selectedQuickAdd.size
+                                    : ""}{" "}
+                                selected
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        {data.previousSeasonRefs.map((user) => {
+                            const selected = selectedQuickAdd.has(user.id)
+                            return (
+                                <button
+                                    key={user.id}
+                                    type="button"
+                                    aria-pressed={selected}
+                                    disabled={isPending}
+                                    onClick={() => toggleQuickAdd(user.id)}
+                                    title={user.email}
+                                    className={cn(
+                                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors disabled:opacity-50",
+                                        selected
+                                            ? "border-primary bg-primary text-primary-foreground"
+                                            : "border-input bg-background hover:bg-muted"
+                                    )}
+                                >
+                                    {selected ? (
+                                        <RiCheckLine className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <RiAddLine className="h-3.5 w-3.5 opacity-60" />
+                                    )}
+                                    {formatPlayerName(
+                                        user.firstName,
+                                        user.lastName,
+                                        user.preferredName
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Active refs table */}
             {data.refs.length === 0 ? (

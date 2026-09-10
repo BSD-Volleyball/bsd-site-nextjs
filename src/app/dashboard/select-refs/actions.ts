@@ -2,7 +2,7 @@
 
 import { db } from "@/database/db"
 import { seasonRefs, users, divisions, seasons } from "@/database/schema"
-import { eq, and, desc, asc, or, ilike } from "drizzle-orm"
+import { eq, and, desc, asc, or, ilike, lt, inArray } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import {
     withAction,
@@ -49,6 +49,8 @@ export interface SelectRefsData {
     seasonLabel: string
     refs: SeasonRefRow[]
     divisions: DivisionRow[]
+    previousSeasonLabel: string | null
+    previousSeasonRefs: UserSearchResultRef[]
 }
 
 export interface UserSearchResultRef {
@@ -82,7 +84,9 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
             seasonId: config.seasonId,
             seasonLabel: "Unknown Season",
             refs: [],
-            divisions: []
+            divisions: [],
+            previousSeasonLabel: null,
+            previousSeasonRefs: []
         }
     }
 
@@ -132,11 +136,59 @@ export async function getSelectRefsData(): Promise<SelectRefsData> {
         .where(eq(divisions.active, true))
         .orderBy(asc(divisions.level))
 
+    // Quick-add pool: active refs from the most recent prior season that had
+    // any refs configured, minus anyone already on this season's roster.
+    const currentRefUserIds = new Set(refs.map((r) => r.userId))
+
+    const [previousSeason] = await db
+        .select({
+            id: seasons.id,
+            year: seasons.year,
+            season: seasons.season
+        })
+        .from(seasons)
+        .innerJoin(seasonRefs, eq(seasonRefs.season_id, seasons.id))
+        .where(lt(seasons.id, config.seasonId))
+        .groupBy(seasons.id, seasons.year, seasons.season)
+        .orderBy(desc(seasons.id))
+        .limit(1)
+
+    let previousSeasonLabel: string | null = null
+    let previousSeasonRefs: UserSearchResultRef[] = []
+
+    if (previousSeason) {
+        previousSeasonLabel = `${previousSeason.season} ${previousSeason.year}`
+
+        const prevRows = await db
+            .select({
+                id: users.id,
+                firstName: users.first_name,
+                lastName: users.last_name,
+                preferredName: users.preferred_name,
+                email: users.email
+            })
+            .from(seasonRefs)
+            .innerJoin(users, eq(seasonRefs.user_id, users.id))
+            .where(
+                and(
+                    eq(seasonRefs.season_id, previousSeason.id),
+                    eq(seasonRefs.is_active, true)
+                )
+            )
+            .orderBy(asc(users.last_name), asc(users.first_name))
+
+        previousSeasonRefs = prevRows.filter(
+            (r) => !currentRefUserIds.has(r.id)
+        )
+    }
+
     return {
         seasonId: config.seasonId,
         seasonLabel,
         refs,
-        divisions: divisionRows
+        divisions: divisionRows,
+        previousSeasonLabel,
+        previousSeasonRefs
     }
 }
 
@@ -178,6 +230,89 @@ export const searchUsersForRef = withAction(
 // Add season ref
 // ---------------------------------------------------------------------------
 
+/**
+ * Inserts one season_refs row (carrying forward the user's most recent prior
+ * season settings) and grants the referee role. Returns false when the user is
+ * already a ref for this season. Callers must have already authorized.
+ */
+async function insertSeasonRef(
+    userId: string,
+    seasonId: number,
+    actorId: string,
+    highestDivisionLevel: number
+): Promise<boolean> {
+    // Check if already a ref this season
+    const [existing] = await db
+        .select({ id: seasonRefs.id })
+        .from(seasonRefs)
+        .where(
+            and(
+                eq(seasonRefs.season_id, seasonId),
+                eq(seasonRefs.user_id, userId)
+            )
+        )
+        .limit(1)
+
+    if (existing) return false
+
+    let isCertified = false
+    let hasW9 = false
+    let passedTest = false
+    let maxDivisionLevel = highestDivisionLevel
+
+    // Use previous season values if they exist and are from a different season
+    const [prevSeasonRef] = await db
+        .select({
+            isCertified: seasonRefs.is_certified,
+            hasW9: seasonRefs.has_w9,
+            passedTest: seasonRefs.passed_test,
+            maxDivisionLevel: seasonRefs.max_division_level,
+            seasonId: seasonRefs.season_id
+        })
+        .from(seasonRefs)
+        .innerJoin(seasons, eq(seasonRefs.season_id, seasons.id))
+        .where(eq(seasonRefs.user_id, userId))
+        .orderBy(desc(seasons.id))
+        .limit(1)
+
+    if (prevSeasonRef && prevSeasonRef.seasonId !== seasonId) {
+        isCertified = prevSeasonRef.isCertified
+        hasW9 = prevSeasonRef.hasW9
+        passedTest = prevSeasonRef.passedTest
+        maxDivisionLevel = prevSeasonRef.maxDivisionLevel
+    }
+
+    await db.insert(seasonRefs).values({
+        season_id: seasonId,
+        user_id: userId,
+        is_certified: isCertified,
+        has_w9: hasW9,
+        passed_test: passedTest,
+        is_active: true,
+        max_division_level: maxDivisionLevel
+    })
+
+    // Grant referee RBAC role for this season
+    await grantRole(userId, "referee", {
+        seasonId,
+        grantedBy: actorId
+    })
+
+    return true
+}
+
+/** Highest active division level, used as the default max for new refs. */
+async function getHighestDivisionLevel(): Promise<number> {
+    const activeDivisions = await db
+        .select({ level: divisions.level })
+        .from(divisions)
+        .where(eq(divisions.active, true))
+        .orderBy(desc(divisions.level))
+        .limit(1)
+
+    return activeDivisions[0]?.level ?? 1
+}
+
 export const addSeasonRef = withAction(
     async (userId: string): Promise<ActionResult> => {
         const session = await requireSession()
@@ -185,74 +320,17 @@ export const addSeasonRef = withAction(
         const config = await requireSeasonConfig()
         requireNonEmptyString(userId, "User ID")
 
-        // Check if already a ref this season
-        const [existing] = await db
-            .select({ id: seasonRefs.id })
-            .from(seasonRefs)
-            .where(
-                and(
-                    eq(seasonRefs.season_id, config.seasonId),
-                    eq(seasonRefs.user_id, userId)
-                )
-            )
-            .limit(1)
+        const highestLevel = await getHighestDivisionLevel()
+        const added = await insertSeasonRef(
+            userId,
+            config.seasonId,
+            session.user.id,
+            highestLevel
+        )
 
-        if (existing) {
+        if (!added) {
             return fail("User is already a ref for this season.")
         }
-
-        // Get active divisions for default max level
-        const activeDivisions = await db
-            .select({ level: divisions.level })
-            .from(divisions)
-            .where(eq(divisions.active, true))
-            .orderBy(desc(divisions.level))
-            .limit(1)
-
-        const highestLevel = activeDivisions[0]?.level ?? 1
-
-        let isCertified = false
-        let hasW9 = false
-        let passedTest = false
-        let maxDivisionLevel = highestLevel
-
-        // Use previous season values if they exist and are from a different season
-        const [prevSeasonRef] = await db
-            .select({
-                isCertified: seasonRefs.is_certified,
-                hasW9: seasonRefs.has_w9,
-                passedTest: seasonRefs.passed_test,
-                maxDivisionLevel: seasonRefs.max_division_level,
-                seasonId: seasonRefs.season_id
-            })
-            .from(seasonRefs)
-            .innerJoin(seasons, eq(seasonRefs.season_id, seasons.id))
-            .where(eq(seasonRefs.user_id, userId))
-            .orderBy(desc(seasons.id))
-            .limit(1)
-
-        if (prevSeasonRef && prevSeasonRef.seasonId !== config.seasonId) {
-            isCertified = prevSeasonRef.isCertified
-            hasW9 = prevSeasonRef.hasW9
-            passedTest = prevSeasonRef.passedTest
-            maxDivisionLevel = prevSeasonRef.maxDivisionLevel
-        }
-
-        await db.insert(seasonRefs).values({
-            season_id: config.seasonId,
-            user_id: userId,
-            is_certified: isCertified,
-            has_w9: hasW9,
-            passed_test: passedTest,
-            is_active: true,
-            max_division_level: maxDivisionLevel
-        })
-
-        // Grant referee RBAC role for this season
-        await grantRole(userId, "referee", {
-            seasonId: config.seasonId,
-            grantedBy: session.user.id
-        })
 
         await logAuditEntry({
             userId: session.user.id,
@@ -264,6 +342,64 @@ export const addSeasonRef = withAction(
 
         revalidatePath("/dashboard/select-refs")
         return ok()
+    }
+)
+
+// ---------------------------------------------------------------------------
+// Add several season refs at once (quick add from previous season)
+// ---------------------------------------------------------------------------
+
+export const addSeasonRefs = withAction(
+    async (userIds: string[]): Promise<ActionResult<number>> => {
+        const session = await requireSession()
+        await requirePermission("schedule:manage")
+        const config = await requireSeasonConfig()
+
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            throw new ActionError("Select at least one referee to add.")
+        }
+        for (const id of userIds) {
+            requireNonEmptyString(id, "User ID")
+        }
+
+        // De-dupe and confirm every id is a real user before touching anything.
+        const uniqueIds = [...new Set(userIds)]
+        const found = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(inArray(users.id, uniqueIds))
+
+        if (found.length !== uniqueIds.length) {
+            throw new ActionError("One or more selected users no longer exist.")
+        }
+
+        const highestLevel = await getHighestDivisionLevel()
+
+        let addedCount = 0
+        for (const id of uniqueIds) {
+            const added = await insertSeasonRef(
+                id,
+                config.seasonId,
+                session.user.id,
+                highestLevel
+            )
+            if (added) addedCount++
+        }
+
+        if (addedCount === 0) {
+            return fail("Those users are already refs for this season.")
+        }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create",
+            entityType: "season_refs",
+            entityId: String(config.seasonId),
+            summary: `Added ${addedCount} ref(s) to season ${config.seasonId} from the previous season roster`
+        })
+
+        revalidatePath("/dashboard/select-refs")
+        return ok(addedCount)
     }
 )
 
