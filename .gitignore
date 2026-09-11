@@ -60,3 +60,9 @@ cache/
 
 # local one-off data snapshots (contains member PII, never commit)
 /scripts/data/
+
+# Cloudflare Workers (workers/*): standalone packages
+workers/**/node_modules
+workers/**/.wrangler
+workers/**/.dev.vars
+workers/**/worker-configuration.d.ts

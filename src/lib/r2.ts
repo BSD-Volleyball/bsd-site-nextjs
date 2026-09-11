@@ -10,6 +10,7 @@ import { requireEnv } from "@/lib/utils"
 
 const R2_REGION = "auto"
 const UPLOAD_TTL_SECONDS = 60
+const DOWNLOAD_TTL_SECONDS = 60
 // 10 MB — comfortable ceiling for a player headshot JPEG; adjust per-feature
 // via the `maxContentLength` param if needed.
 export const PLAYER_PICTURE_MAX_BYTES = 10 * 1024 * 1024
@@ -121,6 +122,30 @@ export async function putR2Object(params: {
     })
 
     await getR2Client().send(command)
+}
+
+/**
+ * Short-lived signed GET for a staff download. The browser fetches the bytes
+ * from R2 directly, so an attachment of any size never has to fit through a
+ * Vercel function response. The Content-Type/Disposition overrides are
+ * signed into the URL, so R2 serves exactly what the app decided.
+ */
+export async function createAttachmentDownloadPresignedUrl(params: {
+    key: string
+    contentType: string
+    contentDisposition: string
+}): Promise<string> {
+    const command = new GetObjectCommand({
+        Bucket: getR2Bucket(),
+        Key: params.key,
+        ResponseContentType: params.contentType,
+        ResponseContentDisposition: params.contentDisposition,
+        ResponseCacheControl: "private, no-store"
+    })
+
+    return getSignedUrl(getR2Client(), command, {
+        expiresIn: DOWNLOAD_TTL_SECONDS
+    })
 }
 
 export interface R2ObjectStream {

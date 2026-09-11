@@ -32,6 +32,11 @@ import {
     type PostmarkAttachment,
     storeInboundAttachments
 } from "@/lib/email-attachments"
+import { deleteR2Object, getR2Object } from "@/lib/r2"
+
+// A spooled inbound message can carry up to 35 MB of attachments; fetching,
+// parsing and re-uploading those needs more than the default budget.
+export const maxDuration = 300
 
 // ---------------------------------------------------------------------------
 // Postmark Inbound Email Payload (subset of fields we use)
@@ -101,6 +106,53 @@ interface PostmarkSpamComplaintPayload {
     MessageStream: string
     Email: string
     BouncedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Spooled inbound envelope (our own, not Postmark's)
+//
+// Vercel rejects request bodies over 4.5 MB at the edge, while Postmark
+// inlines up to 35 MB of attachments as base64. The Cloudflare Worker in
+// workers/postmark-inbound/ takes Postmark's POST, streams the raw JSON into
+// R2, and calls this route with only the object key. Everything else about
+// inbound handling is unchanged: the spooled JSON is the exact Postmark
+// payload and goes through the same dispatch as an inline one.
+// ---------------------------------------------------------------------------
+
+interface PostmarkSpooledEnvelope {
+    RecordType: "BSDSpooledInbound"
+    /** R2 object key holding the verbatim Postmark JSON. */
+    SpoolKey: string
+    /** Byte length the Worker wrote, cross-checked against the object. */
+    ContentLength: number
+}
+
+const SPOOL_KEY_PATTERN =
+    /^inbound-spool\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.json$/
+// Postmark caps attachments at 35 MB (~48 MB base64); anything near the
+// Worker's own 90 MB cap is a RawEmail regression, not a legitimate email.
+const SPOOL_MAX_BYTES = 120 * 1024 * 1024
+
+/** Shape-check the envelope; the key pattern also pins it to our prefix. */
+function parseSpooledEnvelope(
+    payload: Record<string, unknown>
+): PostmarkSpooledEnvelope | null {
+    const key = payload.SpoolKey
+    const length = payload.ContentLength
+    if (typeof key !== "string" || !SPOOL_KEY_PATTERN.test(key)) return null
+    if (
+        typeof length !== "number" ||
+        !Number.isInteger(length) ||
+        length <= 0 ||
+        length > SPOOL_MAX_BYTES
+    ) {
+        return null
+    }
+    return {
+        RecordType: "BSDSpooledInbound",
+        SpoolKey: key,
+        ContentLength: length
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +578,31 @@ async function findRecordedMessage(
     return null
 }
 
+/** Postgres unique_violation, whether raised directly or wrapped by Drizzle. */
+function isUniqueViolation(error: unknown): boolean {
+    const code = (error as { code?: unknown })?.code
+    if (code === "23505") return true
+    const cause = (error as { cause?: { code?: unknown } })?.cause
+    return cause?.code === "23505"
+}
+
+/**
+ * Run an insert keyed by a Postmark MessageID. The partial unique indexes on
+ * those columns turn an overlapping redelivery (Postmark retrying while a
+ * slow first attempt is still running) into a unique violation here, which
+ * is reported as `null` so the caller can stop without minting a duplicate.
+ */
+async function insertUnlessRedelivered<T>(
+    insert: () => Promise<T>
+): Promise<T | null> {
+    try {
+        return await insert()
+    } catch (error) {
+        if (isUniqueViolation(error)) return null
+        throw error
+    }
+}
+
 async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const messageId = payload.MessageID
 
@@ -605,18 +682,28 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 .where(eq(inboundEmails.id, existingThread.id))
                 .limit(1)
 
-            const [received] = await db
-                .insert(inboundEmailReceived)
-                .values({
-                    email_id: existingThread.id,
-                    from_address: fromEmail,
-                    from_name: fromName,
-                    subject,
-                    body_text: bodyText,
-                    body_html: bodyHtml,
-                    postmark_message_id: messageId
-                })
-                .returning({ id: inboundEmailReceived.id })
+            const received = await insertUnlessRedelivered(async () => {
+                const [row] = await db
+                    .insert(inboundEmailReceived)
+                    .values({
+                        email_id: existingThread.id,
+                        from_address: fromEmail,
+                        from_name: fromName,
+                        subject,
+                        body_text: bodyText,
+                        body_html: bodyHtml,
+                        postmark_message_id: messageId
+                    })
+                    .returning({ id: inboundEmailReceived.id })
+                return row
+            })
+            if (!received) {
+                logger.info(
+                    "[postmark-webhook] Ignored concurrent redelivery",
+                    { threadType: "email", ticketId: existingThread.id }
+                )
+                return
+            }
             await storeInboundAttachments({
                 parentType: "email_received",
                 parentId: received.id,
@@ -664,18 +751,28 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
                 .where(eq(concerns.id, existingThread.id))
                 .limit(1)
 
-            const [received] = await db
-                .insert(concernReceived)
-                .values({
-                    concern_id: existingThread.id,
-                    from_address: fromEmail,
-                    from_name: fromName,
-                    subject,
-                    body_text: bodyText,
-                    body_html: bodyHtml,
-                    postmark_message_id: messageId
-                })
-                .returning({ id: concernReceived.id })
+            const received = await insertUnlessRedelivered(async () => {
+                const [row] = await db
+                    .insert(concernReceived)
+                    .values({
+                        concern_id: existingThread.id,
+                        from_address: fromEmail,
+                        from_name: fromName,
+                        subject,
+                        body_text: bodyText,
+                        body_html: bodyHtml,
+                        postmark_message_id: messageId
+                    })
+                    .returning({ id: concernReceived.id })
+                return row
+            })
+            if (!received) {
+                logger.info(
+                    "[postmark-webhook] Ignored concurrent redelivery",
+                    { threadType: "concern", ticketId: existingThread.id }
+                )
+                return
+            }
             await storeInboundAttachments({
                 parentType: "concern_received",
                 parentId: received.id,
@@ -714,24 +811,33 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     }
 
     if (isConcern) {
-        const [createdConcern] = await db
-            .insert(concerns)
-            .values({
-                user_id: null,
-                anonymous: false,
-                contact_name: fromName,
-                contact_email: fromEmail,
-                contact_phone: null,
-                want_followup: false,
-                incident_date: new Date().toISOString().split("T")[0],
-                location: "Submitted via email",
-                person_involved: subject,
-                description: bodyText || bodyHtml || "(No email body)",
-                status: "new",
-                source: "email",
-                source_email_id: messageId
+        const createdConcern = await insertUnlessRedelivered(async () => {
+            const [row] = await db
+                .insert(concerns)
+                .values({
+                    user_id: null,
+                    anonymous: false,
+                    contact_name: fromName,
+                    contact_email: fromEmail,
+                    contact_phone: null,
+                    want_followup: false,
+                    incident_date: new Date().toISOString().split("T")[0],
+                    location: "Submitted via email",
+                    person_involved: subject,
+                    description: bodyText || bodyHtml || "(No email body)",
+                    status: "new",
+                    source: "email",
+                    source_email_id: messageId
+                })
+                .returning({ id: concerns.id })
+            return row
+        })
+        if (!createdConcern) {
+            logger.info("[postmark-webhook] Ignored concurrent redelivery", {
+                threadType: "concern"
             })
-            .returning({ id: concerns.id })
+            return
+        }
         await storeInboundAttachments({
             parentType: "concern",
             parentId: createdConcern.id,
@@ -740,19 +846,28 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
         })
         await notifyQuietly(() => notifyOmbudsmen(appUrl), "ombudsmen")
     } else {
-        const [created] = await db
-            .insert(inboundEmails)
-            .values({
-                email_id: messageId,
-                from_address: fromEmail,
-                from_name: fromName,
-                to_address: toAddresses[0] || payload.To,
-                subject,
-                body_text: bodyText,
-                body_html: bodyHtml,
-                status: "new"
+        const created = await insertUnlessRedelivered(async () => {
+            const [row] = await db
+                .insert(inboundEmails)
+                .values({
+                    email_id: messageId,
+                    from_address: fromEmail,
+                    from_name: fromName,
+                    to_address: toAddresses[0] || payload.To,
+                    subject,
+                    body_text: bodyText,
+                    body_html: bodyHtml,
+                    status: "new"
+                })
+                .returning({ id: inboundEmails.id })
+            return row
+        })
+        if (!created) {
+            logger.info("[postmark-webhook] Ignored concurrent redelivery", {
+                threadType: "email"
             })
-            .returning({ id: inboundEmails.id })
+            return
+        }
         await storeInboundAttachments({
             parentType: "email",
             parentId: created.id,
@@ -1051,6 +1166,121 @@ function verifyWebhookAuth(request: NextRequest): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Dispatch
+// ---------------------------------------------------------------------------
+
+/** Route a Postmark payload — inline or spooled — to its handler. */
+async function dispatchPostmarkPayload(payload: Record<string, unknown>) {
+    // Postmark uses RecordType to distinguish webhook types
+    if (payload.RecordType === "SubscriptionChange") {
+        await handleSubscriptionChange(
+            payload as unknown as PostmarkSubscriptionChangePayload
+        )
+        return
+    }
+
+    if (payload.RecordType === "Bounce") {
+        await handleBounce(payload as unknown as PostmarkBouncePayload)
+        return
+    }
+
+    if (payload.RecordType === "SpamComplaint") {
+        await handleSpamComplaint(
+            payload as unknown as PostmarkSpamComplaintPayload
+        )
+        return
+    }
+
+    // Inbound emails have no RecordType but have MessageID + From + To
+    if (payload.MessageID && payload.From && !payload.RecordType) {
+        await handleInboundEmail(payload as unknown as PostmarkInboundPayload)
+        return
+    }
+
+    // Other webhook types (bounces, opens, etc.) — acknowledge but ignore
+    logger.info("[postmark-webhook] Unhandled RecordType", {
+        recordType: payload.RecordType ?? "unknown"
+    })
+}
+
+/**
+ * Process an inbound message the Worker spooled to R2. A 400 makes Postmark
+ * retry through the Worker, which spools a fresh copy under a new key, so
+ * the object is deleted only after success; failures leave it for the
+ * bucket's lifecycle rule (and for debugging).
+ */
+async function handleSpooledInbound(
+    payload: Record<string, unknown>
+): Promise<NextResponse> {
+    const envelope = parseSpooledEnvelope(payload)
+    if (!envelope) {
+        logger.warn("[postmark-webhook] Rejected malformed spool envelope", {
+            spoolKey: String(payload.SpoolKey ?? "")
+        })
+        return NextResponse.json({ error: "Bad envelope" }, { status: 400 })
+    }
+    const { SpoolKey: spoolKey, ContentLength: contentLength } = envelope
+
+    const object = await getR2Object(spoolKey)
+    if (!object) {
+        logger.error("[postmark-webhook] Spool object missing", { spoolKey })
+        return NextResponse.json({ error: "Spool missing" }, { status: 400 })
+    }
+    if (
+        object.contentLength !== null &&
+        object.contentLength !== contentLength
+    ) {
+        logger.error("[postmark-webhook] Spool object length mismatch", {
+            spoolKey,
+            expected: contentLength,
+            actual: object.contentLength
+        })
+        return NextResponse.json({ error: "Spool truncated" }, { status: 400 })
+    }
+
+    let inner: unknown
+    try {
+        inner = await new Response(object.body).json()
+    } catch {
+        logger.error("[postmark-webhook] Spool object is not JSON", {
+            spoolKey
+        })
+        return NextResponse.json({ error: "Spool unreadable" }, { status: 400 })
+    }
+    if (typeof inner !== "object" || inner === null) {
+        logger.error("[postmark-webhook] Spool object is not a JSON object", {
+            spoolKey
+        })
+        return NextResponse.json({ error: "Spool unreadable" }, { status: 400 })
+    }
+
+    try {
+        await dispatchPostmarkPayload(inner as Record<string, unknown>)
+    } catch (error) {
+        logger.error("[postmark-webhook] Spooled message failed", {
+            spoolKey,
+            error: error instanceof Error ? error.message : String(error)
+        })
+        throw error
+    }
+
+    try {
+        await deleteR2Object(spoolKey)
+    } catch (error) {
+        // Lifecycle expiry cleans it up; never fail a processed message here.
+        logger.warn("[postmark-webhook] Could not delete spool object", {
+            spoolKey,
+            error: error instanceof Error ? error.message : String(error)
+        })
+    }
+    logger.info("[postmark-webhook] Processed spooled message", {
+        spoolKey,
+        contentLength
+    })
+    return NextResponse.json({ received: true })
+}
+
+// ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
@@ -1060,36 +1290,13 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const payload = await request.json()
+        const payload = (await request.json()) as Record<string, unknown>
 
-        // Postmark uses RecordType to distinguish webhook types
-        if (payload.RecordType === "SubscriptionChange") {
-            await handleSubscriptionChange(
-                payload as PostmarkSubscriptionChangePayload
-            )
-            return NextResponse.json({ received: true })
+        if (payload.RecordType === "BSDSpooledInbound") {
+            return await handleSpooledInbound(payload)
         }
 
-        if (payload.RecordType === "Bounce") {
-            await handleBounce(payload as PostmarkBouncePayload)
-            return NextResponse.json({ received: true })
-        }
-
-        if (payload.RecordType === "SpamComplaint") {
-            await handleSpamComplaint(payload as PostmarkSpamComplaintPayload)
-            return NextResponse.json({ received: true })
-        }
-
-        // Inbound emails have no RecordType but have MessageID + From + To
-        if (payload.MessageID && payload.From && !payload.RecordType) {
-            await handleInboundEmail(payload as PostmarkInboundPayload)
-            return NextResponse.json({ received: true })
-        }
-
-        // Other webhook types (bounces, opens, etc.) — acknowledge but ignore
-        logger.info("[postmark-webhook] Unhandled RecordType", {
-            recordType: payload.RecordType ?? "unknown"
-        })
+        await dispatchPostmarkPayload(payload)
         return NextResponse.json({ received: true })
     } catch (error) {
         logger.error(

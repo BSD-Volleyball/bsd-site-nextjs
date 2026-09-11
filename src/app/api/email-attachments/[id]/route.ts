@@ -2,8 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { type AttachmentParentType, emailAttachments } from "@/database/schema"
+import { attachmentContentDisposition } from "@/lib/email-attachments"
 import type { Permission } from "@/lib/permissions"
-import { getR2Object } from "@/lib/r2"
+import { createAttachmentDownloadPresignedUrl } from "@/lib/r2"
 import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 
@@ -25,17 +26,18 @@ function mayInline(contentType: string): boolean {
     return contentType.startsWith("image/") && contentType !== "image/svg+xml"
 }
 
-/** RFC 6266 Content-Disposition with an ASCII fallback plus UTF-8 filename*. */
-function contentDisposition(type: "inline" | "attachment", filename: string) {
-    const ascii = filename.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'")
-    return `${type}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`
-}
-
 /**
- * Streams an inbound-email attachment from R2 to a staff member who may view
- * the ticket it belongs to. Every failure — bad id, no session, wrong role,
- * missing object — is a bare 404 so the route never confirms an attachment
- * exists to someone who can't see it.
+ * Hands a staff member who may view the ticket a short-lived signed R2 URL
+ * for one of its attachments. The bytes go browser ↔ R2 directly: Vercel caps
+ * a function response at 4.5 MB, and Postmark allows 35 MB of attachments.
+ * Browsers follow the 302 for both `<a download>` and `<img src>`; R2's
+ * signed Content-Disposition keeps the filename on cross-origin downloads.
+ *
+ * Every failure — bad id, no session, wrong role — is a bare 404 so the
+ * route never confirms an attachment exists to someone who can't see it.
+ *
+ * The Vercel WAF challenges non-browser clients site-wide; a custom bypass
+ * rule for GET /api/email-attachments/ keeps `<a download>` fetches working.
  */
 export async function GET(
     request: NextRequest,
@@ -66,28 +68,21 @@ export async function GET(
     })
     if (!allowed) return notFound()
 
-    const object = await getR2Object(row.r2_key)
-    if (!object) return notFound()
-
     const inline =
         request.nextUrl.searchParams.get("inline") === "1" &&
         mayInline(row.content_type)
 
-    // Buffer rather than stream: attachments are small (Postmark caps a
-    // message at 35 MB) and a fully materialised body lets the platform set
-    // Content-Length/encoding itself, so nothing can disagree about length.
-    const bytes = await new Response(object.body).arrayBuffer()
+    const url = await createAttachmentDownloadPresignedUrl({
+        key: row.r2_key,
+        contentType: row.content_type,
+        contentDisposition: attachmentContentDisposition(
+            inline ? "inline" : "attachment",
+            row.filename
+        )
+    })
 
-    return new NextResponse(bytes, {
-        status: 200,
-        headers: {
-            "Content-Type": row.content_type,
-            "Content-Disposition": contentDisposition(
-                inline ? "inline" : "attachment",
-                row.filename
-            ),
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff"
-        }
+    return NextResponse.redirect(url, {
+        status: 302,
+        headers: { "Cache-Control": "private, no-store" }
     })
 }

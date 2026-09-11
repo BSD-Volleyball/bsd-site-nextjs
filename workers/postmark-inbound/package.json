@@ -1,0 +1,27 @@
+{
+    "name": "bsd-postmark-inbound",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Front door for Postmark's inbound webhook: spools the (up to ~50 MB) JSON into R2 so the Vercel app only receives an object key.",
+    "scripts": {
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "types": "wrangler types",
+        "check-types": "wrangler types && tsc --noEmit",
+        "test": "vitest run",
+        "tail": "wrangler tail"
+    },
+    "devDependencies": {
+        "@cloudflare/vitest-plugin": "1.1.8",
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.10",
+        "wrangler": "4.131.1"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "workerd",
+            "esbuild"
+        ]
+    }
+}

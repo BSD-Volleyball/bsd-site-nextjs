@@ -167,10 +167,21 @@ Common environment variables used across the app include:
 - `MAIL_FROM`
 - `NEXT_PUBLIC_APP_URL`
 - `PLAYER_PIC_URL`
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (Cloudflare R2 via the S3 API: player pictures, inbound email attachments, the inbound-email spool)
+- `INBOUND_CONCERN_ADDRESS` (inbound mail to this address becomes a concern instead of an admin email ticket)
 - `SQUARE_ACCESS_TOKEN`
 - `SQUARE_ENVIRONMENT`
 - `NEXT_PUBLIC_SQUARE_APP_ID`
 - `NEXT_PUBLIC_SQUARE_LOCATION_ID`
+
+## Inbound Email (Postmark → Cloudflare Worker → app)
+
+- Postmark's inbound webhook inlines attachments as base64 (up to 35 MB per message, ~50 MB of JSON). Vercel rejects request bodies over 4.5 MB at the edge, so Postmark does **not** post to the app directly: its `InboundHookUrl` is the Cloudflare Worker in `workers/postmark-inbound/` (`https://hooks.bumpsetdrink.com/postmark/inbound`).
+- The Worker verifies the same Basic credentials, streams the raw JSON into R2 under `inbound-spool/<uuid>.json`, then POSTs a `{ RecordType: "BSDSpooledInbound", SpoolKey, ContentLength }` envelope to `/api/webhooks/postmark`. The route fetches the object, runs the normal inbound dispatch, and deletes it; a bucket lifecycle rule expires stragglers after 3 days. Bounce/spam/subscription webhooks still post to the app directly.
+- The Worker is a standalone pnpm package (not a workspace member; the Vercel build never installs it). `pnpm worker:install`, `pnpm worker:test` (runs inside the Workers runtime with a local R2), `pnpm worker:check-types`, `pnpm worker:deploy` (`wrangler deploy`, needs a Cloudflare login). Secrets `WEBHOOK_USER`/`WEBHOOK_PASSWORD` are set with `wrangler secret put` and must equal the app's `POSTMARK_WEBHOOK_USER`/`POSTMARK_WEBHOOK_PASSWORD`. See `workers/postmark-inbound/README.md` for the runbook.
+- Keep "Include raw email" **off** on the Postmark server: it doubles the payload and the Worker refuses bodies over 90 MB.
+- The Vercel WAF challenges non-browser clients site-wide; `POST /api/webhooks/postmark` and `GET /api/email-attachments/` have custom bypass rules. Any new machine-facing endpoint needs one too.
+- Staff attachment downloads (`/api/email-attachments/[id]`) redirect to a 60-second presigned R2 URL rather than proxying bytes, because Vercel also caps function responses at 4.5 MB.
 
 ## Agent Behavior Expectations
 

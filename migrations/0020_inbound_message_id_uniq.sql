@@ -1,0 +1,4 @@
+CREATE UNIQUE INDEX "concern_received_message_id_uniq" ON "concern_received" USING btree ("postmark_message_id") WHERE "concern_received"."postmark_message_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "concerns_source_email_id_uniq" ON "concerns" USING btree ("source_email_id") WHERE "concerns"."source_email_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "inbound_email_received_message_id_uniq" ON "inbound_email_received" USING btree ("postmark_message_id") WHERE "inbound_email_received"."postmark_message_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "inbound_emails_email_id_uniq" ON "inbound_emails" USING btree ("email_id") WHERE "inbound_emails"."email_id" IS NOT NULL;

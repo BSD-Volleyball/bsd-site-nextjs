@@ -19,6 +19,10 @@
         "test:coverage": "vitest run --coverage",
         "test:e2e": "playwright test",
         "test:e2e:ui": "playwright test --ui",
+        "worker:install": "pnpm --dir workers/postmark-inbound install --frozen-lockfile",
+        "worker:check-types": "pnpm --dir workers/postmark-inbound check-types",
+        "worker:test": "pnpm --dir workers/postmark-inbound test",
+        "worker:deploy": "pnpm --dir workers/postmark-inbound deploy",
         "format": "biome check --write"
     },
     "dependencies": {

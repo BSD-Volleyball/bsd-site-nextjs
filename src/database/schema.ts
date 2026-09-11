@@ -1111,7 +1111,12 @@ export const concerns = pgTable(
         concernsAssignedToIdx: index("concerns_assigned_to_idx").on(
             table.assigned_to
         ),
-        concernsUserIdx: index("concerns_user_idx").on(table.user_id)
+        concernsUserIdx: index("concerns_user_idx").on(table.user_id),
+        // One ticket per Postmark MessageID; makes the webhook's
+        // read-then-insert dedupe safe against overlapping redeliveries.
+        concernsSourceEmailIdUniq: uniqueIndex("concerns_source_email_id_uniq")
+            .on(table.source_email_id)
+            .where(sql`${table.source_email_id} IS NOT NULL`)
     })
 )
 
@@ -1176,7 +1181,12 @@ export const concernReceived = pgTable(
     (table) => ({
         concernReceivedConcernIdx: index("concern_received_concern_idx").on(
             table.concern_id
+        ),
+        concernReceivedMessageIdUniq: uniqueIndex(
+            "concern_received_message_id_uniq"
         )
+            .on(table.postmark_message_id)
+            .where(sql`${table.postmark_message_id} IS NOT NULL`)
     })
 )
 
@@ -1209,7 +1219,12 @@ export const inboundEmails = pgTable(
         ),
         inboundEmailsEmailIdIdx: index("inbound_emails_email_id_idx").on(
             table.email_id
-        )
+        ),
+        // One ticket per Postmark MessageID; makes the webhook's
+        // read-then-insert dedupe safe against overlapping redeliveries.
+        inboundEmailsEmailIdUniq: uniqueIndex("inbound_emails_email_id_uniq")
+            .on(table.email_id)
+            .where(sql`${table.email_id} IS NOT NULL`)
     })
 )
 
@@ -1274,7 +1289,12 @@ export const inboundEmailReceived = pgTable(
     (table) => ({
         inboundEmailReceivedEmailIdx: index(
             "inbound_email_received_email_idx"
-        ).on(table.email_id)
+        ).on(table.email_id),
+        inboundEmailReceivedMessageIdUniq: uniqueIndex(
+            "inbound_email_received_message_id_uniq"
+        )
+            .on(table.postmark_message_id)
+            .where(sql`${table.postmark_message_id} IS NOT NULL`)
     })
 )
 

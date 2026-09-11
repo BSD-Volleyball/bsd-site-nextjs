@@ -12,7 +12,7 @@ import {
     users
 } from "@/database/schema"
 import { sendBatchEmails, sendEmail } from "@/lib/postmark"
-import { putR2Object } from "@/lib/r2"
+import { deleteR2Object, getR2Object, putR2Object } from "@/lib/r2"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { POST } from "./route"
 
@@ -712,5 +712,252 @@ describe("inbound attachments", () => {
         await POST(webhookRequest(inboundWithAttachments({ Attachments: [] })))
         expect(await db.select().from(emailAttachments)).toHaveLength(0)
         expect(vi.mocked(putR2Object)).not.toHaveBeenCalled()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Spooled inbound — the Cloudflare Worker streams Postmark's JSON into R2 and
+// posts only the object key; the route fetches, dispatches, and deletes it.
+// ---------------------------------------------------------------------------
+
+describe("spooled inbound", () => {
+    const SPOOL_KEY = "inbound-spool/0f1e2d3c-4b5a-4978-8a6b-5c4d3e2f1a0b.json"
+    const FILE_BYTES = Buffer.from("spooled-file")
+
+    function inboundPayload(overrides: Record<string, unknown> = {}) {
+        return {
+            MessageID: "spool-1",
+            From: "outsider@example.test",
+            FromName: "An Outsider",
+            To: "info@bumpsetdrink.com",
+            Subject: "Big photo",
+            TextBody: "See attached.",
+            HtmlBody: "<p>See attached.</p>",
+            Attachments: [
+                {
+                    Name: "photo.jpg",
+                    Content: FILE_BYTES.toString("base64"),
+                    ContentType: "image/jpeg",
+                    ContentLength: FILE_BYTES.length,
+                    ContentID: ""
+                }
+            ],
+            ...overrides
+        }
+    }
+
+    /** Make the R2 mock hand back `payload` as the spooled object. */
+    function spool(payload: unknown, lengthOverride?: number) {
+        const json = JSON.stringify(payload)
+        const contentLength = Buffer.byteLength(json)
+        vi.mocked(getR2Object).mockResolvedValueOnce({
+            body: new Blob([json]).stream(),
+            contentType: "application/json",
+            contentLength: lengthOverride ?? contentLength
+        })
+        return contentLength
+    }
+
+    function envelope(overrides: Record<string, unknown> = {}) {
+        return {
+            RecordType: "BSDSpooledInbound",
+            SpoolKey: SPOOL_KEY,
+            ContentLength: 1,
+            ...overrides
+        }
+    }
+
+    it("processes the spooled payload and deletes the spool object", async () => {
+        await createUser()
+        const length = spool(inboundPayload())
+
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: length }))
+        )
+
+        expect(response.status).toBe(200)
+        expect(vi.mocked(getR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
+        const tickets = await db.select().from(inboundEmails)
+        expect(tickets).toHaveLength(1)
+        expect(tickets[0]).toMatchObject({
+            email_id: "spool-1",
+            subject: "Big photo"
+        })
+        const files = await db.select().from(emailAttachments)
+        expect(files).toHaveLength(1)
+        expect(files[0]).toMatchObject({
+            parent_type: "email",
+            parent_id: tickets[0].id,
+            filename: "photo.jpg",
+            size_bytes: FILE_BYTES.length
+        })
+        expect(vi.mocked(putR2Object)).toHaveBeenCalledWith(
+            expect.objectContaining({ body: FILE_BYTES })
+        )
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
+    })
+
+    it("still requires the webhook credentials", async () => {
+        const response = await POST(webhookRequest(envelope(), null))
+        expect(response.status).toBe(401)
+        expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
+    })
+
+    it("rejects a missing spool object without deleting anything", async () => {
+        // Default getR2Object mock resolves null.
+        const response = await POST(webhookRequest(envelope()))
+
+        expect(response.status).toBe(400)
+        expect(await db.select().from(inboundEmails)).toHaveLength(0)
+        expect(vi.mocked(deleteR2Object)).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        ["wrong prefix", "email-attachments/x/0-secret.pdf"],
+        ["path traversal", "inbound-spool/../users.json"],
+        ["not a uuid", "inbound-spool/latest.json"],
+        [
+            "uuid-ish garbage",
+            "inbound-spool/------------------------------------.json"
+        ]
+    ])("rejects a bad SpoolKey (%s) before touching R2", async (_, key) => {
+        const response = await POST(
+            webhookRequest(envelope({ SpoolKey: key, ContentLength: 10 }))
+        )
+        expect(response.status).toBe(400)
+        expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
+    })
+
+    it.each([
+        0,
+        -1,
+        1.5,
+        "10",
+        200 * 1024 * 1024
+    ])("rejects a bad ContentLength (%s) before touching R2", async (length) => {
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: length }))
+        )
+        expect(response.status).toBe(400)
+        expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
+    })
+
+    it("rejects a spool object whose length disagrees with the envelope", async () => {
+        await createUser()
+        const length = spool(inboundPayload())
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: length + 1 }))
+        )
+        expect(response.status).toBe(400)
+        expect(await db.select().from(inboundEmails)).toHaveLength(0)
+        expect(vi.mocked(deleteR2Object)).not.toHaveBeenCalled()
+    })
+
+    it("rejects a spool object that is not JSON and keeps it", async () => {
+        vi.mocked(getR2Object).mockResolvedValueOnce({
+            body: new Blob(["{not json"]).stream(),
+            contentType: "application/json",
+            contentLength: 9
+        })
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: 9 }))
+        )
+        expect(response.status).toBe(400)
+        expect(vi.mocked(deleteR2Object)).not.toHaveBeenCalled()
+    })
+
+    it("keeps the spool object when processing throws", async () => {
+        // A spooled inbound whose To is missing makes handleInboundEmail throw.
+        const length = spool(
+            inboundPayload({ To: undefined, ToFull: undefined })
+        )
+        const response = await POST(
+            webhookRequest(envelope({ ContentLength: length }))
+        )
+        expect(response.status).toBe(400)
+        expect(vi.mocked(deleteR2Object)).not.toHaveBeenCalled()
+    })
+
+    it("treats a second spool of the same MessageID as a redelivery", async () => {
+        await createUser()
+        const first = spool(inboundPayload())
+        await POST(webhookRequest(envelope({ ContentLength: first })))
+
+        const otherKey =
+            "inbound-spool/11111111-2222-4333-8444-555555555555.json"
+        const second = spool(inboundPayload())
+        const response = await POST(
+            webhookRequest(
+                envelope({ SpoolKey: otherKey, ContentLength: second })
+            )
+        )
+
+        expect(response.status).toBe(200)
+        expect(await db.select().from(inboundEmails)).toHaveLength(1)
+        expect(await db.select().from(emailAttachments)).toHaveLength(1)
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(SPOOL_KEY)
+        expect(vi.mocked(deleteR2Object)).toHaveBeenCalledWith(otherKey)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Overlapping deliveries — Postmark retrying while a slow first attempt is
+// still running must not mint a second ticket.
+// ---------------------------------------------------------------------------
+
+describe("concurrent redelivery", () => {
+    function inbound(messageId: string, to = "info@bumpsetdrink.com") {
+        return {
+            MessageID: messageId,
+            From: "outsider@example.test",
+            FromName: "An Outsider",
+            To: to,
+            ToFull: [{ Email: to, Name: "" }],
+            Subject: "Racing",
+            TextBody: "Hello",
+            HtmlBody: "<p>Hello</p>"
+        }
+    }
+
+    it("creates exactly one email ticket for two simultaneous deliveries", async () => {
+        await createUser()
+        const responses = await Promise.all([
+            POST(webhookRequest(inbound("race-1"))),
+            POST(webhookRequest(inbound("race-1")))
+        ])
+        expect(responses.map((r) => r.status)).toEqual([200, 200])
+        expect(await db.select().from(inboundEmails)).toHaveLength(1)
+    })
+
+    it("creates exactly one concern for two simultaneous deliveries", async () => {
+        process.env.INBOUND_CONCERN_ADDRESS = "concerns@bumpsetdrink.com"
+        await createUser()
+        const responses = await Promise.all([
+            POST(
+                webhookRequest(inbound("race-2", "concerns@bumpsetdrink.com"))
+            ),
+            POST(webhookRequest(inbound("race-2", "concerns@bumpsetdrink.com")))
+        ])
+        expect(responses.map((r) => r.status)).toEqual([200, 200])
+        expect(await db.select().from(concerns)).toHaveLength(1)
+    })
+
+    it("records exactly one received reply for two simultaneous deliveries", async () => {
+        await createUser()
+        await POST(webhookRequest(inbound("orig-3")))
+        const [ticket] = await db
+            .select({ id: inboundEmails.id })
+            .from(inboundEmails)
+
+        const reply = {
+            ...inbound("reply-3"),
+            Subject: `Re: Email #${ticket.id}: Racing`
+        }
+        const responses = await Promise.all([
+            POST(webhookRequest(reply)),
+            POST(webhookRequest(reply))
+        ])
+        expect(responses.map((r) => r.status)).toEqual([200, 200])
+        expect(await db.select().from(inboundEmailReceived)).toHaveLength(1)
     })
 })

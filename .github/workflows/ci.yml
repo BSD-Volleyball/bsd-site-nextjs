@@ -51,6 +51,12 @@ jobs:
         env:
           TEST_PG_URL: postgres://bsd_test:bsd_test@localhost:5432
 
+      - name: Postmark inbound Worker (types + tests)
+        run: |
+          pnpm worker:install
+          pnpm worker:check-types
+          pnpm worker:test
+
       - name: Build
         run: pnpm build
         env:
