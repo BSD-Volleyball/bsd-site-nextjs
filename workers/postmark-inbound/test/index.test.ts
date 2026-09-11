@@ -79,7 +79,7 @@ describe("postmark inbound worker", () => {
         expect(origin.calls).toHaveLength(1)
         const call = origin.calls[0] as { url: string; init: RequestInit }
         expect(call.url).toBe(
-            "https://www.bumpsetdrink.com/api/webhooks/postmark"
+            "https://bsd-site-nextjs.vercel.app/api/webhooks/postmark"
         )
         expect(call.init.method).toBe("POST")
         expect(call.init.redirect).toBe("manual")

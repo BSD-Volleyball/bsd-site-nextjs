@@ -9,12 +9,20 @@
     // only the object key, sidestepping Vercel's 4.5 MB request-body cap.
     "routes": [{ "pattern": "hooks.bumpsetdrink.com", "custom_domain": true }],
     "r2_buckets": [{ "binding": "SPOOL_BUCKET", "bucket_name": "bsd" }],
+    // The app's Vercel-owned hostname, NOT www.bumpsetdrink.com: a Worker's
+    // fetch() to a hostname on its own zone is routed through the zone's
+    // SSL/TLS mode, and in the default "Flexible" mode that hop is plain HTTP,
+    // which Vercel answers with a 308 back to https (observed 2026-09-11).
+    // An off-zone hostname takes the ordinary path and always speaks TLS.
     "vars": {
-        "ORIGIN_WEBHOOK_URL": "https://www.bumpsetdrink.com/api/webhooks/postmark"
+        "ORIGIN_WEBHOOK_URL": "https://bsd-site-nextjs.vercel.app/api/webhooks/postmark"
     },
     // Secrets (wrangler secret put): WEBHOOK_USER, WEBHOOK_PASSWORD — the same
     // values as the Vercel app's POSTMARK_WEBHOOK_USER / POSTMARK_WEBHOOK_PASSWORD.
-    "limits": { "cpu_ms": 30000 },
+    // The account is on the Workers Free plan, which rejects the "limits" key.
+    // Streaming to R2 spends almost no JS CPU, so the Free 10 ms budget holds
+    // (measured 2026-09-11 with a 30 MB body); on a paid plan you may add
+    // "limits": { "cpu_ms": 30000 } for headroom.
     "observability": {
         "enabled": true,
         "logs": { "enabled": true, "head_sampling_rate": 1 },
