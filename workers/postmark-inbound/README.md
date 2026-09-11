@@ -66,6 +66,16 @@ key and the app dedupes by MessageID.
 `https://<user>:<password>@www.bumpsetdrink.com/api/webhooks/postmark`. The
 app still accepts inline payloads (attachments over ~3 MB will 413 again).
 
+## Why the origin is `bsd-site-nextjs.vercel.app`, not `www`
+
+A Worker's `fetch()` to a hostname on its own Cloudflare zone is routed
+through the zone's SSL/TLS mode; in the default "Flexible" mode that hop is
+plain HTTP, and Vercel answers with a `308` back to `https`, which the Worker
+refuses to follow. The project's Vercel-owned hostname is off-zone and always
+speaks TLS. If production deployment protection is ever enabled for that
+hostname, the relay will start getting 401s — switch the zone to
+"Full (strict)" and point `ORIGIN_WEBHOOK_URL` back at `www` instead.
+
 ## Failure map
 
 | Worker answer to Postmark | Meaning | Spool object |
