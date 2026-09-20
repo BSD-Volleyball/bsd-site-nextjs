@@ -117,13 +117,13 @@ function PersonChip({
 function AddPresencePopover({
     date,
     slot,
-    admins,
+    pool,
     currentUserId,
     onDone
 }: {
     date: CoverageDate
     slot: CoverageSlot
-    admins: CoverageView["admins"]
+    pool: CoverageView["pool"]
     currentUserId: string
     onDone: (message: string | null) => void
 }) {
@@ -170,12 +170,13 @@ function AddPresencePopover({
                     <p className="text-sm font-medium">Who will be there?</p>
                     <Select value={userId} onValueChange={setUserId}>
                         <SelectTrigger>
-                            <SelectValue placeholder="Pick an admin" />
+                            <SelectValue placeholder="Pick a person" />
                         </SelectTrigger>
                         <SelectContent>
-                            {admins.map((a) => (
+                            {pool.map((a) => (
                                 <SelectItem key={a.userId} value={a.userId}>
                                     {a.name}
+                                    {a.isLeadership ? " (leadership)" : ""}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -341,7 +342,7 @@ export function CoverageClient({
                                     <AddPresencePopover
                                         date={d}
                                         slot={slot}
-                                        admins={view.admins}
+                                        pool={view.pool}
                                         currentUserId={currentUserId}
                                         onDone={afterMutation}
                                     />

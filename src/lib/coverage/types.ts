@@ -10,9 +10,13 @@ export type CoverageSource = "play" | "work" | "ref" | "present"
 export interface CoveragePerson {
     userId: string
     name: string
-    /** Counts toward the slot's coverage (admin role, not unavailable). */
+    /**
+     * Counts toward the slot's coverage: admins always (unless unavailable);
+     * leadership_group members only when manually added present for this
+     * slot (a "present" source), also unless unavailable.
+     */
     counts: boolean
-    /** leadership_group member shown for information only. */
+    /** leadership_group member (not also an admin). */
     isLeadership: boolean
     /** Has a user_unavailability row for this night. */
     unavailable: boolean
@@ -52,7 +56,9 @@ export interface CoverageDate {
     orphanedPresence: OrphanedPresence[]
 }
 
+/** A member of the presence-picker pool: an admin or a leadership member. */
 export interface CoverageAdmin {
     userId: string
     name: string
+    isLeadership: boolean
 }

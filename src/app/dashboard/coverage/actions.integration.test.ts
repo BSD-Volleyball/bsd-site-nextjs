@@ -150,7 +150,7 @@ describe("getCoverageView", () => {
         // Week 2's match had a null date and resolved from the event.
         expect(night2?.slots.map((x) => x.startTime)).toEqual(["19:00:00"])
         expect(night2?.status).toBe("green")
-        expect(result.data.admins.map((a) => a.userId)).toContain(admin.id)
+        expect(result.data.pool.map((a) => a.userId)).toContain(admin.id)
     })
 
     it("flags unavailable admins and excludes them from coverage", async () => {
@@ -195,6 +195,25 @@ describe("getCoverageView", () => {
             counts: false
         })
         expect(night1?.status).toBe("red")
+    })
+
+    it("lists leadership members in the presence pool", async () => {
+        await seedSeason()
+        const { userRoles } = await import("@/database/schema")
+        const lead = await createUser({ first_name: "Lee", last_name: "Lead" })
+        await db
+            .insert(userRoles)
+            .values({ user_id: lead.id, role: "leadership_group" })
+        const admin = await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getCoverageView()
+        if (!result.status) throw new Error(result.message)
+        expect(result.data.pool).toContainEqual(
+            expect.objectContaining({ userId: lead.id, isLeadership: true })
+        )
+        expect(result.data.pool).toContainEqual(
+            expect.objectContaining({ userId: admin.id, isLeadership: false })
+        )
     })
 })
 
@@ -254,6 +273,34 @@ describe("addPresence / removePresence", () => {
             .from(coveragePresence)
             .where(eq(coveragePresence.user_id, admin.id))
         expect(after).toHaveLength(1)
+    })
+
+    it("adds presence for a leadership member and they count", async () => {
+        await seedSeason()
+        const { userRoles } = await import("@/database/schema")
+        const lead = await createUser({ first_name: "Lee", last_name: "Lead" })
+        await db
+            .insert(userRoles)
+            .values({ user_id: lead.id, role: "leadership_group" })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const add = await addPresence({
+            userId: lead.id,
+            date: DATE,
+            slotTimes: ["19:00:00", "20:00:00", "21:00:00"]
+        })
+        expect(add.status).toBe(true)
+
+        const view = await getCoverageView()
+        if (!view.status) throw new Error(view.message)
+        const night1 = view.data.dates.find((d) => d.date === DATE)
+        expect(night1?.status).toBe("green")
+        expect(night1?.slots[0].people[0]).toMatchObject({
+            userId: lead.id,
+            counts: true,
+            isLeadership: true,
+            sources: ["present"]
+        })
     })
 
     it("is idempotent on duplicate adds", async () => {

@@ -191,14 +191,18 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
             for (const [userId, a] of accByKey.get(key) ?? []) {
                 const person = input.people.get(userId)
                 const isAdmin = input.adminIds.has(userId)
+                const isLeadership = !isAdmin && input.leadershipIds.has(userId)
                 const unavailable = input.unavailable.has(
                     `${userId}|${event.eventId}`
                 )
+                const isPresent = a.sources.has("present")
                 people.push({
                     userId,
                     name: person ? displayName(person) : "Unknown",
-                    counts: isAdmin && !unavailable,
-                    isLeadership: !isAdmin && input.leadershipIds.has(userId),
+                    counts:
+                        !unavailable &&
+                        (isAdmin || (isLeadership && isPresent)),
+                    isLeadership,
                     unavailable,
                     sources: SOURCE_ORDER.filter((s) => a.sources.has(s)),
                     presenceId: a.presenceId,

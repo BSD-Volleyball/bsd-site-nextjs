@@ -227,6 +227,62 @@ describe("buildCoverage", () => {
         expect(d.status).toBe("red")
     })
 
+    it("a leadership member with a manual presence row counts", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                presence: [
+                    {
+                        id: 1,
+                        userId: "l1",
+                        date: "2026-10-06",
+                        slotTime: "19:00:00",
+                        note: null
+                    },
+                    {
+                        id: 2,
+                        userId: "l1",
+                        date: "2026-10-06",
+                        slotTime: "20:00:00",
+                        note: null
+                    },
+                    {
+                        id: 3,
+                        userId: "l1",
+                        date: "2026-10-06",
+                        slotTime: "21:00:00",
+                        note: null
+                    }
+                ]
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.userId).toBe("l1")
+        expect(p.counts).toBe(true)
+        expect(p.isLeadership).toBe(true)
+        expect(p.sources).toEqual(["present"])
+        expect(d.status).toBe("green")
+    })
+
+    it("an unavailable leadership member with presence does not count", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                presence: [
+                    {
+                        id: 1,
+                        userId: "l1",
+                        date: "2026-10-06",
+                        slotTime: "19:00:00",
+                        note: null
+                    }
+                ],
+                unavailable: new Set(["l1|10"])
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.counts).toBe(false)
+        expect(p.unavailable).toBe(true)
+    })
+
     it("unavailable admins are flagged and do not count", () => {
         const [d] = buildCoverage(
             baseInput({

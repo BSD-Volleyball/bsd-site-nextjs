@@ -732,7 +732,7 @@ export function buildCoverageDigestHtml(opts: {
             <div style="background-color:${banner.bg};color:${banner.fg};border-radius:8px;padding:12px 16px;margin:12px 0;">
                 <strong>${escapeHtml(banner.title)}</strong> — ${escapeHtml(day.reason)}
             </div>
-            <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Only admins count toward coverage; leadership members are listed for information.</p>
+            <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Admins always count toward coverage; leadership members count only for slots where they were added here manually.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">${rows}</table>
             <p style="font-size:13px;color:#6b7280;">Can you fill a gap? Add yourself on the Coverage page.</p>
         `,

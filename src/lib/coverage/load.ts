@@ -174,28 +174,36 @@ export async function loadCoverage(opts: {
     return buildCoverage(input)
 }
 
-/** Admin role holders, for the "add presence" picker. */
-export async function listAdminPool(): Promise<CoverageAdmin[]> {
+/**
+ * Admin and leadership_group role holders, for the "add presence" picker.
+ * Deduped by user id; a user with both roles is treated as an admin
+ * (`isLeadership: false`) since admin already grants full counting.
+ */
+export async function listPresencePool(): Promise<CoverageAdmin[]> {
     const rows = await db
         .select({
             userId: users.id,
             firstName: users.first_name,
             lastName: users.last_name,
-            preferredName: users.preferred_name
+            preferredName: users.preferred_name,
+            role: userRoles.role
         })
         .from(userRoles)
         .innerJoin(users, eq(userRoles.user_id, users.id))
-        .where(eq(userRoles.role, "admin"))
-    const seen = new Set<string>()
-    return rows
-        .filter((r) => {
-            if (seen.has(r.userId)) return false
-            seen.add(r.userId)
-            return true
-        })
-        .map((r) => ({
+        .where(inArray(userRoles.role, ["admin", "leadership_group"]))
+    const byId = new Map<string, CoverageAdmin>()
+    for (const r of rows) {
+        const isAdminRow = r.role === "admin"
+        const existing = byId.get(r.userId)
+        if (existing) {
+            if (isAdminRow) existing.isLeadership = false
+            continue
+        }
+        byId.set(r.userId, {
             userId: r.userId,
-            name: `${r.preferredName || r.firstName} ${r.lastName}`.trim()
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
+            name: `${r.preferredName || r.firstName} ${r.lastName}`.trim(),
+            isLeadership: !isAdminRow
+        })
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
 }

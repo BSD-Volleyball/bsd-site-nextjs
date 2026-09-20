@@ -6,7 +6,7 @@ import { db } from "@/database/db"
 import { coveragePresence } from "@/database/schema"
 import { logAuditEntry } from "@/lib/audit-log"
 import { normalizeTime } from "@/lib/coverage/format"
-import { listAdminPool, loadCoverage } from "@/lib/coverage/load"
+import { listPresencePool, loadCoverage } from "@/lib/coverage/load"
 import type { CoverageAdmin, CoverageDate } from "@/lib/coverage/types"
 import { getLeagueDateString } from "@/lib/date-utils"
 import { sendCoverageDigestForDate } from "@/lib/notifications/coverage-digest"
@@ -24,7 +24,7 @@ import {
 
 export interface CoverageView {
     dates: CoverageDate[]
-    admins: CoverageAdmin[]
+    pool: CoverageAdmin[]
     today: string
 }
 
@@ -32,11 +32,11 @@ export const getCoverageView = withAction(
     async (): Promise<ActionResult<CoverageView>> => {
         await requireAdmin()
         const today = getLeagueDateString()
-        const [dates, admins] = await Promise.all([
+        const [dates, pool] = await Promise.all([
             loadCoverage({ fromDate: today }),
-            listAdminPool()
+            listPresencePool()
         ])
-        return ok({ dates, admins, today })
+        return ok({ dates, pool, today })
     }
 )
 
@@ -66,9 +66,13 @@ export const addPresence = withAction(
         }
         const note = input.note?.trim() ? input.note.trim().slice(0, 200) : null
 
-        const admins = await listAdminPool()
-        const target = admins.find((a) => a.userId === userId)
-        if (!target) return fail("Only admins can be marked present.")
+        const pool = await listPresencePool()
+        const target = pool.find((a) => a.userId === userId)
+        if (!target) {
+            return fail(
+                "Only admins or leadership members can be marked present."
+            )
+        }
 
         const [day] = await loadCoverage({ fromDate: date, toDate: date })
         if (!day) return fail("No matches are scheduled on that date.")
