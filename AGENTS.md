@@ -174,6 +174,14 @@ Common environment variables used across the app include:
 - `NEXT_PUBLIC_SQUARE_APP_ID`
 - `NEXT_PUBLIC_SQUARE_LOCATION_ID`
 
+## Surveys
+
+- Templates hold questions (`survey_templates`/`survey_questions`); each sent survey is an instance (`surveys`) with a snapshotted audience (`survey_recipients`) and a frozen `question_ids` list. Pure logic lives in `src/lib/surveys/` (question-type registry, branching evaluator, submission validator, lock rules, reporting math) and is shared by the admin preview, the respondent form, and the server validator — never fork it.
+- Once a question has answers its type/options lock (`template-rules.ts`): options may be appended or relabeled, never removed or re-keyed. Trends match on question id across instances of one template.
+- Anonymous surveys sever `user_id`/`recipient_id` on submit and coarsen timestamps to the league day (`league-day.ts`); anonymous responses are single-submit. Results suppress segments under 5 responses and the anonymous CSV drops identifying columns.
+- Emails go through `dispatchNotification` with dedupe keys `survey-<id>-invite` / `survey-<id>-reminder-<n>`; reminders and auto-close run from `/api/cron/survey-reminders` (daily, `CRON_SECRET`). Permissions: `surveys:manage`, `surveys:view_results` (admin only today).
+- `mergeUserRecords` repoints survey rows; keep it in sync if survey tables gain user references.
+
 ## Inbound Email (Postmark → Cloudflare Worker → app)
 
 - Postmark's inbound webhook inlines attachments as base64 (up to 35 MB per message, ~50 MB of JSON). Vercel rejects request bodies over 4.5 MB at the edge, so Postmark does **not** post to the app directly: its `InboundHookUrl` is the Cloudflare Worker in `workers/postmark-inbound/` (`https://hooks.bumpsetdrink.com/postmark/inbound`).
