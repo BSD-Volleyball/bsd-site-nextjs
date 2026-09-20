@@ -21,6 +21,16 @@ import type {
     SignupDropCategory,
     SignupDropStage
 } from "../lib/signup-drops-display"
+import type {
+    SurveyAudienceDefinition,
+    SurveyGender,
+    SurveyQuestionConfig,
+    SurveyQuestionType,
+    SurveyResponseStatus,
+    SurveyRoleTag,
+    SurveyStatus,
+    SurveyVisibility
+} from "../lib/surveys/types"
 
 export const users = pgTable("users", {
     id: text("id").primaryKey(),
@@ -2241,6 +2251,229 @@ export const tournamentPlacements = pgTable(
         tournamentPlacementsPlaceUniq: uniqueIndex(
             "tournament_placements_division_place_uniq"
         ).on(table.tournament_id, table.division_id, table.place)
+    })
+)
+
+// --- Surveys ---
+
+/**
+ * A reusable set of questions. Surveys point at a template rather than owning
+ * their questions, so the same question bank can be re-run season after season
+ * and results compared across runs.
+ */
+export const surveyTemplates = pgTable("survey_templates", {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    is_archived: boolean("is_archived").default(false).notNull(),
+    created_by: text("created_by").references(() => users.id, {
+        onDelete: "set null"
+    }),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull()
+})
+
+/**
+ * One question on a template. `config` holds the type-specific shape (options,
+ * rating bounds, text limits) and `visibility` the branching rules that decide
+ * whether the question is shown for a given respondent.
+ */
+export const surveyQuestions = pgTable(
+    "survey_questions",
+    {
+        id: serial("id").primaryKey(),
+        template_id: integer("template_id")
+            .notNull()
+            .references(() => surveyTemplates.id, { onDelete: "cascade" }),
+        sort_order: integer("sort_order").default(0).notNull(),
+        type: text("type").$type<SurveyQuestionType>().notNull(),
+        prompt: text("prompt").notNull(),
+        help_text: text("help_text"),
+        required: boolean("required").default(false).notNull(),
+        config: jsonb("config").$type<SurveyQuestionConfig>().notNull(),
+        visibility: jsonb("visibility")
+            .$type<SurveyVisibility>()
+            .notNull()
+            .default(sql`'{"conditions":[],"roleTags":[]}'::jsonb`),
+        // Soft delete: answers from past runs must keep resolving to a question.
+        archived_at: timestamp("archived_at"),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        surveyQuestionsTemplateOrderIdx: index(
+            "survey_questions_template_order_idx"
+        ).on(table.template_id, table.sort_order)
+    })
+)
+
+/**
+ * One run of a template: its audience, its window, and its reminder cadence.
+ * Templates cannot be deleted out from under a run (onDelete: restrict).
+ */
+export const surveys = pgTable(
+    "surveys",
+    {
+        id: serial("id").primaryKey(),
+        template_id: integer("template_id")
+            .notNull()
+            .references(() => surveyTemplates.id, { onDelete: "restrict" }),
+        season_id: integer("season_id").references(() => seasons.id, {
+            onDelete: "set null"
+        }),
+        title: text("title").notNull(),
+        intro: text("intro"),
+        status: text("status").$type<SurveyStatus>().default("draft").notNull(),
+        is_anonymous: boolean("is_anonymous").default(false).notNull(),
+        audience: jsonb("audience")
+            .$type<SurveyAudienceDefinition>()
+            .notNull()
+            .default(
+                sql`'{"groups":[],"addUserIds":[],"removeUserIds":[]}'::jsonb`
+            ),
+        // Frozen at publish; NULL while draft (render the live template).
+        question_ids: jsonb("question_ids").$type<number[]>(),
+        opens_at: timestamp("opens_at"),
+        closes_at: timestamp("closes_at"),
+        reminder_interval_days: integer("reminder_interval_days")
+            .default(0)
+            .notNull(),
+        reminder_max_count: integer("reminder_max_count").default(0).notNull(),
+        reminder_count: integer("reminder_count").default(0).notNull(),
+        last_reminder_at: timestamp("last_reminder_at"),
+        published_at: timestamp("published_at"),
+        closed_at: timestamp("closed_at"),
+        created_by: text("created_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        surveysTemplateIdx: index("surveys_template_idx").on(table.template_id),
+        surveysSeasonIdx: index("surveys_season_idx").on(table.season_id),
+        surveysStatusIdx: index("surveys_status_idx").on(table.status)
+    })
+)
+
+/**
+ * The invite list, resolved from the audience definition at publish time.
+ * Role tags / division / gender are snapshotted here so results stay
+ * segmentable after rosters change — and so anonymous surveys can report
+ * segments without linking a response back to a person.
+ */
+export const surveyRecipients = pgTable(
+    "survey_recipients",
+    {
+        id: serial("id").primaryKey(),
+        survey_id: integer("survey_id")
+            .notNull()
+            .references(() => surveys.id, { onDelete: "cascade" }),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        role_tags: jsonb("role_tags")
+            .$type<SurveyRoleTag[]>()
+            .notNull()
+            .default(sql`'[]'::jsonb`),
+        division_id: integer("division_id").references(() => divisions.id, {
+            onDelete: "set null"
+        }),
+        gender: text("gender").$type<SurveyGender>(),
+        invited_at: timestamp("invited_at").defaultNow().notNull(),
+        // Anonymous surveys store league-day midnight here, never the exact time.
+        submitted_at: timestamp("submitted_at"),
+        removed_at: timestamp("removed_at"),
+        added_by: text("added_by").references(() => users.id, {
+            onDelete: "set null"
+        })
+    },
+    (table) => ({
+        surveyRecipientsSurveyUserUniq: uniqueIndex(
+            "survey_recipients_survey_user_uniq"
+        ).on(table.survey_id, table.user_id),
+        surveyRecipientsUserIdx: index("survey_recipients_user_idx").on(
+            table.user_id
+        )
+    })
+)
+
+/**
+ * One respondent's answer sheet. Identity columns are cleared on submit for
+ * anonymous surveys, leaving only the snapshotted segments behind.
+ */
+export const surveyResponses = pgTable(
+    "survey_responses",
+    {
+        id: serial("id").primaryKey(),
+        survey_id: integer("survey_id")
+            .notNull()
+            .references(() => surveys.id, { onDelete: "cascade" }),
+        // Both NULL once an anonymous survey's response is submitted.
+        user_id: text("user_id").references(() => users.id, {
+            onDelete: "cascade"
+        }),
+        recipient_id: integer("recipient_id").references(
+            () => surveyRecipients.id,
+            { onDelete: "set null" }
+        ),
+        role_tags: jsonb("role_tags")
+            .$type<SurveyRoleTag[]>()
+            .notNull()
+            .default(sql`'[]'::jsonb`),
+        division_id: integer("division_id").references(() => divisions.id, {
+            onDelete: "set null"
+        }),
+        gender: text("gender").$type<SurveyGender>(),
+        status: text("status")
+            .$type<SurveyResponseStatus>()
+            .default("draft")
+            .notNull(),
+        // Day granularity on purpose (league time zone).
+        submitted_on: date("submitted_on", { mode: "string" }),
+        created_at: timestamp("created_at").defaultNow().notNull(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        surveyResponsesSurveyStatusIdx: index(
+            "survey_responses_survey_status_idx"
+        ).on(table.survey_id, table.status),
+        // Partial unique: identified respondents answer once; anonymous rows
+        // (user_id NULL) are exempt.
+        surveyResponsesSurveyUserUniq: uniqueIndex(
+            "survey_responses_survey_user_uniq"
+        )
+            .on(table.survey_id, table.user_id)
+            .where(sql`${table.user_id} IS NOT NULL`)
+    })
+)
+
+/**
+ * One answer to one question. The value lands in the column matching the
+ * question type; the others stay NULL.
+ */
+export const surveyAnswers = pgTable(
+    "survey_answers",
+    {
+        id: serial("id").primaryKey(),
+        response_id: integer("response_id")
+            .notNull()
+            .references(() => surveyResponses.id, { onDelete: "cascade" }),
+        question_id: integer("question_id")
+            .notNull()
+            .references(() => surveyQuestions.id, { onDelete: "cascade" }),
+        value_bool: boolean("value_bool"),
+        value_number: integer("value_number"),
+        value_text: text("value_text"),
+        value_options: jsonb("value_options").$type<string[]>(),
+        updated_at: timestamp("updated_at").defaultNow().notNull()
+    },
+    (table) => ({
+        surveyAnswersResponseQuestionUniq: uniqueIndex(
+            "survey_answers_response_question_uniq"
+        ).on(table.response_id, table.question_id),
+        surveyAnswersQuestionIdx: index("survey_answers_question_idx").on(
+            table.question_id
+        )
     })
 )
 

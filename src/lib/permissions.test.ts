@@ -51,6 +51,26 @@ describe("ROLE_PERMISSIONS", () => {
         }
     })
 
+    it("grants both survey permissions to admins only", () => {
+        const surveyPermissions: Permission[] = [
+            "surveys:manage",
+            "surveys:view_results"
+        ]
+        for (const permission of surveyPermissions) {
+            expect(ROLE_PERMISSIONS.admin).toContain(permission)
+            expect(ROLE_PERMISSIONS.captain).not.toContain(permission)
+        }
+        for (const role of ALL_ROLES) {
+            if (role === "admin") continue
+            for (const permission of surveyPermissions) {
+                expect(
+                    ROLE_PERMISSIONS[role].includes(permission),
+                    `${role} ${permission}`
+                ).toBe(false)
+            }
+        }
+    })
+
     it("keeps privileged season controls away from non-admin roles", () => {
         for (const role of ALL_ROLES) {
             if (role === "admin") continue

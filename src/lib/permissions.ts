@@ -54,6 +54,9 @@ export type Permission =
     | "admin_emails:manage"
     // Sponsors
     | "sponsors:manage"
+    // Surveys
+    | "surveys:manage"
+    | "surveys:view_results"
 
 // All permissions — used for admin wildcard.
 // Keep in sync with the Permission type above.
@@ -82,7 +85,9 @@ const ALL_PERMISSIONS: Permission[] = [
     "attrition:view",
     "admin_emails:view",
     "admin_emails:manage",
-    "sponsors:manage"
+    "sponsors:manage",
+    "surveys:manage",
+    "surveys:view_results"
     // concerns:view and concerns:manage are intentionally omitted — only ombudsman role has access
 ]
 

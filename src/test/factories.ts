@@ -9,6 +9,10 @@ import {
     signups,
     sponsors,
     sponsorships,
+    surveyQuestions,
+    surveyRecipients,
+    surveyTemplates,
+    surveys,
     teams,
     tournamentDivisions,
     tournamentRoster,
@@ -259,6 +263,69 @@ export async function createSponsorship(
         .insert(sponsorships)
         .values({
             amount: "500.00",
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createSurveyTemplate(
+    overrides: Partial<typeof surveyTemplates.$inferInsert> = {}
+) {
+    const [row] = await db
+        .insert(surveyTemplates)
+        .values({
+            name: "End of Season",
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createSurveyQuestion(
+    templateId: number,
+    overrides: Partial<typeof surveyQuestions.$inferInsert> = {}
+) {
+    const [row] = await db
+        .insert(surveyQuestions)
+        .values({
+            template_id: templateId,
+            sort_order: 0,
+            type: "yes_no",
+            prompt: "Did you have fun?",
+            config: { type: "yes_no" },
+            visibility: { conditions: [], roleTags: [] },
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createSurvey(
+    templateId: number,
+    overrides: Partial<typeof surveys.$inferInsert> = {}
+) {
+    const [row] = await db
+        .insert(surveys)
+        .values({
+            template_id: templateId,
+            title: "Fall survey",
+            ...overrides
+        })
+        .returning()
+    return row
+}
+
+export async function createSurveyRecipient(
+    surveyId: number,
+    userId: string,
+    overrides: Partial<typeof surveyRecipients.$inferInsert> = {}
+) {
+    const [row] = await db
+        .insert(surveyRecipients)
+        .values({
+            survey_id: surveyId,
+            user_id: userId,
             ...overrides
         })
         .returning()
