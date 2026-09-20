@@ -50,6 +50,45 @@ function inputFrom(
     }
 }
 
+describe("validateQuestionUpdate — config must match the type", () => {
+    it("rejects a config whose type disagrees with the question type", () => {
+        const existing = question({
+            type: "rating",
+            config: { type: "rating", min: 1, max: 5 }
+        })
+        // Crafted payload: the type still says "rating", so the type check
+        // passes, but the config is a choice config and would slip past every
+        // lock branch that keys off config.type.
+        const incoming = inputFrom(existing, {
+            type: "rating",
+            config: {
+                type: "single_choice",
+                options: [
+                    { key: "opt_a", label: "Yes" },
+                    { key: "opt_b", label: "No" }
+                ]
+            }
+        })
+        expect(validateQuestionUpdate(existing, incoming, true)).toMatch(
+            /config/i
+        )
+    })
+
+    it("rejects the mismatch even when the question has no answers", () => {
+        const existing = question({
+            type: "text",
+            config: { type: "text", variant: "short" }
+        })
+        const incoming = inputFrom(existing, {
+            type: "text",
+            config: { type: "yes_no" }
+        })
+        expect(validateQuestionUpdate(existing, incoming, false)).toMatch(
+            /config/i
+        )
+    })
+})
+
 describe("validateQuestionUpdate — locked (has answers)", () => {
     it("rejects a type change", () => {
         const existing = question()
@@ -215,6 +254,85 @@ describe("validateQuestionUpdate — locked (has answers)", () => {
         expect(validateQuestionUpdate(existing, rekeyed, true)).not.toBeNull()
     })
 
+    it("rejects a multi_choice selection bound change", () => {
+        const existing = question({
+            type: "multi_choice",
+            config: {
+                type: "multi_choice",
+                options: [
+                    { key: "opt_a", label: "Monday" },
+                    { key: "opt_b", label: "Tuesday" }
+                ],
+                minSelections: 1,
+                maxSelections: 2
+            }
+        })
+
+        expect(
+            validateQuestionUpdate(
+                existing,
+                inputFrom(existing, {
+                    config: {
+                        type: "multi_choice",
+                        options: [
+                            { key: "opt_a", label: "Monday" },
+                            { key: "opt_b", label: "Tuesday" }
+                        ],
+                        minSelections: 2,
+                        maxSelections: 2
+                    }
+                }),
+                true
+            )
+        ).toMatch(/selections/i)
+
+        expect(
+            validateQuestionUpdate(
+                existing,
+                inputFrom(existing, {
+                    config: {
+                        type: "multi_choice",
+                        options: [
+                            { key: "opt_a", label: "Monday" },
+                            { key: "opt_b", label: "Tuesday" }
+                        ],
+                        minSelections: 1,
+                        maxSelections: 1
+                    }
+                }),
+                true
+            )
+        ).toMatch(/selections/i)
+    })
+
+    it("allows a multi_choice edit that keeps both selection bounds", () => {
+        const existing = question({
+            type: "multi_choice",
+            config: {
+                type: "multi_choice",
+                options: [
+                    { key: "opt_a", label: "Monday" },
+                    { key: "opt_b", label: "Tuesday" }
+                ],
+                minSelections: 1,
+                maxSelections: 2
+            }
+        })
+        const incoming = inputFrom(existing, {
+            config: {
+                type: "multi_choice",
+                options: [
+                    { key: "opt_a", label: "Monday nights" },
+                    { key: "opt_b", label: "Tuesday" },
+                    { key: "opt_c", label: "Wednesday" }
+                ],
+                minSelections: 1,
+                maxSelections: 2
+            }
+        })
+        expect(validateQuestionUpdate(existing, incoming, true)).toBeNull()
+    })
+
     it("allows text variant and length limit edits", () => {
         const existing = question({
             type: "text",
@@ -228,6 +346,33 @@ describe("validateQuestionUpdate — locked (has answers)", () => {
 })
 
 describe("validateQuestionUpdate — unlocked (no answers)", () => {
+    it("allows multi_choice selection bounds to change", () => {
+        const existing = question({
+            type: "multi_choice",
+            config: {
+                type: "multi_choice",
+                options: [
+                    { key: "opt_a", label: "Monday" },
+                    { key: "opt_b", label: "Tuesday" }
+                ],
+                minSelections: 1,
+                maxSelections: 2
+            }
+        })
+        const incoming = inputFrom(existing, {
+            config: {
+                type: "multi_choice",
+                options: [
+                    { key: "opt_a", label: "Monday" },
+                    { key: "opt_b", label: "Tuesday" }
+                ],
+                minSelections: 2,
+                maxSelections: 2
+            }
+        })
+        expect(validateQuestionUpdate(existing, incoming, false)).toBeNull()
+    })
+
     it("allows a type change, a scale change and option removal", () => {
         const existing = question({
             type: "rating",

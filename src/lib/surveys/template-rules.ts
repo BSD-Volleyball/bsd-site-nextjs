@@ -33,8 +33,12 @@ export interface TemplateQuestionInput {
 
 /**
  * Whether `incoming` may replace `existing`. `hasAnswers` is true when at
- * least one answer row points at the question; when it is false every change
- * is allowed (config validity itself is the registry's job).
+ * least one answer row points at the question; when it is false only the
+ * config/type agreement below is enforced.
+ *
+ * This enforces the lock rules only — the save action must additionally run
+ * `QUESTION_TYPE_DEFS[incoming.type].validateConfig(incoming.config)` to know
+ * the config is well-formed at all.
  *
  * Returns a human-readable error, or null when the edit is allowed.
  */
@@ -43,6 +47,13 @@ export function validateQuestionUpdate(
     incoming: TemplateQuestionInput,
     hasAnswers: boolean
 ): string | null {
+    // Every lock rule below keys off config.type, so a payload whose config
+    // belongs to another type would slip past all of them. Reject it first,
+    // answers or not.
+    if (incoming.config.type !== incoming.type) {
+        return "Question config does not match its type."
+    }
+
     if (!hasAnswers) return null
 
     if (incoming.type !== existing.type) {
@@ -74,6 +85,20 @@ export function validateQuestionUpdate(
         return same
             ? null
             : "This question already has answers, so its agreement scale cannot be changed."
+    }
+
+    if (
+        existing.config.type === "multi_choice" &&
+        incoming.config.type === "multi_choice"
+    ) {
+        // Tightening either bound would strand answers already stored outside
+        // the new range.
+        if (
+            incoming.config.minSelections !== existing.config.minSelections ||
+            incoming.config.maxSelections !== existing.config.maxSelections
+        ) {
+            return "This question already has answers, so its number of selections cannot be changed."
+        }
     }
 
     if ("options" in existing.config && "options" in incoming.config) {
