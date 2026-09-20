@@ -61,6 +61,8 @@ import {
     type PlayoffNextMatchData
 } from "./next-match-actions"
 import { PlayoffNextMatchCard } from "@/components/dashboard/playoff-next-match-card"
+import { SurveyCard } from "@/components/dashboard/survey-card"
+import { listSurveysForUser } from "@/lib/surveys/respondent"
 import { FriendsCard } from "@/components/dashboard/friends-card"
 import {
     getFriendsWithNextMatch,
@@ -118,6 +120,25 @@ export default async function DashboardPage() {
     const tournamentCard = session?.user
         ? await getTournamentDashboardCard(session.user.id)
         : null
+    // Only surveys that are open and still unanswered earn a nudge. Fail-soft
+    // for the same reason as the sponsorship lookup below: a survey query
+    // problem must never take the whole dashboard down.
+    const openSurveys = session?.user
+        ? await listSurveysForUser(session.user.id)
+              .then((lists) =>
+                  lists.open.filter(
+                      (survey) => survey.responseStatus !== "submitted"
+                  )
+              )
+              .catch((error) => {
+                  logger.error(
+                      "Dashboard survey lookup failed",
+                      { userId: session.user.id },
+                      error
+                  )
+                  return []
+              })
+        : []
     // Sponsor contacts get a pay/manage card; getSeasonConfig is request-cached.
     // Fail-soft: a sponsor lookup problem (e.g. code deployed ahead of its
     // migration) must never take the whole dashboard down.
@@ -1536,6 +1557,8 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
                 )}
+
+                <SurveyCard surveys={openSurveys} />
 
                 {shouldShowWelcomeTeamCard && captainWelcomeData && (
                     <WelcomeTeamCard data={captainWelcomeData} />

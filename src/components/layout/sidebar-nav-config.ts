@@ -54,6 +54,17 @@ export const captainPairingNavItem: NavItem = {
     icon: RiStarLine
 }
 
+/**
+ * Only shown to people who were actually invited to a survey — there is
+ * nothing behind the link otherwise.
+ */
+export const surveysNavItem: NavItem = {
+    title: "My Surveys",
+    url: "/dashboard/surveys",
+    icon: RiSurveyLine,
+    activePrefix: "/dashboard/surveys"
+}
+
 export const baseNavItems: NavItem[] = [
     { title: "Dashboard", url: "/dashboard", icon: RiSpeedUpLine },
     {

@@ -68,6 +68,7 @@ import {
     seasonCategories,
     seasonHistoryNavItem,
     signupNavItem,
+    surveysNavItem,
     tournamentCategories,
     tournamentScheduleNavItem,
     tournamentScoresNavItem,
@@ -261,6 +262,7 @@ export function AppSidebar({
         hasConcernsAccess,
         isReferee,
         isRefCoordinator,
+        hasSurveys,
         historicalNav,
         phase,
         tournament
@@ -422,6 +424,12 @@ export function AppSidebar({
             captainPairingNavItem,
             ...navItems.slice(dashboardIdx + 1)
         ]
+    }
+
+    // My Surveys sits at the end of the personal items: it appears only for
+    // people who were invited to a survey they can still open.
+    if (hasSurveys) {
+        navItems = [...navItems, surveysNavItem]
     }
 
     // Admin hidden section — collect all currently-suppressed items by group

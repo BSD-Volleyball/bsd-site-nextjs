@@ -14,9 +14,11 @@ import {
     divisions,
     individual_divisions,
     signups,
-    tournaments
+    tournaments,
+    surveyRecipients,
+    surveys
 } from "@/database/schema"
-import { eq, and, lt, lte, desc, inArray, or } from "drizzle-orm"
+import { eq, and, lt, lte, desc, inArray, isNull, or } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { dateRecencyKey, seasonRecencyKey } from "@/lib/season-utils"
 import {
@@ -222,6 +224,8 @@ export interface SidebarData {
     hasConcernsAccess: boolean
     isReferee: boolean
     isRefCoordinator: boolean
+    /** Has a live invite to a published survey — the only way the link shows. */
+    hasSurveys: boolean
     historicalNav: HistoricalNavEntry[]
     phase: SeasonPhase | null
     tournament: TournamentSidebarInfo | null
@@ -243,6 +247,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
             hasConcernsAccess: false,
             isReferee: false,
             isRefCoordinator: false,
+            hasSurveys: false,
             historicalNav: [],
             phase: null,
             tournament: null
@@ -264,7 +269,8 @@ export async function loadSidebarData(): Promise<SidebarData> {
         isReferee,
         isRefCoordinator,
         historicalNav,
-        isCoach
+        isCoach,
+        hasSurveys
     ] = await Promise.all([
         checkSignupEligibility(session.user.id),
         seasonId
@@ -326,7 +332,24 @@ export async function loadSidebarData(): Promise<SidebarData> {
                       .limit(1)
                   return !!coachEntry
               })()
-            : Promise.resolve(false)
+            : Promise.resolve(false),
+        (async () => {
+            // A recipient row only exists once a survey is published, and a
+            // removed recipient has nothing left to answer or look back at.
+            const [invite] = await db
+                .select({ id: surveyRecipients.id })
+                .from(surveyRecipients)
+                .innerJoin(surveys, eq(surveys.id, surveyRecipients.survey_id))
+                .where(
+                    and(
+                        eq(surveyRecipients.user_id, session.user.id),
+                        isNull(surveyRecipients.removed_at),
+                        inArray(surveys.status, ["open", "closed"])
+                    )
+                )
+                .limit(1)
+            return !!invite
+        })()
     ])
 
     const tournament = await getTournamentSidebarInfo(session.user.id)
@@ -343,6 +366,7 @@ export async function loadSidebarData(): Promise<SidebarData> {
         hasConcernsAccess,
         isReferee,
         isRefCoordinator,
+        hasSurveys,
         historicalNav,
         phase: seasonId ? config.phase : null,
         tournament
