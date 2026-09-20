@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest"
-import { leagueDayMidnight } from "./league-day"
+import { getLeagueDateString } from "@/lib/date-utils"
+import { leagueDateString, leagueDayMidnight } from "./league-day"
+
+describe("leagueDateString", () => {
+    it("uses the league day, not the UTC day, on a UTC evening", () => {
+        // 2026-07-04 23:30 in New York is already July 5 in UTC.
+        expect(leagueDateString(new Date("2026-07-05T03:30:00Z"))).toBe(
+            "2026-07-04"
+        )
+    })
+
+    it("uses the league day on a UTC morning that is still yesterday", () => {
+        // 2026-01-15 19:00 EST is 2026-01-16 00:00 UTC.
+        expect(leagueDateString(new Date("2026-01-16T00:00:00Z"))).toBe(
+            "2026-01-15"
+        )
+    })
+
+    it("zero-pads single-digit months and days", () => {
+        expect(leagueDateString(new Date("2026-03-08T16:00:00Z"))).toBe(
+            "2026-03-08"
+        )
+    })
+
+    it("agrees with getLeagueDateString for the current instant", () => {
+        expect(leagueDateString()).toBe(getLeagueDateString(0))
+    })
+})
 
 describe("leagueDayMidnight", () => {
     it("anchors a summer (EDT) instant to 04:00 UTC", () => {

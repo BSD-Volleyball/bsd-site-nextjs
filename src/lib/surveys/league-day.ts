@@ -67,6 +67,21 @@ function zoneOffsetMs(instant: Date): number {
 }
 
 /**
+ * "YYYY-MM-DD" for `now`'s league day.
+ *
+ * `getLeagueDateString` answers the same question but only ever about
+ * `Date.now()`. A write that stamps several columns has to read one clock and
+ * derive everything from it, or a submit landing on the stroke of midnight can
+ * file its date under one day and its timestamps under the next.
+ */
+export function leagueDateString(now: Date = new Date()): string {
+    const wall = wallClockAt(now)
+    const month = String(wall.month).padStart(2, "0")
+    const day = String(wall.day).padStart(2, "0")
+    return `${wall.year}-${month}-${day}`
+}
+
+/**
  * Midnight of `now`'s league day, as an instant.
  *
  * DST-safe: the offset is measured at the naive guess and then re-measured at
@@ -75,8 +90,8 @@ function zoneOffsetMs(instant: Date): number {
  * so midnight is never the skipped or the doubled hour.)
  */
 export function leagueDayMidnight(now: Date = new Date()): Date {
-    const wall = wallClockAt(now)
-    const naive = Date.UTC(wall.year, wall.month - 1, wall.day)
+    const [year, month, day] = leagueDateString(now).split("-").map(Number)
+    const naive = Date.UTC(year, month - 1, day)
 
     const firstGuess = naive - zoneOffsetMs(new Date(naive))
     const corrected = naive - zoneOffsetMs(new Date(firstGuess))

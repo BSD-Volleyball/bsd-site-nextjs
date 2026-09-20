@@ -30,8 +30,7 @@ import {
     surveys
 } from "@/database/schema"
 import { ActionError } from "@/lib/action-result"
-import { getLeagueDateString } from "@/lib/date-utils"
-import { leagueDayMidnight } from "./league-day"
+import { leagueDateString, leagueDayMidnight } from "./league-day"
 import { QUESTION_TYPE_DEFS } from "./question-types"
 import { questionsForSurvey } from "./questions-for-survey"
 import { getTemplateQuestions } from "./templates"
@@ -151,9 +150,13 @@ export async function listSurveysForUser(
 
 /**
  * Everything the respondent form renders, or null when this user has no live
- * invite to the survey. `answers` comes back empty for an anonymous survey the
- * user already submitted: the link from response to person is gone, so there
- * is nothing left to show them.
+ * invite to the survey.
+ *
+ * An anonymous survey this user has already submitted reads back with no
+ * answers, full stop. The submit severs the link — `findResponse` has nothing
+ * to find — but the guarantee is stated here rather than left to rest on that:
+ * a stray row carrying this user id, from a future bug or a hand-written
+ * script, must not turn into a read-back of an anonymous answer sheet.
  */
 export async function getSurveyForRespondent(
     surveyId: number,
@@ -164,7 +167,11 @@ export async function getSurveyForRespondent(
     const { survey, recipient } = context
 
     const questions = await loadQuestions(survey)
-    const response = await findResponse(surveyId, userId)
+    const anonymouslySubmitted =
+        survey.is_anonymous && recipient.submitted_at !== null
+    const response = anonymouslySubmitted
+        ? null
+        : await findResponse(surveyId, userId)
     const answers = response
         ? await loadAnswers(response.id, questions)
         : ({} as AnswerMap)
@@ -257,7 +264,7 @@ async function writeAnswers(
         })
         await replaceAnswers(tx, responseId, questions, cleaned, stamp)
         if (mode === "submit") {
-            await finishSubmit(tx, { survey, responseId, locked, stamp })
+            await finishSubmit(tx, { survey, responseId, locked, now, stamp })
         }
     })
 
@@ -346,10 +353,14 @@ async function finishSubmit(
         survey: SurveyRow
         responseId: number
         locked: RecipientRow
+        now: Date
         stamp: Date
     }
 ): Promise<void> {
-    const submittedOn = getLeagueDateString(0)
+    // Derived from the same instant the timestamps were, so a submit landing
+    // on the stroke of midnight cannot file its date under one league day and
+    // its timestamps under the next.
+    const submittedOn = leagueDateString(params.now)
     await executor
         .update(surveyResponses)
         .set(

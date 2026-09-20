@@ -510,6 +510,43 @@ describe("survey respondent actions", () => {
             expect(unwrap(await getMySurveys()).open[0].canEdit).toBe(false)
         })
 
+        it("hides them even if a row carrying the user id reappears", async () => {
+            const { survey, funQ, feedbackQ } = await seedSurvey({
+                is_anonymous: true
+            })
+            const { user, recipient } = await addRespondent(survey.id)
+
+            unwrap(
+                await submitSurveyResponse(survey.id, {
+                    [funQ.id]: false,
+                    [feedbackQ.id]: "Fewer emails"
+                })
+            )
+
+            // Stands in for a future regression (or a hand-written script)
+            // that leaves a response row pointing back at this user: the
+            // anonymity guarantee must not depend on there being none.
+            const [stray] = await db
+                .insert(surveyResponses)
+                .values({
+                    survey_id: survey.id,
+                    user_id: user.id,
+                    recipient_id: recipient.id,
+                    status: "submitted"
+                })
+                .returning({ id: surveyResponses.id })
+            await db.insert(surveyAnswers).values({
+                response_id: stray.id,
+                question_id: funQ.id,
+                value_bool: true
+            })
+
+            const view = unwrap(await getMySurvey(survey.id))
+            expect(view.answers).toEqual({})
+            expect(view.canEdit).toBe(false)
+            expect(view.survey.responseStatus).toBe("submitted")
+        })
+
         it("refuses a second save or submit", async () => {
             const { survey, funQ, feedbackQ } = await seedSurvey({
                 is_anonymous: true
