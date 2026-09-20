@@ -73,7 +73,7 @@ describe("buildCoverageDigestHtml", () => {
     })
 
     it("shades a counting admin green and leadership sky", () => {
-        expect(html).toContain("#dcfce7")
-        expect(html).toContain("#e0f2fe")
+        expect(html).toMatch(/background:#dcfce7;[^"]*">Ada &lt;Admin&gt;</)
+        expect(html).toMatch(/background:#e0f2fe;[^"]*">Lee Lead</)
     })
 })

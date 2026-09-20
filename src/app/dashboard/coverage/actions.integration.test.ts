@@ -177,6 +177,9 @@ describe("getCoverageView", () => {
         expect(result.status).toBe(true)
         if (!result.status) return
         const night1 = result.data.dates.find((d) => d.date === DATE)
+        // The Away team's throwaway captain also coaches but is outside the
+        // admin/leadership pool, so only the admin appears.
+        expect(night1?.slots[0].people).toHaveLength(1)
         expect(night1?.slots[0].people[0]).toMatchObject({
             userId: admin.id,
             sources: ["coach"],

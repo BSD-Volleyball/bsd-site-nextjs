@@ -692,8 +692,7 @@ const COVERAGE_SOURCE_LABEL: Record<CoveragePerson["sources"][number], string> =
 
 const TONE_STYLES: Record<PersonTone, string> = {
     admin: "background:#dcfce7;color:#14532d;",
-    admin_unavailable:
-        "background:#fee2e2;color:#7f1d1d;text-decoration:line-through;",
+    admin_unavailable: "background:#fee2e2;color:#7f1d1d;",
     leadership: "background:#e0f2fe;color:#0c4a6e;",
     leadership_covering: "background:#ede9fe;color:#4c1d95;",
     other: "background:#f3f4f6;color:#6b7280;"
@@ -725,7 +724,7 @@ function renderCoveragePerson(p: CoveragePerson): string {
     if (!p.counts && !p.isLeadership && !p.unavailable) {
         tags.push("not an admin")
     }
-    const style = `display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 0;${TONE_STYLES[personTone(p)]}`
+    const style = `display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 0;${TONE_STYLES[personTone(p)]}${p.unavailable ? "text-decoration:line-through;" : ""}`
     return `<span style="${style}">${escapeHtml(p.name)}</span> <span style="color:#6b7280;font-size:13px;">(${escapeHtml(tags.join(", "))})</span>`
 }
 

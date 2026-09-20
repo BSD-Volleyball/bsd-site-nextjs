@@ -131,7 +131,7 @@ function PersonChip({
             <span
                 className={cn(
                     "font-medium",
-                    tone === "admin_unavailable" && "line-through"
+                    person.unavailable && "line-through"
                 )}
             >
                 {person.name}
