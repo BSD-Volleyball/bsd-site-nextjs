@@ -8,9 +8,11 @@ import {
     type TemplateQuestionInput
 } from "@/lib/surveys/template-rules"
 import {
+    assertActiveQuestionLimit,
     assertVisibilityGraphSound,
     getTemplateEditorData,
     listTemplates,
+    lockTemplate,
     rowToQuestionDef,
     saveTemplateQuestions as saveTemplateQuestionRows,
     type TemplateEditorData,
@@ -258,10 +260,10 @@ export const archiveTemplateQuestion = withAction(
 
         await logAuditEntry({
             userId: session.user.id,
-            action: "survey_template_update",
-            entityType: "survey_template",
-            entityId: id,
-            summary: `Archived question "${target.prompt}".`
+            action: "survey_question_archive",
+            entityType: "survey_question",
+            entityId: qid,
+            summary: `Archived question "${target.prompt}" on survey template ${id}.`
         })
         revalidatePath(MANAGE_SURVEYS_PATH)
         return ok(undefined, "Question archived.")
@@ -294,21 +296,24 @@ export const restoreTemplateQuestion = withAction(
         }
 
         // Its own branching rules come back with it, so the graph has to hold
-        // again; a dangling rule rolls the restore back.
+        // again, and the active list must still fit under the question
+        // ceiling; either failure rolls the restore back.
         await db.transaction(async (tx) => {
+            await lockTemplate(id, tx)
             await tx
                 .update(surveyQuestions)
                 .set({ archived_at: null })
                 .where(eq(surveyQuestions.id, qid))
+            await assertActiveQuestionLimit(id, tx)
             await assertVisibilityGraphSound(id, tx)
         })
 
         await logAuditEntry({
             userId: session.user.id,
-            action: "survey_template_restore",
-            entityType: "survey_template",
-            entityId: id,
-            summary: `Restored question "${target.prompt}".`
+            action: "survey_question_restore",
+            entityType: "survey_question",
+            entityId: qid,
+            summary: `Restored question "${target.prompt}" on survey template ${id}.`
         })
         revalidatePath(MANAGE_SURVEYS_PATH)
         return ok(undefined, "Question restored.")

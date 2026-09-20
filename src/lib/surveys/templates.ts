@@ -226,10 +226,11 @@ async function selectQuestionRows(
 
 /** Which of the given questions already have at least one answer row. */
 export async function questionIdsWithAnswers(
-    questionIds: number[]
+    questionIds: number[],
+    executor: DbExecutor = db
 ): Promise<Set<number>> {
     if (questionIds.length === 0) return new Set()
-    const rows = await db
+    const rows = await executor
         .selectDistinct({ questionId: surveyAnswers.question_id })
         .from(surveyAnswers)
         .where(inArray(surveyAnswers.question_id, questionIds))
@@ -249,6 +250,14 @@ interface CleanedInput extends TemplateQuestionInput {
  * Replaces the template's active question list with `inputs`, in array order.
  * Throws ActionError with a message the editor can show when any rule fails;
  * nothing is written unless every rule passes.
+ *
+ * Everything that reads the database happens inside the transaction, behind a
+ * `FOR UPDATE` lock on the template row. The delete-vs-archive decision turns
+ * on whether a question has answers, and `survey_answers.question_id` cascades
+ * on delete — reading that set before the transaction would let an answer
+ * arriving in the gap be deleted silently. The lock also serialises two admins
+ * saving the same template, so neither gets a success return over the other's
+ * lost edit.
  */
 export async function saveTemplateQuestions(
     templateId: number,
@@ -263,44 +272,53 @@ export async function saveTemplateQuestions(
         )
     }
 
+    // Input-shape validation needs no database, so it stays outside the lock.
     const cleaned = inputs.map(cleanInput)
-
-    const existingRows = await selectQuestionRows(templateId)
-    const activeById = new Map(
-        existingRows
-            .filter((row) => row.archived_at === null)
-            .map((row) => [row.id, row])
-    )
-    for (const input of cleaned) {
-        if (input.id !== null && !activeById.has(input.id)) {
-            throw new ActionError(
-                "This template's questions changed while you were editing. Reload and try again."
-            )
-        }
-    }
-
-    const answered = await questionIdsWithAnswers([...activeById.keys()])
-
-    for (const input of cleaned) {
-        if (input.id === null) continue
-        const existing = activeById.get(input.id)
-        if (!existing) continue
-        const error = validateQuestionUpdate(
-            rowToQuestionDef(existing),
-            input,
-            answered.has(input.id)
-        )
-        if (error) {
-            throw new ActionError(`"${input.prompt}" is locked: ${error}`)
-        }
-    }
-
-    const keptIds = new Set(
-        cleaned.map((input) => input.id).filter((id) => id !== null)
-    )
-    const droppedIds = [...activeById.keys()].filter((id) => !keptIds.has(id))
+    assertNoDuplicateIds(cleaned)
 
     await db.transaction(async (tx) => {
+        await lockTemplate(templateId, tx)
+
+        const existingRows = await selectQuestionRows(templateId, tx)
+        const activeById = new Map(
+            existingRows
+                .filter((row) => row.archived_at === null)
+                .map((row) => [row.id, row])
+        )
+        for (const input of cleaned) {
+            if (input.id !== null && !activeById.has(input.id)) {
+                throw new ActionError(
+                    "This template's questions changed while you were editing. Reload and try again."
+                )
+            }
+        }
+
+        const answered = await questionIdsWithAnswers(
+            [...activeById.keys()],
+            tx
+        )
+
+        for (const input of cleaned) {
+            if (input.id === null) continue
+            const existing = activeById.get(input.id)
+            if (!existing) continue
+            const error = validateQuestionUpdate(
+                rowToQuestionDef(existing),
+                input,
+                answered.has(input.id)
+            )
+            if (error) {
+                throw new ActionError(`"${input.prompt}" is locked: ${error}`)
+            }
+        }
+
+        const keptIds = new Set(
+            cleaned.map((input) => input.id).filter((id) => id !== null)
+        )
+        const droppedIds = [...activeById.keys()].filter(
+            (id) => !keptIds.has(id)
+        )
+
         for (const input of cleaned) {
             const values = {
                 sort_order: input.sortOrder,
@@ -346,6 +364,39 @@ export async function saveTemplateQuestions(
         // saved shape. A failure throws and the whole save rolls back.
         await assertVisibilityGraphSound(templateId, tx)
     })
+}
+
+/**
+ * Serialises writers against one template. Every read the save decides on is
+ * taken after this, so nothing it saw can change underneath it. Callers hold
+ * it for the rest of their transaction.
+ */
+export async function lockTemplate(
+    templateId: number,
+    executor: DbExecutor
+): Promise<void> {
+    const [row] = await executor
+        .select({ id: surveyTemplates.id })
+        .from(surveyTemplates)
+        .where(eq(surveyTemplates.id, templateId))
+        .limit(1)
+        .for("update")
+    if (!row) throw new ActionError("Survey template not found.")
+}
+
+/**
+ * The same row twice in one payload would make the diff ambiguous: one copy
+ * would win the update and the other would silently vanish.
+ */
+function assertNoDuplicateIds(cleaned: CleanedInput[]): void {
+    const seen = new Set<number>()
+    for (const input of cleaned) {
+        if (input.id === null) continue
+        if (seen.has(input.id)) {
+            throw new ActionError("Duplicate question in payload.")
+        }
+        seen.add(input.id)
+    }
 }
 
 /** Validates one posted question, in the order the editor surfaces problems. */
@@ -408,6 +459,24 @@ function cleanInput(input: TemplateQuestionInput, index: number): CleanedInput {
         config: input.config,
         visibility: { conditions, roleTags },
         sortOrder: index
+    }
+}
+
+/**
+ * Throws when the template's active questions have grown past the editor's
+ * ceiling. Restoring an archived question is the one path that can cross it
+ * without going through `saveTemplateQuestions`.
+ */
+export async function assertActiveQuestionLimit(
+    templateId: number,
+    executor: DbExecutor = db
+): Promise<void> {
+    const rows = await selectQuestionRows(templateId, executor)
+    const active = rows.filter((row) => row.archived_at === null).length
+    if (active > SURVEY_LIMITS.maxQuestions) {
+        throw new ActionError(
+            `A template can hold at most ${SURVEY_LIMITS.maxQuestions} questions.`
+        )
     }
 }
 

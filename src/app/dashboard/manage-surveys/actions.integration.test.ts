@@ -2,12 +2,14 @@ import { asc, eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import {
+    auditLog,
     surveyAnswers,
     surveyQuestions,
     surveyResponses,
     surveyTemplates
 } from "@/database/schema"
 import type { TemplateQuestionInput } from "@/lib/surveys/template-rules"
+import { SURVEY_LIMITS } from "@/lib/surveys/types"
 import {
     createSurvey,
     createSurveyQuestion,
@@ -223,6 +225,112 @@ describe("saveTemplateQuestions", () => {
         expect(after).toHaveLength(2)
         const kept = after.find((r) => r.id === answered.id)
         expect(kept?.archived_at).toBeInstanceOf(Date)
+    })
+
+    // The delete-vs-archive decision and the answered-question set are read
+    // inside the save's transaction, behind a FOR UPDATE lock on the template
+    // row. survey_answers.question_id cascades on delete, so a stale read here
+    // would destroy answers.
+    it("reads the answered set at save time, not when the payload was built", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [
+            yesNo("Keep"),
+            yesNo("Answered")
+        ])
+        const [keep, answered] = await questionRows(template.id)
+
+        // Payload first, answer second, save last.
+        const payload = [yesNo("Keep", keep.id)]
+        await seedAnswer(template.id, answered.id)
+        const result = await saveTemplateQuestions(template.id, payload)
+        expect(result.status).toBe(true)
+
+        const after = await questionRows(template.id)
+        expect(
+            after.find((r) => r.id === answered.id)?.archived_at
+        ).toBeInstanceOf(Date)
+        const remaining = await db
+            .select()
+            .from(surveyAnswers)
+            .where(eq(surveyAnswers.question_id, answered.id))
+        expect(remaining).toHaveLength(1)
+    })
+
+    // Discriminating test for the row lock: the answer is committed by a
+    // concurrent writer while the save is already in flight. Only a save that
+    // takes the lock BEFORE reading the answered set sees it — one that reads
+    // first would delete the question and cascade the answer away.
+    it("takes the template lock before reading, so a concurrent answer is seen", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [
+            yesNo("Keep"),
+            yesNo("Answered")
+        ])
+        const [keep, answered] = await questionRows(template.id)
+        const survey = await createSurvey(template.id, { status: "closed" })
+
+        let pending: Promise<
+            Awaited<ReturnType<typeof saveTemplateQuestions>>
+        > | null = null
+
+        await db.transaction(async (tx) => {
+            await tx
+                .select({ id: surveyTemplates.id })
+                .from(surveyTemplates)
+                .where(eq(surveyTemplates.id, template.id))
+                .for("update")
+
+            // The save starts while this transaction holds the lock.
+            pending = saveTemplateQuestions(template.id, [
+                yesNo("Keep", keep.id)
+            ])
+            await new Promise((resolve) => setTimeout(resolve, 200))
+
+            // ...and an answer lands before the lock is released.
+            const [response] = await tx
+                .insert(surveyResponses)
+                .values({ survey_id: survey.id, status: "submitted" })
+                .returning()
+            await tx.insert(surveyAnswers).values({
+                response_id: response.id,
+                question_id: answered.id,
+                value_bool: true
+            })
+        })
+
+        const result = await (pending as unknown as Promise<
+            Awaited<ReturnType<typeof saveTemplateQuestions>>
+        >)
+        expect(result.status).toBe(true)
+
+        const after = await questionRows(template.id)
+        expect(
+            after.find((r) => r.id === answered.id)?.archived_at
+        ).toBeInstanceOf(Date)
+        const survivingAnswers = await db
+            .select()
+            .from(surveyAnswers)
+            .where(eq(surveyAnswers.question_id, answered.id))
+        expect(survivingAnswers).toHaveLength(1)
+    })
+
+    it("rejects the same question id twice in one payload", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [yesNo("Once")])
+        const [row] = await questionRows(template.id)
+
+        const result = await saveTemplateQuestions(template.id, [
+            yesNo("Once", row.id),
+            yesNo("Again", row.id)
+        ])
+        expect(result).toEqual({
+            status: false,
+            message: "Duplicate question in payload."
+        })
+        expect(await questionRows(template.id)).toHaveLength(1)
     })
 
     it("rejects an id that is not on the template", async () => {
@@ -567,6 +675,79 @@ describe("archiveTemplateQuestion", () => {
         ).toBe(true)
         ;[after] = await questionRows(template.id)
         expect(after.archived_at).toBeNull()
+    })
+
+    it("audits question archive and restore under their own action names", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [yesNo("Solo")])
+        const [row] = await questionRows(template.id)
+
+        await archiveTemplateQuestion(template.id, row.id)
+        await restoreTemplateQuestion(template.id, row.id)
+
+        const entries = await db
+            .select({
+                action: auditLog.action,
+                entityType: auditLog.entity_type,
+                entityId: auditLog.entity_id
+            })
+            .from(auditLog)
+            .orderBy(asc(auditLog.id))
+        expect(
+            entries.filter((e) => e.action.startsWith("survey_question_"))
+        ).toEqual([
+            {
+                action: "survey_question_archive",
+                entityType: "survey_question",
+                entityId: String(row.id)
+            },
+            {
+                action: "survey_question_restore",
+                entityType: "survey_question",
+                entityId: String(row.id)
+            }
+        ])
+    })
+
+    it("refuses a restore that would push the template past the question limit", async () => {
+        const template = await createSurveyTemplate()
+        await db.insert(surveyQuestions).values(
+            Array.from({ length: SURVEY_LIMITS.maxQuestions }, (_, i) => ({
+                template_id: template.id,
+                sort_order: i,
+                type: "yes_no" as const,
+                prompt: `Question ${i}`,
+                config: { type: "yes_no" as const },
+                visibility: { conditions: [], roleTags: [] }
+            }))
+        )
+        const [archived] = await db
+            .insert(surveyQuestions)
+            .values({
+                template_id: template.id,
+                sort_order: SURVEY_LIMITS.maxQuestions,
+                type: "yes_no",
+                prompt: "One too many",
+                config: { type: "yes_no" },
+                visibility: { conditions: [], roleTags: [] },
+                archived_at: new Date()
+            })
+            .returning()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await restoreTemplateQuestion(template.id, archived.id)
+        expect(result.status).toBe(false)
+        if (result.status) throw new Error("expected failure")
+        expect(result.message).toContain(
+            `at most ${SURVEY_LIMITS.maxQuestions} questions`
+        )
+
+        const [after] = await db
+            .select()
+            .from(surveyQuestions)
+            .where(eq(surveyQuestions.id, archived.id))
+        expect(after.archived_at).toBeInstanceOf(Date)
     })
 })
 
