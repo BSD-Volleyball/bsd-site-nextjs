@@ -3,6 +3,10 @@
  *
  * Pure, framework-free: no db, no server-only, no Next imports. Both server
  * actions and client report/CSV-building components import from here.
+ *
+ * CSV consumers must serialize each cell through `serializeCsvField` from
+ * `src/lib/utils.ts` before writing it to a file — the rows returned here are
+ * raw values (numbers, strings, null), not escaped CSV text.
  */
 
 import { isEmptyAnswer, optionsOf, QUESTION_TYPE_DEFS } from "./question-types"
@@ -173,6 +177,10 @@ export function aggregateQuestion(
     const answered = values.filter((v) => !isEmptyAnswer(v))
 
     switch (question.type) {
+        case "section":
+            // Unreachable: the hasAnswer check above already returned for
+            // section questions. Kept so this switch stays exhaustive.
+            return { type: "section", answered: 0 }
         case "yes_no": {
             const bools = answered as boolean[]
             const yes = bools.filter(Boolean).length
@@ -238,7 +246,13 @@ export function aggregateQuestion(
                 SurveyQuestionConfig,
                 { type: "likert" }
             >
-            const strs = answered as string[]
+            // Option keys can never be removed or re-keyed once a question has
+            // answers (see the lock rule in template-rules.ts), so an unknown
+            // key should be unreachable in practice. Defend anyway: an answer
+            // whose key matches no current option does not count as answered,
+            // so it cannot dilute the percentages below.
+            const knownKeys = new Set(config.options.map((opt) => opt.key))
+            const strs = (answered as string[]).filter((v) => knownKeys.has(v))
             const n = strs.length
             const options = config.options.map((opt) => {
                 const count = strs.filter((v) => v === opt.key).length
@@ -267,13 +281,22 @@ export function aggregateQuestion(
                 { type: "single_choice" } | { type: "multi_choice" }
             >
             const isMulti = question.type === "multi_choice"
-            const n = answered.length
+            const knownKeys = new Set(config.options.map((opt) => opt.key))
+            // See the likert case above: option keys are locked once a
+            // question has answers, so an unknown key should be unreachable.
+            // Defend anyway — an answer with no recognized key does not count
+            // as answered, so it cannot dilute the percentages below.
+            const known = isMulti
+                ? (answered as string[][]).filter((v) =>
+                      v.some((key) => knownKeys.has(key))
+                  )
+                : (answered as string[]).filter((v) => knownKeys.has(v))
+            const n = known.length
             const options = config.options.map((opt) => {
                 const count = isMulti
-                    ? (answered as string[][]).filter((v) =>
-                          v.includes(opt.key)
-                      ).length
-                    : (answered as string[]).filter((v) => v === opt.key).length
+                    ? (known as string[][]).filter((v) => v.includes(opt.key))
+                          .length
+                    : (known as string[]).filter((v) => v === opt.key).length
                 return {
                     key: opt.key,
                     label: opt.label,
@@ -293,7 +316,14 @@ export function aggregateQuestion(
                 SurveyQuestionConfig,
                 { type: "ranking" }
             >
-            const rankings = answered as string[][]
+            // See the likert case above: option keys are locked once a
+            // question has answers, so an unknown key should be unreachable.
+            // Defend anyway — a ranking with no recognized key does not count
+            // as answered, so it cannot dilute the average positions below.
+            const knownKeys = new Set(config.options.map((opt) => opt.key))
+            const rankings = (answered as string[][]).filter((ranking) =>
+                ranking.some((key) => knownKeys.has(key))
+            )
             const n = rankings.length
             const options = config.options.map((opt) => {
                 const positions: number[] = []
@@ -325,9 +355,6 @@ export function aggregateQuestion(
                 .filter((v) => v.length > 0)
             return { type: "text", answered: strs.length, answers: strs }
         }
-
-        default:
-            return { type: "section", answered: 0 }
     }
 }
 
@@ -389,52 +416,109 @@ export function aggregateSurvey(input: {
 // Trend
 // ---------------------------------------------------------------------------
 
-export function trendValues(
-    _question: SurveyQuestionDef,
-    aggregate: QuestionAggregate
-): { key: string; label: string; value: number | null }[] {
-    switch (aggregate.type) {
+/**
+ * The trend/report series a question exposes, derived from its config alone
+ * (not from any particular aggregate). This is what makes a NPS-preset rating
+ * question always offer both a "mean" and a "nps" series, even for an
+ * instance whose aggregate happens to have zero answers.
+ */
+export function seriesDefsFor(
+    question: SurveyQuestionDef
+): { key: string; label: string }[] {
+    switch (question.type) {
         case "section":
             return []
         case "yes_no":
-            return [{ key: "yes", label: "Yes %", value: aggregate.yesPct }]
+            return [{ key: "yes", label: "Yes %" }]
         case "rating": {
-            const out: { key: string; label: string; value: number | null }[] =
-                [{ key: "mean", label: "Average", value: aggregate.mean }]
-            if (aggregate.nps !== null) {
-                out.push({
-                    key: "nps",
-                    label: "NPS",
-                    value: aggregate.nps.score
-                })
+            const config = question.config as Extract<
+                SurveyQuestionConfig,
+                { type: "rating" }
+            >
+            const defs = [{ key: "mean", label: "Average" }]
+            const npsEligible =
+                config.preset === "nps" ||
+                (config.min === 0 && config.max === 10)
+            if (npsEligible) {
+                defs.push({ key: "nps", label: "NPS" })
             }
-            return out
+            return defs
         }
         case "likert":
             return [
-                { key: "mean", label: "Average (1-5)", value: aggregate.mean },
-                { key: "topbox", label: "Agree %", value: aggregate.topBoxPct }
+                { key: "mean", label: "Average (1-5)" },
+                { key: "topbox", label: "Agree %" }
             ]
         case "single_choice":
-        case "multi_choice":
-            return aggregate.options.map((opt) => ({
+        case "multi_choice": {
+            const config = question.config as Extract<
+                SurveyQuestionConfig,
+                { type: "single_choice" } | { type: "multi_choice" }
+            >
+            return config.options.map((opt) => ({
                 key: `opt:${opt.key}`,
-                label: `${opt.label} %`,
-                value: opt.pct
+                label: `${opt.label} %`
             }))
-        case "ranking":
-            return aggregate.options.map((opt) => ({
+        }
+        case "ranking": {
+            const config = question.config as Extract<
+                SurveyQuestionConfig,
+                { type: "ranking" }
+            >
+            return config.options.map((opt) => ({
                 key: `rank:${opt.key}`,
-                label: `${opt.label} avg position`,
-                value: opt.averagePosition
+                label: `${opt.label} avg position`
             }))
+        }
         case "text":
-            return [
-                { key: "count", label: "Responses", value: aggregate.answered }
-            ]
-        default:
-            return []
+            return [{ key: "count", label: "Responses" }]
     }
+}
+
+/** The value a given series key takes from one aggregate, or null when that
+ * aggregate has nothing for it (wrong shape, or an option/series absent from
+ * this particular aggregate). */
+function valueForSeries(
+    aggregate: QuestionAggregate,
+    key: string
+): number | null {
+    switch (aggregate.type) {
+        case "section":
+            return null
+        case "yes_no":
+            return key === "yes" ? aggregate.yesPct : null
+        case "rating":
+            if (key === "mean") return aggregate.mean
+            if (key === "nps") return aggregate.nps ? aggregate.nps.score : null
+            return null
+        case "likert":
+            if (key === "mean") return aggregate.mean
+            if (key === "topbox") return aggregate.topBoxPct
+            return null
+        case "single_choice":
+        case "multi_choice": {
+            if (!key.startsWith("opt:")) return null
+            const opt = aggregate.options.find((o) => `opt:${o.key}` === key)
+            return opt ? opt.pct : null
+        }
+        case "ranking": {
+            if (!key.startsWith("rank:")) return null
+            const opt = aggregate.options.find((o) => `rank:${o.key}` === key)
+            return opt ? opt.averagePosition : null
+        }
+        case "text":
+            return key === "count" ? aggregate.answered : null
+    }
+}
+
+export function trendValues(
+    question: SurveyQuestionDef,
+    aggregate: QuestionAggregate
+): { key: string; label: string; value: number | null }[] {
+    return seriesDefsFor(question).map((def) => ({
+        ...def,
+        value: valueForSeries(aggregate, def.key)
+    }))
 }
 
 export function buildTrend(
@@ -444,8 +528,7 @@ export function buildTrend(
     const sorted = [...instances].sort((a, b) => a.orderKey - b.orderKey)
 
     return questions.map((question) => {
-        const template = aggregateQuestion(question, [])
-        const seriesDefs = trendValues(question, template)
+        const seriesDefs = seriesDefsFor(question)
 
         const series: TrendSeries[] = seriesDefs.map((def) => ({
             key: def.key,
@@ -460,12 +543,10 @@ export function buildTrend(
                         n: 0
                     }
                 }
-                const values = trendValues(question, aggregate)
-                const match = values.find((v) => v.key === def.key)
                 return {
                     surveyId: instance.surveyId,
                     label: instance.label,
-                    value: match ? match.value : null,
+                    value: valueForSeries(aggregate, def.key),
                     n: aggregate.answered
                 }
             })

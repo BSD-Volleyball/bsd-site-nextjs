@@ -362,6 +362,23 @@ describe("aggregateQuestion", () => {
             answers: ["Great job", "Thanks!"]
         })
     })
+
+    it("does not count an answer whose key matches no current option (defensive: option keys are locked once answered)", () => {
+        const single = q(1, "single_choice", {
+            type: "single_choice",
+            options: CHOICES
+        })
+        const result = aggregateQuestion(single, ["opt_a", "opt_gone", "opt_b"])
+        expect(result).toEqual({
+            type: "single_choice",
+            answered: 2,
+            options: [
+                { key: "opt_a", label: "Alpha", count: 1, pct: 50 },
+                { key: "opt_b", label: "Bravo", count: 1, pct: 50 },
+                { key: "opt_c", label: "Charlie", count: 0, pct: 0 }
+            ]
+        })
+    })
 })
 
 // ---------------------------------------------------------------------------
@@ -783,6 +800,77 @@ describe("buildTrend", () => {
         const section = q(1, "section", { type: "section" })
         const trends = buildTrend([section], [])
         expect(trends).toEqual([{ question: section, series: [] }])
+    })
+
+    it("includes both the mean and NPS series for an NPS-preset rating question across instances", () => {
+        const nps = q(9, "rating", {
+            type: "rating",
+            min: 0,
+            max: 10,
+            preset: "nps"
+        })
+
+        const aggX = aggregateQuestion(nps, [9, 10, 8, 3, 7, 6, 10])
+        const aggY = aggregateQuestion(nps, [5, 5, 5])
+
+        const instX: TrendInstance = {
+            surveyId: 1,
+            label: "Winter",
+            orderKey: 0,
+            submitted: 7,
+            aggregates: { 9: aggX }
+        }
+        const instY: TrendInstance = {
+            surveyId: 2,
+            label: "Spring",
+            orderKey: 1,
+            submitted: 3,
+            aggregates: { 9: aggY }
+        }
+
+        const trends = buildTrend([nps], [instX, instY])
+        expect(trends).toHaveLength(1)
+        const [trend] = trends
+        expect(trend.series).toHaveLength(2)
+
+        const byKey = Object.fromEntries(trend.series.map((s) => [s.key, s]))
+
+        expect(byKey.mean.label).toBe("Average")
+        expect(byKey.mean.points).toEqual([
+            { surveyId: 1, label: "Winter", value: 7.57, n: 7 },
+            { surveyId: 2, label: "Spring", value: 5, n: 3 }
+        ])
+
+        expect(byKey.nps.label).toBe("NPS")
+        expect(byKey.nps.points).toEqual([
+            { surveyId: 1, label: "Winter", value: 14, n: 7 },
+            { surveyId: 2, label: "Spring", value: -100, n: 3 }
+        ])
+    })
+
+    it("always includes the NPS series definition for an NPS-preset question, even when every instance has zero answers", () => {
+        const nps = q(9, "rating", {
+            type: "rating",
+            min: 0,
+            max: 10,
+            preset: "nps"
+        })
+        const aggEmpty = aggregateQuestion(nps, [])
+        const inst: TrendInstance = {
+            surveyId: 1,
+            label: "Winter",
+            orderKey: 0,
+            submitted: 0,
+            aggregates: { 9: aggEmpty }
+        }
+        const trends = buildTrend([nps], [inst])
+        const byKey = Object.fromEntries(
+            trends[0].series.map((s) => [s.key, s])
+        )
+        expect(Object.keys(byKey).sort()).toEqual(["mean", "nps"])
+        expect(byKey.nps.points).toEqual([
+            { surveyId: 1, label: "Winter", value: null, n: 0 }
+        ])
     })
 })
 
