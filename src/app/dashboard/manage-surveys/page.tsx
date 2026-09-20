@@ -1,16 +1,14 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle
-} from "@/components/ui/card"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getSurveyTemplates } from "./actions"
+import {
+    getSurveyEditorOptions,
+    getSurveys,
+    getSurveyTemplates
+} from "./actions"
+import { SurveysList } from "./surveys-list"
 import { TemplatesList } from "./templates-list"
 
 export const metadata: Metadata = {
@@ -20,7 +18,11 @@ export const metadata: Metadata = {
 export default async function ManageSurveysPage() {
     await requirePermissionOrRedirect("surveys:manage")
 
-    const result = await getSurveyTemplates()
+    const [templatesResult, surveysResult, optionsResult] = await Promise.all([
+        getSurveyTemplates(),
+        getSurveys(),
+        getSurveyEditorOptions()
+    ])
 
     return (
         <div className="space-y-6">
@@ -36,26 +38,33 @@ export default async function ManageSurveysPage() {
                 </TabsList>
 
                 <TabsContent value="surveys">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>No surveys yet</CardTitle>
-                            <CardDescription>
-                                Surveys will appear here once Phase 2 ships.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="text-muted-foreground text-sm">
-                            Until then, build and preview the templates a survey
-                            will be run from.
-                        </CardContent>
-                    </Card>
+                    {surveysResult.status &&
+                    templatesResult.status &&
+                    optionsResult.status ? (
+                        <SurveysList
+                            surveys={surveysResult.data}
+                            templates={templatesResult.data}
+                            seasons={optionsResult.data.seasons}
+                        />
+                    ) : (
+                        <StatusBanner variant="error">
+                            {(!surveysResult.status && surveysResult.message) ||
+                                (!templatesResult.status &&
+                                    templatesResult.message) ||
+                                (!optionsResult.status &&
+                                    optionsResult.message) ||
+                                "Failed to load surveys."}
+                        </StatusBanner>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="templates">
-                    {result.status ? (
-                        <TemplatesList templates={result.data} />
+                    {templatesResult.status ? (
+                        <TemplatesList templates={templatesResult.data} />
                     ) : (
                         <StatusBanner variant="error">
-                            {result.message || "Failed to load templates."}
+                            {templatesResult.message ||
+                                "Failed to load templates."}
                         </StatusBanner>
                     )}
                 </TabsContent>
