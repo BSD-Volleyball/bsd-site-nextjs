@@ -30,7 +30,8 @@ import {
     RiImageLine,
     RiNotification3Line,
     RiArchiveLine,
-    RiUserHeartLine
+    RiUserHeartLine,
+    RiSurveyLine
 } from "@remixicon/react"
 
 export type NavItem = {
@@ -165,6 +166,12 @@ export const adminNavItems: NavItem[] = [
         title: "Send Email",
         url: "/dashboard/send-email",
         icon: RiMailLine
+    },
+    {
+        title: "Manage Surveys",
+        url: "/dashboard/manage-surveys",
+        icon: RiSurveyLine,
+        activePrefix: "/dashboard/manage-surveys"
     },
     {
         title: "Manage Emails",
