@@ -249,6 +249,28 @@ export function buildSurveyInvitationHtml(opts: {
     })
 }
 
+/**
+ * Follow-up nudge while a survey is still open. Unlike the invitation, this
+ * carries no admin-authored intro — just the title and, if set, the deadline.
+ */
+export function buildSurveyReminderHtml(opts: {
+    firstName: string
+    title: string
+    closesLabel?: string | null
+    surveyUrl: string
+}): string {
+    return renderEmailHtml({
+        heading: opts.title,
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <p>Just a reminder that this survey is still open and we haven't heard from you yet.</p>
+            ${opts.closesLabel ? `<p>Please respond by ${escapeHtml(opts.closesLabel)}.</p>` : ""}
+        `,
+        action: "Take the survey",
+        actionUrl: opts.surveyUrl
+    })
+}
+
 export function buildAvailabilityChangeHtml(opts: {
     captainFirstName: string
     playerName: string

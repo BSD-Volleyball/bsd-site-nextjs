@@ -20,6 +20,7 @@ export type NotificationCategoryId =
     | "game_reminders"
     | "captain"
     | "friends"
+    | "surveys"
 
 export type NotificationType =
     | "league_announcements"
@@ -41,6 +42,7 @@ export type NotificationType =
     | "sponsorship_payment_due"
     | "waitlist_approved"
     | "survey_invitation"
+    | "survey_reminder"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -86,6 +88,10 @@ export const NOTIFICATION_CATEGORIES: Record<
         label: "Friends",
         description:
             "Friend requests and confirmations from other league members."
+    },
+    surveys: {
+        label: "Surveys",
+        description: "Reminders to finish a league survey you were invited to."
     }
 }
 
@@ -222,6 +228,13 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             description: "When the league invites you to a survey.",
             mandatory: true
         },
+        survey_reminder: {
+            category: "surveys",
+            stream: "automated-reminders",
+            label: "Survey reminders",
+            description:
+                "Follow-up reminders while a survey you were invited to is still open."
+        },
         transactional: {
             category: null,
             stream: "outbound",
@@ -258,7 +271,7 @@ export const STREAM_LABELS: Record<string, string> = {
     outbound: "account & team emails",
     broadcast: "league announcements",
     "in-season-updates": "in-season updates",
-    "automated-reminders": "game reminders"
+    "automated-reminders": "game and survey reminders"
 }
 
 export function typesInCategory(
