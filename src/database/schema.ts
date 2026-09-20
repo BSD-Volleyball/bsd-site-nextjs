@@ -935,6 +935,37 @@ export const sponsorships = pgTable(
     })
 )
 
+/**
+ * Manual "I'll be at the gym" entries for the admin Coverage page. Keyed by
+ * (date, slot start time) rather than event/slot ids because coverage slots
+ * are derived from match times and playoff nights have no time-slot rows.
+ * A row whose (date, time) no longer matches a slot is surfaced as an orphan.
+ */
+export const coveragePresence = pgTable(
+    "coverage_presence",
+    {
+        id: serial("id").primaryKey(),
+        user_id: text("user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "cascade" }),
+        event_date: date("event_date", { mode: "string" }).notNull(),
+        slot_time: time("slot_time").notNull(),
+        note: text("note"),
+        created_by: text("created_by").references(() => users.id, {
+            onDelete: "set null"
+        }),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        coveragePresenceUserDateSlotUniq: uniqueIndex(
+            "coverage_presence_user_date_slot_uniq"
+        ).on(table.user_id, table.event_date, table.slot_time),
+        coveragePresenceDateIdx: index("coverage_presence_date_idx").on(
+            table.event_date
+        )
+    })
+)
+
 export const evaluations = pgTable(
     "evaluations",
     {

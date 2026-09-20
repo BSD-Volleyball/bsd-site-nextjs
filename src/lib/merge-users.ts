@@ -4,6 +4,7 @@ import {
     concernComments,
     concernReplies,
     concerns,
+    coveragePresence,
     signupDrops,
     discounts,
     draftCaptRounds,
@@ -1168,6 +1169,44 @@ export async function mergeUserRecords(
             .update(surveyTemplates)
             .set({ created_by: newUserId })
             .where(eq(surveyTemplates.created_by, oldUserId))
+
+        // Coverage presence: user_id cascades on delete, so repoint first.
+        // (user_id, event_date, slot_time) is unique; drop rows the survivor
+        // already has, then move the rest. created_by only repoints.
+        const survivorPresence = await tx
+            .select({
+                date: coveragePresence.event_date,
+                slot: coveragePresence.slot_time
+            })
+            .from(coveragePresence)
+            .where(eq(coveragePresence.user_id, newUserId))
+        const survivorKeys = new Set(
+            survivorPresence.map((r) => `${r.date}|${r.slot}`)
+        )
+        const oldPresence = await tx
+            .select({
+                id: coveragePresence.id,
+                date: coveragePresence.event_date,
+                slot: coveragePresence.slot_time
+            })
+            .from(coveragePresence)
+            .where(eq(coveragePresence.user_id, oldUserId))
+        for (const row of oldPresence) {
+            if (survivorKeys.has(`${row.date}|${row.slot}`)) {
+                await tx
+                    .delete(coveragePresence)
+                    .where(eq(coveragePresence.id, row.id))
+            } else {
+                await tx
+                    .update(coveragePresence)
+                    .set({ user_id: newUserId })
+                    .where(eq(coveragePresence.id, row.id))
+            }
+        }
+        await tx
+            .update(coveragePresence)
+            .set({ created_by: newUserId })
+            .where(eq(coveragePresence.created_by, oldUserId))
 
         // Finally delete the old user. Only its sessions and better-auth
         // `accounts` rows cascade away with it: those authenticate this
