@@ -724,7 +724,7 @@ function renderCoveragePerson(p: CoveragePerson): string {
     if (!p.counts && !p.isLeadership && !p.unavailable) {
         tags.push("not an admin")
     }
-    const style = `display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 0;${TONE_STYLES[personTone(p)]}${p.unavailable ? "text-decoration:line-through;" : ""}`
+    const style = `display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 0;${TONE_STYLES[personTone(p)]}${p.unavailable && !p.counts ? "text-decoration:line-through;" : ""}`
     return `<span style="${style}">${escapeHtml(p.name)}</span> <span style="color:#6b7280;font-size:13px;">(${escapeHtml(tags.join(", "))})</span>`
 }
 

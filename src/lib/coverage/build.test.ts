@@ -264,7 +264,29 @@ describe("buildCoverage", () => {
         expect(d.status).toBe("green")
     })
 
-    it("an unavailable leadership member with presence does not count", () => {
+    it("an unavailable admin with a manual presence row counts (override)", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                items: [playItem("a1", "2026-10-06", "19:00:00")],
+                presence: [
+                    {
+                        id: 2,
+                        userId: "a1",
+                        date: "2026-10-06",
+                        slotTime: "19:00:00",
+                        note: "can't play, will cover"
+                    }
+                ],
+                unavailable: new Set(["a1|10"])
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.counts).toBe(true)
+        expect(p.unavailable).toBe(true)
+        expect(p.sources).toEqual(["play", "present"])
+    })
+
+    it("an unavailable leadership member with presence counts (override)", () => {
         const [d] = buildCoverage(
             baseInput({
                 presence: [
@@ -280,7 +302,7 @@ describe("buildCoverage", () => {
             })
         )
         const p = d.slots[0].people[0]
-        expect(p.counts).toBe(false)
+        expect(p.counts).toBe(true)
         expect(p.unavailable).toBe(true)
     })
 

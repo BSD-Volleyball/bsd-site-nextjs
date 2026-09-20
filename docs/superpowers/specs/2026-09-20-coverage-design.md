@@ -14,7 +14,7 @@ This feature adds an admin **Coverage** page that lists every upcoming match dat
 | Dates in scope | Regular-season and playoff nights only. Tryouts have their own volunteer system; preseason weeks are admin-run by design. |
 | Slot definition | The distinct match start times on the date. Matches with a null time land in a "TBD" slot that never counts as first or last. |
 | Who counts | Holders of the global `admin` role, always. `leadership_group` members are **shown** in slots when they play/ref, but only count toward the status for slots where an admin added them present manually on the Coverage page. Leadership members are not emailed the digest. |
-| Unavailability | An admin with a `user_unavailability` row for the night does not count. They still appear, struck through, tagged "unavailable". |
+| Unavailability | An admin with a `user_unavailability` row for the night does not count. They still appear, struck through, tagged "unavailable". A manual presence row overrides this: someone unable to play (injury) but able to cover counts and shows in their covering colour, with the "unavailable" tag kept for information. |
 | Manual presence | Per (date, slot start time). A "Whole night" shortcut creates one row per slot. Any admin can add or remove any admin. |
 | Email | Sent every day at 11 AM Eastern for the following day's match date, to all admins, regardless of status. Subject leads with the colour word when not green. Mandatory notification type (no opt-out), deduped per date. |
 | Status colours | **Red**: first or last slot has no counting admin. **Yellow**: otherwise, any middle slot has none. **Green**: every slot has at least one. A single-slot night treats that slot as both first and last. |

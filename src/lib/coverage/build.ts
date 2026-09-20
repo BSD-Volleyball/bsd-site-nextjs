@@ -222,12 +222,14 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
                     `${userId}|${event.eventId}`
                 )
                 const isPresent = a.sources.has("present")
+                // A manual presence row overrides unavailability: someone
+                // unable to play (injury) can still cover the gym.
                 people.push({
                     userId,
                     name: person ? displayName(person) : "Unknown",
-                    counts:
-                        !unavailable &&
-                        (isAdmin || (isLeadership && isPresent)),
+                    counts: isPresent
+                        ? isAdmin || isLeadership
+                        : isAdmin && !unavailable,
                     isLeadership,
                     unavailable,
                     sources: SOURCE_ORDER.filter((s) => a.sources.has(s)),

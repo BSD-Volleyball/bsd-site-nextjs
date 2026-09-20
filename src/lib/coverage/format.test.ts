@@ -75,6 +75,12 @@ describe("personTone", () => {
         ).toBe("admin")
     })
 
+    it("is admin for an unavailable admin who counts via manual presence", () => {
+        expect(
+            personTone({ counts: true, isLeadership: false, unavailable: true })
+        ).toBe("admin")
+    })
+
     it("is admin_unavailable for an unavailable non-leadership person", () => {
         expect(
             personTone({

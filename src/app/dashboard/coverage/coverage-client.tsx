@@ -126,7 +126,7 @@ function PersonChip({
             <span
                 className={cn(
                     "font-medium",
-                    person.unavailable && "line-through"
+                    person.unavailable && !person.counts && "line-through"
                 )}
             >
                 {person.name}

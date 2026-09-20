@@ -205,6 +205,35 @@ describe("getCoverageView", () => {
         expect(night1?.status).toBe("red")
     })
 
+    it("manual presence overrides unavailability", async () => {
+        const s = await seedSeason()
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        await db
+            .insert(drafts)
+            .values({ team: s.home.id, user: admin.id, round: 1, overall: 1 })
+        await db
+            .insert(userUnavailability)
+            .values({ user_id: admin.id, event_id: s.event1.id })
+        const add = await addPresence({
+            userId: admin.id,
+            date: DATE,
+            slotTimes: ["19:00:00", "20:00:00", "21:00:00"],
+            note: "injured, covering"
+        })
+        expect(add.status).toBe(true)
+
+        const result = await getCoverageView()
+        if (!result.status) throw new Error(result.message)
+        const night1 = result.data.dates.find((d) => d.date === DATE)
+        expect(night1?.slots[0].people[0]).toMatchObject({
+            userId: admin.id,
+            counts: true,
+            unavailable: true,
+            sources: ["play", "present"]
+        })
+        expect(night1?.status).toBe("green")
+    })
+
     it("lists leadership members without counting them", async () => {
         const s = await seedSeason()
         const lead = await createUser({ first_name: "Lee", last_name: "Lead" })
