@@ -1,9 +1,9 @@
 /**
  * Day-before admin coverage digest.
  *
- * One dispatch per match night, keyed by date so a re-run of the cron and the
- * "Send digest now" button share one idempotent path. Recipients are the admin
- * role holders; leadership members appear in the body but are not mailed.
+ * One dispatch per match night, keyed by date so a re-run of the cron is a
+ * no-op. Recipients are the admin role holders; leadership members appear in
+ * the body but are not mailed.
  */
 
 import { site } from "@/config/site"

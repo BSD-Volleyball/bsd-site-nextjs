@@ -36,12 +36,7 @@ import type {
 } from "@/lib/coverage/types"
 import { cn } from "@/lib/utils"
 
-import {
-    type CoverageView,
-    addPresence,
-    removePresence,
-    sendCoverageDigest
-} from "./actions"
+import { type CoverageView, addPresence, removePresence } from "./actions"
 
 const STATUS_BORDER: Record<CoverageStatus, string> = {
     green: "border-l-green-500",
@@ -316,30 +311,9 @@ export function CoverageClient({
                                 {d.matchCount === 1 ? "" : "es"} · {d.reason}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Badge className={STATUS_BADGE[d.status]}>
-                                {STATUS_LABELS[d.status]}
-                            </Badge>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={pending}
-                                onClick={() =>
-                                    startTransition(async () => {
-                                        const r = await sendCoverageDigest({
-                                            date: d.date
-                                        })
-                                        setMessage(
-                                            r.status
-                                                ? (r.message ?? "Sent.")
-                                                : r.message
-                                        )
-                                    })
-                                }
-                            >
-                                Send digest now
-                            </Button>
-                        </div>
+                        <Badge className={STATUS_BADGE[d.status]}>
+                            {STATUS_LABELS[d.status]}
+                        </Badge>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {d.slots.map((slot) => {

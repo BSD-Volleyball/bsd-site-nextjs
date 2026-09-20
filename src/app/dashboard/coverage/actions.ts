@@ -9,7 +9,6 @@ import { normalizeTime } from "@/lib/coverage/format"
 import { listPresencePool, loadCoverage } from "@/lib/coverage/load"
 import type { CoverageAdmin, CoverageDate } from "@/lib/coverage/types"
 import { getLeagueDateString } from "@/lib/date-utils"
-import { sendCoverageDigestForDate } from "@/lib/notifications/coverage-digest"
 import {
     ActionError,
     type ActionResult,
@@ -140,36 +139,5 @@ export const removePresence = withAction(
             summary: `Removed presence for user ${row.userId} on ${row.date} at ${row.slot}`
         })
         return ok(undefined, "Removed.")
-    }
-)
-
-export const sendCoverageDigest = withAction(
-    async (input: {
-        date: string
-    }): Promise<ActionResult<{ sent: number; skipped: number }>> => {
-        await requireAdmin()
-        const session = await requireSession()
-        const date = requireNonEmptyString(input.date, "date")
-        if (!DATE_RE.test(date)) throw new ActionError("Invalid date.")
-        if (date < getLeagueDateString()) {
-            throw new ActionError("That date has passed.")
-        }
-
-        const result = await sendCoverageDigestForDate(date)
-        if (result.status === null) {
-            return fail("No matches are scheduled on that date.")
-        }
-        await logAuditEntry({
-            userId: session.user.id,
-            action: "send_coverage_digest",
-            entityType: "coverage_digest",
-            entityId: date,
-            summary: `Sent coverage digest for ${date} (sent ${result.sent}, skipped ${result.skipped})`
-        })
-        const message =
-            result.sent === 0 && result.skipped > 0
-                ? "Already sent for that date."
-                : `Sent to ${result.sent} admin${result.sent === 1 ? "" : "s"}.${result.failed > 0 ? ` (${result.failed} failed)` : ""}`
-        return ok({ sent: result.sent, skipped: result.skipped }, message)
     }
 )

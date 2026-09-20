@@ -18,12 +18,8 @@ import {
 } from "@/test/factories"
 import { sentMessages } from "@/test/email"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import {
-    addPresence,
-    getCoverageView,
-    removePresence,
-    sendCoverageDigest
-} from "./actions"
+import { sendCoverageDigestForDate } from "@/lib/notifications/coverage-digest"
+import { addPresence, getCoverageView, removePresence } from "./actions"
 
 const DATE = "2099-10-06"
 const DATE2 = "2099-10-13"
@@ -388,24 +384,15 @@ describe("addPresence / removePresence", () => {
     })
 })
 
-describe("sendCoverageDigest", () => {
-    it("rejects non-admins", async () => {
-        await createUserWithRoles([{ role: "captain" }])
-        expect(await sendCoverageDigest({ date: DATE })).toEqual({
-            status: false,
-            message: "Unauthorized."
-        })
-    })
-
+describe("sendCoverageDigestForDate", () => {
     it("emails every admin once and is a no-op on the second call", async () => {
         await seedSeason()
         const admin = await createUserWithRoles([{ role: "admin" }])
         const before = sentMessages().length
 
-        const first = await sendCoverageDigest({ date: DATE })
-        expect(first.status).toBe(true)
-        if (!first.status) return
-        expect(first.data.sent).toBeGreaterThanOrEqual(1)
+        const first = await sendCoverageDigestForDate(DATE)
+        expect(first.status).toBe("red")
+        expect(first.sent).toBeGreaterThanOrEqual(1)
         const mine = sentMessages()
             .slice(before)
             .filter((m) => m.to.toLowerCase() === admin.email.toLowerCase())
@@ -413,17 +400,17 @@ describe("sendCoverageDigest", () => {
         expect(mine[0].subject).toContain("[RED] Coverage for")
         expect(mine[0].htmlBody).toContain("nobody")
 
-        const second = await sendCoverageDigest({ date: DATE })
-        expect(second.status).toBe(true)
-        if (!second.status) return
-        expect(second.data.sent).toBe(0)
-        expect(second.data.skipped).toBeGreaterThanOrEqual(1)
+        const second = await sendCoverageDigestForDate(DATE)
+        expect(second.sent).toBe(0)
+        expect(second.skipped).toBeGreaterThanOrEqual(1)
     })
 
-    it("reports nothing to send for a date with no matches", async () => {
+    it("sends nothing for a date with no matches", async () => {
         await seedSeason()
         await createUserWithRoles([{ role: "admin" }])
-        const r = await sendCoverageDigest({ date: "2099-12-25" })
-        expect(r).toMatchObject({ status: false })
+        const before = sentMessages().length
+        const r = await sendCoverageDigestForDate("2099-12-25")
+        expect(r).toMatchObject({ status: null, sent: 0 })
+        expect(sentMessages().length).toBe(before)
     })
 })
