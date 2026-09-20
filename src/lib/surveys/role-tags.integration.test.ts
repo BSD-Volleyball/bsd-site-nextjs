@@ -5,6 +5,8 @@ import {
     individual_divisions,
     seasonRefs,
     signupDrops,
+    tryoutVolunteerAssignments,
+    tryoutVolunteerJobs,
     userRoles
 } from "@/database/schema"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
@@ -12,6 +14,7 @@ import {
     addToWaitlist,
     createDivision,
     createSeason,
+    createSeasonEvent,
     createSignup,
     createTeam
 } from "@/test/factories"
@@ -30,6 +33,23 @@ async function makeIndividualDivision(
         gender_split: "coed",
         teams: 4
     })
+}
+
+/** Assigns a user to a tryout job for the season (creating the night + job). */
+async function assignTryoutJob(seasonId: number, userId: string) {
+    const event = await createSeasonEvent(seasonId)
+    const [job] = await db
+        .insert(tryoutVolunteerJobs)
+        .values({
+            season_id: seasonId,
+            event_id: event.id,
+            name: "Scorekeeper",
+            scope: "whole_night"
+        })
+        .returning()
+    await db
+        .insert(tryoutVolunteerAssignments)
+        .values({ job_id: job.id, user_id: userId })
 }
 
 async function draftOnto(teamId: number, userId: string, overall = 1) {
@@ -51,6 +71,7 @@ describe("computeRecipientSegments", () => {
         const referee = await createUser()
         const refCoordinator = await createUser()
         const volunteer = await createUser()
+        const volunteerRoleOnly = await createUser()
         const waitlisted = await createUser()
         const dropped = await createUser()
         const admin = await createUser()
@@ -78,13 +99,16 @@ describe("computeRecipientSegments", () => {
                 season_id: season.id
             },
             {
-                user_id: volunteer.id,
+                user_id: volunteerRoleOnly.id,
                 role: "tryout_volunteer",
                 season_id: season.id
             },
             { user_id: admin.id, role: "admin" },
             { user_id: leader.id, role: "leadership_group" }
         ])
+
+        // The tag follows the actual job assignment, not the role grant.
+        await assignTryoutJob(season.id, volunteer.id)
 
         await db.insert(seasonRefs).values({
             season_id: season.id,
@@ -112,6 +136,7 @@ describe("computeRecipientSegments", () => {
             referee.id,
             refCoordinator.id,
             volunteer.id,
+            volunteerRoleOnly.id,
             waitlisted.id,
             dropped.id,
             admin.id,
@@ -145,8 +170,14 @@ describe("computeRecipientSegments", () => {
         expect(segments.get(volunteer.id)?.roleTags).toEqual([
             "tryout_volunteer"
         ])
+        // The tryout_volunteer role row alone only opens the scheduling UI.
+        expect(segments.get(volunteerRoleOnly.id)?.roleTags).toEqual([])
         expect(segments.get(waitlisted.id)?.roleTags).toEqual(["waitlisted"])
-        expect(segments.get(dropped.id)?.roleTags).toEqual(["dropped"])
+        // The drop row is this season's history, so the player is a rookie too.
+        expect(segments.get(dropped.id)?.roleTags).toEqual([
+            "dropped",
+            "first_season"
+        ])
         expect(segments.get(admin.id)?.roleTags).toEqual(["admin"])
         expect(segments.get(leader.id)?.roleTags).toEqual(["leadership_group"])
     })
@@ -263,6 +294,53 @@ describe("computeRecipientSegments", () => {
             "returning"
         )
         expect(segments.get(noHistory.id)?.roleTags).toEqual([])
+    })
+
+    it("counts signup_drops seasons as history", async () => {
+        // A pre-draft drop deletes the signups row, so signup_drops is the only
+        // record that the player was ever in that season.
+        const prior = await createSeason({ year: 2025, season: "spring" })
+        const season = await createSeason({ year: 2026, season: "fall" })
+
+        const droppedLastTime = await createUser()
+        const droppedThisTime = await createUser()
+        const dropper = await createUser()
+
+        await db.insert(signupDrops).values([
+            {
+                signup_id: 101,
+                stage: "pre_draft",
+                season: prior.id,
+                player: droppedLastTime.id,
+                reason_category: "injury",
+                dropped_by: dropper.id
+            },
+            {
+                signup_id: 102,
+                stage: "pre_draft",
+                season: season.id,
+                player: droppedThisTime.id,
+                reason_category: "moved",
+                dropped_by: dropper.id
+            }
+        ])
+        await createSignup({ season: season.id, player: droppedLastTime.id })
+
+        const segments = await computeRecipientSegments(season.id, [
+            droppedLastTime.id,
+            droppedThisTime.id
+        ])
+
+        // Only prior-season record is the drop row, so they are returning.
+        expect(segments.get(droppedLastTime.id)?.roleTags).toEqual([
+            "signed_up",
+            "returning"
+        ])
+        // Only record at all is this season's drop row.
+        expect(segments.get(droppedThisTime.id)?.roleTags).toEqual([
+            "dropped",
+            "first_season"
+        ])
     })
 
     it("computes only global tags and gender when the season is null", async () => {

@@ -23,6 +23,8 @@ import {
     signupDrops,
     signups,
     teams,
+    tryoutVolunteerAssignments,
+    tryoutVolunteerJobs,
     userRoles,
     users,
     waitlist
@@ -42,8 +44,11 @@ const ID_CHUNK_SIZE = 1000
 /** Global (season-less) role rows worth tagging. "director" is the legacy admin. */
 const GLOBAL_ROLES = ["admin", "director", "leadership_group"]
 
-/** Season-scoped role rows worth tagging. */
-const SEASON_ROLES = ["commissioner", "referee_coordinator", "tryout_volunteer"]
+/**
+ * Season-scoped role rows worth tagging. `tryout_volunteer` is deliberately
+ * absent: that tag means an actual job assignment, not the role grant.
+ */
+const SEASON_ROLES = ["commissioner", "referee_coordinator"]
 
 type Accumulator = {
     tags: Set<SurveyRoleTag>
@@ -204,7 +209,7 @@ async function applySeasonSources(
         }
     }
 
-    // commissioner / ref_coordinator / tryout_volunteer
+    // commissioner / ref_coordinator
     const roleRows = await collect(ids, (chunk) =>
         db
             .select({
@@ -230,12 +235,29 @@ async function applySeasonSources(
             if (entry.divisionId === null && row.divisionId !== null) {
                 entry.divisionId = row.divisionId
             }
-        } else if (row.role === "referee_coordinator") {
-            entry.tags.add("ref_coordinator")
         } else {
-            entry.tags.add("tryout_volunteer")
+            entry.tags.add("ref_coordinator")
         }
     }
+
+    // tryout_volunteer — an actual job assignment for one of the season's
+    // tryout nights, not the role grant (which only opens the scheduling UI).
+    const volunteerRows = await collect(ids, (chunk) =>
+        db
+            .select({ userId: tryoutVolunteerAssignments.user_id })
+            .from(tryoutVolunteerAssignments)
+            .innerJoin(
+                tryoutVolunteerJobs,
+                eq(tryoutVolunteerJobs.id, tryoutVolunteerAssignments.job_id)
+            )
+            .where(
+                and(
+                    eq(tryoutVolunteerJobs.season_id, seasonId),
+                    inArray(tryoutVolunteerAssignments.user_id, chunk)
+                )
+            )
+    )
+    for (const row of volunteerRows) tag(acc, row.userId, "tryout_volunteer")
 
     // referee
     const refRows = await collect(ids, (chunk) =>
@@ -284,8 +306,12 @@ async function applySeasonSources(
 
 /**
  * first_season / returning. A player's history is every season they signed up
- * for or were drafted into; the tags compare its earliest season to this one.
- * No history at all means neither tag.
+ * for, were drafted into, or dropped out of; the tags compare its earliest
+ * season to this one. No history at all means neither tag.
+ *
+ * Drops have to count: a pre-draft drop deletes the signups row (it is archived
+ * into signup_drops), so without them a player who quit before the draft would
+ * look like they had never played that season at all.
  */
 async function applyHistory(
     acc: Map<string, Accumulator>,
@@ -323,9 +349,21 @@ async function applyHistory(
             .where(inArray(drafts.user, chunk))
     )
 
+    const dropHistory = await collect(ids, (chunk) =>
+        db
+            .select({
+                user: signupDrops.player,
+                year: seasons.year,
+                season: seasons.season
+            })
+            .from(signupDrops)
+            .innerJoin(seasons, eq(signupDrops.season, seasons.id))
+            .where(inArray(signupDrops.player, chunk))
+    )
+
     const earliest = new Map<string, number>()
     const hasEarlier = new Set<string>()
-    for (const row of [...signupHistory, ...draftHistory]) {
+    for (const row of [...signupHistory, ...draftHistory, ...dropHistory]) {
         const key = seasonRecencyKey(row.year, row.season)
         const known = earliest.get(row.user)
         if (known === undefined || key < known) earliest.set(row.user, key)
