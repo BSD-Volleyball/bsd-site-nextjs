@@ -24,8 +24,10 @@ import {
     STATUS_LABELS,
     coverageDateTitle,
     formatCoverageDate,
-    formatSlotLabel
+    formatSlotLabel,
+    personTone
 } from "@/lib/coverage/format"
+import type { PersonTone } from "@/lib/coverage/format"
 import type {
     CoverageDate,
     CoveragePerson,
@@ -57,8 +59,46 @@ const SOURCE_LABEL = {
     play: "playing",
     work: "working",
     ref: "reffing",
+    coach: "coaching",
     present: "present"
 } as const
+
+const TONE_CLASSES: Record<PersonTone, string> = {
+    admin: "border-green-300 bg-green-100 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100",
+    admin_unavailable:
+        "border-red-300 bg-red-100 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100",
+    leadership:
+        "border-sky-300 bg-sky-100 text-sky-900 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-100",
+    leadership_covering:
+        "border-violet-300 bg-violet-100 text-violet-900 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100",
+    other: "border-border bg-muted text-muted-foreground"
+}
+
+const TONE_LEGEND: { tone: PersonTone; label: string }[] = [
+    { tone: "admin", label: "Admin present" },
+    { tone: "admin_unavailable", label: "Admin unavailable" },
+    { tone: "leadership", label: "Leadership (informational)" },
+    { tone: "leadership_covering", label: "Leadership covering" },
+    { tone: "other", label: "Not an admin" }
+]
+
+function CoverageLegend() {
+    return (
+        <div className="flex flex-wrap items-center gap-3 text-muted-foreground text-xs">
+            {TONE_LEGEND.map(({ tone, label }) => (
+                <span key={tone} className="flex items-center gap-1.5">
+                    <span
+                        className={cn(
+                            "inline-block h-3 w-3 rounded-sm border",
+                            TONE_CLASSES[tone]
+                        )}
+                    />
+                    {label}
+                </span>
+            ))}
+        </div>
+    )
+}
 
 function isEndSlot(date: CoverageDate, slot: CoverageSlot): boolean {
     const timed = date.slots.filter((s) => s.startTime !== null)
@@ -80,22 +120,23 @@ function PersonChip({
     if (!person.counts && !person.isLeadership && !person.unavailable) {
         tags.push("not an admin")
     }
+    const tone = personTone(person)
     return (
         <span
             className={cn(
                 "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm",
-                !person.counts && "text-muted-foreground"
+                TONE_CLASSES[tone]
             )}
         >
             <span
                 className={cn(
                     "font-medium",
-                    person.unavailable && "line-through"
+                    tone === "admin_unavailable" && "line-through"
                 )}
             >
                 {person.name}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs opacity-80">
                 ({tags.join(", ")}
                 {person.note ? `: ${person.note}` : ""})
             </span>
@@ -103,7 +144,7 @@ function PersonChip({
                 <button
                     type="button"
                     aria-label={`Remove ${person.name}`}
-                    className="ml-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    className="ml-1 opacity-70 hover:opacity-100 disabled:opacity-50"
                     disabled={busy}
                     onClick={() => onRemove(person.presenceId as number)}
                 >
@@ -167,7 +208,7 @@ function AddPresencePopover({
             </PopoverTrigger>
             <PopoverContent className="w-72 space-y-3" align="end">
                 <div className="space-y-1">
-                    <p className="text-sm font-medium">Who will be there?</p>
+                    <p className="font-medium text-sm">Who will be there?</p>
                     <Select value={userId} onValueChange={setUserId}>
                         <SelectTrigger>
                             <SelectValue placeholder="Pick a person" />
@@ -189,7 +230,7 @@ function AddPresencePopover({
                         maxLength={200}
                         onChange={(e) => setNote(e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                         To change a note, remove the entry and add it again.
                     </p>
                 </div>
@@ -256,8 +297,9 @@ export function CoverageClient({
     return (
         <div className="space-y-4">
             {message && (
-                <p className="text-sm text-muted-foreground">{message}</p>
+                <p className="text-muted-foreground text-sm">{message}</p>
             )}
+            <CoverageLegend />
             {view.dates.map((d) => (
                 <Card
                     key={d.eventId}
@@ -269,7 +311,7 @@ export function CoverageClient({
                                 {formatCoverageDate(d.date)} ·{" "}
                                 {coverageDateTitle(d)}
                             </CardTitle>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 {d.matchCount} match
                                 {d.matchCount === 1 ? "" : "es"} · {d.reason}
                             </p>
@@ -318,14 +360,14 @@ export function CoverageClient({
                                         <div className="font-medium">
                                             {formatSlotLabel(slot.startTime)}
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
+                                        <div className="text-muted-foreground text-xs">
                                             {slot.matchCount} match
                                             {slot.matchCount === 1 ? "" : "es"}
                                         </div>
                                     </div>
                                     <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                                         {slot.people.length === 0 ? (
-                                            <span className="text-sm text-muted-foreground">
+                                            <span className="text-muted-foreground text-sm">
                                                 — nobody —
                                             </span>
                                         ) : (
@@ -350,7 +392,7 @@ export function CoverageClient({
                             )
                         })}
                         {d.orphanedPresence.length > 0 && (
-                            <div className="rounded-md border border-dashed p-2 text-sm text-muted-foreground">
+                            <div className="rounded-md border border-dashed p-2 text-muted-foreground text-sm">
                                 <p className="mb-1 font-medium">
                                     No longer matches a slot
                                 </p>

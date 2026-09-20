@@ -3,7 +3,7 @@
  */
 
 import { formatMatchTime, formatShortDate } from "@/lib/season-utils"
-import type { CoverageDate, CoverageStatus } from "./types"
+import type { CoverageDate, CoveragePerson, CoverageStatus } from "./types"
 
 /**
  * Canonical "HH:MM:SS". Match times come back from pg as "HH:MM:SS" but
@@ -38,4 +38,26 @@ export const STATUS_LABELS: Record<CoverageStatus, string> = {
     green: "Covered",
     yellow: "Gaps mid-night",
     red: "Setup or cleanup uncovered"
+}
+
+/**
+ * How a person chip should be shaded, on the page and in the digest email.
+ * Order matters: a leadership member who also counts (added present, or now
+ * coaching) is "leadership_covering" rather than plain "leadership".
+ */
+export type PersonTone =
+    | "admin"
+    | "admin_unavailable"
+    | "leadership"
+    | "leadership_covering"
+    | "other"
+
+export function personTone(
+    p: Pick<CoveragePerson, "counts" | "isLeadership" | "unavailable">
+): PersonTone {
+    if (!p.isLeadership && p.counts) return "admin"
+    if (!p.isLeadership && p.unavailable) return "admin_unavailable"
+    if (p.isLeadership && p.counts) return "leadership_covering"
+    if (p.isLeadership) return "leadership"
+    return "other"
 }

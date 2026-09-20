@@ -87,6 +87,7 @@ function baseInput(over: Partial<BuildCoverageInput> = {}): BuildCoverageInput {
         ],
         items: [],
         presence: [],
+        coaching: [],
         unavailable: new Set(),
         people: new Map([
             ["a1", ADMIN],
@@ -439,6 +440,59 @@ describe("buildCoverage", () => {
             ["2026-10-13", "regular_season", 2],
             ["2026-11-03", "playoff", 1]
         ])
+    })
+
+    it("an admin coaching counts with source coach", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                coaching: [
+                    { userId: "a1", date: "2026-10-06", startTime: "19:00:00" }
+                ]
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.userId).toBe("a1")
+        expect(p.counts).toBe(true)
+        expect(p.sources).toEqual(["coach"])
+    })
+
+    it("a leadership member coaching is informational", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                coaching: [
+                    { userId: "l1", date: "2026-10-06", startTime: "19:00:00" }
+                ]
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.userId).toBe("l1")
+        expect(p.counts).toBe(false)
+        expect(p.isLeadership).toBe(true)
+        expect(p.sources).toEqual(["coach"])
+    })
+
+    it("play and coach merge in source order", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                items: [playItem("a1", "2026-10-06", "19:00:00")],
+                coaching: [
+                    { userId: "a1", date: "2026-10-06", startTime: "19:00:00" }
+                ]
+            })
+        )
+        const p = d.slots[0].people[0]
+        expect(p.sources).toEqual(["play", "coach"])
+    })
+
+    it("ignores a coaching row at a non-slot time", () => {
+        const [d] = buildCoverage(
+            baseInput({
+                coaching: [
+                    { userId: "a1", date: "2026-10-06", startTime: "18:30:00" }
+                ]
+            })
+        )
+        expect(d.slots.flatMap((s) => s.people)).toHaveLength(0)
     })
 
     it("sorts people: counting admins, then unavailable admins, then leadership", () => {

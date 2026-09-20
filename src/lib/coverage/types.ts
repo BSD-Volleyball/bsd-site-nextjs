@@ -5,7 +5,7 @@
 
 export type CoverageStatus = "green" | "yellow" | "red"
 
-export type CoverageSource = "play" | "work" | "ref" | "present"
+export type CoverageSource = "play" | "work" | "ref" | "coach" | "present"
 
 export interface CoveragePerson {
     userId: string

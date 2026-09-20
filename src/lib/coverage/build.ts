@@ -35,11 +35,19 @@ export interface PresenceInput {
     note: string | null
 }
 
+export interface CoachInput {
+    userId: string
+    date: string
+    startTime: string | null
+}
+
 export interface BuildCoverageInput {
     events: CoverageEventInput[]
     matches: CoverageMatchInput[]
     items: ScheduleItem[]
     presence: PresenceInput[]
+    /** Coach (captain/captain2) rows for teams in coaches-mode divisions. */
+    coaching: CoachInput[]
     /** "userId|eventId" pairs from user_unavailability. */
     unavailable: Set<string>
     people: Map<string, SchedulePerson>
@@ -47,7 +55,13 @@ export interface BuildCoverageInput {
     leadershipIds: Set<string>
 }
 
-const SOURCE_ORDER: CoverageSource[] = ["play", "work", "ref", "present"]
+const SOURCE_ORDER: CoverageSource[] = [
+    "play",
+    "work",
+    "ref",
+    "coach",
+    "present"
+]
 const TBD_KEY = "__tbd__"
 
 export function displayName(p: SchedulePerson): string {
@@ -83,6 +97,12 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
         const list = presenceByDate.get(p.date) ?? []
         list.push(p)
         presenceByDate.set(p.date, list)
+    }
+    const coachingByDate = new Map<string, CoachInput[]>()
+    for (const c of input.coaching) {
+        const list = coachingByDate.get(c.date) ?? []
+        list.push(c)
+        coachingByDate.set(c.date, list)
     }
 
     const events = [...input.events].sort((a, b) =>
@@ -162,6 +182,12 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
             const source: CoverageSource =
                 it.kind === "ref" ? "ref" : it.role === "work" ? "work" : "play"
             acc(key, it.userId).sources.add(source)
+        }
+
+        for (const c of coachingByDate.get(event.date) ?? []) {
+            const key = slotKey(c.startTime)
+            if (!matchCountByKey.has(key)) continue
+            acc(key, c.userId).sources.add("coach")
         }
 
         const orphanedPresence: OrphanedPresence[] = []

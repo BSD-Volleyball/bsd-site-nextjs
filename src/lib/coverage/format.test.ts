@@ -3,7 +3,8 @@ import {
     coverageDateTitle,
     formatCoverageDate,
     formatSlotLabel,
-    normalizeTime
+    normalizeTime,
+    personTone
 } from "./format"
 
 describe("normalizeTime", () => {
@@ -60,5 +61,53 @@ describe("coverageDateTitle", () => {
         expect(
             coverageDateTitle({ eventType: "playoff", ordinal: 1, label: null })
         ).toBe("Playoffs Week 1")
+    })
+})
+
+describe("personTone", () => {
+    it("is admin for a counting non-leadership person", () => {
+        expect(
+            personTone({
+                counts: true,
+                isLeadership: false,
+                unavailable: false
+            })
+        ).toBe("admin")
+    })
+
+    it("is admin_unavailable for an unavailable non-leadership person", () => {
+        expect(
+            personTone({
+                counts: false,
+                isLeadership: false,
+                unavailable: true
+            })
+        ).toBe("admin_unavailable")
+    })
+
+    it("is leadership_covering for a counting leadership person", () => {
+        expect(
+            personTone({ counts: true, isLeadership: true, unavailable: false })
+        ).toBe("leadership_covering")
+    })
+
+    it("is leadership for a non-counting leadership person", () => {
+        expect(
+            personTone({
+                counts: false,
+                isLeadership: true,
+                unavailable: false
+            })
+        ).toBe("leadership")
+    })
+
+    it("is other for a non-admin, non-leadership person", () => {
+        expect(
+            personTone({
+                counts: false,
+                isLeadership: false,
+                unavailable: false
+            })
+        ).toBe("other")
     })
 })

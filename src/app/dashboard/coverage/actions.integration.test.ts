@@ -4,7 +4,9 @@ import { db } from "@/database/db"
 import {
     coveragePresence,
     drafts,
+    individual_divisions,
     matchReferees,
+    teams,
     userUnavailability
 } from "@/database/schema"
 import {
@@ -151,6 +153,36 @@ describe("getCoverageView", () => {
         expect(night2?.slots.map((x) => x.startTime)).toEqual(["19:00:00"])
         expect(night2?.status).toBe("green")
         expect(result.data.pool.map((a) => a.userId)).toContain(admin.id)
+    })
+
+    it("derives coaching for an admin who is captain of a coached team", async () => {
+        const admin = await createUserWithRoles([{ role: "admin" }], {
+            first_name: "Cody",
+            last_name: "Coach"
+        })
+        const s = await seedSeason()
+        await db.insert(individual_divisions).values({
+            season: s.season.id,
+            division: s.division.id,
+            coaches: true,
+            gender_split: "coed",
+            teams: 2
+        })
+        await db
+            .update(teams)
+            .set({ captain: admin.id })
+            .where(eq(teams.id, s.home.id))
+
+        const result = await getCoverageView()
+        expect(result.status).toBe(true)
+        if (!result.status) return
+        const night1 = result.data.dates.find((d) => d.date === DATE)
+        expect(night1?.slots[0].people[0]).toMatchObject({
+            userId: admin.id,
+            sources: ["coach"],
+            counts: true
+        })
+        expect(night1?.status).toBe("green")
     })
 
     it("flags unavailable admins and excludes them from coverage", async () => {

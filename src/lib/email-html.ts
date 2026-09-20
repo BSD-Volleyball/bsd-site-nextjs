@@ -8,9 +8,11 @@
 
 import { site } from "@/config/site"
 import {
+    type PersonTone,
     coverageDateTitle,
     formatCoverageDate,
-    formatSlotLabel
+    formatSlotLabel,
+    personTone
 } from "@/lib/coverage/format"
 import type {
     CoverageDate,
@@ -684,8 +686,33 @@ const COVERAGE_SOURCE_LABEL: Record<CoveragePerson["sources"][number], string> =
         play: "playing",
         work: "working",
         ref: "reffing",
+        coach: "coaching",
         present: "present"
     }
+
+const TONE_STYLES: Record<PersonTone, string> = {
+    admin: "background:#dcfce7;color:#14532d;",
+    admin_unavailable:
+        "background:#fee2e2;color:#7f1d1d;text-decoration:line-through;",
+    leadership: "background:#e0f2fe;color:#0c4a6e;",
+    leadership_covering: "background:#ede9fe;color:#4c1d95;",
+    other: "background:#f3f4f6;color:#6b7280;"
+}
+
+const TONE_LEGEND: { tone: PersonTone; label: string }[] = [
+    { tone: "admin", label: "Admin present" },
+    { tone: "admin_unavailable", label: "Admin unavailable" },
+    { tone: "leadership", label: "Leadership (informational)" },
+    { tone: "leadership_covering", label: "Leadership covering" },
+    { tone: "other", label: "Not an admin" }
+]
+
+function renderCoverageLegend(): string {
+    return TONE_LEGEND.map(
+        ({ tone, label }) =>
+            `<span style="display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 6px 2px 0;font-size:12px;${TONE_STYLES[tone]}">${escapeHtml(label)}</span>`
+    ).join("")
+}
 
 function renderCoveragePerson(p: CoveragePerson): string {
     const tags = p.sources.map((s) =>
@@ -698,9 +725,7 @@ function renderCoveragePerson(p: CoveragePerson): string {
     if (!p.counts && !p.isLeadership && !p.unavailable) {
         tags.push("not an admin")
     }
-    const style = p.counts
-        ? "font-weight:600;"
-        : `color:#6b7280;${p.unavailable ? "text-decoration:line-through;" : ""}`
+    const style = `display:inline-block;padding:2px 8px;border-radius:6px;margin:2px 0;${TONE_STYLES[personTone(p)]}`
     return `<span style="${style}">${escapeHtml(p.name)}</span> <span style="color:#6b7280;font-size:13px;">(${escapeHtml(tags.join(", "))})</span>`
 }
 
@@ -734,6 +759,7 @@ export function buildCoverageDigestHtml(opts: {
             </div>
             <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Admins always count toward coverage; leadership members count only for slots where they were added on the Coverage page.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">${rows}</table>
+            <p style="font-size:12px;margin:12px 0;">${renderCoverageLegend()}</p>
             <p style="font-size:13px;color:#6b7280;">Can you fill a gap? Add yourself on the Coverage page.</p>
         `,
         action: "Open Coverage",

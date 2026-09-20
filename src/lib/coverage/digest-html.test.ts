@@ -71,4 +71,9 @@ describe("buildCoverageDigestHtml", () => {
     it("links to the coverage page", () => {
         expect(html).toContain("https://example.test/dashboard/coverage")
     })
+
+    it("shades a counting admin green and leadership sky", () => {
+        expect(html).toContain("#dcfce7")
+        expect(html).toContain("#e0f2fe")
+    })
 })

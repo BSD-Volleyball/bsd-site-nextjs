@@ -13,9 +13,11 @@ import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
     coveragePresence,
+    individual_divisions,
     matches,
     seasonEvents,
     seasons,
+    teams,
     userRoles,
     users,
     userUnavailability
@@ -24,6 +26,7 @@ import { getRecipientsWithRole } from "@/lib/rbac"
 import { getScheduleForUsers } from "@/lib/schedule-items"
 import {
     type BuildCoverageInput,
+    type CoachInput,
     type CoverageEventInput,
     type CoverageMatchInput,
     buildCoverage
@@ -91,18 +94,56 @@ export async function loadCoverage(opts: {
             date: matches.date,
             time: matches.time,
             week: matches.week,
-            playoff: matches.playoff
+            playoff: matches.playoff,
+            homeTeam: matches.home_team,
+            awayTeam: matches.away_team
         })
         .from(matches)
         .where(eq(matches.season, season.id))
 
     const slotMatches: CoverageMatchInput[] = []
+    const inRangeMatches: (typeof matchRows)[number][] = []
+    const matchDateById = new Map<number, string>()
     for (const m of matchRows) {
         const date =
             m.date ||
             (m.playoff ? null : (regularEvents[m.week - 1]?.eventDate ?? null))
         if (!date || !rangeDates.has(date)) continue
         slotMatches.push({ matchId: m.id, date, startTime: m.time })
+        inRangeMatches.push(m)
+        matchDateById.set(m.id, date)
+    }
+
+    // Coach derivation: a team's captain/captain2 in a coaches-mode division
+    // (individual_divisions.coaches = true) are its coaches. Coaches are
+    // usually not on the draft roster, so getScheduleForUsers emits no item
+    // for them; coverage derives it here from the match's teams.
+    const coachedTeamRows = await db
+        .select({
+            id: teams.id,
+            captain: teams.captain,
+            captain2: teams.captain2
+        })
+        .from(teams)
+        .innerJoin(
+            individual_divisions,
+            and(
+                eq(individual_divisions.season, teams.season),
+                eq(individual_divisions.division, teams.division)
+            )
+        )
+        .where(
+            and(
+                eq(teams.season, season.id),
+                eq(individual_divisions.coaches, true)
+            )
+        )
+    const coachesByTeam = new Map<number, string[]>()
+    for (const row of coachedTeamRows) {
+        const coaches = [row.captain, row.captain2].filter(
+            (c): c is string => c !== null
+        )
+        coachesByTeam.set(row.id, coaches)
     }
 
     const [admins, leadership] = await Promise.all([
@@ -135,6 +176,22 @@ export async function loadCoverage(opts: {
             ...presenceRows.map((p) => p.userId)
         ])
     ]
+    const userIdSet = new Set(userIds)
+
+    // Coaches not already in the admin/leadership pool are irrelevant to
+    // coverage and must not be added to userIds.
+    const coaching: CoachInput[] = []
+    for (const m of inRangeMatches) {
+        const date = matchDateById.get(m.id)
+        if (!date) continue
+        for (const teamId of [m.homeTeam, m.awayTeam]) {
+            if (teamId === null) continue
+            for (const userId of coachesByTeam.get(teamId) ?? []) {
+                if (!userIdSet.has(userId)) continue
+                coaching.push({ userId, date, startTime: m.time })
+            }
+        }
+    }
 
     const bundle = await getScheduleForUsers(userIds, season.id)
 
@@ -164,6 +221,7 @@ export async function loadCoverage(opts: {
         matches: slotMatches,
         items: bundle.items,
         presence: presenceRows.filter((p) => rangeDates.has(p.date)),
+        coaching,
         unavailable: new Set(
             unavailRows.map((r) => `${r.userId}|${r.eventId}`)
         ),
