@@ -23,7 +23,6 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table"
-import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
 import type { SurveyEditorRecipient } from "@/lib/surveys/surveys"
 import { SURVEY_ROLE_TAG_LABELS } from "@/lib/surveys/types"
 import {
@@ -31,6 +30,7 @@ import {
     removeSurveyRecipient,
     resendSurveyInvitations
 } from "./actions"
+import { formatLeagueDateTime } from "./league-datetime"
 
 interface RecipientsTableProps {
     surveyId: number
@@ -39,18 +39,6 @@ interface RecipientsTableProps {
     canResend: boolean
     users: { id: string; name: string }[]
     onChanged: () => void
-}
-
-function formatDate(date: Date | null): string {
-    if (!date) return "—"
-    return date.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })
 }
 
 /** Recipients table for a published survey: status badges, remove, add late, resend. */
@@ -179,12 +167,16 @@ export function RecipientsTable({
                                     {recipient.removedAt ? (
                                         <Badge variant="secondary">
                                             Removed{" "}
-                                            {formatDate(recipient.removedAt)}
+                                            {formatLeagueDateTime(
+                                                recipient.removedAt
+                                            )}
                                         </Badge>
                                     ) : recipient.submittedAt ? (
                                         <Badge>
                                             Submitted{" "}
-                                            {formatDate(recipient.submittedAt)}
+                                            {formatLeagueDateTime(
+                                                recipient.submittedAt
+                                            )}
                                         </Badge>
                                     ) : (
                                         <Badge variant="outline">Pending</Badge>

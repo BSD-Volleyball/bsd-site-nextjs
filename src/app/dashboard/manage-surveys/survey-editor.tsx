@@ -48,7 +48,11 @@ import {
     type SurveyEditorOptionsPayload
 } from "./actions"
 import { AudienceBuilder } from "./audience-builder"
-import { leagueLocalToIso, isoToLeagueLocal } from "./league-datetime"
+import {
+    formatLeagueDateTime,
+    isoToLeagueLocal,
+    leagueLocalToIso
+} from "./league-datetime"
 import { RecipientsTable } from "./recipients-table"
 
 interface SurveyEditorProps {
@@ -58,18 +62,6 @@ interface SurveyEditorProps {
 }
 
 const NO_SEASON = "none"
-
-function formatLeague(date: Date | null): string {
-    if (!date) return "—"
-    return date.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })
-}
 
 /** The survey editor: settings, audience, and (once published) the recipients panel. */
 export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
@@ -123,6 +115,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
 
     const isDraft = survey.status === "draft"
     const isOpen = survey.status === "open"
+    const isClosed = survey.status === "closed"
     const isPublished = !isDraft
 
     function refresh() {
@@ -232,6 +225,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         <Input
                             id="survey-title"
                             value={title}
+                            disabled={isClosed}
                             maxLength={SURVEY_LIMITS.maxTitleLength}
                             onChange={(event) => setTitle(event.target.value)}
                         />
@@ -244,6 +238,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                             id="survey-intro"
                             rows={3}
                             value={intro}
+                            disabled={isClosed}
                             onChange={(event) => setIntro(event.target.value)}
                         />
                     </div>
@@ -294,6 +289,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                                 id="survey-opens"
                                 type="datetime-local"
                                 value={opensAt}
+                                disabled={isClosed}
                                 onChange={(event) =>
                                     setOpensAt(event.target.value)
                                 }
@@ -307,6 +303,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                                 id="survey-closes"
                                 type="datetime-local"
                                 value={closesAt}
+                                disabled={isClosed}
                                 onChange={(event) =>
                                     setClosesAt(event.target.value)
                                 }
@@ -324,6 +321,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                                 min={0}
                                 max={90}
                                 value={reminderIntervalDays}
+                                disabled={isClosed}
                                 onChange={(event) =>
                                     setReminderIntervalDays(event.target.value)
                                 }
@@ -339,6 +337,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                                 min={0}
                                 max={20}
                                 value={reminderMaxCount}
+                                disabled={isClosed}
                                 onChange={(event) =>
                                     setReminderMaxCount(event.target.value)
                                 }
@@ -349,12 +348,13 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         <p className="text-muted-foreground text-sm">
                             Sent {survey.reminder_count}/
                             {survey.reminder_max_count} reminders. Last
-                            reminder: {formatLeague(survey.last_reminder_at)}.
+                            reminder:{" "}
+                            {formatLeagueDateTime(survey.last_reminder_at)}.
                         </p>
                     )}
                     <Button
                         type="button"
-                        disabled={savingSettings}
+                        disabled={savingSettings || isClosed}
                         onClick={handleSaveSettings}
                     >
                         Save settings
@@ -403,7 +403,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         <RecipientsTable
                             surveyId={surveyId}
                             recipients={recipients}
-                            canManage={isPublished}
+                            canManage={isOpen}
                             canResend={isOpen}
                             users={options.users}
                             onChanged={refresh}

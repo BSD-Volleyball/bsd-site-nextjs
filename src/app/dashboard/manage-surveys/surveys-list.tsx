@@ -11,9 +11,9 @@ import {
     TableHeader,
     TableRow
 } from "@/components/ui/table"
-import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
 import type { SurveyListRow } from "@/lib/surveys/surveys"
 import type { TemplateSummary } from "@/lib/surveys/templates"
+import { formatLeagueDateTime } from "./league-datetime"
 import { NewSurveyDialog } from "./new-survey-dialog"
 
 interface SurveysListProps {
@@ -28,18 +28,6 @@ function statusVariant(
     if (status === "open") return "default"
     if (status === "closed") return "secondary"
     return "outline"
-}
-
-function formatDate(date: Date | null): string {
-    if (!date) return "—"
-    return date.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })
 }
 
 /** The Surveys tab: every survey instance, newest first, with a "New survey" launcher. */
@@ -102,7 +90,7 @@ export function SurveysList({ surveys, templates, seasons }: SurveysListProps) {
                                     {survey.submitted}/{survey.recipients}
                                 </TableCell>
                                 <TableCell>
-                                    {formatDate(survey.closesAt)}
+                                    {formatLeagueDateTime(survey.closesAt)}
                                 </TableCell>
                                 <TableCell>
                                     {survey.reminderCount}/

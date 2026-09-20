@@ -192,7 +192,10 @@ export function AudienceBuilder({
                                         )
                                     }
                                 >
-                                    <SelectTrigger className="w-64">
+                                    <SelectTrigger
+                                        className="w-64"
+                                        aria-label="Division"
+                                    >
                                         <SelectValue placeholder="Choose a division">
                                             {nameOf(
                                                 options.divisions,
@@ -260,7 +263,10 @@ export function AudienceBuilder({
                                         )
                                     }
                                 >
-                                    <SelectTrigger className="w-64">
+                                    <SelectTrigger
+                                        className="w-64"
+                                        aria-label="Team"
+                                    >
                                         <SelectValue placeholder="Choose a team">
                                             {nameOf(
                                                 options.teams,

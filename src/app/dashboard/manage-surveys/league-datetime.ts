@@ -51,6 +51,25 @@ export function isoToLeagueLocal(date: Date): string {
 }
 
 /**
+ * A human-readable rendering of a timestamp in the league zone, e.g.
+ * "Jan 15, 2027, 6:30 PM". Accepts a Date, an ISO string, or null (renders
+ * as an em dash) so callers can pass a nullable row field straight through.
+ */
+export function formatLeagueDateTime(date: Date | string | null): string {
+    if (!date) return "—"
+    const instant = date instanceof Date ? date : new Date(date)
+    if (Number.isNaN(instant.getTime())) return "—"
+    return instant.toLocaleString("en-US", {
+        timeZone: LEAGUE_TIME_ZONE,
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit"
+    })
+}
+
+/**
  * `LEAGUE_TIME_ZONE`'s offset (in ms, to be subtracted from a wall-clock time
  * expressed as UTC millis to get the real UTC instant) as observed at the
  * given instant.
