@@ -20,7 +20,7 @@ export default async function CoveragePage() {
         <div className="space-y-6">
             <PageHeader
                 title="Coverage"
-                description="Which admins are at the gym for each upcoming match night. Every night needs at least one admin in every slot, especially the first (setup) and last (cleanup)."
+                description="Who is covering the gym for each upcoming match night. Every night needs at least one admin (or a leadership member added here) in every slot, especially the first (setup) and last (cleanup)."
             />
             {!result.status ? (
                 <p className="text-muted-foreground">{result.message}</p>
