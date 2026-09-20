@@ -182,6 +182,13 @@ Common environment variables used across the app include:
 - Emails go through `dispatchNotification` with dedupe keys `survey-<id>-invite` / `survey-<id>-reminder-<n>`; reminders and auto-close run from `/api/cron/survey-reminders` (daily, `CRON_SECRET`). Permissions: `surveys:manage`, `surveys:view_results` (admin only today).
 - `mergeUserRecords` repoints survey rows; keep it in sync if survey tables gain user references.
 
+## Coverage (admin gym presence)
+
+- `/dashboard/coverage` shows every upcoming regular-season and playoff night with one row per time slot (the distinct match start times that night) and the admins in each: derived from `getScheduleForUsers()` for the `admin` and `leadership_group` pools (play / playoff work / ref items) plus manual rows in `coverage_presence` keyed by `(user_id, event_date, slot_time)`. Only `admin` role holders count; leadership members are informational; an admin with a `user_unavailability` row for the night is shown struck through and does not count.
+- Status is one pure function, `computeStatus()` in `src/lib/coverage/status.ts`: red if the first or last timed slot has no counting admin, yellow for a middle gap, green otherwise. The TBD slot (null match time) never affects status. `buildCoverage()` (pure) and `loadCoverage()` (server) live beside it.
+- A presence row whose (date, time) no longer matches a slot is an orphan; the page lists it with a remove button rather than dropping it. `mergeUserRecords` repoints `coverage_presence`.
+- Digest: `coverage_digest` is a mandatory notification type; `sendCoverageDigestForDate(date)` dispatches once per night with dedupe key `coverage-<date>`, so the daily cron (`/api/cron/coverage-digest`, 15:00 UTC, for tomorrow) and the page's "Send digest now" button share one idempotent path.
+
 ## Inbound Email (Postmark → Cloudflare Worker → app)
 
 - Postmark's inbound webhook inlines attachments as base64 (up to 35 MB per message, ~50 MB of JSON). Vercel rejects request bodies over 4.5 MB at the edge, so Postmark does **not** post to the app directly: its `InboundHookUrl` is the Cloudflare Worker in `workers/postmark-inbound/` (`https://hooks.bumpsetdrink.com/postmark/inbound`).
