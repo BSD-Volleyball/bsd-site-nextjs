@@ -66,3 +66,6 @@ workers/**/node_modules
 workers/**/.wrangler
 workers/**/.dev.vars
 workers/**/worker-configuration.d.ts
+
+# Subagent-driven-development scratch workspace
+.superpowers/
