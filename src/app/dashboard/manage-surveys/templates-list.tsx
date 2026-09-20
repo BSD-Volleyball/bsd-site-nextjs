@@ -40,6 +40,10 @@ function templateHref(templateId: number): string {
     return `/dashboard/manage-surveys/templates/${templateId}`
 }
 
+function trendsHref(templateId: number): string {
+    return `/dashboard/manage-surveys/templates/${templateId}/trends`
+}
+
 /** The template bank: create, open, archive and restore. */
 export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
     const router = useRouter()
@@ -212,6 +216,16 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
                                 >
                                     <Link href={templateHref(template.id)}>
                                         Edit
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy}
+                                    asChild
+                                >
+                                    <Link href={trendsHref(template.id)}>
+                                        Trends
                                     </Link>
                                 </Button>
                                 <Button
