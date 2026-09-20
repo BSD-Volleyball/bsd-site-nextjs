@@ -78,12 +78,18 @@ function PersonChip({
         <span
             className={cn(
                 "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm",
-                !person.counts && "text-muted-foreground",
-                person.unavailable && "line-through"
+                !person.counts && "text-muted-foreground"
             )}
         >
-            <span className="font-medium">{person.name}</span>
-            <span className="text-xs text-muted-foreground no-underline">
+            <span
+                className={cn(
+                    "font-medium",
+                    person.unavailable && "line-through"
+                )}
+            >
+                {person.name}
+            </span>
+            <span className="text-xs text-muted-foreground">
                 ({tags.join(", ")}
                 {person.note ? `: ${person.note}` : ""})
             </span>
@@ -139,6 +145,7 @@ function AddPresencePopover({
             if (result.status) {
                 setOpen(false)
                 setNote("")
+                setUserId(currentUserId)
             }
         })
     }
