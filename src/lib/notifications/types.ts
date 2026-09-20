@@ -43,6 +43,7 @@ export type NotificationType =
     | "waitlist_approved"
     | "survey_invitation"
     | "survey_reminder"
+    | "coverage_digest"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -234,6 +235,14 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Survey reminders",
             description:
                 "Follow-up reminders while a survey you were invited to is still open."
+        },
+        coverage_digest: {
+            category: null,
+            stream: "outbound",
+            label: "Admin coverage digest",
+            description:
+                "Day-before summary of which admins are at the gym for each time slot.",
+            mandatory: true
         },
         transactional: {
             category: null,

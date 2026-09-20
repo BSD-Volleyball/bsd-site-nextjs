@@ -7,6 +7,16 @@
  */
 
 import { site } from "@/config/site"
+import {
+    coverageDateTitle,
+    formatCoverageDate,
+    formatSlotLabel
+} from "@/lib/coverage/format"
+import type {
+    CoverageDate,
+    CoveragePerson,
+    CoverageStatus
+} from "@/lib/coverage/types"
 
 // ---------------------------------------------------------------------------
 // Base email layout
@@ -653,5 +663,77 @@ export function buildThreadReplyNotificationHtml(
         bodyHtml: `<p>A reply has been received on ${label} #${opts.ticketId}.</p>${summary}`,
         action: `View ${label} Thread`,
         actionUrl: pageUrl
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Admin coverage digest
+// ---------------------------------------------------------------------------
+
+const COVERAGE_BANNER: Record<
+    CoverageStatus,
+    { bg: string; fg: string; title: string }
+> = {
+    green: { bg: "#dcfce7", fg: "#166534", title: "Covered" },
+    yellow: { bg: "#fef3c7", fg: "#92400e", title: "Gaps mid-night" },
+    red: { bg: "#fee2e2", fg: "#991b1b", title: "Setup or cleanup uncovered" }
+}
+
+const COVERAGE_SOURCE_LABEL: Record<CoveragePerson["sources"][number], string> =
+    {
+        play: "playing",
+        work: "working",
+        ref: "reffing",
+        present: "present"
+    }
+
+function renderCoveragePerson(p: CoveragePerson): string {
+    const tags = p.sources.map((s) =>
+        s === "present" && p.note
+            ? `present: ${p.note}`
+            : COVERAGE_SOURCE_LABEL[s]
+    )
+    if (p.unavailable) tags.push("unavailable")
+    if (p.isLeadership) tags.push("leadership")
+    const style = p.counts
+        ? "font-weight:600;"
+        : `color:#6b7280;${p.unavailable ? "text-decoration:line-through;" : ""}`
+    return `<span style="${style}">${escapeHtml(p.name)}</span> <span style="color:#6b7280;font-size:13px;">(${escapeHtml(tags.join(", "))})</span>`
+}
+
+export function buildCoverageDigestHtml(opts: {
+    firstName: string
+    day: CoverageDate
+    coverageUrl: string
+}): string {
+    const { day } = opts
+    const banner = COVERAGE_BANNER[day.status]
+    const dateLabel = `${formatCoverageDate(day.date)} · ${coverageDateTitle(day)}`
+    const rows = day.slots
+        .map((slot) => {
+            const people =
+                slot.people.length === 0
+                    ? `<span style="color:#991b1b;">— nobody —</span>`
+                    : slot.people.map(renderCoveragePerson).join("<br/>")
+            return `<tr>
+                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;font-weight:600;">${escapeHtml(formatSlotLabel(slot.startTime))}<br/><span style="font-weight:400;color:#6b7280;font-size:12px;">${slot.matchCount} match${slot.matchCount === 1 ? "" : "es"}</span></td>
+                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;vertical-align:top;">${people}</td>
+            </tr>`
+        })
+        .join("")
+
+    return renderEmailHtml({
+        heading: `Coverage for ${dateLabel}`,
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            <div style="background-color:${banner.bg};color:${banner.fg};border-radius:8px;padding:12px 16px;margin:12px 0;">
+                <strong>${escapeHtml(banner.title)}</strong> — ${escapeHtml(day.reason)}
+            </div>
+            <p>Here is who is at the gym tomorrow, ${escapeHtml(formatCoverageDate(day.date))}. Only admins count toward coverage; leadership members are listed for information.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">${rows}</table>
+            <p style="font-size:13px;color:#6b7280;">Can you fill a gap? Add yourself on the Coverage page.</p>
+        `,
+        action: "Open Coverage",
+        actionUrl: opts.coverageUrl
     })
 }
