@@ -17,7 +17,7 @@
 
 import { eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
-import { seasons, users } from "@/database/schema"
+import { divisions, seasons, teams, users } from "@/database/schema"
 import { ActionError } from "@/lib/action-result"
 import {
     type Recipient,
@@ -55,19 +55,41 @@ export async function resolveAudience(
     const errors = validateAudience(def, seasonId)
     if (errors.length > 0) throw new ActionError(errors[0])
 
+    const groups = def.groups ?? []
     const seasonLabel =
         seasonId === null ? undefined : await loadSeasonLabel(seasonId)
+    // Without these every division group would be minted as "Division (Fall
+    // 2026)", and the Send Email page would list a row per division under one
+    // indistinguishable name.
+    const divisionNames = await loadNames(
+        divisions,
+        groups.map((group) => group.divisionId)
+    )
+    const teamNames = await loadNames(
+        teams,
+        groups.map((group) => group.teamId)
+    )
 
     const byUserId = new Map<string, Recipient>()
     const groupCounts: ResolvedAudience["groupCounts"] = []
 
-    for (const group of def.groups ?? []) {
+    for (const group of groups) {
         // Season-less groups (everyone, all refs, leadership) must not be
         // scoped to a season: ensureRecipientGroup keys on the scope columns,
         // so passing one would mint a duplicate group row per season.
         const seasonScoped = SEASON_BOUND_GROUP_TYPES.includes(group.type)
         const groupId = await ensureRecipientGroup(group.type, {
-            name: describeAudienceGroup(group, { seasonLabel }),
+            name: describeAudienceGroup(group, {
+                seasonLabel,
+                divisionName:
+                    group.divisionId === undefined
+                        ? undefined
+                        : divisionNames.get(group.divisionId),
+                teamName:
+                    group.teamId === undefined
+                        ? undefined
+                        : teamNames.get(group.teamId)
+            }),
             seasonId: seasonScoped && seasonId !== null ? seasonId : undefined,
             divisionId: group.divisionId,
             teamId: group.teamId,
@@ -94,6 +116,23 @@ export async function resolveAudience(
     }
 
     return { recipients: [...byUserId.values()], groupCounts }
+}
+
+/** id → name for whichever of `ids` are set, in one query. */
+async function loadNames(
+    table: typeof divisions | typeof teams,
+    ids: (number | undefined)[]
+): Promise<Map<number, string>> {
+    const wanted = [
+        ...new Set(ids.filter((id): id is number => typeof id === "number"))
+    ]
+    if (wanted.length === 0) return new Map()
+
+    const rows = await db
+        .select({ id: table.id, name: table.name })
+        .from(table)
+        .where(inArray(table.id, wanted))
+    return new Map(rows.map((row) => [row.id, row.name]))
 }
 
 async function loadSeasonLabel(seasonId: number): Promise<string | undefined> {

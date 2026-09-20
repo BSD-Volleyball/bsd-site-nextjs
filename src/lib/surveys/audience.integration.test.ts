@@ -57,6 +57,26 @@ describe("resolveAudience", () => {
         }
     })
 
+    it("names a division group after the division, not the season", async () => {
+        const season = await createSeason({ year: 2026, season: "fall" })
+        const division = await createDivision({ name: "Rec A" })
+
+        await resolveAudience(
+            {
+                groups: [{ type: "season_division", divisionId: division.id }],
+                addUserIds: [],
+                removeUserIds: []
+            },
+            season.id
+        )
+
+        const [group] = await db
+            .select()
+            .from(emailRecipientGroups)
+            .where(eq(emailRecipientGroups.division_id, division.id))
+        expect(group.name).toBe("Division: Rec A")
+    })
+
     it("rejects a season-bound group with no season", async () => {
         await expect(
             resolveAudience(

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import { surveyRecipients, surveys } from "@/database/schema"
 import { sendBatchEmails } from "@/lib/postmark"
+import { sentBatchMessages } from "@/test/email"
 import {
     addToWaitlist,
     createDivision,
@@ -103,10 +104,6 @@ async function seedScene(
     }
 }
 
-function sentMessages() {
-    return mockedSendBatch.mock.calls.flatMap((call) => call[0])
-}
-
 describe("publishSurvey", () => {
     it("invites the resolved audience and freezes the active question list", async () => {
         const scene = await seedScene()
@@ -143,7 +140,7 @@ describe("publishSurvey", () => {
         ])
         expect(updated.published_at).not.toBeNull()
 
-        const messages = sentMessages()
+        const messages = sentBatchMessages()
         expect(messages).toHaveLength(3)
         expect(new Set(messages.map((m) => m.to))).toEqual(
             new Set([
@@ -281,7 +278,7 @@ describe("addRecipients", () => {
         )
 
         expect(result.added).toBe(1)
-        const messages = sentMessages()
+        const messages = sentBatchMessages()
         expect(messages).toHaveLength(1)
         expect(messages[0].to).toBe(latecomer.email)
 
@@ -303,12 +300,18 @@ describe("addRecipients", () => {
         await publishSurvey(scene.survey.id, scene.actor.id)
         await removeRecipient(scene.survey.id, scene.captain.id)
 
+        mockedSendBatch.mockClear()
         const result = await addRecipients(
             scene.survey.id,
             [scene.captain.id],
             scene.actor.id
         )
         expect(result.added).toBe(1)
+
+        // The address was already claimed under this survey's dedupe key at
+        // publish, so putting them back on the list does not mail them twice.
+        expect(result.invitations).toEqual({ sent: 0, failed: 0, skipped: 1 })
+        expect(sentBatchMessages()).toHaveLength(0)
 
         const [row] = await db
             .select()

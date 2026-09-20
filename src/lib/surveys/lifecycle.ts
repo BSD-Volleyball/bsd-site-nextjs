@@ -145,7 +145,21 @@ export async function publishSurvey(
         recipients: recipientCount
     })
 
-    const invitations = await sendSurveyInvitations(surveyId)
+    // The survey is open and its recipients are written; an invitation that
+    // fails to go out must not surface as a failed publish, or the retry hits
+    // "already published" with no way forward. dispatchNotification swallows
+    // its own send failures, but the reads around it can still throw.
+    let invitations: DispatchResult = { ...NO_DISPATCH }
+    try {
+        invitations = await sendSurveyInvitations(surveyId)
+    } catch (error) {
+        logger.error(
+            "[surveys] Invitations failed after publish",
+            { surveyId },
+            error
+        )
+    }
+
     return { recipients: recipientCount, invitations }
 }
 
