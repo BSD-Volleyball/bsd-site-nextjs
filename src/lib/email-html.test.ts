@@ -4,6 +4,7 @@ import {
     buildSponsorshipPaidHtml,
     buildSponsorshipPaymentDueHtml,
     buildSponsorshipReceiptHtml,
+    buildSurveyInvitationHtml,
     buildThreadReplyNotificationHtml
 } from "./email-html"
 
@@ -162,5 +163,25 @@ describe("sponsorship emails", () => {
         })
         expect(html).toContain("$500.00")
         expect(html).toContain("https://square.test/r/1")
+    })
+})
+
+describe("buildSurveyInvitationHtml", () => {
+    it("escapes the intro into paragraphs and links to the survey", () => {
+        const html = buildSurveyInvitationHtml({
+            firstName: "Pat",
+            title: "Fall wrap-up",
+            intro: "How did <it> go?\n\nBe honest.",
+            closesLabel: "Oct 1, 2026, 11:59 PM",
+            isAnonymous: true,
+            surveyUrl: `${APP_URL}/dashboard/surveys/7`
+        })
+
+        expect(html).not.toContain("<it>")
+        expect(html).toContain("<p>How did &lt;it&gt; go?</p>")
+        expect(html).toContain("<p>Be honest.</p>")
+        expect(html).toContain("Your answers are anonymous.")
+        expect(html).toContain("Please respond by Oct 1, 2026, 11:59 PM.")
+        expect(html).toContain(`${APP_URL}/dashboard/surveys/7`)
     })
 })

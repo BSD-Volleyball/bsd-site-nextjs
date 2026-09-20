@@ -198,9 +198,10 @@ export async function getTemplateEditorData(
 
 /** Every question on the template, active ones first, each in sort order. */
 export async function getTemplateQuestions(
-    templateId: number
+    templateId: number,
+    executor: DbExecutor = db
 ): Promise<SurveyQuestionDef[]> {
-    const rows = await selectQuestionRows(templateId)
+    const rows = await selectQuestionRows(templateId, executor)
     return rows.map(rowToQuestionDef)
 }
 

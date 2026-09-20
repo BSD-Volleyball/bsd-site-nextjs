@@ -210,6 +210,45 @@ export function buildWaitlistApprovedHtml(opts: {
     })
 }
 
+/**
+ * Survey invitation.
+ *
+ * The intro is prose an admin typed into the survey editor, so it is escaped
+ * and split into paragraphs on blank lines rather than passed through as HTML:
+ * the editor is a plain textarea, and treating its content as markup would
+ * turn a stray angle bracket into an injection point.
+ */
+export function buildSurveyInvitationHtml(opts: {
+    firstName: string
+    title: string
+    intro?: string | null
+    closesLabel?: string | null
+    isAnonymous: boolean
+    surveyUrl: string
+}): string {
+    const introHtml = (opts.intro ?? "")
+        .split(/\r?\n\s*\r?\n/)
+        .map((paragraph) => paragraph.trim())
+        .filter((paragraph) => paragraph !== "")
+        .map(
+            (paragraph) =>
+                `<p>${escapeHtml(paragraph).replace(/\r?\n/g, "<br />")}</p>`
+        )
+        .join("")
+
+    return renderEmailHtml({
+        heading: opts.title,
+        bodyHtml: `
+            <p>Hi ${escapeHtml(opts.firstName)},</p>
+            ${introHtml}
+            ${opts.isAnonymous ? "<p>Your answers are anonymous.</p>" : ""}
+            ${opts.closesLabel ? `<p>Please respond by ${escapeHtml(opts.closesLabel)}.</p>` : ""}
+        `,
+        action: "Take the survey",
+        actionUrl: opts.surveyUrl
+    })
+}
+
 export function buildAvailabilityChangeHtml(opts: {
     captainFirstName: string
     playerName: string

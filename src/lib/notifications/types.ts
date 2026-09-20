@@ -40,6 +40,7 @@ export type NotificationType =
     | "friend_request_accepted"
     | "sponsorship_payment_due"
     | "waitlist_approved"
+    | "survey_invitation"
     | "transactional"
 
 export interface NotificationCategoryDef {
@@ -212,6 +213,13 @@ export const NOTIFICATION_TYPES: Record<NotificationType, NotificationTypeDef> =
             label: "Waitlist approvals",
             description:
                 "When a spot opens up and you're approved off the waitlist to sign up for a season.",
+            mandatory: true
+        },
+        survey_invitation: {
+            category: null,
+            stream: "outbound",
+            label: "Survey invitations",
+            description: "When the league invites you to a survey.",
             mandatory: true
         },
         transactional: {
