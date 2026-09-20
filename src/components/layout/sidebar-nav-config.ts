@@ -4,6 +4,7 @@ import {
     RiShieldLine,
     RiSpeedUpLine,
     RiBasketballLine,
+    RiCalendarCheckLine,
     RiEditLine,
     RiSearchLine,
     RiTeamLine,
@@ -273,6 +274,11 @@ export const adminNavItems: NavItem[] = [
         title: "Insurance Report",
         url: "/dashboard/insurance-report",
         icon: RiShieldLine
+    },
+    {
+        title: "Coverage",
+        url: "/dashboard/coverage",
+        icon: RiCalendarCheckLine
     }
 ]
 
