@@ -34,9 +34,12 @@ import {
     deleteSurvey,
     getSurveyEditor,
     getSurveyEditorOptions,
+    getSurveyRawResponses,
+    getSurveyResults,
     getSurveyTemplateEditor,
     getSurveyTemplates,
     getSurveys,
+    getTemplateTrends,
     previewSurveyAudience,
     publishSurvey as publishSurveyAction,
     removeSurveyRecipient,
@@ -1550,5 +1553,229 @@ describe("getSurveyEditorOptions", () => {
             { id: team.id, name: "Spikers", divisionId: division.id }
         ])
         expect(result.data.users.length).toBeGreaterThan(0)
+    })
+})
+
+// --- results and trends ------------------------------------------------
+
+/** A submitted yes/no response, seeded straight into the tables. */
+async function seedYesNoResponse(
+    surveyId: number,
+    questionId: number,
+    value: boolean,
+    overrides: Partial<typeof surveyResponses.$inferInsert> = {}
+) {
+    const [response] = await db
+        .insert(surveyResponses)
+        .values({
+            survey_id: surveyId,
+            status: "submitted",
+            role_tags: [],
+            submitted_on: "2026-09-01",
+            ...overrides
+        })
+        .returning()
+    await db.insert(surveyAnswers).values({
+        response_id: response.id,
+        question_id: questionId,
+        value_bool: value
+    })
+    return response
+}
+
+async function resultsScene() {
+    const template = await createSurveyTemplate()
+    const question = await createSurveyQuestion(template.id)
+    const survey = await createSurvey(template.id, {
+        status: "open",
+        question_ids: [question.id]
+    })
+    return { template, question, survey }
+}
+
+describe("getSurveyResults", () => {
+    it("rejects unauthenticated callers", async () => {
+        const { survey } = await resultsScene()
+        const result = await getSurveyResults(survey.id, {})
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("rejects authenticated non-admins", async () => {
+        const { survey } = await resultsScene()
+        await createUserWithRoles([{ role: "captain" }])
+        const result = await getSurveyResults(survey.id, {})
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("aggregates seeded responses across segments and filters by role tag", async () => {
+        const { question, survey } = await resultsScene()
+        await seedYesNoResponse(survey.id, question.id, true, {
+            role_tags: ["captain"]
+        })
+        await seedYesNoResponse(survey.id, question.id, true, {
+            role_tags: ["captain"]
+        })
+        await seedYesNoResponse(survey.id, question.id, false, {
+            role_tags: ["coach"]
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const all = await getSurveyResults(survey.id, {})
+        expect(all.status).toBe(true)
+        if (!all.status) throw new Error("expected results")
+        expect(all.data.report.submitted).toBe(3)
+        expect(all.data.report.filteredCount).toBe(3)
+        expect(all.data.survey).toMatchObject({
+            id: survey.id,
+            title: survey.title,
+            status: "open",
+            isAnonymous: false,
+            templateId: survey.template_id
+        })
+        const allAggregate = all.data.report.byQuestion[0].aggregate
+        if (allAggregate.type !== "yes_no") throw new Error("expected yes_no")
+        expect(allAggregate.answered).toBe(3)
+
+        const filtered = await getSurveyResults(survey.id, {
+            roleTag: "captain"
+        })
+        if (!filtered.status) throw new Error("expected results")
+        expect(filtered.data.report.filteredCount).toBe(2)
+        const filteredAggregate = filtered.data.report.byQuestion[0].aggregate
+        if (filteredAggregate.type !== "yes_no") {
+            throw new Error("expected yes_no")
+        }
+        expect(filteredAggregate.answered).toBe(2)
+        expect(filteredAggregate.yes).toBe(2)
+    })
+
+    it("suppresses a filtered segment under the minimum cell on an anonymous survey", async () => {
+        const template = await createSurveyTemplate()
+        const question = await createSurveyQuestion(template.id)
+        const survey = await createSurvey(template.id, {
+            status: "open",
+            is_anonymous: true,
+            question_ids: [question.id]
+        })
+        for (let i = 0; i < 3; i++) {
+            await seedYesNoResponse(survey.id, question.id, true, {
+                role_tags: ["captain"]
+            })
+        }
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getSurveyResults(survey.id, {
+            roleTag: "captain"
+        })
+        if (!result.status) throw new Error("expected results")
+        expect(result.data.report.suppressed).toBe(true)
+        expect(result.data.report.byQuestion[0].aggregate).toMatchObject({
+            answered: 0
+        })
+    })
+})
+
+describe("getSurveyRawResponses", () => {
+    it("rejects authenticated non-admins", async () => {
+        const { survey } = await resultsScene()
+        await createUserWithRoles([{ role: "captain" }])
+        const result = await getSurveyRawResponses(survey.id)
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("omits identity on an anonymous survey and includes it on an identified one for an admin", async () => {
+        const template = await createSurveyTemplate()
+        const question = await createSurveyQuestion(template.id)
+        const identified = await createSurvey(template.id, {
+            status: "open",
+            question_ids: [question.id]
+        })
+        const anonymous = await createSurvey(template.id, {
+            status: "open",
+            is_anonymous: true,
+            question_ids: [question.id]
+        })
+
+        const respondent = await createUser({
+            first_name: "Robin",
+            last_name: "Reader"
+        })
+        await seedYesNoResponse(identified.id, question.id, true, {
+            user_id: respondent.id
+        })
+        await seedYesNoResponse(anonymous.id, question.id, true)
+
+        await createUserWithRoles([{ role: "admin" }])
+
+        const identifiedResult = await getSurveyRawResponses(identified.id)
+        if (!identifiedResult.status) throw new Error("expected responses")
+        expect(identifiedResult.data.anonymous).toBe(false)
+        expect(identifiedResult.data.responses).toHaveLength(1)
+        expect(identifiedResult.data.responses[0].name).toContain("Reader")
+        expect(identifiedResult.data.responses[0].email).toBe(respondent.email)
+
+        const anonymousResult = await getSurveyRawResponses(anonymous.id)
+        if (!anonymousResult.status) throw new Error("expected responses")
+        expect(anonymousResult.data.anonymous).toBe(true)
+        expect(anonymousResult.data.responses).toHaveLength(1)
+        expect(anonymousResult.data.responses[0].name).toBeUndefined()
+        expect(anonymousResult.data.responses[0].email).toBeUndefined()
+    })
+})
+
+describe("getTemplateTrends", () => {
+    it("rejects authenticated non-admins", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "captain" }])
+        const result = await getTemplateTrends(template.id)
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("orders instances across two seasons and reports the trend series", async () => {
+        const template = await createSurveyTemplate()
+        const question = await createSurveyQuestion(template.id)
+
+        const springSeason = await createSeason({
+            year: 2026,
+            season: "spring"
+        })
+        const fallSeason = await createSeason({ year: 2026, season: "fall" })
+
+        const springSurvey = await createSurvey(template.id, {
+            title: "Spring check-in",
+            status: "closed",
+            season_id: springSeason.id,
+            question_ids: [question.id]
+        })
+        const fallSurvey = await createSurvey(template.id, {
+            title: "Fall wrap-up",
+            status: "closed",
+            season_id: fallSeason.id,
+            question_ids: [question.id]
+        })
+
+        await seedYesNoResponse(springSurvey.id, question.id, false)
+        await seedYesNoResponse(fallSurvey.id, question.id, true)
+        await seedYesNoResponse(fallSurvey.id, question.id, true)
+
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await getTemplateTrends(template.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected trends")
+
+        expect(result.data.template).toEqual({
+            id: template.id,
+            name: template.name
+        })
+        expect(result.data.trends).toHaveLength(1)
+
+        const series = result.data.trends[0].series.find((s) => s.key === "yes")
+        expect(series).toBeDefined()
+        expect(series?.points.map((p) => p.label)).toEqual([
+            "Spring check-in (Spring 2026)",
+            "Fall wrap-up (Fall 2026)"
+        ])
+        expect(series?.points.map((p) => p.value)).toEqual([0, 100])
     })
 })

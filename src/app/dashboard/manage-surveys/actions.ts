@@ -10,6 +10,20 @@ import {
 } from "@/database/schema"
 import { logAuditEntry } from "@/lib/audit-log"
 import type { DispatchResult } from "@/lib/notifications/dispatch"
+import {
+    buildTrend,
+    aggregateSurvey,
+    type QuestionTrend,
+    type ReportResponse,
+    type SegmentFilter,
+    type SurveyReport
+} from "@/lib/surveys/reporting"
+import { questionsForSurvey } from "@/lib/surveys/questions-for-survey"
+import {
+    loadSurveyResponses,
+    loadRawResponses,
+    loadTemplateInstances
+} from "@/lib/surveys/results-data"
 import { resolveAudience } from "@/lib/surveys/audience"
 import {
     addRecipients,
@@ -36,6 +50,7 @@ import {
     assertActiveQuestionLimit,
     assertVisibilityGraphSound,
     getTemplateEditorData,
+    getTemplateQuestions,
     listTemplates,
     lockTemplate,
     rowToQuestionDef,
@@ -46,8 +61,12 @@ import {
 import {
     SURVEY_GROUP_TYPES,
     SURVEY_LIMITS,
+    isSurveyRoleTag,
     type SurveyAudienceDefinition,
     type SurveyAudienceGroup,
+    type SurveyGender,
+    type SurveyQuestionDef,
+    type SurveyStatus,
     validateAudience
 } from "@/lib/surveys/types"
 import { listUserNames } from "@/lib/user-directory"
@@ -63,6 +82,7 @@ import {
     requireSession,
     withAction
 } from "@/next/action-helpers"
+import { hasPermissionBySession } from "@/next/session"
 import { and, eq, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 
@@ -921,4 +941,153 @@ function sanitizeUserIds(input: unknown): string[] {
 
 function isPositiveInt(value: unknown): value is number {
     return typeof value === "number" && Number.isInteger(value) && value > 0
+}
+
+// ---------------------------------------------------------------------------
+// Results and trends
+// ---------------------------------------------------------------------------
+
+export interface SurveyResultsSurveySummary {
+    id: number
+    title: string
+    status: SurveyStatus
+    isAnonymous: boolean
+    closesAt: Date | null
+    templateId: number
+}
+
+export const getSurveyResults = withAction(
+    async (
+        surveyId: number,
+        filter: SegmentFilter
+    ): Promise<
+        ActionResult<{
+            report: SurveyReport
+            questions: SurveyQuestionDef[]
+            survey: SurveyResultsSurveySummary
+        }>
+    > => {
+        await requirePermission("surveys:view_results")
+        await requireSession()
+        const id = requirePositiveInt(surveyId, "survey ID")
+        const survey = await loadSurvey(id)
+
+        const templateQuestions = await getTemplateQuestions(survey.template_id)
+        const questions = questionsForSurvey(
+            { questionIds: survey.question_ids },
+            templateQuestions
+        )
+        const cleanFilter = sanitizeSegmentFilter(filter)
+        const { invited, responses } = await loadSurveyResponses(id)
+        const report = aggregateSurvey({
+            questions,
+            responses,
+            invited,
+            filter: cleanFilter,
+            anonymous: survey.is_anonymous
+        })
+
+        return ok({
+            report,
+            questions,
+            survey: {
+                id: survey.id,
+                title: survey.title,
+                status: survey.status,
+                isAnonymous: survey.is_anonymous,
+                closesAt: survey.closes_at,
+                templateId: survey.template_id
+            }
+        })
+    }
+)
+
+export const getSurveyRawResponses = withAction(
+    async (
+        surveyId: number
+    ): Promise<
+        ActionResult<{
+            questions: SurveyQuestionDef[]
+            responses: (ReportResponse & { name?: string; email?: string })[]
+            anonymous: boolean
+        }>
+    > => {
+        await requirePermission("surveys:view_results")
+        await requireSession()
+        const id = requirePositiveInt(surveyId, "survey ID")
+        const survey = await loadSurvey(id)
+
+        const templateQuestions = await getTemplateQuestions(survey.template_id)
+        const questions = questionsForSurvey(
+            { questionIds: survey.question_ids },
+            templateQuestions
+        )
+        // Only a caller who can also manage surveys sees names on an
+        // identified survey; an anonymous survey never joins identity.
+        const includeIdentity =
+            !survey.is_anonymous &&
+            (await hasPermissionBySession("surveys:manage"))
+        const responses = await loadRawResponses(id, includeIdentity)
+
+        return ok({ questions, responses, anonymous: survey.is_anonymous })
+    }
+)
+
+export const getTemplateTrends = withAction(
+    async (
+        templateId: number
+    ): Promise<
+        ActionResult<{
+            template: { id: number; name: string }
+            questions: SurveyQuestionDef[]
+            trends: QuestionTrend[]
+        }>
+    > => {
+        await requirePermission("surveys:view_results")
+        await requireSession()
+        const id = requirePositiveInt(templateId, "template ID")
+
+        const [template] = await db
+            .select({ id: surveyTemplates.id, name: surveyTemplates.name })
+            .from(surveyTemplates)
+            .where(eq(surveyTemplates.id, id))
+            .limit(1)
+        if (!template) return fail("Survey template not found.")
+
+        const instances = await loadTemplateInstances(id)
+        const appearingIds = new Set<number>()
+        for (const instance of instances) {
+            for (const key of Object.keys(instance.aggregates)) {
+                appearingIds.add(Number(key))
+            }
+        }
+
+        const allQuestions = await getTemplateQuestions(id)
+        const questions = allQuestions.filter((question) =>
+            appearingIds.has(question.id)
+        )
+        const trends = buildTrend(questions, instances)
+
+        return ok({ template, questions, trends })
+    }
+)
+
+/**
+ * Rebuilds a segment filter from whatever crossed the RSC boundary: an
+ * unknown role tag, a non-positive division id or an unrecognised gender is
+ * dropped rather than rejected outright, so a stale filter degrades to "no
+ * filter on that field" instead of failing the whole request.
+ */
+function sanitizeSegmentFilter(input: unknown): SegmentFilter {
+    if (typeof input !== "object" || input === null) return {}
+    const raw = input as Partial<SegmentFilter>
+    const filter: SegmentFilter = {}
+    if (isSurveyRoleTag(raw.roleTag)) filter.roleTag = raw.roleTag
+    if (isPositiveInt(raw.divisionId)) filter.divisionId = raw.divisionId
+    if (isSurveyGender(raw.gender)) filter.gender = raw.gender
+    return filter
+}
+
+function isSurveyGender(value: unknown): value is SurveyGender {
+    return value === "male" || value === "non_male"
 }
