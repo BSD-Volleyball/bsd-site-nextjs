@@ -267,6 +267,22 @@ describe("multi_choice", () => {
                 maxSelections: 2
             })
         ).toBeTruthy()
+        // min above the option count with no explicit max
+        expect(
+            def.validateConfig({
+                type: "multi_choice",
+                options: CHOICES,
+                minSelections: 10
+            })
+        ).toBeTruthy()
+        // min equal to the option count with no explicit max is fine
+        expect(
+            def.validateConfig({
+                type: "multi_choice",
+                options: CHOICES,
+                minSelections: 3
+            })
+        ).toBeNull()
         // duplicate keys
         expect(
             def.validateConfig({

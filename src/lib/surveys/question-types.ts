@@ -257,8 +257,12 @@ export const QUESTION_TYPE_DEFS: Record<SurveyQuestionType, QuestionTypeDef> = {
             if (max !== undefined && max > config.options.length) {
                 return "The maximum number of selections cannot exceed the option count."
             }
-            if (min !== undefined && max !== undefined && min > max) {
-                return "The minimum number of selections cannot exceed the maximum."
+            // With no explicit maximum, the option count is the ceiling.
+            const effectiveMax = max ?? config.options.length
+            if (min !== undefined && min > effectiveMax) {
+                return max === undefined
+                    ? "The minimum number of selections cannot exceed the option count."
+                    : "The minimum number of selections cannot exceed the maximum."
             }
             return null
         },
@@ -276,11 +280,12 @@ export const QUESTION_TYPE_DEFS: Record<SurveyQuestionType, QuestionTypeDef> = {
                 return "Choose from the listed options."
             }
             const min = config.minSelections
-            const max = config.maxSelections
+            // With no explicit maximum, the option count is the ceiling.
+            const max = config.maxSelections ?? keys.length
             if (min !== undefined && value.length < min) {
                 return `Choose at least ${min} option${min === 1 ? "" : "s"}.`
             }
-            if (max !== undefined && value.length > max) {
+            if (value.length > max) {
                 return `Choose at most ${max} option${max === 1 ? "" : "s"}.`
             }
             return null
