@@ -14,12 +14,14 @@ import {
 import type { SurveySettingsInput } from "@/lib/surveys/surveys"
 import type { TemplateQuestionInput } from "@/lib/surveys/template-rules"
 import { SURVEY_LIMITS } from "@/lib/surveys/types"
+import { sentBatchMessages } from "@/test/email"
 import {
     createDivision,
     createSeason,
     createSignup,
     createSurvey,
     createSurveyQuestion,
+    createSurveyRecipient,
     createSurveyTemplate,
     createTeam
 } from "@/test/factories"
@@ -47,6 +49,7 @@ import {
     restoreSurveyTemplate,
     restoreTemplateQuestion,
     saveTemplateQuestions,
+    sendSurveyReminderNow,
     updateSurveyAudience,
     updateSurveySettings,
     updateSurveyTemplate
@@ -1466,6 +1469,70 @@ describe("resendSurveyInvitations", () => {
         const survey = await createSurvey(template.id)
 
         expect((await resendSurveyInvitations(survey.id)).status).toBe(false)
+    })
+})
+
+describe("sendSurveyReminderNow", () => {
+    it("rejects unauthenticated callers", async () => {
+        const template = await createSurveyTemplate()
+        const survey = await createSurvey(template.id, { status: "open" })
+
+        expect(await sendSurveyReminderNow(survey.id)).toEqual({
+            status: false,
+            message: "Unauthorized."
+        })
+    })
+
+    it("rejects authenticated non-admins", async () => {
+        const template = await createSurveyTemplate()
+        const survey = await createSurvey(template.id, { status: "open" })
+        await createUserWithRoles([{ role: "captain" }])
+
+        expect(await sendSurveyReminderNow(survey.id)).toEqual({
+            status: false,
+            message: "Unauthorized."
+        })
+    })
+
+    it("sends to the one pending recipient, increments reminder_count, and audits", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const template = await createSurveyTemplate()
+        const survey = await createSurvey(template.id, { status: "open" })
+        const submitted = await createUser()
+        const pending = await createUser()
+        await createSurveyRecipient(survey.id, submitted.id, {
+            submitted_at: new Date()
+        })
+        await createSurveyRecipient(survey.id, pending.id)
+
+        const result = await sendSurveyReminderNow(survey.id)
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected a dispatch")
+        expect(result.data.sent).toBe(1)
+
+        const messages = sentBatchMessages()
+        expect(messages).toHaveLength(1)
+        expect(messages[0].to).toBe(pending.email)
+
+        const row = await surveyRow(survey.id)
+        expect(row.reminder_count).toBe(1)
+
+        const actions = (
+            await db.select({ action: auditLog.action }).from(auditLog)
+        ).map((e) => e.action)
+        expect(actions).toContain("survey_reminder")
+    })
+
+    it("refuses a draft", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        const survey = await createSurvey(template.id)
+
+        const result = await sendSurveyReminderNow(survey.id)
+        expect(result).toEqual({
+            status: false,
+            message: "Survey is not open."
+        })
     })
 })
 

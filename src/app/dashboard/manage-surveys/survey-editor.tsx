@@ -43,6 +43,7 @@ import {
     deleteSurvey,
     previewSurveyAudience,
     publishSurvey,
+    sendSurveyReminderNow,
     updateSurveySettings,
     type AudiencePreview,
     type SurveyEditorOptionsPayload
@@ -95,6 +96,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
     const [publishPreviewBusy, setPublishPreviewBusy] = useState(false)
     const [closeOpen, setCloseOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
+    const [reminderOpen, setReminderOpen] = useState(false)
 
     // Resync the form whenever the server re-sends the survey (after a
     // router.refresh() following any mutation).
@@ -117,6 +119,9 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
     const isOpen = survey.status === "open"
     const isClosed = survey.status === "closed"
     const isPublished = !isDraft
+    const pendingRecipientCount = recipients.filter(
+        (recipient) => !recipient.removedAt && !recipient.submittedAt
+    ).length
 
     function refresh() {
         router.refresh()
@@ -175,6 +180,19 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
         setCloseOpen(false)
         if (result.status) {
             toast.success(result.message ?? "Survey closed.")
+            refresh()
+        } else {
+            toast.error(result.message)
+        }
+    }
+
+    async function handleSendReminder() {
+        setBusy(true)
+        const result = await sendSurveyReminderNow(surveyId)
+        setBusy(false)
+        setReminderOpen(false)
+        if (result.status) {
+            toast.success(result.message ?? "Reminder sent.")
             refresh()
         } else {
             toast.error(result.message)
@@ -352,6 +370,16 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                             {formatLeagueDateTime(survey.last_reminder_at)}.
                         </p>
                     )}
+                    {isOpen && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => setReminderOpen(true)}
+                        >
+                            Send reminder now
+                        </Button>
+                    )}
                     <Button
                         type="button"
                         disabled={savingSettings || isClosed}
@@ -460,6 +488,32 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                             }}
                         >
                             Publish
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={reminderOpen} onOpenChange={setReminderOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Send a reminder now?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingRecipientCount} recipient(s) haven't
+                            submitted yet and will get a reminder email.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={busy}
+                            onClick={(event) => {
+                                event.preventDefault()
+                                void handleSendReminder()
+                            }}
+                        >
+                            Send reminder
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

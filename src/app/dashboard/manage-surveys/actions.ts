@@ -32,6 +32,7 @@ import {
     removeRecipient,
     sendSurveyInvitations
 } from "@/lib/surveys/lifecycle"
+import { sendSurveyReminder } from "@/lib/surveys/reminders"
 import {
     getEditorOptions,
     getSurveyEditorData,
@@ -821,6 +822,43 @@ export const resendSurveyInvitations = withAction(
         return ok(
             invitations,
             `${invitations.sent} invitation(s) sent; ${invitations.skipped} already invited.`
+        )
+    }
+)
+
+export const sendSurveyReminderNow = withAction(
+    async (surveyId: number): Promise<ActionResult<DispatchResult>> => {
+        await requirePermission("surveys:manage")
+        const session = await requireSession()
+        const id = requirePositiveInt(surveyId, "survey ID")
+        const survey = await loadSurvey(id)
+        if (survey.status !== "open") {
+            return fail("Survey is not open.")
+        }
+
+        // force: true bypasses the interval/max-count gate but still claims
+        // the round (optimistic compare-and-set on reminder_count), so a
+        // concurrent cron run or a double click can't send two rounds at once.
+        const result = await sendSurveyReminder(id, { force: true })
+        if (!result.claimed) {
+            return fail("Could not send a reminder right now. Try again.")
+        }
+
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "survey_reminder",
+            entityType: "survey",
+            entityId: id,
+            summary: `Sent a reminder for survey "${survey.title}": ${result.sent} sent, ${result.skipped} skipped.`
+        })
+        revalidatePath(MANAGE_SURVEYS_PATH)
+        return ok(
+            {
+                sent: result.sent,
+                skipped: result.skipped,
+                failed: result.failed
+            },
+            `Reminder sent to ${result.sent} recipient(s)`
         )
     }
 )
