@@ -119,9 +119,68 @@ describe("buildCoverage", () => {
         expect(d.matchCount).toBe(3)
     })
 
-    it("omits event dates with no matches", () => {
-        const out = buildCoverage(baseInput({ matches: [] }))
+    it("omits an event date with neither matches nor presence", () => {
+        const out = buildCoverage(baseInput({ matches: [], presence: [] }))
         expect(out).toEqual([])
+    })
+
+    it("surfaces presence rows on an event date with no matches as orphans", () => {
+        const out = buildCoverage(
+            baseInput({
+                matches: [],
+                presence: [
+                    {
+                        id: 42,
+                        userId: "a1",
+                        date: "2026-10-06",
+                        slotTime: "19:00:00",
+                        note: null
+                    }
+                ]
+            })
+        )
+        expect(out).toHaveLength(1)
+        const [d] = out
+        expect(d.matchCount).toBe(0)
+        expect(d.slots).toEqual([])
+        expect(d.status).toBe("red")
+        expect(d.orphanedPresence).toEqual([
+            {
+                presenceId: 42,
+                userId: "a1",
+                name: "Alex Admin",
+                slotTime: "19:00:00",
+                note: null
+            }
+        ])
+    })
+
+    it("a match-less week still consumes its ordinal", () => {
+        const out = buildCoverage(
+            baseInput({
+                events: [
+                    {
+                        eventId: 10,
+                        date: "2026-10-06",
+                        eventType: "regular_season",
+                        label: null
+                    },
+                    {
+                        eventId: 11,
+                        date: "2026-10-13",
+                        eventType: "regular_season",
+                        label: null
+                    }
+                ],
+                matches: [
+                    { matchId: 1, date: "2026-10-13", startTime: "19:00:00" }
+                ],
+                presence: []
+            })
+        )
+        expect(out).toHaveLength(1)
+        expect(out[0].date).toBe("2026-10-13")
+        expect(out[0].ordinal).toBe(2)
     })
 
     it("an admin playing counts, with source play", () => {

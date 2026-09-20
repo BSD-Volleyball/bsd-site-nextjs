@@ -95,7 +95,37 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
         ordinals[event.eventType] += 1
         const ordinal = ordinals[event.eventType]
         const matches = matchesByDate.get(event.date) ?? []
-        if (matches.length === 0) continue
+        const presenceForDate = presenceByDate.get(event.date) ?? []
+        if (matches.length === 0 && presenceForDate.length === 0) continue
+
+        if (matches.length === 0) {
+            const orphanedPresence: OrphanedPresence[] = presenceForDate.map(
+                (p) => {
+                    const person = input.people.get(p.userId)
+                    return {
+                        presenceId: p.id,
+                        userId: p.userId,
+                        name: person ? displayName(person) : "Unknown",
+                        slotTime: normalizeTime(p.slotTime) ?? p.slotTime,
+                        note: p.note
+                    }
+                }
+            )
+            const { status, reason } = computeStatus([])
+            out.push({
+                date: event.date,
+                eventId: event.eventId,
+                eventType: event.eventType,
+                ordinal,
+                label: event.label,
+                matchCount: 0,
+                slots: [],
+                status,
+                reason,
+                orphanedPresence
+            })
+            continue
+        }
 
         // Slots: distinct normalized start times, TBD last.
         const matchCountByKey = new Map<string, number>()

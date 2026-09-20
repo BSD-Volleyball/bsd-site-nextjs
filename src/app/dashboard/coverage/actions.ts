@@ -164,8 +164,8 @@ export const sendCoverageDigest = withAction(
         })
         const message =
             result.sent === 0 && result.skipped > 0
-                ? "Already sent today."
-                : `Sent to ${result.sent} admin${result.sent === 1 ? "" : "s"}.`
+                ? "Already sent for that date."
+                : `Sent to ${result.sent} admin${result.sent === 1 ? "" : "s"}.${result.failed > 0 ? ` (${result.failed} failed)` : ""}`
         return ok({ sent: result.sent, skipped: result.skipped }, message)
     }
 )

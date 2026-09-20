@@ -39,7 +39,7 @@ export async function sendCoverageDigestForDate(
         skipped: 0
     }
     const [day] = await loadCoverage({ fromDate: date, toDate: date })
-    if (!day) return result
+    if (!day || day.matchCount === 0) return result
     result.status = day.status
 
     const recipients = await getRecipientsWithRole("admin")

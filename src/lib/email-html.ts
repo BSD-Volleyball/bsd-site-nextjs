@@ -695,6 +695,9 @@ function renderCoveragePerson(p: CoveragePerson): string {
     )
     if (p.unavailable) tags.push("unavailable")
     if (p.isLeadership) tags.push("leadership")
+    if (!p.counts && !p.isLeadership && !p.unavailable) {
+        tags.push("not an admin")
+    }
     const style = p.counts
         ? "font-weight:600;"
         : `color:#6b7280;${p.unavailable ? "text-decoration:line-through;" : ""}`

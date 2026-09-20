@@ -1,8 +1,9 @@
 /**
  * load.ts — server-side data loading for Coverage. Reads the newest season,
- * its upcoming regular-season and playoff nights, the matches that define
- * each night's slots, and the admin/leadership schedules, then hands
- * everything to the pure buildCoverage().
+ * ALL of its regular-season and playoff nights (needed so buildCoverage can
+ * number ordinals correctly), the admin/leadership schedules, and only the
+ * matches/presence rows that fall within the requested date range, then
+ * hands everything to the pure buildCoverage().
  */
 
 import "server-only"

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
@@ -239,8 +240,14 @@ export function CoverageClient({
     if (view.dates.length === 0) {
         return (
             <p className="text-muted-foreground">
-                No upcoming match nights. Add regular-season or playoff dates in
-                Season Configuration and generate the schedule first.
+                No upcoming match nights. Add regular-season or playoff dates in{" "}
+                <Link
+                    href="/dashboard/season-config"
+                    className="underline underline-offset-2"
+                >
+                    Season Configuration
+                </Link>{" "}
+                and generate the schedule first.
             </p>
         )
     }
@@ -252,7 +259,7 @@ export function CoverageClient({
             )}
             {view.dates.map((d) => (
                 <Card
-                    key={d.date}
+                    key={d.eventId}
                     className={cn("border-l-4", STATUS_BORDER[d.status])}
                 >
                     <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
