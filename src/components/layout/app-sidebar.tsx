@@ -49,7 +49,9 @@ import {
     addPicturesNavItem,
     addTeamPicturesNavItem,
     adminDangerNavItems,
-    adminNavItems,
+    adminGeneralNavItems,
+    adminSeasonNavItems,
+    adminTournamentNavItems,
     alwaysHiddenAdminItems,
     baseNavItems,
     captainPagesNavItems,
@@ -303,9 +305,11 @@ export function AppSidebar({
         phase === "select_commissioners" || phase === "select_captains"
     const showCreateSchedule = phase === "draft"
 
-    // Tryout volunteer tools: staffing is planned from the moment
-    // registration opens and is done once the last tryout night is over.
+    // Tryout tools: slot requests and volunteer staffing are handled from
+    // the moment registration opens and are done once the last tryout
+    // night is over, so none of them belong in the Draft phase onward.
     const tryoutVolunteerUrls = [
+        "/dashboard/tryout-slot-requests",
         "/dashboard/configure-tryout-jobs",
         "/dashboard/pick-tryout-volunteers",
         "/dashboard/assign-tryout-jobs"
@@ -317,11 +321,6 @@ export function AppSidebar({
     // (tournament is null when the latest tournament is complete or none
     // exists). Tournament Control stays visible so a new one can be created.
     const hasActiveTournament = !!tournament
-    const tournamentAdminUrls = [
-        "/dashboard/tournament-overview",
-        "/dashboard/tournament-pools",
-        "/dashboard/view-tournament-waitlist"
-    ]
 
     // Reffing section — visible to refs during regular_season and playoffs
     const showReffingSection =
@@ -515,9 +514,7 @@ export function AppSidebar({
             hiddenGroups.push({
                 label: "Tournament (no active tournament)",
                 items: [
-                    ...adminNavItems.filter((item) =>
-                        tournamentAdminUrls.includes(item.url)
-                    ),
+                    ...adminTournamentNavItems,
                     ...adminDangerNavItems.filter(
                         (item) => item.url === "/dashboard/tournament-config"
                     )
@@ -600,9 +597,9 @@ export function AppSidebar({
                 items: hiddenCommissionerItems
             })
 
-        // Admin items: Review Pairs, Evaluate New Players, and the tryout
-        // volunteer tools if suppressed
-        const hiddenAdminItems = adminNavItems.filter(
+        // Admin - Season items: Review Pairs, Evaluate New Players, and the
+        // tryout tools if suppressed
+        const hiddenAdminItems = adminSeasonNavItems.filter(
             (item) =>
                 (item.url === "/dashboard/review-pairs" && !showReviewPairs) ||
                 (item.url === "/dashboard/evaluate-players" &&
@@ -611,7 +608,10 @@ export function AppSidebar({
                     !showTryoutVolunteerTools)
         )
         if (hiddenAdminItems.length > 0)
-            hiddenGroups.push({ label: "Admin", items: hiddenAdminItems })
+            hiddenGroups.push({
+                label: "Admin - Season",
+                items: hiddenAdminItems
+            })
 
         // Sign-up link if admin's account isn't eligible
         if (!showSignupLink)
@@ -910,36 +910,64 @@ export function AppSidebar({
                 {isAdmin && (
                     <SidebarGroup>
                         <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
-                            Admin
+                            Admin - Season
                         </SidebarGroupLabel>
                         <SidebarGroupContent>
                             <SidebarMenu>
                                 <NavItems
-                                    items={adminNavItems.filter((item) => {
-                                        if (
-                                            item.url ===
-                                            "/dashboard/review-pairs"
-                                        )
-                                            return showReviewPairs
-                                        if (
-                                            item.url ===
-                                            "/dashboard/evaluate-players"
-                                        )
-                                            return showEvaluatePlayers
-                                        if (
-                                            tournamentAdminUrls.includes(
-                                                item.url
+                                    items={adminSeasonNavItems.filter(
+                                        (item) => {
+                                            if (
+                                                item.url ===
+                                                "/dashboard/review-pairs"
                                             )
-                                        )
-                                            return hasActiveTournament
-                                        if (
-                                            tryoutVolunteerUrls.includes(
-                                                item.url
+                                                return showReviewPairs
+                                            if (
+                                                item.url ===
+                                                "/dashboard/evaluate-players"
                                             )
-                                        )
-                                            return showTryoutVolunteerTools
-                                        return true
-                                    })}
+                                                return showEvaluatePlayers
+                                            if (
+                                                tryoutVolunteerUrls.includes(
+                                                    item.url
+                                                )
+                                            )
+                                                return showTryoutVolunteerTools
+                                            return true
+                                        }
+                                    )}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isAdmin && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Admin - General
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={adminGeneralNavItems}
+                                    pathname={pathname}
+                                />
+                            </SidebarMenu>
+                        </SidebarGroupContent>
+                    </SidebarGroup>
+                )}
+
+                {isAdmin && hasActiveTournament && (
+                    <SidebarGroup>
+                        <SidebarGroupLabel className="text-muted-foreground/65 uppercase">
+                            Admin - Tournament
+                        </SidebarGroupLabel>
+                        <SidebarGroupContent>
+                            <SidebarMenu>
+                                <NavItems
+                                    items={adminTournamentNavItems}
                                     pathname={pathname}
                                 />
                             </SidebarMenu>

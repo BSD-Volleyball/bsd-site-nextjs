@@ -158,37 +158,16 @@ export const signupNavItem: NavItem = {
     icon: RiEditLine
 }
 
-export const adminNavItems: NavItem[] = [
-    {
-        title: "Admin Player Lookup",
-        url: "/dashboard/player-lookup",
-        icon: RiSearchLine
-    },
+/**
+ * Admin pages tied to running the current season: registration, tryouts,
+ * pairing, evaluation and gym coverage. Several are phase-gated in
+ * app-sidebar.tsx.
+ */
+export const adminSeasonNavItems: NavItem[] = [
     {
         title: "Admin View Signups",
         url: "/dashboard/admin-view-signups",
         icon: RiGroupLine
-    },
-    {
-        title: "View Roles",
-        url: "/dashboard/view-roles",
-        icon: RiUserSettingsLine
-    },
-    {
-        title: "Send Email",
-        url: "/dashboard/send-email",
-        icon: RiMailLine
-    },
-    {
-        title: "Manage Surveys",
-        url: "/dashboard/manage-surveys",
-        icon: RiSurveyLine,
-        activePrefix: "/dashboard/manage-surveys"
-    },
-    {
-        title: "Manage Emails",
-        url: "/dashboard/manage-emails",
-        icon: RiInboxLine
     },
     {
         title: "View Waitlist",
@@ -216,14 +195,54 @@ export const adminNavItems: NavItem[] = [
         icon: RiCheckboxLine
     },
     {
-        title: "Google Membership",
-        url: "/dashboard/google-membership",
-        icon: RiMailLine
-    },
-    {
         title: "Review Pairs",
         url: "/dashboard/review-pairs",
         icon: RiLinksLine
+    },
+    {
+        title: "Evaluate New Players",
+        url: "/dashboard/evaluate-players",
+        icon: RiStarLine
+    },
+    {
+        title: "Coverage",
+        url: "/dashboard/coverage",
+        icon: RiCalendarCheckLine
+    }
+]
+
+/** Admin pages that are not specific to any season. Always visible. */
+export const adminGeneralNavItems: NavItem[] = [
+    {
+        title: "Admin Player Lookup",
+        url: "/dashboard/player-lookup",
+        icon: RiSearchLine
+    },
+    {
+        title: "View Roles",
+        url: "/dashboard/view-roles",
+        icon: RiUserSettingsLine
+    },
+    {
+        title: "Send Email",
+        url: "/dashboard/send-email",
+        icon: RiMailLine
+    },
+    {
+        title: "Manage Surveys",
+        url: "/dashboard/manage-surveys",
+        icon: RiSurveyLine,
+        activePrefix: "/dashboard/manage-surveys"
+    },
+    {
+        title: "Manage Emails",
+        url: "/dashboard/manage-emails",
+        icon: RiInboxLine
+    },
+    {
+        title: "Google Membership",
+        url: "/dashboard/google-membership",
+        icon: RiMailLine
     },
     {
         title: "Manage Discounts",
@@ -234,11 +253,6 @@ export const adminNavItems: NavItem[] = [
         title: "Manage Sponsors",
         url: "/dashboard/manage-sponsors",
         icon: RiHandHeartLine
-    },
-    {
-        title: "Evaluate New Players",
-        url: "/dashboard/evaluate-players",
-        icon: RiStarLine
     },
     {
         title: "Draft History",
@@ -256,6 +270,15 @@ export const adminNavItems: NavItem[] = [
         icon: RiArchiveLine
     },
     {
+        title: "Insurance Report",
+        url: "/dashboard/insurance-report",
+        icon: RiShieldLine
+    }
+]
+
+/** Admin pages for the active tournament; the whole group hides when none is active. */
+export const adminTournamentNavItems: NavItem[] = [
+    {
         title: "Tournament Overview",
         url: "/dashboard/tournament-overview",
         icon: RiTrophyLine
@@ -269,16 +292,6 @@ export const adminNavItems: NavItem[] = [
         title: "Place Tournament Players",
         url: "/dashboard/view-tournament-waitlist",
         icon: RiGroupLine
-    },
-    {
-        title: "Insurance Report",
-        url: "/dashboard/insurance-report",
-        icon: RiShieldLine
-    },
-    {
-        title: "Coverage",
-        url: "/dashboard/coverage",
-        icon: RiCalendarCheckLine
     }
 ]
 
