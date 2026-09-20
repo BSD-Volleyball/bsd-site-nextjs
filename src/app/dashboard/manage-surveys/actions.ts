@@ -37,6 +37,7 @@ import {
     getEditorOptions,
     getSurveyEditorData,
     labelAudienceGroups,
+    listCurrentSeasonDivisions,
     listSurveys,
     type SurveyEditorData,
     type SurveyEditorOptions,
@@ -993,6 +994,22 @@ export interface SurveyResultsSurveySummary {
     closesAt: Date | null
     templateId: number
 }
+
+/**
+ * The narrow set of filter options the results page's Select controls need.
+ * Deliberately separate from `getSurveyEditorOptions` (gated on
+ * `surveys:manage`) so a `surveys:view_results`-only viewer can load the
+ * results page's division filter without an editor-level permission.
+ */
+export const getSurveyFilterOptions = withAction(
+    async (): Promise<
+        ActionResult<{ divisions: { id: number; name: string }[] }>
+    > => {
+        await requirePermission("surveys:view_results")
+        await requireSession()
+        return ok({ divisions: await listCurrentSeasonDivisions() })
+    }
+)
 
 export const getSurveyResults = withAction(
     async (

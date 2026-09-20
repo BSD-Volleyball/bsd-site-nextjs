@@ -36,6 +36,7 @@ import {
     deleteSurvey,
     getSurveyEditor,
     getSurveyEditorOptions,
+    getSurveyFilterOptions,
     getSurveyRawResponses,
     getSurveyResults,
     getSurveyTemplateEditor,
@@ -1739,6 +1740,27 @@ describe("getSurveyResults", () => {
         expect(result.data.report.byQuestion[0].aggregate).toMatchObject({
             answered: 0
         })
+    })
+})
+
+describe("getSurveyFilterOptions", () => {
+    it("rejects unauthenticated callers", async () => {
+        const result = await getSurveyFilterOptions()
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("rejects authenticated non-admins", async () => {
+        await createUserWithRoles([{ role: "captain" }])
+        const result = await getSurveyFilterOptions()
+        expect(result).toEqual({ status: false, message: "Unauthorized." })
+    })
+
+    it("returns divisions for an admin", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const result = await getSurveyFilterOptions()
+        expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected filter options")
+        expect(Array.isArray(result.data.divisions)).toBe(true)
     })
 })
 

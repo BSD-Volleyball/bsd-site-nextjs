@@ -5,6 +5,7 @@ import {
     Bar,
     BarChart,
     CartesianGrid,
+    LabelList,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -93,11 +94,13 @@ export function QuestionResultCard({
                                     label: "No",
                                     count: aggregate.no,
                                     pct:
-                                        aggregate.yesPct === null
-                                            ? null
-                                            : Math.round(
-                                                  (100 - aggregate.yesPct) * 10
+                                        aggregate.answered > 0
+                                            ? Math.round(
+                                                  (aggregate.no /
+                                                      aggregate.answered) *
+                                                      1000
                                               ) / 10
+                                            : null
                                 }
                             ]}
                             layout="vertical"
@@ -105,12 +108,34 @@ export function QuestionResultCard({
                         >
                             <XAxis type="number" allowDecimals={false} />
                             <YAxis type="category" dataKey="label" width={60} />
-                            <Tooltip formatter={(value) => [value, "Count"]} />
+                            <Tooltip
+                                formatter={(value, _name, entry) => {
+                                    const pct = (
+                                        entry.payload as { pct: number | null }
+                                    ).pct
+                                    return [
+                                        pct !== null
+                                            ? `${value} (${pct}%)`
+                                            : value,
+                                        "Count"
+                                    ]
+                                }}
+                            />
                             <Bar
                                 dataKey="count"
                                 fill="var(--chart-1)"
                                 radius={[0, 4, 4, 0]}
-                            />
+                            >
+                                <LabelList
+                                    dataKey="pct"
+                                    position="right"
+                                    formatter={(value) =>
+                                        value !== null && value !== undefined
+                                            ? `${value}%`
+                                            : ""
+                                    }
+                                />
+                            </Bar>
                         </BarChart>
                     </ResponsiveContainer>
                 )}

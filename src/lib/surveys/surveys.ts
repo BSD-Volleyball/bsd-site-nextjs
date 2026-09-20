@@ -223,6 +223,53 @@ export async function getSurveyEditorData(
  * come from this season's teams rather than the division table, so a division
  * that is not running this season never appears as a targetable group.
  */
+/**
+ * Team rows for the current season, joined to their division. Shared by
+ * `getEditorOptions` (which also needs team names) and
+ * `listCurrentSeasonDivisions` (which only needs the distinct divisions).
+ */
+async function loadCurrentSeasonTeams(): Promise<
+    {
+        id: number
+        name: string
+        divisionId: number
+        divisionName: string
+        divisionLevel: number
+    }[]
+> {
+    const config = await getSeasonConfig()
+    if (!config.seasonId) return []
+    return db
+        .select({
+            id: teams.id,
+            name: teams.name,
+            divisionId: teams.division,
+            divisionName: divisions.name,
+            divisionLevel: divisions.level
+        })
+        .from(teams)
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .where(eq(teams.season, config.seasonId))
+        .orderBy(asc(divisions.level), asc(teams.name))
+}
+
+/** The distinct divisions fielding a team in the current season, in level order. */
+export async function listCurrentSeasonDivisions(): Promise<
+    { id: number; name: string }[]
+> {
+    const teamRows = await loadCurrentSeasonTeams()
+    const divisionOptions = new Map<number, { id: number; name: string }>()
+    for (const team of teamRows) {
+        if (!divisionOptions.has(team.divisionId)) {
+            divisionOptions.set(team.divisionId, {
+                id: team.divisionId,
+                name: team.divisionName
+            })
+        }
+    }
+    return [...divisionOptions.values()]
+}
+
 export async function getEditorOptions(): Promise<SurveyEditorOptions> {
     const seasonRows = await db
         .select({
@@ -233,22 +280,7 @@ export async function getEditorOptions(): Promise<SurveyEditorOptions> {
         .from(seasons)
         .orderBy(desc(seasons.id))
 
-    const config = await getSeasonConfig()
-    const teamRows = config.seasonId
-        ? await db
-              .select({
-                  id: teams.id,
-                  name: teams.name,
-                  divisionId: teams.division,
-                  divisionName: divisions.name,
-                  divisionLevel: divisions.level
-              })
-              .from(teams)
-              .innerJoin(divisions, eq(teams.division, divisions.id))
-              .where(eq(teams.season, config.seasonId))
-              .orderBy(asc(divisions.level), asc(teams.name))
-        : []
-
+    const teamRows = await loadCurrentSeasonTeams()
     const divisionOptions = new Map<number, { id: number; name: string }>()
     for (const team of teamRows) {
         if (!divisionOptions.has(team.divisionId)) {

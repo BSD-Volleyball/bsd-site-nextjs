@@ -268,6 +268,16 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
                                     {template.questionCount === 1 ? "" : "s"}
                                 </Badge>
                                 <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={busy}
+                                    asChild
+                                >
+                                    <Link href={trendsHref(template.id)}>
+                                        Trends
+                                    </Link>
+                                </Button>
+                                <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"

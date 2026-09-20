@@ -72,6 +72,7 @@ function TrendChart({ trend }: { trend: QuestionTrend }) {
         }
         for (const series of trend.series) {
             row[series.key] = series.points[idx]?.value ?? null
+            row[`${series.key}__n`] = series.points[idx]?.n ?? 0
         }
         return row
     })
@@ -82,9 +83,17 @@ function TrendChart({ trend }: { trend: QuestionTrend }) {
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
-                    formatter={(value, name) => {
+                    formatter={(value, name, entry) => {
                         const series = trend.series.find((s) => s.key === name)
-                        return [value ?? "—", series?.label ?? String(name)]
+                        const n = (
+                            entry.payload as Record<string, number | null>
+                        )[`${name}__n`]
+                        return [
+                            value !== null && value !== undefined
+                                ? `${value} (n = ${n ?? 0})`
+                                : "—",
+                            series?.label ?? String(name)
+                        ]
                     }}
                 />
                 {trend.series.map((series, idx) => (

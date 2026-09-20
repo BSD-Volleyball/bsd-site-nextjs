@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getSurveyEditorOptions, getSurveyResults } from "../../actions"
+import { getSurveyFilterOptions, getSurveyResults } from "../../actions"
 import { ResultsClient } from "./results-client"
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default async function SurveyResultsPage({
 
     const [resultsResult, optionsResult] = await Promise.all([
         getSurveyResults(id, {}),
-        getSurveyEditorOptions()
+        getSurveyFilterOptions()
     ])
 
     if (!resultsResult.status) {
