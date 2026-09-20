@@ -82,7 +82,18 @@ async function loadAnswerMaps(
     return byResponse
 }
 
-/** Invited count + submitted responses (with answers decoded) for one survey. */
+/**
+ * Invited count + submitted responses (with answers decoded) for one survey.
+ *
+ * The counting rule, so the response rate can never exceed 100%: `invited` is
+ * the recipients still on the list (`removed_at IS NULL`), and `submitted` is
+ * the submitted responses that belong to one of those recipients. A response
+ * whose recipient was later removed is left out of both sides rather than
+ * counted against a denominator it is no longer part of. An anonymous
+ * survey's submitted response has its `recipient_id` cleared on purpose (that
+ * is what makes it anonymous), so it has no recipient to check and always
+ * counts.
+ */
 async function loadInvitedAndResponses(
     surveyId: number,
     questionById: Map<number, SurveyQuestionDef>
@@ -98,8 +109,12 @@ async function loadInvitedAndResponses(
                 )
             ),
         db
-            .select()
+            .select({ response: surveyResponses, recipient: surveyRecipients })
             .from(surveyResponses)
+            .leftJoin(
+                surveyRecipients,
+                eq(surveyRecipients.id, surveyResponses.recipient_id)
+            )
             .where(
                 and(
                     eq(surveyResponses.survey_id, surveyId),
@@ -108,18 +123,22 @@ async function loadInvitedAndResponses(
             )
     ])
 
+    const counted = responseRows.filter(
+        (row) => row.recipient === null || row.recipient.removed_at === null
+    )
+
     const answers = await loadAnswerMaps(
-        responseRows.map((row) => row.id),
+        counted.map((row) => row.response.id),
         questionById
     )
 
-    const responses: ReportResponse[] = responseRows.map((row) => ({
-        responseId: row.id,
-        submittedOn: row.submitted_on,
-        roleTags: row.role_tags,
-        divisionId: row.division_id,
-        gender: row.gender,
-        answers: answers.get(row.id) ?? {}
+    const responses: ReportResponse[] = counted.map(({ response }) => ({
+        responseId: response.id,
+        submittedOn: response.submitted_on,
+        roleTags: response.role_tags,
+        divisionId: response.division_id,
+        gender: response.gender,
+        answers: answers.get(response.id) ?? {}
     }))
 
     return { invited: invitedRows.length, responses }

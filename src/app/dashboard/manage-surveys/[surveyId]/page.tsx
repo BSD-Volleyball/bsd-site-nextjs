@@ -10,6 +10,16 @@ export const metadata: Metadata = {
     title: "Edit Survey"
 }
 
+/**
+ * Publishing resolves the audience, writes a recipient row per person and
+ * then mails every one of them; a league-wide survey is ~2k recipients, which
+ * runs past the default function duration. The publish action lives in this
+ * segment, so its budget is this page's. Recipients commit before any mail
+ * goes out, so a timeout would only produce a spurious failure toast over a
+ * survey that did publish — but that is exactly the confusion to avoid.
+ */
+export const maxDuration = 300
+
 export default async function SurveyEditorPage({
     params
 }: {

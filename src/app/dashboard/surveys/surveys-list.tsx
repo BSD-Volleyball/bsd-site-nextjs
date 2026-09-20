@@ -9,7 +9,7 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 import type { MySurveySummary } from "@/lib/surveys/respondent"
 
 interface SurveysListProps {
@@ -121,24 +121,13 @@ function linkLabel(survey: MySurveySummary): string {
 function deadlineLine(survey: MySurveySummary): string {
     if (survey.canEdit) {
         return survey.closesAt
-            ? `Closes ${formatClosesAt(survey.closesAt)}`
+            ? `Closes ${formatLeagueDateTime(survey.closesAt)}`
             : "No deadline"
     }
     if (survey.isAnonymous && survey.responseStatus === "submitted") {
         return "Submitted anonymously — answers can no longer be changed."
     }
     return survey.closesAt
-        ? `Closed ${formatClosesAt(survey.closesAt)}`
+        ? `Closed ${formatLeagueDateTime(survey.closesAt)}`
         : "Closed"
-}
-
-function formatClosesAt(closesAt: Date): string {
-    return closesAt.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })
 }

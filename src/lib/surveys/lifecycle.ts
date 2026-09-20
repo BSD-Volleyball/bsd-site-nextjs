@@ -78,6 +78,14 @@ export async function publishSurvey(
             throw new ActionError("This survey has already been published.")
         }
 
+        // A close date already in the past would publish a survey that is
+        // open and expired at once: nobody can answer it, and the next
+        // auto-close sweep shuts it again. Catch it here rather than letting
+        // the invitations go out first.
+        if (survey.closes_at && survey.closes_at <= new Date()) {
+            throw new ActionError("Close date must be in the future.")
+        }
+
         const questions = await getTemplateQuestions(survey.template_id, tx)
         const active = questions.filter((q) => q.archivedAt === null)
 

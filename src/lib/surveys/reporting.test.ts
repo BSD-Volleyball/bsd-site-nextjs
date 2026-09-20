@@ -1021,11 +1021,15 @@ describe("buildResponsesCsv", () => {
         ])
     })
 
-    it("omits Name and Email when anonymous", () => {
-        const csv = buildResponsesCsv(questions, [resp1], { anonymous: true })
+    it("omits Name, Email and the submit date when anonymous", () => {
+        // Ten responses: the segment columns survive, the date does not.
+        const many = Array.from({ length: 10 }, (_, i) => ({
+            ...resp1,
+            responseId: 200 + i
+        }))
+        const csv = buildResponsesCsv(questions, many, { anonymous: true })
         expect(csv.headers).toEqual([
             "Response ID",
-            "Submitted on",
             "Role tags",
             "Division ID",
             "Gender",
@@ -1038,8 +1042,7 @@ describe("buildResponsesCsv", () => {
             "Agree?"
         ])
         expect(csv.rows[0]).toEqual([
-            101,
-            "2026-01-05T00:00:00Z",
+            200,
             "captain; rostered",
             10,
             "male",
@@ -1050,6 +1053,45 @@ describe("buildResponsesCsv", () => {
             "Bravo > Alpha > Charlie",
             "Great season",
             "Agree"
+        ])
+    })
+
+    it("also omits the segment columns on a small anonymous export", () => {
+        // Role tags + division + gender identify a person on a short list.
+        const csv = buildResponsesCsv(questions, [resp1], { anonymous: true })
+        expect(csv.headers).toEqual([
+            "Response ID",
+            "Did you enjoy?",
+            "Rate us",
+            "Favorite?",
+            "Interests?",
+            "Rank these",
+            "Comments",
+            "Agree?"
+        ])
+        expect(csv.rows[0]).toEqual([
+            101,
+            "Yes",
+            8,
+            "Bravo",
+            "Alpha; Charlie",
+            "Bravo > Alpha > Charlie",
+            "Great season",
+            "Agree"
+        ])
+    })
+
+    it("keeps every column on a small identified export", () => {
+        // The small-cell rule is about anonymity, not export size.
+        const csv = buildResponsesCsv(questions, [resp1], { anonymous: false })
+        expect(csv.headers.slice(0, 7)).toEqual([
+            "Response ID",
+            "Submitted on",
+            "Role tags",
+            "Division ID",
+            "Gender",
+            "Name",
+            "Email"
         ])
     })
 })

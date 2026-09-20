@@ -238,6 +238,31 @@ export async function questionIdsWithAnswers(
     return new Set(rows.map((row) => row.questionId))
 }
 
+/**
+ * Which of the given questions are named by the frozen `question_ids` of a
+ * survey that is still open. Those runs render the list exactly as it was at
+ * publish, so the rows behind it have to keep existing.
+ */
+export async function questionIdsFrozenIntoOpenSurveys(
+    questionIds: number[],
+    executor: DbExecutor = db
+): Promise<Set<number>> {
+    if (questionIds.length === 0) return new Set()
+    const rows = await executor
+        .select({ questionIds: surveys.question_ids })
+        .from(surveys)
+        .where(eq(surveys.status, "open"))
+
+    const frozen = new Set<number>()
+    const candidates = new Set(questionIds)
+    for (const row of rows) {
+        for (const id of row.questionIds ?? []) {
+            if (candidates.has(id)) frozen.add(id)
+        }
+    }
+    return frozen
+}
+
 // ---------------------------------------------------------------------------
 // The diff save
 // ---------------------------------------------------------------------------
@@ -342,8 +367,19 @@ export async function saveTemplateQuestions(
             }
         }
 
-        const toArchive = droppedIds.filter((id) => answered.has(id))
-        const toDelete = droppedIds.filter((id) => !answered.has(id))
+        // A dropped question that an open survey froze into its
+        // `question_ids` must survive the save even with zero answers: that
+        // survey renders its frozen list, and deleting the row would make it
+        // render a question that no longer exists (or, once someone answers
+        // it, fail the answer insert on a dangling FK).
+        const frozenIntoOpenSurvey = await questionIdsFrozenIntoOpenSurveys(
+            droppedIds,
+            tx
+        )
+        const mustKeep = (id: number) =>
+            answered.has(id) || frozenIntoOpenSurvey.has(id)
+        const toArchive = droppedIds.filter(mustKeep)
+        const toDelete = droppedIds.filter((id) => !mustKeep(id))
         if (toArchive.length > 0) {
             await tx
                 .update(surveyQuestions)

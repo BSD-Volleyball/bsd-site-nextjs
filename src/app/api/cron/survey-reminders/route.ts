@@ -35,8 +35,7 @@ export async function GET(request: NextRequest) {
 
     const now = new Date()
     const closed = await autoCloseExpiredSurveys(now)
-    const { closed: _placeholder, ...result } =
-        await sendDueSurveyReminders(now)
+    const result = await sendDueSurveyReminders(now)
     logger.info("[cron] Survey reminders run", { closed, ...result })
     return NextResponse.json({ ...result, closed })
 }

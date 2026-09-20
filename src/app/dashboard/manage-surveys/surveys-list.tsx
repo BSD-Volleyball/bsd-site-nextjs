@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table"
 import type { SurveyListRow } from "@/lib/surveys/surveys"
 import type { TemplateSummary } from "@/lib/surveys/templates"
-import { formatLeagueDateTime } from "./league-datetime"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 import { NewSurveyDialog } from "./new-survey-dialog"
 
 interface SurveysListProps {

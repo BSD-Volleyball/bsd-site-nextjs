@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { validateSubmission } from "./validate-submission"
+import { REQUIRED_MESSAGE, validateSubmission } from "./validate-submission"
 import type {
     AnswerMap,
     SurveyOption,
@@ -195,6 +195,39 @@ describe("validateSubmission", () => {
         ]
         const result = run(questions, { 1: 9 })
         expect(result.errors[1]).toMatch(/between 1 and 5/)
+    })
+
+    // The contract behind RankingInput's seeding effect: a required ranking
+    // is only satisfied by a full permutation of its option keys, and an
+    // untouched question (no answer at all) fails. Nothing about the default
+    // order the component shows makes it an answer — the component has to
+    // emit it.
+    it("accepts a full permutation for a required ranking", () => {
+        const questions = [
+            q(
+                1,
+                "ranking",
+                { type: "ranking", options: CHOICES },
+                { required: true }
+            )
+        ]
+        const result = run(questions, { 1: ["opt_b", "opt_a"] })
+        expect(result.errors).toEqual({})
+        expect(result.cleaned).toEqual({ 1: ["opt_b", "opt_a"] })
+    })
+
+    it("fails a required ranking that was never answered", () => {
+        const questions = [
+            q(
+                1,
+                "ranking",
+                { type: "ranking", options: CHOICES },
+                { required: true }
+            )
+        ]
+        const result = run(questions, {})
+        expect(result.errors[1]).toBe(REQUIRED_MESSAGE)
+        expect(result.cleaned).toEqual({})
     })
 
     it("honours role tags when deciding what is visible", () => {

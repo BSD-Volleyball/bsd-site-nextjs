@@ -30,11 +30,12 @@ import {
     removeSurveyRecipient,
     resendSurveyInvitations
 } from "./actions"
-import { formatLeagueDateTime } from "./league-datetime"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 
 interface RecipientsTableProps {
     surveyId: number
     recipients: SurveyEditorRecipient[]
+    isAnonymous: boolean
     canManage: boolean
     canResend: boolean
     users: { id: string; name: string }[]
@@ -45,6 +46,7 @@ interface RecipientsTableProps {
 export function RecipientsTable({
     surveyId,
     recipients,
+    isAnonymous,
     canManage,
     canResend,
     users,
@@ -55,8 +57,13 @@ export function RecipientsTable({
     const [pendingRemove, setPendingRemove] =
         useState<SurveyEditorRecipient | null>(null)
 
-    const existingIds = new Set(recipients.map((r) => r.userId))
-    const addableUsers = users.filter((u) => !existingIds.has(u.id))
+    // Only a recipient still on the list blocks re-adding. `addRecipients`
+    // restores a removed row rather than inserting a second one, so someone
+    // taken off by mistake has to stay pickable here.
+    const activeIds = new Set(
+        recipients.filter((r) => r.removedAt === null).map((r) => r.userId)
+    )
+    const addableUsers = users.filter((u) => !activeIds.has(u.id))
 
     async function handleAdd() {
         if (!addPick) return
@@ -172,11 +179,17 @@ export function RecipientsTable({
                                             )}
                                         </Badge>
                                     ) : recipient.submittedAt ? (
+                                        // An anonymous survey's submit time is
+                                        // stored at league-day midnight, but
+                                        // showing even that next to a name
+                                        // orders the roster by who answered
+                                        // when — enough, on a small list, to
+                                        // pair a person with a response. The
+                                        // bare badge is all an admin needs.
                                         <Badge>
-                                            Submitted{" "}
-                                            {formatLeagueDateTime(
-                                                recipient.submittedAt
-                                            )}
+                                            {isAnonymous
+                                                ? "Submitted"
+                                                : `Submitted ${formatLeagueDateTime(recipient.submittedAt)}`}
                                         </Badge>
                                     ) : (
                                         <Badge variant="outline">Pending</Badge>

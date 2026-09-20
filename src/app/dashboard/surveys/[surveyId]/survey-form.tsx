@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 import type { RespondentSurveyView } from "@/lib/surveys/respondent"
 import type { AnswerMap, AnswerValue } from "@/lib/surveys/types"
 import { validateSubmission } from "@/lib/surveys/validate-submission"
@@ -256,8 +256,8 @@ export function SurveyForm({ view }: { view: RespondentSurveyView }) {
             )}
             {canEdit && survey.closesAt && (
                 <p className="text-muted-foreground text-sm">
-                    Closes {formatClosesAt(survey.closesAt)}. Your answers save
-                    as you go.
+                    Closes {formatLeagueDateTime(survey.closesAt)}. Your answers
+                    save as you go.
                 </p>
             )}
 
@@ -355,17 +355,6 @@ function closedReason(view: RespondentSurveyView): string {
         return "You submitted this survey anonymously. Your answers were separated from your name, so they can no longer be shown or changed."
     }
     return survey.closesAt
-        ? `This survey closed ${formatClosesAt(survey.closesAt)} and is no longer accepting answers.`
+        ? `This survey closed ${formatLeagueDateTime(survey.closesAt)} and is no longer accepting answers.`
         : "This survey is closed and is no longer accepting answers."
-}
-
-function formatClosesAt(closesAt: Date): string {
-    return closesAt.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })
 }

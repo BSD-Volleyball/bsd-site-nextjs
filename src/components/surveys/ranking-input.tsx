@@ -1,7 +1,7 @@
 "use client"
 
 import { RiArrowDownLine, RiArrowUpLine, RiDraggable } from "@remixicon/react"
-import { type DragEvent, useState } from "react"
+import { type DragEvent, useEffect, useState } from "react"
 import type { SurveyOption } from "@/lib/surveys/types"
 import { cn } from "@/lib/utils"
 
@@ -38,6 +38,12 @@ function normalizeOrder(
     return ordered
 }
 
+/** Same keys in the same positions. */
+function sameOrder(a: string[] | undefined, b: string[]): boolean {
+    if (a === undefined || a.length !== b.length) return false
+    return a.every((key, index) => key === b[index])
+}
+
 /** Move the entry at `from` to `to`; everything in between shifts by one. */
 function moveEntry(order: string[], from: number, to: number): string[] {
     if (from === to || from < 0 || to < 0) return order
@@ -52,6 +58,14 @@ function moveEntry(order: string[], from: number, to: number): string[] {
  * Drag-and-drop plus keyboard-reachable move buttons. The value is always a
  * complete ordering of the option keys, so the parent never has to reconcile a
  * partial list.
+ *
+ * The rendered order is also *emitted*, not just displayed. A required ranking
+ * is satisfied by a full permutation of the option keys and by nothing else
+ * (see validate-submission.test.ts), so a respondent who agrees with the
+ * default order and never drags anything would otherwise be unable to submit.
+ * The seeding effect below is what makes that default an actual answer — and
+ * it doubles as the repair for a stored order that went stale when the editor
+ * appended an option.
  */
 export function RankingInput({
     options,
@@ -64,6 +78,14 @@ export function RankingInput({
 
     const order = normalizeOrder(options, value)
     const labels = new Map(options.map((option) => [option.key, option.label]))
+
+    // Seed (or repair) the stored answer from what is on screen. Idempotent:
+    // once `value` equals the normalised order there is nothing to emit, so
+    // this cannot loop even though `onChange` is usually a fresh closure.
+    const needsSeed = !disabled && !sameOrder(value, order)
+    useEffect(() => {
+        if (needsSeed) onChange(order)
+    })
 
     function move(from: number, to: number) {
         if (disabled) return

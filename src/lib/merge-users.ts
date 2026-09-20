@@ -27,6 +27,10 @@ import {
     signups,
     subRequests,
     substitutions,
+    surveyRecipients,
+    surveyResponses,
+    surveyTemplates,
+    surveys,
     teams,
     tournamentRoster,
     tournamentTeams,
@@ -1028,6 +1032,142 @@ export async function mergeUserRecords(
             .update(friendships)
             .set({ addressee: newUserId })
             .where(eq(friendships.addressee, oldUserId))
+
+        // Surveys. Both `survey_recipients.user_id` and
+        // `survey_responses.user_id` cascade on delete, so without this the
+        // merged-away account's invites and its identified answers would be
+        // destroyed rather than moved. Anonymous responses carry no user_id
+        // at all and are never touched.
+        //
+        // Recipients first: (survey_id, user_id) is unique, so a survey both
+        // accounts were invited to has to collapse to one row before the
+        // repoint. The survivor's row is the one that stays, but a submission
+        // recorded only on the old row is real participation and is carried
+        // over, and any response still pointing at the old row is moved to
+        // the surviving one before it goes away.
+        const [oldRecipientRows, newRecipientRows] = await Promise.all([
+            tx
+                .select({
+                    id: surveyRecipients.id,
+                    survey_id: surveyRecipients.survey_id,
+                    submitted_at: surveyRecipients.submitted_at
+                })
+                .from(surveyRecipients)
+                .where(eq(surveyRecipients.user_id, oldUserId)),
+            tx
+                .select({
+                    id: surveyRecipients.id,
+                    survey_id: surveyRecipients.survey_id,
+                    submitted_at: surveyRecipients.submitted_at
+                })
+                .from(surveyRecipients)
+                .where(eq(surveyRecipients.user_id, newUserId))
+        ])
+        const newRecipientBySurvey = new Map(
+            newRecipientRows.map((row) => [row.survey_id, row])
+        )
+        for (const oldRow of oldRecipientRows) {
+            const survivorRow = newRecipientBySurvey.get(oldRow.survey_id)
+            if (!survivorRow) continue
+            if (oldRow.submitted_at && survivorRow.submitted_at === null) {
+                await tx
+                    .update(surveyRecipients)
+                    .set({ submitted_at: oldRow.submitted_at })
+                    .where(eq(surveyRecipients.id, survivorRow.id))
+            }
+            await tx
+                .update(surveyResponses)
+                .set({ recipient_id: survivorRow.id })
+                .where(eq(surveyResponses.recipient_id, oldRow.id))
+            await tx
+                .delete(surveyRecipients)
+                .where(eq(surveyRecipients.id, oldRow.id))
+        }
+        await tx
+            .update(surveyRecipients)
+            .set({ user_id: newUserId })
+            .where(eq(surveyRecipients.user_id, oldUserId))
+        await tx
+            .update(surveyRecipients)
+            .set({ added_by: newUserId })
+            .where(eq(surveyRecipients.added_by, oldUserId))
+
+        // survey_responses: a partial unique index allows one identified
+        // response per (survey, user), so a survey both accounts answered has
+        // to lose one. A submitted sheet beats a draft — the survivor's is
+        // kept unless it is unsubmitted and the old one is not, in which case
+        // the real submission wins. Answers cascade with the loser.
+        const [oldResponseRows, newResponseRows] = await Promise.all([
+            tx
+                .select({
+                    id: surveyResponses.id,
+                    survey_id: surveyResponses.survey_id,
+                    status: surveyResponses.status
+                })
+                .from(surveyResponses)
+                .where(eq(surveyResponses.user_id, oldUserId)),
+            tx
+                .select({
+                    id: surveyResponses.id,
+                    survey_id: surveyResponses.survey_id,
+                    status: surveyResponses.status
+                })
+                .from(surveyResponses)
+                .where(eq(surveyResponses.user_id, newUserId))
+        ])
+        const newResponseBySurvey = new Map(
+            newResponseRows.map((row) => [row.survey_id, row])
+        )
+        const dropResponseIds: number[] = []
+        for (const oldRow of oldResponseRows) {
+            const survivorRow = newResponseBySurvey.get(oldRow.survey_id)
+            if (!survivorRow) continue
+            const keepSurvivor =
+                survivorRow.status === "submitted" ||
+                oldRow.status !== "submitted"
+            dropResponseIds.push(keepSurvivor ? oldRow.id : survivorRow.id)
+        }
+        if (dropResponseIds.length > 0) {
+            await tx
+                .delete(surveyResponses)
+                .where(inArray(surveyResponses.id, dropResponseIds))
+        }
+        await tx
+            .update(surveyResponses)
+            .set({ user_id: newUserId })
+            .where(eq(surveyResponses.user_id, oldUserId))
+
+        // Every surviving recipient row now belongs to the survivor, so a
+        // response can be pointed at the one covering its survey. Anonymous
+        // rows (user_id NULL) are skipped: their missing link is the point.
+        const survivorRecipientRows = await tx
+            .select({
+                id: surveyRecipients.id,
+                survey_id: surveyRecipients.survey_id
+            })
+            .from(surveyRecipients)
+            .where(eq(surveyRecipients.user_id, newUserId))
+        for (const row of survivorRecipientRows) {
+            await tx
+                .update(surveyResponses)
+                .set({ recipient_id: row.id })
+                .where(
+                    and(
+                        eq(surveyResponses.survey_id, row.survey_id),
+                        eq(surveyResponses.user_id, newUserId)
+                    )
+                )
+        }
+
+        // Authorship of the survey itself and of its template.
+        await tx
+            .update(surveys)
+            .set({ created_by: newUserId })
+            .where(eq(surveys.created_by, oldUserId))
+        await tx
+            .update(surveyTemplates)
+            .set({ created_by: newUserId })
+            .where(eq(surveyTemplates.created_by, oldUserId))
 
         // Finally delete the old user. Only its sessions and better-auth
         // `accounts` rows cascade away with it: those authenticate this

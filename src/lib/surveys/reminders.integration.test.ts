@@ -285,7 +285,6 @@ describe("sendDueSurveyReminders", () => {
         expect(result.sent).toBe(1)
         expect(result.skipped).toBe(0)
         expect(result.failed).toBe(0)
-        expect(result.closed).toBe(0)
 
         const messages = sentBatchMessages()
         expect(messages.map((m) => m.to)).toEqual([dueUser.email])
@@ -318,7 +317,6 @@ describe("sendDueSurveyReminders", () => {
     it("defaults now to the current time when omitted", async () => {
         const result = await sendDueSurveyReminders()
         expect(result).toEqual({
-            closed: 0,
             surveys: 0,
             sent: 0,
             skipped: 0,

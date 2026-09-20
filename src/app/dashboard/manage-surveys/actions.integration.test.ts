@@ -255,6 +255,51 @@ describe("saveTemplateQuestions", () => {
         expect(kept?.archived_at).toBeInstanceOf(Date)
     })
 
+    it("archives rather than deletes an unanswered question an open survey froze", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [
+            yesNo("Keep"),
+            yesNo("In flight")
+        ])
+        const [keep, inFlight] = await questionRows(template.id)
+        // Open run, question frozen into it, nobody has answered yet.
+        await createSurvey(template.id, {
+            status: "open",
+            question_ids: [keep.id, inFlight.id]
+        })
+
+        const result = await saveTemplateQuestions(template.id, [
+            yesNo("Keep", keep.id)
+        ])
+        expect(result.status).toBe(true)
+
+        const after = await questionRows(template.id)
+        expect(after).toHaveLength(2)
+        expect(
+            after.find((r) => r.id === inFlight.id)?.archived_at
+        ).toBeInstanceOf(Date)
+    })
+
+    it("still deletes an unanswered question only a draft or closed survey named", async () => {
+        const template = await createSurveyTemplate()
+        await createUserWithRoles([{ role: "admin" }])
+        await saveTemplateQuestions(template.id, [yesNo("Keep"), yesNo("Drop")])
+        const [keep, drop] = await questionRows(template.id)
+        await createSurvey(template.id, {
+            status: "closed",
+            question_ids: [keep.id, drop.id]
+        })
+
+        const result = await saveTemplateQuestions(template.id, [
+            yesNo("Keep", keep.id)
+        ])
+        expect(result.status).toBe(true)
+
+        const after = await questionRows(template.id)
+        expect(after.map((r) => r.id)).toEqual([keep.id])
+    })
+
     // The delete-vs-archive decision and the answered-question set are read
     // inside the save's transaction, behind a FOR UPDATE lock on the template
     // row. survey_answers.question_id cascades on delete, so a stale read here

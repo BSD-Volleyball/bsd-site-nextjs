@@ -36,6 +36,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 import { EMPTY_AUDIENCE, SURVEY_LIMITS } from "@/lib/surveys/types"
 import type { SurveyEditorData } from "@/lib/surveys/surveys"
 import {
@@ -49,11 +50,7 @@ import {
     type SurveyEditorOptionsPayload
 } from "./actions"
 import { AudienceBuilder } from "./audience-builder"
-import {
-    formatLeagueDateTime,
-    isoToLeagueLocal,
-    leagueLocalToIso
-} from "./league-datetime"
+import { isoToLeagueLocal, leagueLocalToIso } from "./league-datetime"
 import { RecipientsTable } from "./recipients-table"
 
 interface SurveyEditorProps {
@@ -431,6 +428,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         <RecipientsTable
                             surveyId={surveyId}
                             recipients={recipients}
+                            isAnonymous={survey.is_anonymous}
                             canManage={isOpen}
                             canResend={isOpen}
                             users={options.users}
@@ -476,6 +474,14 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                                           : "identified — each response is tied to who submitted it."
                                   } The audience and question set lock once published.`
                                 : "Loading the audience count…"}
+                        </AlertDialogDescription>
+                        {/* The season groups are everyone signed up, which
+                            includes staff — so the person clicking Publish is
+                            usually on their own invite list. */}
+                        <AlertDialogDescription>
+                            Heads up: the Season signups group covers league
+                            admins, commissioners and captains too, so you may
+                            be a recipient of this survey yourself.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

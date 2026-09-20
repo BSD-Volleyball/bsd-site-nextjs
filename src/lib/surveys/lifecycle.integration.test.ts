@@ -233,6 +233,30 @@ describe("publishSurvey", () => {
         )
     })
 
+    it("refuses to publish with a close date already in the past", async () => {
+        const scene = await seedScene()
+        await db
+            .update(surveys)
+            .set({ closes_at: new Date(Date.now() - 60_000) })
+            .where(eq(surveys.id, scene.survey.id))
+
+        await expect(
+            publishSurvey(scene.survey.id, scene.actor.id)
+        ).rejects.toThrow(/future/i)
+
+        // Nothing was written: the survey is still a draft with no invites.
+        const [row] = await db
+            .select()
+            .from(surveys)
+            .where(eq(surveys.id, scene.survey.id))
+        expect(row.status).toBe("draft")
+        const rows = await db
+            .select()
+            .from(surveyRecipients)
+            .where(eq(surveyRecipients.survey_id, scene.survey.id))
+        expect(rows).toHaveLength(0)
+    })
+
     it("never invites a placeholder legacy address", async () => {
         const season = await createSeason()
         const actor = await createUser()

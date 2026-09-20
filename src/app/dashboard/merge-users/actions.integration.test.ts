@@ -11,6 +11,11 @@ import {
     notificationOptouts,
     seasonRefs,
     signups,
+    surveyAnswers,
+    surveyRecipients,
+    surveyResponses,
+    surveys as surveysTable,
+    surveyTemplates as surveyTemplatesTable,
     teams,
     userRoles,
     users,
@@ -24,6 +29,10 @@ import {
     createSeason,
     createSeasonEvent,
     createSignup,
+    createSurvey,
+    createSurveyQuestion,
+    createSurveyRecipient,
+    createSurveyTemplate,
     createTeam,
     addToWaitlist
 } from "@/test/factories"
@@ -608,6 +617,203 @@ describe("mergeUsers moves records that used to cascade away", () => {
             .where(eq(userUnavailability.event_id, event.id))
         expect(rows).toHaveLength(1)
         expect(rows[0].id).toBe(kept.id)
+    })
+})
+
+describe("mergeUsers moves survey invites and responses", () => {
+    it("carries a recipient row and a submitted identified response onto the survivor", async () => {
+        // survey_recipients.user_id and survey_responses.user_id both cascade
+        // on delete, so a merge that forgot them would destroy the invite and
+        // the answers rather than move them.
+        const template = await createSurveyTemplate()
+        const question = await createSurveyQuestion(template.id)
+        const survey = await createSurvey(template.id, {
+            status: "open",
+            question_ids: [question.id]
+        })
+        const userA = await createUser()
+        const userB = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const submittedAt = new Date("2026-09-10T00:00:00Z")
+        const recipient = await createSurveyRecipient(survey.id, userA.id, {
+            submitted_at: submittedAt
+        })
+        const [response] = await db
+            .insert(surveyResponses)
+            .values({
+                survey_id: survey.id,
+                user_id: userA.id,
+                recipient_id: recipient.id,
+                status: "submitted",
+                submitted_on: "2026-09-10"
+            })
+            .returning()
+        await db.insert(surveyAnswers).values({
+            response_id: response.id,
+            question_id: question.id,
+            value_bool: true
+        })
+
+        const result = await mergeUsers(userA.id, userB.id, KEEP_B)
+        expect(result.status).toBe(true)
+
+        const recipientRows = await db
+            .select()
+            .from(surveyRecipients)
+            .where(eq(surveyRecipients.survey_id, survey.id))
+        expect(recipientRows).toHaveLength(1)
+        expect(recipientRows[0].user_id).toBe(userB.id)
+        expect(recipientRows[0].submitted_at?.toISOString()).toBe(
+            submittedAt.toISOString()
+        )
+
+        const responseRows = await db
+            .select()
+            .from(surveyResponses)
+            .where(eq(surveyResponses.survey_id, survey.id))
+        expect(responseRows).toHaveLength(1)
+        expect(responseRows[0].id).toBe(response.id)
+        expect(responseRows[0].user_id).toBe(userB.id)
+        expect(responseRows[0].recipient_id).toBe(recipientRows[0].id)
+
+        const answerRows = await db
+            .select()
+            .from(surveyAnswers)
+            .where(eq(surveyAnswers.response_id, response.id))
+        expect(answerRows).toHaveLength(1)
+    })
+
+    it("collapses a duplicate invite to one row and keeps the submission", async () => {
+        // (survey_id, user_id) is unique, so the two invites have to become
+        // one — and the submission recorded only on the merged-away row is
+        // real participation that has to survive.
+        const template = await createSurveyTemplate()
+        const survey = await createSurvey(template.id, { status: "open" })
+        const userA = await createUser()
+        const userB = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const submittedAt = new Date("2026-09-11T00:00:00Z")
+        const oldRow = await createSurveyRecipient(survey.id, userA.id, {
+            submitted_at: submittedAt
+        })
+        const survivorRow = await createSurveyRecipient(survey.id, userB.id)
+        const [response] = await db
+            .insert(surveyResponses)
+            .values({
+                survey_id: survey.id,
+                user_id: userA.id,
+                recipient_id: oldRow.id,
+                status: "submitted",
+                submitted_on: "2026-09-11"
+            })
+            .returning()
+
+        const result = await mergeUsers(userA.id, userB.id, KEEP_B)
+        expect(result.status).toBe(true)
+
+        const recipientRows = await db
+            .select()
+            .from(surveyRecipients)
+            .where(eq(surveyRecipients.survey_id, survey.id))
+        expect(recipientRows).toHaveLength(1)
+        expect(recipientRows[0].id).toBe(survivorRow.id)
+        expect(recipientRows[0].user_id).toBe(userB.id)
+        expect(recipientRows[0].submitted_at?.toISOString()).toBe(
+            submittedAt.toISOString()
+        )
+
+        const [responseAfter] = await db
+            .select()
+            .from(surveyResponses)
+            .where(eq(surveyResponses.id, response.id))
+        expect(responseAfter.user_id).toBe(userB.id)
+        expect(responseAfter.recipient_id).toBe(survivorRow.id)
+    })
+
+    it("keeps the submitted response when the survivor only has a draft", async () => {
+        // The partial unique index allows one identified response per survey,
+        // and a real submission beats an untouched draft.
+        const template = await createSurveyTemplate()
+        const survey = await createSurvey(template.id, { status: "open" })
+        const userA = await createUser()
+        const userB = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const [submitted] = await db
+            .insert(surveyResponses)
+            .values({
+                survey_id: survey.id,
+                user_id: userA.id,
+                status: "submitted",
+                submitted_on: "2026-09-12"
+            })
+            .returning()
+        await db.insert(surveyResponses).values({
+            survey_id: survey.id,
+            user_id: userB.id,
+            status: "draft"
+        })
+
+        const result = await mergeUsers(userA.id, userB.id, KEEP_B)
+        expect(result.status).toBe(true)
+
+        const rows = await db
+            .select()
+            .from(surveyResponses)
+            .where(eq(surveyResponses.survey_id, survey.id))
+        expect(rows).toHaveLength(1)
+        expect(rows[0].id).toBe(submitted.id)
+        expect(rows[0].user_id).toBe(userB.id)
+    })
+
+    it("leaves an anonymous response alone and repoints survey authorship", async () => {
+        const template = await createSurveyTemplate()
+        const userA = await createUser()
+        const userB = await createUser()
+        await createUserWithRoles([{ role: "admin" }])
+        const survey = await createSurvey(template.id, {
+            status: "closed",
+            is_anonymous: true,
+            created_by: userA.id
+        })
+        await db
+            .update(surveyTemplatesTable)
+            .set({ created_by: userA.id })
+            .where(eq(surveyTemplatesTable.id, template.id))
+        const [anonymous] = await db
+            .insert(surveyResponses)
+            .values({
+                survey_id: survey.id,
+                user_id: null,
+                recipient_id: null,
+                status: "submitted",
+                submitted_on: "2026-09-13"
+            })
+            .returning()
+
+        const result = await mergeUsers(userA.id, userB.id, KEEP_B)
+        expect(result.status).toBe(true)
+
+        const [after] = await db
+            .select()
+            .from(surveyResponses)
+            .where(eq(surveyResponses.id, anonymous.id))
+        expect(after.user_id).toBeNull()
+        expect(after.recipient_id).toBeNull()
+
+        const [surveyAfter] = await db
+            .select()
+            .from(surveysTable)
+            .where(eq(surveysTable.id, survey.id))
+        expect(surveyAfter.created_by).toBe(userB.id)
+
+        const [templateAfter] = await db
+            .select()
+            .from(surveyTemplatesTable)
+            .where(eq(surveyTemplatesTable.id, template.id))
+        expect(templateAfter.created_by).toBe(userB.id)
     })
 })
 

@@ -28,7 +28,6 @@ import {
 } from "@/lib/notifications/dispatch"
 
 export interface SurveyReminderRunResult {
-    closed: number
     surveys: number
     sent: number
     skipped: number
@@ -157,6 +156,12 @@ export async function sendSurveyReminder(
 export async function sendDueSurveyReminders(
     now: Date = new Date()
 ): Promise<SurveyReminderRunResult> {
+    // The timestamp columns are naive (`timestamp without time zone`) and the
+    // app writes UTC into them, so the comparison value has to be a UTC wall
+    // clock too. Drizzle's `gt(column, Date)` handles that for a typed column;
+    // a raw `sql` fragment does not, and a bare Date would be bound in the
+    // server's local zone. Pass the ISO string explicitly.
+    const nowIso = now.toISOString()
     const due = await db
         .select({ id: surveys.id })
         .from(surveys)
@@ -165,7 +170,7 @@ export async function sendDueSurveyReminders(
                 eq(surveys.status, "open"),
                 gt(surveys.reminder_interval_days, 0),
                 sql`${surveys.reminder_count} < ${surveys.reminder_max_count}`,
-                sql`coalesce(${surveys.last_reminder_at}, ${surveys.published_at}) + (${surveys.reminder_interval_days} || ' days')::interval <= ${now}`,
+                sql`coalesce(${surveys.last_reminder_at}, ${surveys.published_at}) + (${surveys.reminder_interval_days} || ' days')::interval <= ${nowIso}::timestamp`,
                 or(isNull(surveys.closes_at), gt(surveys.closes_at, now))
             )
         )
@@ -180,5 +185,5 @@ export async function sendDueSurveyReminders(
         failed += result.failed
     }
 
-    return { closed: 0, surveys: due.length, sent, skipped, failed }
+    return { surveys: due.length, sent, skipped, failed }
 }

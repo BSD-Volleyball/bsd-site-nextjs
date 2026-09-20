@@ -1,7 +1,7 @@
 import { RiSurveyLine } from "@remixicon/react"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { LEAGUE_TIME_ZONE } from "@/lib/date-utils"
+import { formatLeagueDateTime } from "@/lib/surveys/format"
 import type { MySurveySummary } from "@/lib/surveys/respondent"
 
 /**
@@ -58,12 +58,5 @@ function deadlineLine(survey: MySurveySummary): string {
     if (!survey.closesAt) {
         return "It only takes a few minutes, and your answers save as you go."
     }
-    return `It closes ${survey.closesAt.toLocaleString("en-US", {
-        timeZone: LEAGUE_TIME_ZONE,
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-    })}.`
+    return `It closes ${formatLeagueDateTime(survey.closesAt)}.`
 }

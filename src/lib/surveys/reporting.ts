@@ -596,6 +596,14 @@ function csvValueFor(
     }
 }
 
+/**
+ * Below this many responses, an anonymous export drops its segment columns
+ * too. Role tags + division + gender is close to a fingerprint on a small
+ * list, and a spreadsheet is the one place the aggregate report's small-cell
+ * suppression cannot follow the data.
+ */
+const CSV_SEGMENT_MIN = 10
+
 export function buildResponsesCsv(
     questions: SurveyQuestionDef[],
     responses: (ReportResponse & { name?: string; email?: string })[],
@@ -605,12 +613,18 @@ export function buildResponsesCsv(
         (q) => QUESTION_TYPE_DEFS[q.type].hasAnswer
     )
 
+    // An anonymous survey stores the submit date at league-day midnight, but
+    // the export is still a list: a date column sorts it into submission
+    // order, which lines up with the invite list's "Submitted" badges. Drop
+    // it entirely rather than hope nobody cross-references.
+    const includeSubmittedOn = !opts.anonymous
+    const includeSegments =
+        !opts.anonymous || responses.length >= CSV_SEGMENT_MIN
+
     const headers = [
         "Response ID",
-        "Submitted on",
-        "Role tags",
-        "Division ID",
-        "Gender",
+        ...(includeSubmittedOn ? ["Submitted on"] : []),
+        ...(includeSegments ? ["Role tags", "Division ID", "Gender"] : []),
         ...(opts.anonymous ? [] : ["Name", "Email"]),
         ...answerableQuestions.map((q) => q.prompt)
     ]
@@ -618,10 +632,10 @@ export function buildResponsesCsv(
     const rows = responses.map((r) => {
         const base: unknown[] = [
             r.responseId,
-            r.submittedOn,
-            r.roleTags.join("; "),
-            r.divisionId,
-            r.gender,
+            ...(includeSubmittedOn ? [r.submittedOn] : []),
+            ...(includeSegments
+                ? [r.roleTags.join("; "), r.divisionId, r.gender]
+                : []),
             ...(opts.anonymous ? [] : [r.name ?? "", r.email ?? ""])
         ]
         const answerCells = answerableQuestions.map((q) =>
