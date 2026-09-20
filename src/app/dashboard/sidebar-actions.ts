@@ -3,6 +3,8 @@
 // during server rendering and passes the result to <AppSidebar> as a prop.
 import "server-only"
 
+import { logger } from "@/lib/logger"
+
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { checkSignupEligibility } from "@/lib/site-config"
@@ -336,19 +338,29 @@ export async function loadSidebarData(): Promise<SidebarData> {
         (async () => {
             // A recipient row only exists once a survey is published, and a
             // removed recipient has nothing left to answer or look back at.
-            const [invite] = await db
-                .select({ id: surveyRecipients.id })
-                .from(surveyRecipients)
-                .innerJoin(surveys, eq(surveys.id, surveyRecipients.survey_id))
-                .where(
-                    and(
-                        eq(surveyRecipients.user_id, session.user.id),
-                        isNull(surveyRecipients.removed_at),
-                        inArray(surveys.status, ["open", "closed"])
+            // Fail soft: a missing link must never take the whole sidebar
+            // (and with it every dashboard page) down.
+            try {
+                const [invite] = await db
+                    .select({ id: surveyRecipients.id })
+                    .from(surveyRecipients)
+                    .innerJoin(
+                        surveys,
+                        eq(surveys.id, surveyRecipients.survey_id)
                     )
-                )
-                .limit(1)
-            return !!invite
+                    .where(
+                        and(
+                            eq(surveyRecipients.user_id, session.user.id),
+                            isNull(surveyRecipients.removed_at),
+                            inArray(surveys.status, ["open", "closed"])
+                        )
+                    )
+                    .limit(1)
+                return !!invite
+            } catch (error) {
+                logger.error("Failed to load survey sidebar flag", {}, error)
+                return false
+            }
         })()
     ])
 
