@@ -14,8 +14,14 @@ import {
     createSeasonEvent,
     createTeam
 } from "@/test/factories"
+import { sentMessages } from "@/test/email"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import { addPresence, getCoverageView, removePresence } from "./actions"
+import {
+    addPresence,
+    getCoverageView,
+    removePresence,
+    sendCoverageDigest
+} from "./actions"
 
 const DATE = "2099-10-06"
 const DATE2 = "2099-10-13"
@@ -297,5 +303,45 @@ describe("addPresence / removePresence", () => {
             })
         ).toMatchObject({ status: false })
         expect(s.event1.id).toBeGreaterThan(0)
+    })
+})
+
+describe("sendCoverageDigest", () => {
+    it("rejects non-admins", async () => {
+        await createUserWithRoles([{ role: "captain" }])
+        expect(await sendCoverageDigest({ date: DATE })).toEqual({
+            status: false,
+            message: "Unauthorized."
+        })
+    })
+
+    it("emails every admin once and is a no-op on the second call", async () => {
+        await seedSeason()
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        const before = sentMessages().length
+
+        const first = await sendCoverageDigest({ date: DATE })
+        expect(first.status).toBe(true)
+        if (!first.status) return
+        expect(first.data.sent).toBeGreaterThanOrEqual(1)
+        const mine = sentMessages()
+            .slice(before)
+            .filter((m) => m.to.toLowerCase() === admin.email.toLowerCase())
+        expect(mine).toHaveLength(1)
+        expect(mine[0].subject).toContain("[RED] Coverage for")
+        expect(mine[0].htmlBody).toContain("nobody")
+
+        const second = await sendCoverageDigest({ date: DATE })
+        expect(second.status).toBe(true)
+        if (!second.status) return
+        expect(second.data.sent).toBe(0)
+        expect(second.data.skipped).toBeGreaterThanOrEqual(1)
+    })
+
+    it("reports nothing to send for a date with no matches", async () => {
+        await seedSeason()
+        await createUserWithRoles([{ role: "admin" }])
+        const r = await sendCoverageDigest({ date: "2099-12-25" })
+        expect(r).toMatchObject({ status: false })
     })
 })

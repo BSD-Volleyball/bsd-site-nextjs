@@ -33,7 +33,12 @@ import type {
 } from "@/lib/coverage/types"
 import { cn } from "@/lib/utils"
 
-import { type CoverageView, addPresence, removePresence } from "./actions"
+import {
+    type CoverageView,
+    addPresence,
+    removePresence,
+    sendCoverageDigest
+} from "./actions"
 
 const STATUS_BORDER: Record<CoverageStatus, string> = {
     green: "border-l-green-500",
@@ -243,9 +248,7 @@ export function CoverageClient({
     return (
         <div className="space-y-4">
             {message && (
-                <p className="text-sm text-red-700 dark:text-red-300">
-                    {message}
-                </p>
+                <p className="text-sm text-muted-foreground">{message}</p>
             )}
             {view.dates.map((d) => (
                 <Card
@@ -267,7 +270,25 @@ export function CoverageClient({
                             <Badge className={STATUS_BADGE[d.status]}>
                                 {STATUS_LABELS[d.status]}
                             </Badge>
-                            {/* Task 8 adds the "Send digest now" button here. */}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={pending}
+                                onClick={() =>
+                                    startTransition(async () => {
+                                        const r = await sendCoverageDigest({
+                                            date: d.date
+                                        })
+                                        setMessage(
+                                            r.status
+                                                ? (r.message ?? "Sent.")
+                                                : r.message
+                                        )
+                                    })
+                                }
+                            >
+                                Send digest now
+                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
