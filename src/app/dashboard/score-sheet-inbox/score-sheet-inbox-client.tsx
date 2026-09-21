@@ -70,6 +70,7 @@ export function ScoreSheetInboxClient({
     const [busy, setBusy] = useState<string | null>(null)
     const [dragging, setDragging] = useState(false)
     const fileInput = useRef<HTMLInputElement | null>(null)
+    const cameraInput = useRef<HTMLInputElement | null>(null)
 
     const refresh = async (forDate = date) => {
         const result = await getSheetInbox(forDate)
@@ -152,7 +153,10 @@ export function ScoreSheetInboxClient({
             }
         }
         setBusy(null)
+        // Cleared so the same file can be chosen again, and so a phone user
+        // can photograph the next court without the input ignoring them.
         if (fileInput.current) fileInput.current.value = ""
+        if (cameraInput.current) cameraInput.current.value = ""
     }
 
     const retry = async (row: SheetInboxRow, court?: number) => {
@@ -192,6 +196,36 @@ export function ScoreSheetInboxClient({
                 </Select>
             </div>
 
+            {/*
+             * The camera comes first because that is the phone case, and the
+             * phone case is the common one: an admin walks the courts at the
+             * end of the night photographing each sheet in turn. `capture`
+             * opens the camera directly rather than a file browser, and the
+             * input takes one photo at a time because that is what a camera
+             * returns.
+             */}
+            <div className="flex flex-wrap items-center gap-3">
+                <Button
+                    type="button"
+                    size="lg"
+                    disabled={busy !== null}
+                    onClick={() => cameraInput.current?.click()}
+                >
+                    {busy ?? "Take a photo"}
+                </Button>
+                <span className="text-muted-foreground text-sm">
+                    One sheet at a time. It reads as soon as you take it.
+                </span>
+            </div>
+            <input
+                ref={cameraInput}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => void handleFiles([...(e.target.files ?? [])])}
+            />
+
             <button
                 type="button"
                 onClick={() => fileInput.current?.click()}
@@ -215,7 +249,7 @@ export function ScoreSheetInboxClient({
                 )}
             >
                 <span className="font-medium">
-                    {busy ?? "Drop tonight's photos here, or click to choose"}
+                    {busy ?? "Or drop tonight's photos here, all at once"}
                 </span>
                 <span className="text-muted-foreground text-sm">
                     One photo per court. Get all four corner marks in frame.

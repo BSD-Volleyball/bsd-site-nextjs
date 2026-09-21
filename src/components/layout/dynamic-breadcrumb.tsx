@@ -28,6 +28,8 @@ function formatSegmentToTitle(segment: string): string {
     const specialCases: Record<string, string> = {
         // Route kept as /captain-pairing after the page was renamed.
         "captain-pairing": "My Season Preferences",
+        // The route says inbox; the page is called what admins call it.
+        "score-sheet-inbox": "Score Sheet Photos",
         api: "API",
         ui: "UI",
         ux: "UX",

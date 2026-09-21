@@ -49,7 +49,7 @@ export default async function ScoreSheetInboxPage() {
         <div className="space-y-6">
             <PageHeader
                 title="Score Sheet Photos"
-                description="Drop in photos of tonight's sheets. Each one says which court it is, so they file themselves, and whatever can be read is offered as a draft on Enter Scores for you to check and save."
+                description="Photograph each court's sheet at the end of the night, or drop them in from a computer. Each sheet says which court it is, so they file themselves, and whatever can be read is offered as a draft on Enter Scores for you to check and save."
             />
             {matchDates.length === 0 ? (
                 <StatusBanner variant="error">
