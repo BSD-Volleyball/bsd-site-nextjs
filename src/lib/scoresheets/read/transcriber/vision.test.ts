@@ -1,0 +1,159 @@
+import { describe, expect, it, vi } from "vitest"
+
+import type { ScoreCrop } from "../crops"
+import { TranscriberError } from "./port"
+import { createVisionTranscriber } from "./vision"
+
+function crop(id: string, legal = [0, 19, 21, 25, 26, 27]): ScoreCrop {
+    const [matchId, team, game] = id.split(":")
+    return {
+        id,
+        matchId: Number(matchId),
+        team: team as "home" | "away",
+        game: Number(game) as 1 | 2 | 3,
+        png: new Uint8Array([137, 80, 78, 71]),
+        width: 110,
+        height: 65,
+        legalValues: legal,
+        inkRatio: 0.2
+    }
+}
+
+const CROPS = [crop("1:home:1"), crop("1:away:1")]
+
+function reply(body: unknown, ok = true, status = 200) {
+    return vi.fn(
+        async () =>
+            new Response(
+                typeof body === "string" ? body : JSON.stringify(body),
+                { status: ok ? status : status }
+            )
+    ) as unknown as typeof fetch
+}
+
+function completion(content: string) {
+    return { choices: [{ message: { content } }] }
+}
+
+function make(fetchImpl: typeof fetch) {
+    return createVisionTranscriber({
+        apiKey: "test-key",
+        model: "test-model",
+        baseUrl: "https://example.test/v1",
+        fetchImpl
+    })
+}
+
+describe("createVisionTranscriber", () => {
+    it("sends one image per box and reads the reply", async () => {
+        const fetchImpl = reply(
+            completion(
+                JSON.stringify({
+                    readings: [
+                        { id: "1:home:1", value: 25, confidence: 0.9 },
+                        { id: "1:away:1", value: 19, confidence: 0.88 }
+                    ]
+                })
+            )
+        )
+        const readings = await make(fetchImpl).transcribe(CROPS)
+
+        expect(readings.map((r) => r.value)).toEqual([25, 19])
+
+        const call = vi.mocked(fetchImpl).mock.calls[0]
+        const body = JSON.parse(String(call[1]?.body))
+        expect(body.model).toBe("test-model")
+        expect(body.temperature).toBe(0)
+        // One text instruction plus one image per crop
+        const images = body.messages[0].content.filter(
+            (c: { type: string }) => c.type === "image_url"
+        )
+        expect(images).toHaveLength(2)
+        expect(images[0].image_url.url).toMatch(/^data:image\/png;base64,/)
+        // The ids it must answer are spelled out
+        expect(body.messages[0].content[0].text).toContain("1:home:1")
+    })
+
+    it("tolerates a reply wrapped in prose or fences", async () => {
+        const readings = await make(
+            reply(
+                completion(
+                    'Here you go:\n```json\n{"readings":[{"id":"1:home:1","value":25,"confidence":0.9},{"id":"1:away:1","value":19,"confidence":0.9}]}\n```'
+                )
+            )
+        ).transcribe(CROPS)
+        expect(readings.map((r) => r.value)).toEqual([25, 19])
+    })
+
+    it("refuses a reply that answers the wrong boxes", async () => {
+        await expect(
+            make(
+                reply(
+                    completion(
+                        JSON.stringify({
+                            readings: [
+                                { id: "1:home:1", value: 25, confidence: 0.9 },
+                                { id: "9:away:3", value: 19, confidence: 0.9 }
+                            ]
+                        })
+                    )
+                )
+            ).transcribe(CROPS)
+        ).rejects.toThrow(TranscriberError)
+    })
+
+    it("refuses a reply that skips a box", async () => {
+        await expect(
+            make(
+                reply(
+                    completion(
+                        JSON.stringify({
+                            readings: [
+                                { id: "1:home:1", value: 25, confidence: 0.9 }
+                            ]
+                        })
+                    )
+                )
+            ).transcribe(CROPS)
+        ).rejects.toThrow(/missing/i)
+    })
+
+    it("demotes a value the game could not have ended on", async () => {
+        const readings = await make(
+            reply(
+                completion(
+                    JSON.stringify({
+                        readings: [
+                            // 33 is not a legal regular-season score
+                            { id: "1:home:1", value: 33, confidence: 0.9 },
+                            { id: "1:away:1", value: 19, confidence: 0.9 }
+                        ]
+                    })
+                )
+            )
+        ).transcribe(CROPS)
+
+        const home = readings.find((r) => r.id === "1:home:1")
+        expect(home?.value).toBeNull()
+        // Kept as a runner-up so reconciliation can still weigh it
+        expect(home?.alternatives[0]).toMatchObject({ value: 33 })
+    })
+
+    it("reports a service error rather than guessing", async () => {
+        await expect(
+            make(reply("rate limited", false, 429)).transcribe(CROPS)
+        ).rejects.toThrow(/429/)
+    })
+
+    it("rejects a reply that is not JSON at all", async () => {
+        await expect(
+            make(reply(completion("I could not read these."))).transcribe(CROPS)
+        ).rejects.toThrow(TranscriberError)
+    })
+
+    it("does not call out at all when there is nothing to read", async () => {
+        const fetchImpl = reply(completion("{}"))
+        expect(await make(fetchImpl).transcribe([])).toEqual([])
+        expect(vi.mocked(fetchImpl)).not.toHaveBeenCalled()
+    })
+})

@@ -60,6 +60,7 @@ import {
     concernsNavItems,
     currentRostersNavItem,
     enterScoresNavItem,
+    scoreSheetInboxNavItem,
     hallOfChampionsNavItem,
     manageRefsNavItems,
     myAvailabilityNavItem,
@@ -548,7 +549,9 @@ export function AppSidebar({
 
         // Court Mgmt
         const hiddenCourtMgmtItems = [
-            ...(!showEnterScores ? [enterScoresNavItem] : []),
+            ...(!showEnterScores
+                ? [enterScoresNavItem, scoreSheetInboxNavItem]
+                : []),
             ...(!showPictures ? [addPicturesNavItem] : []),
             ...(!showAddTeamPictures ? [addTeamPicturesNavItem] : [])
         ]
@@ -764,7 +767,10 @@ export function AppSidebar({
                                 <NavItems
                                     items={[
                                         ...(showEnterScores
-                                            ? [enterScoresNavItem]
+                                            ? [
+                                                  enterScoresNavItem,
+                                                  scoreSheetInboxNavItem
+                                              ]
                                             : []),
                                         ...(showAddTeamPictures
                                             ? [addTeamPicturesNavItem]

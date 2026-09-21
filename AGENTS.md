@@ -169,6 +169,7 @@ Common environment variables used across the app include:
 - `PLAYER_PIC_URL`
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` (Cloudflare R2 via the S3 API: player pictures, inbound email attachments, the inbound-email spool)
 - `INBOUND_CONCERN_ADDRESS` (inbound mail to this address becomes a concern instead of an admin email ticket)
+- `SCORESHEET_MODEL_API_KEY`, `SCORESHEET_MODEL`, `SCORESHEET_MODEL_BASE_URL` (reading handwritten scores off photographed sheets; any OpenAI-compatible vision endpoint. With no key the reader still identifies the sheet and counts the WIN ticks, so local dev, CI and e2e need nothing set)
 - `SQUARE_ACCESS_TOKEN`
 - `SQUARE_ENVIRONMENT`
 - `NEXT_PUBLIC_SQUARE_APP_ID`

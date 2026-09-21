@@ -23,6 +23,7 @@ import { readSheetTagFromPhoto } from "./identity"
 import { readSheet, type SheetRead } from "./read"
 import type { Transcriber } from "./transcriber/port"
 import { nullTranscriber } from "./transcriber/stub"
+import { transcriberFromEnv } from "./transcriber/vision"
 
 /** Statuses a row can hold; only a human produces `confirmed`. */
 export type StoredReadStatus =
@@ -41,7 +42,10 @@ const MAX_ATTEMPTS = 3
 export interface ProcessOptions {
     scoreSheetId: number
     seasonId: number
-    /** Defaults to the null reader, which still yields ticks and identity. */
+    /**
+     * Defaults to whatever is configured, or to the null reader when nothing
+     * is, which still yields the ticks and the sheet's identity.
+     */
     transcriber?: Transcriber
     /** Court supplied by an admin when the tag could not be read. */
     courtHint?: number | null
@@ -182,7 +186,8 @@ export async function processScoreSheet(
             image: decodeJpeg(bytes),
             matchIds: layout.matchIds,
             eventType: layout.eventType,
-            transcriber: opts.transcriber ?? nullTranscriber
+            transcriber:
+                opts.transcriber ?? transcriberFromEnv() ?? nullTranscriber
         })
 
         const problems = [...result.problems]

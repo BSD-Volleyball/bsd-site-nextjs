@@ -1,0 +1,171 @@
+/**
+ * vision.ts — the one implementation that asks a model to read handwriting.
+ *
+ * Speaks the OpenAI-compatible chat-completions shape, which is deliberate
+ * rather than a preference for any one vendor: Google's Gemini, Groq,
+ * OpenRouter, Vercel's AI Gateway and OpenAI itself all accept it. Pointing
+ * this at whichever has the friendliest free tier is a change of two
+ * environment variables, not of code. The volume is about six sheets a week,
+ * so a free tier covers it outright.
+ *
+ * Each box is sent as its own image rather than tiled into one montage. A
+ * montage is cheaper, but it invites the failure this design most wants to
+ * avoid: a row read one line out, attaching one game's score to another. With
+ * separate images the answer is checked against the id it claims to answer.
+ */
+
+import { requireEnv } from "@/lib/utils"
+
+import type { ScoreCrop } from "../crops"
+import {
+    type ScoreReading,
+    ResponseSchema,
+    type Transcriber,
+    TranscriberError,
+    validateReadings
+} from "./port"
+
+const DEFAULT_BASE_URL =
+    "https://generativelanguage.googleapis.com/v1beta/openai"
+const TIMEOUT_MS = 60_000
+
+export interface VisionConfig {
+    apiKey: string
+    model: string
+    baseUrl?: string
+    fetchImpl?: typeof fetch
+}
+
+function instructions(crops: readonly ScoreCrop[]): string {
+    const lines = crops.map((crop, index) => {
+        const legal = crop.legalValues
+        const range = `${Math.min(...legal)}-${Math.max(...legal)}`
+        return `${index + 1}. id "${crop.id}" — a volleyball game score, between ${range}`
+    })
+
+    return [
+        "Each image shows two printed boxes side by side with a handwritten volleyball score in them.",
+        "The left box holds the tens digit and may be empty for a single-digit score. The right box holds the units.",
+        "",
+        "Read each image and reply with JSON only, in this exact shape:",
+        '{"readings":[{"id":"<id>","value":<number or null>,"confidence":<0..1>,"alternatives":[{"value":<number>,"confidence":<0..1>}]}]}',
+        "",
+        "Rules:",
+        "- Answer every id below exactly once, and no others.",
+        "- If a box looks empty or you genuinely cannot tell, use null rather than guessing.",
+        "- confidence is how sure you are, not how legible the writing is.",
+        "- List any other reading you seriously considered under alternatives.",
+        "",
+        "The images, in order:",
+        ...lines
+    ].join("\n")
+}
+
+function toDataUrl(png: Uint8Array): string {
+    return `data:image/png;base64,${Buffer.from(png).toString("base64")}`
+}
+
+/**
+ * Pull the JSON object out of a reply. Models wrap JSON in prose or fences
+ * often enough that insisting on a bare object would fail for no good reason,
+ * but anything that is not parseable JSON is an error rather than a guess.
+ */
+function extractJson(text: string): unknown {
+    const trimmed = text
+        .trim()
+        .replace(/^```(?:json)?/i, "")
+        .replace(/```$/, "")
+    const start = trimmed.indexOf("{")
+    const end = trimmed.lastIndexOf("}")
+    if (start < 0 || end <= start) {
+        throw new TranscriberError("The model did not return JSON.")
+    }
+    try {
+        return JSON.parse(trimmed.slice(start, end + 1))
+    } catch {
+        throw new TranscriberError("The model's JSON could not be parsed.")
+    }
+}
+
+export function createVisionTranscriber(config: VisionConfig): Transcriber {
+    const baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "")
+    const doFetch = config.fetchImpl ?? fetch
+
+    return {
+        name: config.model,
+        async transcribe(
+            crops: readonly ScoreCrop[],
+            signal?: AbortSignal
+        ): Promise<ScoreReading[]> {
+            if (crops.length === 0) return []
+
+            const content = [
+                { type: "text", text: instructions(crops) },
+                ...crops.map((crop) => ({
+                    type: "image_url",
+                    image_url: { url: toDataUrl(crop.png) }
+                }))
+            ]
+
+            const timeout = AbortSignal.timeout(TIMEOUT_MS)
+            const response = await doFetch(`${baseUrl}/chat/completions`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${config.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: config.model,
+                    // Nothing creative is wanted here.
+                    temperature: 0,
+                    response_format: { type: "json_object" },
+                    messages: [{ role: "user", content }]
+                }),
+                signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+            })
+
+            if (!response.ok) {
+                const detail = await response.text().catch(() => "")
+                throw new TranscriberError(
+                    `The reading service returned ${response.status}. ${detail.slice(0, 200)}`
+                )
+            }
+
+            const payload = (await response.json()) as {
+                choices?: { message?: { content?: string } }[]
+            }
+            const text = payload.choices?.[0]?.message?.content
+            if (!text) {
+                throw new TranscriberError("The reading service sent no reply.")
+            }
+
+            const parsed = ResponseSchema.safeParse(extractJson(text))
+            if (!parsed.success) {
+                throw new TranscriberError(
+                    "The model's reply did not match the expected shape."
+                )
+            }
+
+            // Every id checked against what was actually asked; illegal values
+            // demoted rather than trusted.
+            return validateReadings(crops, parsed.data.readings)
+        }
+    }
+}
+
+/**
+ * The configured transcriber, or null when no model is set up.
+ *
+ * Returning null rather than throwing is deliberate: with no model the reader
+ * still identifies the sheet and counts the WIN ticks, so an admin gets a
+ * partly pre-filled form instead of an error. That also keeps local
+ * development, CI and the end-to-end tests working with no secret at all.
+ */
+export function transcriberFromEnv(): Transcriber | null {
+    if (!process.env.SCORESHEET_MODEL_API_KEY) return null
+    return createVisionTranscriber({
+        apiKey: requireEnv("SCORESHEET_MODEL_API_KEY"),
+        model: process.env.SCORESHEET_MODEL ?? "gemini-2.0-flash",
+        baseUrl: process.env.SCORESHEET_MODEL_BASE_URL
+    })
+}

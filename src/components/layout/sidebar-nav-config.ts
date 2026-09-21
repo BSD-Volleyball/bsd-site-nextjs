@@ -442,6 +442,12 @@ export const enterScoresNavItem: NavItem = {
     icon: RiClipboardLine
 }
 
+export const scoreSheetInboxNavItem: NavItem = {
+    title: "Score Sheet Photos",
+    url: "/dashboard/score-sheet-inbox",
+    icon: RiClipboardLine
+}
+
 export const addPicturesNavItem: NavItem = {
     title: "Add Pictures",
     url: "/dashboard/add-pictures",
