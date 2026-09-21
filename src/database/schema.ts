@@ -1445,9 +1445,15 @@ export const scoreSheets = pgTable(
         season_id: integer("season_id")
             .notNull()
             .references(() => seasons.id, { onDelete: "restrict" }),
-        division_id: integer("division_id")
-            .notNull()
-            .references(() => divisions.id, { onDelete: "restrict" }),
+        /**
+         * Null for a sheet uploaded in bulk: those are keyed by court, and on
+         * playoff week 2 one court legitimately spans two divisions.
+         */
+        division_id: integer("division_id").references(() => divisions.id, {
+            onDelete: "restrict"
+        }),
+        /** Which court the sheet is for, once its tag has been read. */
+        court: integer("court"),
         match_date: date("match_date", { mode: "string" }).notNull(),
         image_path: text("image_path").notNull(),
         uploaded_by: text("uploaded_by")
@@ -1505,6 +1511,57 @@ export const scoreSheetPrints = pgTable(
         scoreSheetPrintsDateIdx: index("score_sheet_prints_date_idx").on(
             table.season_id,
             table.match_date
+        )
+    })
+)
+
+/**
+ * The result of reading a photographed sheet.
+ *
+ * One row per uploaded photo, holding what the pipeline made of it. The
+ * extracted values live in `result` as JSON rather than in columns: nothing
+ * queries them, they are read back whole to pre-fill a form, and their shape
+ * belongs to the reader rather than to the database.
+ *
+ * Statuses: pending, processing, read, needs_review, unidentified,
+ * not_located, failed. Only a human moves a read to confirmed.
+ */
+export const scoreSheetReads = pgTable(
+    "score_sheet_reads",
+    {
+        id: serial("id").primaryKey(),
+        score_sheet_id: integer("score_sheet_id")
+            .notNull()
+            .references(() => scoreSheets.id, { onDelete: "cascade" }),
+        status: text("status").notNull(),
+        /** The tag decoded from the page, when it could be read. */
+        tag: text("tag"),
+        template_version: integer("template_version"),
+        print_id: integer("print_id").references(() => scoreSheetPrints.id, {
+            onDelete: "set null"
+        }),
+        /** The whole SheetRead, for pre-filling the entry form. */
+        result: jsonb("result"),
+        problems: text("problems").array().notNull().default(sql`'{}'::text[]`),
+        transcriber: text("transcriber"),
+        /** How well the page was located, in page points. */
+        residual_pt: numeric("residual_pt"),
+        /** Guards against a double click charging for two reads. */
+        attempts: integer("attempts").default(0).notNull(),
+        error: text("error"),
+        started_at: timestamp("started_at"),
+        finished_at: timestamp("finished_at"),
+        confirmed_at: timestamp("confirmed_at"),
+        confirmed_by: text("confirmed_by").references(() => users.id, {
+            onDelete: "set null"
+        })
+    },
+    (table) => ({
+        scoreSheetReadsSheetUniq: uniqueIndex(
+            "score_sheet_reads_sheet_uniq"
+        ).on(table.score_sheet_id),
+        scoreSheetReadsStatusIdx: index("score_sheet_reads_status_idx").on(
+            table.status
         )
     })
 )

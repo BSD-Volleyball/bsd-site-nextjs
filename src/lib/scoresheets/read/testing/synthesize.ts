@@ -200,11 +200,15 @@ export interface SyntheticSheet {
     }
 }
 
-export function fakeCourtSheet(matchCount: number, court = 4): CourtSheet {
+export function fakeCourtSheet(
+    matchCount: number,
+    court = 4,
+    matchIds?: readonly number[]
+): CourtSheet {
     const matches: SheetMatch[] = []
     for (let i = 0; i < matchCount; i++) {
         matches.push({
-            matchId: 900 + i,
+            matchId: matchIds?.[i] ?? 900 + i,
             orderOnCourt: i + 1,
             divisionName: "AA",
             time: "19:00:00",
@@ -240,7 +244,12 @@ export interface SynthesizeOptions {
     date?: string
     seasonCode?: string
     ordinal?: number
-    /** Score per (matchIndex, team, game); missing entries are left blank. */
+    /**
+     * Real match ids, when the sheet has to line up with rows in a database.
+     * Defaults to a private 900-series so pure tests need not invent any.
+     */
+    matchIds?: readonly number[]
+    /** Score per (matchId, team, game); missing entries are left blank. */
     scores?: GameTruth[]
     jitter?: number
 }
@@ -249,7 +258,7 @@ export async function synthesizeSheet(
     opts: SynthesizeOptions
 ): Promise<SyntheticSheet> {
     const court = opts.court ?? 4
-    const sheet = fakeCourtSheet(opts.matchCount, court)
+    const sheet = fakeCourtSheet(opts.matchCount, court, opts.matchIds)
     const geometry = buildSheetGeometry(sheet, opts.eventType)
     const canvas = createCanvas(opts.scale)
 

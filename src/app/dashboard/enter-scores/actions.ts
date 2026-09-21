@@ -124,7 +124,12 @@ export interface DivisionMatchGroup {
 
 export interface ScoreSheetData {
     id: number
-    divisionId: number
+    /**
+     * Null for a sheet uploaded in bulk and identified by its own code, which
+     * is keyed by court rather than division. On playoff week 2 one court
+     * carries two divisions, so a single division id cannot describe it.
+     */
+    divisionId: number | null
     imagePath: string
 }
 

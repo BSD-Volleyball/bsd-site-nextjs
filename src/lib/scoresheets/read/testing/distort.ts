@@ -4,6 +4,8 @@
  * always reproducible.
  */
 
+import { encode as encodeJpeg } from "jpeg-js"
+
 import { applyH, invertH, solveHomography } from "../homography"
 import { type RasterImage, sampleBilinear } from "../image"
 
@@ -183,4 +185,26 @@ export function addNoise(
         gray[i] = Math.max(0, Math.min(255, img.gray[i] + n))
     }
     return { width: img.width, height: img.height, gray }
+}
+
+/**
+ * Encode as a real JPEG, which is what an upload actually is. Using this in
+ * tests means the production decode path runs for real and the synthetic
+ * photos carry genuine compression artefacts rather than an idealised signal.
+ */
+export function toJpeg(img: RasterImage, quality = 82): Uint8Array {
+    const rgba = Buffer.alloc(img.width * img.height * 4)
+    for (let i = 0, p = 0; i < img.gray.length; i++, p += 4) {
+        const v = img.gray[i]
+        rgba[p] = v
+        rgba[p + 1] = v
+        rgba[p + 2] = v
+        rgba[p + 3] = 255
+    }
+    return new Uint8Array(
+        encodeJpeg(
+            { data: rgba, width: img.width, height: img.height },
+            quality
+        ).data
+    )
 }
