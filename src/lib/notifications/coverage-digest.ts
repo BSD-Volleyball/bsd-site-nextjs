@@ -13,7 +13,9 @@ import { coverageDateTitle, formatCoverageDate } from "@/lib/coverage/format"
 import { loadCoverage } from "@/lib/coverage/load"
 import type { CoverageDate, CoverageStatus } from "@/lib/coverage/types"
 import { buildCoverageDigestHtml } from "@/lib/email-html"
+import { logger } from "@/lib/logger"
 import { getRecipientsWithRole } from "@/lib/rbac"
+import { buildScoreSheetsPdfBytes } from "@/lib/scoresheets/generate"
 import { dispatchNotification } from "./dispatch"
 
 export interface CoverageDigestRunResult {
@@ -69,6 +71,19 @@ export async function sendCoverageDigestForDate(
     const recipients = await coverageDigestRecipients(day)
     if (recipients.length === 0) return result
 
+    // The printable sheets ride along so whoever opens the gym can print
+    // them straight from the email. A failure here must not stop the digest:
+    // the coverage information is the point, the attachment is a convenience.
+    let scoreSheets: { bytes: Uint8Array; fileName: string } | null = null
+    try {
+        scoreSheets = await buildScoreSheetsPdfBytes(date)
+    } catch (error) {
+        logger.error("[coverage-digest] Score sheet build failed", {
+            date,
+            error: error instanceof Error ? error.message : String(error)
+        })
+    }
+
     const coverageUrl = `${site.url}/dashboard/coverage`
     const dispatched = await dispatchNotification({
         type: "coverage_digest",
@@ -78,10 +93,22 @@ export async function sendCoverageDigestForDate(
             buildCoverageDigestHtml({
                 firstName: r.firstName ?? "there",
                 day,
-                coverageUrl
+                coverageUrl,
+                hasScoreSheets: scoreSheets !== null
             }),
         tag: "coverage-digest",
-        dedupeKey: `coverage-${date}`
+        dedupeKey: `coverage-${date}`,
+        attachments: scoreSheets
+            ? [
+                  {
+                      name: scoreSheets.fileName,
+                      content: Buffer.from(scoreSheets.bytes).toString(
+                          "base64"
+                      ),
+                      contentType: "application/pdf"
+                  }
+              ]
+            : undefined
     })
     result.sent = dispatched.sent
     result.failed = dispatched.failed

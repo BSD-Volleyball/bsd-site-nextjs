@@ -387,9 +387,20 @@ export function CoverageClient({
                                 {d.matchCount === 1 ? "" : "es"} · {d.reason}
                             </p>
                         </div>
-                        <Badge className={STATUS_BADGE[d.status]}>
-                            {STATUS_LABELS[d.status]}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            {d.matchCount > 0 && (
+                                <Button asChild size="sm" variant="outline">
+                                    <a
+                                        href={`/dashboard/coverage/score-sheets/${d.date}`}
+                                    >
+                                        Score sheets
+                                    </a>
+                                </Button>
+                            )}
+                            <Badge className={STATUS_BADGE[d.status]}>
+                                {STATUS_LABELS[d.status]}
+                            </Badge>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {d.slots.map((slot) => {

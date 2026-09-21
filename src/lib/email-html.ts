@@ -756,6 +756,8 @@ export function buildCoverageDigestHtml(opts: {
     firstName: string
     day: CoverageDate
     coverageUrl: string
+    /** Whether this message carries the printable score sheets. */
+    hasScoreSheets?: boolean
 }): string {
     const { day } = opts
     const banner = COVERAGE_BANNER[day.status]
@@ -783,6 +785,11 @@ export function buildCoverageDigestHtml(opts: {
             <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Admins always count toward coverage; leadership members count only for slots where they were added on the Coverage page. The gym jobs for each slot are listed under it, with the people they fall to.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">${rows}</table>
             <p style="font-size:12px;margin:12px 0;">${renderCoverageLegend()}</p>
+            ${
+                opts.hasScoreSheets
+                    ? `<p style="font-size:13px;color:#6b7280;">Attached: the score sheets for this night, one page per court, already filled in with the teams, captains and referees. Print them single-sided.</p>`
+                    : ""
+            }
             <p style="font-size:13px;color:#6b7280;">Can you fill a gap? Add yourself on the Coverage page.</p>
         `,
         action: "Open Coverage",

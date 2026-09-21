@@ -41,6 +41,14 @@ function getPostmarkClient(): ServerClient {
 // Transactional email (single)
 // ---------------------------------------------------------------------------
 
+export interface EmailAttachment {
+    name: string
+    /** base64 */
+    content: string
+    contentType: string
+    contentId?: string
+}
+
 export interface SendEmailOptions {
     from: string
     fromName?: string
@@ -53,12 +61,7 @@ export interface SendEmailOptions {
     replyTo?: string
     inReplyTo?: string
     headers?: Array<{ name: string; value: string }>
-    attachments?: Array<{
-        name: string
-        content: string // base64
-        contentType: string
-        contentId?: string
-    }>
+    attachments?: EmailAttachment[]
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +165,8 @@ export interface BatchEmailMessage {
     tag?: string
     replyTo?: string
     headers?: Array<{ name: string; value: string }>
+    /** Postmark's batch endpoint takes per-message attachments too. */
+    attachments?: EmailAttachment[]
 }
 
 export interface BatchSendResult {
@@ -284,6 +289,12 @@ export async function sendBatchEmails(
                 Headers: m.headers?.map((h) => ({
                     Name: h.name,
                     Value: h.value
+                })),
+                Attachments: m.attachments?.map((a) => ({
+                    Name: a.name,
+                    Content: a.content,
+                    ContentType: a.contentType,
+                    ContentID: a.contentId ?? null
                 }))
             }))
         )

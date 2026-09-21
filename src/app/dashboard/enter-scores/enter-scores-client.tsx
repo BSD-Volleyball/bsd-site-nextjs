@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import {
     Select,
     SelectContent,
@@ -46,6 +47,8 @@ interface EnterScoresClientProps {
     initialDivisions: DivisionMatchGroup[]
     initialScoreSheets: ScoreSheetData[]
     picBaseUrl: string
+    /** Court from a score sheet's QR code; scrolled to and outlined. */
+    highlightCourt?: number | null
 }
 
 export function EnterScoresClient({
@@ -53,9 +56,13 @@ export function EnterScoresClient({
     defaultDate,
     initialDivisions,
     initialScoreSheets,
-    picBaseUrl
+    picBaseUrl,
+    highlightCourt = null
 }: EnterScoresClientProps) {
     const [selectedDate, setSelectedDate] = useState(defaultDate)
+    // Dropped as soon as the user picks a different night: the court only
+    // means anything for the night the sheet was printed for.
+    const [courtFocus, setCourtFocus] = useState<number | null>(highlightCourt)
     const [divisionGroups, setDivisionGroups] =
         useState<DivisionMatchGroup[]>(initialDivisions)
     const [scoreSheetsList, setScoreSheetsList] =
@@ -95,6 +102,33 @@ export function EnterScoresClient({
         }
         return out
     }, [divisionGroups, formStates])
+
+    // Divisions with a match on the court the score sheet's QR code named.
+    // On playoff week 2 one court hosts two divisions, so this can be a pair.
+    const focusedDivisionIds = useMemo(() => {
+        const ids = new Set<number>()
+        if (courtFocus === null) return ids
+        for (const div of divisionGroups) {
+            if (div.matches.some((m) => m.court === courtFocus)) {
+                ids.add(div.divisionId)
+            }
+        }
+        return ids
+    }, [courtFocus, divisionGroups])
+
+    // Scroll to the first matching card once, on arrival from a QR scan.
+    const hasScrolledToCourt = useRef(false)
+    useEffect(() => {
+        if (hasScrolledToCourt.current || focusedDivisionIds.size === 0) return
+        const first = divisionGroups.find((d) =>
+            focusedDivisionIds.has(d.divisionId)
+        )
+        if (!first) return
+        hasScrolledToCourt.current = true
+        document
+            .getElementById(`division-${first.divisionId}`)
+            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, [divisionGroups, focusedDivisionIds])
 
     // When a TBD match's effective teams change (e.g. user switched the
     // winner of a prerequisite), clear any entered scores for the dependent
@@ -158,6 +192,7 @@ export function EnterScoresClient({
 
     const handleDateChange = async (date: string) => {
         setSelectedDate(date)
+        setCourtFocus(null)
         setLoadingDate(true)
         setWarnings([])
         try {
@@ -431,6 +466,24 @@ export function EnterScoresClient({
                 </Select>
             </div>
 
+            {courtFocus !== null && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-4 py-2 text-sm">
+                    <span>
+                        Opened from the Court {courtFocus} score sheet.
+                        {focusedDivisionIds.size === 0
+                            ? " No division plays on that court tonight."
+                            : " Its matches are outlined below."}
+                    </span>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setCourtFocus(null)}
+                    >
+                        Clear
+                    </Button>
+                </div>
+            )}
+
             {loadingDate ? (
                 <div className="rounded-md bg-muted p-6 text-center text-muted-foreground">
                     Loading matches...
@@ -442,25 +495,34 @@ export function EnterScoresClient({
             ) : (
                 <div className="space-y-8">
                     {divisionGroups.map((division) => (
-                        <DivisionScoreCard
+                        <div
                             key={division.divisionId}
-                            division={division}
-                            scoreSheetsList={scoreSheetsList}
-                            uploadingDivision={uploadingDivision}
-                            savingDivision={savingDivision}
-                            formStates={formStates}
-                            warningsByMatch={warningsByMatch}
-                            resolvedByMatchId={resolvedByMatchId}
-                            cameraInputRefs={cameraInputRefs}
-                            uploadInputRefs={uploadInputRefs}
-                            handleFileSelected={handleFileSelected}
-                            handleDeleteScoreSheet={handleDeleteScoreSheet}
-                            handleSaveDivision={handleSaveDivision}
-                            updateFormField={updateFormField}
-                            selectWinner={selectWinner}
-                            setViewingImage={setViewingImage}
-                            getImageUrl={getImageUrl}
-                        />
+                            id={`division-${division.divisionId}`}
+                            className={
+                                focusedDivisionIds.has(division.divisionId)
+                                    ? "rounded-xl ring-2 ring-primary ring-offset-4 ring-offset-background"
+                                    : undefined
+                            }
+                        >
+                            <DivisionScoreCard
+                                division={division}
+                                scoreSheetsList={scoreSheetsList}
+                                uploadingDivision={uploadingDivision}
+                                savingDivision={savingDivision}
+                                formStates={formStates}
+                                warningsByMatch={warningsByMatch}
+                                resolvedByMatchId={resolvedByMatchId}
+                                cameraInputRefs={cameraInputRefs}
+                                uploadInputRefs={uploadInputRefs}
+                                handleFileSelected={handleFileSelected}
+                                handleDeleteScoreSheet={handleDeleteScoreSheet}
+                                handleSaveDivision={handleSaveDivision}
+                                updateFormField={updateFormField}
+                                selectWinner={selectWinner}
+                                setViewingImage={setViewingImage}
+                                getImageUrl={getImageUrl}
+                            />
+                        </div>
                     ))}
                 </div>
             )}

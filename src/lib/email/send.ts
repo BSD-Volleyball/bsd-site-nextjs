@@ -252,18 +252,20 @@ function optOutTypeFor(mode: MailMode): NotificationType | null {
 /**
  * Which Postmark transport to use.
  *
- * Attachments, a display-name From, and In-Reply-To only exist on the
- * single-message API, so they force it. Beyond that, anything that is 1:1 by
- * nature — a receipt, a password reset, a ticket reply — goes single too: the
- * message id comes back cleanly for the caller to store, which the reply
- * threads depend on. Notifications and broadcasts are bulk by nature and use
- * the batch API even when today's audience happens to be one person.
+ * A display-name From and In-Reply-To only exist on the single-message API,
+ * so they force it. Attachments do not: Postmark's batch endpoint carries
+ * them per message, which is what lets the coverage digest mail one PDF to
+ * every admin. Beyond that, anything that is 1:1 by nature — a receipt, a
+ * password reset, a ticket reply — goes single too: the message id comes back
+ * cleanly for the caller to store, which the reply threads depend on.
+ * Notifications and broadcasts are bulk by nature and use the batch API even
+ * when today's audience happens to be one person.
  */
 function needsSingleTransport(
     opts: SendMailOptions,
     recipientCount: number
 ): boolean {
-    if (opts.attachments?.length || opts.fromName || opts.inReplyTo) return true
+    if (opts.fromName || opts.inReplyTo) return true
     const bulk =
         opts.mode.kind === "notification" || opts.mode.kind === "broadcast"
     return !bulk && recipientCount === 1
@@ -465,7 +467,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
             if (needsSingleTransport(opts, recipients.length)) {
                 if (recipients.length !== 1) {
                     logger.error(
-                        "[email] Attachments/fromName/inReplyTo require exactly one recipient",
+                        "[email] fromName/inReplyTo require exactly one recipient",
                         { mode: mode.kind, count: recipients.length }
                     )
                     result.skipped = unaddressable + initial
@@ -501,7 +503,8 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
                     stream,
                     tag,
                     replyTo: opts.replyTo,
-                    headers: headersFor(r)
+                    headers: headersFor(r),
+                    attachments: opts.attachments
                 }))
                 const { results } = await sendBatchEmails(messages)
                 const byEmail = new Map(

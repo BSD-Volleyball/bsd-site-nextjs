@@ -14,7 +14,11 @@
  * and structured logs.
  */
 
-import { sendMail, type MailRecipient } from "@/lib/email/send"
+import {
+    sendMail,
+    type MailAttachment,
+    type MailRecipient
+} from "@/lib/email/send"
 import type { NotificationType } from "./types"
 
 export { buildUnsubscribeUrl } from "@/lib/email/send"
@@ -42,6 +46,12 @@ export interface DispatchOptions {
      * re-running the same dispatch cannot double-send.
      */
     dedupeKey?: string
+    /**
+     * Files to attach to every message. Note that attachments force the
+     * single-message transport in sendMail (batching cannot carry them), so
+     * keep these to small files and modest recipient lists.
+     */
+    attachments?: MailAttachment[]
 }
 
 export interface DispatchResult {
@@ -78,7 +88,8 @@ export async function dispatchNotification(
         subject: adapt(opts.subject),
         htmlBody: adapt(opts.htmlBody),
         textBody: opts.textBody ? adapt(opts.textBody) : undefined,
-        tag: opts.tag
+        tag: opts.tag,
+        attachments: opts.attachments
     })
     return { sent, failed, skipped }
 }
