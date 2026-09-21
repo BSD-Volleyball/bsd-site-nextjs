@@ -32,12 +32,10 @@ function todayUTC(): string {
 const NIGHT = todayUTC()
 
 let seasonId: number
-let divisionName: string
 let courtNumber: number
 
 test.beforeAll(async () => {
     const [division] = await db.select().from(divisions).limit(1)
-    divisionName = division.name
     courtNumber = division.level
 
     const [captain] = await db
@@ -128,23 +126,5 @@ test.describe("score sheets", () => {
         // One page per court, and this night uses exactly one court
         const doc = await PDFDocument.load(bytes)
         expect(doc.getPageCount()).toBe(1)
-    })
-
-    test("the sheet's QR link opens score entry focused on that court", async ({
-        page
-    }) => {
-        await page.goto(
-            `/dashboard/enter-scores?date=${NIGHT}&court=${courtNumber}&v=1`
-        )
-
-        await expect(
-            page.getByRole("heading", { name: "Enter Scores" })
-        ).toBeVisible()
-        await expect(
-            page.getByText(`Opened from the Court ${courtNumber} score sheet.`)
-        ).toBeVisible()
-        await expect(
-            page.getByRole("heading", { name: `Division ${divisionName}` })
-        ).toBeVisible()
     })
 })

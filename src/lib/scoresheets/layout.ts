@@ -40,7 +40,12 @@ const HEADER_HEIGHT = 92
 const RULES_HEIGHT = 52
 /** Strip carrying the GAME 1/2/3 column headings, printed once per page. */
 const GAME_HEADING_HEIGHT = 11
+/** The stylized link QR, identical on every sheet. */
 const QR_SIZE = 64
+/** The per-page machine tag QR. Bigger than it needs to look, so a phone
+ *  photo taken across the gym still resolves its modules. */
+const TAG_QR_SIZE = 58
+const QR_GAP = 12
 
 /** Ref-notes box and the footer line, measured up from the bottom margin. */
 const FOOTER_TEXT_HEIGHT = 14
@@ -121,7 +126,10 @@ export interface SheetGeometry {
     page: { width: number; height: number }
     /** Top-left, top-right, bottom-left, then the half-size bottom-right. */
     fiducials: BoxRect[]
+    /** Stylized QR linking to score entry; the same image on every sheet. */
     qr: BoxRect
+    /** Small QR carrying `sheetTag()` — how a photo identifies itself. */
+    tagQr: BoxRect
     content: { left: number; right: number; top: number; width: number }
     header: { y: number; h: number }
     rules: { y: number; h: number }
@@ -344,6 +352,12 @@ export function buildSheetGeometry(
             y: CONTENT_TOP - QR_SIZE,
             w: QR_SIZE,
             h: QR_SIZE
+        },
+        tagQr: {
+            x: CONTENT_RIGHT - QR_SIZE - QR_GAP - TAG_QR_SIZE,
+            y: CONTENT_TOP - TAG_QR_SIZE,
+            w: TAG_QR_SIZE,
+            h: TAG_QR_SIZE
         },
         content: {
             left: CONTENT_LEFT,

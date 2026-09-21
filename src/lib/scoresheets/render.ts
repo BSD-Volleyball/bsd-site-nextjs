@@ -8,13 +8,14 @@
 import {
     PDFDocument,
     type PDFFont,
+    type PDFImage,
     type PDFPage,
     rgb,
     StandardFonts
 } from "pdf-lib"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import QRCode from "qrcode"
-
-import { site } from "@/config/site"
 
 import { fitTextToCell, truncateToFit } from "@/lib/pdf/tryout-sheet-shared"
 import { formatMatchTime } from "@/lib/date-utils"
@@ -31,8 +32,10 @@ import {
 import {
     FILL_INSTRUCTION,
     ruleLines,
+    SCORE_ENTRY_SHORT_URL,
     sheetCode,
-    sheetDeepLink
+    sheetTag,
+    startNote
 } from "./sheet-config"
 import type { CourtSheet, SheetMatch, SheetNight, SheetTeam } from "./types"
 
@@ -41,10 +44,29 @@ const GREY = rgb(0.45, 0.45, 0.45)
 const LIGHT = rgb(0.72, 0.72, 0.72)
 const ACCENT = rgb(0.44, 0.2, 0.95)
 const STRUCK = rgb(0.6, 0.6, 0.6)
+const NOTE_BG = rgb(0.99, 0.91, 0.91)
+const NOTE_FG = rgb(0.6, 0.11, 0.11)
+
+/**
+ * The stylized link QR is a fixed asset, read once per process and embedded
+ * once per document, so a six-court night carries the image bytes once.
+ */
+let linkQrPngCache: Buffer | null = null
+function linkQrPng(): Buffer {
+    linkQrPngCache ??= readFileSync(
+        join(process.cwd(), "public", "score-sheet-qr.png")
+    )
+    return linkQrPngCache
+}
 
 interface Fonts {
     regular: PDFFont
     bold: PDFFont
+}
+
+interface EmbeddedImages {
+    linkQr: PDFImage
+    tagQr: PDFImage
 }
 
 function drawBox(
@@ -94,10 +116,10 @@ function drawFiducials(page: PDFPage, geometry: SheetGeometry) {
 
 async function drawHeader(
     page: PDFPage,
-    doc: PDFDocument,
     geometry: SheetGeometry,
     night: SheetNight,
     court: number | null,
+    images: EmbeddedImages,
     fonts: Fonts
 ) {
     const { content } = geometry
@@ -128,39 +150,64 @@ async function drawHeader(
         color: ACCENT
     })
 
-    const code = sheetCode(night, court)
-    const link = sheetDeepLink(site.url, night.date, court)
-    const qrPng = await QRCode.toBuffer(link, {
-        errorCorrectionLevel: "M",
-        margin: 0,
-        width: 256
-    })
-    const qrImage = await doc.embedPng(qrPng)
-    page.drawImage(qrImage, {
+    const centred = (
+        text: string,
+        box: BoxRect,
+        y: number,
+        size: number,
+        font: PDFFont,
+        color = GREY
+    ) => {
+        const width = font.widthOfTextAtSize(text, size)
+        page.drawText(text, {
+            x: box.x + (box.w - width) / 2,
+            y,
+            size,
+            font,
+            color
+        })
+    }
+
+    // Stylized link QR — the same on every sheet, so whoever collects the
+    // night's paperwork lands on one page and works through the lot.
+    page.drawImage(images.linkQr, {
         x: geometry.qr.x,
         y: geometry.qr.y,
         width: geometry.qr.w,
         height: geometry.qr.h
     })
+    centred(
+        "Scan to enter scores",
+        geometry.qr,
+        geometry.qr.y - 8,
+        6,
+        fonts.regular
+    )
+    centred(
+        SCORE_ENTRY_SHORT_URL,
+        geometry.qr,
+        geometry.qr.y - 16,
+        6,
+        fonts.regular,
+        LIGHT
+    )
 
-    const codeWidth = fonts.bold.widthOfTextAtSize(code, 7.5)
-    page.drawText(code, {
-        x: geometry.qr.x + (geometry.qr.w - codeWidth) / 2,
-        y: geometry.qr.y - 9,
-        size: 7.5,
-        font: fonts.bold,
-        color: BLACK
+    // Machine tag — what tells a processor which sheet a photo is, now that
+    // the visible QR says the same thing on every page.
+    page.drawImage(images.tagQr, {
+        x: geometry.tagQr.x,
+        y: geometry.tagQr.y,
+        width: geometry.tagQr.w,
+        height: geometry.tagQr.h
     })
-
-    const scanLabel = "Scan to enter scores"
-    const scanWidth = fonts.regular.widthOfTextAtSize(scanLabel, 6)
-    page.drawText(scanLabel, {
-        x: geometry.qr.x + (geometry.qr.w - scanWidth) / 2,
-        y: geometry.qr.y - 17,
-        size: 6,
-        font: fonts.regular,
-        color: GREY
-    })
+    centred(
+        sheetCode(night, court),
+        geometry.tagQr,
+        geometry.tagQr.y - 9,
+        8,
+        fonts.bold,
+        BLACK
+    )
 }
 
 function drawRules(
@@ -238,92 +285,138 @@ function drawMatchHeader(
     page: PDFPage,
     block: BlockGeometry,
     match: SheetMatch,
+    previous: SheetMatch | null,
     fonts: Fonts
 ) {
     const y = block.headerY + 3
+    const rightEdge = block.x + block.w
 
-    page.drawText(matchHeadline(match), {
-        x: block.x,
-        y,
-        size: 10,
-        font: fonts.bold,
-        color: BLACK
-    })
-
-    page.drawText(match.divisionName, {
-        x: block.x + 78,
-        y,
-        size: 9,
-        font: fonts.bold,
-        color: ACCENT
-    })
-
-    const time = match.time ? formatMatchTime(match.time) : "time TBD"
-    page.drawText(time, {
-        x: block.x + 112,
-        y,
-        size: 9,
-        font: fonts.regular,
-        color: BLACK
-    })
-
-    // Referee, then the work team on playoff sheets
-    const refX = block.x + 168
-    page.drawText("REF:", {
-        x: refX,
-        y,
-        size: 8,
-        font: fonts.bold,
-        color: GREY
-    })
-    const refName = match.referee ?? ""
-    page.drawText(
-        truncateToFit({
-            text: refName,
-            maxWidth: 104,
-            fontSize: 9,
-            font: fonts.regular
-        }),
-        { x: refX + 22, y, size: 9, font: fonts.regular, color: BLACK }
-    )
-    if (!refName) {
-        drawUnderline(page, refX + 22, y - 2, 104)
-    }
-
-    let tailX = refX + 134
-    if (match.backupReferee) {
-        page.drawText(`backup: ${match.backupReferee}`, {
-            x: tailX,
-            y,
-            size: 7,
-            font: fonts.regular,
-            color: GREY
-        })
-        tailX += 96
-    }
-    if (match.workTeam) {
-        page.drawText(
-            truncateToFit({
-                text: `WORK: ${match.workTeam}`,
-                maxWidth: block.x + block.w - tailX - 34,
-                fontSize: 8,
-                font: fonts.bold
-            }),
-            { x: tailX, y, size: 8, font: fonts.bold, color: BLACK }
-        )
-    }
-
-    // Tiny machine id, right-aligned: a redundant cross-check for a reader
-    // that has already identified the sheet from its QR code.
+    // Right side first: the machine id and the highlighted start-time note
+    // claim their space, and everything else is fitted into what is left.
     const idLabel = `#${match.matchId}`
     const idWidth = fonts.regular.widthOfTextAtSize(idLabel, 6)
     page.drawText(idLabel, {
-        x: block.x + block.w - idWidth,
+        x: rightEdge - idWidth,
         y,
         size: 6,
         font: fonts.regular,
         color: LIGHT
     })
+
+    let middleEdge = rightEdge - idWidth - 8
+
+    const note = startNote(match, previous)
+    if (note) {
+        const noteSize = 6.5
+        const noteWidth = fonts.bold.widthOfTextAtSize(note, noteSize)
+        const padding = 5
+        const boxW = noteWidth + padding * 2
+        const boxX = middleEdge - boxW
+        page.drawRectangle({
+            x: boxX,
+            y: block.headerY + 0.5,
+            width: boxW,
+            height: block.headerH - 1,
+            color: NOTE_BG
+        })
+        page.drawText(note, {
+            x: boxX + padding,
+            y,
+            size: noteSize,
+            font: fonts.bold,
+            color: NOTE_FG
+        })
+        middleEdge = boxX - 8
+    }
+
+    // Left side, in a running cursor so nothing can overlap the note.
+    let x = block.x
+    page.drawText(matchHeadline(match), {
+        x,
+        y,
+        size: 10,
+        font: fonts.bold,
+        color: BLACK
+    })
+    x += fonts.bold.widthOfTextAtSize(matchHeadline(match), 10) + 8
+
+    page.drawText(match.divisionName, {
+        x,
+        y,
+        size: 9,
+        font: fonts.bold,
+        color: ACCENT
+    })
+    x += fonts.bold.widthOfTextAtSize(match.divisionName, 9) + 8
+
+    const time = match.time ? formatMatchTime(match.time) : "time TBD"
+    page.drawText(time, { x, y, size: 9, font: fonts.regular, color: BLACK })
+    x += fonts.regular.widthOfTextAtSize(time, 9) + 10
+
+    page.drawText("REF:", { x, y, size: 8, font: fonts.bold, color: GREY })
+    x += fonts.bold.widthOfTextAtSize("REF:", 8) + 4
+
+    // Whatever the note and id left over, shared by ref / backup / work.
+    const remaining = Math.max(middleEdge - x, 0)
+    const refWidth = Math.min(remaining, 100)
+    const refName = match.referee ?? ""
+    if (refName) {
+        page.drawText(
+            truncateToFit({
+                text: refName,
+                maxWidth: refWidth,
+                fontSize: 9,
+                font: fonts.regular
+            }),
+            { x, y, size: 9, font: fonts.regular, color: BLACK }
+        )
+    } else if (refWidth > 20) {
+        drawUnderline(page, x, y - 2, refWidth)
+    }
+    x += refWidth + 8
+
+    // The work team outranks the backup referee for the remaining space: on a
+    // playoff night four people have to know they are working this match,
+    // whereas the backup is a name the primary already knows. Reserve the
+    // work team's width first so it can never be squeezed to an ellipsis.
+    let backupEdge = middleEdge
+    if (match.workTeam) {
+        const label = `WORK: ${match.workTeam}`
+        const width = fonts.bold.widthOfTextAtSize(label, 8)
+        if (middleEdge - x >= width) {
+            page.drawText(label, {
+                x: middleEdge - width,
+                y,
+                size: 8,
+                font: fonts.bold,
+                color: BLACK
+            })
+            backupEdge = middleEdge - width - 8
+        } else if (middleEdge - x > 60) {
+            page.drawText(
+                truncateToFit({
+                    text: label,
+                    maxWidth: middleEdge - x,
+                    fontSize: 8,
+                    font: fonts.bold
+                }),
+                { x, y, size: 8, font: fonts.bold, color: BLACK }
+            )
+            backupEdge = x
+        }
+    }
+
+    if (match.backupReferee && backupEdge - x > 46) {
+        page.drawText(
+            truncateToFit({
+                text: `backup: ${match.backupReferee}`,
+                maxWidth: Math.min(backupEdge - x, 92),
+                fontSize: 7,
+                font: fonts.regular
+            }),
+            { x, y, size: 7, font: fonts.regular, color: GREY }
+        )
+    }
 
     drawUnderline(page, block.x, block.headerY, block.w, GREY)
 }
@@ -519,13 +612,14 @@ async function drawCourtPage(
     doc: PDFDocument,
     night: SheetNight,
     sheet: CourtSheet,
+    images: EmbeddedImages,
     fonts: Fonts
 ) {
     const geometry = buildSheetGeometry(sheet, night.eventType)
     const page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT])
 
     drawFiducials(page, geometry)
-    await drawHeader(page, doc, geometry, night, sheet.court, fonts)
+    await drawHeader(page, geometry, night, sheet.court, images, fonts)
     drawRules(page, geometry, night, fonts)
     drawGameHeadings(page, geometry, fonts)
 
@@ -533,7 +627,13 @@ async function drawCourtPage(
         const match = sheet.matches[index]
         if (!match) return
 
-        drawMatchHeader(page, block, match, fonts)
+        drawMatchHeader(
+            page,
+            block,
+            match,
+            sheet.matches[index - 1] ?? null,
+            fonts
+        )
 
         drawTeamLabel(
             page,
@@ -574,8 +674,18 @@ export async function renderScoreSheetsPdf(
         bold: await doc.embedFont(StandardFonts.HelveticaBold)
     }
 
+    // The link QR is identical on every page, so it is embedded once and
+    // drawn many times; only the machine tag differs per court.
+    const linkQr = await doc.embedPng(linkQrPng())
+
     for (const sheet of night.courts) {
-        await drawCourtPage(doc, night, sheet, fonts)
+        const tagPng = await QRCode.toBuffer(sheetTag(night, sheet.court), {
+            errorCorrectionLevel: "M",
+            margin: 0,
+            width: 320
+        })
+        const tagQr = await doc.embedPng(tagPng)
+        await drawCourtPage(doc, night, sheet, { linkQr, tagQr }, fonts)
     }
 
     return doc.save()

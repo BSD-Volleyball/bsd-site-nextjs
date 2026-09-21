@@ -6,11 +6,7 @@ import { hasPermissionBySession } from "@/next/session"
 import { getMatchDatesForSeason, getMatchesForDate } from "./actions"
 import { EnterScoresClient } from "./enter-scores-client"
 
-export default async function EnterScoresPage({
-    searchParams
-}: {
-    searchParams: Promise<{ date?: string; court?: string }>
-}) {
+export default async function EnterScoresPage() {
     await requireSessionOrRedirect()
 
     const config = await getSeasonConfig()
@@ -26,7 +22,6 @@ export default async function EnterScoresPage({
 
     const datesResult = await getMatchDatesForSeason()
     const matchDates = datesResult.dates
-    const params = await searchParams
 
     // Default to today or most recent past date
     const today = new Date().toISOString().split("T")[0]
@@ -41,18 +36,6 @@ export default async function EnterScoresPage({
 
     // Pre-fetch matches for the default date
     let initialData = null
-    // A score sheet's QR code deep-links to its own night and court. An
-    // unknown date falls back to the default rather than showing nothing.
-    if (params.date && matchDates.some((d) => d.date === params.date)) {
-        defaultDate = params.date
-    }
-
-    const requestedCourt = Number.parseInt(params.court ?? "", 10)
-    const highlightCourt =
-        Number.isInteger(requestedCourt) && requestedCourt > 0
-            ? requestedCourt
-            : null
-
     if (defaultDate) {
         initialData = await getMatchesForDate(defaultDate)
     }
@@ -68,7 +51,6 @@ export default async function EnterScoresPage({
                 initialDivisions={initialData?.divisions ?? []}
                 initialScoreSheets={initialData?.scoreSheets ?? []}
                 picBaseUrl={playerPicUrl}
-                highlightCourt={highlightCourt}
             />
         </div>
     )

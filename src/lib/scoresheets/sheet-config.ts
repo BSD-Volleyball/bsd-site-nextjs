@@ -100,18 +100,70 @@ export function sheetCode(
 }
 
 /**
- * The QR target: the score-entry page with this night and court preselected.
- * The link doubles as the sheet's machine identity -- it carries the date,
- * the court and the template version.
+ * Printed beside the QR code for anyone typing it by hand. The QR image
+ * itself (`public/score-sheet-qr.png`) encodes this same short link, which
+ * redirects to /dashboard/enter-scores. It is deliberately generic: one
+ * person collects every court's sheet and works through them on one page.
  */
-export function sheetDeepLink(
-    siteUrl: string,
-    date: string,
+export const SCORE_ENTRY_SHORT_URL = "bsdvb.us/s"
+
+/**
+ * The per-page machine tag, carried in its own small QR code.
+ *
+ * Because the visible QR is generic, this is what tells a processor exactly
+ * which sheet a photo is. Leading `BSD<version>` both namespaces the payload
+ * and says which template geometry to read it with.
+ */
+export function sheetTag(
+    night: Pick<SheetNight, "seasonCode" | "eventType" | "ordinal" | "date">,
     court: number | null
 ): string {
-    const base = siteUrl.replace(/\/+$/, "")
-    const params = new URLSearchParams({ date })
-    if (court !== null) params.set("court", String(court))
-    params.set("v", String(TEMPLATE_VERSION))
-    return `${base}/dashboard/enter-scores?${params.toString()}`
+    const phase = night.eventType === "playoff" ? "P" : "W"
+    return [
+        `BSD${TEMPLATE_VERSION}`,
+        night.seasonCode,
+        `${phase}${night.ordinal}`,
+        night.date,
+        court === null ? "TBD" : String(court)
+    ].join(":")
+}
+
+// --- start-time guidance --------------------------------------------------
+
+/** Grace after the scheduled start before a first match must be under way. */
+export const FIRST_MATCH_GRACE_MINUTES = 10
+/** Turnaround between back-to-back matches on the same court. */
+export const TURNAROUND_MINUTES = 6
+
+/** "19:00:00" + 10 -> "7:10pm", matching the wording on the old sheet. */
+function shiftedClockLabel(time: string, addMinutes: number): string {
+    const [hours, minutes] = time.split(":").map(Number)
+    const total = (hours * 60 + minutes + addMinutes + 1440) % 1440
+    const h24 = Math.floor(total / 60)
+    const m = total % 60
+    const period = h24 >= 12 ? "pm" : "am"
+    const h12 = h24 % 12 || 12
+    return `${h12}:${String(m).padStart(2, "0")}${period}`
+}
+
+/**
+ * The highlighted note on a match block.
+ *
+ * A court's first match is pinned to the clock. So is the first match of a
+ * *new division* on the same court, which is what playoff week 2 looks like:
+ * one court hosts two divisions in separate time blocks, and the later block
+ * does not follow on from the earlier one.
+ */
+export function startNote(
+    match: { time: string | null; divisionName: string },
+    previous: { divisionName: string } | null
+): string | null {
+    const startsNewBlock =
+        previous === null || previous.divisionName !== match.divisionName
+
+    if (!startsNewBlock) {
+        return `Start ${TURNAROUND_MINUTES} mins after previous match ends`
+    }
+    if (!match.time) return null
+    return `Start no later than ${shiftedClockLabel(match.time, FIRST_MATCH_GRACE_MINUTES)}`
 }

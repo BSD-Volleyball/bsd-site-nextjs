@@ -62,6 +62,34 @@ describe("buildSheetGeometry", () => {
         }
     })
 
+    it("keeps the two header codes apart and on the page", () => {
+        const geometry = buildSheetGeometry(courtSheet(3), "regular_season")
+        const { qr, tagQr } = geometry
+
+        expect(overlaps(qr, tagQr)).toBe(false)
+        // Tag sits left of the link QR, both inside the content column
+        expect(tagQr.x + tagQr.w).toBeLessThanOrEqual(qr.x)
+        expect(tagQr.x).toBeGreaterThanOrEqual(geometry.content.left)
+        expect(qr.x + qr.w).toBeLessThanOrEqual(geometry.content.right)
+        // Room beneath each for its caption
+        expect(tagQr.y).toBeGreaterThan(geometry.header.y)
+        expect(qr.y).toBeGreaterThan(geometry.header.y)
+    })
+
+    it("keeps the header codes clear of the match blocks", () => {
+        const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
+        for (const block of geometry.blocks) {
+            const rect = {
+                x: block.x,
+                y: block.y,
+                w: block.w,
+                h: block.h
+            }
+            expect(overlaps(rect, geometry.qr)).toBe(false)
+            expect(overlaps(rect, geometry.tagQr)).toBe(false)
+        }
+    })
+
     it("never lets a fiducial collide with a FINAL box", () => {
         const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
         for (const fiducial of geometry.fiducials) {

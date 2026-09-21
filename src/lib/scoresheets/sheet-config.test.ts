@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest"
 
 import {
+    FIRST_MATCH_GRACE_MINUTES,
     gameRules,
     ruleLines,
     seasonCodeFor,
     sheetCode,
-    sheetDeepLink,
+    sheetTag,
+    startNote,
     tallyRowCount,
-    TEMPLATE_VERSION
+    TEMPLATE_VERSION,
+    TURNAROUND_MINUTES
 } from "./sheet-config"
 
 describe("gameRules", () => {
@@ -78,27 +81,69 @@ describe("sheetCode", () => {
     })
 })
 
-describe("sheetDeepLink", () => {
-    it("carries the date, court and template version", () => {
-        const url = new URL(
-            sheetDeepLink("https://bumpsetdrink.com", "2026-10-05", 4)
+describe("sheetTag", () => {
+    const night = {
+        seasonCode: "F26",
+        ordinal: 3,
+        date: "2026-10-05",
+        eventType: "regular_season" as const
+    }
+
+    it("identifies the sheet and the template that printed it", () => {
+        expect(sheetTag(night, 4)).toBe(
+            `BSD${TEMPLATE_VERSION}:F26:W3:2026-10-05:4`
         )
-        expect(url.pathname).toBe("/dashboard/enter-scores")
-        expect(url.searchParams.get("date")).toBe("2026-10-05")
-        expect(url.searchParams.get("court")).toBe("4")
-        expect(url.searchParams.get("v")).toBe(String(TEMPLATE_VERSION))
     })
 
-    it("omits the court when there is none", () => {
-        const url = new URL(
-            sheetDeepLink("https://bumpsetdrink.com", "2026-10-05", null)
+    it("marks playoff nights with P", () => {
+        expect(sheetTag({ ...night, eventType: "playoff" }, 1)).toBe(
+            `BSD${TEMPLATE_VERSION}:F26:P3:2026-10-05:1`
         )
-        expect(url.searchParams.has("court")).toBe(false)
     })
 
-    it("does not double a trailing slash on the site url", () => {
-        expect(
-            sheetDeepLink("https://bumpsetdrink.com/", "2026-10-05", 2)
-        ).toContain("https://bumpsetdrink.com/dashboard/enter-scores?")
+    it("still identifies a sheet with no court assigned", () => {
+        expect(sheetTag(night, null)).toBe(
+            `BSD${TEMPLATE_VERSION}:F26:W3:2026-10-05:TBD`
+        )
+    })
+
+    it("stays short enough for a small printed code", () => {
+        expect(sheetTag(night, 4).length).toBeLessThanOrEqual(32)
+    })
+})
+
+describe("startNote", () => {
+    const aa = (time: string | null) => ({ time, divisionName: "AA" })
+
+    it("pins the first match on a court to the clock", () => {
+        expect(startNote(aa("19:00:00"), null)).toBe(
+            "Start no later than 7:10pm"
+        )
+        expect(FIRST_MATCH_GRACE_MINUTES).toBe(10)
+    })
+
+    it("rolls the clock over the hour correctly", () => {
+        expect(startNote(aa("20:55:00"), null)).toBe(
+            "Start no later than 9:05pm"
+        )
+    })
+
+    it("tells later matches to follow the previous one", () => {
+        expect(startNote(aa("20:10:00"), aa("19:00:00"))).toBe(
+            `Start ${TURNAROUND_MINUTES} mins after previous match ends`
+        )
+    })
+
+    it("pins a new division's first match even mid-court", () => {
+        // Playoff week 2: one court hosts two divisions in separate blocks,
+        // so the later block does not follow on from the earlier one.
+        const a = { time: "20:40:00", divisionName: "A" }
+        expect(startNote(a, { divisionName: "AA" })).toBe(
+            "Start no later than 8:50pm"
+        )
+    })
+
+    it("says nothing when a first match has no scheduled time", () => {
+        expect(startNote(aa(null), null)).toBeNull()
     })
 })
