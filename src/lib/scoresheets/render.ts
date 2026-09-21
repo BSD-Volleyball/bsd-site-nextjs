@@ -169,7 +169,9 @@ async function drawHeader(
     }
 
     // Stylized link QR — the same on every sheet, so whoever collects the
-    // night's paperwork lands on one page and works through the lot.
+    // night's paperwork lands on one page and works through the lot. The
+    // machine tag lives in the footer, which leaves this corner to the code
+    // people actually point a phone at.
     page.drawImage(images.linkQr, {
         x: geometry.qr.x,
         y: geometry.qr.y,
@@ -177,36 +179,11 @@ async function drawHeader(
         height: geometry.qr.h
     })
     centred(
-        "Scan to enter scores",
+        `Scan to enter scores  ·  ${SCORE_ENTRY_SHORT_URL}`,
         geometry.qr,
         geometry.qr.y - 8,
         6,
         fonts.regular
-    )
-    centred(
-        SCORE_ENTRY_SHORT_URL,
-        geometry.qr,
-        geometry.qr.y - 16,
-        6,
-        fonts.regular,
-        LIGHT
-    )
-
-    // Machine tag — what tells a processor which sheet a photo is, now that
-    // the visible QR says the same thing on every page.
-    page.drawImage(images.tagQr, {
-        x: geometry.tagQr.x,
-        y: geometry.tagQr.y,
-        width: geometry.tagQr.w,
-        height: geometry.tagQr.h
-    })
-    centred(
-        sheetCode(night, court),
-        geometry.tagQr,
-        geometry.tagQr.y - 9,
-        8,
-        fonts.bold,
-        BLACK
     )
 }
 
@@ -240,7 +217,14 @@ function drawRules(
     }
 }
 
-function drawFooter(page: PDFPage, geometry: SheetGeometry, fonts: Fonts) {
+function drawFooter(
+    page: PDFPage,
+    geometry: SheetGeometry,
+    night: SheetNight,
+    court: number | null,
+    images: EmbeddedImages,
+    fonts: Fonts
+) {
     const notes = geometry.refNotes
     drawBox(page, notes, 0.8, LIGHT)
 
@@ -257,6 +241,26 @@ function drawFooter(page: PDFPage, geometry: SheetGeometry, fonts: Fonts) {
         size: 7,
         font: fonts.regular,
         color: GREY
+    })
+
+    // Machine tag, squared off against the ref-notes box. This is what tells
+    // a processor which sheet a photo is, since the header QR is identical
+    // on every page.
+    const { tagQr } = geometry
+    page.drawImage(images.tagQr, {
+        x: tagQr.x,
+        y: tagQr.y,
+        width: tagQr.w,
+        height: tagQr.h
+    })
+    const code = sheetCode(night, court)
+    const codeWidth = fonts.bold.widthOfTextAtSize(code, 8)
+    page.drawText(code, {
+        x: tagQr.x + (tagQr.w - codeWidth) / 2,
+        y: tagQr.y - 10,
+        size: 8,
+        font: fonts.bold,
+        color: BLACK
     })
 
     const footer =
@@ -660,7 +664,7 @@ async function drawCourtPage(
         drawBlockFooter(page, geometry, block, fonts)
     })
 
-    drawFooter(page, geometry, fonts)
+    drawFooter(page, geometry, night, sheet.court, images, fonts)
 }
 
 export async function renderScoreSheetsPdf(

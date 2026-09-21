@@ -41,15 +41,18 @@ const RULES_HEIGHT = 52
 /** Strip carrying the GAME 1/2/3 column headings, printed once per page. */
 const GAME_HEADING_HEIGHT = 11
 /** The stylized link QR, identical on every sheet. */
-const QR_SIZE = 64
-/** The per-page machine tag QR. Bigger than it needs to look, so a phone
- *  photo taken across the gym still resolves its modules. */
-const TAG_QR_SIZE = 58
-const QR_GAP = 12
+const QR_SIZE = 80
 
 /** Ref-notes box and the footer line, measured up from the bottom margin. */
 const FOOTER_TEXT_HEIGHT = 14
 const REF_NOTES_HEIGHT = 56
+/**
+ * The machine tag sits in the bottom-right corner beside the ref-notes box,
+ * squared off to the same height so the two read as one band. Keeping it out
+ * of the header leaves the whole corner to the link QR.
+ */
+const TAG_QR_SIZE = REF_NOTES_HEIGHT
+const TAG_QR_GAP = 12
 
 // --- match blocks ---------------------------------------------------------
 
@@ -237,8 +240,14 @@ export function buildSheetGeometry(
     const refNotes: BoxRect = {
         x: CONTENT_LEFT,
         y: refNotesY,
-        w: CONTENT_WIDTH,
+        w: CONTENT_WIDTH - TAG_QR_SIZE - TAG_QR_GAP,
         h: REF_NOTES_HEIGHT
+    }
+    const tagQr: BoxRect = {
+        x: CONTENT_RIGHT - TAG_QR_SIZE,
+        y: refNotesY,
+        w: TAG_QR_SIZE,
+        h: TAG_QR_SIZE
     }
 
     const headingsY = rulesY - GAME_HEADING_HEIGHT
@@ -353,12 +362,7 @@ export function buildSheetGeometry(
             w: QR_SIZE,
             h: QR_SIZE
         },
-        tagQr: {
-            x: CONTENT_RIGHT - QR_SIZE - QR_GAP - TAG_QR_SIZE,
-            y: CONTENT_TOP - TAG_QR_SIZE,
-            w: TAG_QR_SIZE,
-            h: TAG_QR_SIZE
-        },
+        tagQr,
         content: {
             left: CONTENT_LEFT,
             right: CONTENT_RIGHT,

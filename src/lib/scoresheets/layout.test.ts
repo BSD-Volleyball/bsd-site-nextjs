@@ -62,21 +62,34 @@ describe("buildSheetGeometry", () => {
         }
     })
 
-    it("keeps the two header codes apart and on the page", () => {
+    it("puts the link QR in the header with room for its caption", () => {
         const geometry = buildSheetGeometry(courtSheet(3), "regular_season")
-        const { qr, tagQr } = geometry
+        const { qr } = geometry
 
-        expect(overlaps(qr, tagQr)).toBe(false)
-        // Tag sits left of the link QR, both inside the content column
-        expect(tagQr.x + tagQr.w).toBeLessThanOrEqual(qr.x)
-        expect(tagQr.x).toBeGreaterThanOrEqual(geometry.content.left)
         expect(qr.x + qr.w).toBeLessThanOrEqual(geometry.content.right)
-        // Room beneath each for its caption
-        expect(tagQr.y).toBeGreaterThan(geometry.header.y)
-        expect(qr.y).toBeGreaterThan(geometry.header.y)
+        expect(qr.y + qr.h).toBeLessThanOrEqual(geometry.content.top)
+        // A caption line sits below it and must clear the rules block
+        expect(qr.y - 8).toBeGreaterThan(
+            geometry.rules.y + geometry.rules.h - 8
+        )
     })
 
-    it("keeps the header codes clear of the match blocks", () => {
+    it("squares the machine tag off against the ref-notes box", () => {
+        const geometry = buildSheetGeometry(courtSheet(3), "regular_season")
+        const { tagQr, refNotes } = geometry
+
+        expect(overlaps(tagQr, refNotes)).toBe(false)
+        expect(overlaps(tagQr, geometry.qr)).toBe(false)
+        // Bottom-right corner, same band as the notes box
+        expect(tagQr.x + tagQr.w).toBe(geometry.content.right)
+        expect(tagQr.y).toBe(refNotes.y)
+        expect(tagQr.h).toBe(refNotes.h)
+        expect(refNotes.x + refNotes.w).toBeLessThanOrEqual(tagQr.x)
+        // Room beneath it for the printed sheet code
+        expect(tagQr.y - 10).toBeGreaterThan(0)
+    })
+
+    it("keeps both codes clear of the match blocks", () => {
         const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
         for (const block of geometry.blocks) {
             const rect = {
@@ -87,6 +100,14 @@ describe("buildSheetGeometry", () => {
             }
             expect(overlaps(rect, geometry.qr)).toBe(false)
             expect(overlaps(rect, geometry.tagQr)).toBe(false)
+        }
+    })
+
+    it("keeps the machine tag clear of the corner fiducials", () => {
+        const geometry = buildSheetGeometry(courtSheet(2), "regular_season")
+        for (const fiducial of geometry.fiducials) {
+            expect(overlaps(fiducial, geometry.tagQr)).toBe(false)
+            expect(overlaps(fiducial, geometry.refNotes)).toBe(false)
         }
     })
 
