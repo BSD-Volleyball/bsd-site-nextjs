@@ -50,6 +50,7 @@
         "R2_BUCKET",
         "SCORESHEET_MODEL_API_KEY",
         "SCORESHEET_MODEL",
-        "SCORESHEET_MODEL_BASE_URL"
+        "SCORESHEET_MODEL_BASE_URL",
+        "AI_GATEWAY_API_KEY"
     ]
 }

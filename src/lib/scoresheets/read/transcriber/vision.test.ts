@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { ScoreCrop } from "../crops"
 import { TranscriberError } from "./port"
-import { createVisionTranscriber } from "./vision"
+import { createVisionTranscriber, transcriberFromEnv } from "./vision"
 
 function crop(id: string, legal = [0, 19, 21, 25, 26, 27]): ScoreCrop {
     const [matchId, team, game] = id.split(":")
@@ -155,5 +155,41 @@ describe("createVisionTranscriber", () => {
         const fetchImpl = reply(completion("{}"))
         expect(await make(fetchImpl).transcribe([])).toEqual([])
         expect(vi.mocked(fetchImpl)).not.toHaveBeenCalled()
+    })
+})
+
+describe("transcriberFromEnv", () => {
+    const saved = { ...process.env }
+    afterEach(() => {
+        process.env = { ...saved }
+    })
+
+    it("stays off until a key is configured", () => {
+        process.env.SCORESHEET_MODEL_API_KEY = undefined
+        process.env.AI_GATEWAY_API_KEY = undefined
+        // Deleting is what an unset variable actually looks like
+        delete process.env.SCORESHEET_MODEL_API_KEY
+        delete process.env.AI_GATEWAY_API_KEY
+        expect(transcriberFromEnv()).toBeNull()
+    })
+
+    it("turns on with the Gateway's own key name", () => {
+        delete process.env.SCORESHEET_MODEL_API_KEY
+        delete process.env.SCORESHEET_MODEL
+        process.env.AI_GATEWAY_API_KEY = "gateway-key"
+        // The default is a Gateway slug, which is provider/model
+        expect(transcriberFromEnv()?.name).toBe("google/gemini-3-flash")
+    })
+
+    it("lets the model be changed without a deploy", () => {
+        process.env.AI_GATEWAY_API_KEY = "gateway-key"
+        process.env.SCORESHEET_MODEL = "anthropic/claude-haiku-4.5"
+        expect(transcriberFromEnv()?.name).toBe("anthropic/claude-haiku-4.5")
+    })
+
+    it("prefers an explicit key over the Gateway's", () => {
+        process.env.AI_GATEWAY_API_KEY = "gateway-key"
+        process.env.SCORESHEET_MODEL_API_KEY = "explicit-key"
+        expect(transcriberFromEnv()).not.toBeNull()
     })
 })

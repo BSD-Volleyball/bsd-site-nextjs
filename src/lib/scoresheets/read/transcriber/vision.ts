@@ -1,20 +1,23 @@
 /**
  * vision.ts — the one implementation that asks a model to read handwriting.
  *
- * Speaks the OpenAI-compatible chat-completions shape, which is deliberate
- * rather than a preference for any one vendor: Google's Gemini, Groq,
- * OpenRouter, Vercel's AI Gateway and OpenAI itself all accept it. Pointing
- * this at whichever has the friendliest free tier is a change of two
- * environment variables, not of code. The volume is about six sheets a week,
- * so a free tier covers it outright.
+ * Speaks the OpenAI-compatible chat-completions shape and defaults to Vercel's
+ * AI Gateway, which the app already deploys behind. That buys one credential
+ * for every provider, per-request logs, and a spend cap, and it means changing
+ * model is an environment variable rather than a deployment. Any other
+ * OpenAI-compatible endpoint still works by setting the base URL.
+ *
+ * Model ids are Gateway slugs (`provider/model`) from
+ * https://ai-gateway.vercel.sh/v1/models. Reading two digits out of a clean
+ * crop is not a demanding vision task, so a fast mid-tier model is the right
+ * default; at roughly 180 sheets a season the difference between the cheapest
+ * and the dearest model on the list is a couple of dollars either way.
  *
  * Each box is sent as its own image rather than tiled into one montage. A
  * montage is cheaper, but it invites the failure this design most wants to
  * avoid: a row read one line out, attaching one game's score to another. With
  * separate images the answer is checked against the id it claims to answer.
  */
-
-import { requireEnv } from "@/lib/utils"
 
 import type { ScoreCrop } from "../crops"
 import {
@@ -25,8 +28,9 @@ import {
     validateReadings
 } from "./port"
 
-const DEFAULT_BASE_URL =
-    "https://generativelanguage.googleapis.com/v1beta/openai"
+const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1"
+/** A Gateway slug from https://ai-gateway.vercel.sh/v1/models. */
+const DEFAULT_MODEL = "google/gemini-3-flash"
 const TIMEOUT_MS = 60_000
 
 export interface VisionConfig {
@@ -160,12 +164,20 @@ export function createVisionTranscriber(config: VisionConfig): Transcriber {
  * still identifies the sheet and counts the WIN ticks, so an admin gets a
  * partly pre-filled form instead of an error. That also keeps local
  * development, CI and the end-to-end tests working with no secret at all.
+ *
+ * `AI_GATEWAY_API_KEY` is the Gateway's own conventional name and the one to
+ * set; `SCORESHEET_MODEL_API_KEY` overrides it for anyone pointing this at a
+ * different endpoint. Read at call time rather than module scope so a
+ * redeploy is not needed to turn reading on.
  */
 export function transcriberFromEnv(): Transcriber | null {
-    if (!process.env.SCORESHEET_MODEL_API_KEY) return null
+    const apiKey =
+        process.env.SCORESHEET_MODEL_API_KEY ?? process.env.AI_GATEWAY_API_KEY
+    if (!apiKey) return null
+
     return createVisionTranscriber({
-        apiKey: requireEnv("SCORESHEET_MODEL_API_KEY"),
-        model: process.env.SCORESHEET_MODEL ?? "gemini-2.0-flash",
+        apiKey,
+        model: process.env.SCORESHEET_MODEL ?? DEFAULT_MODEL,
         baseUrl: process.env.SCORESHEET_MODEL_BASE_URL
     })
 }
