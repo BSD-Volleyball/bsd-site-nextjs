@@ -464,6 +464,43 @@ describe("buildCoverage", () => {
         ])
     })
 
+    it("records the type of the following night, null for the last", () => {
+        const out = buildCoverage(
+            baseInput({
+                events: [
+                    {
+                        eventId: 10,
+                        date: "2026-10-06",
+                        eventType: "regular_season",
+                        label: null
+                    },
+                    {
+                        eventId: 11,
+                        date: "2026-10-13",
+                        eventType: "regular_season",
+                        label: null
+                    },
+                    {
+                        eventId: 12,
+                        date: "2026-11-03",
+                        eventType: "playoff",
+                        label: null
+                    }
+                ],
+                matches: [
+                    { matchId: 1, date: "2026-10-06", startTime: "19:00:00" },
+                    { matchId: 2, date: "2026-10-13", startTime: "19:00:00" },
+                    { matchId: 3, date: "2026-11-03", startTime: "19:00:00" }
+                ]
+            })
+        )
+        expect(out.map((d) => d.nextEventType)).toEqual([
+            "regular_season",
+            "playoff",
+            null
+        ])
+    })
+
     it("an admin coaching counts with source coach", () => {
         const [d] = buildCoverage(
             baseInput({

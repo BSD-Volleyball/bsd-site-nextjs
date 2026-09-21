@@ -28,6 +28,7 @@ import {
     personTone
 } from "@/lib/coverage/format"
 import type { PersonTone } from "@/lib/coverage/format"
+import { slotAssigneeNames, slotTaskGroups } from "@/lib/coverage/tasks"
 import type {
     CoverageDate,
     CoveragePerson,
@@ -92,6 +93,46 @@ function CoverageLegend() {
                 </span>
             ))}
         </div>
+    )
+}
+
+function SlotTasks({ date, slot }: { date: CoverageDate; slot: CoverageSlot }) {
+    const groups = slotTaskGroups(date, slot)
+    if (groups.length === 0) return null
+    const assignees = slotAssigneeNames(slot)
+    return (
+        <details className="basis-full text-sm">
+            <summary className="cursor-pointer text-muted-foreground text-xs">
+                Jobs this slot: {groups.map((g) => g.title).join(" · ")} —{" "}
+                {assignees.length === 0 ? (
+                    <span className="text-red-700 dark:text-red-300">
+                        nobody assigned
+                    </span>
+                ) : (
+                    assignees.join(", ")
+                )}
+            </summary>
+            <div className="mt-2 space-y-3 pl-1">
+                {groups.map((g) => (
+                    <div key={g.key}>
+                        <p className="font-medium">
+                            {g.title}
+                            {g.hint && (
+                                <span className="font-normal text-muted-foreground">
+                                    {" "}
+                                    ({g.hint})
+                                </span>
+                            )}
+                        </p>
+                        <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+                            {g.items.map((item) => (
+                                <li key={item}>{item}</li>
+                            ))}
+                        </ul>
+                    </div>
+                ))}
+            </div>
+        </details>
     )
 }
 
@@ -362,6 +403,7 @@ export function CoverageClient({
                                         currentUserId={currentUserId}
                                         onDone={afterMutation}
                                     />
+                                    <SlotTasks date={d} slot={slot} />
                                 </div>
                             )
                         })}

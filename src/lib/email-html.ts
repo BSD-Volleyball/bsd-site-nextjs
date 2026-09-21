@@ -14,9 +14,11 @@ import {
     formatSlotLabel,
     personTone
 } from "@/lib/coverage/format"
+import { slotAssigneeNames, slotTaskGroups } from "@/lib/coverage/tasks"
 import type {
     CoverageDate,
     CoveragePerson,
+    CoverageSlot,
     CoverageStatus
 } from "@/lib/coverage/types"
 
@@ -728,6 +730,24 @@ function renderCoveragePerson(p: CoveragePerson): string {
     return `<span style="${style}">${escapeHtml(p.name)}</span> <span style="color:#6b7280;font-size:13px;">(${escapeHtml(tags.join(", "))})</span>`
 }
 
+function renderCoverageTasks(day: CoverageDate, slot: CoverageSlot): string {
+    const groups = slotTaskGroups(day, slot)
+    if (groups.length === 0) return ""
+    const assignees = slotAssigneeNames(slot)
+    const who =
+        assignees.length === 0
+            ? `<span style="color:#991b1b;">nobody assigned</span>`
+            : escapeHtml(assignees.join(", "))
+    return groups
+        .map(
+            (g) => `<div style="margin-top:8px;font-size:13px;">
+                <div><strong>${escapeHtml(g.title)}</strong>${g.hint ? ` <span style="color:#6b7280;">(${escapeHtml(g.hint)})</span>` : ""} — ${who}</div>
+                <ul style="margin:4px 0 0;padding-left:18px;color:#374151;">${g.items.map((item) => `<li style="margin:2px 0;">${escapeHtml(item)}</li>`).join("")}</ul>
+            </div>`
+        )
+        .join("")
+}
+
 export function buildCoverageDigestHtml(opts: {
     firstName: string
     day: CoverageDate
@@ -744,7 +764,7 @@ export function buildCoverageDigestHtml(opts: {
                     : slot.people.map(renderCoveragePerson).join("<br/>")
             return `<tr>
                 <td style="padding:8px 12px;border-top:1px solid #e5e7eb;white-space:nowrap;vertical-align:top;font-weight:600;">${escapeHtml(formatSlotLabel(slot.startTime))}<br/><span style="font-weight:400;color:#6b7280;font-size:12px;">${slot.matchCount} match${slot.matchCount === 1 ? "" : "es"}</span></td>
-                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;vertical-align:top;">${people}</td>
+                <td style="padding:8px 12px;border-top:1px solid #e5e7eb;vertical-align:top;">${people}${renderCoverageTasks(day, slot)}</td>
             </tr>`
         })
         .join("")
@@ -756,7 +776,7 @@ export function buildCoverageDigestHtml(opts: {
             <div style="background-color:${banner.bg};color:${banner.fg};border-radius:8px;padding:12px 16px;margin:12px 0;">
                 <strong>${escapeHtml(banner.title)}</strong> — ${escapeHtml(day.reason)}
             </div>
-            <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Admins always count toward coverage; leadership members count only for slots where they were added on the Coverage page.</p>
+            <p>Here is who is at the gym on ${escapeHtml(formatCoverageDate(day.date))}. Admins always count toward coverage; leadership members count only for slots where they were added on the Coverage page. The gym jobs for each slot are listed under it, with the people they fall to.</p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">${rows}</table>
             <p style="font-size:12px;margin:12px 0;">${renderCoverageLegend()}</p>
             <p style="font-size:13px;color:#6b7280;">Can you fill a gap? Add yourself on the Coverage page.</p>

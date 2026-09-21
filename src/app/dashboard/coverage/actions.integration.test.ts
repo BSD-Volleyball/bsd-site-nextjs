@@ -434,6 +434,52 @@ describe("sendCoverageDigestForDate", () => {
         expect(second.skipped).toBeGreaterThanOrEqual(1)
     })
 
+    it("also emails a leadership member who is covering a slot, not one merely playing", async () => {
+        const s = await seedSeason()
+        const { userRoles } = await import("@/database/schema")
+        const covering = await createUser({
+            first_name: "Cov",
+            last_name: "Lead"
+        })
+        const playing = await createUser({
+            first_name: "Play",
+            last_name: "Lead"
+        })
+        await db.insert(userRoles).values([
+            { user_id: covering.id, role: "leadership_group" },
+            { user_id: playing.id, role: "leadership_group" }
+        ])
+        await db.insert(drafts).values({
+            team: s.home.id,
+            user: playing.id,
+            round: 1,
+            overall: 1
+        })
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        await db.insert(coveragePresence).values({
+            user_id: covering.id,
+            event_date: DATE,
+            slot_time: "21:00:00",
+            created_by: admin.id
+        })
+        const before = sentMessages().length
+
+        const r = await sendCoverageDigestForDate(DATE)
+        expect(r.sent).toBeGreaterThanOrEqual(2)
+        const to = sentMessages()
+            .slice(before)
+            .map((m) => m.to.toLowerCase())
+        expect(to).toContain(admin.email.toLowerCase())
+        expect(to).toContain(covering.email.toLowerCase())
+        expect(to).not.toContain(playing.email.toLowerCase())
+
+        const mine = sentMessages()
+            .slice(before)
+            .find((m) => m.to.toLowerCase() === covering.email.toLowerCase())
+        expect(mine?.htmlBody).toContain("Cleanup")
+        expect(mine?.htmlBody).toMatch(/Cleanup[\s\S]*Cov Lead/)
+    })
+
     it("sends nothing for a date with no matches", async () => {
         await seedSeason()
         await createUserWithRoles([{ role: "admin" }])

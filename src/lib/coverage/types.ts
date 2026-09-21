@@ -46,6 +46,12 @@ export interface CoverageDate {
     date: string
     eventId: number
     eventType: "regular_season" | "playoff"
+    /**
+     * Type of the season's next regular-season or playoff night after this
+     * one, or null when this is the last. Drives the "playoffs next week"
+     * task lines.
+     */
+    nextEventType: "regular_season" | "playoff" | null
     /** 1-based within its event type: Week N / Playoffs Week N. */
     ordinal: number
     label: string | null

@@ -6,6 +6,7 @@ const DAY: CoverageDate = {
     date: "2026-10-06",
     eventId: 1,
     eventType: "regular_season",
+    nextEventType: "playoff",
     ordinal: 4,
     label: null,
     matchCount: 6,
@@ -66,6 +67,23 @@ describe("buildCoverageDigestHtml", () => {
         expect(html).toContain("playing, present: setup")
         expect(html).toContain("leadership")
         expect(html).toContain("nobody")
+    })
+
+    it("lists setup tasks on the first slot, naming who counts", () => {
+        expect(html).toContain("Setup")
+        expect(html).toContain("plan for ~10 minutes")
+        expect(html).toContain("Move the bins to the courts")
+        expect(html).toMatch(
+            /Setup[\s\S]*Ada &lt;Admin&gt;[\s\S]*Move the bins/
+        )
+    })
+
+    it("lists mid-way and cleanup tasks on the last slot, unassigned", () => {
+        expect(html).toContain("Mid-way")
+        expect(html).toContain("Cleanup")
+        expect(html).toContain("BRING THE SCORESHEETS WITH YOU")
+        expect(html).toContain("Last week of the regular season")
+        expect(html).toMatch(/Cleanup[\s\S]*nobody assigned/)
     })
 
     it("links to the coverage page", () => {

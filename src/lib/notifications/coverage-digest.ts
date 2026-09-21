@@ -2,8 +2,10 @@
  * Day-before admin coverage digest.
  *
  * One dispatch per match night, keyed by date so a re-run of the cron is a
- * no-op. Recipients are the admin role holders; leadership members appear in
- * the body but are not mailed.
+ * no-op. Recipients are the admin role holders plus any leadership_group
+ * member who counts toward that night's coverage (added present for at least
+ * one slot); leadership members who merely play or ref appear in the body but
+ * are not mailed.
  */
 
 import { site } from "@/config/site"
@@ -28,6 +30,28 @@ export function coverageDigestSubject(day: CoverageDate): string {
     return `${prefix}Coverage for ${formatCoverageDate(day.date)} (${coverageDateTitle(day)}): ${day.reason}`
 }
 
+/** Admins, plus leadership members covering at least one slot that night. */
+async function coverageDigestRecipients(day: CoverageDate) {
+    const coveringLeadership = new Set(
+        day.slots.flatMap((s) =>
+            s.people
+                .filter((p) => p.isLeadership && p.counts)
+                .map((p) => p.userId)
+        )
+    )
+    const [admins, leadership] = await Promise.all([
+        getRecipientsWithRole("admin"),
+        coveringLeadership.size > 0
+            ? getRecipientsWithRole("leadership_group")
+            : Promise.resolve([])
+    ])
+    const seen = new Set(admins.map((a) => a.userId))
+    const extra = leadership.filter(
+        (l) => coveringLeadership.has(l.userId) && !seen.has(l.userId)
+    )
+    return [...admins, ...extra]
+}
+
 export async function sendCoverageDigestForDate(
     date: string
 ): Promise<CoverageDigestRunResult> {
@@ -42,7 +66,7 @@ export async function sendCoverageDigestForDate(
     if (!day || day.matchCount === 0) return result
     result.status = day.status
 
-    const recipients = await getRecipientsWithRole("admin")
+    const recipients = await coverageDigestRecipients(day)
     if (recipients.length === 0) return result
 
     const coverageUrl = `${site.url}/dashboard/coverage`

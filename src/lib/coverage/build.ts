@@ -111,7 +111,8 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
     const ordinals = { regular_season: 0, playoff: 0 }
     const out: CoverageDate[] = []
 
-    for (const event of events) {
+    for (const [index, event] of events.entries()) {
+        const nextEventType = events[index + 1]?.eventType ?? null
         ordinals[event.eventType] += 1
         const ordinal = ordinals[event.eventType]
         const matches = matchesByDate.get(event.date) ?? []
@@ -136,6 +137,7 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
                 date: event.date,
                 eventId: event.eventId,
                 eventType: event.eventType,
+                nextEventType,
                 ordinal,
                 label: event.label,
                 matchCount: 0,
@@ -255,6 +257,7 @@ export function buildCoverage(input: BuildCoverageInput): CoverageDate[] {
             date: event.date,
             eventId: event.eventId,
             eventType: event.eventType,
+            nextEventType,
             ordinal,
             label: event.label,
             matchCount: matches.length,
