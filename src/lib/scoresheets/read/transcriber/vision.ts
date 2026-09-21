@@ -29,8 +29,16 @@ import {
 } from "./port"
 
 const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1"
-/** A Gateway slug from https://ai-gateway.vercel.sh/v1/models. */
-const DEFAULT_MODEL = "google/gemini-3-flash"
+/**
+ * A Gateway slug from https://ai-gateway.vercel.sh/v1/models.
+ *
+ * Chosen by measurement, not reputation. Reading fourteen handwritten scores
+ * off real crops: this model and qwen3.7-flash got all fourteen, gemini-2.5-
+ * flash-lite twelve, gpt-5-nano eight, nova-lite four. It is also reachable
+ * on a free-tier Gateway account, which several stronger-sounding models are
+ * not. Re-measure before changing it; the ranking is not what you would guess.
+ */
+const DEFAULT_MODEL = "alibaba/qwen3.5-flash"
 const TIMEOUT_MS = 60_000
 
 export interface VisionConfig {

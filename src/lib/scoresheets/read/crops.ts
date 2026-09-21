@@ -31,6 +31,15 @@ const CROP_MARGIN = 2
  * This sits in that gap with roughly threefold margin either way.
  */
 const INK_THRESHOLD = 0.012
+/**
+ * Ink in the tens box alone, above which the score is certainly two digits
+ * and below which it is certainly one. Between them the count is unknown and
+ * no conclusion is drawn: a handwritten "1" is the sparsest mark on the page
+ * and sits close to this line, so guessing either way would be worse than
+ * admitting the box is ambiguous.
+ */
+const TENS_PRESENT = 0.05
+const TENS_ABSENT = 0.008
 /** Ignored border of each box, as a fraction, when measuring ink. */
 const INK_INSET = 0.24
 /** How much darker than paper a pixel must be to count as a pen stroke. */
@@ -52,7 +61,19 @@ export interface ScoreCrop {
     legalValues: number[]
     /** Fraction of the boxes covered in ink; drives the blank decision. */
     inkRatio: number
+    /**
+     * How many digits were actually written, measured box by box.
+     *
+     * This is the check that catches a transcriber dropping a tens digit.
+     * Reading "18" as "8" produces a score that is perfectly legal and has
+     * the same winner, so neither the rules nor the WIN tick notice; only the
+     * ink in the tens box does.
+     */
+    digitsWritten: DigitCount
 }
+
+/** `null` when the ink is too ambiguous to commit either way. */
+export type DigitCount = 1 | 2 | null
 
 export interface CropResult {
     /** Boxes with ink in them, worth transcribing. */
@@ -90,6 +111,10 @@ function pairRect(boxes: [BoxRect, BoxRect]): BoxRect {
  * paper separates them cleanly, because a border halo is a gradient and pen
  * strokes are not.
  */
+function boxInk(img: RasterImage, toImage: Matrix3, box: BoxRect): number {
+    return inkCoverage(img, toImage, [box, box])
+}
+
 function inkCoverage(
     img: RasterImage,
     toImage: Matrix3,
@@ -142,6 +167,7 @@ export function cropScoreBoxes(
 
         const rect = pairRect(game.finalDigits)
         const sample = sampleRect(img, toImage, rect, CROP_SCALE)
+        const tensInk = boxInk(img, toImage, game.finalDigits[0])
         written.push({
             id,
             matchId: game.matchId,
@@ -151,7 +177,9 @@ export function cropScoreBoxes(
             width: sample.width,
             height: sample.height,
             legalValues: legalValues(gameConstraint(eventType, game.game)),
-            inkRatio
+            inkRatio,
+            digitsWritten:
+                tensInk >= TENS_PRESENT ? 2 : tensInk <= TENS_ABSENT ? 1 : null
         })
     }
 

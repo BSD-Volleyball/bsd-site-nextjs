@@ -266,3 +266,50 @@ describe("reconcileMatch", () => {
         expect(m.problems.join(" ")).toContain("could not be read")
     })
 })
+
+describe("the measured digit count", () => {
+    /**
+     * The failure this exists to catch, found only by running a real model:
+     * reading "19" as "9" produces a legal score with the same winner, so
+     * neither the rules nor the WIN tick object. Only the ink in the tens box
+     * knows, and because that is measured rather than claimed, it outranks
+     * whatever the transcriber says.
+     */
+    it("refuses a one-digit reading when two digits were written", () => {
+        const v = reconcileGame({
+            constraint: REGULAR,
+            home: { value: 25, confidence: 0.95, digitsWritten: 2 },
+            away: { value: 9, confidence: 0.95, digitsWritten: 2 },
+            homeWin: marked,
+            awayWin: unmarked
+        })
+        // 25-9 is perfectly legal, which is exactly why this was slipping past
+        expect(v.away).not.toBe(9)
+        expect(v.level).not.toBe("high")
+    })
+
+    it("accepts a one-digit reading when one digit was written", () => {
+        const v = reconcileGame({
+            constraint: REGULAR,
+            home: { value: 25, confidence: 0.95, digitsWritten: 2 },
+            away: { value: 9, confidence: 0.95, digitsWritten: 1 },
+            homeWin: marked,
+            awayWin: unmarked
+        })
+        expect(v.away).toBe(9)
+        expect(v.level).toBe("high")
+    })
+
+    it("draws no conclusion when the ink is ambiguous", () => {
+        // A handwritten "1" is the sparsest mark on the page and sits near
+        // the line; guessing either way would be worse than abstaining.
+        const v = reconcileGame({
+            constraint: REGULAR,
+            home: { value: 25, confidence: 0.95, digitsWritten: null },
+            away: { value: 9, confidence: 0.95, digitsWritten: null },
+            homeWin: marked,
+            awayWin: unmarked
+        })
+        expect(v.away).toBe(9)
+    })
+})

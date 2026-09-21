@@ -139,7 +139,11 @@ export function drawDigit(
     const segs = SEGMENTS[digit]
     if (!segs) return
 
-    const inset = box.w * 0.22
+    // Drawn well inside the box, as a person writing in one does. The reader
+    // ignores the outer quarter of a box so a printed border cannot read as
+    // ink, and a glyph pressed against the edge would fall in that blind
+    // spot: a "1", which is only its right-hand strokes, would vanish.
+    const inset = box.w * 0.32
     const left = box.x + inset
     const right = box.x + box.w - inset
     const bottom = box.y + box.h * 0.18

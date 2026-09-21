@@ -15,7 +15,8 @@ function crop(id: string, legal = [0, 19, 21, 25, 26, 27]): ScoreCrop {
         width: 110,
         height: 65,
         legalValues: legal,
-        inkRatio: 0.2
+        inkRatio: 0.2,
+        digitsWritten: 2
     }
 }
 
@@ -178,7 +179,7 @@ describe("transcriberFromEnv", () => {
         delete process.env.SCORESHEET_MODEL
         process.env.AI_GATEWAY_API_KEY = "gateway-key"
         // The default is a Gateway slug, which is provider/model
-        expect(transcriberFromEnv()?.name).toBe("google/gemini-3-flash")
+        expect(transcriberFromEnv()?.name).toBe("alibaba/qwen3.5-flash")
     })
 
     it("lets the model be changed without a deploy", () => {

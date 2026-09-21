@@ -21,6 +21,13 @@ export interface ScoreCandidate {
     confidence: number
     /** Runners-up the transcriber also considered plausible. */
     alternatives?: { value: number; confidence: number }[]
+    /**
+     * How many digits were actually written, measured from the ink rather
+     * than read. A transcriber that drops a tens digit turns 18 into 8: still
+     * a legal score, still the same winner, so neither the rules nor the WIN
+     * tick object. Only the ink in the tens box does.
+     */
+    digitsWritten?: 1 | 2 | null
 }
 
 export interface GameEvidence {
@@ -57,15 +64,39 @@ const TICK_WEIGHT = 1.6
 const UNSEEN = Math.log(0.002)
 /** Penalty for expecting a number and finding no ink. */
 const MISSING = Math.log(0.05)
+/**
+ * Penalty for a value with the wrong number of digits for the ink present.
+ *
+ * Heavier than `UNSEEN` on purpose. The digit count is measured off the page;
+ * the transcriber's answer is a claim about it. When the two disagree the
+ * measurement wins, and the usual outcome is that no supported reading
+ * survives and the game is handed to a human — which is the right answer,
+ * because something genuinely does not add up.
+ */
+const WRONG_DIGIT_COUNT = Math.log(1e-5)
 
 function digitLogProb(candidate: ScoreCandidate | null, value: number): number {
     if (!candidate) return MISSING
+
+    let score: number
     if (candidate.value === value) {
-        return Math.log(Math.max(1e-6, candidate.confidence))
+        score = Math.log(Math.max(1e-6, candidate.confidence))
+    } else {
+        const alt = candidate.alternatives?.find((a) => a.value === value)
+        score = alt ? Math.log(Math.max(1e-6, alt.confidence)) : UNSEEN
     }
-    const alt = candidate.alternatives?.find((a) => a.value === value)
-    if (alt) return Math.log(Math.max(1e-6, alt.confidence))
-    return UNSEEN
+
+    // Two boxes were written in, so the score cannot be a single digit, and
+    // vice versa. This is measured off the page rather than claimed by a
+    // model, so it outranks the model's own confidence.
+    if (
+        candidate.digitsWritten !== undefined &&
+        candidate.digitsWritten !== null
+    ) {
+        const digits = value >= 10 ? 2 : 1
+        if (digits !== candidate.digitsWritten) score += WRONG_DIGIT_COUNT
+    }
+    return score
 }
 
 /** Did the transcriber actually propose this number for this side? */

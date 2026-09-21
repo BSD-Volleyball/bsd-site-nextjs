@@ -143,13 +143,17 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
                 written,
                 input.signal
             )
+            const digitsById = new Map(
+                written.map((c) => [c.id, c.digitsWritten])
+            )
             candidates = new Map(
                 validateReadings(written, raw).map((r) => [
                     r.id,
                     {
                         value: r.value,
                         confidence: r.confidence,
-                        alternatives: r.alternatives
+                        alternatives: r.alternatives,
+                        digitsWritten: digitsById.get(r.id)
                     }
                 ])
             )
@@ -212,6 +216,16 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
     if (transform.residualPt > 3) {
         problems.push(
             "The page looks bent or the photo is at a steep angle; check the numbers carefully."
+        )
+    }
+
+    // A sheet nobody wrote on does not get photographed. Finding no ink at all
+    // means the read failed — the page was located badly enough that every box
+    // sampled blank paper — and reporting a confident "no games played" would
+    // be the worst possible way to be wrong.
+    if (written.length === 0 && blank.length > 0) {
+        problems.push(
+            "No scores were found anywhere on this sheet, which usually means the photo is too angled or blurred to read. Retake it square-on."
         )
     }
 
