@@ -1,12 +1,11 @@
 import jsQR from "jsqr"
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { grayToRgba, type RasterImage } from "../image"
 import { distort } from "./distort"
 import { synthesizeSheet } from "./synthesize"
 
-/** Old 1280px upload vs the new 3000px one, in pixels per point. */
-const OLD_SCALE = 1280 / 792
+/** The 3000px upload ceiling, in pixels per point. */
 const NEW_SCALE = 3000 / 792
 
 function decode(img: RasterImage) {
@@ -14,6 +13,14 @@ function decode(img: RasterImage) {
         inversionAttempts: "dontInvert"
     })
 }
+
+/**
+ * These tests synthesize and warp multi-megapixel pages in pure JavaScript,
+ * which is inherently slower than the 5-second default allows for on a CI
+ * runner. The work is bounded and deliberate, so the ceiling is raised rather
+ * than the coverage cut.
+ */
+vi.setConfig({ testTimeout: 60_000 })
 
 describe("synthesized sheets", () => {
     it("carries a tag the decoder can read", async () => {
@@ -127,10 +134,12 @@ describe("distortion", () => {
     })
 
     it("is deterministic for a seed", async () => {
+        // Reproducibility does not depend on resolution, so this runs small:
+        // a failure here is about the random source, not the imaging.
         const sheet = await synthesizeSheet({
             matchCount: 2,
             eventType: "regular_season",
-            scale: OLD_SCALE
+            scale: 1
         })
         const a = distort(sheet.image, { seed: 3, perspective: 0.04 })
         const b = distort(sheet.image, { seed: 3, perspective: 0.04 })

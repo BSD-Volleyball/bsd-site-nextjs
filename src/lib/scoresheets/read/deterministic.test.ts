@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { readCheckbox } from "./checkbox"
 import { cropScoreBoxes } from "./crops"
@@ -36,6 +36,14 @@ function scores(matchIds: number[]): GameTruth[] {
     }
     return out
 }
+
+/**
+ * These tests synthesize and warp multi-megapixel pages in pure JavaScript,
+ * which is inherently slower than the 5-second default allows for on a CI
+ * runner. The work is bounded and deliberate, so the ceiling is raised rather
+ * than the coverage cut.
+ */
+vi.setConfig({ testTimeout: 60_000 })
 
 describe("parseSheetTag", () => {
     it("reads a regular-season tag", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { cropId } from "./crops"
 import { readSheet } from "./read"
@@ -46,6 +46,14 @@ async function photograph(opts: {
     )
     return { image, sheet, truth }
 }
+
+/**
+ * These tests synthesize and warp multi-megapixel pages in pure JavaScript,
+ * which is inherently slower than the 5-second default allows for on a CI
+ * runner. The work is bounded and deliberate, so the ceiling is raised rather
+ * than the coverage cut.
+ */
+vi.setConfig({ testTimeout: 60_000 })
 
 describe("readSheet", () => {
     it("recovers a whole night's scores from a photo", async () => {
