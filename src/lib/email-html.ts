@@ -14,7 +14,11 @@ import {
     formatSlotLabel,
     personTone
 } from "@/lib/coverage/format"
-import { slotAssigneeNames, slotTaskGroups } from "@/lib/coverage/tasks"
+import {
+    CONDITION_LABELS,
+    slotAssigneeNames,
+    slotTaskGroups
+} from "@/lib/coverage/tasks"
 import type {
     CoverageDate,
     CoveragePerson,
@@ -742,7 +746,7 @@ function renderCoverageTasks(day: CoverageDate, slot: CoverageSlot): string {
         .map(
             (g) => `<div style="margin-top:8px;font-size:13px;">
                 <div><strong>${escapeHtml(g.title)}</strong>${g.hint ? ` <span style="color:#6b7280;">(${escapeHtml(g.hint)})</span>` : ""} — ${who}</div>
-                <ul style="margin:4px 0 0;padding-left:18px;color:#374151;">${g.items.map((item) => `<li style="margin:2px 0;">${escapeHtml(item)}</li>`).join("")}</ul>
+                <ul style="margin:4px 0 0;padding-left:18px;color:#374151;">${g.lines.map((l) => `<li style="margin:2px 0;">${l.when ? `<em>${escapeHtml(CONDITION_LABELS[l.when])}:</em> ` : ""}${escapeHtml(l.text)}</li>`).join("")}</ul>
             </div>`
         )
         .join("")

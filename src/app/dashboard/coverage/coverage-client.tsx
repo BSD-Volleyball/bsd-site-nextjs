@@ -28,7 +28,13 @@ import {
     personTone
 } from "@/lib/coverage/format"
 import type { PersonTone } from "@/lib/coverage/format"
-import { slotAssigneeNames, slotTaskGroups } from "@/lib/coverage/tasks"
+import {
+    CONDITION_LABELS,
+    TASK_GROUPS,
+    slotAssigneeNames,
+    slotTaskKeys
+} from "@/lib/coverage/tasks"
+import type { TaskGroupKey } from "@/lib/coverage/tasks"
 import type {
     CoverageDate,
     CoveragePerson,
@@ -96,25 +102,28 @@ function CoverageLegend() {
     )
 }
 
-function SlotTasks({ date, slot }: { date: CoverageDate; slot: CoverageSlot }) {
-    const groups = slotTaskGroups(date, slot)
-    if (groups.length === 0) return null
-    const assignees = slotAssigneeNames(slot)
+const TASK_TITLE: Record<TaskGroupKey, string> = Object.fromEntries(
+    TASK_GROUPS.map((g) => [g.key, g.title])
+) as Record<TaskGroupKey, string>
+
+/**
+ * The reference list of gym jobs, shown once above the weekly cards. Each
+ * slot below only says which groups fall to it and to whom.
+ */
+function GymJobs() {
     return (
-        <details className="basis-full text-sm">
-            <summary className="cursor-pointer text-muted-foreground text-xs">
-                Jobs this slot: {groups.map((g) => g.title).join(" · ")} —{" "}
-                {assignees.length === 0 ? (
-                    <span className="text-red-700 dark:text-red-300">
-                        nobody assigned
-                    </span>
-                ) : (
-                    assignees.join(", ")
-                )}
-            </summary>
-            <div className="mt-2 space-y-3 pl-1">
-                {groups.map((g) => (
-                    <div key={g.key}>
+        <Card>
+            <CardHeader className="space-y-1">
+                <CardTitle className="text-lg">Gym jobs</CardTitle>
+                <p className="text-muted-foreground text-sm">
+                    Setup falls to the first slot, mid-way to the slot before
+                    the last, and cleanup to the last slot. Each slot below
+                    names who those jobs fall to.
+                </p>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+                {TASK_GROUPS.map((g) => (
+                    <div key={g.key} className="text-sm">
                         <p className="font-medium">
                             {g.title}
                             {g.hint && (
@@ -125,14 +134,39 @@ function SlotTasks({ date, slot }: { date: CoverageDate; slot: CoverageSlot }) {
                             )}
                         </p>
                         <ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-                            {g.items.map((item) => (
-                                <li key={item}>{item}</li>
+                            {g.lines.map((l) => (
+                                <li key={l.text}>
+                                    {l.when && (
+                                        <em className="text-foreground">
+                                            {CONDITION_LABELS[l.when]}:{" "}
+                                        </em>
+                                    )}
+                                    {l.text}
+                                </li>
                             ))}
                         </ul>
                     </div>
                 ))}
-            </div>
-        </details>
+            </CardContent>
+        </Card>
+    )
+}
+
+function SlotJobs({ date, slot }: { date: CoverageDate; slot: CoverageSlot }) {
+    const keys = slotTaskKeys(date, slot)
+    if (keys.length === 0) return null
+    const assignees = slotAssigneeNames(slot)
+    return (
+        <p className="basis-full text-muted-foreground text-xs">
+            {keys.map((k) => TASK_TITLE[k]).join(" + ")} —{" "}
+            {assignees.length === 0 ? (
+                <span className="text-red-700 dark:text-red-300">
+                    nobody assigned
+                </span>
+            ) : (
+                assignees.join(", ")
+            )}
+        </p>
     )
 }
 
@@ -335,6 +369,7 @@ export function CoverageClient({
             {message && (
                 <p className="text-muted-foreground text-sm">{message}</p>
             )}
+            <GymJobs />
             <CoverageLegend />
             {view.dates.map((d) => (
                 <Card
@@ -403,7 +438,7 @@ export function CoverageClient({
                                         currentUserId={currentUserId}
                                         onDone={afterMutation}
                                     />
-                                    <SlotTasks date={d} slot={slot} />
+                                    <SlotJobs date={d} slot={slot} />
                                 </div>
                             )
                         })}

@@ -69,20 +69,26 @@ describe("buildCoverageDigestHtml", () => {
         expect(html).toContain("nobody")
     })
 
-    it("lists setup tasks on the first slot, naming who counts", () => {
+    it("lists setup and mid-way tasks on the first of two slots, naming who counts", () => {
         expect(html).toContain("Setup")
         expect(html).toContain("plan for ~10 minutes")
         expect(html).toContain("Move the bins to the courts")
         expect(html).toMatch(
             /Setup[\s\S]*Ada &lt;Admin&gt;[\s\S]*Move the bins/
         )
+        expect(html).toMatch(/Mid-way[\s\S]*Ada &lt;Admin&gt;/)
+        expect(html).toContain(
+            "<em>Last week of regular season:</em> Place two flags"
+        )
+        expect(html).toContain(
+            "<em>Playoffs next week:</em> Pull out the Playoff"
+        )
+        expect(html).not.toContain("line judges")
     })
 
-    it("lists mid-way and cleanup tasks on the last slot, unassigned", () => {
-        expect(html).toContain("Mid-way")
+    it("lists cleanup tasks on the last slot, unassigned", () => {
         expect(html).toContain("Cleanup")
         expect(html).toContain("BRING THE SCORESHEETS WITH YOU")
-        expect(html).toContain("Last week of the regular season")
         expect(html).toMatch(/Cleanup[\s\S]*nobody assigned/)
     })
 

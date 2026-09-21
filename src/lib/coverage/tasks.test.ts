@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { slotAssigneeNames, slotTaskGroups } from "./tasks"
+import {
+    TASK_GROUPS,
+    resolveTaskGroups,
+    slotAssigneeNames,
+    slotTaskGroups,
+    slotTaskKeys
+} from "./tasks"
 import type { CoverageDate, CoverageSlot } from "./types"
 
 function slot(startTime: string | null): CoverageSlot {
@@ -22,25 +28,37 @@ function day(
     }
 }
 
-const keys = (groups: ReturnType<typeof slotTaskGroups>) =>
-    groups.map((g) => g.key)
 const text = (groups: ReturnType<typeof slotTaskGroups>) =>
-    groups.flatMap((g) => g.items).join("\n")
+    groups.flatMap((g) => g.lines.map((l) => l.text)).join("\n")
 
-describe("slotTaskGroups", () => {
-    it("gives setup to the first slot, mid-way and cleanup to the last", () => {
+describe("slotTaskKeys", () => {
+    it("setup first, mid-way on the slot before last, cleanup last", () => {
         const d = day()
-        expect(keys(slotTaskGroups(d, d.slots[0]))).toEqual(["setup"])
-        expect(keys(slotTaskGroups(d, d.slots[1]))).toEqual([])
-        expect(keys(slotTaskGroups(d, d.slots[2]))).toEqual([
-            "midway",
-            "cleanup"
+        expect(slotTaskKeys(d, d.slots[0])).toEqual(["setup"])
+        expect(slotTaskKeys(d, d.slots[1])).toEqual(["midway"])
+        expect(slotTaskKeys(d, d.slots[2])).toEqual(["cleanup"])
+    })
+
+    it("with four slots the second middle slot gets mid-way", () => {
+        const d = day({}, [
+            slot("18:00:00"),
+            slot("19:00:00"),
+            slot("20:00:00"),
+            slot("21:00:00")
         ])
+        expect(slotTaskKeys(d, d.slots[1])).toEqual([])
+        expect(slotTaskKeys(d, d.slots[2])).toEqual(["midway"])
+    })
+
+    it("a two-slot night puts setup and mid-way on the first slot", () => {
+        const d = day({}, [slot("19:00:00"), slot("20:00:00")])
+        expect(slotTaskKeys(d, d.slots[0])).toEqual(["setup", "midway"])
+        expect(slotTaskKeys(d, d.slots[1])).toEqual(["cleanup"])
     })
 
     it("a single-slot night carries all three groups", () => {
         const d = day({}, [slot("19:00:00")])
-        expect(keys(slotTaskGroups(d, d.slots[0]))).toEqual([
+        expect(slotTaskKeys(d, d.slots[0])).toEqual([
             "setup",
             "midway",
             "cleanup"
@@ -49,10 +67,22 @@ describe("slotTaskGroups", () => {
 
     it("the TBD slot never carries tasks and never shifts the ends", () => {
         const d = day({}, [slot("19:00:00"), slot("20:00:00"), slot(null)])
-        expect(slotTaskGroups(d, d.slots[2])).toEqual([])
-        expect(keys(slotTaskGroups(d, d.slots[1]))).toEqual([
-            "midway",
-            "cleanup"
+        expect(slotTaskKeys(d, d.slots[2])).toEqual([])
+        expect(slotTaskKeys(d, d.slots[0])).toEqual(["setup", "midway"])
+        expect(slotTaskKeys(d, d.slots[1])).toEqual(["cleanup"])
+    })
+})
+
+describe("resolveTaskGroups / slotTaskGroups", () => {
+    it("the reference list labels every conditional line", () => {
+        const conditional = TASK_GROUPS.flatMap((g) => g.lines).filter(
+            (l) => l.when !== null
+        )
+        expect(conditional.map((l) => l.when)).toEqual([
+            "regular_season",
+            "playoff",
+            "last_regular_week",
+            "playoffs_next_week"
         ])
     })
 
@@ -68,36 +98,30 @@ describe("slotTaskGroups", () => {
         const setup = text(slotTaskGroups(d, d.slots[0]))
         expect(setup).toContain("line judges")
         expect(setup).not.toContain("on the ref stand")
-        const end = text(slotTaskGroups(d, d.slots[2]))
-        expect(end).toContain("clipboards and flags")
-        expect(end).toContain("volleyballs and two flags")
-        expect(end).toContain("Playoff scoresheets")
-        expect(end).not.toContain("Last week of the regular season")
+        const mid = text(slotTaskGroups(d, d.slots[1]))
+        expect(mid).toContain("Playoff scoresheets")
+        expect(mid).not.toContain("Place two flags")
     })
 
     it("the last regular-season week places flags and pulls playoff scoresheets", () => {
         const d = day({ nextEventType: "playoff" })
-        const end = text(slotTaskGroups(d, d.slots[2]))
-        expect(end).toContain("Last week of the regular season")
-        expect(end).toContain("Playoff scoresheets")
-        expect(end).not.toContain("Pull out new scoresheets")
+        const mid = text(slotTaskGroups(d, d.slots[1]))
+        expect(mid).toContain("Place two flags")
+        expect(mid).toContain("Playoff scoresheets")
     })
 
     it("a mid-season week pulls regular scoresheets only", () => {
         const d = day()
-        const end = text(slotTaskGroups(d, d.slots[2]))
-        expect(end).toContain("Pull out new scoresheets")
-        expect(end).not.toContain("Playoff scoresheets")
-        expect(end).not.toContain("Last week of the regular season")
-        expect(end).toContain("load the next scoresheets")
+        const mid = text(slotTaskGroups(d, d.slots[1]))
+        expect(mid).toContain("Pull out new scoresheets")
+        expect(mid).not.toContain("Playoff scoresheets")
+        expect(mid).not.toContain("Place two flags")
     })
 
-    it("the final night of the season pulls and loads no scoresheets", () => {
-        const d = day({ eventType: "playoff", nextEventType: null })
-        const end = text(slotTaskGroups(d, d.slots[2]))
-        expect(end).not.toContain("scoresheets from the supply bin")
-        expect(end).not.toContain("load the next scoresheets")
-        expect(end).toContain("BRING THE SCORESHEETS WITH YOU")
+    it("keeps group order and hints when resolving", () => {
+        const groups = resolveTaskGroups(day())
+        expect(groups.map((g) => g.key)).toEqual(["setup", "midway", "cleanup"])
+        expect(groups[0].hint).toBe("plan for ~10 minutes")
     })
 })
 
