@@ -14,10 +14,13 @@ import type { SheetEventType, SheetNight } from "./types"
 
 /**
  * Bumped whenever the printed geometry changes in a way that would break a
- * reader built against the old layout. Printed on the sheet and carried in
- * the QR link so a photo can always be matched to the template that made it.
+ * reader built against the old layout. Carried in the page's machine tag so
+ * a photo can always be matched to the template that printed it.
+ *
+ * v2: the third checkbox in each game cell became a WIN tick (the team that
+ * won the game) where v1 had a forfeit tick, and moved 1.5pt right.
  */
-export const TEMPLATE_VERSION = 1
+export const TEMPLATE_VERSION = 2
 
 export interface GameRule {
     game: 1 | 2 | 3
@@ -78,10 +81,11 @@ export function ruleLines(eventType: SheetEventType): string[] {
 
 /**
  * How to fill the sheet. Printed in bold above the match blocks because the
- * FINAL boxes are new and are the only thing a reader will later parse.
+ * FINAL boxes and the WIN tick are new, and between them are everything a
+ * reader will later parse.
  */
 export const FILL_INSTRUCTION =
-    "Slash each point as it is scored. At the end of every game write the FINAL score in the boxes, one digit per box."
+    "Slash each point as scored. After each game: write the FINAL score, one digit per box, and tick WIN for the winner."
 
 /** "fall" + 2026 -> "F26". */
 export function seasonCodeFor(seasonName: string, year: number): string {

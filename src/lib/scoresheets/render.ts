@@ -434,7 +434,9 @@ function drawTeamLabel(
     fonts: Fonts
 ) {
     const maxWidth = block.labelColumn.w - 8
-    const nameTop = rowY + rowH - 11
+    const captainLine =
+        team.captains.length > 0 ? `C: ${team.captains.join(", ")}` : null
+    const captainGap = 9
 
     const fitted = fitTextToCell({
         text: team.name,
@@ -443,25 +445,33 @@ function drawTeamLabel(
         minFontSize: 6.5,
         font: fonts.bold
     })
+
+    // Centre the name (plus its captain line, when there is one) against the
+    // team's row, so the label sits level with the tally grid beside it
+    // rather than riding at the top of the row.
+    const stackHeight = fitted.fontSize + (captainLine ? captainGap : 0)
+    const nameBaseline =
+        rowY + (rowH - stackHeight) / 2 + (captainLine ? captainGap : 0)
+
     page.drawText(fitted.text, {
         x: block.labelColumn.x,
-        y: nameTop,
+        y: nameBaseline,
         size: fitted.fontSize,
         font: fonts.bold,
         color: team.isPlaceholder ? GREY : BLACK
     })
 
-    if (team.captains.length > 0) {
+    if (captainLine) {
         page.drawText(
             truncateToFit({
-                text: `C: ${team.captains.join(", ")}`,
+                text: captainLine,
                 maxWidth,
                 fontSize: 7,
                 font: fonts.regular
             }),
             {
                 x: block.labelColumn.x,
-                y: nameTop - 9,
+                y: nameBaseline - captainGap,
                 size: 7,
                 font: fonts.regular,
                 color: GREY
@@ -535,14 +545,16 @@ function drawGameCell(page: PDFPage, game: GameGeometry, fonts: Fonts) {
         drawBox(page, digit, 1.1, BLACK)
     }
 
-    page.drawText("FFT", {
-        x: game.forfeit.x - 13,
+    // Ticked by the winner of the game. Two independent records of the same
+    // outcome, so a reader can flag a sheet whose boxes disagree.
+    page.drawText("WIN", {
+        x: game.win.x - 15,
         y: boxBaseline,
         size: 6,
-        font: fonts.regular,
+        font: fonts.bold,
         color: GREY
     })
-    drawBox(page, game.forfeit, 0.7, GREY)
+    drawBox(page, game.win, 0.9, BLACK)
 }
 
 function drawBlockFooter(

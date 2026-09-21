@@ -65,7 +65,7 @@ const MAX_BLOCK_HEIGHT = 150
 const LABEL_COLUMN_WIDTH = 150
 const GAME_GAP = 6
 
-/** The row holding timeouts, the FINAL digit boxes and the forfeit tick. */
+/** The row holding timeouts, the FINAL digit boxes and the win tick. */
 const FINAL_LINE_HEIGHT = 16
 const DIGIT_BOX = 13
 const CHECK_BOX = 7.5
@@ -89,7 +89,8 @@ export interface GameGeometry {
     /** Tens then ones. The only fields a reader must interpret. */
     finalDigits: [BoxRect, BoxRect]
     timeouts: [BoxRect, BoxRect]
-    forfeit: BoxRect
+    /** Ticked for the team that won this game: a check on the digits. */
+    win: BoxRect
     tally: TallyGeometry
 }
 
@@ -187,13 +188,13 @@ function buildGameCells(
         const digitY = finalBottom + (FINAL_LINE_HEIGHT - DIGIT_BOX) / 2
         const checkY = finalBottom + (FINAL_LINE_HEIGHT - CHECK_BOX) / 2
 
-        // Left to right across the row: T.O. [][]  FINAL [][]  FFT []
+        // Left to right across the row: T.O. [][]  FINAL [][]  WIN []
         const x = column.x
         const timeout1X = x + 15
         const timeout2X = timeout1X + CHECK_BOX + 1.5
         const digit1X = x + 59.5
         const digit2X = digit1X + DIGIT_BOX + 2
-        const forfeitX = digit2X + DIGIT_BOX + 17.5
+        const winX = digit2X + DIGIT_BOX + 19
 
         return {
             matchId,
@@ -207,7 +208,7 @@ function buildGameCells(
                 { x: timeout1X, y: checkY, w: CHECK_BOX, h: CHECK_BOX },
                 { x: timeout2X, y: checkY, w: CHECK_BOX, h: CHECK_BOX }
             ] as [BoxRect, BoxRect],
-            forfeit: { x: forfeitX, y: checkY, w: CHECK_BOX, h: CHECK_BOX },
+            win: { x: winX, y: checkY, w: CHECK_BOX, h: CHECK_BOX },
             tally: {
                 x: column.x,
                 y: tallyBottom,

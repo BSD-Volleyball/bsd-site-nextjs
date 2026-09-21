@@ -181,7 +181,7 @@ describe("buildSheetGeometry", () => {
                         const boxes: BoxRect[] = [
                             ...game.finalDigits,
                             ...game.timeouts,
-                            game.forfeit
+                            game.win
                         ]
                         for (const box of boxes) {
                             expect(box.x).toBeGreaterThanOrEqual(column.x)
@@ -198,7 +198,7 @@ describe("buildSheetGeometry", () => {
                     const boxes: BoxRect[] = geometry.games.flatMap((game) => [
                         ...game.finalDigits,
                         ...game.timeouts,
-                        game.forfeit
+                        game.win
                     ])
                     for (let i = 0; i < boxes.length; i++) {
                         for (let j = i + 1; j < boxes.length; j++) {
