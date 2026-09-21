@@ -162,6 +162,13 @@
       "when": 1789910859625,
       "tag": "0022_coverage_presence",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790007301680,
+      "tag": "0023_score_sheet_prints",
+      "breakpoints": true
     }
   ]
 }

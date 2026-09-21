@@ -20,6 +20,7 @@ import {
 import { isAdminOrDirector } from "@/lib/rbac"
 
 import { loadScoreSheetNight } from "./load"
+import { recordScoreSheetPrints } from "./prints"
 import { renderScoreSheetsPdf } from "./render"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -42,7 +43,8 @@ async function currentSeasonId(): Promise<number | null> {
  * digest; callers that need authorization use `generateScoreSheetsPdf`.
  */
 export async function buildScoreSheetsPdfBytes(
-    date: string
+    date: string,
+    userId: string | null = null
 ): Promise<{ bytes: Uint8Array; fileName: string } | null> {
     if (!DATE_RE.test(date)) return null
 
@@ -51,6 +53,11 @@ export async function buildScoreSheetsPdfBytes(
 
     const night = await loadScoreSheetNight(seasonId, date)
     if (!night || night.courts.length === 0) return null
+
+    // Remember the layout these pages were printed with, so a photo of them
+    // can later be read with the exact boxes that reached the paper. Both the
+    // download and the coverage digest funnel through here.
+    await recordScoreSheetPrints(night, seasonId, userId)
 
     return {
         bytes: await renderScoreSheetsPdf(night),
@@ -73,7 +80,7 @@ export async function generateScoreSheetsPdf(
     }
 
     try {
-        const result = await buildScoreSheetsPdfBytes(date)
+        const result = await buildScoreSheetsPdfBytes(date, userId)
         if (!result) {
             return pdfErrorResponse(
                 "No matches are scheduled for that date.",

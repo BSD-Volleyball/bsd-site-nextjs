@@ -2,7 +2,7 @@ import { PDFDocument } from "pdf-lib"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { db } from "@/database/db"
-import { matchReferees, playoffMatchesMeta } from "@/database/schema"
+import { matchReferees, matches, playoffMatchesMeta } from "@/database/schema"
 import { sendCoverageDigestForDate } from "@/lib/notifications/coverage-digest"
 import { sendBatchEmails } from "@/lib/postmark"
 import {
@@ -16,6 +16,8 @@ import { createUser, createUserWithRoles, logout } from "@/test/session"
 
 import { buildScoreSheetsPdfBytes, generateScoreSheetsPdf } from "./generate"
 import { loadScoreSheetNight } from "./load"
+import { findScoreSheetPrint, listScoreSheetPrints } from "./prints"
+import { sheetTag, TEMPLATE_VERSION } from "./sheet-config"
 
 const NIGHT = "2026-10-05"
 const mockedSendBatch = vi.mocked(sendBatchEmails)
@@ -428,5 +430,75 @@ describe("coverage digest attachment", () => {
         const messages = mockedSendBatch.mock.calls[0][0]
         expect(messages[0].attachments).toBeUndefined()
         expect(messages[0].htmlBody).not.toContain("Attached")
+    })
+})
+
+describe("score sheet print records", () => {
+    it("records the printed geometry for every court", async () => {
+        const seeded = await seedRegularNight()
+        await buildScoreSheetsPdfBytes(NIGHT)
+
+        const prints = await listScoreSheetPrints(seeded.seasonId, NIGHT)
+        expect(prints.map((p) => p.court).sort()).toEqual([1, 2])
+
+        const night = await loadScoreSheetNight(seeded.seasonId, NIGHT)
+        expect(night).not.toBeNull()
+        if (!night) return
+
+        const courtOne = night.courts.find((c) => c.court === 1)
+        const printed = prints.find((p) => p.court === 1)
+        expect(printed?.tag).toBe(sheetTag(night, 1))
+        expect(printed?.templateVersion).toBe(TEMPLATE_VERSION)
+        expect(printed?.eventType).toBe("regular_season")
+        // Ordered exactly as the blocks were printed down the page
+        expect(printed?.matchIds).toEqual(
+            courtOne?.matches.map((m) => m.matchId)
+        )
+    })
+
+    it("is found by the tag a photo's QR would carry", async () => {
+        const seeded = await seedRegularNight()
+        await buildScoreSheetsPdfBytes(NIGHT)
+
+        const night = await loadScoreSheetNight(seeded.seasonId, NIGHT)
+        if (!night) throw new Error("night missing")
+
+        const found = await findScoreSheetPrint(sheetTag(night, 2))
+        expect(found?.court).toBe(2)
+        expect(found?.matchIds).toHaveLength(1)
+        expect(await findScoreSheetPrint("BSD2:XX:W9:2099-01-01:9")).toBeNull()
+    })
+
+    it("overwrites the record when a sheet is reprinted", async () => {
+        const seeded = await seedRegularNight()
+        await buildScoreSheetsPdfBytes(NIGHT)
+
+        const before = await listScoreSheetPrints(seeded.seasonId, NIGHT)
+        const courtTwoBefore = before.find((p) => p.court === 2)
+        expect(courtTwoBefore?.matchIds).toHaveLength(1)
+
+        // The schedule changes: another match is added to court 2
+        await db.insert(matches).values({
+            season: seeded.seasonId,
+            division: seeded.divisionA,
+            week: 3,
+            date: NIGHT,
+            time: "20:10:00",
+            court: 2,
+            home_team: null,
+            away_team: null
+        })
+
+        await buildScoreSheetsPdfBytes(NIGHT)
+
+        const after = await listScoreSheetPrints(seeded.seasonId, NIGHT)
+        // Still one row per court, not a second one for the same tag
+        expect(after.filter((p) => p.court === 2)).toHaveLength(1)
+        expect(after.find((p) => p.court === 2)?.matchIds).toHaveLength(2)
+    })
+
+    it("does not fail a download when recording is impossible", async () => {
+        // No season at all: the generator returns null rather than throwing
+        expect(await buildScoreSheetsPdfBytes("2099-01-01")).toBeNull()
     })
 })

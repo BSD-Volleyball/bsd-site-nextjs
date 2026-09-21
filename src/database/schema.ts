@@ -1462,6 +1462,53 @@ export const scoreSheets = pgTable(
     })
 )
 
+/**
+ * What a printed score sheet's geometry was, so a photo of it can be read
+ * with the exact boxes that were printed.
+ *
+ * `buildSheetGeometry()` depends on only the ordered match ids, how many
+ * there are, and the event type — nothing about names, times or referees
+ * moves a coordinate. Storing those few facts at generation time therefore
+ * reproduces the printed layout exactly, even if the schedule changes
+ * afterwards. Keyed by the tag encoded in the page's machine-readable QR
+ * (`sheetTag()`, e.g. `BSD2:F26:W3:2026-10-05:4`); regenerating a sheet
+ * overwrites the row, because a reprint means the older copy is obsolete.
+ */
+export const scoreSheetPrints = pgTable(
+    "score_sheet_prints",
+    {
+        id: serial("id").primaryKey(),
+        tag: text("tag").notNull(),
+        season_id: integer("season_id")
+            .notNull()
+            .references(() => seasons.id, { onDelete: "cascade" }),
+        match_date: date("match_date", { mode: "string" }).notNull(),
+        /** Null for the trailing sheet of matches with no court assigned. */
+        court: integer("court"),
+        template_version: integer("template_version").notNull(),
+        event_type: text("event_type").notNull(),
+        /** Ordered exactly as the blocks were printed down the page. */
+        match_ids: integer("match_ids")
+            .array()
+            .notNull()
+            .default(sql`'{}'::integer[]`),
+        generated_at: timestamp("generated_at").defaultNow().notNull(),
+        /** Null when the coverage digest cron generated the sheet. */
+        generated_by: text("generated_by").references(() => users.id, {
+            onDelete: "set null"
+        })
+    },
+    (table) => ({
+        scoreSheetPrintsTagUniq: uniqueIndex("score_sheet_prints_tag_uniq").on(
+            table.tag
+        ),
+        scoreSheetPrintsDateIdx: index("score_sheet_prints_date_idx").on(
+            table.season_id,
+            table.match_date
+        )
+    })
+)
+
 // user_roles: multi-role assignment table supporting season/division scoping.
 // Replaces users.role column and commissioners table as the source of truth
 // for authorization. Permissions are defined in src/lib/permissions.ts.

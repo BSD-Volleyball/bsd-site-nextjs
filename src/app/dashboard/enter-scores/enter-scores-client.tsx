@@ -10,6 +10,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { compressImageForUpload } from "@/lib/image-compression"
+import { SCORE_SHEET_COMPRESSION } from "@/lib/scoresheets/capture"
 import {
     createScoreSheetUpload,
     deleteScoreSheet,
@@ -304,7 +305,10 @@ export function EnterScoresClient({
         try {
             let processedImage: { blob: Blob }
             try {
-                processedImage = await compressImageForUpload(file)
+                processedImage = await compressImageForUpload(
+                    file,
+                    SCORE_SHEET_COMPRESSION
+                )
             } catch {
                 toast.error(
                     "Could not process that image. Please try another photo."
