@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 import { db } from "@/database/db"
-import { scoreSheetReads, scoreSheets } from "@/database/schema"
+import {
+    matches,
+    scoreSheetReads,
+    scoreSheetScoreSamples,
+    scoreSheets
+} from "@/database/schema"
 import { getR2Object } from "@/lib/r2"
 import {
     createDivision,
@@ -18,6 +23,7 @@ import { loadScoreSheetNight } from "../load"
 import { sheetTag } from "../sheet-config"
 import { cropId } from "./crops"
 import { processScoreSheet } from "./pipeline"
+import { labelConfirmedSamples } from "./samples"
 import { distort, toJpeg } from "./testing/distort"
 import { type GameTruth, synthesizeSheet } from "./testing/synthesize"
 import { stubTranscriber } from "./transcriber/stub"
@@ -259,5 +265,100 @@ describe("processScoreSheet", () => {
         // No digits, so it needs a human, but the sheet was still identified
         expect(result.status).toBe("needs_review")
         expect(result.read?.tag).not.toBeNull()
+    })
+})
+
+describe("the training corpus", () => {
+    it("keeps each cropped box and what the reader thought", async () => {
+        const { seasonId, matchIds } = await seedNight()
+        const scores = twoNil(matchIds[0])
+        const { scoreSheetId } = await uploadPhoto({
+            seasonId,
+            matchIds,
+            scores
+        })
+        const truth = new Map<string, number | null>(
+            scores.map((g) => [cropId(g.matchId, g.team, g.game), g.score])
+        )
+
+        await processScoreSheet({
+            scoreSheetId,
+            seasonId,
+            transcriber: stubTranscriber({ truth })
+        })
+
+        const samples = await db.select().from(scoreSheetScoreSamples)
+        // The four boxes that were written in
+        expect(samples).toHaveLength(4)
+        for (const sample of samples) {
+            expect(sample.image_path).toContain("scoresheet-samples/")
+            expect(sample.confirmed).toBeNull()
+        }
+        const first = samples.find(
+            (s) => s.crop_id === cropId(matchIds[0], "home", 1)
+        )
+        expect(first?.predicted).toBe(25)
+    })
+
+    it("labels them with the scores that were actually saved", async () => {
+        const { seasonId, matchIds } = await seedNight()
+        const scores = twoNil(matchIds[0])
+        const { scoreSheetId } = await uploadPhoto({
+            seasonId,
+            matchIds,
+            scores
+        })
+        const truth = new Map<string, number | null>(
+            scores.map((g) => [cropId(g.matchId, g.team, g.game), g.score])
+        )
+        await processScoreSheet({
+            scoreSheetId,
+            seasonId,
+            transcriber: stubTranscriber({ truth })
+        })
+
+        // An admin saves a different game-1 score than the reader proposed
+        await db
+            .update(matches)
+            .set({
+                home_set1_score: 27,
+                away_set1_score: 25,
+                home_set2_score: 25,
+                away_set2_score: 21
+            })
+            .where(eq(matches.id, matchIds[0]))
+
+        const labelled = await labelConfirmedSamples([matchIds[0]])
+        expect(labelled).toBe(4)
+
+        const samples = await db.select().from(scoreSheetScoreSamples)
+        const corrected = samples.find(
+            (s) => s.crop_id === cropId(matchIds[0], "home", 1)
+        )
+        // The label follows what the league believes, not what was predicted
+        expect(corrected?.predicted).toBe(25)
+        expect(corrected?.confirmed).toBe(27)
+    })
+
+    it("leaves a sample unlabelled until its match has a score", async () => {
+        const { seasonId, matchIds } = await seedNight()
+        const scores = twoNil(matchIds[0])
+        const { scoreSheetId } = await uploadPhoto({
+            seasonId,
+            matchIds,
+            scores
+        })
+        const truth = new Map<string, number | null>(
+            scores.map((g) => [cropId(g.matchId, g.team, g.game), g.score])
+        )
+        await processScoreSheet({
+            scoreSheetId,
+            seasonId,
+            transcriber: stubTranscriber({ truth })
+        })
+
+        expect(await labelConfirmedSamples([matchIds[0]])).toBe(0)
+        const samples = await db.select().from(scoreSheetScoreSamples)
+        expect(samples.every((s) => s.confirmed === null)).toBe(true)
     })
 })

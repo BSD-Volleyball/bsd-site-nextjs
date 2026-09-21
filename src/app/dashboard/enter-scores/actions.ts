@@ -25,6 +25,7 @@ import {
     PLAYER_PICTURE_MAX_BYTES
 } from "@/lib/r2"
 import { logAuditEntry } from "@/lib/audit-log"
+import { labelConfirmedSamples } from "@/lib/scoresheets/read/samples"
 import { parseSourceToken } from "@/lib/playoff-sources"
 
 async function getEnterScoresSeasonId(): Promise<number | null> {
@@ -869,6 +870,16 @@ export async function saveScoresForDivision(
                 }
             }
         })
+
+        // Any cropped boxes kept from a photograph of these matches can now
+        // be labelled with what was actually saved, which is how a corpus of
+        // real handwriting accumulates without anyone doing extra work. Never
+        // allowed to affect the save: the scores are the point.
+        try {
+            await labelConfirmedSamples(matchScores.map((m) => m.matchId))
+        } catch {
+            // Deliberately ignored; recorded inside labelConfirmedSamples.
+        }
 
         const session = await auth.api.getSession({
             headers: await headers()

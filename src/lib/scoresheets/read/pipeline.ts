@@ -21,6 +21,7 @@ import type { SheetEventType } from "../types"
 import { decodeJpeg } from "./image"
 import { readSheetTagFromPhoto } from "./identity"
 import { readSheet, type SheetRead } from "./read"
+import { storeScoreSamples } from "./samples"
 import type { Transcriber } from "./transcriber/port"
 import { nullTranscriber } from "./transcriber/stub"
 import { transcriberFromEnv } from "./transcriber/vision"
@@ -222,7 +223,7 @@ export async function processScoreSheet(
                 .where(eq(scoreSheets.id, opts.scoreSheetId))
         }
 
-        await upsertRead(opts.scoreSheetId, {
+        const stored = await upsertRead(opts.scoreSheetId, {
             status,
             attempts,
             tag: result.tag,
@@ -236,6 +237,16 @@ export async function processScoreSheet(
             finished_at: new Date(),
             error: null
         })
+
+        // Keep the crops alongside what the reader thought they said. The
+        // confirmed answer arrives later, when the night is saved.
+        if (stored && result.crops.length > 0) {
+            await storeScoreSamples(
+                stored,
+                { ...result, problems },
+                result.crops
+            )
+        }
 
         return { status, read: { ...result, problems }, problems }
     } catch (error) {
@@ -268,8 +279,12 @@ async function finish(
 
 type ReadUpdate = Partial<typeof scoreSheetReads.$inferInsert>
 
-async function upsertRead(scoreSheetId: number, values: ReadUpdate) {
-    await db
+/** Returns the read row's id, which the sample corpus is keyed on. */
+async function upsertRead(
+    scoreSheetId: number,
+    values: ReadUpdate
+): Promise<number | null> {
+    const [row] = await db
         .insert(scoreSheetReads)
         .values({
             score_sheet_id: scoreSheetId,
@@ -280,6 +295,8 @@ async function upsertRead(scoreSheetId: number, values: ReadUpdate) {
             target: scoreSheetReads.score_sheet_id,
             set: values
         })
+        .returning({ id: scoreSheetReads.id })
+    return row?.id ?? null
 }
 
 /** The stored read for an upload, for the review UI. */

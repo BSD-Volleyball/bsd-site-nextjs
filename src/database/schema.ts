@@ -1566,6 +1566,45 @@ export const scoreSheetReads = pgTable(
     })
 )
 
+/**
+ * A cropped score box kept alongside what it turned out to be.
+ *
+ * Every sheet an admin confirms hands back real, in-domain training data for
+ * free: the image of two handwritten digits, and the number a human agreed
+ * they said. Enough of these and a small classifier can be trained on how
+ * this league's referees actually write, which is the path off a hosted
+ * model. Stored as the digit *pair*, because a future trainer can split it
+ * using the same geometry that cropped it.
+ */
+export const scoreSheetScoreSamples = pgTable(
+    "score_sheet_score_samples",
+    {
+        id: serial("id").primaryKey(),
+        read_id: integer("read_id")
+            .notNull()
+            .references(() => scoreSheetReads.id, { onDelete: "cascade" }),
+        /** `${matchId}:${team}:${game}`, the crop's identity within a sheet. */
+        crop_id: text("crop_id").notNull(),
+        match_id: integer("match_id"),
+        /** R2 key of the cropped image. */
+        image_path: text("image_path").notNull(),
+        /** What the reader thought, before a human looked. */
+        predicted: integer("predicted"),
+        predicted_confidence: numeric("predicted_confidence"),
+        /** What was actually saved; null until the night is confirmed. */
+        confirmed: integer("confirmed"),
+        created_at: timestamp("created_at").defaultNow().notNull()
+    },
+    (table) => ({
+        scoreSheetScoreSamplesCropUniq: uniqueIndex(
+            "score_sheet_score_samples_crop_uniq"
+        ).on(table.read_id, table.crop_id),
+        scoreSheetScoreSamplesConfirmedIdx: index(
+            "score_sheet_score_samples_confirmed_idx"
+        ).on(table.confirmed)
+    })
+)
+
 // user_roles: multi-role assignment table supporting season/division scoping.
 // Replaces users.role column and commissioners table as the source of truth
 // for authorization. Permissions are defined in src/lib/permissions.ts.

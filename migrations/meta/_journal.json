@@ -176,6 +176,13 @@
       "when": 1790009224249,
       "tag": "0024_score_sheet_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790010591050,
+      "tag": "0025_score_sheet_samples",
+      "breakpoints": true
     }
   ]
 }
