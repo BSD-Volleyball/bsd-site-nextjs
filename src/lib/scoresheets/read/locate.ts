@@ -15,7 +15,12 @@
  * upright and can be given the white margin the print lacks.
  */
 
-import { buildFiducials, PAGE_HEIGHT, PAGE_WIDTH } from "../layout"
+import {
+    buildFiducials,
+    buildSheetGeometry,
+    PAGE_HEIGHT,
+    PAGE_WIDTH
+} from "../layout"
 import { binarize } from "./binarize"
 import { type Blob, findBlobs, squareCandidates } from "./blobs"
 import {
@@ -26,7 +31,7 @@ import {
     rectCorners,
     solveHomography
 } from "./homography"
-import { downscale, type RasterImage } from "./image"
+import { downscale, meanOverRect, type RasterImage } from "./image"
 
 export type LocateMethod = "fiducial" | "qr" | "fiducial+qr"
 
@@ -43,6 +48,9 @@ export interface PageTransform {
 
 /** Detection runs on a downscaled copy; full resolution buys nothing here. */
 const DETECT_MAX_DIMENSION = 1400
+
+/** Below this the candidate transform is not looking at a score sheet. */
+const MIN_CONTENT_SCORE = 0.35
 
 /** Page-space centres of the four registration squares. */
 function fiducialCentres(): Point[] {
@@ -75,26 +83,25 @@ function cyclicOrder(points: readonly Point[]): number[] {
 /**
  * Match four detected squares to the four printed ones.
  *
- * The half-size marker anchors the correspondence: whichever blob is clearly
- * the smallest must be the bottom-right one. That leaves only the direction of
- * travel around the page in doubt, which is two possibilities, and the better
- * of the two is simply the one that reprojects with less error.
+ * The obvious scoring rule does not work here. Four correspondences determine
+ * a homography exactly, so *every* assignment reprojects with zero error: a
+ * page rectified ninety degrees out scores just as well as the right one. The
+ * assignment has to be judged on whether the resulting transform actually
+ * lands on the page's printing, which is what `scoreTransform` measures.
+ *
+ * The half-size marker suggests which corner is bottom-right, so the two
+ * assignments anchored on it are tried first; the other rotations follow in
+ * case it was mis-measured. The winner is whichever one finds the ink.
  */
 function matchFiducials(
+    img: RasterImage,
     blobs: readonly Blob[],
     scale: number
-): { toImage: Matrix3; residualPt: number } | null {
+): { toImage: Matrix3; score: number } | null {
     if (blobs.length < 4) return null
 
     const sides = blobs.map((b) => (b.width + b.height) / 2)
     const smallest = sides.indexOf(Math.min(...sides))
-    const others = sides.filter((_, i) => i !== smallest)
-    const medianOther = others.sort((a, b) => a - b)[
-        Math.floor(others.length / 2)
-    ]
-    // The half-size marker should be visibly smaller; if nothing is, the
-    // orientation is undetermined and the QR path is the honest fallback.
-    if (sides[smallest] > medianOther * 0.8) return null
 
     const points: Point[] = blobs.map((b) => ({ x: b.cx, y: b.cy }))
     const order = cyclicOrder(points)
@@ -105,43 +112,77 @@ function matchFiducials(
     const expectedOrder = cyclicOrder(expected)
     const expectedSmallPos = expectedOrder.indexOf(SMALL_INDEX)
 
-    let best: { toImage: Matrix3; residualPt: number } | null = null
+    let best: { toImage: Matrix3; score: number } | null = null
 
-    for (const direction of [1, -1]) {
-        const src: Point[] = []
-        const dst: Point[] = []
-        for (let k = 0; k < 4; k++) {
-            const detected = order[(smallPos + direction * k + 8) % 4]
-            const printed = expectedOrder[(expectedSmallPos + k) % 4]
-            src.push(expected[printed])
-            dst.push({
-                x: points[detected].x / scale,
-                y: points[detected].y / scale
-            })
-        }
+    for (const rotation of [0, 1, 2, 3]) {
+        for (const direction of [1, -1]) {
+            const src: Point[] = []
+            const dst: Point[] = []
+            for (let k = 0; k < 4; k++) {
+                const detected =
+                    order[(smallPos + rotation + direction * k + 8) % 4]
+                const printed = expectedOrder[(expectedSmallPos + k) % 4]
+                src.push(expected[printed])
+                dst.push({
+                    x: points[detected].x / scale,
+                    y: points[detected].y / scale
+                })
+            }
 
-        const h = solveHomography(src, dst)
-        if (!h) continue
-        const toPage = invertH(h)
-        if (!toPage) continue
+            const h = solveHomography(src, dst)
+            if (!h || !invertH(h)) continue
 
-        // Residual measured in page points, by mapping the observed corners
-        // back and comparing against where they were printed.
-        const back = dst.map((p) => applyH(toPage, p))
-        const residualPt = Math.sqrt(
-            back.reduce(
-                (acc, p, i) =>
-                    acc + (p.x - src[i].x) ** 2 + (p.y - src[i].y) ** 2,
-                0
-            ) / back.length
-        )
-
-        if (!best || residualPt < best.residualPt) {
-            best = { toImage: h, residualPt }
+            const score = scoreTransform(img, h)
+            if (!best || score > best.score) best = { toImage: h, score }
         }
     }
 
     return best
+}
+
+/**
+ * How much a candidate transform looks like it found the printed page.
+ *
+ * Two features are on every sheet and sit asymmetrically, which is what pins
+ * the orientation down: the ref-notes box, a wide outlined rectangle across
+ * the bottom left, and the machine tag beside it, which is dense and busy in a
+ * way blank paper never is. A transform rotated or mirrored puts both over
+ * empty margin and scores near nothing.
+ */
+function scoreTransform(img: RasterImage, toImage: Matrix3): number {
+    const geometry = buildSheetGeometry(
+        { court: null, matches: [] },
+        "regular_season"
+    )
+    const notes = geometry.refNotes
+    const edge = 2
+
+    // The notes box is an outline: its edges carry ink, its middle does not.
+    const top = meanOverRect(img, toImage, {
+        x: notes.x,
+        y: notes.y + notes.h - edge,
+        w: notes.w,
+        h: edge
+    })
+    const bottom = meanOverRect(img, toImage, {
+        x: notes.x,
+        y: notes.y,
+        w: notes.w,
+        h: edge
+    })
+    const middle = meanOverRect(img, toImage, {
+        x: notes.x + notes.w * 0.2,
+        y: notes.y + notes.h * 0.35,
+        w: notes.w * 0.6,
+        h: notes.h * 0.3
+    })
+    const outlineScore = Math.max(0, middle - Math.min(top, bottom)) / 255
+
+    // A QR is roughly half ink; paper is not.
+    const tagInk = 1 - meanOverRect(img, toImage, geometry.tagQr, 16) / 255
+    const tagScore = 1 - Math.abs(tagInk - 0.45) / 0.45
+
+    return outlineScore * 2 + Math.max(0, tagScore)
 }
 
 export interface QrDetection {
@@ -202,29 +243,32 @@ export function locatePage(
     const candidates = squareCandidates(blobs, { expectedSide })
 
     const corners = pickCornerCandidates(candidates, small.width, small.height)
-    const byFiducial = corners ? matchFiducials(corners, scale) : null
+    const byFiducial = corners ? matchFiducials(img, corners, scale) : null
 
-    let chosen = byFiducial
+    let toImage: Matrix3 | null = byFiducial?.toImage ?? null
     let method: LocateMethod = "fiducial"
     let fiducialsFound = corners?.length ?? 0
+    let residualPt = 0
 
-    if (!chosen && opts.qr && opts.tagQrRect) {
-        chosen = fromQr(opts.qr, opts.tagQrRect)
-        method = "qr"
-        fiducialsFound = 0
+    // A transform that cannot find the ref-notes box or the tag is not a
+    // transform; fall back rather than hand back a confident wrong answer.
+    if (byFiducial && byFiducial.score < MIN_CONTENT_SCORE) toImage = null
+
+    if (!toImage && opts.qr && opts.tagQrRect) {
+        const fromQrFit = fromQr(opts.qr, opts.tagQrRect)
+        if (fromQrFit) {
+            toImage = fromQrFit.toImage
+            residualPt = fromQrFit.residualPt
+            method = "qr"
+            fiducialsFound = 0
+        }
     }
-    if (!chosen) return null
+    if (!toImage) return null
 
-    const toPage = invertH(chosen.toImage)
+    const toPage = invertH(toImage)
     if (!toPage) return null
 
-    return {
-        toImage: chosen.toImage,
-        toPage,
-        method,
-        fiducialsFound,
-        residualPt: chosen.residualPt
-    }
+    return { toImage, toPage, method, fiducialsFound, residualPt }
 }
 
 /**

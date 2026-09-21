@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import { readCheckbox } from "./checkbox"
+import { cropScoreBoxes } from "./crops"
+import { geometryForPrint } from "./read"
 import { parseSheetTag, readSheetTag } from "./identity"
 import { locatePage } from "./locate"
 import { distort } from "./testing/distort"
@@ -201,4 +203,53 @@ describe("reading a photographed sheet", () => {
             }
         }
     })
+})
+
+describe("telling a written box from an empty one", () => {
+    /**
+     * This is the decision that stops a transcriber inventing scores, so the
+     * margin behind it is worth pinning down rather than trusting.
+     */
+    it("separates ink from paper by a wide margin", async () => {
+        const sheet = await synthesizeSheet({
+            matchCount: 4,
+            eventType: "playoff",
+            scale: SCALE,
+            scores: [
+                // The sparsest realistic scores: one digit, tens box empty
+                { matchId: 900, team: "home", game: 1, score: 7, win: false },
+                { matchId: 900, team: "away", game: 1, score: 1, win: false },
+                { matchId: 901, team: "home", game: 1, score: 25, win: true }
+            ]
+        })
+
+        for (const seed of [11, 12, 13]) {
+            const { image } = distort(sheet.image, {
+                seed,
+                perspective: 0.03,
+                rotationDeg: 6,
+                blurSigma: 1.5,
+                noiseSigma: 6,
+                shading: 0.35
+            })
+            const transform = locatePage(image)
+            if (!transform) throw new Error("not located")
+
+            const geometry = geometryForPrint([900, 901, 902, 903], "playoff")
+            const { written, blank } = cropScoreBoxes(
+                image,
+                transform.toImage,
+                geometry,
+                "playoff"
+            )
+
+            // Exactly the three boxes that were written in
+            expect(written).toHaveLength(3)
+            expect(blank).toHaveLength(21)
+            // Even a lone "1" stays well clear of the threshold
+            expect(Math.min(...written.map((w) => w.inkRatio))).toBeGreaterThan(
+                0.03
+            )
+        }
+    }, 60_000)
 })
