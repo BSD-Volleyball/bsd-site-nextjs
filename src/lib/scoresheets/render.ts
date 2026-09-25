@@ -27,7 +27,8 @@ import {
     type GameGeometry,
     PAGE_HEIGHT,
     PAGE_WIDTH,
-    type SheetGeometry
+    type SheetGeometry,
+    type TeamRowGeometry
 } from "./layout"
 import {
     FILL_INSTRUCTION,
@@ -434,13 +435,11 @@ function drawTeamLabel(
     page: PDFPage,
     block: BlockGeometry,
     team: SheetTeam,
-    rowY: number,
-    rowH: number,
-    initials: BoxRect | null,
+    row: TeamRowGeometry,
     fonts: Fonts
 ) {
     const maxWidth = block.labelColumn.w - 8
-    const nameTop = rowY + rowH - 13
+    const { nameBaselineY, captainBaselineY, initials } = row.label
 
     const fitted = fitTextToCell({
         text: team.name,
@@ -451,7 +450,7 @@ function drawTeamLabel(
     })
     page.drawText(fitted.text, {
         x: block.labelColumn.x,
-        y: nameTop,
+        y: nameBaselineY,
         size: fitted.fontSize,
         font: fonts.bold,
         color: team.isPlaceholder ? GREY : BLACK
@@ -467,7 +466,7 @@ function drawTeamLabel(
             }),
             {
                 x: block.labelColumn.x,
-                y: nameTop - 11,
+                y: captainBaselineY,
                 size: 9,
                 font: fonts.regular,
                 color: BLACK
@@ -475,18 +474,16 @@ function drawTeamLabel(
         )
     }
 
-    // One box per captain, under that captain's own name, so there is no
-    // ambiguity about whose initials belong where.
-    if (initials) {
-        drawBox(page, initials, 0.9, BLACK)
-        page.drawText("Captain initial to confirm score", {
-            x: initials.x + initials.w + 5,
-            y: initials.y + initials.h / 2 - 3,
-            size: 8,
-            font: fonts.regular,
-            color: BLACK
-        })
-    }
+    // Directly under that captain's own name, so there is no ambiguity about
+    // whose initials belong where.
+    drawBox(page, initials, 0.9, BLACK)
+    page.drawText("Captain initial to confirm score", {
+        x: initials.x + initials.w + 5,
+        y: initials.y + initials.h / 2 - 3,
+        size: 8,
+        font: fonts.regular,
+        color: BLACK
+    })
 }
 
 function drawGameCell(page: PDFPage, game: GameGeometry, fonts: Fonts) {
@@ -643,29 +640,8 @@ async function drawCourtPage(
             fonts
         )
 
-        const initialsFor = (team: "home" | "away") =>
-            geometry.captainInitials.find(
-                (i) => i.matchId === block.matchId && i.team === team
-            )?.box ?? null
-
-        drawTeamLabel(
-            page,
-            block,
-            match.home,
-            block.rows[0].y,
-            block.rows[0].h,
-            initialsFor("home"),
-            fonts
-        )
-        drawTeamLabel(
-            page,
-            block,
-            match.away,
-            block.rows[1].y,
-            block.rows[1].h,
-            initialsFor("away"),
-            fonts
-        )
+        drawTeamLabel(page, block, match.home, block.rows[0], fonts)
+        drawTeamLabel(page, block, match.away, block.rows[1], fonts)
 
         for (const game of geometry.games) {
             if (game.matchId !== block.matchId) continue

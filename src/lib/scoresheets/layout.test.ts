@@ -221,6 +221,37 @@ describe("buildSheetGeometry", () => {
                     }
                 })
 
+                it("stacks the name, the captain and the box in that order", () => {
+                    for (const block of geometry.blocks) {
+                        for (const row of block.rows) {
+                            const l = row.label
+                            expect(l.captainBaselineY).toBeLessThan(
+                                l.nameBaselineY
+                            )
+                            // The box belongs under the captain it is for, not
+                            // at the foot of the cell.
+                            expect(l.initials.y + l.initials.h).toBeLessThan(
+                                l.captainBaselineY
+                            )
+                        }
+                    }
+                })
+
+                it("centres the three of them in the cell", () => {
+                    for (const block of geometry.blocks) {
+                        for (const row of block.rows) {
+                            const l = row.label
+                            // The name's line box starts one line height above
+                            // its baseline; that is the top of the group.
+                            const groupTop = l.nameBaselineY + 13
+                            const above = row.y + row.h - groupTop
+                            const below = l.initials.y - row.y
+                            expect(above).toBeGreaterThanOrEqual(0)
+                            expect(above).toBeCloseTo(below, 5)
+                        }
+                    }
+                })
+
                 it("keeps every box within its game column", () => {
                     const columnByKey = new Map<
                         string,

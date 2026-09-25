@@ -102,6 +102,22 @@ const CHECK_BOX = 7.5
 const INITIALS_BOX_W = 22
 const INITIALS_BOX_H = 13
 
+/**
+ * The stack of three things in a team's cell: the name, the captain beneath
+ * it, and that captain's initials box beneath that.
+ *
+ * Measured from the top of the group down, so the whole group can be centred
+ * in the row rather than hung from its top edge. A team row is a good deal
+ * taller than these three lines, and pinning the name to the top left the
+ * initials box stranded at the bottom of the cell, nowhere near the captain
+ * whose initials it wants.
+ */
+const NAME_LINE_HEIGHT = 13
+const CAPTAIN_LINE_HEIGHT = 11
+const INITIALS_GAP = 5
+const LABEL_GROUP_HEIGHT =
+    NAME_LINE_HEIGHT + CAPTAIN_LINE_HEIGHT + INITIALS_GAP + INITIALS_BOX_H
+
 export interface TallyGeometry extends BoxRect {
     rows: number
     perRow: number
@@ -124,11 +140,29 @@ export interface GameGeometry {
     tally: TallyGeometry
 }
 
+/**
+ * Where the three stacked items in a team's cell sit.
+ *
+ * Here rather than in the renderer because the renderer may not invent a
+ * coordinate, and because a reader has to know exactly where the initials box
+ * landed. Both baselines and the box come from one calculation, so they cannot
+ * drift apart.
+ */
+export interface TeamLabelGeometry {
+    /** Text baseline for the team name. */
+    nameBaselineY: number
+    /** Text baseline for the captain line below it. */
+    captainBaselineY: number
+    /** The box that captain initials in. */
+    initials: BoxRect
+}
+
 export interface TeamRowGeometry {
     team: "home" | "away"
     /** Bottom edge and height of the whole row. */
     y: number
     h: number
+    label: TeamLabelGeometry
 }
 
 export interface GameColumn {
@@ -153,6 +187,34 @@ export interface BlockGeometry {
     footerH: number
     labelColumn: { x: number; w: number }
     gameColumns: [GameColumn, GameColumn, GameColumn]
+}
+
+/**
+ * Centre the name, the captain and the initials box as one group in a row.
+ *
+ * Everything is placed from the top of the group downwards, which is how the
+ * eye reads it, and the group's top is whatever leaves equal air above and
+ * below. A row shorter than the group would push the box below the row, so the
+ * group is pinned to the top in that case and simply overflows downward, which
+ * no real sheet does.
+ */
+function labelGroup(rowY: number, rowH: number): TeamLabelGeometry {
+    const slack = Math.max(0, rowH - LABEL_GROUP_HEIGHT)
+    const groupTop = rowY + rowH - slack / 2
+
+    const nameBaselineY = groupTop - NAME_LINE_HEIGHT
+    const captainBaselineY = nameBaselineY - CAPTAIN_LINE_HEIGHT
+
+    return {
+        nameBaselineY,
+        captainBaselineY,
+        initials: {
+            x: CONTENT_LEFT,
+            y: captainBaselineY - INITIALS_GAP - INITIALS_BOX_H,
+            w: INITIALS_BOX_W,
+            h: INITIALS_BOX_H
+        }
+    }
 }
 
 export interface SheetGeometry {
@@ -326,8 +388,18 @@ export function buildSheetGeometry(
         const gameColumns = sharedColumns
 
         const rows: [TeamRowGeometry, TeamRowGeometry] = [
-            { team: "home", y: homeBottom, h: teamRowHeight },
-            { team: "away", y: awayBottom, h: teamRowHeight }
+            {
+                team: "home",
+                y: homeBottom,
+                h: teamRowHeight,
+                label: labelGroup(homeBottom, teamRowHeight)
+            },
+            {
+                team: "away",
+                y: awayBottom,
+                h: teamRowHeight,
+                label: labelGroup(awayBottom, teamRowHeight)
+            }
         ]
 
         blocks.push({
@@ -358,18 +430,13 @@ export function buildSheetGeometry(
             )
         }
 
-        // One box per captain, at the foot of that captain's own row, so it
-        // is obvious which signature belongs to which team.
+        // One box per captain, directly under that captain's own name, so it
+        // is obvious which initials belong to which team.
         for (const row of rows) {
             captainInitials.push({
                 matchId: match.matchId,
                 team: row.team,
-                box: {
-                    x: CONTENT_LEFT,
-                    y: row.y + 1.5,
-                    w: INITIALS_BOX_W,
-                    h: INITIALS_BOX_H
-                }
+                box: row.label.initials
             })
         }
     })
