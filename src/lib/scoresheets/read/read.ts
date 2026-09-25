@@ -175,8 +175,16 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
             const constraint = gameConstraint(input.eventType, game)
             const cell = (team: "home" | "away") => {
                 const id = cropId(matchId, team, game)
+                // Null means "this box is empty paper", and only the ink may
+                // say that. A box the transcriber gave no answer for has ink
+                // in it and is merely unreadable, so it gets an empty
+                // candidate instead. Returning null here would let a failed
+                // model turn a played game into a confident "never played" —
+                // the stub answers every crop, so only a real timeout or a
+                // refused request ever took this path, and one did the first
+                // time a real photograph went through.
                 if (blankIds.has(id)) return null
-                return candidates.get(id) ?? null
+                return candidates.get(id) ?? { value: null, confidence: 0 }
             }
             const tick = (team: "home" | "away") => {
                 const box = geometry.games.find(

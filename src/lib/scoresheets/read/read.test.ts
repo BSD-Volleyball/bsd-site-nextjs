@@ -176,6 +176,36 @@ describe("readSheet", () => {
         expect(result.tag).not.toBeNull()
     })
 
+    it("calls a played game unreadable, not blank, when the model fails", async () => {
+        // Scores written, WIN left unticked — which is most of a real sheet,
+        // since referees tick it inconsistently and a faint tick does not
+        // always survive a photograph. With no tick and no digits, every
+        // signal that a game happened comes from the ink in the boxes.
+        const scores: GameTruth[] = [
+            { matchId: 900, team: "home", game: 1, score: 25, win: false },
+            { matchId: 900, team: "away", game: 1, score: 19, win: false },
+            { matchId: 900, team: "home", game: 2, score: 25, win: false },
+            { matchId: 900, team: "away", game: 2, score: 21, win: false }
+        ]
+        const { image } = await photograph({ scores, seed: 211 })
+
+        const result = await readSheet({
+            image,
+            matchIds: MATCH_IDS,
+            eventType: "regular_season",
+            transcriber: stubTranscriber({ truth: new Map(), fail: true })
+        })
+
+        // The failure that matters is not losing the digits, which is
+        // survivable and says so. It is announcing "these games were never
+        // played" at full confidence, which is what a sixty-second timeout
+        // did the first time real photographs went through.
+        for (const game of result.matches[0].games.slice(0, 2)) {
+            expect(game.blank).toBe(false)
+            expect(game.level).toBe("unreadable")
+        }
+    })
+
     it("reports a photo it cannot place instead of guessing", async () => {
         const blank = {
             width: 600,

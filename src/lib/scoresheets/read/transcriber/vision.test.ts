@@ -152,6 +152,77 @@ describe("createVisionTranscriber", () => {
         ).rejects.toThrow(TranscriberError)
     })
 
+    it("splits a whole sheet across several requests", async () => {
+        const many = Array.from({ length: 14 }, (_, i) => crop(`${i}:home:1`))
+        const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+            const body = JSON.parse(init.body as string)
+            const ids: string[] = body.messages[0].content[0].text
+                .match(/\d+:home:1/g)
+                .filter(
+                    (v: string, i: number, a: string[]) => a.indexOf(v) === i
+                )
+            return new Response(
+                JSON.stringify(
+                    completion(
+                        JSON.stringify({
+                            readings: ids.map((id) => ({
+                                id,
+                                value: 25,
+                                confidence: 0.9
+                            }))
+                        })
+                    )
+                )
+            )
+        }) as unknown as typeof fetch
+
+        const readings = await make(fetchImpl).transcribe(many)
+        expect(vi.mocked(fetchImpl).mock.calls.length).toBeGreaterThan(1)
+        expect(readings).toHaveLength(14)
+    })
+
+    it("keeps the boxes it could read when one request fails", async () => {
+        const many = Array.from({ length: 12 }, (_, i) => crop(`${i}:home:1`))
+        let call = 0
+        const fetchImpl = vi.fn(async (_url: string, init: RequestInit) => {
+            call++
+            if (call === 1) return new Response("nope", { status: 500 })
+            const body = JSON.parse(init.body as string)
+            const ids: string[] = body.messages[0].content[0].text
+                .match(/\d+:home:1/g)
+                .filter(
+                    (v: string, i: number, a: string[]) => a.indexOf(v) === i
+                )
+            return new Response(
+                JSON.stringify(
+                    completion(
+                        JSON.stringify({
+                            readings: ids.map((id) => ({
+                                id,
+                                value: 25,
+                                confidence: 0.9
+                            }))
+                        })
+                    )
+                )
+            )
+        }) as unknown as typeof fetch
+
+        // Losing one request costs its own boxes and nothing else; the rest of
+        // the sheet still comes back, and the missing ones read as unreadable.
+        const readings = await make(fetchImpl).transcribe(many)
+        expect(readings.length).toBeGreaterThan(0)
+        expect(readings.length).toBeLessThan(12)
+    })
+
+    it("reports a failure only when every request fails", async () => {
+        const many = Array.from({ length: 12 }, (_, i) => crop(`${i}:home:1`))
+        const fetchImpl = reply("nope", false, 500)
+        await expect(make(fetchImpl).transcribe(many)).rejects.toBeInstanceOf(
+            TranscriberError
+        )
+    })
+
     it("does not call out at all when there is nothing to read", async () => {
         const fetchImpl = reply(completion("{}"))
         expect(await make(fetchImpl).transcribe([])).toEqual([])

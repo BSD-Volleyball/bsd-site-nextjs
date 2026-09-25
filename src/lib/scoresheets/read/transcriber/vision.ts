@@ -40,6 +40,16 @@ const DEFAULT_BASE_URL = "https://ai-gateway.vercel.sh/v1"
  */
 const DEFAULT_MODEL = "alibaba/qwen3.5-flash"
 const TIMEOUT_MS = 60_000
+/**
+ * Crops per request.
+ *
+ * A full sheet is sixteen or eighteen boxes, and sending them in one request
+ * made the whole sheet depend on one slow reply: the first real photographs
+ * from the gym timed out at sixty seconds and lost every score on the page.
+ * Split into chunks, a slow or refused chunk costs only its own boxes, and the
+ * rest of the sheet still comes back.
+ */
+const CROPS_PER_REQUEST = 6
 
 export interface VisionConfig {
     apiKey: string
@@ -111,57 +121,84 @@ export function createVisionTranscriber(config: VisionConfig): Transcriber {
         ): Promise<ScoreReading[]> {
             if (crops.length === 0) return []
 
-            const content = [
-                { type: "text", text: instructions(crops) },
-                ...crops.map((crop) => ({
-                    type: "image_url",
-                    image_url: { url: toDataUrl(crop.png) }
-                }))
-            ]
-
-            const timeout = AbortSignal.timeout(TIMEOUT_MS)
-            const response = await doFetch(`${baseUrl}/chat/completions`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${config.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: config.model,
-                    // Nothing creative is wanted here.
-                    temperature: 0,
-                    response_format: { type: "json_object" },
-                    messages: [{ role: "user", content }]
-                }),
-                signal: signal ? AbortSignal.any([signal, timeout]) : timeout
-            })
-
-            if (!response.ok) {
-                const detail = await response.text().catch(() => "")
-                throw new TranscriberError(
-                    `The reading service returned ${response.status}. ${detail.slice(0, 200)}`
-                )
+            const chunks: ScoreCrop[][] = []
+            for (let i = 0; i < crops.length; i += CROPS_PER_REQUEST) {
+                chunks.push(crops.slice(i, i + CROPS_PER_REQUEST))
             }
 
-            const payload = (await response.json()) as {
-                choices?: { message?: { content?: string } }[]
+            const settled = await Promise.allSettled(
+                chunks.map((chunk) => readChunk(chunk, signal))
+            )
+            const readings = settled.flatMap((r) =>
+                r.status === "fulfilled" ? r.value : []
+            )
+            // Only a total failure is worth reporting as one: a sheet that
+            // gave up two boxes out of sixteen is still worth showing, and the
+            // boxes with no reading come back as unreadable rather than blank.
+            if (readings.length === 0) {
+                const first = settled.find((r) => r.status === "rejected")
+                throw first && first.status === "rejected"
+                    ? first.reason
+                    : new TranscriberError("The reading service sent no reply.")
             }
-            const text = payload.choices?.[0]?.message?.content
-            if (!text) {
-                throw new TranscriberError("The reading service sent no reply.")
-            }
-
-            const parsed = ResponseSchema.safeParse(extractJson(text))
-            if (!parsed.success) {
-                throw new TranscriberError(
-                    "The model's reply did not match the expected shape."
-                )
-            }
-
-            // Every id checked against what was actually asked; illegal values
-            // demoted rather than trusted.
-            return validateReadings(crops, parsed.data.readings)
+            return readings
         }
+    }
+
+    async function readChunk(
+        crops: readonly ScoreCrop[],
+        signal?: AbortSignal
+    ): Promise<ScoreReading[]> {
+        const content = [
+            { type: "text", text: instructions(crops) },
+            ...crops.map((crop) => ({
+                type: "image_url",
+                image_url: { url: toDataUrl(crop.png) }
+            }))
+        ]
+
+        const timeout = AbortSignal.timeout(TIMEOUT_MS)
+        const response = await doFetch(`${baseUrl}/chat/completions`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.apiKey}`
+            },
+            body: JSON.stringify({
+                model: config.model,
+                // Nothing creative is wanted here.
+                temperature: 0,
+                response_format: { type: "json_object" },
+                messages: [{ role: "user", content }]
+            }),
+            signal: signal ? AbortSignal.any([signal, timeout]) : timeout
+        })
+
+        if (!response.ok) {
+            const detail = await response.text().catch(() => "")
+            throw new TranscriberError(
+                `The reading service returned ${response.status}. ${detail.slice(0, 200)}`
+            )
+        }
+
+        const payload = (await response.json()) as {
+            choices?: { message?: { content?: string } }[]
+        }
+        const text = payload.choices?.[0]?.message?.content
+        if (!text) {
+            throw new TranscriberError("The reading service sent no reply.")
+        }
+
+        const parsed = ResponseSchema.safeParse(extractJson(text))
+        if (!parsed.success) {
+            throw new TranscriberError(
+                "The model's reply did not match the expected shape."
+            )
+        }
+
+        // Every id checked against what was actually asked; illegal values
+        // demoted rather than trusted.
+        return validateReadings(crops, parsed.data.readings)
     }
 }
 
