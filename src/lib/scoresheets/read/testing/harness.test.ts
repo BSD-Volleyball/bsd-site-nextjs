@@ -1,6 +1,7 @@
 import jsQR from "jsqr"
 import { describe, expect, it, vi } from "vitest"
 
+import { TEMPLATE_VERSION } from "../../sheet-config"
 import { grayToRgba, type RasterImage } from "../image"
 import { distort } from "./distort"
 import { synthesizeSheet } from "./synthesize"
@@ -31,7 +32,9 @@ describe("synthesized sheets", () => {
             court: 1
         })
         expect(decode(sheet.image)?.data).toBe(sheet.truth.tag)
-        expect(sheet.truth.tag).toBe("BSD2:F26:W3:2026-10-05:1")
+        expect(sheet.truth.tag).toBe(
+            `BSD${TEMPLATE_VERSION}:F26:W3:2026-10-05:1`
+        )
     })
 
     it("records exactly what it drew", async () => {

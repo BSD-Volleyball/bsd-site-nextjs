@@ -18,6 +18,7 @@
 import {
     buildFiducials,
     buildSheetGeometry,
+    FIDUCIAL_SIZE_PT,
     PAGE_HEIGHT,
     PAGE_WIDTH
 } from "../layout"
@@ -51,6 +52,17 @@ const DETECT_MAX_DIMENSION = 1400
 
 /** Below this the candidate transform is not looking at a score sheet. */
 const MIN_CONTENT_SCORE = 0.35
+/**
+ * Weight given to the half-size corner mark agreeing with the assignment.
+ * Larger than any content score, because the size of a printed square is far
+ * harder to misread than whether a sampled region looks like an outline.
+ */
+const SMALL_MARK_BONUS = 10
+/**
+ * Weight on the page keeping its proportions. Set high enough that a
+ * reflected assignment loses even when it also carries the small-mark bonus.
+ */
+const SQUASH_WEIGHT = 60
 
 /** Page-space centres of the four registration squares. */
 function fiducialCentres(): Point[] {
@@ -118,9 +130,11 @@ function matchFiducials(
         for (const direction of [1, -1]) {
             const src: Point[] = []
             const dst: Point[] = []
+            const assigned: number[] = []
             for (let k = 0; k < 4; k++) {
                 const detected =
                     order[(smallPos + rotation + direction * k + 8) % 4]
+                assigned.push(detected)
                 const printed = expectedOrder[(expectedSmallPos + k) % 4]
                 src.push(expected[printed])
                 dst.push({
@@ -132,12 +146,49 @@ function matchFiducials(
             const h = solveHomography(src, dst)
             if (!h || !invertH(h)) continue
 
-            const score = scoreTransform(img, h)
+            // The half-size marker is the whole reason the page has an
+            // asymmetric corner, so an assignment that puts the smallest blob
+            // where the small mark is printed starts well ahead. Rotations are
+            // still tried, but only win when the sizes say nothing useful.
+            // k = 0 is always the printed small mark, so the blob assigned
+            // to it is simply the first one in this assignment.
+            const sizeAgrees = assigned[0] === smallest
+            const score =
+                scoreTransform(img, h) +
+                (sizeAgrees ? SMALL_MARK_BONUS : 0) -
+                squashPenalty(src, dst)
+
             if (!best || score > best.score) best = { toImage: h, score }
         }
     }
 
     return best
+}
+
+/**
+ * How badly an assignment has to stretch the page to fit the marks.
+ *
+ * The page is 612 by 792, not square, and a photograph of it is close to a
+ * similarity transform: whatever scale the width comes back at, the height
+ * comes back at much the same. An assignment that has been reflected about a
+ * diagonal has to squash one axis and stretch the other to compensate, which
+ * shows up here and nowhere else. It is the only check that survives a
+ * reflection through the small corner mark, where both the mark itself and
+ * the sampled content land in roughly the right places.
+ */
+function squashPenalty(src: readonly Point[], dst: readonly Point[]): number {
+    const span = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y)
+
+    const srcWidth = span(src[0], src[1])
+    const srcHeight = span(src[0], src[3])
+    const dstWidth = span(dst[0], dst[1])
+    const dstHeight = span(dst[0], dst[3])
+    if (srcWidth < 1 || srcHeight < 1 || dstWidth < 1 || dstHeight < 1) {
+        return SQUASH_WEIGHT
+    }
+
+    const ratio = dstWidth / srcWidth / (dstHeight / srcHeight)
+    return Math.abs(Math.log(ratio)) * SQUASH_WEIGHT
 }
 
 /**
@@ -238,8 +289,8 @@ export function locatePage(
     const bin = binarize(small)
     const blobs = findBlobs(bin, 20)
 
-    // A full-size marker is 12pt; convert to pixels in the downscaled copy.
-    const expectedSide = 12 * (small.height / PAGE_HEIGHT)
+    // Convert the printed mark's size into pixels in the downscaled copy.
+    const expectedSide = FIDUCIAL_SIZE_PT * (small.height / PAGE_HEIGHT)
     const candidates = squareCandidates(blobs, { expectedSide })
 
     const corners = pickCornerCandidates(candidates, small.width, small.height)
@@ -252,7 +303,13 @@ export function locatePage(
 
     // A transform that cannot find the ref-notes box or the tag is not a
     // transform; fall back rather than hand back a confident wrong answer.
-    if (byFiducial && byFiducial.score < MIN_CONTENT_SCORE) toImage = null
+    if (
+        byFiducial &&
+        byFiducial.score % SMALL_MARK_BONUS < MIN_CONTENT_SCORE &&
+        byFiducial.score < SMALL_MARK_BONUS
+    ) {
+        toImage = null
+    }
 
     if (!toImage && opts.qr && opts.tagQrRect) {
         const fromQrFit = fromQr(opts.qr, opts.tagQrRect)

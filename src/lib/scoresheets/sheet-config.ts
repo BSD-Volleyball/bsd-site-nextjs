@@ -19,8 +19,12 @@ import type { SheetEventType, SheetNight } from "./types"
  *
  * v2: the third checkbox in each game cell became a WIN tick (the team that
  * won the game) where v1 had a forfeit tick, and moved 1.5pt right.
+ * v3: after the first night in the gym — corner marks moved inside the
+ * printable area (they were being clipped), everything set larger and in
+ * black, rules cut from five lines to three, and the captain's initials box
+ * moved under each captain's own name.
  */
-export const TEMPLATE_VERSION = 2
+export const TEMPLATE_VERSION = 3
 
 export interface GameRule {
     game: 1 | 2 | 3
@@ -59,20 +63,22 @@ export function tallyRowCount(rule: GameRule): number {
     return Math.ceil(rule.maxPoint / rule.perRow)
 }
 
+/**
+ * Three lines, not five. They came back from the gym too small to read, and
+ * the fix is as much about using the width of the page as about the type
+ * size: each line now runs the full column instead of stopping a third of the
+ * way across.
+ */
 const REGULAR_SEASON_TEXT: string[] = [
-    "WARM-UPS: warm up and be ready before the previous match ends.",
-    "RALLY SCORING. Play to 25, win by 2, with a 27-point cap.",
-    "Game 1 ends more than 25 min after match start? Start game 2 at 6-6 (X out points 1-6).",
-    "Game 2 ends more than 40 min after match start? Start game 3 at 6-6 (X out points 1-6).",
-    "Two 30-second timeouts per team per game."
+    "RALLY SCORING — play to 25, win by 2, 27-point cap. Two 30-second timeouts per team per game.",
+    "Warm up before the previous match ends so the next match can start on time.",
+    "Game 1 ran past 25 min? Start game 2 at 6-6. Game 2 past 40 min? Start game 3 at 6-6. X out points 1-6."
 ]
 
 const PLAYOFF_TEXT: string[] = [
-    "WARM-UPS: warm up and be ready before the previous match ends.",
-    "RALLY SCORING. Games 1 & 2: both teams start at 4. Play to 25, win by 2, 30-point cap.",
-    "Game 3: start at 4, play to 25, win by 2, NO cap. Switch sides at 15.",
-    "Points 1-4 are pre-marked. Two 30-second timeouts per team per game.",
-    "Work team is 4 players: scorer, two line judges, down ref."
+    "RALLY SCORING — every game starts 4-4 (points 1-4 pre-marked). Two 30-second timeouts per team per game.",
+    "Games 1 & 2: play to 25, win by 2, 30-point cap. Game 3: to 25, win by 2, NO cap, switch sides at 15.",
+    "Warm up before the previous match ends. Work team is 4: scorer, two line judges, down ref."
 ]
 
 export function ruleLines(eventType: SheetEventType): string[] {
@@ -85,7 +91,7 @@ export function ruleLines(eventType: SheetEventType): string[] {
  * reader will later parse.
  */
 export const FILL_INSTRUCTION =
-    "Slash each point as scored. After each game: write the FINAL score, one digit per box, and tick WIN for the winner."
+    "Slash each point as scored. After each game write the FINAL score, one digit per box, and tick WIN for the winner."
 
 /** "fall" + 2026 -> "F26". */
 export function seasonCodeFor(seasonName: string, year: number): string {

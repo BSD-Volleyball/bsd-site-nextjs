@@ -26,18 +26,46 @@ export interface BoxRect {
 export const PAGE_WIDTH = 612
 export const PAGE_HEIGHT = 792
 
-/** Fiducials sit in this band, outside the content area. */
-const FIDUCIAL_INSET = 14
-const FIDUCIAL_SIZE = 12
+/**
+ * Registration marks, and how far in they have to sit.
+ *
+ * These started at 14pt from the page edge and came back from the first real
+ * night clipped: a consumer printer will not put ink within a quarter inch of
+ * the paper, and many need half an inch. A mark that is half printed moves its
+ * own centre, which is the one thing the whole reader depends on. So they now
+ * start at 34pt — a shade under half an inch — and everything printed stays
+ * clear of the band they occupy.
+ */
+const FIDUCIAL_INSET = 34
+const FIDUCIAL_SIZE = 14
+/** Exported so the reader looks for the size that is actually printed. */
+export const FIDUCIAL_SIZE_PT = FIDUCIAL_SIZE
+/**
+ * Clear air around each mark, on top of its own size.
+ *
+ * Without it the bottom-left mark sat flush against the ref-notes box and the
+ * two merged into a single blob under blur, so the detector stopped seeing a
+ * square there at all and picked something else as the corner. A mark has to
+ * be an island.
+ */
+const FIDUCIAL_GAP = 7
+/** Nothing is printed inside this distance of a corner. */
+const FIDUCIAL_CLEAR = FIDUCIAL_INSET + FIDUCIAL_SIZE + FIDUCIAL_GAP
 
 const CONTENT_MARGIN = 34
 const CONTENT_LEFT = CONTENT_MARGIN
 const CONTENT_RIGHT = PAGE_WIDTH - CONTENT_MARGIN
 const CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT
-const CONTENT_TOP = PAGE_HEIGHT - CONTENT_MARGIN
+/**
+ * The content stops below the corner marks rather than beside them, which
+ * keeps the full page width for the tally grid: the marks are only in the way
+ * at the very top and bottom, where they cost 14pt of height and no width.
+ */
+const CONTENT_TOP = PAGE_HEIGHT - FIDUCIAL_CLEAR
 
 const HEADER_HEIGHT = 92
-const RULES_HEIGHT = 52
+/** Three lines of rules, set large enough to read on paper. */
+const RULES_HEIGHT = 44
 /** Strip carrying the GAME 1/2/3 column headings, printed once per page. */
 const GAME_HEADING_HEIGHT = 11
 /** The stylized link QR, identical on every sheet. */
@@ -62,15 +90,17 @@ const BLOCK_INNER_PAD = 4
 /** A single match should not balloon to fill the whole page. */
 const MAX_BLOCK_HEIGHT = 150
 
-const LABEL_COLUMN_WIDTH = 150
+/** Wide enough for a team name and a captain at a readable size. */
+const LABEL_COLUMN_WIDTH = 158
 const GAME_GAP = 6
 
 /** The row holding timeouts, the FINAL digit boxes and the win tick. */
 const FINAL_LINE_HEIGHT = 16
 const DIGIT_BOX = 13
 const CHECK_BOX = 7.5
-const INITIALS_BOX_W = 13
-const INITIALS_BOX_H = 10
+/** One per team, sitting under that captain's own name. */
+const INITIALS_BOX_W = 22
+const INITIALS_BOX_H = 13
 
 export interface TallyGeometry extends BoxRect {
     rows: number
@@ -237,7 +267,8 @@ export function buildSheetGeometry(
     const headerY = CONTENT_TOP - HEADER_HEIGHT
     const rulesY = headerY - RULES_HEIGHT
 
-    const refNotesY = CONTENT_MARGIN + FOOTER_TEXT_HEIGHT
+    // Clears the bottom corner marks, so the notes box cannot overlap one.
+    const refNotesY = FIDUCIAL_CLEAR
     const refNotes: BoxRect = {
         x: CONTENT_LEFT,
         y: refNotesY,
@@ -327,30 +358,20 @@ export function buildSheetGeometry(
             )
         }
 
-        const initialsY =
-            footerBottom + (MATCH_FOOTER_HEIGHT - INITIALS_BOX_H) / 2
-        captainInitials.push(
-            {
+        // One box per captain, at the foot of that captain's own row, so it
+        // is obvious which signature belongs to which team.
+        for (const row of rows) {
+            captainInitials.push({
                 matchId: match.matchId,
-                team: "home",
+                team: row.team,
                 box: {
-                    x: CONTENT_LEFT + 62,
-                    y: initialsY,
+                    x: CONTENT_LEFT,
+                    y: row.y + 1.5,
                     w: INITIALS_BOX_W,
                     h: INITIALS_BOX_H
                 }
-            },
-            {
-                matchId: match.matchId,
-                team: "away",
-                box: {
-                    x: CONTENT_LEFT + 79,
-                    y: initialsY,
-                    w: INITIALS_BOX_W,
-                    h: INITIALS_BOX_H
-                }
-            }
-        )
+            })
+        }
     })
 
     return {
@@ -378,7 +399,7 @@ export function buildSheetGeometry(
             columns: sharedColumns
         },
         refNotes,
-        footerTextY: CONTENT_MARGIN,
+        footerTextY: CONTENT_MARGIN + 2,
         blocks,
         games,
         captainInitials

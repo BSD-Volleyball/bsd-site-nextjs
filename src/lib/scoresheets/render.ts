@@ -135,10 +135,10 @@ async function drawHeader(
 
     page.drawText(`${night.seasonLabel}  •  ${night.nightLabel}`, {
         x: content.left,
-        y: top - 28,
-        size: 9,
+        y: top - 29,
+        size: 10.5,
         font: fonts.regular,
-        color: GREY
+        color: BLACK
     })
 
     const courtLabel = court === null ? "COURT TBD" : `COURT ${court}`
@@ -181,9 +181,10 @@ async function drawHeader(
     centred(
         `Scan to enter scores  ·  ${SCORE_ENTRY_SHORT_URL}`,
         geometry.qr,
-        geometry.qr.y - 8,
-        6,
-        fonts.regular
+        geometry.qr.y - 9,
+        7,
+        fonts.regular,
+        BLACK
     )
 }
 
@@ -199,21 +200,23 @@ function drawRules(
     page.drawText(FILL_INSTRUCTION, {
         x: geometry.content.left,
         y,
-        size: 7.5,
+        size: 9,
         font: fonts.bold,
         color: BLACK
     })
-    y -= 9
+    y -= 11
 
+    // Black, not grey. Grey reads fine on a screen and disappears on paper
+    // under gym lighting, which is where this is actually read.
     for (const line of lines) {
-        page.drawText(`• ${line}`, {
+        page.drawText(line, {
             x: geometry.content.left,
             y,
-            size: 7,
+            size: 9.5,
             font: fonts.regular,
-            color: GREY
+            color: BLACK
         })
-        y -= 8
+        y -= 11
     }
 }
 
@@ -231,7 +234,7 @@ function drawFooter(
     page.drawText("REF NOTES", {
         x: notes.x + 6,
         y: notes.y + notes.h - 11,
-        size: 8,
+        size: 9,
         font: fonts.bold,
         color: BLACK
     })
@@ -253,12 +256,14 @@ function drawFooter(
         width: tagQr.w,
         height: tagQr.h
     })
+    // Above the tag rather than below it: below would put the text into the
+    // corner the registration mark now occupies.
     const code = sheetCode(night, court)
-    const codeWidth = fonts.bold.widthOfTextAtSize(code, 8)
+    const codeWidth = fonts.bold.widthOfTextAtSize(code, 9)
     page.drawText(code, {
         x: tagQr.x + (tagQr.w - codeWidth) / 2,
-        y: tagQr.y - 10,
-        size: 8,
+        y: tagQr.y + tagQr.h + 4,
+        size: 9,
         font: fonts.bold,
         color: BLACK
     })
@@ -431,52 +436,56 @@ function drawTeamLabel(
     team: SheetTeam,
     rowY: number,
     rowH: number,
+    initials: BoxRect | null,
     fonts: Fonts
 ) {
     const maxWidth = block.labelColumn.w - 8
-    const captainLine =
-        team.captains.length > 0 ? `C: ${team.captains.join(", ")}` : null
-    const captainGap = 9
+    const nameTop = rowY + rowH - 13
 
     const fitted = fitTextToCell({
         text: team.name,
         maxWidth,
-        baseFontSize: 10,
-        minFontSize: 6.5,
+        baseFontSize: 13,
+        minFontSize: 8,
         font: fonts.bold
     })
-
-    // Centre the name (plus its captain line, when there is one) against the
-    // team's row, so the label sits level with the tally grid beside it
-    // rather than riding at the top of the row.
-    const stackHeight = fitted.fontSize + (captainLine ? captainGap : 0)
-    const nameBaseline =
-        rowY + (rowH - stackHeight) / 2 + (captainLine ? captainGap : 0)
-
     page.drawText(fitted.text, {
         x: block.labelColumn.x,
-        y: nameBaseline,
+        y: nameTop,
         size: fitted.fontSize,
         font: fonts.bold,
         color: team.isPlaceholder ? GREY : BLACK
     })
 
-    if (captainLine) {
+    if (team.captains.length > 0) {
         page.drawText(
             truncateToFit({
-                text: captainLine,
+                text: team.captains.join(", "),
                 maxWidth,
-                fontSize: 7,
+                fontSize: 9,
                 font: fonts.regular
             }),
             {
                 x: block.labelColumn.x,
-                y: nameBaseline - captainGap,
-                size: 7,
+                y: nameTop - 11,
+                size: 9,
                 font: fonts.regular,
-                color: GREY
+                color: BLACK
             }
         )
+    }
+
+    // One box per captain, under that captain's own name, so there is no
+    // ambiguity about whose initials belong where.
+    if (initials) {
+        drawBox(page, initials, 0.9, BLACK)
+        page.drawText("Captain initial to confirm score", {
+            x: initials.x + initials.w + 5,
+            y: initials.y + initials.h / 2 - 3,
+            size: 8,
+            font: fonts.regular,
+            color: BLACK
+        })
     }
 }
 
@@ -493,7 +502,7 @@ function drawGameCell(page: PDFPage, game: GameGeometry, fonts: Fonts) {
 
         const label = String(point)
         const struck = point <= tally.preStruck
-        const size = 6.5
+        const size = 7.5
         const textWidth = fonts.regular.widthOfTextAtSize(label, size)
         const textX = cx + (tally.cellWidth - textWidth) / 2
         const textY = cy + (tally.rowHeight - size) / 2 + 0.5
@@ -525,18 +534,18 @@ function drawGameCell(page: PDFPage, game: GameGeometry, fonts: Fonts) {
     page.drawText("T.O.", {
         x: game.tally.x,
         y: boxBaseline,
-        size: 6,
+        size: 7,
         font: fonts.regular,
-        color: GREY
+        color: BLACK
     })
     for (const timeout of game.timeouts) {
         drawBox(page, timeout, 0.7, GREY)
     }
 
     page.drawText("FINAL", {
-        x: game.finalDigits[0].x - 23,
+        x: game.finalDigits[0].x - 24,
         y: game.finalDigits[0].y + 4,
-        size: 6.5,
+        size: 7.5,
         font: fonts.bold,
         color: BLACK
     })
@@ -548,53 +557,36 @@ function drawGameCell(page: PDFPage, game: GameGeometry, fonts: Fonts) {
     // Ticked by the winner of the game. Two independent records of the same
     // outcome, so a reader can flag a sheet whose boxes disagree.
     page.drawText("WIN", {
-        x: game.win.x - 15,
+        x: game.win.x - 17,
         y: boxBaseline,
-        size: 6,
+        size: 7,
         font: fonts.bold,
-        color: GREY
+        color: BLACK
     })
     drawBox(page, game.win, 0.9, BLACK)
 }
 
-function drawBlockFooter(
-    page: PDFPage,
-    geometry: SheetGeometry,
-    block: BlockGeometry,
-    fonts: Fonts
-) {
+function drawBlockFooter(page: PDFPage, block: BlockGeometry, fonts: Fonts) {
     const y = block.footerY + 3
-
-    page.drawText("Captains confirm:", {
-        x: block.labelColumn.x,
-        y,
-        size: 6.5,
-        font: fonts.regular,
-        color: GREY
-    })
-    for (const initials of geometry.captainInitials) {
-        if (initials.matchId !== block.matchId) continue
-        drawBox(page, initials.box, 0.7, GREY)
-    }
 
     for (const column of block.gameColumns) {
         page.drawText("start:", {
             x: column.x,
             y,
-            size: 6.5,
+            size: 8,
             font: fonts.regular,
-            color: GREY
+            color: BLACK
         })
-        drawUnderline(page, column.x + 19, block.footerY + 2, 34)
+        drawUnderline(page, column.x + 24, block.footerY + 2, 32, GREY)
 
         page.drawText("end:", {
-            x: column.x + 58,
+            x: column.x + 62,
             y,
-            size: 6.5,
+            size: 8,
             font: fonts.regular,
-            color: GREY
+            color: BLACK
         })
-        drawUnderline(page, column.x + 74, block.footerY + 2, 34)
+        drawUnderline(page, column.x + 81, block.footerY + 2, 32, GREY)
     }
 }
 
@@ -611,11 +603,11 @@ function drawGameHeadings(
     const { gameHeadings } = geometry
     for (const column of gameHeadings.columns) {
         const label = `GAME ${column.game}`
-        const width = fonts.bold.widthOfTextAtSize(label, 8)
+        const width = fonts.bold.widthOfTextAtSize(label, 9)
         page.drawText(label, {
             x: column.x + (column.w - width) / 2,
             y: gameHeadings.y + 2,
-            size: 8,
+            size: 9,
             font: fonts.bold,
             color: BLACK
         })
@@ -651,12 +643,18 @@ async function drawCourtPage(
             fonts
         )
 
+        const initialsFor = (team: "home" | "away") =>
+            geometry.captainInitials.find(
+                (i) => i.matchId === block.matchId && i.team === team
+            )?.box ?? null
+
         drawTeamLabel(
             page,
             block,
             match.home,
             block.rows[0].y,
             block.rows[0].h,
+            initialsFor("home"),
             fonts
         )
         drawTeamLabel(
@@ -665,6 +663,7 @@ async function drawCourtPage(
             match.away,
             block.rows[1].y,
             block.rows[1].h,
+            initialsFor("away"),
             fonts
         )
 
@@ -673,7 +672,7 @@ async function drawCourtPage(
             drawGameCell(page, game, fonts)
         }
 
-        drawBlockFooter(page, geometry, block, fonts)
+        drawBlockFooter(page, block, fonts)
     })
 
     drawFooter(page, geometry, night, sheet.court, images, fonts)

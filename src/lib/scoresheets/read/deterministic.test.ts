@@ -47,8 +47,8 @@ vi.setConfig({ testTimeout: 60_000 })
 
 describe("parseSheetTag", () => {
     it("reads a regular-season tag", () => {
-        expect(parseSheetTag("BSD2:F26:W3:2026-10-05:4")).toEqual({
-            templateVersion: 2,
+        expect(parseSheetTag("BSD3:F26:W3:2026-10-05:4")).toEqual({
+            templateVersion: 3,
             seasonCode: "F26",
             phase: "W",
             ordinal: 3,
@@ -58,7 +58,7 @@ describe("parseSheetTag", () => {
     })
 
     it("reads a playoff tag and a court-less sheet", () => {
-        expect(parseSheetTag("BSD2:S27:P1:2027-03-08:TBD")).toMatchObject({
+        expect(parseSheetTag("BSD3:S27:P1:2027-03-08:TBD")).toMatchObject({
             phase: "P",
             ordinal: 1,
             court: null
@@ -68,11 +68,11 @@ describe("parseSheetTag", () => {
     it("rejects anything it does not fully understand", () => {
         for (const bad of [
             "",
-            "BSD2:F26:W3:2026-10-05",
-            "XXX2:F26:W3:2026-10-05:4",
-            "BSD2:F26:X3:2026-10-05:4",
-            "BSD2:F26:W3:05-10-2026:4",
-            "BSD2:F26:W3:2026-10-05:court4"
+            "BSD3:F26:W3:2026-10-05",
+            "XXX3:F26:W3:2026-10-05:4",
+            "BSD3:F26:X3:2026-10-05:4",
+            "BSD3:F26:W3:05-10-2026:4",
+            "BSD3:F26:W3:2026-10-05:court4"
         ]) {
             expect(parseSheetTag(bad)).toBeNull()
         }
@@ -103,7 +103,7 @@ describe("reading a photographed sheet", () => {
         const identity = readSheetTag(image, transform, sheet.geometry.tagQr)
         expect(identity?.text).toBe(sheet.truth.tag)
         expect(identity?.parts.court).toBe(2)
-        expect(identity?.parts.templateVersion).toBe(2)
+        expect(identity?.parts.templateVersion).toBe(3)
     })
 
     it("recovers every WIN tick exactly", async () => {

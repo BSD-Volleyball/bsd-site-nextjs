@@ -43,6 +43,50 @@ const EVENT_TYPES: SheetEventType[] = ["regular_season", "playoff"]
 const COUNTS = [1, 2, 3, 4]
 
 describe("buildSheetGeometry", () => {
+    it("keeps the corner marks inside what a printer will actually print", () => {
+        // The first night in the gym came back with these clipped. A consumer
+        // printer refuses to put ink within a quarter inch of the paper and
+        // many need half an inch; a half-printed mark moves its own centre,
+        // which is the single thing the whole reader depends on.
+        const HALF_INCH = 36
+        const geometry = buildSheetGeometry(courtSheet(3), "regular_season")
+
+        for (const f of geometry.fiducials) {
+            const fromLeft = f.x
+            const fromRight = PAGE_WIDTH - (f.x + f.w)
+            const fromBottom = f.y
+            const fromTop = PAGE_HEIGHT - (f.y + f.h)
+            const nearestEdge = Math.min(
+                fromLeft,
+                fromRight,
+                fromBottom,
+                fromTop
+            )
+            expect(nearestEdge).toBeGreaterThanOrEqual(HALF_INCH - 4)
+        }
+    })
+
+    it("keeps printed content out of the corners the marks occupy", () => {
+        const geometry = buildSheetGeometry(courtSheet(4, true), "playoff")
+        const boxes: BoxRect[] = [
+            geometry.qr,
+            geometry.tagQr,
+            geometry.refNotes,
+            ...geometry.blocks.map((b) => ({
+                x: b.x,
+                y: b.y,
+                w: b.w,
+                h: b.h
+            })),
+            ...geometry.captainInitials.map((i) => i.box)
+        ]
+        for (const fiducial of geometry.fiducials) {
+            for (const box of boxes) {
+                expect(overlaps(fiducial, box)).toBe(false)
+            }
+        }
+    })
+
     it("places four fiducials with a half-size bottom-right marker", () => {
         const geometry = buildSheetGeometry(courtSheet(3), "regular_season")
         expect(geometry.fiducials).toHaveLength(4)
@@ -155,6 +199,26 @@ describe("buildSheetGeometry", () => {
                 it("emits one cell per team per game", () => {
                     expect(geometry.games).toHaveLength(count * 2 * 3)
                     expect(geometry.captainInitials).toHaveLength(count * 2)
+                })
+
+                it("puts each captain's box in that captain's own row", () => {
+                    for (const block of geometry.blocks) {
+                        for (const row of block.rows) {
+                            const entry = geometry.captainInitials.find(
+                                (i) =>
+                                    i.matchId === block.matchId &&
+                                    i.team === row.team
+                            )
+                            expect(entry).toBeDefined()
+                            if (!entry) continue
+                            // Inside its own team row, in the label column
+                            expect(entry.box.y).toBeGreaterThanOrEqual(row.y)
+                            expect(
+                                entry.box.y + entry.box.h
+                            ).toBeLessThanOrEqual(row.y + row.h)
+                            expect(entry.box.x).toBe(block.labelColumn.x)
+                        }
+                    }
                 })
 
                 it("keeps every box within its game column", () => {

@@ -42,10 +42,10 @@ describe("ruleLines", () => {
     it("prints only the rules that apply to the night", () => {
         const regular = ruleLines("regular_season").join(" ")
         expect(regular).toContain("27-point cap")
-        expect(regular).not.toContain("start at 4")
+        expect(regular).not.toContain("4-4")
 
         const playoff = ruleLines("playoff").join(" ")
-        expect(playoff).toContain("start at 4")
+        expect(playoff).toContain("4-4")
         expect(playoff).not.toContain("27-point cap")
     })
 })

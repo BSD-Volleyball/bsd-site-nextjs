@@ -20,7 +20,7 @@ import { createUser, logout } from "@/test/session"
 
 import { buildScoreSheetsPdfBytes } from "../generate"
 import { loadScoreSheetNight } from "../load"
-import { sheetTag } from "../sheet-config"
+import { sheetTag, TEMPLATE_VERSION } from "../sheet-config"
 import { cropId } from "./crops"
 import { processScoreSheet } from "./pipeline"
 import { labelConfirmedSamples } from "./samples"
@@ -211,7 +211,7 @@ describe("processScoreSheet", () => {
 
         const night = await loadScoreSheetNight(seasonId, NIGHT)
         expect(row.tag).toBe(sheetTag(night as never, 1))
-        expect(row.template_version).toBe(2)
+        expect(row.template_version).toBe(TEMPLATE_VERSION)
         expect(row.attempts).toBe(1)
         expect(row.finished_at).not.toBeNull()
         expect(row.result).not.toBeNull()
