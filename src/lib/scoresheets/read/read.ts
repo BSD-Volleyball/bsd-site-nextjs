@@ -147,15 +147,22 @@ export async function readSheet(input: ReadInput): Promise<SheetRead> {
                 written.map((c) => [c.id, c.digitsWritten])
             )
             candidates = new Map(
-                validateReadings(written, raw).map((r) => [
-                    r.id,
-                    {
-                        value: r.value,
-                        confidence: r.confidence,
-                        alternatives: r.alternatives,
-                        digitsWritten: digitsById.get(r.id)
-                    }
-                ])
+                // Tolerant here on purpose. The transcriber checks each of its
+                // own requests strictly, so anything that arrives has already
+                // been proved to line up; a box missing at this level means a
+                // request failed, and those boxes read as unreadable rather
+                // than costing the sheet the ones that succeeded.
+                validateReadings(written, raw, { allowMissing: true }).map(
+                    (r) => [
+                        r.id,
+                        {
+                            value: r.value,
+                            confidence: r.confidence,
+                            alternatives: r.alternatives,
+                            digitsWritten: digitsById.get(r.id)
+                        }
+                    ]
+                )
             )
         } catch (error) {
             // The deterministic half still stands, so carry on without digits

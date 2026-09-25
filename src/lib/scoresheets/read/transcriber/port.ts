@@ -53,6 +53,20 @@ export const ResponseSchema = z.object({
 
 export class TranscriberError extends Error {}
 
+export interface ValidateOptions {
+    /**
+     * Accept a reply that leaves some boxes unanswered.
+     *
+     * Off within a single request, where every box must come back: a reply
+     * that has dropped one has probably drifted, and a drifted reply attaches
+     * one game's score to another. On when checking a whole sheet that was
+     * assembled from several requests, where a missing box means one request
+     * failed and those boxes are simply unread. Refusing the sheet for that
+     * would throw away every box that did come back.
+     */
+    allowMissing?: boolean
+}
+
 /**
  * Check a reply against the crops it was supposed to answer.
  *
@@ -62,7 +76,8 @@ export class TranscriberError extends Error {}
  */
 export function validateReadings(
     crops: readonly ScoreCrop[],
-    readings: readonly ScoreReading[]
+    readings: readonly ScoreReading[],
+    opts: ValidateOptions = {}
 ): ScoreReading[] {
     const expected = new Map(crops.map((c) => [c.id, c]))
     const seen = new Set<string>()
@@ -79,7 +94,7 @@ export function validateReadings(
         seen.add(reading.id)
     }
 
-    if (seen.size !== expected.size) {
+    if (!opts.allowMissing && seen.size !== expected.size) {
         const missing = [...expected.keys()].filter((id) => !seen.has(id))
         throw new TranscriberError(
             `Reply is missing ${missing.length} box(es): ${missing.slice(0, 3).join(", ")}`
