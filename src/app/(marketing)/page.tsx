@@ -1,17 +1,13 @@
 import { HeroSection } from "@/components/layout/sections/hero"
 import { SponsorsStrip } from "@/components/layout/sections/sponsors-strip"
 import { site } from "@/config/site"
-import { auth } from "@/lib/auth"
-import { getTournamentConfig } from "@/lib/tournament-config"
 import { isSeasonRegistrationOpen } from "@/lib/season-phases"
+import { formatSeasonLabel, getEventsByType } from "@/lib/site-config"
 import {
-    getSeasonConfig,
-    formatSeasonLabel,
-    getEventsByType
-} from "@/lib/site-config"
+    getCachedSeasonConfig,
+    getCachedTournamentConfig
+} from "@/next/public-cache"
 import Link from "next/link"
-import { headers } from "next/headers"
-import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
     Card,
@@ -109,22 +105,12 @@ const quickLinks = [
     }
 ]
 
-export default async function Home({
-    searchParams
-}: {
-    searchParams: Promise<{ stay?: string }>
-}) {
-    const session = await auth.api.getSession({ headers: await headers() })
-
-    // Signed-in users land on their dashboard instead of the marketing page.
-    // Brand/logo links pass ?stay=1 so they can still view the homepage.
-    const { stay } = await searchParams
-    if (session?.user && stay !== "1") {
-        redirect("/dashboard")
-    }
-
-    const tournament = await getTournamentConfig()
-    const seasonConfig = await getSeasonConfig()
+// Static (ISR, hourly via the marketing layout). The signed-in redirect and
+// the ?stay=1 escape hatch live in src/proxy.ts so this page never reads
+// headers() or searchParams, which would make every crawler hit render live.
+export default async function Home() {
+    const tournament = await getCachedTournamentConfig()
+    const seasonConfig = await getCachedSeasonConfig()
     const seasonLabel = formatSeasonLabel(seasonConfig)
 
     // Registration banner: show only while the season is accepting signups.
@@ -314,31 +300,27 @@ export default async function Home({
             {/* Sponsor logos — only once at least one sponsorship is paid */}
             <SponsorsStrip />
 
-            {/* CTA Section */}
-            {!session && (
-                <section className="container mx-auto px-4 py-24">
-                    <div className="mx-auto max-w-4xl text-center">
-                        <h2 className="mb-4 font-bold text-3xl">
-                            Ready to Play?
-                        </h2>
-                        <p className="mb-8 text-lg text-muted-foreground">
-                            Join our community of volleyball enthusiasts.
-                            Register today to be included in our next
-                            season&apos;s draft.
-                        </p>
-                        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-                            <Button asChild size="lg">
-                                <Link href="/auth/sign-up">Register Now</Link>
-                            </Button>
-                            <Button asChild variant="outline" size="lg">
-                                <Link href="/player-experience">
-                                    Check Skill Levels
-                                </Link>
-                            </Button>
-                        </div>
+            {/* CTA Section. Shown to everyone: the page is static, and signed-in
+                visitors only reach it deliberately via ?stay=1. */}
+            <section className="container mx-auto px-4 py-24">
+                <div className="mx-auto max-w-4xl text-center">
+                    <h2 className="mb-4 font-bold text-3xl">Ready to Play?</h2>
+                    <p className="mb-8 text-lg text-muted-foreground">
+                        Join our community of volleyball enthusiasts. Register
+                        today to be included in our next season&apos;s draft.
+                    </p>
+                    <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+                        <Button asChild size="lg">
+                            <Link href="/auth/sign-up">Register Now</Link>
+                        </Button>
+                        <Button asChild variant="outline" size="lg">
+                            <Link href="/player-experience">
+                                Check Skill Levels
+                            </Link>
+                        </Button>
                     </div>
-                </section>
-            )}
+                </div>
+            </section>
         </>
     )
 }
