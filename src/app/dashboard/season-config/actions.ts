@@ -2,7 +2,8 @@
 
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { SEASON_CONFIG_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import {
     seasons,
@@ -428,6 +429,7 @@ export const saveSeasonConfig = withAction(
             revalidatePath("/dashboard")
             // Public season-info page renders these dates/pricing
             revalidatePath("/season-info")
+            revalidateTag(SEASON_CONFIG_TAG, "max")
             return ok(undefined, "Season configuration saved successfully")
         } catch (error) {
             console.error("Failed to save season config:", error)

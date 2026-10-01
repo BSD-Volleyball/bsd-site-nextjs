@@ -3,8 +3,11 @@ import { RiExternalLinkLine, RiMailLine } from "@remixicon/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { site } from "@/config/site"
-import { formatSeasonLabel, getSeasonConfig } from "@/lib/site-config"
-import { getPublicSponsors } from "@/lib/sponsors"
+import { formatSeasonLabel } from "@/lib/site-config"
+import {
+    getCachedPublicSponsors,
+    getCachedSeasonConfig
+} from "@/next/public-cache"
 
 export const metadata = {
     title: `Our Sponsors - ${site.name}`,
@@ -16,10 +19,10 @@ export const metadata = {
 export const revalidate = 3600
 
 export default async function SponsorsPage() {
-    const config = await getSeasonConfig()
+    const config = await getCachedSeasonConfig()
     const seasonLabel = formatSeasonLabel(config)
     const sponsors = config.seasonId
-        ? await getPublicSponsors(config.seasonId)
+        ? await getCachedPublicSponsors(config.seasonId)
         : []
 
     return (

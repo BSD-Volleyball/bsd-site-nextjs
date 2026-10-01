@@ -5,7 +5,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { site } from "@/config/site"
-import { getSeasonConfig, formatSeasonLabel } from "@/lib/site-config"
+import { formatSeasonLabel } from "@/lib/site-config"
+import { getCachedSeasonConfig } from "@/next/public-cache"
 
 interface FooterLinkProps {
     href: string
@@ -67,7 +68,7 @@ const socialLinks: FooterLinkProps[] = [
 ]
 
 export const FooterSection = async () => {
-    const config = await getSeasonConfig()
+    const config = await getCachedSeasonConfig()
     const seasonLabel = formatSeasonLabel(config)
     const seasonLink: FooterLinkProps = {
         href: "/season-info",

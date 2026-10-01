@@ -3,7 +3,8 @@
 import type { ActionResult } from "@/next/action-helpers"
 import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { SEASON_CONFIG_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import {
     champions,
@@ -243,6 +244,7 @@ export const advanceSeasonPhase = withAction(
             }
 
             revalidatePath("/dashboard/season-control")
+            revalidateTag(SEASON_CONFIG_TAG, "max")
             return ok(
                 undefined,
                 `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}${resetSummary ?? ""}`
@@ -298,6 +300,7 @@ export const revertSeasonPhase = withAction(
             })
 
             revalidatePath("/dashboard/season-control")
+            revalidateTag(SEASON_CONFIG_TAG, "max")
             return ok(
                 undefined,
                 `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`
@@ -472,6 +475,7 @@ export const createSeason = withAction(
             // Public season surfaces that display the current season
             revalidatePath("/season-info")
             revalidatePath("/")
+            revalidateTag(SEASON_CONFIG_TAG, "max")
 
             return ok(
                 { seasonId: newSeasonId },

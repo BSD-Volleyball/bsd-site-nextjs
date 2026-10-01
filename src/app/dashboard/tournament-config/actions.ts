@@ -1,6 +1,7 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { TOURNAMENT_CONFIG_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -362,6 +363,7 @@ export const saveTournamentConfig = withAction(
 
         revalidatePath("/dashboard/tournament-config")
         revalidatePath("/dashboard")
+        revalidateTag(TOURNAMENT_CONFIG_TAG, "max")
         return ok()
     }
 )

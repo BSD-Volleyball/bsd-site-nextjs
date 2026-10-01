@@ -1,6 +1,7 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { SEASON_CONFIG_TAG } from "@/next/public-cache"
 import {
     and,
     asc,
@@ -398,6 +399,7 @@ export const saveTryoutJobs = withAction(
 
         revalidatePath("/dashboard/configure-tryout-jobs")
         revalidatePath("/dashboard/assign-tryout-jobs")
+        revalidateTag(SEASON_CONFIG_TAG, "max")
         return ok(undefined, "Volunteer jobs saved.")
     }
 )
@@ -557,6 +559,7 @@ export const importJobsFromLastSeason = withAction(
 
         revalidatePath("/dashboard/configure-tryout-jobs")
         revalidatePath("/dashboard/assign-tryout-jobs")
+        revalidateTag(SEASON_CONFIG_TAG, "max")
 
         const message =
             toInsert.length === 0

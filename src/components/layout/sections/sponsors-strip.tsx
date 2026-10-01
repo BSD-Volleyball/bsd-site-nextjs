@@ -1,6 +1,9 @@
 import Link from "next/link"
-import { formatSeasonLabel, getSeasonConfig } from "@/lib/site-config"
-import { getPublicSponsors } from "@/lib/sponsors"
+import { formatSeasonLabel } from "@/lib/site-config"
+import {
+    getCachedPublicSponsors,
+    getCachedSeasonConfig
+} from "@/next/public-cache"
 
 function SponsorLogo({
     sponsor
@@ -26,9 +29,9 @@ function SponsorLogo({
  * until at least one sponsorship is paid, so an empty season leaves no gap.
  */
 export async function SponsorsStrip() {
-    const config = await getSeasonConfig()
+    const config = await getCachedSeasonConfig()
     if (!config.seasonId) return null
-    const sponsors = await getPublicSponsors(config.seasonId)
+    const sponsors = await getCachedPublicSponsors(config.seasonId)
     if (sponsors.length === 0) return null
 
     const seasonLabel = formatSeasonLabel(config)

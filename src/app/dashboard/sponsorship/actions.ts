@@ -2,7 +2,8 @@
 
 import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { PUBLIC_SPONSORS_TAG } from "@/next/public-cache"
 import { db } from "@/database/db"
 import { sponsors, sponsorships } from "@/database/schema"
 import {
@@ -45,6 +46,7 @@ function revalidateSponsorPages() {
     revalidatePath("/dashboard/manage-sponsors")
     revalidatePath("/sponsors")
     revalidatePath("/")
+    revalidateTag(PUBLIC_SPONSORS_TAG, "max")
 }
 
 /**

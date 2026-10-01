@@ -1,14 +1,11 @@
 import Link from "next/link"
 import type { Metadata } from "next"
 import { Button } from "@/components/ui/button"
-import {
-    getSeasonConfig,
-    formatSeasonLabel,
-    getEventsByType
-} from "@/lib/site-config"
+import { formatSeasonLabel, getEventsByType } from "@/lib/site-config"
+import { getCachedSeasonConfig } from "@/next/public-cache"
 
 export async function generateMetadata(): Promise<Metadata> {
-    const config = await getSeasonConfig()
+    const config = await getCachedSeasonConfig()
     const label = formatSeasonLabel(config)
     const title = label ? `${label} Season Info` : "Season Info"
     return {
@@ -41,7 +38,7 @@ function addDays(dateStr: string, days: number): string {
 }
 
 function buildDetailRows(
-    config: Awaited<ReturnType<typeof getSeasonConfig>>
+    config: Awaited<ReturnType<typeof getCachedSeasonConfig>>
 ): DetailRow[] {
     const rows: DetailRow[] = []
 
@@ -112,7 +109,7 @@ function buildDetailRows(
 }
 
 export default async function SeasonInfoPage() {
-    const config = await getSeasonConfig()
+    const config = await getCachedSeasonConfig()
     const label = formatSeasonLabel(config)
     const heading = label ? `${label} Season Info` : "Season Info"
     const detailRows = buildDetailRows(config)
