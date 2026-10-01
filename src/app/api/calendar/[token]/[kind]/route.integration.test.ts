@@ -134,7 +134,9 @@ describe("GET /api/calendar/[token]/[kind]", () => {
         expect(res.headers.get("content-disposition")).toMatch(
             /^inline; filename="bsd-schedule-fall-2026\.ics"$/
         )
-        expect(res.headers.get("cache-control")).toBe("private, max-age=300")
+        expect(res.headers.get("cache-control")).toBe(
+            "public, s-maxage=3600, stale-while-revalidate=3600"
+        )
         const body = await unfolded(res)
         expect(body).toContain(`UID:bsd-match-${match.id}@bsd-volleyball.com`)
         expect(body).toContain("SUMMARY:BSD: Spikers vs Diggers (Josh)")
@@ -291,5 +293,21 @@ describe("GET /api/calendar/[token]/[kind]", () => {
         const newToken = await rotateCalendarToken(user.id)
         expect((await get(oldToken, "personal.ics")).status).toBe(404)
         expect((await get(newToken, "personal.ics")).status).toBe(200)
+    })
+
+    it("lets the CDN cache a feed for an hour", async () => {
+        const user = await createUser()
+        const token = await getOrCreateCalendarToken(user.id)
+        const res = await get(token, "personal.ics")
+        expect(res.status).toBe(200)
+        expect(res.headers.get("Cache-Control")).toBe(
+            "public, s-maxage=3600, stale-while-revalidate=3600"
+        )
+    })
+
+    it("does not let the CDN cache a 404", async () => {
+        const res = await get("A".repeat(43), "personal.ics")
+        expect(res.status).toBe(404)
+        expect(res.headers.get("Cache-Control")).toBe("no-store")
     })
 })

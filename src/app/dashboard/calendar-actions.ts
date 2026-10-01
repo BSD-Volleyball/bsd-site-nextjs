@@ -9,12 +9,14 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import { type CalendarLinks, buildCalendarLinks } from "@/lib/calendar-links"
 import { eq } from "drizzle-orm"
+import { revalidateTag } from "next/cache"
 import { db } from "@/database/db"
 import { users } from "@/database/schema"
 import {
     getOrCreateCalendarToken,
     rotateCalendarToken
 } from "@/lib/calendar-token"
+import { CALENDAR_FEED_TAG } from "@/next/calendar-feed-cache"
 
 async function linksFor(userId: string, token: string): Promise<CalendarLinks> {
     const [row] = await db
@@ -44,6 +46,9 @@ export const resetCalendarToken = withAction(
     async (): Promise<ActionResult<CalendarLinks>> => {
         const session = await requireSession()
         const token = await rotateCalendarToken(session.user.id)
+        // The old URL is cached for up to an hour; drop it now so a reset
+        // actually locks out whoever had the previous link.
+        revalidateTag(CALENDAR_FEED_TAG, "max")
         await logAuditEntry({
             userId: session.user.id,
             action: "reset_calendar_token",

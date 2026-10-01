@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm"
-import { describe, expect, it } from "vitest"
+import { revalidateTag } from "next/cache"
+import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import { auditLog, calendarTokens } from "@/database/schema"
 import { findUserIdByCalendarToken } from "@/lib/calendar-token"
+import { CALENDAR_FEED_TAG } from "@/next/calendar-feed-cache"
 import { createUserWithRoles, logout } from "@/test/session"
 import { getCalendarLinks, resetCalendarToken } from "./calendar-actions"
 
@@ -91,5 +93,13 @@ describe("resetCalendarToken", () => {
             .from(calendarTokens)
             .where(eq(calendarTokens.user_id, user.id))
         expect(rows).toHaveLength(1)
+    })
+
+    it("invalidates cached feeds so the old token stops resolving", async () => {
+        await createUserWithRoles([])
+        vi.mocked(revalidateTag).mockClear()
+        const result = await resetCalendarToken()
+        expect(result.status).toBe(true)
+        expect(revalidateTag).toHaveBeenCalledWith(CALENDAR_FEED_TAG, "max")
     })
 })

@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { buildCalendar, emptyCalendar } from "@/lib/calendar-feed"
 import { type CalendarKind, isCalendarKind } from "@/lib/calendar-links"
-import { findUserIdByCalendarToken } from "@/lib/calendar-token"
-import { getSeasonConfig } from "@/lib/site-config"
+import {
+    CALENDAR_FEED_MAX_AGE_SECONDS,
+    getCachedCalendarFeed
+} from "@/next/calendar-feed-cache"
 
 export const runtime = "nodejs"
 
@@ -11,7 +12,10 @@ export const runtime = "nodejs"
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,64}$/
 
 function notFound(): NextResponse {
-    return new NextResponse("Not found", { status: 404 })
+    return new NextResponse("Not found", {
+        status: 404,
+        headers: { "Cache-Control": "no-store" }
+    })
 }
 
 function parseKind(segment: string): CalendarKind | null {
@@ -24,6 +28,11 @@ function parseKind(segment: string): CalendarKind | null {
  * Public iCalendar subscription feed. The token in the path is the whole
  * credential — calendar apps fetch with no session — so every failure is a
  * bare 404 and nothing distinguishes "bad token" from "bad path".
+ *
+ * The feed body comes from getCachedCalendarFeed (one database build per
+ * token per hour) and the public s-maxage lets Vercel's CDN answer repeat
+ * polls without invoking this function at all. Both exist to keep calendar
+ * pollers from waking the Neon compute every few minutes overnight.
  *
  * Infra note: the fetchers (Google-Calendar-Importer, Apple dataaccessd,
  * Outlook) are not browsers and cannot pass a JS challenge, so the Vercel
@@ -39,29 +48,15 @@ export async function GET(
     const kind = parseKind(kindSegment)
     if (!kind || !TOKEN_SHAPE.test(token)) return notFound()
 
-    const userId = await findUserIdByCalendarToken(token)
-    if (!userId) return notFound()
+    const feed = await getCachedCalendarFeed(token, kind)
+    if (!feed) return notFound()
 
-    const config = await getSeasonConfig()
-    let ics: string
-    let filename = `bsd-${kind}.ics`
-    if (config.seasonId) {
-        const calendar = await buildCalendar(kind, userId, config.seasonId)
-        if (!calendar) return notFound()
-        ics = calendar.ics
-        filename = calendar.filename
-    } else {
-        // Between seasons: a valid empty calendar keeps subscribed clients
-        // from flagging the feed as broken.
-        ics = emptyCalendar(kind)
-    }
-
-    return new NextResponse(ics, {
+    return new NextResponse(feed.ics, {
         status: 200,
         headers: {
             "Content-Type": "text/calendar; charset=utf-8",
-            "Content-Disposition": `inline; filename="${filename}"`,
-            "Cache-Control": "private, max-age=300"
+            "Content-Disposition": `inline; filename="${feed.filename}"`,
+            "Cache-Control": `public, s-maxage=${CALENDAR_FEED_MAX_AGE_SECONDS}, stale-while-revalidate=${CALENDAR_FEED_MAX_AGE_SECONDS}`
         }
     })
 }
