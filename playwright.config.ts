@@ -57,7 +57,11 @@ export default defineConfig({
         }
     ],
     webServer: {
-        command: "pnpm dev --port 3100",
+        // unstable_cache entries (season config, sponsors, calendar feeds)
+        // persist on disk across server restarts, so a previous run's or a
+        // prod build's data would otherwise outlive the e2e reseed for an hour.
+        command:
+            "rm -rf .next/dev/cache/fetch-cache .next/cache/fetch-cache && pnpm dev --port 3100",
         // Readiness probe must not touch the database — the e2e database is
         // migrated/seeded by the setup project after the server is up
         url: `${baseURL}/robots.txt`,
