@@ -71,6 +71,7 @@ npx @better-auth/cli generate
 ## Architecture and Coding Patterns
 
 - Prefer App Router server components for data loading.
+- **Public pages must not read Postgres per request.** The Neon compute scales to zero after 5 idle minutes (not configurable on the Launch plan), so anything that queries on every hit from crawlers, calendar pollers or session polling keeps it awake. Marketing pages, the footer and the sponsors strip read season, tournament and sponsor data through the tagged `unstable_cache` wrappers in `src/next/public-cache.ts`; actions that change those rows call `revalidateTag(<TAG>, "max")` beside `revalidatePath`. Calendar feeds go through `src/next/calendar-feed-cache.ts` (hourly, CDN-cacheable; token reset revalidates the tag). The homepage stays static: its signed-in redirect lives in `src/proxy.ts`, never in the page. Do not add `headers()`, `cookies()` or `searchParams` to a marketing page.
 - Co-locate mutations in `actions.ts` with `"use server"`.
 - Client forms/components generally use controlled state (`useState`) and call server actions.
 - After successful mutations, call `router.refresh()` in client components to resync server-rendered data.
@@ -101,7 +102,7 @@ npx @better-auth/cli generate
 - Every exported server action must enforce authorization at the action boundary, even if the route/page is already protected.
 - For season-bound actions, validate incoming `seasonId` (positive integer) before querying.
 - Commissioner division-scoping is configurable: a commissioner row with `division_id = NULL` in `user_roles` has league-wide access; a row with a specific `division_id` is restricted to that division. Pass `{ seasonId, divisionId }` context to `hasPermission()` to enforce division-level checks.
-- Role updates that change privilege should invalidate active sessions for the affected user (call `invalidateAllSessionsForUser`).
+- Role updates that change privilege should invalidate active sessions for the affected user (call `invalidateAllSessionsForUser`). better-auth's `cookieCache` (5 minutes, `src/lib/auth.ts`) means an already-open browser can keep a revoked session for up to that long; authorization is unaffected because every permission check reads `user_roles` live.
 - Roles are stored in the `user_roles` table, which is the sole authority for all role checks. The legacy `users.role` column has been removed from the schema.
 - Baseline HTTP security headers are configured in `next.config.ts` (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
 

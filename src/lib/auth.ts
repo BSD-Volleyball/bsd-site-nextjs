@@ -25,7 +25,15 @@ export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_BASE_URL,
     session: {
         expiresIn: 60 * 60 * 24 * 30, // 30 days
-        updateAge: 60 * 60 * 24 // refresh the session daily
+        updateAge: 60 * 60 * 24, // refresh the session daily
+        // get-session is polled by every dashboard tab (and installed PWAs
+        // overnight); answering from a short-lived signed cookie keeps that
+        // polling from waking the Neon compute. Revocation of an active
+        // session can lag by up to maxAge; role checks still hit user_roles.
+        cookieCache: {
+            enabled: true,
+            maxAge: 5 * 60
+        }
     },
     database: drizzleAdapter(db, {
         provider: "pg",
