@@ -124,6 +124,10 @@ function NavItems({ items, pathname }: { items: NavItem[]; pathname: string }) {
                             <Link
                                 href={item.url}
                                 className="flex items-center gap-3"
+                                // Every dashboard page is dynamic and reads
+                                // Postgres; prefetching the whole sidebar
+                                // turned one visit into a dozen renders.
+                                prefetch={false}
                             >
                                 {item.icon && (
                                     <item.icon
@@ -181,7 +185,7 @@ function SeasonNavMenuItem({
                                         asChild
                                         isActive={pathname.startsWith(href)}
                                     >
-                                        <Link href={href}>
+                                        <Link href={href} prefetch={false}>
                                             <span>{cat.label}</span>
                                         </Link>
                                     </SidebarMenuSubButton>
@@ -234,7 +238,7 @@ function TournamentNavMenuItem({
                                         asChild
                                         isActive={pathname.startsWith(href)}
                                     >
-                                        <Link href={href}>
+                                        <Link href={href} prefetch={false}>
                                             <span>{cat.label}</span>
                                         </Link>
                                     </SidebarMenuSubButton>
