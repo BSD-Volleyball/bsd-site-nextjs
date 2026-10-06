@@ -40,8 +40,8 @@ export default async function DraftSetupOrderPage({
     }
 
     const division =
-        result.divisions.find((d) => d.divisionId === requested) ??
-        result.divisions[0]
+        result.data.divisions.find((d) => d.divisionId === requested) ??
+        result.data.divisions[0]
 
     if (!division) {
         return (
@@ -55,7 +55,7 @@ export default async function DraftSetupOrderPage({
         config.seasonId,
         division.divisionId
     )
-    const pickerDivisions = result.divisions.map((d) => ({
+    const pickerDivisions = result.data.divisions.map((d) => ({
         id: d.divisionId,
         name: d.divisionName
     }))
@@ -64,7 +64,7 @@ export default async function DraftSetupOrderPage({
         <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <h2 className="font-semibold text-xl">
-                    {result.seasonLabel} — {division.divisionName}
+                    {result.data.seasonLabel} — {division.divisionName}
                 </h2>
                 <DraftSetupDivisionPicker
                     step="order"
@@ -106,7 +106,7 @@ export default async function DraftSetupOrderPage({
                 <DraftDayForm
                     key={division.divisionId}
                     division={division}
-                    seasonLabel={result.seasonLabel}
+                    seasonLabel={result.data.seasonLabel}
                     orderLocked={status.order.state === "locked"}
                 />
             )}

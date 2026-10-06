@@ -1,11 +1,7 @@
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
-import {
-    getWeek2HomeworkData,
-    type Week2HomeworkData,
-    type CoachWeek2HomeworkData
-} from "./actions"
+import { getWeek2HomeworkData } from "./actions"
 import { Week2HomeworkForm } from "./week-2-homework-form"
 import { CoachWeek2HomeworkForm } from "./coach-week-2-homework-form"
 import type { Metadata } from "next"
@@ -21,7 +17,7 @@ export default async function Week2HomeworkPage() {
 
     const result = await getWeek2HomeworkData()
 
-    if (!result.status || !result.data) {
+    if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader
@@ -35,8 +31,10 @@ export default async function Week2HomeworkPage() {
         )
     }
 
-    if (result.mode === "coach") {
-        const data = result.data as CoachWeek2HomeworkData
+    const view = result.data
+
+    if (view.mode === "coach") {
+        const data = view.homework
         const hasSubmitted = data.existingSubmissions.length > 0
 
         return (
@@ -99,7 +97,7 @@ export default async function Week2HomeworkPage() {
     }
 
     // Captain view
-    const data = result.data as Week2HomeworkData
+    const data = view.homework
     const hasSubmitted = data.existingSubmissions.length > 0
 
     return (

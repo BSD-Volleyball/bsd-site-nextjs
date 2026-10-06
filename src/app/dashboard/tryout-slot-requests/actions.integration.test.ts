@@ -94,14 +94,14 @@ describe("createTryoutSlotRequest", () => {
         expect(result.status).toBe(true)
 
         const list = await getTryoutSlotRequests()
-        expect(list.status).toBe(true)
-        expect(list.requests).toHaveLength(1)
-        expect(list.requests[0].userId).toBe(player.id)
-        expect(list.requests[0].week).toBe(2)
-        expect(list.requests[0].canSlot1).toBe(true)
-        expect(list.requests[0].canSlot2).toBe(false)
-        expect(list.requests[0].canSlot3).toBe(true)
-        expect(list.requests[0].comment).toBe("works late on Tuesdays")
+        if (!list.status) throw new Error(list.message)
+        expect(list.data.requests).toHaveLength(1)
+        expect(list.data.requests[0].userId).toBe(player.id)
+        expect(list.data.requests[0].week).toBe(2)
+        expect(list.data.requests[0].canSlot1).toBe(true)
+        expect(list.data.requests[0].canSlot2).toBe(false)
+        expect(list.data.requests[0].canSlot3).toBe(true)
+        expect(list.data.requests[0].comment).toBe("works late on Tuesdays")
         void season
     })
 
@@ -131,7 +131,8 @@ describe("updateTryoutSlotRequest / deleteTryoutSlotRequest", () => {
             requestData(player.id, { week: 1, canSlot3: false })
         )
         const list = await getTryoutSlotRequests()
-        const id = list.requests[0].id
+        if (!list.status) throw new Error(list.message)
+        const id = list.data.requests[0].id
 
         const invalid = await updateTryoutSlotRequest({
             id,
@@ -152,9 +153,10 @@ describe("updateTryoutSlotRequest / deleteTryoutSlotRequest", () => {
         expect(valid.status).toBe(true)
 
         const after = await getTryoutSlotRequests()
-        expect(after.requests[0].canSlot1).toBe(false)
-        expect(after.requests[0].canSlot2).toBe(true)
-        expect(after.requests[0].comment).toBe("updated")
+        if (!after.status) throw new Error(after.message)
+        expect(after.data.requests[0].canSlot1).toBe(false)
+        expect(after.data.requests[0].canSlot2).toBe(true)
+        expect(after.data.requests[0].comment).toBe("updated")
     })
 
     it("deletes a request", async () => {
@@ -164,12 +166,14 @@ describe("updateTryoutSlotRequest / deleteTryoutSlotRequest", () => {
 
         await createTryoutSlotRequest(requestData(player.id))
         const list = await getTryoutSlotRequests()
+        if (!list.status) throw new Error(list.message)
 
-        const result = await deleteTryoutSlotRequest(list.requests[0].id)
+        const result = await deleteTryoutSlotRequest(list.data.requests[0].id)
         expect(result.status).toBe(true)
 
         const after = await getTryoutSlotRequests()
-        expect(after.requests).toHaveLength(0)
+        if (!after.status) throw new Error(after.message)
+        expect(after.data.requests).toHaveLength(0)
     })
 })
 

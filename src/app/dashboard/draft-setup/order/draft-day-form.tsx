@@ -118,7 +118,7 @@ export function DraftDayForm({
             setIsGenerating(null)
             return
         }
-        const bytes = await generateBlankDraftSheet(result)
+        const bytes = await generateBlankDraftSheet(result.data)
         downloadPdf(bytes, "blank-draft-sheet.pdf")
         setIsGenerating(null)
     }
@@ -131,7 +131,7 @@ export function DraftDayForm({
             setIsGenerating(null)
             return
         }
-        const bytes = await generatePrefilledDraftSheet(result)
+        const bytes = await generatePrefilledDraftSheet(result.data)
         downloadPdf(bytes, "prefilled-draft-sheet.pdf")
         setIsGenerating(null)
     }

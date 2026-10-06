@@ -59,10 +59,10 @@ describe("getRatePlayerData: Players I've Rated", () => {
 
         const result = await getRatePlayerData()
 
-        expect(result.status).toBe(true)
-        expect(result.currentSeasonId).toBe(current.id)
+        if (!result.status) throw new Error(result.message)
+        expect(result.data.currentSeasonId).toBe(current.id)
         expect(
-            result.ratedPlayers.map((r) => [
+            result.data.ratedPlayers.map((r) => [
                 r.player.lastName,
                 r.seasonLabel,
                 r.canRate
@@ -73,9 +73,13 @@ describe("getRatePlayerData: Players I've Rated", () => {
             ["Cole", "Spring 2025", true],
             ["Brown", "Spring 2025", false]
         ])
-        expect(result.ratedPlayers.map((r) => r.overall)).toEqual([7, 8, 6, 5])
-        expect(result.ratedPlayers[0].ratedAt).toBe("2026-09-01T12:00:00.000Z")
-        expect(result.ratedSeasons).toEqual([
+        expect(result.data.ratedPlayers.map((r) => r.overall)).toEqual([
+            7, 8, 6, 5
+        ])
+        expect(result.data.ratedPlayers[0].ratedAt).toBe(
+            "2026-09-01T12:00:00.000Z"
+        )
+        expect(result.data.ratedSeasons).toEqual([
             { seasonId: current.id, label: "Fall 2026" },
             { seasonId: prior.id, label: "Spring 2025" }
         ])
@@ -90,12 +94,12 @@ describe("getRatePlayerData: Players I've Rated", () => {
 
         const result = await getRatePlayerData()
 
-        expect(result.status).toBe(true)
-        expect(result.players).toEqual([])
-        expect(result.ratedPlayers).toHaveLength(1)
-        expect(result.ratedPlayers[0].player.id).toBe(dan.id)
-        expect(result.ratedPlayers[0].canRate).toBe(false)
-        expect(result.ratedSeasons).toEqual([
+        if (!result.status) throw new Error(result.message)
+        expect(result.data.players).toEqual([])
+        expect(result.data.ratedPlayers).toHaveLength(1)
+        expect(result.data.ratedPlayers[0].player.id).toBe(dan.id)
+        expect(result.data.ratedPlayers[0].canRate).toBe(false)
+        expect(result.data.ratedSeasons).toEqual([
             { seasonId: prior.id, label: "Fall 2025" }
         ])
     })

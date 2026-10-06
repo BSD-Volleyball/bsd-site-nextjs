@@ -50,10 +50,10 @@ export default async function TryoutSlotRequestsPage() {
         <div className="space-y-8">
             <PageHeader
                 title="Tryout Slot Requests"
-                description={`Track which tryout time slots players can attend for ${requestsResult.seasonLabel}. Placement honors these as a strong preference — check the slots the player CAN make.`}
+                description={`Track which tryout time slots players can attend for ${requestsResult.data.seasonLabel}. Placement honors these as a strong preference — check the slots the player CAN make.`}
             />
             <TryoutSlotRequestsManager
-                requests={requestsResult.requests}
+                requests={requestsResult.data.requests}
                 users={usersData}
                 slotLabelsByWeek={slotLabelsByWeek}
             />

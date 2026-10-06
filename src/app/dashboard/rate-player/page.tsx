@@ -42,24 +42,24 @@ export default async function RatePlayerPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Rate Player — ${result.seasonLabel}`}
+                title={`Rate Player — ${result.data.seasonLabel}`}
                 description="Choose a lookup type and rate players using shared and private notes."
             />
             <RatePlayerClient
-                players={result.players}
-                tryout1Sessions={result.tryout1Sessions}
-                tryout2Divisions={result.tryout2Divisions}
-                tryout3Divisions={result.tryout3Divisions}
-                tryout2TimeSlots={result.tryout2TimeSlots}
-                tryout3TimeSlots={result.tryout3TimeSlots}
-                byTeamDivisions={result.byTeamDivisions}
-                captainTeam={result.captainTeam}
-                defaultLookupType={result.defaultLookupType}
-                initialRatings={result.ratingsByPlayer}
-                ratedPlayers={result.ratedPlayers}
-                ratedSeasons={result.ratedSeasons}
-                currentSeasonId={result.currentSeasonId}
-                currentSeasonLabel={result.seasonLabel}
+                players={result.data.players}
+                tryout1Sessions={result.data.tryout1Sessions}
+                tryout2Divisions={result.data.tryout2Divisions}
+                tryout3Divisions={result.data.tryout3Divisions}
+                tryout2TimeSlots={result.data.tryout2TimeSlots}
+                tryout3TimeSlots={result.data.tryout3TimeSlots}
+                byTeamDivisions={result.data.byTeamDivisions}
+                captainTeam={result.data.captainTeam}
+                defaultLookupType={result.data.defaultLookupType}
+                initialRatings={result.data.ratingsByPlayer}
+                ratedPlayers={result.data.ratedPlayers}
+                ratedSeasons={result.data.ratedSeasons}
+                currentSeasonId={result.data.currentSeasonId}
+                currentSeasonLabel={result.data.seasonLabel}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>

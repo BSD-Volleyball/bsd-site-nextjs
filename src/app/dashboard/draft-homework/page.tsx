@@ -16,7 +16,7 @@ export default async function DraftHomeworkPage() {
 
     const result = await getDraftHomeworkData()
 
-    if (!result.status || !result.data) {
+    if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader

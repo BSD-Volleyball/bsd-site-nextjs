@@ -83,11 +83,11 @@ describe("createDiscount", () => {
 
         expect(result.status).toBe(true)
         const listing = await getDiscounts()
-        expect(listing.status).toBe(true)
-        expect(listing.discounts).toHaveLength(1)
-        expect(listing.discounts[0].percentage).toBe("25")
-        expect(listing.discounts[0].userName).toBe("Pat Player")
-        expect(listing.discounts[0].used).toBe(false)
+        if (!listing.status) throw new Error(listing.message)
+        expect(listing.data).toHaveLength(1)
+        expect(listing.data[0].percentage).toBe("25")
+        expect(listing.data[0].userName).toBe("Pat Player")
+        expect(listing.data[0].used).toBe(false)
     })
 })
 

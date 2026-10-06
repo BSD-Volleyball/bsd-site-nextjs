@@ -33,10 +33,10 @@ export default async function ManageDiscountsPage() {
         )
     }
 
-    const seasonDiscounts = discountsResult.discounts.filter(
+    const seasonDiscounts = discountsResult.data.filter(
         (d) => d.scope === "season"
     )
-    const tournamentDiscounts = discountsResult.discounts.filter(
+    const tournamentDiscounts = discountsResult.data.filter(
         (d) => d.scope === "tournament"
     )
 

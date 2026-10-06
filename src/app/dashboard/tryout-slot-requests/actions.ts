@@ -4,13 +4,11 @@ import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import { users, tryoutSlotRequests } from "@/database/schema"
 import { and, asc, eq } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 
 export interface TryoutSlotRequestEntry {
@@ -48,87 +46,73 @@ function validateSlotSelection(data: SlotSelection): string | null {
     return null
 }
 
-export async function getTryoutSlotRequests(): Promise<{
-    status: boolean
-    message?: string
-    seasonLabel: string
-    requests: TryoutSlotRequestEntry[]
-}> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "Unauthorized",
-            seasonLabel: "",
-            requests: []
+export const getTryoutSlotRequests = withAction(
+    async (): Promise<
+        ActionResult<{
+            seasonLabel: string
+            requests: TryoutSlotRequestEntry[]
+        }>
+    > => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
 
-    try {
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No current season found.",
-                seasonLabel: "",
-                requests: []
+        try {
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No current season found.")
             }
-        }
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        const rows = await db
-            .select({
-                id: tryoutSlotRequests.id,
-                userId: tryoutSlotRequests.user_id,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name,
-                week: tryoutSlotRequests.week,
-                canSlot1: tryoutSlotRequests.can_slot_1,
-                canSlot2: tryoutSlotRequests.can_slot_2,
-                canSlot3: tryoutSlotRequests.can_slot_3,
-                comment: tryoutSlotRequests.comment,
-                createdAt: tryoutSlotRequests.created_at
+            const rows = await db
+                .select({
+                    id: tryoutSlotRequests.id,
+                    userId: tryoutSlotRequests.user_id,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name,
+                    week: tryoutSlotRequests.week,
+                    canSlot1: tryoutSlotRequests.can_slot_1,
+                    canSlot2: tryoutSlotRequests.can_slot_2,
+                    canSlot3: tryoutSlotRequests.can_slot_3,
+                    comment: tryoutSlotRequests.comment,
+                    createdAt: tryoutSlotRequests.created_at
+                })
+                .from(tryoutSlotRequests)
+                .innerJoin(users, eq(tryoutSlotRequests.user_id, users.id))
+                .where(eq(tryoutSlotRequests.season, config.seasonId))
+                .orderBy(
+                    asc(tryoutSlotRequests.week),
+                    asc(users.last_name),
+                    asc(users.first_name)
+                )
+
+            return ok({
+                seasonLabel,
+                requests: rows.map((row) => ({
+                    id: row.id,
+                    userId: row.userId,
+                    userName: formatPlayerName(
+                        row.firstName,
+                        row.lastName,
+                        row.preferredName
+                    ),
+                    week: row.week,
+                    canSlot1: row.canSlot1,
+                    canSlot2: row.canSlot2,
+                    canSlot3: row.canSlot3,
+                    comment: row.comment,
+                    createdAt: row.createdAt
+                }))
             })
-            .from(tryoutSlotRequests)
-            .innerJoin(users, eq(tryoutSlotRequests.user_id, users.id))
-            .where(eq(tryoutSlotRequests.season, config.seasonId))
-            .orderBy(
-                asc(tryoutSlotRequests.week),
-                asc(users.last_name),
-                asc(users.first_name)
-            )
-
-        return {
-            status: true,
-            seasonLabel,
-            requests: rows.map((row) => ({
-                id: row.id,
-                userId: row.userId,
-                userName: formatPlayerName(
-                    row.firstName,
-                    row.lastName,
-                    row.preferredName
-                ),
-                week: row.week,
-                canSlot1: row.canSlot1,
-                canSlot2: row.canSlot2,
-                canSlot3: row.canSlot3,
-                comment: row.comment,
-                createdAt: row.createdAt
-            }))
-        }
-    } catch (error) {
-        console.error("Error fetching tryout slot requests:", error)
-        return {
-            status: false,
-            message: "Failed to load tryout slot requests.",
-            seasonLabel: "",
-            requests: []
+        } catch (error) {
+            console.error("Error fetching tryout slot requests:", error)
+            return fail("Failed to load tryout slot requests.")
         }
     }
-}
+)
 
 export async function getUsers(): Promise<{ id: string; name: string }[]> {
     const hasAccess = await isAdminOrDirectorBySession()
@@ -201,9 +185,7 @@ export const createTryoutSlotRequest = withAction(
                 )
             }
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
+            const userId = await getSessionUserId()
 
             await db.insert(tryoutSlotRequests).values({
                 season: config.seasonId,
@@ -213,12 +195,12 @@ export const createTryoutSlotRequest = withAction(
                 can_slot_2: data.canSlot2,
                 can_slot_3: data.canSlot3,
                 comment: data.comment?.trim() || null,
-                created_by: session?.user.id ?? null
+                created_by: userId
             })
 
-            if (session) {
+            if (userId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId,
                     action: "create",
                     entityType: "tryout_slot_requests",
                     summary: `Created week ${data.week} tryout slot request for user ${data.userId}`
@@ -282,12 +264,10 @@ export const updateTryoutSlotRequest = withAction(
                 })
                 .where(eq(tryoutSlotRequests.id, data.id))
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const userId = await getSessionUserId()
+            if (userId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId,
                     action: "update",
                     entityType: "tryout_slot_requests",
                     entityId: data.id,
@@ -316,12 +296,10 @@ export const deleteTryoutSlotRequest = withAction(
                 .delete(tryoutSlotRequests)
                 .where(eq(tryoutSlotRequests.id, id))
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const userId = await getSessionUserId()
+            if (userId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId,
                     action: "delete",
                     entityType: "tryout_slot_requests",
                     entityId: id,

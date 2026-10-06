@@ -45,18 +45,18 @@ export default async function SelectCaptainsPage() {
                 description="Create teams for the current season by selecting captains."
             />
             <SelectCaptainsForm
-                seasonLabel={result.seasonLabel || ""}
-                divisions={result.divisions}
-                users={result.users}
-                allUsers={result.allUsers}
-                emailTemplate={result.emailTemplate || ""}
-                emailTemplateContent={result.emailTemplateContent}
-                emailSubject={result.emailSubject || ""}
-                seasonConfig={result.seasonConfig}
+                seasonLabel={result.data.seasonLabel || ""}
+                divisions={result.data.divisions}
+                users={result.data.users}
+                allUsers={result.data.allUsers}
+                emailTemplate={result.data.emailTemplate || ""}
+                emailTemplateContent={result.data.emailTemplateContent}
+                emailSubject={result.data.emailSubject || ""}
+                seasonConfig={result.data.seasonConfig}
                 commissionerName={session.user.name || ""}
                 currentUserId={session.user.id}
-                divisionCommissioners={result.divisionCommissioners}
-                existingTeamsByDivision={result.existingTeamsByDivision}
+                divisionCommissioners={result.data.divisionCommissioners}
+                existingTeamsByDivision={result.data.existingTeamsByDivision}
             />
         </div>
     )
