@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { and, eq, isNull, or } from "drizzle-orm"
@@ -22,10 +23,6 @@ export interface MissingPicturePlayer {
     oldId: number | null
 }
 
-function getSeasonLabel(seasonName: string, seasonYear: number): string {
-    return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
-}
-
 export const getPlayersNeedingPictures = withAction(
     async (): Promise<
         ActionResult<{
@@ -38,7 +35,7 @@ export const getPlayersNeedingPictures = withAction(
             seasonId: config.seasonId
         })
 
-        const seasonLabel = getSeasonLabel(config.seasonName, config.seasonYear)
+        const seasonLabel = formatSeasonLabel(config)
 
         const rows = await db
             .select({

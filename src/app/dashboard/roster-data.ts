@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -159,7 +160,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             .limit(1)
 
         const seasonLabel = seasonRow
-            ? `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+            ? formatSeasonRowLabel(seasonRow)
             : String(config.seasonId)
 
         // Sub-aware roster: members reflects the currently-active player on

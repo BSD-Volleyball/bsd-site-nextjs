@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import {
     Card,
     CardContent,
@@ -66,7 +67,7 @@ export function EloTrendChart({
     const seasonLabels = new Map(
         allSeasons.map((s) => [
             s.id,
-            `${s.name.charAt(0).toUpperCase() + s.name.slice(1)} ${s.year}`
+            formatSeasonLabel({ seasonName: s.name, seasonYear: s.year })
         ])
     )
 

@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import {
     drafts,
@@ -20,11 +21,7 @@ import {
 } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { eq, inArray } from "drizzle-orm"
-import {
-    buildInsuranceGroups,
-    type InsuranceReport,
-    seasonLabel
-} from "./report-logic"
+import { buildInsuranceGroups, type InsuranceReport } from "./report-logic"
 
 /**
  * Insurance headcount for a calendar year: distinct participants (season
@@ -110,12 +107,12 @@ export const getInsuranceReport = withAction(
             ...rosteredRows.map((r) => ({
                 userId: r.userId,
                 name: nameFor(r.userId),
-                label: seasonLabel(r.season, r.year)
+                label: formatSeasonRowLabel(r)
             })),
             ...subRows.map((r) => ({
                 userId: r.userId,
                 name: nameFor(r.userId),
-                label: seasonLabel(r.season, r.year)
+                label: formatSeasonRowLabel(r)
             })),
             ...tournamentRows.map((r) => ({
                 userId: r.userId,

@@ -2,6 +2,7 @@
 // actions) are responsible for authorization; these helpers only assemble
 // data. Server-only: never import from client components.
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -94,7 +95,7 @@ export async function loadPreseasonBaseData(
         return { ok: false, message: "No current season found." }
     }
 
-    const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const seasonLabel = formatSeasonLabel(config)
     const tryouts = getEventsByType(config, "tryout")
     const tryoutEvent = tryouts[options.tryoutEventIndex] ?? null
 

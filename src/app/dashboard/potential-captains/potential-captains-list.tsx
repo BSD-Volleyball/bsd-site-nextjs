@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { useState, useCallback, useMemo } from "react"
 import { RiArrowDownSLine } from "@remixicon/react"
 import {
@@ -134,7 +135,7 @@ export function PotentialCaptainsList({
             const values: TemplateVariableValues = {
                 division_name: divisionName,
                 season_name: seasonConfig
-                    ? `${seasonConfig.seasonName.charAt(0).toUpperCase() + seasonConfig.seasonName.slice(1)} ${seasonConfig.seasonYear}`
+                    ? formatSeasonLabel(seasonConfig)
                     : "",
                 season_year: seasonConfig
                     ? String(seasonConfig.seasonYear)

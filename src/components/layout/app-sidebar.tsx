@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import {
     RiArrowDownSLine,
     RiCalendarLine,
@@ -153,7 +154,7 @@ function SeasonNavMenuItem({
     season: SeasonNavItem
     pathname: string
 }) {
-    const seasonLabel = `${season.season.charAt(0).toUpperCase() + season.season.slice(1)} ${season.year}`
+    const seasonLabel = formatSeasonRowLabel(season)
 
     return (
         <Collapsible asChild className="group/season">

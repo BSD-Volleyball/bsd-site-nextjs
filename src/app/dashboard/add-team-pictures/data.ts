@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { desc } from "drizzle-orm"
@@ -27,6 +28,6 @@ export async function getSeasonOptionsForPictures(): Promise<
 
     return rows.map((row) => ({
         seasonId: row.id,
-        label: `${row.season.charAt(0).toUpperCase()}${row.season.slice(1)} ${row.year}`
+        label: formatSeasonRowLabel(row)
     }))
 }

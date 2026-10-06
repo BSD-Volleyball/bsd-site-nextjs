@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
 import { db } from "@/database/db"
@@ -699,16 +700,12 @@ export async function getPlayerSubHistory(
         )
         .where(eq(matchSubstitutions.sub_user, userId))
 
-    function seasonLabel(name: string, year: number): string {
-        return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${year}`
-    }
-
     const entries: PlayerSubHistoryEntry[] = [
         ...permOut.map(
             (r): PlayerSubHistoryEntry => ({
                 kind: "permanent",
                 role: "out",
-                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonLabel: formatSeasonLabel(r),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
                 counterpartName: formatDisplayName(
@@ -725,7 +722,7 @@ export async function getPlayerSubHistory(
             (r): PlayerSubHistoryEntry => ({
                 kind: "permanent",
                 role: "in",
-                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonLabel: formatSeasonLabel(r),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
                 counterpartName: formatDisplayName(
@@ -742,7 +739,7 @@ export async function getPlayerSubHistory(
             (r): PlayerSubHistoryEntry => ({
                 kind: "regular",
                 role: "out",
-                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonLabel: formatSeasonLabel(r),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
                 counterpartName: formatDisplayName(
@@ -759,7 +756,7 @@ export async function getPlayerSubHistory(
             (r): PlayerSubHistoryEntry => ({
                 kind: "regular",
                 role: "in",
-                seasonLabel: seasonLabel(r.seasonName, r.seasonYear),
+                seasonLabel: formatSeasonLabel(r),
                 seasonId: r.seasonId,
                 teamName: r.teamName,
                 counterpartName: formatDisplayName(

@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
@@ -236,9 +237,7 @@ export function SelectCaptainsForm({
 
         const values: Record<string, string> = {
             division_name: selectedDivision?.name ?? "",
-            season_name: seasonConfig
-                ? `${seasonConfig.seasonName.charAt(0).toUpperCase() + seasonConfig.seasonName.slice(1)} ${seasonConfig.seasonYear}`
-                : "",
+            season_name: seasonConfig ? formatSeasonLabel(seasonConfig) : "",
             season_year: seasonConfig ? String(seasonConfig.seasonYear) : "",
             gender_split: selectedDivision?.gender_split ?? "",
             court_focus: selectedDivision

@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { useCallback, useId, useState } from "react"
 import { toast } from "sonner"
 import { useAction } from "@/components/hooks/use-action"
@@ -323,7 +324,10 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
         )
     }
 
-    const seasonLabel = `${initialData.seasonName.charAt(0).toUpperCase() + initialData.seasonName.slice(1)} ${initialData.year}`
+    const seasonLabel = formatSeasonLabel({
+        seasonName: initialData.seasonName,
+        seasonYear: initialData.year
+    })
 
     return (
         <div className="space-y-6">

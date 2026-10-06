@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -431,7 +432,7 @@ export async function getLastDraftInfoByUser(
     for (const draft of draftData) {
         if (map.has(draft.userId)) continue
         map.set(draft.userId, {
-            seasonLabel: `${draft.seasonName.charAt(0).toUpperCase() + draft.seasonName.slice(1)} ${draft.seasonYear}`,
+            seasonLabel: formatSeasonLabel(draft),
             seasonYear: draft.seasonYear,
             divisionName: draft.divisionName,
             divisionLevel: draft.divisionLevel,

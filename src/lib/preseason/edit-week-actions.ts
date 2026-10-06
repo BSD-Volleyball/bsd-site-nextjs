@@ -3,6 +3,7 @@
 // resolve the acting user, and delegate here with their week's config.
 // Server-only.
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import "server-only"
 
@@ -111,7 +112,7 @@ export async function getEditWeekData(
             }
         }
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+        const seasonLabel = formatSeasonLabel(config)
         const tryouts = getEventsByType(config, "tryout")
         const tryoutEvent = tryouts[actionConfig.tryoutEventIndex] ?? null
 

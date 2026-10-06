@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -65,7 +66,7 @@ export const getSeasonPairs = withAction(
                 return fail("No current season found.")
             }
 
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             // Fetch all signups for the season. Rows with a pair_pick feed the
             // matched/unmatched buckets; rows with pair = true but no pick feed

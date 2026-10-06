@@ -6,6 +6,7 @@
  * contact sync needed.
  */
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import {
     users,
@@ -653,10 +654,6 @@ export async function filterByNotificationPreference(
 // Ensure team/division recipient groups (called from draft/lifecycle actions)
 // ---------------------------------------------------------------------------
 
-function buildSeasonLabel(year: number, season: string): string {
-    return `${season.charAt(0).toUpperCase() + season.slice(1)} ${year}`
-}
-
 export async function ensureTeamRecipientGroup(
     teamId: number,
     seasonId: number
@@ -680,7 +677,7 @@ export async function ensureTeamRecipientGroup(
             .limit(1)
 
         if (!seasonRow) return
-        const seasonLabel = buildSeasonLabel(seasonRow.year, seasonRow.season)
+        const seasonLabel = formatSeasonRowLabel(seasonRow)
 
         // Ensure season signups group
         await ensureRecipientGroup("season_signups", {

@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest"
 
-import { dateRecencyKey, seasonRecencyKey } from "@/lib/season-utils"
+import {
+    dateRecencyKey,
+    formatSeasonLabel,
+    formatSeasonRowLabel,
+    seasonRecencyKey
+} from "@/lib/season-utils"
+
+describe("formatSeasonLabel", () => {
+    it("capitalizes the season and appends the year", () => {
+        expect(
+            formatSeasonLabel({ seasonName: "spring", seasonYear: 2026 })
+        ).toBe("Spring 2026")
+        expect(formatSeasonRowLabel({ season: "fall", year: 2025 })).toBe(
+            "Fall 2025"
+        )
+    })
+
+    it("returns an empty label when the season is unknown", () => {
+        expect(formatSeasonLabel({ seasonName: "", seasonYear: 0 })).toBe("")
+    })
+})
 
 describe("seasonRecencyKey", () => {
     it("orders seasons within a year: winter > fall > summer > spring", () => {

@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { and, count, desc, eq, inArray, ne } from "drizzle-orm"
@@ -66,10 +67,6 @@ export interface LeaderboardRow {
     rating: number
     matches: number
     divisionLabel: string | null
-}
-
-function formatSeasonLabel(name: string, year: number): string {
-    return `${name.charAt(0).toUpperCase() + name.slice(1)} ${year}`
 }
 
 /** Season list used to label points on the ELO trend chart. */
@@ -205,7 +202,7 @@ async function getChampionships(userId: string): Promise<ChampionshipEntry[]> {
         .sort((a, b) => b.seasonYear - a.seasonYear || b.seasonId - a.seasonId)
         .map((row) => ({
             seasonId: row.seasonId,
-            seasonLabel: formatSeasonLabel(row.seasonName, row.seasonYear),
+            seasonLabel: formatSeasonLabel(row),
             divisionName: row.divisionName,
             teamName: row.teamName
         }))

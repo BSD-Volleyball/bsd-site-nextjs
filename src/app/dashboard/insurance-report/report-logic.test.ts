@@ -1,21 +1,11 @@
 import { describe, expect, it } from "vitest"
-import {
-    buildInsuranceGroups,
-    type InsuranceGroup,
-    seasonLabel
-} from "./report-logic"
+import { buildInsuranceGroups, type InsuranceGroup } from "./report-logic"
 
 function group(groups: InsuranceGroup[], value: string): InsuranceGroup {
     const found = groups.find((g) => g.value === value)
     if (!found) throw new Error(`missing group ${value}`)
     return found
 }
-
-describe("seasonLabel", () => {
-    it("capitalizes the season and appends the year", () => {
-        expect(seasonLabel("spring", 2026)).toBe("Spring 2026")
-    })
-})
 
 describe("buildInsuranceGroups", () => {
     it("counts a user once across multiple events and de-duplicates labels", () => {

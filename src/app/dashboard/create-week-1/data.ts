@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -68,7 +69,7 @@ export const getCreateWeek1Data = withAction(
                 return fail("No current season found.")
             }
 
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
             const tryouts = getEventsByType(config, "tryout")
             const tryout1Event = tryouts[0] ?? null
             const tryout2Event = tryouts[1] ?? null
@@ -289,10 +290,10 @@ export const getCreateWeek1Data = withAction(
                 }
 
                 const lastDraftSeasonLabel = mostRecentDraft
-                    ? `${mostRecentDraft.seasonName.charAt(0).toUpperCase() + mostRecentDraft.seasonName.slice(1)} ${mostRecentDraft.seasonYear}`
+                    ? formatSeasonLabel(mostRecentDraft)
                     : null
                 const previousDraftSeasonLabel = secondMostRecentDraft
-                    ? `${secondMostRecentDraft.seasonName.charAt(0).toUpperCase() + secondMostRecentDraft.seasonName.slice(1)} ${secondMostRecentDraft.seasonYear}`
+                    ? formatSeasonLabel(secondMostRecentDraft)
                     : null
 
                 candidates.push({

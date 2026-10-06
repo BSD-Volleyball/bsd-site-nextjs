@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import type { PlayerDraftHistory } from "@/app/dashboard/player-lookup/actions"
 import {
     BarChart,
@@ -35,7 +36,7 @@ export function DraftPickChart({ draftHistory }: DraftPickChartProps) {
 
     const chartData = draftHistory.map((d) => ({
         ...d,
-        label: `${d.seasonName.charAt(0).toUpperCase() + d.seasonName.slice(1)} ${d.seasonYear}`
+        label: formatSeasonLabel(d)
     }))
 
     return (

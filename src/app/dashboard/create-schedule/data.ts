@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -41,7 +42,7 @@ export const getCreateScheduleData = withAction(
                 return fail("No active season found.")
             }
 
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             // Get divisions for this season via individual_divisions
             const indivDivs = await db

@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -38,7 +39,7 @@ export const getSeasonWaitlist = withAction(
         await requireAdmin()
         const config = await requireSeasonConfig()
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+        const seasonLabel = formatSeasonLabel(config)
 
         const rows = await db
             .select({

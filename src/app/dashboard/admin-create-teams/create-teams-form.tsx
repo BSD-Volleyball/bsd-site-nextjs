@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { useId, useState, useMemo } from "react"
 import { PlayerOptionCombobox } from "@/components/user-combobox"
 import { toast } from "sonner"
@@ -111,12 +112,6 @@ export function CreateTeamsForm({
         }
     }
 
-    const formatSeasonLabel = (season: SeasonOption) => {
-        const seasonName =
-            season.season.charAt(0).toUpperCase() + season.season.slice(1)
-        return `${seasonName} ${season.year}`
-    }
-
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
@@ -187,7 +182,7 @@ export function CreateTeamsForm({
                                             key={season.id}
                                             value={season.id.toString()}
                                         >
-                                            {formatSeasonLabel(season)}
+                                            {formatSeasonRowLabel(season)}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

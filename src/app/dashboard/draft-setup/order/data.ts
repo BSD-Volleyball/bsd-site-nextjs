@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -48,7 +49,7 @@ export const getDraftDayData = withAction(
             }
 
             const seasonId = config.seasonId
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             const userId = await getSessionUserId()
             if (!userId) {

@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import { auth } from "@/lib/auth"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
@@ -897,7 +898,7 @@ async function sendDraftResultNotifications(
 
     const teamById = new Map(teamRows.map((t) => [t.id, t]))
     const userById = new Map(userRows.map((u) => [u.id, u]))
-    const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const seasonLabel = formatSeasonLabel(config)
 
     const recipients: NotificationRecipient[] = []
     const htmlByUserId = new Map<string, string>()

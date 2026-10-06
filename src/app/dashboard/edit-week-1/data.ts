@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -64,7 +65,7 @@ export const getEditWeek1Data = withAction(
                 return fail("No current season found.")
             }
 
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             const [signupPlayersRaw, rosterSlots] = await Promise.all([
                 db

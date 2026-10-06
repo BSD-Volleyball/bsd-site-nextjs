@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -93,7 +94,7 @@ export const getRefCompensationData = withAction(
             })
         }
 
-        const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+        const seasonLabel = formatSeasonRowLabel(seasonRow)
         const certifiedRate = seasonRow.certifiedRate ?? "0"
         const uncertifiedRate = seasonRow.uncertifiedRate ?? "0"
 

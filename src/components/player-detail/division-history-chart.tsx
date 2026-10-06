@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { RiTrophyLine } from "@remixicon/react"
 import {
     BarChart,
@@ -106,7 +107,10 @@ export function DivisionHistoryChart({
 
     const chartData = seasonsInRange.map((s) => {
         const draft = draftBySeasonId.get(s.id)
-        const label = `${s.name.charAt(0).toUpperCase() + s.name.slice(1)} ${s.year}`
+        const label = formatSeasonLabel({
+            seasonName: s.name,
+            seasonYear: s.year
+        })
         if (draft) {
             return {
                 ...draft,

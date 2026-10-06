@@ -191,7 +191,7 @@ export function DraftHomeworkForm({
                     <DialogHeader>
                         <DialogTitle>
                             {lastSeasonDraft
-                                ? `${lastSeasonDraft.divisionName} Division — ${lastSeasonDraft.seasonName.charAt(0).toUpperCase()}${lastSeasonDraft.seasonName.slice(1)} ${lastSeasonDraft.seasonYear} Draft`
+                                ? `${lastSeasonDraft.divisionName} Division — ${formatSeasonLabel(lastSeasonDraft)} Draft`
                                 : "Last Season's Draft"}
                         </DialogTitle>
                     </DialogHeader>

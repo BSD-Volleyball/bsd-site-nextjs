@@ -868,7 +868,7 @@ export default async function DashboardPage() {
     }
 
     const seasonLabel = signupStatus
-        ? `${signupStatus.config.seasonName.charAt(0).toUpperCase() + signupStatus.config.seasonName.slice(1)} ${signupStatus.config.seasonYear}`
+        ? formatSeasonLabel(signupStatus.config)
         : null
 
     const waitlistSeasonId = signupStatus?.season?.id ?? null

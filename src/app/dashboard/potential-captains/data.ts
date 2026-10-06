@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -141,7 +142,7 @@ export const getPotentialCaptainsData = withAction(
             return fail("No season found.")
         }
 
-        const seasonLabel = `${targetSeason.season.charAt(0).toUpperCase() + targetSeason.season.slice(1)} ${targetSeason.year}`
+        const seasonLabel = formatSeasonRowLabel(targetSeason)
 
         // 2. Get all signups for current season
         const signupRows = await db

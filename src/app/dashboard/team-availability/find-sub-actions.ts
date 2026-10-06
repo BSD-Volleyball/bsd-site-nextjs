@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
@@ -648,7 +649,7 @@ export const getPermanentSubCandidates = withAction(
         const historyMap = new Map<string, DraftHistory>()
         for (const row of draftHistoryRows) {
             if (!historyMap.has(row.userId)) {
-                const label = `${row.seasonName.charAt(0).toUpperCase()}${row.seasonName.slice(1)} ${row.seasonYear}`
+                const label = formatSeasonLabel(row)
                 historyMap.set(row.userId, {
                     lastDivisionId: row.divisionId,
                     lastDivisionName: row.divisionName,
@@ -920,7 +921,7 @@ export async function getSubPoolOptions(
     >()
     for (const h of historyRows) {
         if (!historyByUser.has(h.userId)) {
-            const label = `${h.seasonName.charAt(0).toUpperCase()}${h.seasonName.slice(1)} ${h.seasonYear}`
+            const label = formatSeasonLabel(h)
             historyByUser.set(h.userId, {
                 divisionName: h.divisionName,
                 seasonLabel: label

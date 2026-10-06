@@ -37,7 +37,7 @@ import {
     resolveSubjectVariables,
     resolveTemplateVariablesInContent
 } from "@/lib/email-template-variables"
-import { formatSeasonLabel } from "@/lib/season-utils"
+import { formatSeasonLabel, formatSeasonRowLabel } from "@/lib/season-utils"
 import type { SeasonConfig } from "@/lib/season-types"
 import { STREAM_BROADCAST, STREAM_IN_SEASON_UPDATES } from "@/lib/postmark"
 
@@ -207,7 +207,7 @@ async function resolveGroup(
         .where(eq(seasons.id, seasonId))
         .limit(1)
     const seasonLabel = seasonRow
-        ? `${seasonRow.season.charAt(0).toUpperCase()}${seasonRow.season.slice(1)} ${seasonRow.year}`
+        ? formatSeasonRowLabel(seasonRow)
         : "Current Season"
 
     if (sendToType === "season") {

@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 import { db } from "@/database/db"
 import { playerRatings, seasons, users } from "@/database/schema"
@@ -8,10 +9,6 @@ import {
     type PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { formatDisplayName } from "@/lib/utils"
-
-function formatSeasonLabel(seasonName: string, seasonYear: number): string {
-    return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
-}
 
 function average(values: Array<number | null>): number | null {
     const validValues = values.filter(
@@ -80,10 +77,7 @@ export async function getPlayerRatingsSectionData(
         .orderBy(desc(playerRatings.season), desc(playerRatings.updated_at))
 
     const seasonLabelById = new Map(
-        seasonWindowRows.map((season) => [
-            season.id,
-            formatSeasonLabel(season.seasonName, season.seasonYear)
-        ])
+        seasonWindowRows.map((season) => [season.id, formatSeasonLabel(season)])
     )
     const seasonCodeById = new Map(
         seasonWindowRows.map((season) => [season.id, season.seasonCode])
@@ -148,7 +142,7 @@ export async function getPlayerRatingsSectionData(
                     seasonCodeById.get(row.seasonId) || `S${row.seasonId}`
             })),
             seasonLabels: seasonWindowRows.map((season) =>
-                formatSeasonLabel(season.seasonName, season.seasonYear)
+                formatSeasonLabel(season)
             )
         },
         sharedNotes: ratingRows

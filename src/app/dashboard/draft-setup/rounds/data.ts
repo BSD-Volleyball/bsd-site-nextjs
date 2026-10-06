@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -319,7 +320,7 @@ export const getPrepareForDraftData = withAction(
         ])
 
         const seasonLabel = seasonRow
-            ? `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+            ? formatSeasonRowLabel(seasonRow)
             : String(seasonId)
 
         const divisionName = divisionRow?.name ?? ""

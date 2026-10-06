@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -40,7 +41,7 @@ export const getCurrentSeasonPhaseData = withAction(
 
             return ok({
                 seasonId: season.id,
-                seasonLabel: `${season.season.charAt(0).toUpperCase() + season.season.slice(1)} ${season.year}`,
+                seasonLabel: formatSeasonRowLabel(season),
                 phase: season.phase as SeasonPhase
             })
         } catch (error) {

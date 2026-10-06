@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { useState } from "react"
 import { toast } from "sonner"
 import type { PreviousSeason } from "./page"
@@ -30,9 +31,7 @@ export function PreviousSeasonsCard({
     const [teamPhotoUrl, setTeamPhotoUrl] = useState("")
 
     async function handleRowClick(ps: PreviousSeason) {
-        setSeasonLabel(
-            `${ps.season.charAt(0).toUpperCase() + ps.season.slice(1)} ${ps.year}`
-        )
+        setSeasonLabel(formatSeasonRowLabel(ps))
         setTeamName(ps.teamName)
         setIsChampionSeason(ps.champion)
         setChampionPicture(ps.championPicture)
@@ -92,9 +91,7 @@ export function PreviousSeasonsCard({
                                         onClick={() => handleRowClick(ps)}
                                     >
                                         <td className="py-2 pr-4">
-                                            {ps.season.charAt(0).toUpperCase() +
-                                                ps.season.slice(1)}{" "}
-                                            {ps.year}
+                                            {formatSeasonRowLabel(ps)}
                                         </td>
                                         <td className="py-2 pr-4">
                                             {ps.divisionName}

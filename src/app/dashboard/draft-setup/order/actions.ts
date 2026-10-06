@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
@@ -194,7 +195,7 @@ export const getDraftSheetData = withAction(
             }
 
             const seasonId = config.seasonId
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             const userId = await getSessionUserId()
             if (!userId) {

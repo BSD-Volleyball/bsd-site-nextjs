@@ -21,11 +21,6 @@ export type InsuranceReport = {
     groups: InsuranceGroup[]
 }
 
-export function seasonLabel(season: string, year: number): string {
-    const name = season.charAt(0).toUpperCase() + season.slice(1)
-    return `${name} ${year}`
-}
-
 /**
  * Bucket participants into age groups for a single calendar year.
  *

@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
@@ -316,9 +317,6 @@ export const revertSeasonPhase = withAction(
     }
 )
 
-const seasonLabel = (season: string, year: number) =>
-    `${season.charAt(0).toUpperCase() + season.slice(1)} ${year}`
-
 export const createSeason = withAction(
     async (input: {
         season: string
@@ -344,7 +342,7 @@ export const createSeason = withAction(
             return fail("Enter a valid year")
         }
 
-        const label = seasonLabel(season, year)
+        const label = formatSeasonRowLabel({ season, year })
 
         try {
             // Only one season may run at a time — the newest season must be
@@ -360,7 +358,7 @@ export const createSeason = withAction(
                 .limit(1)
             if (latest && latest.phase !== "complete") {
                 return fail(
-                    `Cannot create a new season while ${seasonLabel(latest.season, latest.year)} is not Complete. Finish it in Season Control first.`
+                    `Cannot create a new season while ${formatSeasonRowLabel(latest)} is not Complete. Finish it in Season Control first.`
                 )
             }
 
@@ -469,7 +467,7 @@ export const createSeason = withAction(
                 entityType: "season",
                 entityId: newSeasonId,
                 summary: source
-                    ? `Created ${label} season (cloned config from ${seasonLabel(source.season, source.year)})`
+                    ? `Created ${label} season (cloned config from ${formatSeasonRowLabel(source)})`
                     : `Created ${label} season`
             })
 

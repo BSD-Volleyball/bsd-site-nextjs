@@ -1,6 +1,6 @@
 import "server-only"
 
-import { parseTimeForSort } from "@/lib/season-utils"
+import { parseTimeForSort, formatSeasonRowLabel } from "@/lib/season-utils"
 import { and, eq, inArray } from "drizzle-orm"
 import { db } from "@/database/db"
 import {
@@ -824,7 +824,7 @@ export const getPlayoffData = withAction(
             return fail("Season not found.")
         }
 
-        const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+        const seasonLabel = formatSeasonRowLabel(seasonRow)
 
         const [playoffMatchRows, metaRows, refRows] = await Promise.all([
             db

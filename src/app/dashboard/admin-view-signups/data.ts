@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -20,7 +21,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/next/session"
-import { type SignupDropCategory } from "@/lib/signup-drops-display"
+import type { SignupDropCategory } from "@/lib/signup-drops-display"
 import { formatPlayerName } from "@/lib/utils"
 import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
 
@@ -88,7 +89,7 @@ export const getSeasonSignups = withAction(
                 return fail("No current season found.")
             }
 
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
 
             const signupRows = await db
                 .select({

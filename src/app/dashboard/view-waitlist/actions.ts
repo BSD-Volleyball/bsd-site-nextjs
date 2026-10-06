@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import { users, waitlist } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
@@ -65,7 +66,7 @@ export const setWaitlistApproval = withAction(
         // happening to log in. dispatchNotification never throws, so a mail
         // outage cannot fail the approval itself.
         if (approved && entry.email) {
-            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = formatSeasonLabel(config)
             const firstName =
                 entry.preferredName ||
                 entry.firstName ||

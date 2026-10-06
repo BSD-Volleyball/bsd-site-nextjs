@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
@@ -54,7 +55,7 @@ export default async function DraftPreseasonWeek1Page() {
         )
     }
 
-    const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+    const seasonLabel = formatSeasonLabel(config)
     const tryouts = getEventsByType(config, "tryout")
     const tryout1 = tryouts[0]
     const tryout1DateDisplay = tryout1

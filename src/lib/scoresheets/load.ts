@@ -7,6 +7,7 @@
  * may not import, so the queries are restated here.
  */
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { and, asc, eq, inArray } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 
@@ -304,7 +305,7 @@ export async function loadScoreSheetNight(
         })
         .map(([court, courtMatches]) => ({ court, matches: courtMatches }))
 
-    const seasonLabel = `${season.season.charAt(0).toUpperCase()}${season.season.slice(1)} ${season.year}`
+    const seasonLabel = formatSeasonRowLabel(season)
     const phaseLabel =
         eventType === "playoff" ? `Playoffs Week ${ordinal}` : `Week ${ordinal}`
 

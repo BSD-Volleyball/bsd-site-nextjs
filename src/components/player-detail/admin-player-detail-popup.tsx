@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { useEffect, useState } from "react"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -68,12 +69,6 @@ interface AdminPlayerDetailPopupProps {
     emailHistory?: PlayerEmailHistoryEntry[]
     inline?: boolean
     children?: React.ReactNode
-}
-
-function formatSeasonLabel(signup: PlayerSignup) {
-    const seasonName =
-        signup.seasonName.charAt(0).toUpperCase() + signup.seasonName.slice(1)
-    return `${seasonName} ${signup.seasonYear}`
 }
 
 export function AdminPlayerDetailPopup({

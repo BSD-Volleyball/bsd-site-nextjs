@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -96,7 +97,7 @@ export const getRosterData = withAction(
             return fail("Season not found.")
         }
 
-        const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+        const seasonLabel = formatSeasonRowLabel(seasonRow)
 
         const teamRows = await db
             .select({

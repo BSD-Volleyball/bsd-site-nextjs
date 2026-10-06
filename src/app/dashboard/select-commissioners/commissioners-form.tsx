@@ -1,5 +1,6 @@
 "use client"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { useState, useEffect, useCallback, useId, useMemo } from "react"
 import { toast } from "sonner"
 import { useAction } from "@/components/hooks/use-action"
@@ -266,9 +267,7 @@ export function CommissionersForm({
                                 key={season.id}
                                 value={season.id.toString()}
                             >
-                                {season.season.charAt(0).toUpperCase() +
-                                    season.season.slice(1)}{" "}
-                                {season.year} ({season.code})
+                                {formatSeasonRowLabel(season)} ({season.code})
                             </SelectItem>
                         ))}
                     </SelectContent>

@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { logger } from "@/lib/logger"
@@ -127,10 +128,6 @@ export interface CaptainTeamRef {
     teamId: number
 }
 
-function buildSeasonLabel(seasonName: string, seasonYear: number): string {
-    return `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
-}
-
 function buildDivisionGroups(
     rosterRows: Array<{
         userId: string
@@ -216,10 +213,7 @@ export const getRatePlayerData = withAction(
                 return fail("No active season found.")
             }
 
-            const seasonLabel = buildSeasonLabel(
-                config.seasonName,
-                config.seasonYear
-            )
+            const seasonLabel = formatSeasonLabel(config)
 
             const signupRows = await db
                 .select({
@@ -310,10 +304,7 @@ export const getRatePlayerData = withAction(
                                 lastDivisionByPlayerId.get(row.id) || null
                         },
                         seasonId: row.seasonId,
-                        seasonLabel: buildSeasonLabel(
-                            row.seasonName,
-                            row.seasonYear
-                        ),
+                        seasonLabel: formatSeasonLabel(row),
                         overall: row.overall,
                         ratedAt: row.ratedAt ? row.ratedAt.toISOString() : null,
                         canRate:

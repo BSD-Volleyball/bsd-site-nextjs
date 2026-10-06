@@ -19,6 +19,14 @@ export function formatSeasonLabel(
     return `${name} ${config.seasonYear}`
 }
 
+/** formatSeasonLabel for a raw `seasons` row ({ season, year }). */
+export function formatSeasonRowLabel(row: {
+    season: string
+    year: number
+}): string {
+    return formatSeasonLabel({ seasonName: row.season, seasonYear: row.year })
+}
+
 // Approximate calendar month each season runs in, used only to order seasons
 // against dated events (tournaments) in the same year. Seasons have no date
 // column and backfilled historical seasons have no season_events rows.

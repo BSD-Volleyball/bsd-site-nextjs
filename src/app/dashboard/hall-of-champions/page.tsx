@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import type { Metadata } from "next"
 import { asc, desc, eq } from "drizzle-orm"
 import { PageHeader } from "@/components/layout/page-header"
@@ -57,10 +58,6 @@ async function getChampions(): Promise<ChampionRow[]> {
         .orderBy(desc(seasons.year), desc(seasons.id), asc(divisions.level))
 }
 
-function formatSeasonLabel(season: string, year: number): string {
-    return `${season.charAt(0).toUpperCase()}${season.slice(1)} ${year}`
-}
-
 export default async function HallOfChampionsPage() {
     const rows = await getChampions()
     // champions.picture is snapshotted when a season advances to "complete".
@@ -70,7 +67,7 @@ export default async function HallOfChampionsPage() {
     const listRows: ChampionListRow[] = rows.map((row) => ({
         id: row.id,
         seasonId: row.seasonId,
-        seasonLabel: formatSeasonLabel(row.seasonName, row.seasonYear),
+        seasonLabel: formatSeasonLabel(row),
         divisionName: row.divisionName,
         divisionLevel: row.divisionLevel,
         teamName: row.teamName,

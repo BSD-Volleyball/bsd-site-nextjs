@@ -1,6 +1,6 @@
 import "server-only"
 
-import { parseTimeForSort } from "@/lib/season-utils"
+import { parseTimeForSort, formatSeasonRowLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -86,7 +86,7 @@ export const getCurrentSeasonScheduleData = withAction(
             return fail("Season not found.")
         }
 
-        const seasonLabel = `${seasonRow.season.charAt(0).toUpperCase() + seasonRow.season.slice(1)} ${seasonRow.year}`
+        const seasonLabel = formatSeasonRowLabel(seasonRow)
 
         const [userDraftRow, teamRows] = await Promise.all([
             db

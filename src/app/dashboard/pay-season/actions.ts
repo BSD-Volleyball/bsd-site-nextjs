@@ -1,5 +1,6 @@
 "use server"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
@@ -56,7 +57,7 @@ async function sendSignupConfirmationEmail(
     receiptUrl?: string,
     discountInfo?: { originalAmount: string; percentage: string }
 ) {
-    const seasonLabel = `${seasonName.charAt(0).toUpperCase() + seasonName.slice(1)} ${seasonYear}`
+    const seasonLabel = formatSeasonLabel({ seasonName, seasonYear })
 
     // Build amount display string
     let amountDisplay = amountPaid

@@ -1,3 +1,4 @@
+import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -52,7 +53,7 @@ export const getSignupsData = withAction(
 
         const config = await requireSeasonConfig()
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+        const seasonLabel = formatSeasonLabel(config)
 
         // Fetch all signups for the current season
         const signupRows = await db

@@ -1,3 +1,4 @@
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -86,7 +87,7 @@ export const getHomeworkStatusData = withAction(
         }
 
         const seasonId = targetSeason.id
-        const seasonLabel = `${targetSeason.season.charAt(0).toUpperCase() + targetSeason.season.slice(1)} ${targetSeason.year}`
+        const seasonLabel = formatSeasonRowLabel(targetSeason)
 
         // 2. Auth + division access check
         const session = await auth.api.getSession({ headers: await headers() })
