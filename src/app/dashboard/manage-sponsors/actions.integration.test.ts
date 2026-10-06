@@ -137,23 +137,22 @@ describe("createSponsorship", () => {
         expect(sentMessages()).toHaveLength(0)
     })
 
-    it.each([
-        "0",
-        "-5",
-        "abc",
-        "1e9",
-        ""
-    ])("rejects invalid amount %j", async (amount) => {
-        const contact = await createUser()
-        await createUserWithRoles([{ role: "admin" }])
-        const result = await createSponsorshipAction({
-            newSponsor: { name: "Bravo", website: null, blurb: null },
-            contactUserId: contact.id,
-            amount
-        })
-        expect(result.status).toBe(false)
-        expect(result.message).toBe("Amount must be a positive dollar amount.")
-    })
+    it.each(["0", "-5", "abc", "1e9", ""])(
+        "rejects invalid amount %j",
+        async (amount) => {
+            const contact = await createUser()
+            await createUserWithRoles([{ role: "admin" }])
+            const result = await createSponsorshipAction({
+                newSponsor: { name: "Bravo", website: null, blurb: null },
+                contactUserId: contact.id,
+                amount
+            })
+            expect(result.status).toBe(false)
+            expect(result.message).toBe(
+                "Amount must be a positive dollar amount."
+            )
+        }
+    )
 
     it("rejects an unknown contact user", async () => {
         await createUserWithRoles([{ role: "admin" }])

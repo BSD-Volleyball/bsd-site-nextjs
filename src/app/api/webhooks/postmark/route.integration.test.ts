@@ -829,19 +829,16 @@ describe("spooled inbound", () => {
         expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
     })
 
-    it.each([
-        0,
-        -1,
-        1.5,
-        "10",
-        200 * 1024 * 1024
-    ])("rejects a bad ContentLength (%s) before touching R2", async (length) => {
-        const response = await POST(
-            webhookRequest(envelope({ ContentLength: length }))
-        )
-        expect(response.status).toBe(400)
-        expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
-    })
+    it.each([0, -1, 1.5, "10", 200 * 1024 * 1024])(
+        "rejects a bad ContentLength (%s) before touching R2",
+        async (length) => {
+            const response = await POST(
+                webhookRequest(envelope({ ContentLength: length }))
+            )
+            expect(response.status).toBe(400)
+            expect(vi.mocked(getR2Object)).not.toHaveBeenCalled()
+        }
+    )
 
     it("rejects a spool object whose length disagrees with the envelope", async () => {
         await createUser()

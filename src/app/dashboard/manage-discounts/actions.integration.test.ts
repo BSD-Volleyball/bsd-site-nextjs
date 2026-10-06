@@ -28,25 +28,24 @@ describe("createDiscount", () => {
         expect(await db.select().from(discounts)).toHaveLength(0)
     })
 
-    it.each([
-        "0",
-        "101",
-        "abc"
-    ])("rejects invalid percentage %s", async (percentage) => {
-        const target = await createUser()
-        await createUserWithRoles([{ role: "admin" }])
+    it.each(["0", "101", "abc"])(
+        "rejects invalid percentage %s",
+        async (percentage) => {
+            const target = await createUser()
+            await createUserWithRoles([{ role: "admin" }])
 
-        const result = await createDiscountAction({
-            userId: target.id,
-            percentage,
-            expiration: null,
-            reason: null,
-            scope: "season"
-        })
+            const result = await createDiscountAction({
+                userId: target.id,
+                percentage,
+                expiration: null,
+                reason: null,
+                scope: "season"
+            })
 
-        expect(result.status).toBe(false)
-        expect(result.message).toBe("Percentage must be between 1 and 100.")
-    })
+            expect(result.status).toBe(false)
+            expect(result.message).toBe("Percentage must be between 1 and 100.")
+        }
+    )
 
     it("rejects unknown scopes", async () => {
         const target = await createUser()

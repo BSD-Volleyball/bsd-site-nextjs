@@ -52,19 +52,14 @@ describe("requirePositiveInt", () => {
         expect(requirePositiveInt("7")).toBe(7)
     })
 
-    it.each([
-        0,
-        -1,
-        1.5,
-        "abc",
-        null,
-        undefined,
-        Number.NaN
-    ])("rejects %s", (value) => {
-        expect(() => requirePositiveInt(value, "season ID")).toThrow(
-            "Invalid season ID."
-        )
-    })
+    it.each([0, -1, 1.5, "abc", null, undefined, Number.NaN])(
+        "rejects %s",
+        (value) => {
+            expect(() => requirePositiveInt(value, "season ID")).toThrow(
+                "Invalid season ID."
+            )
+        }
+    )
 })
 
 describe("requireNonEmptyString", () => {

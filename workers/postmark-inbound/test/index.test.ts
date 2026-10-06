@@ -120,18 +120,21 @@ describe("postmark inbound worker", () => {
         ["wrong password", `Basic ${btoa("postmark-hook:nope")}`],
         ["wrong scheme", "Bearer hook-secret"],
         ["not base64", "Basic %%%"]
-    ])("rejects %s credentials without touching R2 or the origin", async (_, auth) => {
-        const origin = originStub(Response.json({ received: true }))
-        const headers: Record<string, string> = {
-            "content-type": "application/json"
-        }
-        if (auth) headers.authorization = auth
-        const res = await run(createHandler(origin), request({ headers }))
+    ])(
+        "rejects %s credentials without touching R2 or the origin",
+        async (_, auth) => {
+            const origin = originStub(Response.json({ received: true }))
+            const headers: Record<string, string> = {
+                "content-type": "application/json"
+            }
+            if (auth) headers.authorization = auth
+            const res = await run(createHandler(origin), request({ headers }))
 
-        expect(res.status).toBe(401)
-        expect(await spooledKeys()).toEqual([])
-        expect(origin.calls).toHaveLength(0)
-    })
+            expect(res.status).toBe(401)
+            expect(await spooledKeys()).toEqual([])
+            expect(origin.calls).toHaveLength(0)
+        }
+    )
 
     it("only serves POST on the webhook path", async () => {
         const origin = originStub(Response.json({ received: true }))
@@ -167,22 +170,23 @@ describe("postmark inbound worker", () => {
         expect(origin.calls).toHaveLength(0)
     })
 
-    it.each([
-        400, 404, 500
-    ])("passes an origin %s through with its own body and keeps the spool", async (status) => {
-        const origin = originStub(
-            new Response("<html>Vercel says no</html>", { status })
-        )
-        const res = await run(createHandler(origin), request())
+    it.each([400, 404, 500])(
+        "passes an origin %s through with its own body and keeps the spool",
+        async (status) => {
+            const origin = originStub(
+                new Response("<html>Vercel says no</html>", { status })
+            )
+            const res = await run(createHandler(origin), request())
 
-        expect(res.status).toBe(status)
-        const text = await res.text()
-        expect(text).not.toContain("Vercel says no")
-        const body = JSON.parse(text) as { error: string; spoolKey: string }
-        expect(body.error).toBe("Origin rejected the message")
-        expect(body.spoolKey).toMatch(SPOOL_KEY)
-        expect(await spooledKeys()).toEqual([body.spoolKey])
-    })
+            expect(res.status).toBe(status)
+            const text = await res.text()
+            expect(text).not.toContain("Vercel says no")
+            const body = JSON.parse(text) as { error: string; spoolKey: string }
+            expect(body.error).toBe("Origin rejected the message")
+            expect(body.spoolKey).toMatch(SPOOL_KEY)
+            expect(await spooledKeys()).toEqual([body.spoolKey])
+        }
+    )
 
     it("reports a WAF challenge as 502", async () => {
         const origin = originStub(
