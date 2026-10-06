@@ -3,7 +3,15 @@
 // the template/worker database it needs.
 const DEFAULT_TEST_PG_URL = "postgres://bsd_test:bsd_test@localhost:5432"
 
-export const TEMPLATE_DB = "bsd_test_template"
+// TEST_DB_PREFIX lets two test runs share one Postgres without dropping
+// each other's databases (e.g. parallel agents or worktrees). Unset, the
+// names are the historical bsd_test_*.
+const DB_PREFIX = (process.env.TEST_DB_PREFIX ?? "bsd_test").replace(
+    /[^a-z0-9_]/gi,
+    ""
+)
+
+export const TEMPLATE_DB = `${DB_PREFIX}_template`
 
 export function getTestPgBaseUrl(): string {
     const base = (process.env.TEST_PG_URL ?? DEFAULT_TEST_PG_URL).replace(
@@ -26,5 +34,5 @@ export function testDbUrl(dbName: string): string {
 
 // Each Vitest fork gets its own database so parallel workers never collide.
 export function workerDbName(): string {
-    return `bsd_test_w${process.env.VITEST_WORKER_ID ?? "0"}`
+    return `${DB_PREFIX}_w${process.env.VITEST_WORKER_ID ?? "0"}`
 }
