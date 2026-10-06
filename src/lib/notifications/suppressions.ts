@@ -92,7 +92,7 @@ export async function recomputeEmailStatus(
     return { status, changed: true }
 }
 
-export interface SuppressionState {
+interface SuppressionState {
     streamId: string
     reason: string
     origin: string

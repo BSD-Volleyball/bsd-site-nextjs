@@ -9,7 +9,7 @@ export function getTeamNumberSlot(teamNumber: number) {
     return Math.floor((teamNumber - 1) / 2) + 1
 }
 
-export interface SameTimeConflict {
+interface SameTimeConflict {
     userId: string
     slot: number
     /** Every team (across divisions) the player holds in that time slot. */

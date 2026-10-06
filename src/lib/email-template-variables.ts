@@ -12,7 +12,7 @@ import {
     formatEventTime
 } from "@/lib/season-utils"
 
-export interface TemplateVariable {
+interface TemplateVariable {
     key: string
     label: string
     category: string

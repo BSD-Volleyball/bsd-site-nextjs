@@ -42,11 +42,11 @@ export interface DraftSeasonRecord {
     divisionName: string
 }
 
-export interface PreseasonBaseCandidate extends PreseasonCandidate {
+interface PreseasonBaseCandidate extends PreseasonCandidate {
     oldId: number | null
 }
 
-export interface PreseasonBaseData {
+interface PreseasonBaseData {
     seasonId: number
     seasonLabel: string
     divisions: PreseasonDivision[]
@@ -56,11 +56,11 @@ export interface PreseasonBaseData {
     userIds: string[]
 }
 
-export type PreseasonLoadResult =
+type PreseasonLoadResult =
     | { ok: true; data: PreseasonBaseData }
     | { ok: false; message: string }
 
-export interface LoadPreseasonBaseDataOptions {
+interface LoadPreseasonBaseDataOptions {
     /** Index into the season's tryout events (week 2 → 1, week 3 → 2). */
     tryoutEventIndex: number
 }

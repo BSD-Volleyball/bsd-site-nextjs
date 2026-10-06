@@ -161,7 +161,7 @@ export function fitTextToCell({
     }
 }
 
-export interface LatestDraftInfo {
+interface LatestDraftInfo {
     seasonId: number
     seasonLabel: string
     divisionLabel: string

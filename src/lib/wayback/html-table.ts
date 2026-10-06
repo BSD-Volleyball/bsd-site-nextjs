@@ -95,7 +95,7 @@ export function toInt(value: string): number | null {
     return match ? Number.parseInt(match[0], 10) : null
 }
 
-export function normalizeSurname(value: string): string {
+function normalizeSurname(value: string): string {
     return value.toLowerCase().replace(/[^a-z]/g, "")
 }
 

@@ -18,7 +18,7 @@ import { getRecipientsWithRole } from "@/lib/rbac"
 import { buildScoreSheetsPdfBytes } from "@/lib/scoresheets/generate"
 import { dispatchNotification } from "./dispatch"
 
-export interface CoverageDigestRunResult {
+interface CoverageDigestRunResult {
     date: string
     status: CoverageStatus | null
     sent: number
@@ -26,7 +26,7 @@ export interface CoverageDigestRunResult {
     skipped: number
 }
 
-export function coverageDigestSubject(day: CoverageDate): string {
+function coverageDigestSubject(day: CoverageDate): string {
     const prefix =
         day.status === "green" ? "" : `[${day.status.toUpperCase()}] `
     return `${prefix}Coverage for ${formatCoverageDate(day.date)} (${coverageDateTitle(day)}): ${day.reason}`

@@ -10,7 +10,7 @@ import { applyH, invertH, solveHomography } from "../homography"
 import { type RasterImage, sampleBilinear } from "../image"
 
 /** Small deterministic PRNG; Math.random would make failures unrepeatable. */
-export function seededRandom(seed: number): () => number {
+function seededRandom(seed: number): () => number {
     let state = (seed * 2654435761) >>> 0
     return () => {
         state = (state * 1664525 + 1013904223) >>> 0
@@ -18,7 +18,7 @@ export function seededRandom(seed: number): () => number {
     }
 }
 
-export interface DistortOptions {
+interface DistortOptions {
     seed: number
     /** Corner displacement as a fraction of the image's size. */
     perspective?: number
@@ -173,7 +173,7 @@ function boxBlurPass(
     return { width: img.width, height: img.height, gray }
 }
 
-export function addNoise(
+function addNoise(
     img: RasterImage,
     sigma: number,
     rand: () => number

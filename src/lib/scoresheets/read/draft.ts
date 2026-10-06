@@ -15,7 +15,7 @@
 import type { ReadLevel } from "./reconcile"
 import type { MatchRead, SheetRead } from "./read"
 
-export interface ScoreDraftFields {
+interface ScoreDraftFields {
     homeScore: string
     awayScore: string
     homeSet1Score: string
@@ -28,7 +28,7 @@ export interface ScoreDraftFields {
     winnerSide: "home" | "away" | null
 }
 
-export interface DraftFlag {
+interface DraftFlag {
     field: keyof ScoreDraftFields
     level: Exclude<ReadLevel, "high"> | "conflict"
     /** Plain language, for showing beside the input. */

@@ -29,7 +29,7 @@ export const LAST_DIVISION_TEAM_COUNT = 4
  * Width of one division-level band in placement-score points; used for
  * score-based division fallback and duplicate-entry targeting.
  */
-export const SCORE_BAND_WIDTH = 50
+const SCORE_BAND_WIDTH = 50
 
 /**
  * Tryout slot (1-based, = ceil(teamNumber / 2)) coaches are steered into so
@@ -44,7 +44,7 @@ export const COACH_OBSERVATION_SLOT = 3
  */
 export const DRAFT_NIGHT_SLOT = 1
 
-export type DivisionPlacementStrategy<C extends PreseasonCandidate> = (
+type DivisionPlacementStrategy<C extends PreseasonCandidate> = (
     divisions: PreseasonDivision[],
     candidates: C[]
 ) => DivisionPlacementResult<C>

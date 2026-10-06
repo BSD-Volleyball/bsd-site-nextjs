@@ -72,7 +72,7 @@ function countGames(sets: SetScore[]): { home: number; away: number } {
     return { home, away }
 }
 
-export function parseJsPlayoffMatches(
+function parseJsPlayoffMatches(
     rawScript: string,
     season: { seasonName: string; seasonYear: number }
 ): JsPlayoffMatch[] {

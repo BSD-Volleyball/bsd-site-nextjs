@@ -144,12 +144,12 @@ export async function hasCaptainPagesAccess(userId: string): Promise<boolean> {
 // Commissioner division scoping
 // ---------------------------------------------------------------------------
 
-export type CommissionerDivisionAccess =
+type CommissionerDivisionAccess =
     | { type: "league_wide" }
     | { type: "division_specific"; divisionId: number }
     | { type: "denied" }
 
-export type CommissionerDivisionScope =
+type CommissionerDivisionScope =
     | { type: "league_wide" }
     | { type: "division_specific"; divisionIds: number[] }
     | { type: "denied" }

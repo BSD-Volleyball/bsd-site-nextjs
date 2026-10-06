@@ -14,7 +14,7 @@ export const SEASON_PHASES = [
 
 export type SeasonPhase = (typeof SEASON_PHASES)[number]
 
-export interface PhaseConfig {
+interface PhaseConfig {
     label: string
     description: string
     adminHint: string

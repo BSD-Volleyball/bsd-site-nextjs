@@ -25,7 +25,7 @@ import {
     type TryoutJobScope
 } from "@/lib/tryout-volunteer-types"
 
-export interface VolunteerAssignmentDetail {
+interface VolunteerAssignmentDetail {
     assignmentId: number
     userId: string
     firstName: string

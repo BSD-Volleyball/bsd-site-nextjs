@@ -73,9 +73,9 @@ export interface ScoreCrop {
 }
 
 /** `null` when the ink is too ambiguous to commit either way. */
-export type DigitCount = 1 | 2 | null
+type DigitCount = 1 | 2 | null
 
-export interface CropResult {
+interface CropResult {
     /** Boxes with ink in them, worth transcribing. */
     written: ScoreCrop[]
     /** Ids of the pairs judged empty; these never reach a model. */

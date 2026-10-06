@@ -34,7 +34,7 @@ import {
 } from "./homography"
 import { downscale, meanOverRect, type RasterImage } from "./image"
 
-export type LocateMethod = "fiducial" | "qr" | "fiducial+qr"
+type LocateMethod = "fiducial" | "qr" | "fiducial+qr"
 
 export interface PageTransform {
     /** Page points to photo pixels; what sampling uses. */
@@ -236,7 +236,7 @@ function scoreTransform(img: RasterImage, toImage: Matrix3): number {
     return outlineScore * 2 + Math.max(0, tagScore)
 }
 
-export interface QrDetection {
+interface QrDetection {
     text: string
     /** Corners of the symbol in photo pixels, clockwise from top-left. */
     corners: [Point, Point, Point, Point]
@@ -273,7 +273,7 @@ function fromQr(
     return { toImage: h, residualPt }
 }
 
-export interface LocateOptions {
+interface LocateOptions {
     /** A QR already decoded from the raw photo, used only as a fallback. */
     qr?: QrDetection | null
     tagQrRect?: { x: number; y: number; w: number; h: number }
@@ -363,14 +363,6 @@ function pickCornerCandidates(
         picked.push(best)
     }
     return picked
-}
-
-/** Where a page-space rect lands in the photo, for cropping. */
-export function projectRect(
-    transform: PageTransform,
-    rect: { x: number; y: number; w: number; h: number }
-): Point[] {
-    return rectCorners(rect).map((p) => applyH(transform.toImage, p))
 }
 
 export const PAGE_SIZE = { width: PAGE_WIDTH, height: PAGE_HEIGHT }

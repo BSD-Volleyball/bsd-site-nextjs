@@ -58,7 +58,7 @@ export type MergeChoice = "a" | "b"
  */
 export type MergeSelection = Partial<Record<MergeFieldKey, MergeChoice>>
 
-export type MergeFieldKind = "text" | "number" | "boolean" | "date"
+type MergeFieldKind = "text" | "number" | "boolean" | "date"
 
 export interface MergeFieldDescriptor {
     key: MergeFieldKey
@@ -66,7 +66,7 @@ export interface MergeFieldDescriptor {
     kind: MergeFieldKind
 }
 
-export interface MergeFieldGroup {
+interface MergeFieldGroup {
     title: string
     fields: MergeFieldDescriptor[]
 }

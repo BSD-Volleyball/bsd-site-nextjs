@@ -56,7 +56,7 @@ import type {
     EditWeekSlot
 } from "@/lib/preseason/edit-week-types"
 
-export interface EditWeekActionConfig {
+interface EditWeekActionConfig {
     week: 2 | 3
     /** Index into the season's tryout events (week 2 → 1, week 3 → 2). */
     tryoutEventIndex: 1 | 2

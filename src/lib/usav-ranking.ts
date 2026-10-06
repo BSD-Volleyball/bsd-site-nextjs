@@ -49,13 +49,13 @@ export interface UsavMatch {
  * standings — all matches are pool play) or a per-match resolver (mixed
  * pool+bracket ranking, which picks pool vs. playoff by `bracket`).
  */
-export type SetsFormatResolver = SetsFormat | ((m: UsavMatch) => SetsFormat)
+type SetsFormatResolver = SetsFormat | ((m: UsavMatch) => SetsFormat)
 
 function resolveFormat(f: SetsFormatResolver, m: UsavMatch): SetsFormat {
     return typeof f === "function" ? f(m) : f
 }
 
-export interface UsavTally {
+interface UsavTally {
     teamId: number
     name: string
     matchWins: number
@@ -68,7 +68,7 @@ export interface UsavTally {
     pointPct: number
 }
 
-export interface RankedTeam extends UsavTally {
+interface RankedTeam extends UsavTally {
     rank: number
 }
 
@@ -86,7 +86,7 @@ export function matchHasFinalScore(m: UsavMatch, format: SetsFormat): boolean {
 }
 
 /** Total points across all played sets, per side. */
-export function pointTotals(m: UsavMatch): { home: number; away: number } {
+function pointTotals(m: UsavMatch): { home: number; away: number } {
     const cols: Array<[number | null, number | null]> = [
         [m.home_set1_score, m.away_set1_score],
         [m.home_set2_score, m.away_set2_score],

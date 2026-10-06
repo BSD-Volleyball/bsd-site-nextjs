@@ -26,7 +26,7 @@ export const AVAILABILITY_AUDIT_ACTION = "update_availability"
  * @example describeAvailability([{ date: "2026-10-03" }]) // "Unavailable for 1 date: 10/3"
  * @example describeAvailability([]) // "Available for all dates"
  */
-export function describeAvailability(events: { date: string }[]): string {
+function describeAvailability(events: { date: string }[]): string {
     if (events.length === 0) return "Available for all dates"
     // Chronological, not the order the client submitted — otherwise two
     // identical selections can produce different summaries.

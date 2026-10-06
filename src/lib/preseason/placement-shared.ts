@@ -72,7 +72,7 @@ export function initDivisionBuckets<C extends PreseasonCandidate>(
     )
 }
 
-export interface PlacementTracker<C extends PreseasonCandidate> {
+interface PlacementTracker<C extends PreseasonCandidate> {
     placeUnit(
         unit: PlacementUnit<C>,
         divisionId: number,

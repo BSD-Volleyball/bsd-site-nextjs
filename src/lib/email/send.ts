@@ -69,7 +69,7 @@ export type MailMode =
     /** Replies on a concern/inbound-email thread, to arbitrary addresses. */
     | { kind: "reply"; category: string }
 
-export type MailModeKind = MailMode["kind"]
+type MailModeKind = MailMode["kind"]
 
 interface ModePolicy {
     /** Honour per-type opt-outs from the Notifications page. */
@@ -159,7 +159,7 @@ export interface MailAttachment {
     contentId?: string
 }
 
-export interface SendMailOptions {
+interface SendMailOptions {
     mode: MailMode
     recipients: MailRecipient[]
     subject: PerRecipient
@@ -186,7 +186,7 @@ export interface SendMailOptions {
     alwaysInclude?: string[]
 }
 
-export interface SendMailResult {
+interface SendMailResult {
     sent: number
     failed: number
     skipped: number

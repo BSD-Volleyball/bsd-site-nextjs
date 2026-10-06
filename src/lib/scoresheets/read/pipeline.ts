@@ -40,7 +40,7 @@ export type StoredReadStatus =
 /** Give up rather than charge for a fourth attempt at a hopeless photo. */
 const MAX_ATTEMPTS = 3
 
-export interface ProcessOptions {
+interface ProcessOptions {
     scoreSheetId: number
     seasonId: number
     /**
@@ -52,7 +52,7 @@ export interface ProcessOptions {
     courtHint?: number | null
 }
 
-export interface ProcessResult {
+interface ProcessResult {
     status: StoredReadStatus
     read: SheetRead | null
     problems: string[]

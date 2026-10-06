@@ -40,7 +40,7 @@ import { getTemplateQuestions } from "./templates"
 import type { RespondentSegments } from "./types"
 import { validateVisibilityGraph } from "./visibility"
 
-export interface PublishResult {
+interface PublishResult {
     recipients: number
     invitations: DispatchResult
 }

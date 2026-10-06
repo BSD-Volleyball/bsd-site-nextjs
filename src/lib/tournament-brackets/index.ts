@@ -13,7 +13,7 @@ import {
     type PoolStandingRow
 } from "@/lib/tournament-standings"
 
-export interface SeedResult {
+interface SeedResult {
     status: boolean
     divisionsSeeded: number
     message: string

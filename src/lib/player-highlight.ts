@@ -6,7 +6,7 @@
  * friends in the site's primary purple. Client-safe: no database imports.
  */
 
-export type PlayerHighlight = "self" | "friend" | null
+type PlayerHighlight = "self" | "friend" | null
 
 /**
  * "self" wins over "friend" (a user is never their own friend, but the

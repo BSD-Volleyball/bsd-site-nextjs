@@ -1,4 +1,4 @@
-export interface LexicalTextNode {
+interface LexicalTextNode {
     detail: number
     format: number
     mode: string
@@ -8,13 +8,13 @@ export interface LexicalTextNode {
     version: number
 }
 
-export interface LexicalTemplateVariableNode {
+interface LexicalTemplateVariableNode {
     type: "template-variable"
     variableKey: string
     version: number
 }
 
-export interface LexicalLineBreakNode {
+interface LexicalLineBreakNode {
     type: "linebreak"
     version: number
 }
@@ -56,9 +56,9 @@ export interface LexicalListNode {
     tag: string
 }
 
-export type LexicalRootChild = LexicalParagraphNode | LexicalListNode
+type LexicalRootChild = LexicalParagraphNode | LexicalListNode
 
-export interface LexicalRootNode {
+interface LexicalRootNode {
     children: LexicalRootChild[]
     direction: null
     format: string

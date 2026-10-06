@@ -23,7 +23,7 @@ import { getEventsByType } from "@/lib/season-utils"
 import type { SeasonConfig, SeasonEvent } from "@/lib/season-types"
 
 /** userId → set of time slot ids that user is rostered to play in. */
-export type PlayingSlotsByUser = Map<string, Set<number>>
+type PlayingSlotsByUser = Map<string, Set<number>>
 
 interface RosterRow {
     user: string

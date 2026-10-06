@@ -226,7 +226,7 @@ async function selectQuestionRows(
 }
 
 /** Which of the given questions already have at least one answer row. */
-export async function questionIdsWithAnswers(
+async function questionIdsWithAnswers(
     questionIds: number[],
     executor: DbExecutor = db
 ): Promise<Set<number>> {
@@ -243,7 +243,7 @@ export async function questionIdsWithAnswers(
  * survey that is still open. Those runs render the list exactly as it was at
  * publish, so the rows behind it have to keep existing.
  */
-export async function questionIdsFrozenIntoOpenSurveys(
+async function questionIdsFrozenIntoOpenSurveys(
     questionIds: number[],
     executor: DbExecutor = db
 ): Promise<Set<number>> {

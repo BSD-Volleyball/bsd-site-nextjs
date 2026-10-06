@@ -26,7 +26,7 @@ import type { SheetEventType, SheetNight } from "./types"
  */
 export const TEMPLATE_VERSION = 3
 
-export interface GameRule {
+interface GameRule {
     game: 1 | 2 | 3
     /** Highest point number printed in the tally grid. */
     maxPoint: number

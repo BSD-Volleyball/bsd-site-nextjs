@@ -26,7 +26,7 @@ import { sheetTag } from "../../sheet-config"
 import type { CourtSheet, SheetEventType, SheetMatch } from "../../types"
 import type { RasterImage } from "../image"
 
-export interface Canvas {
+interface Canvas {
     width: number
     height: number
     gray: Uint8Array
@@ -34,7 +34,7 @@ export interface Canvas {
     scale: number
 }
 
-export function createCanvas(scale: number): Canvas {
+function createCanvas(scale: number): Canvas {
     const width = Math.round(PAGE_WIDTH * scale)
     const height = Math.round(PAGE_HEIGHT * scale)
     return {
@@ -62,7 +62,7 @@ function put(canvas: Canvas, x: number, y: number, value: number) {
     if (value < canvas.gray[i]) canvas.gray[i] = value
 }
 
-export function fillRect(canvas: Canvas, rect: BoxRect, value = 0) {
+function fillRect(canvas: Canvas, rect: BoxRect, value = 0) {
     const [x0, y1] = px(canvas, rect.x, rect.y)
     const [x1, y0] = px(canvas, rect.x + rect.w, rect.y + rect.h)
     for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
@@ -72,12 +72,7 @@ export function fillRect(canvas: Canvas, rect: BoxRect, value = 0) {
     }
 }
 
-export function strokeRect(
-    canvas: Canvas,
-    rect: BoxRect,
-    thicknessPt = 1,
-    value = 0
-) {
+function strokeRect(canvas: Canvas, rect: BoxRect, thicknessPt = 1, value = 0) {
     const t = Math.max(1, thicknessPt * canvas.scale)
     const [x0, y1] = px(canvas, rect.x, rect.y)
     const [x1, y0] = px(canvas, rect.x + rect.w, rect.y + rect.h)
@@ -130,12 +125,7 @@ const SEGMENTS: Record<number, string[]> = {
     9: ["top", "tl", "tr", "middle", "br", "bottom"]
 }
 
-export function drawDigit(
-    canvas: Canvas,
-    digit: number,
-    box: BoxRect,
-    jitter = 0
-) {
+function drawDigit(canvas: Canvas, digit: number, box: BoxRect, jitter = 0) {
     const segs = SEGMENTS[digit]
     if (!segs) return
 
@@ -170,7 +160,7 @@ export function drawDigit(
     }
 }
 
-export function drawTick(canvas: Canvas, box: BoxRect) {
+function drawTick(canvas: Canvas, box: BoxRect) {
     const x0 = box.x + box.w * 0.2
     const x1 = box.x + box.w * 0.45
     const x2 = box.x + box.w * 0.82
@@ -192,7 +182,7 @@ export interface GameTruth {
     win: boolean
 }
 
-export interface SyntheticSheet {
+interface SyntheticSheet {
     image: RasterImage
     geometry: SheetGeometry
     scale: number
@@ -204,7 +194,7 @@ export interface SyntheticSheet {
     }
 }
 
-export function fakeCourtSheet(
+function fakeCourtSheet(
     matchCount: number,
     court = 4,
     matchIds?: readonly number[]
@@ -239,7 +229,7 @@ export function fakeCourtSheet(
     return { court, matches }
 }
 
-export interface SynthesizeOptions {
+interface SynthesizeOptions {
     matchCount: 1 | 2 | 3 | 4
     eventType: SheetEventType
     /** Pixels per point. 1.62 is the old 1280px upload, 3.79 the new 3000px. */

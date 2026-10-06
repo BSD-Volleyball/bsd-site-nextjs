@@ -23,7 +23,7 @@ export const nullTranscriber: Transcriber = {
     }
 }
 
-export interface StubOptions {
+interface StubOptions {
     /** Score per crop id. Anything missing is answered as unreadable. */
     truth: Map<string, number | null>
     confidence?: number

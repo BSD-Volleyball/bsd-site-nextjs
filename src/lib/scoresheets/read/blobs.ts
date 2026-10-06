@@ -95,7 +95,7 @@ export function findBlobs(bin: BinaryImage, minArea = 12): Blob[] {
     return blobs
 }
 
-export interface SquareFilter {
+interface SquareFilter {
     /** Expected side in pixels for a full-size marker. */
     expectedSide: number
     /** Accepted multiples of that side, either way. */

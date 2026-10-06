@@ -25,7 +25,7 @@ import { dispatchNotification } from "./dispatch"
 import type { NotificationRecipient } from "./dispatch"
 import { getTeamRosterWithSubs } from "@/lib/roster"
 
-export interface GameReminderRunResult {
+interface GameReminderRunResult {
     date: string
     matches: number
     playersSent: number

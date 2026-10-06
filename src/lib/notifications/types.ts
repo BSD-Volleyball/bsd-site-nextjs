@@ -46,12 +46,12 @@ export type NotificationType =
     | "coverage_digest"
     | "transactional"
 
-export interface NotificationCategoryDef {
+interface NotificationCategoryDef {
     label: string
     description: string
 }
 
-export interface NotificationTypeDef {
+interface NotificationTypeDef {
     /** null → not toggleable; rendered in the "Always on" section if mandatory */
     category: NotificationCategoryId | null
     stream: MessageStream

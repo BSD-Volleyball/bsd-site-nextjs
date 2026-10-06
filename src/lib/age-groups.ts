@@ -13,7 +13,7 @@ export const AGE_GROUPS = [
     { value: "20+", label: "20 or older" }
 ] as const
 
-export type AgeGroupValue = (typeof AGE_GROUPS)[number]["value"]
+type AgeGroupValue = (typeof AGE_GROUPS)[number]["value"]
 
 // Adults are the default bucket for participants with no recorded signup age
 // that year (e.g. tournament-only players — tournaments don't collect an age).

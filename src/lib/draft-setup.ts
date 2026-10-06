@@ -35,7 +35,7 @@ export interface DraftSetupStatus {
     ready: boolean
 }
 
-export interface DraftSetupInputs {
+interface DraftSetupInputs {
     teams: { captain: string; captainName: string }[]
     captainsWithRounds: string[]
     roundsLockedAt: Date | null

@@ -33,14 +33,6 @@ export function isTryoutJobCourtScope(
     return value === "general" || value === "per_court"
 }
 
-export const TRYOUT_JOB_COURT_SCOPE_LABELS: Record<
-    TryoutJobCourtScope,
-    string
-> = {
-    general: "General",
-    per_court: "Per court"
-}
-
 /** Highest court number an admin can list for a tryout night. */
 export const MAX_COURT_NUMBER = 99
 /** Most courts one tryout night can list. */

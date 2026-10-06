@@ -27,7 +27,7 @@ export interface CoverageMatchInput {
     startTime: string | null
 }
 
-export interface PresenceInput {
+interface PresenceInput {
     id: number
     userId: string
     date: string

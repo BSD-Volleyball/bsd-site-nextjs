@@ -32,7 +32,7 @@ export type PageEra =
     | "js-teamlist"
     | "plain"
 
-export interface SeasonRef {
+interface SeasonRef {
     // "spring" | "summer" | "fall", matching seasons.season
     seasonName: string
     seasonYear: number

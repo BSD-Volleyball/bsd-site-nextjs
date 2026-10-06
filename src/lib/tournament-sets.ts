@@ -21,7 +21,7 @@ export interface SetsFormat {
 }
 
 /** Set-win tally for a single match, counted over the entered (scored) sets. */
-export interface SetTally {
+interface SetTally {
     homeWins: number
     awayWins: number
     /** Number of sets with a score on both sides. */

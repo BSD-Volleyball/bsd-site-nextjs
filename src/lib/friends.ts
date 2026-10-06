@@ -22,7 +22,7 @@ import {
     type PreseasonAssignment
 } from "@/lib/preseason-assignment"
 
-export interface FriendProfile {
+interface FriendProfile {
     userId: string
     /** "Preferred Last" — the Friends page reads as a people list, not a roster. */
     name: string
@@ -32,12 +32,12 @@ export interface FriendProfile {
     pronouns: string | null
 }
 
-export interface FriendEntry extends FriendProfile {
+interface FriendEntry extends FriendProfile {
     friendshipId: number
 }
 
 /** Season-schedule context shared by the page rows and the dashboard card. */
-export interface FriendScheduleContext {
+interface FriendScheduleContext {
     nextMatch: NextMatch | null
     preseason: PreseasonAssignment | null
     /** Has a signups row for the season, whether or not they're scheduled. */
@@ -111,7 +111,7 @@ function sortBySchedule<T extends FriendProfile & FriendScheduleContext>(
 }
 
 /** Accepted friendships for a user (either direction), newest first. */
-export async function listFriends(userId: string): Promise<FriendEntry[]> {
+async function listFriends(userId: string): Promise<FriendEntry[]> {
     const rows = await db
         .select({
             friendshipId: friendships.id,

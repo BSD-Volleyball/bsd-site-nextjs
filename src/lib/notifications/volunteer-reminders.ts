@@ -19,7 +19,7 @@ import {
 } from "@/lib/tryout-volunteer-schedule"
 import { dispatchNotification, type NotificationRecipient } from "./dispatch"
 
-export interface VolunteerReminderRunResult {
+interface VolunteerReminderRunResult {
     date: string
     volunteers: number
     sent: number

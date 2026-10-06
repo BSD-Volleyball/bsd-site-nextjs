@@ -25,7 +25,7 @@ import { renderScoreSheetsPdf } from "./render"
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-export function scoreSheetsFileName(date: string): string {
+function scoreSheetsFileName(date: string): string {
     return `scoresheets-${date}.pdf`
 }
 

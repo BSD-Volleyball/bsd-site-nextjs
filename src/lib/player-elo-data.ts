@@ -38,7 +38,7 @@ export interface ChampionshipEntry {
     teamName: string | null
 }
 
-export interface FrequentPerson {
+interface FrequentPerson {
     userId: string
     name: string
     count: number
@@ -215,7 +215,7 @@ async function getChampionships(userId: string): Promise<ChampionshipEntry[]> {
  * A player's per-season match record plus whether they won the championship
  * that season. Keyed by season id for joining onto draft history.
  */
-export interface PlayerSeasonRecord extends SeasonRecord {
+interface PlayerSeasonRecord extends SeasonRecord {
     seasonId: number
     champion: boolean
 }

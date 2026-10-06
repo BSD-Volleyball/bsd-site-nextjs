@@ -15,7 +15,7 @@ export interface AttachmentMeta {
 }
 
 /** Attachment entry as delivered by Postmark's inbound webhook. */
-export interface PostmarkAttachment {
+interface PostmarkAttachment {
     Name: string
     Content: string
     ContentType: string

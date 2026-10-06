@@ -27,7 +27,7 @@ import {
     dispatchNotification
 } from "@/lib/notifications/dispatch"
 
-export interface SurveyReminderRunResult {
+interface SurveyReminderRunResult {
     surveys: number
     sent: number
     skipped: number

@@ -23,7 +23,7 @@ export interface BinaryImage {
     bits: Uint8Array
 }
 
-export interface BinarizeOptions {
+interface BinarizeOptions {
     /** Window side as a fraction of the shorter dimension. */
     windowFraction?: number
     /** How far below the local mean a pixel must fall to count as ink. */

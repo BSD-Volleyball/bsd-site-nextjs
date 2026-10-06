@@ -28,7 +28,7 @@ import { gameConstraint } from "./rules"
 import { validateReadings } from "./transcriber/port"
 import type { Transcriber } from "./transcriber/port"
 
-export type ReadStatus =
+type ReadStatus =
     | "read"
     | "needs_review"
     | "unidentified"
@@ -58,7 +58,7 @@ export interface SheetRead {
     transcriber: string
 }
 
-export interface ReadInput {
+interface ReadInput {
     image: RasterImage
     /** The layout the sheet was printed with, from its print record. */
     matchIds: number[]

@@ -1,6 +1,6 @@
 import { parseGenderSplit } from "@/lib/utils"
 
-export interface HomeworkRoundMaps {
+interface HomeworkRoundMaps {
     /** Homework male-tab round → expected draft round */
     male: Record<number, number>
     /** Homework non-male-tab round → expected draft round */

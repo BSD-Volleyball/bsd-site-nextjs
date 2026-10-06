@@ -8,7 +8,7 @@ export const TOURNAMENT_PHASES = [
 
 export type TournamentPhase = (typeof TOURNAMENT_PHASES)[number]
 
-export interface TournamentPhaseConfig {
+interface TournamentPhaseConfig {
     label: string
     description: string
     adminHint: string

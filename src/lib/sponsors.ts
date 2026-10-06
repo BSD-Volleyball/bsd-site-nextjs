@@ -274,7 +274,7 @@ export function parseSponsorshipAmount(value: unknown): string {
     return Number(cleaned).toFixed(2)
 }
 
-export interface SponsorDetailsInput {
+interface SponsorDetailsInput {
     name: string
     website: string | null
     blurb: string | null

@@ -17,7 +17,7 @@ import type {
     PreseasonDivision
 } from "./types"
 
-export interface BackCourtConfig {
+interface BackCourtConfig {
     /** Division index the back-court split applies to (0 = top division). */
     divisionIndex: number
     /** The split only activates when the division has exactly this many teams. */
@@ -31,7 +31,7 @@ export interface TeamBuildOptions {
     backCourt: BackCourtConfig | null
 }
 
-export interface TeamPlayer {
+interface TeamPlayer {
     entryId: string
     assignmentUserId: string
     displayName: string
@@ -59,7 +59,7 @@ export interface TeamBucket {
     newCount: number
 }
 
-export interface TeamUnit {
+interface TeamUnit {
     id: string
     players: TeamPlayer[]
     maleCount: number
@@ -98,7 +98,7 @@ export function getSlotViolationEntryIds(teams: TeamBucket[]): Set<string> {
     return result
 }
 
-export function buildTeamUnits(players: TeamPlayer[]): TeamUnit[] {
+function buildTeamUnits(players: TeamPlayer[]): TeamUnit[] {
     const sorted = [...players].sort((a, b) => {
         if (a.placementScore !== b.placementScore) {
             return a.placementScore - b.placementScore

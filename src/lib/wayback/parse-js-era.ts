@@ -24,7 +24,7 @@
 import { identifyPage } from "./identify"
 import type { ParsedMatch, PageIdentity, SetScore } from "./types"
 
-export interface ParsedJsPage {
+interface ParsedJsPage {
     identity: PageIdentity | null
     teams: Map<number, string>
     matches: ParsedMatch[]
@@ -122,7 +122,7 @@ export function parsePlaydates(script: string): string[] {
 }
 
 /** The court every match uses unless it carries its own `match.court`. */
-export function parseDefaultCourt(script: string): number | null {
+function parseDefaultCourt(script: string): number | null {
     const match = script.match(/dates\[d\]\.matches\[m\]\.court\s*=\s*(\d+)/)
     return match ? Number.parseInt(match[1], 10) : null
 }
@@ -168,7 +168,7 @@ function countGames(sets: SetScore[]): { home: number; away: number } {
     return { home, away }
 }
 
-export function parseJsMatches(
+function parseJsMatches(
     rawScript: string,
     options: {
         seasonName: string

@@ -5,7 +5,7 @@ import DOMPurify from "isomorphic-dompurify"
  * `email-attachments.ts`, which is server-only.
  */
 
-export interface AttachmentRef {
+interface AttachmentRef {
     id: number
     content_id: string | null
 }

@@ -23,7 +23,7 @@ export interface GameConstraint {
     floor: number
 }
 
-export interface ScorePair {
+interface ScorePair {
     winner: number
     loser: number
 }

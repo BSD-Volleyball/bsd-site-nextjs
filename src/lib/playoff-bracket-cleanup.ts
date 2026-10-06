@@ -37,7 +37,7 @@ export interface BracketSlot {
     hasAnyScore: boolean
 }
 
-export interface PrunableReset {
+interface PrunableReset {
     metaId: number
     matchId: number | null
     matchNum: number
@@ -124,7 +124,7 @@ export function selectPrunableResets(slots: BracketSlot[]): PrunableReset[] {
     return out
 }
 
-export interface PruneSkip {
+interface PruneSkip {
     matchId: number
     reason: string
 }

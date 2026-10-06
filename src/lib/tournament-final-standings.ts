@@ -22,7 +22,7 @@ export interface FinalMatch extends UsavMatch {
     bracket_round: number | null
 }
 
-export interface FinalStandingRow {
+interface FinalStandingRow {
     teamId: number
     name: string
     place: number
@@ -169,7 +169,7 @@ export function rankDivisionFinal(
 /**
  * Compute final placements for every division of a tournament from current data.
  */
-export async function computeTournamentPlacements(
+async function computeTournamentPlacements(
     tournamentId: number
 ): Promise<Map<number, FinalStandingRow[]>> {
     const divisions = await db

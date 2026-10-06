@@ -12,7 +12,7 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import { findActiveTeamForUser, resolveActiveUserForSlot } from "@/lib/roster"
 
-export type InsertMatchSubstitutionResult =
+type InsertMatchSubstitutionResult =
     | { ok: true; id: number; activeOriginal: string }
     | { ok: false; message: string }
 

@@ -82,12 +82,12 @@ export const FOUR_TEAM_TIMES = ["20:10", "21:20"]
 // Alternates by season type so each division gets early slots every other season:
 //   Fall  → courts 1 (AA), 3 (ABA), 6 (BB) are early
 //   Spring → courts 2 (A), 4 (ABB), 5 (BBB) are early
-export function getEarlyCourts(isSpring: boolean): Set<number> {
+function getEarlyCourts(isSpring: boolean): Set<number> {
     return isSpring ? new Set([2, 4, 5]) : new Set([1, 3, 6])
 }
 
 // Each court shares simultaneous playoff week-2 matches with its paired court.
-export const COURT_PAIR: Record<number, number> = {
+const COURT_PAIR: Record<number, number> = {
     1: 2,
     2: 1,
     3: 4,
@@ -97,8 +97,8 @@ export const COURT_PAIR: Record<number, number> = {
 }
 
 // Playoff week-2 time slots [slotIndex 0, slotIndex 1] for early and late divisions.
-export const PLAYOFF_WEEK2_EARLY_TIMES = ["19:00", "19:50"]
-export const PLAYOFF_WEEK2_LATE_TIMES = ["20:40", "21:30"]
+const PLAYOFF_WEEK2_EARLY_TIMES = ["19:00", "19:50"]
+const PLAYOFF_WEEK2_LATE_TIMES = ["20:40", "21:30"]
 
 // 6-team playoff bracket: double-elimination, 10 scheduled matches + optional 11th
 export interface PlayoffMatchTemplate {
@@ -372,4 +372,3 @@ export const FOUR_TEAM_PLAYOFF: PlayoffMatchTemplate[] = [
 ]
 
 export const REGULAR_SEASON_WEEKS = 6
-export const PLAYOFF_WEEKS = 3

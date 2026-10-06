@@ -49,7 +49,7 @@ import {
 } from "@/database/schema"
 import { and, eq, inArray, or } from "drizzle-orm"
 
-export interface MergeUserRecordsOptions {
+interface MergeUserRecordsOptions {
     /**
      * Copy the deleted account's `old_id` and `picture` onto the survivor.
      *

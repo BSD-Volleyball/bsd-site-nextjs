@@ -30,7 +30,7 @@ export interface Transcriber {
     ): Promise<ScoreReading[]>
 }
 
-export const ReadingSchema = z.object({
+const ReadingSchema = z.object({
     id: z.string().min(1),
     // Two digit boxes cannot express more than 99.
     value: z.number().int().min(0).max(99).nullable(),
@@ -53,7 +53,7 @@ export const ResponseSchema = z.object({
 
 export class TranscriberError extends Error {}
 
-export interface ValidateOptions {
+interface ValidateOptions {
     /**
      * Accept a reply that leaves some boxes unanswered.
      *

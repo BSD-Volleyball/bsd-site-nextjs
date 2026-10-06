@@ -13,7 +13,7 @@ import { eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { calendarTokens } from "@/database/schema"
 
-export function generateCalendarToken(): string {
+function generateCalendarToken(): string {
     return randomBytes(32).toString("base64url")
 }
 

@@ -35,7 +35,7 @@ interface HeadToHeadStats {
     bPoints: number
 }
 
-export interface RankingOptions {
+interface RankingOptions {
     excludeWeeks?: number[]
 }
 

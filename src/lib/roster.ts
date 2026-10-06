@@ -14,7 +14,7 @@ import {
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
-export type PlayerSummary = {
+type PlayerSummary = {
     id: string
     firstName: string
     lastName: string
@@ -22,7 +22,7 @@ export type PlayerSummary = {
     male: boolean | null
 }
 
-export type RosterSubLink = {
+type RosterSubLink = {
     substitutionId: number
     outUser: PlayerSummary
     inUser: PlayerSummary
@@ -30,7 +30,7 @@ export type RosterSubLink = {
     reason: string | null
 }
 
-export type RosterEntry = {
+type RosterEntry = {
     draftId: number
     teamId: number
     round: number
@@ -389,7 +389,7 @@ export function formatPlayerSummaryName(p: PlayerSummary): string {
 // Draft-history lookups shared by the signups views
 // ---------------------------------------------------------------------------
 
-export type LastDraftInfo = {
+type LastDraftInfo = {
     seasonLabel: string
     seasonYear: number
     divisionName: string

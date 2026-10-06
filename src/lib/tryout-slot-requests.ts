@@ -9,7 +9,7 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { tryoutSlotRequests } from "@/database/schema"
 
-export interface TryoutSlotRequestInfo {
+interface TryoutSlotRequestInfo {
     /** 1-based slot numbers the player can attend (week 1: 1-2, weeks 2/3: 1-3). */
     availableSlots: number[]
     comment: string | null

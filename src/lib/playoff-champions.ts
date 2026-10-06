@@ -8,7 +8,7 @@ import {
 } from "@/database/schema"
 import { isWinnerLoserReset, parseSourceToken } from "@/lib/playoff-sources"
 
-export interface DivisionChampion {
+interface DivisionChampion {
     divisionId: number
     divisionName: string
     teamId: number | null

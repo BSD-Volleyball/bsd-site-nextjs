@@ -72,13 +72,13 @@ export interface ScheduleSourceMatch {
     winner_team_id: number | null
 }
 
-export interface ScheduleSourceDivision {
+interface ScheduleSourceDivision {
     id: number
     divisionName: string
     sortOrder: number
 }
 
-export interface BuildScheduleViewInput {
+interface BuildScheduleViewInput {
     tournamentName: string
     eliminationFormat: "single" | "double"
     myTeamId: number | null

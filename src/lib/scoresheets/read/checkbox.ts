@@ -16,7 +16,7 @@ import type { BoxRect } from "../layout"
 import type { Matrix3 } from "./homography"
 import { meanOverRect, type RasterImage } from "./image"
 
-export type CheckState = "unmarked" | "marked" | "ambiguous"
+type CheckState = "unmarked" | "marked" | "ambiguous"
 
 export interface CheckReading {
     /** 0 is pristine paper, 1 is saturated ink, relative to nearby paper. */

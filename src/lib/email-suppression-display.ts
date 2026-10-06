@@ -11,14 +11,14 @@
  */
 
 /** Values stored in users.email_status. */
-export const EMAIL_STATUS_LABELS: Record<string, string> = {
+const EMAIL_STATUS_LABELS: Record<string, string> = {
     valid: "Deliverable",
     unsubscribed: "Unsubscribed",
     bounced: "Bounced",
     spam_complaint: "Spam complaint"
 }
 
-export const EMAIL_STATUS_BADGE_COLORS: Record<string, string> = {
+const EMAIL_STATUS_BADGE_COLORS: Record<string, string> = {
     valid: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
     unsubscribed:
         "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",

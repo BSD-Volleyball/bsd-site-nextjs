@@ -1,4 +1,4 @@
-export interface PlayerRatingSampleEvaluator {
+interface PlayerRatingSampleEvaluator {
     evaluatorName: string
     seasonCode: string
 }

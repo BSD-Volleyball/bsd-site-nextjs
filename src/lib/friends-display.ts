@@ -7,7 +7,7 @@ import { formatShortDate } from "@/lib/season-utils"
 import type { NextMatch, LastMatchResult } from "@/lib/next-match"
 import type { PreseasonAssignment } from "@/lib/preseason-assignment"
 
-export interface FriendScheduleFields {
+interface FriendScheduleFields {
     nextMatch: NextMatch | null
     preseason?: PreseasonAssignment | null
     signedUpForSeason: boolean

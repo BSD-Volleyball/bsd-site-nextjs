@@ -72,7 +72,6 @@ const GAME_HEADING_HEIGHT = 11
 const QR_SIZE = 80
 
 /** Ref-notes box and the footer line, measured up from the bottom margin. */
-const FOOTER_TEXT_HEIGHT = 14
 const REF_NOTES_HEIGHT = 56
 /**
  * The machine tag sits in the bottom-right corner beside the ref-notes box,
@@ -118,7 +117,7 @@ const INITIALS_GAP = 5
 const LABEL_GROUP_HEIGHT =
     NAME_LINE_HEIGHT + CAPTAIN_LINE_HEIGHT + INITIALS_GAP + INITIALS_BOX_H
 
-export interface TallyGeometry extends BoxRect {
+interface TallyGeometry extends BoxRect {
     rows: number
     perRow: number
     rowHeight: number
@@ -148,7 +147,7 @@ export interface GameGeometry {
  * landed. Both baselines and the box come from one calculation, so they cannot
  * drift apart.
  */
-export interface TeamLabelGeometry {
+interface TeamLabelGeometry {
     /** Text baseline for the team name. */
     nameBaselineY: number
     /** Text baseline for the captain line below it. */
@@ -165,7 +164,7 @@ export interface TeamRowGeometry {
     label: TeamLabelGeometry
 }
 
-export interface GameColumn {
+interface GameColumn {
     game: 1 | 2 | 3
     x: number
     w: number

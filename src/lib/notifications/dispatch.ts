@@ -31,7 +31,7 @@ export interface NotificationRecipient {
 
 type PerRecipient = string | ((recipient: NotificationRecipient) => string)
 
-export interface DispatchOptions {
+interface DispatchOptions {
     type: NotificationType
     recipients: NotificationRecipient[]
     subject: PerRecipient

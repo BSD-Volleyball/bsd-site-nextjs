@@ -27,7 +27,7 @@ export interface AnswerColumns {
     value_options: string[] | null
 }
 
-export interface QuestionTypeDef {
+interface QuestionTypeDef {
     label: string
     description: string
     hasAnswer: boolean

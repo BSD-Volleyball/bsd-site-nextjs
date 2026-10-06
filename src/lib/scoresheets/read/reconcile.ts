@@ -30,7 +30,7 @@ export interface ScoreCandidate {
     digitsWritten?: 1 | 2 | null
 }
 
-export interface GameEvidence {
+interface GameEvidence {
     constraint: GameConstraint
     /** Null when the reader found no ink in that pair of boxes. */
     home: ScoreCandidate | null

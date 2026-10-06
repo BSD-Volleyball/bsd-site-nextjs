@@ -41,7 +41,7 @@ function getPostmarkClient(): ServerClient {
 // Transactional email (single)
 // ---------------------------------------------------------------------------
 
-export interface EmailAttachment {
+interface EmailAttachment {
     name: string
     /** base64 */
     content: string
@@ -49,7 +49,7 @@ export interface EmailAttachment {
     contentId?: string
 }
 
-export interface SendEmailOptions {
+interface SendEmailOptions {
     from: string
     fromName?: string
     to: string
@@ -169,7 +169,7 @@ export interface BatchEmailMessage {
     attachments?: EmailAttachment[]
 }
 
-export interface BatchSendResult {
+interface BatchSendResult {
     sent: number
     failed: number
     /** Recipients dropped before submission as undeliverable placeholders. */
@@ -187,7 +187,7 @@ export interface BatchSendResult {
     }>
 }
 
-export interface BatchThrottleOptions {
+interface BatchThrottleOptions {
     /** Recipients per Postmark call. Clamped to Postmark's 500 maximum. */
     batchSize?: number
     /** Pause inserted between chunks. Not applied after the final chunk. */

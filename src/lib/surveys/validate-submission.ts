@@ -13,7 +13,7 @@ import { QUESTION_TYPE_DEFS, isEmptyAnswer } from "./question-types"
 import type { AnswerMap, SurveyQuestionDef, SurveyRoleTag } from "./types"
 import { evaluateVisibility } from "./visibility"
 
-export interface SubmissionValidation {
+interface SubmissionValidation {
     visible: Set<number>
     /** The answers worth persisting: visible, answerable, and valid. */
     cleaned: AnswerMap

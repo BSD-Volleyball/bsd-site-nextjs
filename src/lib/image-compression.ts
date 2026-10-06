@@ -1,4 +1,4 @@
-export interface CompressImageOptions {
+interface CompressImageOptions {
     maxDimension?: number
     targetMaxBytes?: number
     initialQuality?: number
@@ -7,7 +7,7 @@ export interface CompressImageOptions {
     minDimension?: number
 }
 
-export interface CompressedImageResult {
+interface CompressedImageResult {
     blob: Blob
     width: number
     height: number

@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm"
 import { db, type DbExecutor } from "@/database/db"
 import { waivers, waiverAcceptances } from "@/database/schema"
 
-export type ActiveWaiver = {
+type ActiveWaiver = {
     id: number
     content: string
 }

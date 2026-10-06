@@ -3,7 +3,7 @@ import { discounts } from "@/database/schema"
 import { eq, and, or, isNull, gt } from "drizzle-orm"
 import { logger } from "@/lib/logger"
 
-export interface UserDiscount {
+interface UserDiscount {
     id: number
     percentage: string
     expiration: Date | null

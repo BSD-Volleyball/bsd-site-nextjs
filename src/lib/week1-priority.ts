@@ -22,7 +22,7 @@ export interface Week1DraftSeason {
     divisionLevel: number
 }
 
-export interface Week1GroupInput {
+interface Week1GroupInput {
     hasAnyDraft: boolean
     playFirstWeek: boolean
     missesTryout2Or3: boolean
@@ -88,7 +88,7 @@ export function getWeek1PriorityGroup({
  */
 export type Week1Audience = "new" | "likely" | "returning"
 
-export interface Week1AudienceInput {
+interface Week1AudienceInput {
     hasAnyDraft: boolean
     mostRecentDraft: Week1DraftSeason | null
     secondMostRecentDraft: Week1DraftSeason | null

@@ -51,7 +51,7 @@ const TIMEOUT_MS = 60_000
  */
 const CROPS_PER_REQUEST = 6
 
-export interface VisionConfig {
+interface VisionConfig {
     apiKey: string
     model: string
     baseUrl?: string

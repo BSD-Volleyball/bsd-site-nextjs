@@ -16,19 +16,19 @@ import type { CoverageDate, CoverageSlot } from "./types"
 
 export type TaskGroupKey = "setup" | "midway" | "cleanup"
 
-export type TaskCondition =
+type TaskCondition =
     | "regular_season"
     | "playoff"
     | "last_regular_week"
     | "playoffs_next_week"
 
-export interface TaskLine {
+interface TaskLine {
     text: string
     /** null = always applies. */
     when: TaskCondition | null
 }
 
-export interface TaskGroup {
+interface TaskGroup {
     key: TaskGroupKey
     title: string
     /** Shown after the title, e.g. "plan for ~10 minutes". */
@@ -125,7 +125,7 @@ export const TASK_GROUPS: TaskGroup[] = [
 
 type TaskContext = Pick<CoverageDate, "eventType" | "nextEventType">
 
-export function conditionHolds(cond: TaskCondition, ctx: TaskContext): boolean {
+function conditionHolds(cond: TaskCondition, ctx: TaskContext): boolean {
     switch (cond) {
         case "regular_season":
             return ctx.eventType === "regular_season"

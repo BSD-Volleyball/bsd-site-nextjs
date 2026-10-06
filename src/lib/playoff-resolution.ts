@@ -90,7 +90,7 @@ export interface ResolutionContext {
     teamNumberById: Map<number, number>
 }
 
-export interface SourceMatchResult {
+interface SourceMatchResult {
     contains: boolean
     // null when the team is the deterministic resolution; otherwise a human
     // string describing the outcome chain required, e.g. "If you win match 1".

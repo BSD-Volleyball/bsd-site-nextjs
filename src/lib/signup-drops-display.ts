@@ -27,7 +27,7 @@ export function dropCategoryLabel(category: string): string {
     )
 }
 
-export const DROP_STAGE_LABELS: Record<SignupDropStage, string> = {
+const DROP_STAGE_LABELS: Record<SignupDropStage, string> = {
     pre_draft: "Pre-draft",
     post_draft: "Post-draft"
 }

@@ -34,7 +34,7 @@ import {
     validateAudience
 } from "./types"
 
-export interface ResolvedAudience {
+interface ResolvedAudience {
     recipients: Recipient[]
     groupCounts: { group: SurveyAudienceGroup; count: number }[]
 }

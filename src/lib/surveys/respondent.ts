@@ -78,7 +78,7 @@ export interface RespondentSurveyView {
  * state change — the nightly job flips `status` later, but the window shuts the
  * moment it passes.
  */
-export function isSurveyOpenNow(
+function isSurveyOpenNow(
     survey: { status: SurveyStatus; closesAt: Date | null },
     now: Date = new Date()
 ): boolean {

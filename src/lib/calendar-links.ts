@@ -16,8 +16,6 @@ import { site } from "@/config/site"
 
 export type CalendarKind = "personal" | "friends"
 
-export const CALENDAR_KINDS: readonly CalendarKind[] = ["personal", "friends"]
-
 export function isCalendarKind(value: unknown): value is CalendarKind {
     return value === "personal" || value === "friends"
 }
@@ -31,7 +29,7 @@ export function toWebcalUrl(httpUrl: string): string {
     return httpUrl.replace(/^https?:/, "webcal:")
 }
 
-export interface CalendarLink {
+interface CalendarLink {
     url: string
     webcalUrl: string
     /** Display name suggested to the calendar app (X-WR-CALNAME). */
@@ -43,15 +41,15 @@ export interface CalendarLinks {
     friends: CalendarLink
 }
 
-export interface BuildCalendarLinksOptions {
+interface BuildCalendarLinksOptions {
     origin?: string
     /** Short name for the personal calendar, e.g. "Josh". */
     personalName?: string
 }
 
-export const FRIENDS_CALENDAR_NAME = "BSD Volleyball — Friends"
+const FRIENDS_CALENDAR_NAME = "BSD Volleyball — Friends"
 
-export function personalCalendarName(shortName: string | null | undefined) {
+function personalCalendarName(shortName: string | null | undefined) {
     return shortName ? `BSD Volleyball — ${shortName}` : "BSD Volleyball"
 }
 
@@ -74,7 +72,7 @@ export function buildCalendarLinks(
 // Per-platform subscribe deep links
 // ---------------------------------------------------------------------------
 
-export type CalendarPlatform = "google" | "apple" | "outlook" | "ms365"
+type CalendarPlatform = "google" | "apple" | "outlook" | "ms365"
 
 export const CALENDAR_PLATFORMS: readonly CalendarPlatform[] = [
     "apple",

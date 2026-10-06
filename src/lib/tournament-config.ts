@@ -192,7 +192,7 @@ export interface DivisionAvailability {
     full: boolean
 }
 
-export interface TournamentAvailability {
+interface TournamentAvailability {
     divisions: DivisionAvailability[]
     allDivisionsFull: boolean
 }

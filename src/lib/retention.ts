@@ -46,7 +46,7 @@ export interface PruneResult {
     truncated: boolean
 }
 
-export interface PruneRunResult {
+interface PruneRunResult {
     /** Rows older than this were removed. */
     cutoff: string
     notificationLog: PruneResult

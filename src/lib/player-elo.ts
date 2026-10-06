@@ -77,7 +77,7 @@ export interface MatchSubRow {
     subUser: string
 }
 
-export interface EloOptions {
+interface EloOptions {
     base?: number
     divisionStep?: number
     kFactor?: number
@@ -98,7 +98,7 @@ export interface EloHistoryPoint {
     actualScore: number
 }
 
-export interface PlayerEloResult {
+interface PlayerEloResult {
     ratings: Map<string, number>
     histories: Map<string, EloHistoryPoint[]>
     matchCounts: Map<string, number>

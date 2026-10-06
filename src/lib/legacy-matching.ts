@@ -156,13 +156,13 @@ export function reasonFor(a: string, b: string): MatchReason | null {
     return null
 }
 
-export interface NamedAccount {
+interface NamedAccount {
     id: string
     firstName: string
     lastName: string
 }
 
-export interface SuggestionInput<T extends NamedAccount> {
+interface SuggestionInput<T extends NamedAccount> {
     legacy: NamedAccount
     /** Real (non-legacy) accounts to choose from. */
     candidates: T[]

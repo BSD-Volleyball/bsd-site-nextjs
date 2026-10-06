@@ -19,7 +19,7 @@ export interface RasterImage {
 }
 
 /** Rec. 601 luma, the same weighting the QR decoder assumes. */
-export function grayFromRgba(
+function grayFromRgba(
     rgba: Uint8Array | Uint8ClampedArray,
     width: number,
     height: number
@@ -53,7 +53,7 @@ export function decodeJpeg(bytes: Uint8Array): RasterImage {
     return grayFromRgba(decoded.data, decoded.width, decoded.height)
 }
 
-export function pixelAt(img: RasterImage, x: number, y: number): number {
+function pixelAt(img: RasterImage, x: number, y: number): number {
     if (x < 0 || y < 0 || x >= img.width || y >= img.height) return 255
     return img.gray[y * img.width + x]
 }

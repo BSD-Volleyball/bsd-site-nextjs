@@ -84,7 +84,7 @@ function teamLabel(name: string | null, number: number | null): string {
  * to the division's playing window (so a 6pm division doesn't get an 8:30pm
  * placeholder). Falls back to all slots, then to a single default match.
  */
-export function placeholderWindow(
+function placeholderWindow(
     slotStartTimes: string[],
     divisionMinutes: number[]
 ): { startTime: string; endTime: string } {
@@ -128,7 +128,7 @@ const DEFAULT_NIGHT_WINDOW = { startTime: "19:00", endTime: "22:30" }
  * 6-team divisions play seasonTimes[0..2], with static fallbacks. Lets a
  * placeholder narrow post-draft before any matches exist.
  */
-export function predictedDivisionMinutes(
+function predictedDivisionMinutes(
     teamCount: number,
     seasonSlotTimes: string[]
 ): number[] {

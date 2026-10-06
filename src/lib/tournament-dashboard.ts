@@ -20,7 +20,7 @@ import {
 } from "@/lib/tournament-config"
 import type { TournamentPhase } from "@/lib/tournament-phases"
 
-export interface NextMatchInfo {
+interface NextMatchInfo {
     matchId: number
     bracket: string
     court: number | null
@@ -28,7 +28,7 @@ export interface NextMatchInfo {
     opponentName: string
 }
 
-export interface NextWorkInfo {
+interface NextWorkInfo {
     matchId: number
     bracket: string
     court: number | null

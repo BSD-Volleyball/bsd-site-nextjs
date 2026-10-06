@@ -42,7 +42,7 @@ const DIVISION_FIRST = new RegExp(
     "i"
 )
 
-export function normalizeDivisionName(value: string): string {
+function normalizeDivisionName(value: string): string {
     return value
         .trim()
         .toLowerCase()
@@ -138,12 +138,12 @@ function matchSeasonText(text: string) {
     return null
 }
 
-export function extractTitle(html: string): string | null {
+function extractTitle(html: string): string | null {
     const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
     return match ? stripTags(match[1]) : null
 }
 
-export function extractHeadings(html: string): string[] {
+function extractHeadings(html: string): string[] {
     return [...html.matchAll(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi)]
         .map((m) => stripTags(m[1]))
         .filter((h) => h.length > 0)

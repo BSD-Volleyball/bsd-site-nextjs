@@ -68,7 +68,7 @@ export function parseTime(time: string): { hour: number; minute: number } {
     return { hour, minute }
 }
 
-export interface BuildICalendarOptions {
+interface BuildICalendarOptions {
     /** X-WR-CALNAME shown by calendar apps for a subscribed feed. */
     calName?: string
     /**

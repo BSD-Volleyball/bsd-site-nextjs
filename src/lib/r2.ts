@@ -148,7 +148,7 @@ export async function createAttachmentDownloadPresignedUrl(params: {
     })
 }
 
-export interface R2ObjectStream {
+interface R2ObjectStream {
     body: ReadableStream
     contentType: string | null
     contentLength: number | null

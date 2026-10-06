@@ -9,7 +9,7 @@
 
 type LogLevel = "debug" | "info" | "warn" | "error"
 
-export type LogContext = Record<string, unknown>
+type LogContext = Record<string, unknown>
 
 function serializeError(error: unknown): Record<string, unknown> {
     if (error instanceof Error) {

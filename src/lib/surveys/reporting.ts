@@ -118,7 +118,7 @@ export interface TrendInstance {
     aggregates: Record<number, QuestionAggregate>
 }
 
-export interface TrendSeries {
+interface TrendSeries {
     key: string
     label: string
     points: {
@@ -422,7 +422,7 @@ export function aggregateSurvey(input: {
  * question always offer both a "mean" and a "nps" series, even for an
  * instance whose aggregate happens to have zero answers.
  */
-export function seriesDefsFor(
+function seriesDefsFor(
     question: SurveyQuestionDef
 ): { key: string; label: string }[] {
     switch (question.type) {
