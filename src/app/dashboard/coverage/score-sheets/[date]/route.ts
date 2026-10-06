@@ -1,8 +1,6 @@
 import { generateScoreSheetsPdf } from "@/lib/scoresheets/generate"
 import { getSessionUserId } from "@/next/session"
 
-export const runtime = "nodejs"
-
 export async function GET(
     _request: Request,
     { params }: { params: Promise<{ date: string }> }

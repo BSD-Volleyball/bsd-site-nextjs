@@ -31,7 +31,7 @@ Database and auth schema workflows:
 ```bash
 npx drizzle-kit generate
 npx drizzle-kit migrate
-npx @better-auth/cli generate
+pnpm dlx auth@<better-auth version> generate   # the old @better-auth/cli is deprecated
 ```
 
 > **Environment note:** Database credentials and all other secrets live in **`.env.local`** (not `.env`). `drizzle.config.ts` uses `import "dotenv/config"` which reads `.env` by default. Prefix Drizzle commands with `DOTENV_CONFIG_PATH=.env.local` so they pick up the correct credentials:

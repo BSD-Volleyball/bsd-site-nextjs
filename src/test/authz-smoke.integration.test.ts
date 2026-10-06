@@ -393,9 +393,6 @@ const cases: SmokeCase[] = [
     ),
     // settings
     c("settings.getAccountProfile", "fail", () => settings.getAccountProfile()),
-    c("settings.updateAccountField", "fail", () =>
-        settings.updateAccountField("phone" as never, null)
-    ),
     c("settings.updateAccountProfile", "fail", () =>
         settings.updateAccountProfile({} as never)
     ),

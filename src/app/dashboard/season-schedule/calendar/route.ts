@@ -4,8 +4,6 @@ import { auth } from "@/lib/auth"
 import { buildCalendar } from "@/lib/calendar-feed"
 import { getSeasonConfig } from "@/lib/site-config"
 
-export const runtime = "nodejs"
-
 /**
  * One-off .ics download for the signed-in user (`?kind=personal|friends`).
  * The always-current subscription variant of the same calendars lives at

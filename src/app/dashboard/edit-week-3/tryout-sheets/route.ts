@@ -1,8 +1,6 @@
 import { getSessionUserId } from "@/next/session"
 import { generateTryoutSheetsPdf } from "@/lib/pdf/tryout-sheets"
 
-export const runtime = "nodejs"
-
 export async function GET() {
     const userId = await getSessionUserId()
     if (!userId) {

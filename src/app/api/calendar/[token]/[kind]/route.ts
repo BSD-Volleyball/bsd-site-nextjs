@@ -5,8 +5,6 @@ import {
     getCachedCalendarFeed
 } from "@/next/calendar-feed-cache"
 
-export const runtime = "nodejs"
-
 // 32 random bytes base64url-encoded is 43 chars; allow some slack but reject
 // anything that obviously isn't one of ours before touching the database.
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,64}$/

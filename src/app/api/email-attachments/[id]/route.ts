@@ -8,8 +8,6 @@ import { createAttachmentDownloadPresignedUrl } from "@/lib/r2"
 import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 
-export const runtime = "nodejs"
-
 const PERMISSION_FOR_PARENT: Record<AttachmentParentType, Permission> = {
     email: "admin_emails:view",
     email_received: "admin_emails:view",
