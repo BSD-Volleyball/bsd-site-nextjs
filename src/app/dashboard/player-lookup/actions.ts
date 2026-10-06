@@ -18,7 +18,7 @@ import {
     divisions,
     notificationLog
 } from "@/database/schema"
-import { eq, desc, ne, or, and, isNull, inArray } from "drizzle-orm"
+import { asc, eq, desc, ne, or, and, isNull, inArray } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
@@ -286,56 +286,72 @@ export const getPlayerDetails = withAction(
             .where(eq(signups.player, playerId))
             .orderBy(desc(seasons.id))
 
-        // Fetch pair pick names and unavailability for each signup
-        const signupHistory: PlayerSignup[] = await Promise.all(
-            signupData.map(async (signup) => {
-                let pairPickName: string | null = null
-                if (signup.pairPickId) {
-                    const [pairUser] = await db
-                        .select({
-                            first_name: users.first_name,
-                            last_name: users.last_name
-                        })
-                        .from(users)
-                        .where(eq(users.id, signup.pairPickId))
-                        .limit(1)
-
-                    if (pairUser) {
-                        pairPickName = `${pairUser.first_name} ${pairUser.last_name}`
-                    }
-                }
-
-                const unavailRows = await db
-                    .select({
-                        eventDate: seasonEvents.event_date
-                    })
-                    .from(userUnavailability)
-                    .innerJoin(
-                        seasonEvents,
-                        eq(seasonEvents.id, userUnavailability.event_id)
-                    )
-                    .where(eq(userUnavailability.signup_id, signup.id))
-
-                const unavailableDates =
-                    unavailRows.length > 0
-                        ? unavailRows
-                              .map((u) => formatEventDate(u.eventDate))
-                              .join(", ")
-                        : null
-
-                return {
-                    ...signup,
-                    pairPickName,
-                    unavailableDates,
-                    dropped: false as boolean,
-                    dropStage: null as "pre_draft" | "post_draft" | null,
-                    dropCategory: null as string | null,
-                    dropNote: null as string | null,
-                    droppedAt: null as Date | null,
-                    droppedByName: null as string | null
-                }
-            })
+        // Pair pick names and unavailability for every signup in two
+        // queries, rather than two per signup.
+        const pairIds = [
+            ...new Set(
+                signupData
+                    .map((s) => s.pairPickId)
+                    .filter((id): id is string => id !== null)
+            )
+        ]
+        const signupIds = signupData.map((s) => s.id)
+        const [pairUsers, unavailRows] = await Promise.all([
+            pairIds.length > 0
+                ? db
+                      .select({
+                          id: users.id,
+                          first_name: users.first_name,
+                          last_name: users.last_name
+                      })
+                      .from(users)
+                      .where(inArray(users.id, pairIds))
+                : [],
+            signupIds.length > 0
+                ? db
+                      .select({
+                          signupId: userUnavailability.signup_id,
+                          eventDate: seasonEvents.event_date
+                      })
+                      .from(userUnavailability)
+                      .innerJoin(
+                          seasonEvents,
+                          eq(seasonEvents.id, userUnavailability.event_id)
+                      )
+                      .where(inArray(userUnavailability.signup_id, signupIds))
+                      .orderBy(asc(seasonEvents.event_date))
+                : []
+        ])
+        const pairNameById = new Map(
+            pairUsers.map((u) => [u.id, `${u.first_name} ${u.last_name}`])
         )
+
+        const signupHistory: PlayerSignup[] = signupData.map((signup) => {
+            const pairPickName = signup.pairPickId
+                ? (pairNameById.get(signup.pairPickId) ?? null)
+                : null
+            const signupDates = unavailRows.filter(
+                (u) => u.signupId === signup.id
+            )
+            const unavailableDates =
+                signupDates.length > 0
+                    ? signupDates
+                          .map((u) => formatEventDate(u.eventDate))
+                          .join(", ")
+                    : null
+
+            return {
+                ...signup,
+                pairPickName,
+                unavailableDates,
+                dropped: false as boolean,
+                dropStage: null as "pre_draft" | "post_draft" | null,
+                dropCategory: null as string | null,
+                dropNote: null as string | null,
+                droppedAt: null as Date | null,
+                droppedByName: null as string | null
+            }
+        })
 
         // Merge in un-restored drops: post-draft drops annotate their live
         // signup; pre-draft drops no longer have a signups row, so the entry

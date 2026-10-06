@@ -97,6 +97,34 @@ export async function sendGameRemindersForDate(
             )
         )
 
+    // Rosters and recipient details for the whole night up front: one roster
+    // load per season and one user query, instead of two of each per match.
+    const activeIdsByTeam = new Map<number, string[]>()
+    for (const seasonId of new Set(matchRows.map((m) => m.season))) {
+        for (const entry of await getTeamRosterWithSubs(seasonId)) {
+            const ids = activeIdsByTeam.get(entry.teamId) ?? []
+            if (!ids.includes(entry.activeUser.id)) {
+                ids.push(entry.activeUser.id)
+            }
+            activeIdsByTeam.set(entry.teamId, ids)
+        }
+    }
+    const allActiveIds = [...new Set([...activeIdsByTeam.values()].flat())]
+    const userById = new Map(
+        (allActiveIds.length > 0
+            ? await db
+                  .select({
+                      id: users.id,
+                      email: users.email,
+                      firstName: users.first_name,
+                      preferredName: users.preferred_name
+                  })
+                  .from(users)
+                  .where(inArray(users.id, allActiveIds))
+            : []
+        ).map((u) => [u.id, u])
+    )
+
     for (const match of matchRows) {
         const teamName = (name: string | null, number: number | null) =>
             name || (number != null ? `Team ${number}` : "TBD")
@@ -117,21 +145,9 @@ export async function sendGameRemindersForDate(
             [match.awayTeamId, away]
         ] as Array<[number | null, string]>) {
             if (teamId == null) continue
-            const roster = await getTeamRosterWithSubs(match.season, teamId)
-            const activeIds = [
-                ...new Set(roster.map((entry) => entry.activeUser.id))
-            ]
-            if (activeIds.length === 0) continue
-            const userRows = await db
-                .select({
-                    id: users.id,
-                    email: users.email,
-                    firstName: users.first_name,
-                    preferredName: users.preferred_name
-                })
-                .from(users)
-                .where(inArray(users.id, activeIds))
-            for (const u of userRows) {
+            for (const userId of activeIdsByTeam.get(teamId) ?? []) {
+                const u = userById.get(userId)
+                if (!u) continue
                 playerRecipients.push({
                     userId: u.id,
                     email: u.email,

@@ -13,8 +13,7 @@ import { friendships, signups, users } from "@/database/schema"
 import { eq, and, or, desc, inArray } from "drizzle-orm"
 import { formatDisplayName } from "@/lib/utils"
 import {
-    getNextMatchForUser,
-    getLastMatchResultForUser,
+    getScheduleSummaries,
     type NextMatch,
     type LastMatchResult
 } from "@/lib/next-match"
@@ -309,26 +308,20 @@ export async function getFriendsWithSchedule(
         )
     }
 
-    const context = await loadSeasonContext(
-        friends.map((f) => f.userId),
-        seasonId
+    const friendIds = friends.map((f) => f.userId)
+    const [context, schedules] = await Promise.all([
+        loadSeasonContext(friendIds, seasonId),
+        getScheduleSummaries(friendIds, seasonId)
+    ])
+    return sortBySchedule(
+        friends.map((friend) => ({
+            ...friend,
+            nextMatch: schedules.get(friend.userId)?.nextMatch ?? null,
+            preseason: context.preseason.get(friend.userId) ?? null,
+            signedUpForSeason: context.signedUp.has(friend.userId),
+            lastResult: schedules.get(friend.userId)?.lastResult ?? null
+        }))
     )
-    const entries = await Promise.all(
-        friends.map(async (friend) => {
-            const [nextMatch, lastResult] = await Promise.all([
-                getNextMatchForUser(friend.userId, seasonId),
-                getLastMatchResultForUser(friend.userId, seasonId)
-            ])
-            return {
-                ...friend,
-                nextMatch,
-                preseason: context.preseason.get(friend.userId) ?? null,
-                signedUpForSeason: context.signedUp.has(friend.userId),
-                lastResult
-            }
-        })
-    )
-    return sortBySchedule(entries)
 }
 
 /** Lighter variant for the dashboard card: no last-result lookup. */
@@ -348,17 +341,17 @@ export async function getFriendsWithNextMatch(
         )
     }
 
-    const context = await loadSeasonContext(
-        friends.map((f) => f.userId),
-        seasonId
-    )
-    const entries = await Promise.all(
-        friends.map(async (friend) => ({
+    const friendIds = friends.map((f) => f.userId)
+    const [context, schedules] = await Promise.all([
+        loadSeasonContext(friendIds, seasonId),
+        getScheduleSummaries(friendIds, seasonId)
+    ])
+    return sortBySchedule(
+        friends.map((friend) => ({
             ...friend,
-            nextMatch: await getNextMatchForUser(friend.userId, seasonId),
+            nextMatch: schedules.get(friend.userId)?.nextMatch ?? null,
             preseason: context.preseason.get(friend.userId) ?? null,
             signedUpForSeason: context.signedUp.has(friend.userId)
         }))
     )
-    return sortBySchedule(entries)
 }
