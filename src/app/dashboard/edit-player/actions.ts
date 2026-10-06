@@ -31,8 +31,6 @@ import {
 } from "@/lib/notifications/types"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     users,
@@ -53,7 +51,7 @@ import { getSeasonConfig } from "@/lib/site-config"
 import { loadWeek1Audience } from "@/lib/week1-audience"
 import type { Week1Audience } from "@/lib/week1-priority"
 import { logAuditEntry } from "@/lib/audit-log"
-import { isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { invalidateAllSessionsForUser } from "@/lib/rbac"
 import {
     createPlayerPictureUploadPresignedUrl,
@@ -122,184 +120,166 @@ export interface UserDetails {
     captain_eligible: boolean
 }
 
-export async function getUserDetails(
-    userId: string
-): Promise<{ status: boolean; message?: string; user?: UserDetails }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const [user] = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1)
-
-        if (!user) {
-            return { status: false, message: "User not found" }
+export const getUserDetails = withAction(
+    async (userId: string): Promise<ActionResult<UserDetails>> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        return { status: true, user: user as UserDetails }
-    } catch (error) {
-        console.error("Error fetching user details:", error)
-        return { status: false, message: "Failed to load user details." }
-    }
-}
+        try {
+            const [user] = await db
+                .select()
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1)
 
-export async function createPlayerPictureUpload(
-    userId: string,
-    contentLength: number
-): Promise<{
-    status: boolean
-    message?: string
-    uploadUrl?: string
-    pictureFilename?: string
-}> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
+            if (!user) {
+                return fail("User not found")
+            }
 
-    if (
-        !Number.isInteger(contentLength) ||
-        contentLength <= 0 ||
-        contentLength > PLAYER_PICTURE_MAX_BYTES
-    ) {
-        return {
-            status: false,
-            message: `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+            return ok(user as UserDetails)
+        } catch (error) {
+            console.error("Error fetching user details:", error)
+            return fail("Failed to load user details.")
         }
     }
+)
 
-    try {
-        const [user] = await db
-            .select({
-                id: users.id,
-                first_name: users.first_name,
-                last_name: users.last_name,
-                old_id: users.old_id
-            })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1)
-
-        if (!user) {
-            return { status: false, message: "User not found." }
+export const createPlayerPictureUpload = withAction(
+    async (
+        userId: string,
+        contentLength: number
+    ): Promise<
+        ActionResult<{ uploadUrl: string; pictureFilename: string }>
+    > => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        const pictureFilename = getExpectedPlayerPictureFilename(user)
-        if (!pictureFilename) {
-            if (!user.old_id || user.old_id <= 0) {
-                return {
-                    status: false,
-                    message:
+        if (
+            !Number.isInteger(contentLength) ||
+            contentLength <= 0 ||
+            contentLength > PLAYER_PICTURE_MAX_BYTES
+        ) {
+            return fail(
+                `Picture must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+            )
+        }
+
+        try {
+            const [user] = await db
+                .select({
+                    id: users.id,
+                    first_name: users.first_name,
+                    last_name: users.last_name,
+                    old_id: users.old_id
+                })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1)
+
+            if (!user) {
+                return fail("User not found.")
+            }
+
+            const pictureFilename = getExpectedPlayerPictureFilename(user)
+            if (!pictureFilename) {
+                if (!user.old_id || user.old_id <= 0) {
+                    return fail(
                         "User must have a valid old_id before uploading a picture."
+                    )
                 }
-            }
-            return {
-                status: false,
-                message:
+                return fail(
                     "User must have first and last name initials before uploading a picture."
+                )
             }
-        }
 
-        const uploadUrl = await createPlayerPictureUploadPresignedUrl({
-            key: getPlayerPictureObjectKey(pictureFilename),
-            contentType: "image/jpeg",
-            contentLength
-        })
-
-        return {
-            status: true,
-            uploadUrl,
-            pictureFilename
-        }
-    } catch (error) {
-        console.error("Error creating player picture upload URL:", error)
-        return {
-            status: false,
-            message: "Failed to start picture upload."
-        }
-    }
-}
-
-export async function finalizePlayerPictureUpload(
-    userId: string,
-    pictureFilename: string
-): Promise<{ status: boolean; message: string; picturePath?: string }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const [user] = await db
-            .select({
-                id: users.id,
-                first_name: users.first_name,
-                last_name: users.last_name,
-                old_id: users.old_id
+            const uploadUrl = await createPlayerPictureUploadPresignedUrl({
+                key: getPlayerPictureObjectKey(pictureFilename),
+                contentType: "image/jpeg",
+                contentLength
             })
-            .from(users)
-            .where(eq(users.id, userId))
-            .limit(1)
 
-        if (!user) {
-            return { status: false, message: "User not found." }
+            return ok({ uploadUrl, pictureFilename })
+        } catch (error) {
+            console.error("Error creating player picture upload URL:", error)
+            return fail("Failed to start picture upload.")
+        }
+    }
+)
+
+export const finalizePlayerPictureUpload = withAction(
+    async (
+        userId: string,
+        pictureFilename: string
+    ): Promise<ActionResult<{ picturePath: string }>> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        const expectedFilename = getExpectedPlayerPictureFilename(user)
-        if (!expectedFilename) {
-            return {
-                status: false,
-                message:
+        try {
+            const [user] = await db
+                .select({
+                    id: users.id,
+                    first_name: users.first_name,
+                    last_name: users.last_name,
+                    old_id: users.old_id
+                })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1)
+
+            if (!user) {
+                return fail("User not found.")
+            }
+
+            const expectedFilename = getExpectedPlayerPictureFilename(user)
+            if (!expectedFilename) {
+                return fail(
                     "User must have old_id and valid name initials before finalizing picture upload."
+                )
             }
-        }
 
-        if (pictureFilename !== expectedFilename) {
-            return {
-                status: false,
-                message: "Uploaded filename does not match the expected format."
+            if (pictureFilename !== expectedFilename) {
+                return fail(
+                    "Uploaded filename does not match the expected format."
+                )
             }
+
+            const picturePath = getPlayerPictureDbPath(pictureFilename)
+
+            await db
+                .update(users)
+                .set({
+                    picture: picturePath,
+                    updatedAt: new Date()
+                })
+                .where(eq(users.id, userId))
+
+            const actorId = await getSessionUserId()
+            if (actorId) {
+                await logAuditEntry({
+                    userId: actorId,
+                    action: "update",
+                    entityType: "users",
+                    entityId: userId,
+                    summary: `Admin uploaded player picture for ${user.first_name} ${user.last_name} (${userId}) as ${getPlayerPictureObjectKey(
+                        pictureFilename
+                    )}`
+                })
+            }
+
+            revalidatePath("/dashboard/edit-player")
+            return ok({ picturePath }, "Player picture uploaded.")
+        } catch (error) {
+            console.error("Error finalizing player picture upload:", error)
+            return fail("Failed to finalize picture upload.")
         }
-
-        const picturePath = getPlayerPictureDbPath(pictureFilename)
-
-        await db
-            .update(users)
-            .set({
-                picture: picturePath,
-                updatedAt: new Date()
-            })
-            .where(eq(users.id, userId))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "users",
-                entityId: userId,
-                summary: `Admin uploaded player picture for ${user.first_name} ${user.last_name} (${userId}) as ${getPlayerPictureObjectKey(
-                    pictureFilename
-                )}`
-            })
-        }
-
-        revalidatePath("/dashboard/edit-player")
-        return {
-            status: true,
-            message: "Player picture uploaded.",
-            picturePath
-        }
-    } catch (error) {
-        console.error("Error finalizing player picture upload:", error)
-        return { status: false, message: "Failed to finalize picture upload." }
     }
-}
+)
 
 export const updateUser = withAction(
     async (
@@ -446,10 +426,8 @@ export const updateUser = withAction(
                 await invalidateAllSessionsForUser(effectiveId)
             }
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const actorId = await getSessionUserId()
+            if (actorId) {
                 const [updatedUser] = await db
                     .select({
                         first_name: users.first_name,
@@ -462,7 +440,7 @@ export const updateUser = withAction(
                     ? `${updatedUser.first_name} ${updatedUser.last_name}`
                     : originalId
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId: actorId,
                     action: "update",
                     entityType: "users",
                     entityId: effectiveId,
@@ -496,41 +474,38 @@ export interface SignupDetails {
     created_at: Date
 }
 
-export async function getSignupForCurrentSeason(
-    userId: string
-): Promise<{ status: boolean; signup?: SignupDetails }> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return { status: false }
-    }
-
-    try {
-        const config = await getSeasonConfig()
-
-        if (!config.seasonId) {
-            return { status: true }
+export const getSignupForCurrentSeason = withAction(
+    async (userId: string): Promise<ActionResult<SignupDetails | null>> => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+        try {
+            const config = await getSeasonConfig()
 
-        const [signup] = await db
-            .select()
-            .from(signups)
-            .where(
-                and(
-                    eq(signups.season, config.seasonId),
-                    eq(signups.player, userId)
+            if (!config.seasonId) {
+                return ok(null)
+            }
+
+            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+
+            const [signup] = await db
+                .select()
+                .from(signups)
+                .where(
+                    and(
+                        eq(signups.season, config.seasonId),
+                        eq(signups.player, userId)
+                    )
                 )
-            )
-            .limit(1)
+                .limit(1)
 
-        if (!signup) {
-            return { status: true }
-        }
+            if (!signup) {
+                return ok(null)
+            }
 
-        return {
-            status: true,
-            signup: {
+            return ok({
                 id: signup.id,
                 season: signup.season,
                 seasonLabel,
@@ -544,13 +519,13 @@ export async function getSignupForCurrentSeason(
                 order_id: signup.order_id,
                 amount_paid: signup.amount_paid,
                 created_at: signup.created_at
-            }
+            })
+        } catch (error) {
+            console.error("Error fetching signup:", error)
+            return fail("Failed to load signup.")
         }
-    } catch (error) {
-        console.error("Error fetching signup:", error)
-        return { status: false }
     }
-}
+)
 
 /**
  * Everyone signed up for the current season, for the Pair Pick picker. Names
@@ -628,10 +603,8 @@ export const updateSignup = withAction(
         try {
             await db.update(signups).set(update).where(eq(signups.id, signupId))
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const actorId = await getSessionUserId()
+            if (actorId) {
                 const [signup] = await db
                     .select({ player: signups.player })
                     .from(signups)
@@ -652,7 +625,7 @@ export const updateSignup = withAction(
                     }
                 }
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId: actorId,
                     action: "update",
                     entityType: "signups",
                     entityId: signupId,

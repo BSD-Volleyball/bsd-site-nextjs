@@ -63,7 +63,9 @@ describe("getSeasonSignups discount reporting", () => {
 
         const result = await getSeasonSignups()
         expect(result.status).toBe(true)
-        const entry = result.signups.find((s) => s.userId === player.id)
+        const entry = (result.status ? result.data.signups : []).find(
+            (s) => s.userId === player.id
+        )
         expect(entry?.discountCodeName).toBe("Credit for injury")
     })
 
@@ -90,7 +92,9 @@ describe("getSeasonSignups discount reporting", () => {
 
         const result = await getSeasonSignups()
         expect(result.status).toBe(true)
-        const entry = result.signups.find((s) => s.userId === player.id)
+        const entry = (result.status ? result.data.signups : []).find(
+            (s) => s.userId === player.id
+        )
         expect(entry).toBeDefined()
         expect(entry?.discountCodeName).toBeNull()
     })
@@ -111,7 +115,9 @@ describe("getSeasonSignups discount reporting", () => {
         })
 
         const result = await getSeasonSignups()
-        const entry = result.signups.find((s) => s.userId === player.id)
+        const entry = (result.status ? result.data.signups : []).find(
+            (s) => s.userId === player.id
+        )
         expect(entry?.discountCodeName).toBeNull()
     })
 })
@@ -297,14 +303,18 @@ describe("dropSignup / restoreDrop", () => {
 
         // Surfaces on the signups list and in getSeasonDrops
         const listResult = await getSeasonSignups()
-        const entry = listResult.signups.find((s) => s.userId === player.id)
+        const entry = (listResult.status ? listResult.data.signups : []).find(
+            (s) => s.userId === player.id
+        )
         expect(entry?.droppedAt).not.toBeNull()
         expect(entry?.dropCategory).toBe("moved")
 
         const dropsResult = await getSeasonDrops()
         expect(dropsResult.status).toBe(true)
         expect(
-            dropsResult.entries.find((e) => e.userId === player.id)?.stage
+            (dropsResult.status ? dropsResult.data : []).find(
+                (e) => e.userId === player.id
+            )?.stage
         ).toBe("post_draft")
 
         // Post-draft restore only clears the drop

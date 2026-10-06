@@ -24,7 +24,7 @@ export default async function EnterScoresPage() {
     }
 
     const datesResult = await getMatchDatesForSeason()
-    const matchDates = datesResult.dates
+    const matchDates = datesResult.status ? datesResult.data : []
 
     // Default to today or most recent past date
     const today = new Date().toISOString().split("T")[0]
@@ -62,8 +62,12 @@ export default async function EnterScoresPage() {
             <EnterScoresClient
                 matchDates={matchDates}
                 defaultDate={defaultDate}
-                initialDivisions={initialData?.divisions ?? []}
-                initialScoreSheets={initialData?.scoreSheets ?? []}
+                initialDivisions={
+                    initialData?.status ? initialData.data.divisions : []
+                }
+                initialScoreSheets={
+                    initialData?.status ? initialData.data.scoreSheets : []
+                }
                 picBaseUrl={playerPicUrl}
                 initialDrafts={initialDrafts}
             />

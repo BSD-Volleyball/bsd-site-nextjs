@@ -199,15 +199,15 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
 
         setSeasonPlayers(playersResult.status ? playersResult.data : [])
 
-        if (userResult.status && userResult.user) {
-            setFormData(userToFormData(userResult.user))
-            setOriginalId(userResult.user.id)
+        if (userResult.status) {
+            setFormData(userToFormData(userResult.data))
+            setOriginalId(userResult.data.id)
         } else {
             toast.error(userResult.message || "Failed to load user.")
         }
 
-        if (signupResult.status && signupResult.signup) {
-            setSignupData(signupToFormData(signupResult.signup))
+        if (signupResult.status && signupResult.data) {
+            setSignupData(signupToFormData(signupResult.data))
         }
     }
 
@@ -313,16 +313,13 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                 originalId,
                 processedImage.blob.size
             )
-            if (
-                !uploadStart.status ||
-                !uploadStart.uploadUrl ||
-                !uploadStart.pictureFilename
-            ) {
+            if (!uploadStart.status) {
                 toast.error(uploadStart.message || "Failed to start upload.")
                 return
             }
+            const { uploadUrl, pictureFilename } = uploadStart.data
 
-            const uploadResponse = await fetch(uploadStart.uploadUrl, {
+            const uploadResponse = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "image/jpeg",
@@ -338,7 +335,7 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
 
             const finalizeResult = await finalizePlayerPictureUpload(
                 originalId,
-                uploadStart.pictureFilename
+                pictureFilename
             )
 
             if (!finalizeResult.status) {
@@ -351,8 +348,8 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                     ? {
                           ...current,
                           picture:
-                              finalizeResult.picturePath ||
-                              `/playerpics/${uploadStart.pictureFilename}`
+                              finalizeResult.data.picturePath ||
+                              `/playerpics/${pictureFilename}`
                       }
                     : current
             )

@@ -34,7 +34,7 @@ export default async function ScoreSheetInboxPage() {
     if (!allowed) redirect("/dashboard")
 
     const datesResult = await getMatchDatesForSeason()
-    const matchDates = datesResult.dates
+    const matchDates = datesResult.status ? datesResult.data : []
 
     const today = new Date().toISOString().split("T")[0]
     let defaultDate = matchDates.length > 0 ? matchDates[0].date : ""

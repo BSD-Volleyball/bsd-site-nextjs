@@ -37,15 +37,15 @@ export default async function ViewSignupsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Admin View Signups — ${result.seasonLabel}`}
+                title={`Admin View Signups — ${result.data.seasonLabel}`}
                 description="View all players signed up for the current season. New players are highlighted in blue."
             />
             <SignupsList
-                signups={result.signups}
-                drops={dropsResult.entries}
+                signups={result.data.signups}
+                drops={dropsResult.status ? dropsResult.data : []}
                 playerPicUrl={playerPicBaseUrl()}
-                seasonLabel={result.seasonLabel}
-                lateAmount={result.lateAmount}
+                seasonLabel={result.data.seasonLabel}
+                lateAmount={result.data.lateAmount}
             />
         </div>
     )

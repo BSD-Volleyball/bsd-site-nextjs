@@ -239,10 +239,10 @@ export function EnterScoresClient({
                 toast.error(result.message ?? "Failed to load matches.")
                 return
             }
-            setDivisionGroups(result.divisions)
-            setScoreSheetsList(result.scoreSheets)
+            setDivisionGroups(result.data.divisions)
+            setScoreSheetsList(result.data.scoreSheets)
             const newStates: Record<number, MatchFormState> = {}
-            for (const div of result.divisions) {
+            for (const div of result.data.divisions) {
                 for (const m of div.matches) {
                     newStates[m.matchId] = initFormState(m)
                 }
@@ -394,16 +394,13 @@ export function EnterScoresClient({
                 selectedDate,
                 processedImage.blob.size
             )
-            if (
-                !uploadStart.status ||
-                !uploadStart.uploadUrl ||
-                !uploadStart.objectKey
-            ) {
+            if (!uploadStart.status) {
                 toast.error(uploadStart.message ?? "Failed to start upload.")
                 return
             }
+            const { uploadUrl, objectKey } = uploadStart.data
 
-            const uploadResponse = await fetch(uploadStart.uploadUrl, {
+            const uploadResponse = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "image/jpeg",
@@ -420,7 +417,7 @@ export function EnterScoresClient({
             const finalizeResult = await finalizeScoreSheetUpload(
                 divisionId,
                 selectedDate,
-                uploadStart.objectKey
+                objectKey
             )
 
             if (!finalizeResult.status) {
@@ -428,12 +425,8 @@ export function EnterScoresClient({
                 return
             }
 
-            if (finalizeResult.scoreSheet) {
-                setScoreSheetsList((prev) => [
-                    ...prev,
-                    finalizeResult.scoreSheet!
-                ])
-            }
+            const uploadedSheet = finalizeResult.data
+            setScoreSheetsList((prev) => [...prev, uploadedSheet])
 
             toast.success("Score sheet uploaded.")
         } finally {
