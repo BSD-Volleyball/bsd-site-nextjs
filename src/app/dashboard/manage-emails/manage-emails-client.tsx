@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useTransition } from "react"
-import DOMPurify from "isomorphic-dompurify"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import {
     addInboundEmailComment,
     assignInboundEmail,
@@ -39,7 +38,7 @@ import {
     RiAttachment2
 } from "@remixicon/react"
 import { AttachmentList } from "@/components/attachment-list"
-import { rewriteCidImages } from "@/lib/email-attachments-client"
+import { sanitizeInboundEmailHtml } from "@/lib/email-attachments-client"
 import { formatTimestamp } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 import { usePlayerDetailModal } from "@/components/player-detail/use-player-detail-modal"
@@ -175,6 +174,17 @@ function EmailCard({
 }) {
     const [isPending, startTransition] = useTransition()
     const [expanded, setExpanded] = useState(initiallyExpanded)
+    const [showRemoteImages, setShowRemoteImages] = useState(false)
+    // Memoized: the card re-renders on every keystroke in its reply box.
+    const body = useMemo(
+        () =>
+            email.body_html
+                ? sanitizeInboundEmailHtml(email.body_html, email.attachments, {
+                      allowRemoteImages: showRemoteImages
+                  })
+                : null,
+        [email.body_html, email.attachments, showRemoteImages]
+    )
     const [threadItems, setThreadItems] = useState<ThreadItem[]>([])
     const [threadLoaded, setThreadLoaded] = useState(false)
     const [newComment, setNewComment] = useState("")
@@ -483,36 +493,32 @@ function EmailCard({
                             <p className="mb-1 font-medium text-green-800 dark:text-green-200">
                                 Original Email
                             </p>
-                            {email.body_html ? (
-                                <div
-                                    className="prose prose-sm dark:prose-invert mt-1 max-w-none"
-                                    dangerouslySetInnerHTML={{
-                                        __html: DOMPurify.sanitize(
-                                            rewriteCidImages(
-                                                email.body_html,
-                                                email.attachments
-                                            ),
-                                            {
-                                                FORBID_TAGS: [
-                                                    "script",
-                                                    "style",
-                                                    "iframe",
-                                                    "object",
-                                                    "embed",
-                                                    "form"
-                                                ],
-                                                FORBID_ATTR: [
-                                                    "onerror",
-                                                    "onload",
-                                                    "onclick",
-                                                    "onmouseover",
-                                                    "onfocus",
-                                                    "formaction"
-                                                ]
+                            {body ? (
+                                <>
+                                    {body.blockedImages > 0 && (
+                                        <button
+                                            type="button"
+                                            className="mt-1 text-muted-foreground text-xs underline"
+                                            onClick={() =>
+                                                setShowRemoteImages(true)
                                             }
-                                        )
-                                    }}
-                                />
+                                        >
+                                            {body.blockedImages} remote{" "}
+                                            {body.blockedImages === 1
+                                                ? "image"
+                                                : "images"}{" "}
+                                            blocked to protect your privacy.
+                                            Load images
+                                        </button>
+                                    )}
+                                    <div
+                                        className="prose prose-sm dark:prose-invert mt-1 max-w-none"
+                                        // Sanitized: see sanitizeInboundEmailHtml.
+                                        dangerouslySetInnerHTML={{
+                                            __html: body.html
+                                        }}
+                                    />
+                                </>
                             ) : (
                                 <p className="mt-1 whitespace-pre-wrap text-foreground">
                                     {email.body_text || "(No body)"}

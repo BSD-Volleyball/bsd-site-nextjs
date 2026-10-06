@@ -21,9 +21,23 @@ function notFound(): NextResponse {
     return new NextResponse("Not found", { status: 404 })
 }
 
-/** Only raster images may be displayed in-page; everything else downloads. */
-function mayInline(contentType: string): boolean {
-    return contentType.startsWith("image/") && contentType !== "image/svg+xml"
+/**
+ * Raster image types that may be displayed in-page; everything else
+ * downloads. The stored type is whatever the sender's mail client claimed,
+ * so it is normalized first: "image/svg+xml; charset=utf-8" or "IMAGE/SVG+XML"
+ * must not slip past as a non-SVG image.
+ */
+const INLINE_TYPES = new Set([
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/avif"
+])
+
+function inlineContentType(contentType: string): string | null {
+    const normalized = contentType.split(";")[0].trim().toLowerCase()
+    return INLINE_TYPES.has(normalized) ? normalized : null
 }
 
 /**
@@ -68,13 +82,15 @@ export async function GET(
     })
     if (!allowed) return notFound()
 
-    const inline =
-        request.nextUrl.searchParams.get("inline") === "1" &&
-        mayInline(row.content_type)
+    const inlineType =
+        request.nextUrl.searchParams.get("inline") === "1"
+            ? inlineContentType(row.content_type)
+            : null
+    const inline = inlineType !== null
 
     const url = await createAttachmentDownloadPresignedUrl({
         key: row.r2_key,
-        contentType: row.content_type,
+        contentType: inlineType ?? row.content_type,
         contentDisposition: attachmentContentDisposition(
             inline ? "inline" : "attachment",
             row.filename

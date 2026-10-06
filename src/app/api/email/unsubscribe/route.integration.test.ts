@@ -73,13 +73,41 @@ describe("one-click unsubscribe endpoint", () => {
         expect(rows).toHaveLength(0)
     })
 
-    it("GET applies the opt-out and redirects to the Notifications page", async () => {
+    it("GET shows a confirmation page and changes nothing", async () => {
         const user = await createUser()
         const token = createUnsubscribeToken(user.id, "tryout_roster")
 
         const response = await GET(requestWithToken(token, "GET"))
-        expect(response.status).toBeGreaterThanOrEqual(300)
-        expect(response.status).toBeLessThan(400)
+        expect(response.status).toBe(200)
+        expect(response.headers.get("content-type")).toContain("text/html")
+        const html = await response.text()
+        expect(html).toContain('method="post"')
+        expect(html).toContain("Unsubscribe")
+
+        // Link scanners fetch with GET; that alone must not opt anyone out.
+        const rows = await db
+            .select()
+            .from(notificationOptouts)
+            .where(eq(notificationOptouts.user_id, user.id))
+        expect(rows).toHaveLength(0)
+    })
+
+    it("the confirmation form opts out and redirects to Notifications", async () => {
+        const user = await createUser()
+        const token = createUnsubscribeToken(user.id, "tryout_roster")
+        const url = new URL("http://localhost:3000/api/email/unsubscribe")
+        url.searchParams.set("token", token ?? "")
+
+        const response = await POST(
+            new NextRequest(url, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/x-www-form-urlencoded"
+                },
+                body: "confirmed=1"
+            })
+        )
+        expect(response.status).toBe(303)
         expect(response.headers.get("location")).toContain(
             "/dashboard/notifications"
         )
@@ -89,6 +117,25 @@ describe("one-click unsubscribe endpoint", () => {
             .from(notificationOptouts)
             .where(eq(notificationOptouts.user_id, user.id))
         expect(rows).toHaveLength(1)
+    })
+
+    it("an RFC 8058 one-click POST still answers with JSON", async () => {
+        const user = await createUser()
+        const token = createUnsubscribeToken(user.id, "tryout_roster")
+        const url = new URL("http://localhost:3000/api/email/unsubscribe")
+        url.searchParams.set("token", token ?? "")
+
+        const response = await POST(
+            new NextRequest(url, {
+                method: "POST",
+                headers: {
+                    "content-type": "application/x-www-form-urlencoded"
+                },
+                body: "List-Unsubscribe=One-Click"
+            })
+        )
+        expect(response.status).toBe(200)
+        expect(await response.json()).toEqual({ status: "unsubscribed" })
     })
 })
 

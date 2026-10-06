@@ -87,6 +87,48 @@ describe("GET /api/email-attachments/[id]", () => {
         )
     })
 
+    it.each([
+        "image/svg+xml",
+        "image/svg+xml; charset=utf-8",
+        "IMAGE/SVG+XML",
+        "text/html"
+    ])("never inlines %s, however it is spelled", async (contentType) => {
+        await createUserWithRoles([{ role: "admin" }])
+        const id = await seedAttachment("email", {
+            filename: "x.svg",
+            content_type: contentType
+        })
+
+        await get(id, "?inline=1")
+
+        expect(
+            vi.mocked(createAttachmentDownloadPresignedUrl)
+        ).toHaveBeenCalledWith(
+            expect.objectContaining({
+                contentDisposition: expect.stringMatching(/^attachment;/)
+            })
+        )
+    })
+
+    it("serves an inline image with its normalized type", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const id = await seedAttachment("email", {
+            filename: "photo.jpg",
+            content_type: "Image/JPEG; name=photo.jpg"
+        })
+
+        await get(id, "?inline=1")
+
+        expect(
+            vi.mocked(createAttachmentDownloadPresignedUrl)
+        ).toHaveBeenCalledWith(
+            expect.objectContaining({
+                contentType: "image/jpeg",
+                contentDisposition: expect.stringMatching(/^inline;/)
+            })
+        )
+    })
+
     it("hides email attachments from a captain and from anonymous", async () => {
         const id = await seedAttachment("email_received")
 
