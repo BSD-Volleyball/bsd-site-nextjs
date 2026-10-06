@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -49,11 +49,22 @@ export function CreateSeasonCard({
     currentPhaseIsComplete
 }: CreateSeasonCardProps) {
     const router = useRouter()
+    const id = useId()
     const [season, setSeason] = useState("fall")
     const [year, setYear] = useState(String(new Date().getFullYear()))
     const [code, setCode] = useState("")
-    const [saving, setSaving] = useState(false)
     const [confirmOpen, setConfirmOpen] = useState(false)
+    const { run: create, pending: saving } = useAction(createSeason, {
+        refresh: false,
+        onSuccess: () => {
+            setConfirmOpen(false)
+            setCode("")
+            // The new season is now the current one, so Season
+            // Configuration loads it — send the admin there to edit the
+            // cloned dates and pricing.
+            router.push("/dashboard/season-config")
+        }
+    })
 
     const yearNum = Number(year)
     const label = `${capitalize(season)} ${year}`
@@ -64,28 +75,12 @@ export function CreateSeasonCard({
         yearNum >= 2000 &&
         yearNum <= 2100
 
-    async function handleConfirm() {
-        setSaving(true)
-        try {
-            const result = await createSeason({
-                season,
-                year: yearNum,
-                code: code.trim()
-            })
-            if (result.status) {
-                toast.success(result.message ?? "Season created")
-                setConfirmOpen(false)
-                setCode("")
-                // The new season is now the current one, so Season
-                // Configuration loads it — send the admin there to edit the
-                // cloned dates and pricing.
-                router.push("/dashboard/season-config")
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setSaving(false)
-        }
+    function handleConfirm() {
+        void create({
+            season,
+            year: yearNum,
+            code: code.trim()
+        })
     }
 
     const showIncompleteWarning =
@@ -105,9 +100,9 @@ export function CreateSeasonCard({
             <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-name">Season</Label>
+                        <Label htmlFor={`${id}-name`}>Season</Label>
                         <Select value={season} onValueChange={setSeason}>
-                            <SelectTrigger id="new-season-name">
+                            <SelectTrigger id={`${id}-name`}>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -120,9 +115,9 @@ export function CreateSeasonCard({
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-year">Year</Label>
+                        <Label htmlFor={`${id}-year`}>Year</Label>
                         <Input
-                            id="new-season-year"
+                            id={`${id}-year`}
                             type="number"
                             inputMode="numeric"
                             value={year}
@@ -130,9 +125,9 @@ export function CreateSeasonCard({
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-season-code">Code</Label>
+                        <Label htmlFor={`${id}-code`}>Code</Label>
                         <Input
-                            id="new-season-code"
+                            id={`${id}-code`}
                             value={code}
                             placeholder="F26"
                             onChange={(e) => setCode(e.target.value)}

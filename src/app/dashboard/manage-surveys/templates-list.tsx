@@ -3,7 +3,7 @@
 import { RiAddLine, RiSurveyLine } from "@remixicon/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { toast } from "sonner"
 import {
     AlertDialog,
@@ -15,6 +15,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
+import { useAction } from "@/components/hooks/use-action"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -47,12 +48,32 @@ function trendsHref(templateId: number): string {
 /** The template bank: create, open, archive and restore. */
 export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
     const router = useRouter()
+    const id = useId()
     const [showCreate, setShowCreate] = useState(false)
     const [name, setName] = useState("")
     const [description, setDescription] = useState("")
-    const [busy, setBusy] = useState(false)
     const [pendingArchive, setPendingArchive] =
         useState<TemplateSummary | null>(null)
+    const { run: createTemplate, pending: creating } = useAction(
+        createSurveyTemplate,
+        {
+            success: "Template created.",
+            refresh: false,
+            onSuccess: (data) => {
+                setName("")
+                setDescription("")
+                setShowCreate(false)
+                router.push(templateHref(data.templateId))
+            }
+        }
+    )
+    const { run: archiveTemplate, pending: archiving } = useAction(
+        archiveSurveyTemplate
+    )
+    const { run: restoreTemplate, pending: restoring } = useAction(
+        restoreSurveyTemplate
+    )
+    const busy = creating || archiving || restoring
 
     const active = templates.filter((template) => !template.isArchived)
     const archived = templates.filter((template) => template.isArchived)
@@ -62,45 +83,18 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
             toast.error("Give the template a name.")
             return
         }
-        setBusy(true)
-        const result = await createSurveyTemplate({
+        await createTemplate({
             name: name.trim(),
             description: description.trim() === "" ? null : description.trim()
         })
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Template created.")
-            setName("")
-            setDescription("")
-            setShowCreate(false)
-            router.push(templateHref(result.data.templateId))
-        } else {
-            toast.error(result.message)
-        }
     }
 
-    async function handleArchive(template: TemplateSummary) {
-        setBusy(true)
-        const result = await archiveSurveyTemplate(template.id)
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Template archived.")
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
+    function handleArchive(template: TemplateSummary) {
+        void archiveTemplate(template.id)
     }
 
-    async function handleRestore(template: TemplateSummary) {
-        setBusy(true)
-        const result = await restoreSurveyTemplate(template.id)
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Template restored.")
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
+    function handleRestore(template: TemplateSummary) {
+        void restoreTemplate(template.id)
     }
 
     return (
@@ -126,9 +120,9 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="new-template-name">Name</Label>
+                            <Label htmlFor={`${id}-name`}>Name</Label>
                             <Input
-                                id="new-template-name"
+                                id={`${id}-name`}
                                 value={name}
                                 disabled={busy}
                                 maxLength={SURVEY_LIMITS.maxTitleLength}
@@ -138,11 +132,11 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="new-template-description">
+                            <Label htmlFor={`${id}-description`}>
                                 Description (optional)
                             </Label>
                             <Textarea
-                                id="new-template-description"
+                                id={`${id}-description`}
                                 value={description}
                                 rows={2}
                                 disabled={busy}
@@ -315,7 +309,7 @@ export function TemplatesList({ templates }: { templates: TemplateSummary[] }) {
                             onClick={() => {
                                 const target = pendingArchive
                                 setPendingArchive(null)
-                                if (target) void handleArchive(target)
+                                if (target) handleArchive(target)
                             }}
                         >
                             Archive

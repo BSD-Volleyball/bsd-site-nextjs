@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useEffect, useId, useState } from "react"
+import { useAction } from "@/components/hooks/use-action"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -84,16 +84,38 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
     const [reminderMaxCount, setReminderMaxCount] = useState(
         String(survey.reminder_max_count)
     )
-    const [savingSettings, setSavingSettings] = useState(false)
-    const [busy, setBusy] = useState(false)
+    const id = useId()
 
     const [publishOpen, setPublishOpen] = useState(false)
     const [publishPreview, setPublishPreview] =
         useState<AudiencePreview | null>(null)
-    const [publishPreviewBusy, setPublishPreviewBusy] = useState(false)
     const [closeOpen, setCloseOpen] = useState(false)
     const [deleteOpen, setDeleteOpen] = useState(false)
     const [reminderOpen, setReminderOpen] = useState(false)
+
+    const { run: saveSettings, pending: savingSettings } =
+        useAction(updateSurveySettings)
+    const { run: loadPublishPreview, pending: publishPreviewBusy } = useAction(
+        previewSurveyAudience,
+        {
+            success: false,
+            refresh: false,
+            onSuccess: (preview) => {
+                setPublishPreview(preview)
+                setPublishOpen(true)
+            }
+        }
+    )
+    const { run: publish, pending: publishing } = useAction(publishSurvey)
+    const { run: closeNow, pending: closing } = useAction(closeSurvey)
+    const { run: sendReminder, pending: sendingReminder } = useAction(
+        sendSurveyReminderNow
+    )
+    const { run: deleteDraft, pending: deleting } = useAction(deleteSurvey, {
+        refresh: false,
+        onSuccess: () => router.push("/dashboard/manage-surveys")
+    })
+    const busy = publishing || closing || sendingReminder || deleting
 
     // Resync the form whenever the server re-sends the survey (after a
     // router.refresh() following any mutation).
@@ -125,8 +147,7 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
     }
 
     async function handleSaveSettings() {
-        setSavingSettings(true)
-        const result = await updateSurveySettings(surveyId, {
+        await saveSettings(surveyId, {
             title: title.trim(),
             intro: intro.trim() === "" ? null : intro.trim(),
             seasonId: seasonId === NO_SEASON ? null : Number(seasonId),
@@ -136,77 +157,31 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
             reminderIntervalDays: Number(reminderIntervalDays),
             reminderMaxCount: Number(reminderMaxCount)
         })
-        setSavingSettings(false)
-        if (result.status) {
-            toast.success(result.message ?? "Survey saved.")
-            refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     async function openPublishDialog() {
-        setPublishPreviewBusy(true)
-        const result = await previewSurveyAudience(surveyId)
-        setPublishPreviewBusy(false)
-        if (result.status) {
-            setPublishPreview(result.data)
-            setPublishOpen(true)
-        } else {
-            toast.error(result.message)
-        }
+        await loadPublishPreview(surveyId)
     }
 
+    // The confirmation dialogs close whatever the outcome.
     async function handlePublish() {
-        setBusy(true)
-        const result = await publishSurvey(surveyId)
-        setBusy(false)
+        await publish(surveyId)
         setPublishOpen(false)
-        if (result.status) {
-            toast.success(result.message ?? "Survey published.")
-            refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     async function handleClose() {
-        setBusy(true)
-        const result = await closeSurvey(surveyId)
-        setBusy(false)
+        await closeNow(surveyId)
         setCloseOpen(false)
-        if (result.status) {
-            toast.success(result.message ?? "Survey closed.")
-            refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     async function handleSendReminder() {
-        setBusy(true)
-        const result = await sendSurveyReminderNow(surveyId)
-        setBusy(false)
+        await sendReminder(surveyId)
         setReminderOpen(false)
-        if (result.status) {
-            toast.success(result.message ?? "Reminder sent.")
-            refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     async function handleDelete() {
-        setBusy(true)
-        const result = await deleteSurvey(surveyId)
-        setBusy(false)
+        await deleteDraft(surveyId)
         setDeleteOpen(false)
-        if (result.status) {
-            toast.success(result.message ?? "Draft deleted.")
-            router.push("/dashboard/manage-surveys")
-        } else {
-            toast.error(result.message)
-        }
     }
 
     return (
@@ -236,9 +211,9 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="survey-title">Title</Label>
+                        <Label htmlFor={`${id}-title`}>Title</Label>
                         <Input
-                            id="survey-title"
+                            id={`${id}-title`}
                             value={title}
                             disabled={isClosed}
                             maxLength={SURVEY_LIMITS.maxTitleLength}
@@ -246,11 +221,11 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="survey-intro">
+                        <Label htmlFor={`${id}-intro`}>
                             Intro text (optional)
                         </Label>
                         <Textarea
-                            id="survey-intro"
+                            id={`${id}-intro`}
                             rows={3}
                             value={intro}
                             disabled={isClosed}
@@ -258,13 +233,13 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="survey-season">Season</Label>
+                        <Label htmlFor={`${id}-season`}>Season</Label>
                         <Select
                             value={seasonId}
                             onValueChange={setSeasonId}
                             disabled={isPublished}
                         >
-                            <SelectTrigger id="survey-season">
+                            <SelectTrigger id={`${id}-season`}>
                                 <SelectValue placeholder="No season" />
                             </SelectTrigger>
                             <SelectContent>
@@ -284,12 +259,12 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                     </div>
                     <div className="flex items-center gap-3">
                         <Switch
-                            id="survey-anonymous"
+                            id={`${id}-anonymous`}
                             checked={isAnonymous}
                             disabled={isPublished}
                             onCheckedChange={setIsAnonymous}
                         />
-                        <Label htmlFor="survey-anonymous">Anonymous</Label>
+                        <Label htmlFor={`${id}-anonymous`}>Anonymous</Label>
                     </div>
                     <p className="text-muted-foreground text-sm">
                         Anonymous surveys can't be edited after submitting;
@@ -297,11 +272,11 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="survey-opens">
+                            <Label htmlFor={`${id}-opens`}>
                                 Opens (optional)
                             </Label>
                             <Input
-                                id="survey-opens"
+                                id={`${id}-opens`}
                                 type="datetime-local"
                                 value={opensAt}
                                 disabled={isClosed}
@@ -311,11 +286,11 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="survey-closes">
+                            <Label htmlFor={`${id}-closes`}>
                                 Closes (optional)
                             </Label>
                             <Input
-                                id="survey-closes"
+                                id={`${id}-closes`}
                                 type="datetime-local"
                                 value={closesAt}
                                 disabled={isClosed}
@@ -327,11 +302,11 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="survey-reminder-interval">
+                            <Label htmlFor={`${id}-reminder-interval`}>
                                 Reminder interval (days)
                             </Label>
                             <Input
-                                id="survey-reminder-interval"
+                                id={`${id}-reminder-interval`}
                                 type="number"
                                 min={0}
                                 max={90}
@@ -343,11 +318,11 @@ export function SurveyEditor({ surveyId, data, options }: SurveyEditorProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="survey-reminder-max">
+                            <Label htmlFor={`${id}-reminder-max`}>
                                 Max reminders
                             </Label>
                             <Input
-                                id="survey-reminder-max"
+                                id={`${id}-reminder-max`}
                                 type="number"
                                 min={0}
                                 max={20}

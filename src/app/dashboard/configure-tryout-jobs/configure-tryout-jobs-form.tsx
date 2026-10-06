@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { RiAddLine, RiDeleteBinLine, RiDownloadLine } from "@remixicon/react"
 
@@ -15,6 +14,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -89,8 +89,11 @@ export function ConfigureTryoutJobsForm({
 }: {
     view: ConfigureTryoutJobsView
 }) {
-    const router = useRouter()
-    const [busy, setBusy] = useState(false)
+    const { run: runSave, pending: saving } = useAction(saveTryoutJobs)
+    const { run: runImportJobs, pending: importing } = useAction(
+        importJobsFromLastSeason
+    )
+    const busy = saving || importing
     const [jobsByEvent, setJobsByEvent] = useState<Record<number, JobState[]>>(
         () =>
             Object.fromEntries(
@@ -186,8 +189,7 @@ export function ConfigureTryoutJobsForm({
             }
         }
 
-        setBusy(true)
-        const result = await saveTryoutJobs(
+        await runSave(
             night.eventId,
             jobs.map((job) => ({
                 id: job.id,
@@ -199,26 +201,10 @@ export function ConfigureTryoutJobsForm({
             })),
             courtNumbers
         )
-        setBusy(false)
-
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success(result.message ?? "Saved.")
-        router.refresh()
     }
 
-    async function runImport() {
-        setBusy(true)
-        const result = await importJobsFromLastSeason()
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success(result.message ?? "Imported.")
-        router.refresh()
+    function runImport() {
+        void runImportJobs()
     }
 
     return (

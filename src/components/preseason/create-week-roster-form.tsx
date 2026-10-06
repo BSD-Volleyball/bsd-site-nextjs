@@ -9,6 +9,7 @@ import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import { RiDeleteBinLine, RiFileCopyLine } from "@remixicon/react"
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -82,7 +83,12 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
 }: CreateWeekRosterFormProps<C>) {
     const [step, setStep] = useState<1 | 2>(1)
     const optInCaptainIdPrefix = useId()
-    const [isSaving, setIsSaving] = useState(false)
+    // The success toast falls back to a week-specific text, so it is shown
+    // below rather than by the hook.
+    const { run: save, pending: isSaving } = useAction(saveAction, {
+        success: false,
+        refresh: false
+    })
     const modal = usePlayerDetailModal()
     const duplicateCounterRef = useRef(0)
 
@@ -557,19 +563,13 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
             return
         }
 
-        setIsSaving(true)
+        const result = await save(savePayload)
 
-        const result = await saveAction(savePayload)
-
-        if (result.status) {
+        if (result?.status) {
             toast.success(
                 result.message ?? `Week ${config.week} rosters saved.`
             )
-        } else {
-            toast.error(result.message)
         }
-
-        setIsSaving(false)
     }
 
     return (

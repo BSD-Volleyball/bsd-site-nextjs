@@ -2,8 +2,9 @@
 
 import { RiAddLine } from "@remixicon/react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -37,8 +38,8 @@ const NO_SEASON = "none"
 /** "New survey" dialog: pick a template and season, name it, and land in the editor. */
 export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
     const router = useRouter()
+    const id = useId()
     const [open, setOpen] = useState(false)
-    const [busy, setBusy] = useState(false)
     const [templateId, setTemplateId] = useState<string>("")
     const [seasonId, setSeasonId] = useState<string>(NO_SEASON)
     const [title, setTitle] = useState("")
@@ -51,6 +52,16 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
         setTitle("")
     }
 
+    const { run: create, pending: busy } = useAction(createSurvey, {
+        success: "Survey created.",
+        refresh: false,
+        onSuccess: (data) => {
+            setOpen(false)
+            reset()
+            router.push(`/dashboard/manage-surveys/${data.surveyId}`)
+        }
+    })
+
     async function handleCreate() {
         if (templateId === "") {
             toast.error("Pick a template.")
@@ -60,21 +71,11 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
             toast.error("Give the survey a title.")
             return
         }
-        setBusy(true)
-        const result = await createSurvey({
+        await create({
             templateId: Number(templateId),
             seasonId: seasonId === NO_SEASON ? null : Number(seasonId),
             title: title.trim()
         })
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Survey created.")
-            setOpen(false)
-            reset()
-            router.push(`/dashboard/manage-surveys/${result.data.surveyId}`)
-        } else {
-            toast.error(result.message)
-        }
     }
 
     return (
@@ -101,13 +102,13 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="new-survey-template">Template</Label>
+                        <Label htmlFor={`${id}-template`}>Template</Label>
                         <Select
                             value={templateId}
                             onValueChange={setTemplateId}
                             disabled={busy}
                         >
-                            <SelectTrigger id="new-survey-template">
+                            <SelectTrigger id={`${id}-template`}>
                                 <SelectValue placeholder="Choose a template" />
                             </SelectTrigger>
                             <SelectContent>
@@ -123,7 +124,7 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-survey-season">
+                        <Label htmlFor={`${id}-season`}>
                             Season (optional)
                         </Label>
                         <Select
@@ -131,7 +132,7 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
                             onValueChange={setSeasonId}
                             disabled={busy}
                         >
-                            <SelectTrigger id="new-survey-season">
+                            <SelectTrigger id={`${id}-season`}>
                                 <SelectValue placeholder="No season" />
                             </SelectTrigger>
                             <SelectContent>
@@ -150,9 +151,9 @@ export function NewSurveyDialog({ templates, seasons }: NewSurveyDialogProps) {
                         </Select>
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="new-survey-title">Title</Label>
+                        <Label htmlFor={`${id}-title`}>Title</Label>
                         <Input
-                            id="new-survey-title"
+                            id={`${id}-title`}
                             value={title}
                             disabled={busy}
                             maxLength={SURVEY_LIMITS.maxTitleLength}

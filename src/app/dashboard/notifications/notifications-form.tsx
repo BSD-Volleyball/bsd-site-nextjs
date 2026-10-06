@@ -1,9 +1,8 @@
 "use client"
 
 import { RiErrorWarningLine, RiMailCloseLine } from "@remixicon/react"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { NotificationPreferencesEditor } from "@/components/notifications/notification-preferences-editor"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -38,41 +37,24 @@ export function NotificationsForm({
     initialOptedOut,
     suppressions
 }: NotificationsFormProps) {
-    const router = useRouter()
     const [optedOut, setOptedOut] = useState<Set<NotificationType>>(
         new Set(initialOptedOut)
     )
-    const [isSaving, setIsSaving] = useState(false)
     const [resumingStream, setResumingStream] = useState<string | null>(null)
+    const { run: savePreferences, pending: isSaving } = useAction(
+        saveNotificationPreferences
+    )
+    const { run: resume } = useAction(reactivateStream)
 
-    const handleSave = async () => {
-        setIsSaving(true)
-        try {
-            const result = await saveNotificationPreferences([...optedOut])
-            if (result.status) {
-                toast.success(result.message)
-                router.refresh()
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setIsSaving(false)
-        }
+    const handleSave = () => {
+        void savePreferences([...optedOut])
     }
 
+    // run() never rejects, so the per-stream marker always clears.
     const handleResume = async (streamId: string) => {
         setResumingStream(streamId)
-        try {
-            const result = await reactivateStream(streamId)
-            if (result.status) {
-                toast.success(result.message)
-                router.refresh()
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setResumingStream(null)
-        }
+        await resume(streamId)
+        setResumingStream(null)
     }
 
     return (

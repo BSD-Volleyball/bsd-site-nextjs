@@ -3,8 +3,9 @@
 import { RiAddLine, RiArrowLeftLine, RiSaveLine } from "@remixicon/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { SurveyPreview } from "@/components/surveys/survey-preview"
 import {
     AlertDialog,
@@ -112,6 +113,7 @@ function toPayload(drafts: QuestionDraft[]): TemplateQuestionInput[] {
 
 export function TemplateEditor({ data }: { data: TemplateEditorData }) {
     const router = useRouter()
+    const id = useId()
 
     const [template, setTemplate] = useState(data.template)
     const [name, setName] = useState(data.template.name)
@@ -137,7 +139,20 @@ export function TemplateEditor({ data }: { data: TemplateEditorData }) {
     )
 
     const [newType, setNewType] = useState<SurveyQuestionType>("single_choice")
-    const [busy, setBusy] = useState(false)
+    const [questionsBusy, setQuestionsBusy] = useState(false)
+    const { run: saveDetails, pending: savingDetails } = useAction(
+        updateSurveyTemplate,
+        {
+            onSuccess: () =>
+                setTemplate((current) => ({
+                    ...current,
+                    name: name.trim(),
+                    description:
+                        description.trim() === "" ? null : description.trim()
+                }))
+        }
+    )
+    const busy = questionsBusy || savingDetails
     const [pendingRemoval, setPendingRemoval] = useState<QuestionDraft | null>(
         null
     )
@@ -264,24 +279,10 @@ export function TemplateEditor({ data }: { data: TemplateEditorData }) {
             toast.error("Give the template a name.")
             return
         }
-        setBusy(true)
-        const result = await updateSurveyTemplate(template.id, {
+        await saveDetails(template.id, {
             name: name.trim(),
             description: description.trim() === "" ? null : description.trim()
         })
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Template saved.")
-            setTemplate({
-                ...template,
-                name: name.trim(),
-                description:
-                    description.trim() === "" ? null : description.trim()
-            })
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     async function handleSaveQuestions() {
@@ -289,33 +290,44 @@ export function TemplateEditor({ data }: { data: TemplateEditorData }) {
             toast.error("Fix the highlighted problems first.")
             return
         }
-        setBusy(true)
-        const result = await saveTemplateQuestions(
-            template.id,
-            toPayload(drafts)
-        )
-        if (result.status) {
-            await reload()
-            setBusy(false)
-            toast.success(result.message ?? "Questions saved.")
-            router.refresh()
-        } else {
-            setBusy(false)
-            toast.error(result.message)
+        setQuestionsBusy(true)
+        try {
+            const result = await saveTemplateQuestions(
+                template.id,
+                toPayload(drafts)
+            )
+            if (result.status) {
+                await reload()
+                toast.success(result.message ?? "Questions saved.")
+                router.refresh()
+            } else {
+                toast.error(result.message)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setQuestionsBusy(false)
         }
     }
 
     async function handleRestore(question: EditorQuestion) {
-        setBusy(true)
-        const result = await restoreTemplateQuestion(template.id, question.id)
-        if (result.status) {
-            await reload()
-            setBusy(false)
-            toast.success(result.message ?? "Question restored.")
-            router.refresh()
-        } else {
-            setBusy(false)
-            toast.error(result.message)
+        setQuestionsBusy(true)
+        try {
+            const result = await restoreTemplateQuestion(
+                template.id,
+                question.id
+            )
+            if (result.status) {
+                await reload()
+                toast.success(result.message ?? "Question restored.")
+                router.refresh()
+            } else {
+                toast.error(result.message)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setQuestionsBusy(false)
         }
     }
 
@@ -348,9 +360,9 @@ export function TemplateEditor({ data }: { data: TemplateEditorData }) {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="template-name">Name</Label>
+                        <Label htmlFor={`${id}-name`}>Name</Label>
                         <Input
-                            id="template-name"
+                            id={`${id}-name`}
                             value={name}
                             disabled={busy}
                             maxLength={SURVEY_LIMITS.maxTitleLength}
@@ -358,11 +370,11 @@ export function TemplateEditor({ data }: { data: TemplateEditorData }) {
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="template-description">
+                        <Label htmlFor={`${id}-description`}>
                             Description (optional)
                         </Label>
                         <Textarea
-                            id="template-description"
+                            id={`${id}-description`}
                             value={description}
                             rows={2}
                             disabled={busy}

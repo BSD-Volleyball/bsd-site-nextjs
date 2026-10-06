@@ -31,6 +31,7 @@ import type { SurveyResultsSurveySummary } from "../../actions"
 import { QuestionResultCard } from "./question-result-card"
 
 const ALL = "all"
+const GENERIC_ERROR = "Something went wrong. Please try again."
 
 const GENDER_LABELS: Record<SurveyGender, string> = {
     male: "Male",
@@ -95,6 +96,9 @@ export function ResultsClient({
                     setErrorMessage(result.message)
                 }
             })
+            .catch(() => {
+                if (active) setErrorMessage(GENERIC_ERROR)
+            })
             .finally(() => {
                 if (active) setLoading(false)
             })
@@ -106,22 +110,27 @@ export function ResultsClient({
 
     async function handleExport() {
         setExporting(true)
-        const result = await getSurveyRawResponses(surveyId)
-        setExporting(false)
-        if (!result.status) {
-            setErrorMessage(result.message)
-            return
+        try {
+            const result = await getSurveyRawResponses(surveyId)
+            if (!result.status) {
+                setErrorMessage(result.message)
+                return
+            }
+            const { headers, rows } = buildResponsesCsv(
+                result.data.questions,
+                result.data.responses,
+                { anonymous: result.data.anonymous }
+            )
+            const content = buildCsvContent(headers, rows)
+            downloadCsv(
+                content,
+                buildTimestampedCsvFilename("survey-responses", survey.title)
+            )
+        } catch {
+            setErrorMessage(GENERIC_ERROR)
+        } finally {
+            setExporting(false)
         }
-        const { headers, rows } = buildResponsesCsv(
-            result.data.questions,
-            result.data.responses,
-            { anonymous: result.data.anonymous }
-        )
-        const content = buildCsvContent(headers, rows)
-        downloadCsv(
-            content,
-            buildTimestampedCsvFilename("survey-responses", survey.title)
-        )
     }
 
     return (

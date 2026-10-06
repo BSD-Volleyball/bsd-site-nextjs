@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Dialog,
     DialogContent,
@@ -39,11 +39,14 @@ export function DraftHomeworkForm({
     data,
     playerPicUrl
 }: DraftHomeworkFormProps) {
-    const router = useRouter()
     const [selections, setSelections] = useState<Selections>(() =>
         buildInitialSelections(data)
     )
-    const [saving, setSaving] = useState(false)
+    // The success toast is conditional (an incomplete list opens a dialog
+    // instead), so it is shown below rather than by the hook.
+    const { run: save, pending: saving } = useAction(saveDraftHomework, {
+        success: false
+    })
     const [showIncompleteDialog, setShowIncompleteDialog] = useState(false)
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
@@ -73,45 +76,36 @@ export function DraftHomeworkForm({
             return
         }
 
-        setSaving(true)
-        try {
-            const selectionEntries = Object.entries(selections)
-                .filter(([, userId]) => userId !== null)
-                .map(([key, userId]) => {
-                    const parts = key.split("-")
-                    const tabKey = parts[0]
-                    const round = parseInt(parts[1], 10)
-                    const slot = parseInt(parts[2], 10)
-                    return {
-                        round,
-                        slot,
-                        playerId: userId as string,
-                        isMaleTab: tabKey === "m"
-                    }
-                })
-
-            const result = await saveDraftHomework({
-                selections: selectionEntries
+        const selectionEntries = Object.entries(selections)
+            .filter(([, userId]) => userId !== null)
+            .map(([key, userId]) => {
+                const parts = key.split("-")
+                const tabKey = parts[0]
+                const round = parseInt(parts[1], 10)
+                const slot = parseInt(parts[2], 10)
+                return {
+                    round,
+                    slot,
+                    playerId: userId as string,
+                    isMaleTab: tabKey === "m"
+                }
             })
 
-            if (result.status) {
-                // Check if all required round slots are filled (excluding Considering)
-                const requiredSlots =
-                    (maleRounds + nonMaleRounds) * data.numTeams
-                const filledRequiredSlots = selectionEntries.filter(
-                    (s) => s.round !== CONSIDERING_ROUND
-                ).length
-                if (filledRequiredSlots < requiredSlots) {
-                    setShowIncompleteDialog(true)
-                } else {
-                    toast.success(result.message)
-                }
-                router.refresh()
+        const result = await save({
+            selections: selectionEntries
+        })
+
+        if (result?.status) {
+            // Check if all required round slots are filled (excluding Considering)
+            const requiredSlots = (maleRounds + nonMaleRounds) * data.numTeams
+            const filledRequiredSlots = selectionEntries.filter(
+                (s) => s.round !== CONSIDERING_ROUND
+            ).length
+            if (filledRequiredSlots < requiredSlots) {
+                setShowIncompleteDialog(true)
             } else {
-                toast.error(result.message)
+                toast.success(result.message)
             }
-        } finally {
-            setSaving(false)
         }
     }
 

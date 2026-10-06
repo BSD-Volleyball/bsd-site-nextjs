@@ -1,5 +1,6 @@
 "use client"
 
+import { useId } from "react"
 import { formatHeight } from "@/components/player-detail"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ export function RatePlayerDialog({
     controller,
     playerPicUrl
 }: RatePlayerDialogProps) {
+    const id = useId()
     const {
         selectedPlayer,
         isDialogOpen,
@@ -161,11 +163,11 @@ export function RatePlayerDialog({
                             )}
 
                             <div className="space-y-2">
-                                <Label htmlFor="shared_notes">
+                                <Label htmlFor={`${id}-shared_notes`}>
                                     Shared notes
                                 </Label>
                                 <Textarea
-                                    id="shared_notes"
+                                    id={`${id}-shared_notes`}
                                     value={sharedNotes}
                                     onChange={(event) =>
                                         setSharedNotes(event.target.value)
@@ -193,11 +195,11 @@ export function RatePlayerDialog({
                             </h3>
 
                             <div className="space-y-2">
-                                <Label htmlFor="private_notes">
+                                <Label htmlFor={`${id}-private_notes`}>
                                     Private notes
                                 </Label>
                                 <Textarea
-                                    id="private_notes"
+                                    id={`${id}-private_notes`}
                                     value={privateNotes}
                                     onChange={(event) =>
                                         setPrivateNotes(event.target.value)

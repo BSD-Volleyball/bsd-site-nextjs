@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useCallback, useId } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -153,7 +153,7 @@ export function SendEmailClient({
     tryouts,
     history: initialHistory
 }: SendEmailClientProps) {
-    const router = useRouter()
+    const id = useId()
 
     // Compose form state
     const [sendToType, setSendToType] = useState<SendToType | "">("")
@@ -170,13 +170,37 @@ export function SendEmailClient({
         useState<LexicalEmailTemplateContent>(EMPTY_CONTENT)
     const [editorKey, setEditorKey] = useState(0)
 
-    const [sending, setSending] = useState(false)
     const [historyOpen, setHistoryOpen] = useState(false)
 
     // Preview dialog state
     const [preview, setPreview] = useState<BroadcastPreview | null>(null)
     const [previewOpen, setPreviewOpen] = useState(false)
-    const [previewing, setPreviewing] = useState(false)
+
+    const { run: loadPreview, pending: previewing } = useAction(
+        previewBroadcast,
+        {
+            success: false,
+            refresh: false,
+            onSuccess: (data) => {
+                setPreview(data)
+                setPreviewOpen(true)
+            }
+        }
+    )
+    const { run: send, pending: sending } = useAction(createAndSendBroadcast, {
+        success: "Email sent successfully!",
+        onSuccess: () => {
+            setPreviewOpen(false)
+            setPreview(null)
+            setSubject("")
+            setContent(EMPTY_CONTENT)
+            setSendToType("")
+            setSelectedDivisionId("")
+            setSelectedTeamId("")
+            setEditorKey((k) => k + 1)
+        },
+        onError: () => setPreviewOpen(false)
+    })
 
     // Group teams by division for the team dropdown
     const teamsByDivision = divisions
@@ -268,43 +292,11 @@ export function SendEmailClient({
             return
         }
 
-        setPreviewing(true)
-        try {
-            const result = await previewBroadcast(broadcastInput())
-            if (result.status) {
-                setPreview(result.data)
-                setPreviewOpen(true)
-            } else {
-                toast.error(result.message)
-            }
-        } finally {
-            setPreviewing(false)
-        }
+        await loadPreview(broadcastInput())
     }
 
-    const handleSend = async () => {
-        setSending(true)
-        try {
-            const result = await createAndSendBroadcast(broadcastInput())
-
-            if (result.status) {
-                setPreviewOpen(false)
-                setPreview(null)
-                toast.success("Email sent successfully!")
-                setSubject("")
-                setContent(EMPTY_CONTENT)
-                setSendToType("")
-                setSelectedDivisionId("")
-                setSelectedTeamId("")
-                setEditorKey((k) => k + 1)
-                router.refresh()
-            } else {
-                setPreviewOpen(false)
-                toast.error(result.message)
-            }
-        } finally {
-            setSending(false)
-        }
+    const handleSend = () => {
+        void send(broadcastInput())
     }
 
     const canSend =
@@ -409,7 +401,7 @@ export function SendEmailClient({
                         {/* Tryout picker — only for volunteer sends */}
                         {sendToType === "season_tryout_volunteers" && (
                             <div className="space-y-1.5 border-muted border-l-2 pl-4">
-                                <Label htmlFor="tryout-select">
+                                <Label htmlFor={`${id}-tryout-select`}>
                                     Which tryout{" "}
                                     <span className="text-destructive">*</span>
                                 </Label>
@@ -417,7 +409,7 @@ export function SendEmailClient({
                                     value={selectedTryout}
                                     onValueChange={setSelectedTryout}
                                 >
-                                    <SelectTrigger id="tryout-select">
+                                    <SelectTrigger id={`${id}-tryout-select`}>
                                         <SelectValue placeholder="Select a tryout…" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -448,7 +440,7 @@ export function SendEmailClient({
                         {/* Division picker */}
                         {sendToType === "division" && (
                             <div className="space-y-1.5 border-muted border-l-2 pl-4">
-                                <Label htmlFor="division-select">
+                                <Label htmlFor={`${id}-division-select`}>
                                     Division{" "}
                                     <span className="text-destructive">*</span>
                                 </Label>
@@ -456,7 +448,7 @@ export function SendEmailClient({
                                     value={selectedDivisionId}
                                     onValueChange={setSelectedDivisionId}
                                 >
-                                    <SelectTrigger id="division-select">
+                                    <SelectTrigger id={`${id}-division-select`}>
                                         <SelectValue placeholder="Select a division…" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -476,7 +468,7 @@ export function SendEmailClient({
                         {/* Team picker */}
                         {sendToType === "team" && (
                             <div className="space-y-1.5 border-muted border-l-2 pl-4">
-                                <Label htmlFor="team-select">
+                                <Label htmlFor={`${id}-team-select`}>
                                     Team{" "}
                                     <span className="text-destructive">*</span>
                                 </Label>
@@ -484,7 +476,7 @@ export function SendEmailClient({
                                     value={selectedTeamId}
                                     onValueChange={setSelectedTeamId}
                                 >
-                                    <SelectTrigger id="team-select">
+                                    <SelectTrigger id={`${id}-team-select`}>
                                         <SelectValue placeholder="Select a team…" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -514,7 +506,7 @@ export function SendEmailClient({
                             there is no true CC on a broadcast send. */}
                         <div className="flex items-start gap-2 pt-1">
                             <Checkbox
-                                id="cc-directors"
+                                id={`${id}-cc-directors`}
                                 checked={directorsForced || ccDirectors}
                                 disabled={
                                     directorsForced || sendToType === "just_me"
@@ -525,7 +517,7 @@ export function SendEmailClient({
                             />
                             <div className="space-y-0.5">
                                 <Label
-                                    htmlFor="cc-directors"
+                                    htmlFor={`${id}-cc-directors`}
                                     className="font-normal"
                                 >
                                     CC Directors

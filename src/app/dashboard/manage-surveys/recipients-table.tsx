@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { UserCombobox } from "@/components/user-combobox"
 import {
     AlertDialog,
@@ -53,9 +53,27 @@ export function RecipientsTable({
     onChanged
 }: RecipientsTableProps) {
     const [addPick, setAddPick] = useState<string | null>(null)
-    const [busy, setBusy] = useState(false)
     const [pendingRemove, setPendingRemove] =
         useState<SurveyEditorRecipient | null>(null)
+    const { run: addRecipients, pending: adding } = useAction(
+        addSurveyRecipients,
+        {
+            refresh: false,
+            onSuccess: () => {
+                setAddPick(null)
+                onChanged()
+            }
+        }
+    )
+    const { run: removeRecipient, pending: removing } = useAction(
+        removeSurveyRecipient,
+        { refresh: false, onSuccess: () => onChanged() }
+    )
+    const { run: resendInvitations, pending: resending } = useAction(
+        resendSurveyInvitations,
+        { refresh: false, onSuccess: () => onChanged() }
+    )
+    const busy = adding || removing || resending
 
     // Only a recipient still on the list blocks re-adding. `addRecipients`
     // restores a removed row rather than inserting a second one, so someone
@@ -65,44 +83,17 @@ export function RecipientsTable({
     )
     const addableUsers = users.filter((u) => !activeIds.has(u.id))
 
-    async function handleAdd() {
+    function handleAdd() {
         if (!addPick) return
-        setBusy(true)
-        const result = await addSurveyRecipients(surveyId, [addPick])
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Recipient added.")
-            setAddPick(null)
-            onChanged()
-        } else {
-            toast.error(result.message)
-        }
+        void addRecipients(surveyId, [addPick])
     }
 
-    async function handleRemove(recipient: SurveyEditorRecipient) {
-        setBusy(true)
-        const result = await removeSurveyRecipient(surveyId, recipient.userId)
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Recipient removed.")
-            onChanged()
-        } else {
-            toast.error(result.message)
-        }
+    function handleRemove(recipient: SurveyEditorRecipient) {
+        void removeRecipient(surveyId, recipient.userId)
     }
 
-    async function handleResend() {
-        setBusy(true)
-        const result = await resendSurveyInvitations(surveyId)
-        setBusy(false)
-        if (result.status) {
-            toast.success(
-                result.message ?? `${result.data.sent} invitation(s) sent.`
-            )
-            onChanged()
-        } else {
-            toast.error(result.message)
-        }
+    function handleResend() {
+        void resendInvitations(surveyId)
     }
 
     return (
@@ -237,7 +228,7 @@ export function RecipientsTable({
                             onClick={() => {
                                 const target = pendingRemove
                                 setPendingRemove(null)
-                                if (target) void handleRemove(target)
+                                if (target) handleRemove(target)
                             }}
                         >
                             Remove

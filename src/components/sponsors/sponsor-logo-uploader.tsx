@@ -76,6 +76,8 @@ export function SponsorLogoUploader({
             setPreview(done.data.logoUrl)
             onUploaded?.(done.data.logoUrl)
             toast.success("Logo uploaded.")
+        } catch {
+            toast.error("Something went wrong. Please try again.")
         } finally {
             setBusy(false)
             if (inputRef.current) inputRef.current.value = ""

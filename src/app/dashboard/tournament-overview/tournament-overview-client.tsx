@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -61,24 +60,16 @@ function TeamRow({
     team: OverviewTeam
     onPlayerClick: (userId: string) => void
 }) {
-    const router = useRouter()
     const [open, setOpen] = useState(false)
     const [confirmOpen, setConfirmOpen] = useState(false)
-    const [busy, setBusy] = useState(false)
+    const { run: withdraw, pending: busy } = useAction(withdrawTournamentTeam, {
+        onSuccess: () => setConfirmOpen(false)
+    })
     const males = team.roster.filter((p) => p.male === true).length
     const nonMales = team.roster.filter((p) => p.male === false).length
 
     async function handleWithdraw() {
-        setBusy(true)
-        const result = await withdrawTournamentTeam(team.id)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success(result.message ?? "Team withdrawn.")
-        setConfirmOpen(false)
-        router.refresh()
+        await withdraw(team.id)
     }
 
     return (

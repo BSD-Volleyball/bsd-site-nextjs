@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { useAction } from "@/components/hooks/use-action"
 import { getAuditLogs, type AuditLogEntry } from "./actions"
 import { formatFullTimestamp } from "@/lib/date-utils"
 
@@ -30,7 +31,14 @@ export function AuditLogList({
     const [entries, setEntries] = useState(initialEntries)
     const [total, setTotal] = useState(initialTotal)
     const [search, setSearch] = useState("")
-    const [loading, setLoading] = useState(false)
+    const { run: loadMore, pending: loading } = useAction(getAuditLogs, {
+        success: false,
+        refresh: false,
+        onSuccess: (data) => {
+            setEntries((prev) => [...prev, ...data.entries])
+            setTotal(data.total)
+        }
+    })
 
     const filteredEntries = useMemo(() => {
         if (!search) return entries
@@ -44,17 +52,11 @@ export function AuditLogList({
         )
     }, [entries, search])
 
-    const handleLoadMore = async () => {
-        setLoading(true)
-        const result = await getAuditLogs({
+    const handleLoadMore = () => {
+        void loadMore({
             offset: entries.length,
             limit: PAGE_SIZE
         })
-        if (result.status) {
-            setEntries((prev) => [...prev, ...result.data.entries])
-            setTotal(result.data.total)
-        }
-        setLoading(false)
     }
 
     const hasMore = entries.length < total

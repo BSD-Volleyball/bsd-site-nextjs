@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -32,6 +32,7 @@ export function OnboardingVolleyballForm({
     initialData
 }: OnboardingVolleyballFormProps) {
     const router = useRouter()
+    const id = useId()
     const [isLoading, setIsLoading] = useState(false)
 
     const [formData, setFormData] = useState<VolleyballProfileData>({
@@ -48,12 +49,18 @@ export function OnboardingVolleyballForm({
         e.preventDefault()
         setIsLoading(true)
 
-        const result = await completeOnboarding(formData)
+        // On success the button stays disabled while the dashboard loads.
+        try {
+            const result = await completeOnboarding(formData)
 
-        if (result.status) {
-            router.push("/dashboard")
-        } else {
-            toast.error(result.message)
+            if (result.status) {
+                router.push("/dashboard")
+            } else {
+                toast.error(result.message)
+                setIsLoading(false)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
             setIsLoading(false)
         }
     }
@@ -69,12 +76,12 @@ export function OnboardingVolleyballForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label htmlFor="experience">
+                        <Label htmlFor={`${id}-experience`}>
                             Experience{" "}
                             <span className="text-destructive">*</span>
                         </Label>
                         <Textarea
-                            id="experience"
+                            id={`${id}-experience`}
                             placeholder="Describe your volleyball experience..."
                             required
                             value={formData.experience ?? ""}
@@ -89,9 +96,11 @@ export function OnboardingVolleyballForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="assessment">Self Assessment</Label>
+                        <Label htmlFor={`${id}-assessment`}>
+                            Self Assessment
+                        </Label>
                         <Textarea
-                            id="assessment"
+                            id={`${id}-assessment`}
                             placeholder="How would you rate your overall skill level?"
                             value={formData.assessment ?? ""}
                             onChange={(e) =>
@@ -105,7 +114,7 @@ export function OnboardingVolleyballForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="height">
+                        <Label htmlFor={`${id}-height`}>
                             Height <span className="text-destructive">*</span>
                         </Label>
                         <Select
@@ -118,7 +127,7 @@ export function OnboardingVolleyballForm({
                                 })
                             }
                         >
-                            <SelectTrigger id="height">
+                            <SelectTrigger id={`${id}-height`}>
                                 <SelectValue placeholder="Select your height" />
                             </SelectTrigger>
                             <SelectContent>
@@ -148,7 +157,7 @@ export function OnboardingVolleyballForm({
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_passer"
+                                    id={`${id}-skill_passer`}
                                     checked={formData.skill_passer}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -158,7 +167,7 @@ export function OnboardingVolleyballForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_passer"
+                                    htmlFor={`${id}-skill_passer`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Passer
@@ -166,7 +175,7 @@ export function OnboardingVolleyballForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_setter"
+                                    id={`${id}-skill_setter`}
                                     checked={formData.skill_setter}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -176,7 +185,7 @@ export function OnboardingVolleyballForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_setter"
+                                    htmlFor={`${id}-skill_setter`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Setter
@@ -184,7 +193,7 @@ export function OnboardingVolleyballForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_hitter"
+                                    id={`${id}-skill_hitter`}
                                     checked={formData.skill_hitter}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -194,7 +203,7 @@ export function OnboardingVolleyballForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_hitter"
+                                    htmlFor={`${id}-skill_hitter`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Hitter
@@ -202,7 +211,7 @@ export function OnboardingVolleyballForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_other"
+                                    id={`${id}-skill_other`}
                                     checked={formData.skill_other}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -212,7 +221,7 @@ export function OnboardingVolleyballForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_other"
+                                    htmlFor={`${id}-skill_other`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Other

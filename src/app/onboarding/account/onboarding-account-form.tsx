@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -36,6 +36,7 @@ export function OnboardingAccountForm({
     initialData
 }: OnboardingAccountFormProps) {
     const router = useRouter()
+    const id = useId()
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -86,19 +87,25 @@ export function OnboardingAccountForm({
 
         setIsLoading(true)
 
-        const result = await updateOnboardingAccount({
-            preferred_name: formData.preferred_name || null,
-            phone: formData.phone || null,
-            pronouns: formData.pronouns || null,
-            emergency_contact: formData.emergency_contact || null,
-            male: formData.male,
-            referred_by: formData.referred_by || null
-        })
+        // On success the button stays disabled while the next step loads.
+        try {
+            const result = await updateOnboardingAccount({
+                preferred_name: formData.preferred_name || null,
+                phone: formData.phone || null,
+                pronouns: formData.pronouns || null,
+                emergency_contact: formData.emergency_contact || null,
+                male: formData.male,
+                referred_by: formData.referred_by || null
+            })
 
-        if (result.status) {
-            router.push("/onboarding/volleyball-profile")
-        } else {
-            toast.error(result.message)
+            if (result.status) {
+                router.push("/onboarding/volleyball-profile")
+            } else {
+                toast.error(result.message)
+                setIsLoading(false)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
             setIsLoading(false)
         }
     }
@@ -116,14 +123,14 @@ export function OnboardingAccountForm({
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="preferred_name">
+                        <Label htmlFor={`${id}-preferred_name`}>
                             Preferred First Name (if different){" "}
                             <span className="text-muted-foreground">
                                 (optional)
                             </span>
                         </Label>
                         <Input
-                            id="preferred_name"
+                            id={`${id}-preferred_name`}
                             value={formData.preferred_name}
                             onChange={(e) =>
                                 setFormData({
@@ -136,12 +143,12 @@ export function OnboardingAccountForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="phone">
+                        <Label htmlFor={`${id}-phone`}>
                             Phone Number{" "}
                             <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                            id="phone"
+                            id={`${id}-phone`}
                             type="tel"
                             value={formData.phone}
                             onChange={(e) =>
@@ -184,18 +191,24 @@ export function OnboardingAccountForm({
                             className="flex gap-4"
                         >
                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="yes" id="male-yes" />
+                                <RadioGroupItem
+                                    value="yes"
+                                    id={`${id}-male-yes`}
+                                />
                                 <Label
-                                    htmlFor="male-yes"
+                                    htmlFor={`${id}-male-yes`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Yes
                                 </Label>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="no" id="male-no" />
+                                <RadioGroupItem
+                                    value="no"
+                                    id={`${id}-male-no`}
+                                />
                                 <Label
-                                    htmlFor="male-no"
+                                    htmlFor={`${id}-male-no`}
                                     className="cursor-pointer font-normal"
                                 >
                                     No
@@ -205,7 +218,7 @@ export function OnboardingAccountForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="pronouns">
+                        <Label htmlFor={`${id}-pronouns`}>
                             Pronouns{" "}
                             <span className="text-muted-foreground">
                                 (optional)
@@ -232,7 +245,7 @@ export function OnboardingAccountForm({
                                 }
                             }}
                         >
-                            <SelectTrigger id="pronouns">
+                            <SelectTrigger id={`${id}-pronouns`}>
                                 <SelectValue placeholder="Select your pronouns" />
                             </SelectTrigger>
                             <SelectContent>
@@ -251,7 +264,7 @@ export function OnboardingAccountForm({
                         </Select>
                         {pronounSelection === "Other" && (
                             <Input
-                                id="custom_pronouns"
+                                id={`${id}-custom_pronouns`}
                                 value={customPronouns}
                                 onChange={(e) => {
                                     setCustomPronouns(e.target.value)
@@ -267,12 +280,12 @@ export function OnboardingAccountForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="emergency_contact">
+                        <Label htmlFor={`${id}-emergency_contact`}>
                             Emergency Contact{" "}
                             <span className="text-destructive">*</span>
                         </Label>
                         <Input
-                            id="emergency_contact"
+                            id={`${id}-emergency_contact`}
                             value={formData.emergency_contact}
                             onChange={(e) =>
                                 setFormData({
@@ -286,14 +299,14 @@ export function OnboardingAccountForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="referred_by">
+                        <Label htmlFor={`${id}-referred_by`}>
                             Referred By{" "}
                             <span className="text-muted-foreground">
                                 (optional)
                             </span>
                         </Label>
                         <Input
-                            id="referred_by"
+                            id={`${id}-referred_by`}
                             value={formData.referred_by}
                             onChange={(e) =>
                                 setFormData({

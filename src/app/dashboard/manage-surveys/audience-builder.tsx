@@ -2,7 +2,7 @@
 
 import { RiAddLine, RiCloseLine } from "@remixicon/react"
 import { useId, useState } from "react"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { UserCombobox } from "@/components/user-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,9 +62,15 @@ export function AudienceBuilder({
     )
     const [addPick, setAddPick] = useState<string | null>(null)
     const [removePick, setRemovePick] = useState<string | null>(null)
-    const [busy, setBusy] = useState(false)
-    const [previewBusy, setPreviewBusy] = useState(false)
     const [preview, setPreview] = useState<AudiencePreview | null>(null)
+    const { run: saveAudience, pending: busy } = useAction(
+        updateSurveyAudience,
+        { refresh: false, onSuccess: () => onSaved() }
+    )
+    const { run: loadPreview, pending: previewBusy } = useAction(
+        previewSurveyAudience,
+        { success: false, refresh: false, onSuccess: setPreview }
+    )
 
     const simpleSelected = new Set(
         groups
@@ -117,31 +123,16 @@ export function AudienceBuilder({
         setRemovePick(null)
     }
 
-    async function handleSave() {
-        setBusy(true)
-        const result = await updateSurveyAudience(surveyId, {
+    function handleSave() {
+        void saveAudience(surveyId, {
             groups,
             addUserIds,
             removeUserIds
         })
-        setBusy(false)
-        if (result.status) {
-            toast.success(result.message ?? "Audience saved.")
-            onSaved()
-        } else {
-            toast.error(result.message)
-        }
     }
 
-    async function handlePreview() {
-        setPreviewBusy(true)
-        const result = await previewSurveyAudience(surveyId)
-        setPreviewBusy(false)
-        if (result.status) {
-            setPreview(result.data)
-        } else {
-            toast.error(result.message)
-        }
+    function handlePreview() {
+        void loadPreview(surveyId)
     }
 
     return (
