@@ -2,6 +2,7 @@
 // actions) are responsible for authorization and pass the acting user's id;
 // this module validates the payload and writes it. Server-only: never import from client components.
 
+import { logger } from "@/lib/logger"
 import "server-only"
 
 import { and, eq, inArray } from "drizzle-orm"
@@ -154,7 +155,7 @@ export async function savePreseasonWeekRosters(
 
         return ok(undefined, `Week ${week} rosters saved successfully.`)
     } catch (error) {
-        console.error(`Error saving week ${week} rosters:`, error)
+        logger.error(`Error saving week ${week} rosters`, undefined, error)
         return fail(`Something went wrong while saving week ${week} rosters.`)
     }
 }

@@ -3,6 +3,7 @@
 // intentionally different from the week-2/3 generator (tryout-sheets.ts);
 // shared text/enrichment helpers live in tryout-sheet-shared.ts.
 
+import { logger } from "@/lib/logger"
 import { and, eq, inArray } from "drizzle-orm"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { db } from "@/database/db"
@@ -690,7 +691,11 @@ export async function generateWeek1TryoutSheetsPdf(
 
         return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
-        console.error("Error creating week 1 tryout sheets PDF:", error)
+        logger.error(
+            "Error creating week 1 tryout sheets PDF",
+            undefined,
+            error
+        )
         return pdfErrorResponse("Failed to generate tryout sheets PDF.", 500)
     }
 }

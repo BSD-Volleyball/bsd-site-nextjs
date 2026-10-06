@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
@@ -493,7 +494,7 @@ export async function getPlayoffNextMatches(
             status
         }
     } catch (error) {
-        console.error("Error fetching playoff next matches:", error)
+        logger.error("Error fetching playoff next matches", undefined, error)
         return null
     }
 }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import {
     emailRecipientGroups,
@@ -822,7 +823,7 @@ export const createAndSendBroadcast = withAction(
                 .update(emailBroadcasts)
                 .set({ status: "failed", updated_at: new Date() })
                 .where(eq(emailBroadcasts.id, broadcast.id))
-            console.error("[send-email] broadcast failed", err)
+            logger.error("[send-email] broadcast failed", undefined, err)
             return fail("Failed to send emails. Please try again.")
         }
     }

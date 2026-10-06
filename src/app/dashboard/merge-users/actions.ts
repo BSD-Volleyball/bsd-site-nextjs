@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
@@ -428,7 +429,7 @@ export const mergeUsers = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Users merged successfully.")
         } catch (error) {
-            console.error("Error merging users:", error)
+            logger.error("Error merging users", undefined, error)
             return fail("Something went wrong while merging users.")
         }
     }

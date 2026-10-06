@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail, requireSession } from "@/next/action-helpers"
@@ -134,7 +135,7 @@ export const getTeamRoster = withAction(
                 players
             })
         } catch (error) {
-            console.error("Error fetching team roster:", error)
+            logger.error("Error fetching team roster", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -355,8 +356,9 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 emailSubject = template.subject || ""
             }
         } catch (templateError) {
-            console.error(
-                "Error fetching welcome from captains template:",
+            logger.error(
+                "Error fetching welcome from captains template",
+                undefined,
                 templateError
             )
         }
@@ -400,7 +402,11 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 }
             }
         } catch (draftDateError) {
-            console.error("Error fetching division draft date:", draftDateError)
+            logger.error(
+                "Error fetching division draft date",
+                undefined,
+                draftDateError
+            )
         }
 
         // Find next match availability for the team's roster
@@ -470,7 +476,11 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
                 }
             }
         } catch (availError) {
-            console.error("Error fetching next match availability:", availError)
+            logger.error(
+                "Error fetching next match availability",
+                undefined,
+                availError
+            )
         }
 
         const allSeasonRows = await db
@@ -509,7 +519,7 @@ export async function getCaptainWelcomeData(): Promise<CaptainWelcomeData | null
             playerPicUrl: playerPicBaseUrl()
         }
     } catch (error) {
-        console.error("Error fetching captain welcome data:", error)
+        logger.error("Error fetching captain welcome data", undefined, error)
         return null
     }
 }
@@ -629,7 +639,7 @@ export async function getPlayerTeamAssignment(
             roster
         }
     } catch (error) {
-        console.error("Error fetching player team assignment:", error)
+        logger.error("Error fetching player team assignment", undefined, error)
         return null
     }
 }
@@ -692,7 +702,11 @@ export const expressWaitlistInterest = withAction(
                 "Your interest has been recorded. We'll reach out if a spot opens up!"
             )
         } catch (error) {
-            console.error("Failed to express waitlist interest:", error)
+            logger.error(
+                "Failed to express waitlist interest",
+                undefined,
+                error
+            )
             return fail("Something went wrong. Please try again.")
         }
     }

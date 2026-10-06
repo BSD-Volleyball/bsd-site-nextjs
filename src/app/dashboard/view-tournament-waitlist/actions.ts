@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
@@ -430,7 +431,7 @@ export const placeWaitlistPlayerOnTeam = withAction(
                     .where(eq(tournamentWaitlist.id, waitlistId))
             })
         } catch (e) {
-            console.error("placeWaitlistPlayerOnTeam failed:", e)
+            logger.error("placeWaitlistPlayerOnTeam failed", undefined, e)
             return fail("Could not place player (may already be on a team).")
         }
 

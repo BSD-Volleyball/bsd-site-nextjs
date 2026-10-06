@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
@@ -280,7 +281,7 @@ export const addTeamToPool = withAction(
                 team_id: teamId
             })
         } catch (e) {
-            console.error("addTeamToPool failed:", e)
+            logger.error("addTeamToPool failed", undefined, e)
             return fail("Team is already in a pool.")
         }
         await logAuditEntry({

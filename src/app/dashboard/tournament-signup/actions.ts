@@ -296,7 +296,11 @@ export const submitTournamentSignup = withAction(
                 paymentId = response.payment.id ?? undefined
                 receiptUrl = response.payment.receiptUrl ?? undefined
             } catch (error) {
-                console.error("Tournament signup payment error:", error)
+                logger.error(
+                    "Tournament signup payment error",
+                    undefined,
+                    error
+                )
                 return fail("Payment failed. Please try again.")
             }
         }

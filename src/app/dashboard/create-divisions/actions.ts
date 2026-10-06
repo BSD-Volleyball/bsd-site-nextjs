@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
@@ -237,7 +238,7 @@ export const getDivisionsPageData = withAction(
                 evaluatedByDivision
             })
         } catch (error) {
-            console.error("Error loading divisions page data:", error)
+            logger.error("Error loading divisions page data", undefined, error)
             return fail("Something went wrong loading division data.")
         }
     }
@@ -321,7 +322,7 @@ export const saveDivisionSelections = withAction(
                 `Division configuration saved — ${enabledSelections.length} division(s) configured.`
             )
         } catch (error) {
-            console.error("Error saving division selections:", error)
+            logger.error("Error saving division selections", undefined, error)
             return fail("Something went wrong. Please try again.")
         }
     }

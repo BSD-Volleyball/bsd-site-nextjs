@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
@@ -108,7 +109,11 @@ export const getTryoutSlotRequests = withAction(
                 }))
             })
         } catch (error) {
-            console.error("Error fetching tryout slot requests:", error)
+            logger.error(
+                "Error fetching tryout slot requests",
+                undefined,
+                error
+            )
             return fail("Failed to load tryout slot requests.")
         }
     }
@@ -210,7 +215,7 @@ export const createTryoutSlotRequest = withAction(
             revalidatePath("/dashboard/tryout-slot-requests")
             return ok(undefined, "Tryout slot request created.")
         } catch (error) {
-            console.error("Error creating tryout slot request:", error)
+            logger.error("Error creating tryout slot request", undefined, error)
             return fail("Failed to create tryout slot request.")
         }
     }
@@ -278,7 +283,7 @@ export const updateTryoutSlotRequest = withAction(
             revalidatePath("/dashboard/tryout-slot-requests")
             return ok(undefined, "Tryout slot request updated.")
         } catch (error) {
-            console.error("Error updating tryout slot request:", error)
+            logger.error("Error updating tryout slot request", undefined, error)
             return fail("Failed to update tryout slot request.")
         }
     }
@@ -310,7 +315,7 @@ export const deleteTryoutSlotRequest = withAction(
             revalidatePath("/dashboard/tryout-slot-requests")
             return ok(undefined, "Tryout slot request deleted.")
         } catch (error) {
-            console.error("Error deleting tryout slot request:", error)
+            logger.error("Error deleting tryout slot request", undefined, error)
             return fail("Failed to delete tryout slot request.")
         }
     }

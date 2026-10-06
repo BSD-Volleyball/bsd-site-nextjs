@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -82,7 +83,7 @@ export const getMatchDatesForSeason = withAction(
 
             return ok(dates)
         } catch (error) {
-            console.error("Error fetching match dates:", error)
+            logger.error("Error fetching match dates", undefined, error)
             return fail("Failed to load match dates.")
         }
     }
@@ -416,7 +417,7 @@ export const getMatchesForDate = withAction(
                 scoreSheets: scoreSheetData
             })
         } catch (error) {
-            console.error("Error fetching matches for date:", error)
+            logger.error("Error fetching matches for date", undefined, error)
             return fail("Failed to load matches.")
         }
     }
@@ -917,7 +918,7 @@ export const saveScoresForDivision = withAction(
                 `Saved scores for ${matchScores.length} match(es).`
             )
         } catch (error) {
-            console.error("Error saving scores:", error)
+            logger.error("Error saving scores", undefined, error)
             if (
                 error instanceof Error &&
                 error.message.startsWith("INVALID_WINNER:")
@@ -989,7 +990,11 @@ export const createScoreSheetUpload = withAction(
 
             return ok({ uploadUrl, objectKey })
         } catch (error) {
-            console.error("Error creating score sheet upload URL:", error)
+            logger.error(
+                "Error creating score sheet upload URL",
+                undefined,
+                error
+            )
             return fail("Failed to start upload.")
         }
     }
@@ -1063,7 +1068,11 @@ export const finalizeScoreSheetUpload = withAction(
                 "Score sheet uploaded."
             )
         } catch (error) {
-            console.error("Error finalizing score sheet upload:", error)
+            logger.error(
+                "Error finalizing score sheet upload",
+                undefined,
+                error
+            )
             return fail("Failed to save score sheet.")
         }
     }
@@ -1098,7 +1107,7 @@ export const deleteScoreSheet = withAction(
             try {
                 await deleteR2Object(row.imagePath)
             } catch (r2Error) {
-                console.error("Failed to delete R2 object:", r2Error)
+                logger.error("Failed to delete R2 object", undefined, r2Error)
             }
 
             await db.delete(scoreSheets).where(eq(scoreSheets.id, scoreSheetId))
@@ -1117,7 +1126,7 @@ export const deleteScoreSheet = withAction(
             revalidatePath("/dashboard/enter-scores")
             return ok(undefined, "Score sheet deleted.")
         } catch (error) {
-            console.error("Error deleting score sheet:", error)
+            logger.error("Error deleting score sheet", undefined, error)
             return fail("Failed to delete score sheet.")
         }
     }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
@@ -184,7 +185,7 @@ export const getSeasonConfigData = withAction(
                 events
             })
         } catch (error) {
-            console.error("Failed to load season config:", error)
+            logger.error("Failed to load season config", undefined, error)
             return fail("Failed to load season configuration")
         }
     }
@@ -432,7 +433,7 @@ export const saveSeasonConfig = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Season configuration saved successfully")
         } catch (error) {
-            console.error("Failed to save season config:", error)
+            logger.error("Failed to save season config", undefined, error)
             return fail("Failed to save season configuration")
         }
     }

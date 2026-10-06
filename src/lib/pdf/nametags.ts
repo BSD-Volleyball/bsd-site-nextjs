@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 import { and, eq, inArray } from "drizzle-orm"
 import {
     PDFDocument,
@@ -678,7 +679,11 @@ export async function generateWeekNametagsPdf(
 
         return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
-        console.error(`Error creating week ${week} nametag labels PDF:`, error)
+        logger.error(
+            `Error creating week ${week} nametag labels PDF`,
+            undefined,
+            error
+        )
         return pdfErrorResponse("Failed to generate nametag labels PDF.", 500)
     }
 }

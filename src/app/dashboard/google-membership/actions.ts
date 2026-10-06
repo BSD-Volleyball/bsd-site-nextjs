@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
@@ -165,7 +166,11 @@ export const getGoogleMembershipUsers = withAction(
                 filter
             })
         } catch (error) {
-            console.error("Error loading Google Membership users:", error)
+            logger.error(
+                "Error loading Google Membership users",
+                undefined,
+                error
+            )
             return fail("Failed to load users.")
         }
     }
@@ -209,7 +214,11 @@ export const updateGoogleMembership = withAction(
             revalidatePath("/dashboard/google-membership")
             return ok(undefined, "Membership fields updated.")
         } catch (error) {
-            console.error("Error updating Google Membership fields:", error)
+            logger.error(
+                "Error updating Google Membership fields",
+                undefined,
+                error
+            )
             return fail("Failed to update membership fields.")
         }
     }

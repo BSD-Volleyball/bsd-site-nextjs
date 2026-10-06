@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
@@ -176,7 +177,11 @@ export const getCreateScheduleData = withAction(
                 playoffDates
             })
         } catch (error) {
-            console.error("Error fetching create schedule data:", error)
+            logger.error(
+                "Error fetching create schedule data",
+                undefined,
+                error
+            )
             return fail("Something went wrong loading schedule data.")
         }
     }
@@ -360,7 +365,11 @@ export const writeRegularSeasonSchedule = withAction(
                 `Successfully created ${allMatches.length} regular season matches across ${data.divisions.length} divisions!`
             )
         } catch (error) {
-            console.error("Error writing regular season schedule:", error)
+            logger.error(
+                "Error writing regular season schedule",
+                undefined,
+                error
+            )
             return fail("Something went wrong while creating the schedule.")
         }
     }
@@ -474,7 +483,7 @@ export const writePlayoffSchedule = withAction(
                 `Successfully created ${totalMatchesCreated} playoff matches across ${data.divisions.length} divisions!`
             )
         } catch (error) {
-            console.error("Error writing playoff schedule:", error)
+            logger.error("Error writing playoff schedule", undefined, error)
             return fail(
                 "Something went wrong while creating the playoff schedule."
             )

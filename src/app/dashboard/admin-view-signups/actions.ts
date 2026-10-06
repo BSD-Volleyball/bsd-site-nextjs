@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
@@ -378,7 +379,7 @@ export const getSeasonSignups = withAction(
                 lateAmount: config.lateAmount || ""
             })
         } catch (error) {
-            console.error("Error fetching season signups:", error)
+            logger.error("Error fetching season signups", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -600,7 +601,7 @@ export const dropSignup = withAction(
             revalidateCalendarFeeds()
             return ok({ stage: "pre_draft" }, "Signup dropped.")
         } catch (error) {
-            console.error("Error dropping signup:", error)
+            logger.error("Error dropping signup", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -771,7 +772,7 @@ export const restoreDrop = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Drop restored. The signup is live again.")
         } catch (error) {
-            console.error("Error restoring drop:", error)
+            logger.error("Error restoring drop", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -881,7 +882,7 @@ export const getSeasonDrops = withAction(
 
             return ok(entries)
         } catch (error) {
-            console.error("Error fetching season drops:", error)
+            logger.error("Error fetching season drops", undefined, error)
             return fail("Failed to load dropped players.")
         }
     }

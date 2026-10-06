@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -113,7 +114,7 @@ export const getCreateWeek3Data = withAction(
                 excludedPlayers: base.excludedPlayers
             })
         } catch (error) {
-            console.error("Error loading create week 3 data:", error)
+            logger.error("Error loading create week 3 data", undefined, error)
             return fail("Something went wrong while loading data.")
         }
     }

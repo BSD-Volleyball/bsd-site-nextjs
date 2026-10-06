@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -712,7 +713,7 @@ export const getRatePlayerData = withAction(
                 currentSeasonId: config.seasonId
             })
         } catch (error) {
-            console.error("Error loading rate player data:", error)
+            logger.error("Error loading rate player data", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -809,7 +810,7 @@ export const savePlayerSkillRatings = withAction(
 
             return ok(undefined, "Ratings saved.")
         } catch (error) {
-            console.error("Error saving player skill ratings:", error)
+            logger.error("Error saving player skill ratings", undefined, error)
             return fail("Failed to save ratings.")
         }
     }
@@ -886,7 +887,7 @@ export const savePlayerRatingNote = withAction(
 
             return ok(undefined, "Note saved.")
         } catch (error) {
-            console.error("Error saving player rating note:", error)
+            logger.error("Error saving player rating note", undefined, error)
             return fail("Failed to save note.")
         }
     }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -745,7 +746,7 @@ export async function getAssignableUsers(): Promise<AssignableUser[]> {
 
         return result.sort((a, b) => a.name.localeCompare(b.name))
     } catch (error) {
-        console.error("Error fetching assignable users:", error)
+        logger.error("Error fetching assignable users", undefined, error)
         return []
     }
 }

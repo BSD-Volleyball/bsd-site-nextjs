@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 import { and, eq } from "drizzle-orm"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { db } from "@/database/db"
@@ -708,7 +709,11 @@ export async function generateTryoutSheetsPdf(
 
         return pdfDownloadResponse(pdfBytes, downloadFileName)
     } catch (error) {
-        console.error(`Error creating week ${week} tryout sheets PDF:`, error)
+        logger.error(
+            `Error creating week ${week} tryout sheets PDF`,
+            undefined,
+            error
+        )
         return pdfErrorResponse(
             `Failed to generate week ${week} tryout sheets PDF.`,
             500

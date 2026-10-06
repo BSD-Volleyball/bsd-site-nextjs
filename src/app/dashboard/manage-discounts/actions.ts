@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
@@ -72,7 +73,7 @@ export const getDiscounts = withAction(
 
             return ok(entries)
         } catch (error) {
-            console.error("Error fetching discounts:", error)
+            logger.error("Error fetching discounts", undefined, error)
             return fail("Failed to load discounts.")
         }
     }
@@ -152,7 +153,7 @@ export const createDiscount = withAction(
             revalidatePath("/dashboard/manage-discounts")
             return ok(undefined, "Discount created successfully.")
         } catch (error) {
-            console.error("Error creating discount:", error)
+            logger.error("Error creating discount", undefined, error)
             return fail("Failed to create discount.")
         }
     }
@@ -224,7 +225,7 @@ export const updateDiscount = withAction(
             revalidatePath("/dashboard/manage-discounts")
             return ok(undefined, "Discount updated successfully.")
         } catch (error) {
-            console.error("Error updating discount:", error)
+            logger.error("Error updating discount", undefined, error)
             return fail("Failed to update discount.")
         }
     }
@@ -254,7 +255,7 @@ export const deleteDiscount = withAction(
             revalidatePath("/dashboard/manage-discounts")
             return ok(undefined, "Discount deleted successfully.")
         } catch (error) {
-            console.error("Error deleting discount:", error)
+            logger.error("Error deleting discount", undefined, error)
             return fail("Failed to delete discount.")
         }
     }

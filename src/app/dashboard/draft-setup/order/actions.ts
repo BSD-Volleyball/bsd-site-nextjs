@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -186,7 +187,7 @@ export const getDraftDayData = withAction(
                 commissionerDivisionId
             })
         } catch (error) {
-            console.error("Error fetching draft day data:", error)
+            logger.error("Error fetching draft day data", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -307,7 +308,7 @@ export const saveDraftOrder = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Draft order locked.")
         } catch (error) {
-            console.error("Error saving draft order:", error)
+            logger.error("Error saving draft order", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -718,7 +719,7 @@ export const getDraftSheetData = withAction(
 
             return ok({ seasonLabel, divisions: divisionList })
         } catch (error) {
-            console.error("Error fetching draft sheet data:", error)
+            logger.error("Error fetching draft sheet data", undefined, error)
             return fail("Something went wrong.")
         }
     }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm"
@@ -778,8 +779,9 @@ export const getPrepareForDraftData = withAction(
                 emailSubject = template.subject || ""
             }
         } catch (templateError) {
-            console.error(
-                "Error fetching predraft to captains template:",
+            logger.error(
+                "Error fetching predraft to captains template",
+                undefined,
                 templateError
             )
         }

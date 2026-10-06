@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
@@ -55,7 +56,7 @@ export const getSeasons = withAction(
 
             return ok(allSeasons)
         } catch (error) {
-            console.error("Error fetching seasons:", error)
+            logger.error("Error fetching seasons", undefined, error)
             return fail("Failed to load seasons.")
         }
     }
@@ -92,7 +93,7 @@ export const getCurrentSeason = withAction(
 
             return ok(mostRecentSeason?.id ?? null)
         } catch (error) {
-            console.error("Error fetching current season:", error)
+            logger.error("Error fetching current season", undefined, error)
             return fail("Failed to load current season.")
         }
     }
@@ -122,7 +123,7 @@ export const getUsers = withAction(async (): Promise<ActionResult<User[]>> => {
 
         return ok(userList)
     } catch (error) {
-        console.error("Error fetching users:", error)
+        logger.error("Error fetching users", undefined, error)
         return fail("Failed to load users.")
     }
 })
@@ -153,7 +154,7 @@ export const getDivisions = withAction(
 
             return ok(sortedDivisions)
         } catch (error) {
-            console.error("Error fetching divisions:", error)
+            logger.error("Error fetching divisions", undefined, error)
             return fail("Failed to load divisions.")
         }
     }
@@ -212,7 +213,11 @@ export const getCommissionersForSeason = withAction(
 
             return ok(assignments)
         } catch (error) {
-            console.error("Error fetching commissioners for season:", error)
+            logger.error(
+                "Error fetching commissioners for season",
+                undefined,
+                error
+            )
             return fail("Failed to load commissioners.")
         }
     }
@@ -293,7 +298,7 @@ export const saveCommissioners = withAction(
             revalidatePath("/dashboard/select-commissioners")
             return ok(undefined, "Commissioners updated successfully.")
         } catch (error) {
-            console.error("Error saving commissioners:", error)
+            logger.error("Error saving commissioners", undefined, error)
             return fail("Failed to save commissioners.")
         }
     }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { playerPicBaseUrl } from "@/config/env"
@@ -164,9 +165,9 @@ export const advanceSeasonPhase = withAction(
                         )
                     }
                 } catch (err) {
-                    console.error(
+                    logger.error(
                         "[season-control] Reset-final cleanup failed",
-                        seasonId,
+                        { seasonId },
                         err
                     )
                 }
@@ -236,9 +237,9 @@ export const advanceSeasonPhase = withAction(
             // When season completes, clean up granular recipient groups (fire-and-forget)
             if (targetPhase === "complete") {
                 cleanupSeasonRecipientGroups(seasonId).catch((err) =>
-                    console.error(
+                    logger.error(
                         "[season-control] Recipient group cleanup failed",
-                        seasonId,
+                        { seasonId },
                         err
                     )
                 )
@@ -252,7 +253,7 @@ export const advanceSeasonPhase = withAction(
                 `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}${resetSummary ?? ""}`
             )
         } catch (error) {
-            console.error("Failed to advance season phase:", error)
+            logger.error("Failed to advance season phase", undefined, error)
             return fail("Failed to advance season phase")
         }
     }
@@ -309,7 +310,7 @@ export const revertSeasonPhase = withAction(
                 `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`
             )
         } catch (error) {
-            console.error("Failed to revert season phase:", error)
+            logger.error("Failed to revert season phase", undefined, error)
             return fail("Failed to revert season phase")
         }
     }
@@ -486,7 +487,7 @@ export const createSeason = withAction(
                 `${label} season created. Edit dates and pricing in Season Configuration.`
             )
         } catch (error) {
-            console.error("Failed to create season:", error)
+            logger.error("Failed to create season", undefined, error)
             return fail("Failed to create season")
         }
     }
@@ -527,7 +528,7 @@ export const getCurrentSeasonPhaseData = withAction(
                 phase: season.phase as SeasonPhase
             })
         } catch (error) {
-            console.error("Failed to get season phase:", error)
+            logger.error("Failed to get season phase", undefined, error)
             return fail("Failed to load season data")
         }
     }

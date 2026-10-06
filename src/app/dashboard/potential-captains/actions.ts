@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import {
     users,
@@ -504,8 +505,9 @@ export const getPotentialCaptainsData = withAction(
             )
             emailSubject = template.subject || ""
         } else if (templateResult.status === "rejected") {
-            console.error(
-                "Error fetching email template:",
+            logger.error(
+                "Error fetching email template",
+                undefined,
                 templateResult.reason
             )
         }

@@ -3,6 +3,7 @@
 // resolve the acting user, and delegate here with their week's config.
 // Server-only.
 
+import { logger } from "@/lib/logger"
 import "server-only"
 
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
@@ -322,8 +323,9 @@ export async function getEditWeekData(
             slotLabels: getTryoutSlotLabels(config, actionConfig.week)
         }
     } catch (error) {
-        console.error(
-            `Error loading edit week ${actionConfig.week} data:`,
+        logger.error(
+            `Error loading edit week ${actionConfig.week} data`,
+            undefined,
             error
         )
         return {
@@ -447,7 +449,11 @@ export async function updateEditWeekRosters(
             `Week ${actionConfig.week} rosters saved successfully.`
         )
     } catch (error) {
-        console.error(`Error saving week ${actionConfig.week} rosters:`, error)
+        logger.error(
+            `Error saving week ${actionConfig.week} rosters`,
+            undefined,
+            error
+        )
         return fail(
             `Something went wrong while saving week ${actionConfig.week} rosters.`
         )

@@ -521,7 +521,7 @@ export async function submitSeasonPayment(
             message: "Payment processing failed. Please try again."
         }
     } catch (error) {
-        console.error("Payment error:", error)
+        logger.error("Payment error", undefined, error)
         return {
             status: false,
             message:
@@ -711,7 +711,7 @@ export async function submitFreeSignup(
                 "Registration complete! You are now registered for the season."
         }
     } catch (error) {
-        console.error("Free signup error:", error)
+        logger.error("Free signup error", undefined, error)
         return {
             status: false,
             message:

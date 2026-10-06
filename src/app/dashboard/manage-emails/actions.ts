@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import {
@@ -722,7 +723,7 @@ export async function getAssignableAdmins(): Promise<AssignableAdmin[]> {
 
         return result.sort((a, b) => a.name.localeCompare(b.name))
     } catch (error) {
-        console.error("Error fetching assignable admins:", error)
+        logger.error("Error fetching assignable admins", undefined, error)
         return []
     }
 }

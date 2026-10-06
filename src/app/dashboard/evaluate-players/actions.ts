@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
@@ -212,7 +213,7 @@ export const getNewPlayers = withAction(
                 seasonLabel
             })
         } catch (error) {
-            console.error("Error fetching new players:", error)
+            logger.error("Error fetching new players", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -293,7 +294,7 @@ export const saveEvaluations = withAction(
             revalidatePath("/dashboard/evaluate-players")
             return ok(undefined, "Evaluations saved successfully.")
         } catch (error) {
-            console.error("Error saving evaluations:", error)
+            logger.error("Error saving evaluations", undefined, error)
             return fail("Failed to save evaluations.")
         }
     }

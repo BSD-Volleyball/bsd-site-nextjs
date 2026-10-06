@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
@@ -140,7 +141,7 @@ export const getUserDetails = withAction(
 
             return ok(user as UserDetails)
         } catch (error) {
-            console.error("Error fetching user details:", error)
+            logger.error("Error fetching user details", undefined, error)
             return fail("Failed to load user details.")
         }
     }
@@ -204,7 +205,11 @@ export const createPlayerPictureUpload = withAction(
 
             return ok({ uploadUrl, pictureFilename })
         } catch (error) {
-            console.error("Error creating player picture upload URL:", error)
+            logger.error(
+                "Error creating player picture upload URL",
+                undefined,
+                error
+            )
             return fail("Failed to start picture upload.")
         }
     }
@@ -275,7 +280,11 @@ export const finalizePlayerPictureUpload = withAction(
             revalidatePath("/dashboard/edit-player")
             return ok({ picturePath }, "Player picture uploaded.")
         } catch (error) {
-            console.error("Error finalizing player picture upload:", error)
+            logger.error(
+                "Error finalizing player picture upload",
+                undefined,
+                error
+            )
             return fail("Failed to finalize picture upload.")
         }
     }
@@ -452,7 +461,7 @@ export const updateUser = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "User updated successfully.")
         } catch (error) {
-            console.error("Error updating user:", error)
+            logger.error("Error updating user", undefined, error)
             return fail("Failed to update user.")
         }
     }
@@ -521,7 +530,7 @@ export const getSignupForCurrentSeason = withAction(
                 created_at: signup.created_at
             })
         } catch (error) {
-            console.error("Error fetching signup:", error)
+            logger.error("Error fetching signup", undefined, error)
             return fail("Failed to load signup.")
         }
     }
@@ -637,7 +646,7 @@ export const updateSignup = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Signup updated successfully.")
         } catch (error) {
-            console.error("Error updating signup:", error)
+            logger.error("Error updating signup", undefined, error)
             return fail("Failed to update signup.")
         }
     }

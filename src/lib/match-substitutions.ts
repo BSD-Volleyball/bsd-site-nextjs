@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger"
 import "server-only"
 
 import { and, eq } from "drizzle-orm"
@@ -177,7 +178,7 @@ export async function insertMatchSubstitution(
             .returning({ id: matchSubstitutions.id })
         insertedId = inserted[0].id
     } catch (err) {
-        console.error("Failed to record match substitution:", err)
+        logger.error("Failed to record match substitution", undefined, err)
         return { ok: false, message: "Failed to record substitution." }
     }
 

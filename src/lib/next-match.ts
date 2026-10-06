@@ -5,6 +5,7 @@
  * (e.g. self-only, admin, or friendship) before invoking them.
  */
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import {
     teams,
@@ -371,7 +372,7 @@ export async function getScheduleSummaries(
             })
         }
     } catch (error) {
-        console.error("Error fetching schedule summaries:", error)
+        logger.error("Error fetching schedule summaries", undefined, error)
     }
     return result
 }

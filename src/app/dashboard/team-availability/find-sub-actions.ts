@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
@@ -1134,7 +1135,7 @@ export async function lockInPermanentSub(input: {
             return inserted[0].id
         })
     } catch (err) {
-        console.error("Failed to lock in permanent sub:", err)
+        logger.error("Failed to lock in permanent sub", undefined, err)
         return fail("Failed to record substitution.")
     }
 

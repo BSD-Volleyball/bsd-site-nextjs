@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -465,7 +466,7 @@ export const getCreateWeek1Data = withAction(
                 groups
             })
         } catch (error) {
-            console.error("Error loading create week 1 data:", error)
+            logger.error("Error loading create week 1 data", undefined, error)
             return fail("Something went wrong while loading data.")
         }
     }
@@ -585,7 +586,7 @@ export const saveWeek1Rosters = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Week 1 rosters saved successfully.")
         } catch (error) {
-            console.error("Error saving week 1 rosters:", error)
+            logger.error("Error saving week 1 rosters", undefined, error)
             return fail("Something went wrong while saving week 1 rosters.")
         }
     }

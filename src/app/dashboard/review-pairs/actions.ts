@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -303,7 +304,7 @@ export const getSeasonPairs = withAction(
                 seasonLabel
             })
         } catch (error) {
-            console.error("Error fetching season pairs:", error)
+            logger.error("Error fetching season pairs", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -363,7 +364,7 @@ export const bustMatchedPair = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Pair has been split.")
         } catch (error) {
-            console.error("Error busting matched pair:", error)
+            logger.error("Error busting matched pair", undefined, error)
             return fail("Failed to split pair.")
         }
     }
@@ -415,7 +416,7 @@ export const bustUnmatchedPair = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Pair request has been removed.")
         } catch (error) {
-            console.error("Error busting unmatched pair:", error)
+            logger.error("Error busting unmatched pair", undefined, error)
             return fail("Failed to remove pair request.")
         }
     }
@@ -518,7 +519,7 @@ export const completeUnmatchedPair = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Pair has been completed.")
         } catch (error) {
-            console.error("Error completing unmatched pair:", error)
+            logger.error("Error completing unmatched pair", undefined, error)
             return fail("Failed to complete pair.")
         }
     }
@@ -640,7 +641,7 @@ export const assignPairPartner = withAction(
             revalidateCalendarFeeds()
             return ok(undefined, "Pair has been assigned.")
         } catch (error) {
-            console.error("Error assigning pair partner:", error)
+            logger.error("Error assigning pair partner", undefined, error)
             return fail("Failed to assign pair.")
         }
     }

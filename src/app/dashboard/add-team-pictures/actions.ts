@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { and, asc, desc, eq } from "drizzle-orm"
@@ -175,7 +176,11 @@ export const getTeamsForPicturePage = withAction(
             if (error instanceof ActionError) {
                 return fail(error.message)
             }
-            console.error("Error loading teams for picture page:", error)
+            logger.error(
+                "Error loading teams for picture page",
+                undefined,
+                error
+            )
             return fail("Failed to load teams.")
         }
     }
@@ -235,7 +240,11 @@ export const createTeamPhotoUpload = withAction(
             if (error instanceof ActionError) {
                 return fail(error.message)
             }
-            console.error("Error creating team photo upload URL:", error)
+            logger.error(
+                "Error creating team photo upload URL",
+                undefined,
+                error
+            )
             return fail("Failed to start upload.")
         }
     }
@@ -298,7 +307,7 @@ export const finalizeTeamPhotoUpload = withAction(
             if (error instanceof ActionError) {
                 return fail(error.message)
             }
-            console.error("Error finalizing team photo upload:", error)
+            logger.error("Error finalizing team photo upload", undefined, error)
             return fail("Failed to save team photo.")
         }
     }

@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -246,8 +247,9 @@ export const getCreateTeamsData = withAction(
                     emailSubject = template.subject || ""
                 }
             } catch (templateError) {
-                console.error(
-                    "Error fetching captains selected template:",
+                logger.error(
+                    "Error fetching captains selected template",
+                    undefined,
                     templateError
                 )
             }
@@ -266,7 +268,7 @@ export const getCreateTeamsData = withAction(
                 existingTeamsByDivision
             })
         } catch (error) {
-            console.error("Error fetching create teams data:", error)
+            logger.error("Error fetching create teams data", undefined, error)
             return fail("Something went wrong.")
         }
     }
@@ -572,7 +574,7 @@ export const createTeams = withAction(
                 `Successfully ${isUpdate ? "updated" : "created"} teams!`
             )
         } catch (error) {
-            console.error("Error saving teams:", error)
+            logger.error("Error saving teams", undefined, error)
             return fail("Something went wrong while saving teams.")
         }
     }

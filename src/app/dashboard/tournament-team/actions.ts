@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { formatPlayerName } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
@@ -368,7 +369,7 @@ export const addPlayerToRoster = withAction(
                     )
             })
         } catch (e) {
-            console.error("addPlayerToRoster failed:", e)
+            logger.error("addPlayerToRoster failed", undefined, e)
             return fail("Could not add player.")
         }
 

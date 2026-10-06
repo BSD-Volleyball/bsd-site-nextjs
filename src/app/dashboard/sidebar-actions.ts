@@ -117,7 +117,7 @@ async function getRecentSeasonsNav(): Promise<SeasonNavItem[]> {
                 divisions: divisionsBySeasonId.get(s.id) || []
             }))
     } catch (error) {
-        console.error("Error fetching recent seasons nav:", error)
+        logger.error("Error fetching recent seasons nav", undefined, error)
         return []
     }
 }
@@ -155,7 +155,7 @@ async function getRecentTournamentsNav(): Promise<
             .orderBy(desc(tournaments.id))
             .limit(1)
     } catch (error) {
-        console.error("Error fetching recent tournaments nav:", error)
+        logger.error("Error fetching recent tournaments nav", undefined, error)
         return []
     }
 }

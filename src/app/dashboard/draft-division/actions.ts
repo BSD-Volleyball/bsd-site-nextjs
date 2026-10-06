@@ -1,5 +1,6 @@
 "use server"
 
+import { logger } from "@/lib/logger"
 import { auth } from "@/lib/auth"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { headers } from "next/headers"
@@ -1074,9 +1075,9 @@ export const submitDraft = withAction(
                 for (const teamId of draftedTeamIds) {
                     ensureTeamRecipientGroup(teamId, config.seasonId).catch(
                         (err) =>
-                            console.error(
+                            logger.error(
                                 "[draft] Team recipient group sync failed",
-                                teamId,
+                                { teamId },
                                 err
                             )
                     )
@@ -1093,7 +1094,7 @@ export const submitDraft = withAction(
         } catch (error) {
             // Kept (not redundant): preserves this action's distinct
             // user-facing failure message instead of withAction's generic one.
-            console.error("Error submitting draft:", error)
+            logger.error("Error submitting draft", undefined, error)
             return fail("Something went wrong while submitting the draft.")
         }
     }
