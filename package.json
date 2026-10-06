@@ -67,7 +67,7 @@
         "jsqr": "^1.4.0",
         "lexical": "^0.43.0",
         "motion": "^12.43.0",
-        "next": "16.2.4",
+        "next": "16.3.8",
         "next-themes": "0.4.6",
         "nextjs-toploader": "^3.9.17",
         "pdf-lib": "^1.17.1",
