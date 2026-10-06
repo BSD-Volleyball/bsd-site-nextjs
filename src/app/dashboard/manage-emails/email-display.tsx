@@ -77,7 +77,7 @@ export function FromDisplay({
                     {userId ? (
                         <button
                             type="button"
-                            className="font-medium underline hover:no-underline"
+                            className="relative font-medium underline hover:no-underline"
                             onClick={(e) => {
                                 e.stopPropagation()
                                 onPlayerClick(userId)
@@ -93,7 +93,7 @@ export function FromDisplay({
             )}
             <a
                 href={mailtoHref}
-                className="underline hover:no-underline"
+                className="relative underline hover:no-underline"
                 onClick={(e) => e.stopPropagation()}
             >
                 {email}
@@ -122,7 +122,7 @@ export function StatusBadge({ status }: { status: string }) {
     )
 }
 
-/** The always-visible summary row inside the card's collapsible trigger. */
+/** The always-visible summary row, under the card's stretched collapsible trigger. */
 export function EmailCardSummary({
     email,
     expanded,

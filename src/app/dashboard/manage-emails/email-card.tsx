@@ -279,18 +279,24 @@ export function EmailCard({
     return (
         <Collapsible open={expanded} onOpenChange={handleToggle}>
             <div ref={cardRef} className="rounded-lg border bg-card">
-                <CollapsibleTrigger asChild>
-                    <button
-                        type="button"
-                        className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-muted/40"
-                    >
-                        <EmailCardSummary
-                            email={email}
-                            expanded={expanded}
-                            onPlayerClick={onPlayerClick}
+                {/* The trigger is stretched over the summary row rather than
+                    wrapping it: the row holds its own controls (player name,
+                    mailto link), and a button may not contain interactive
+                    content. Those controls are positioned to sit above it. */}
+                <div className="relative flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-muted/40">
+                    <CollapsibleTrigger asChild>
+                        <button
+                            type="button"
+                            aria-label={`${expanded ? "Collapse" : "Expand"} email #${email.id}: ${email.subject}`}
+                            className="absolute inset-0"
                         />
-                    </button>
-                </CollapsibleTrigger>
+                    </CollapsibleTrigger>
+                    <EmailCardSummary
+                        email={email}
+                        expanded={expanded}
+                        onPlayerClick={onPlayerClick}
+                    />
+                </div>
 
                 <CollapsibleContent>
                     <div className="space-y-4 border-t px-4 pt-4 pb-4">
