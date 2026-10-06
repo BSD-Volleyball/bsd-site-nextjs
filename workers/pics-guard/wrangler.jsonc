@@ -1,0 +1,28 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "bsd-pics-guard",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-09-11",
+    // Only these prefixes run the Worker; every other picture is served by
+    // the R2 custom domain directly (no Worker invocation, no cost).
+    "routes": [
+        {
+            "pattern": "pics.bumpsetdrink.com/email-attachments/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/inbound-spool/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/scoresheet-samples/*",
+            "zone_name": "bumpsetdrink.com"
+        },
+        {
+            "pattern": "pics.bumpsetdrink.com/sponsorlogos/*",
+            "zone_name": "bumpsetdrink.com"
+        }
+    ],
+    "r2_buckets": [{ "binding": "PICS", "bucket_name": "bsd" }],
+    "observability": { "enabled": true }
+}

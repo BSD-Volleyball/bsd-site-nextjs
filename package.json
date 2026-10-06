@@ -26,6 +26,10 @@
         "worker:check-types": "pnpm --dir workers/postmark-inbound check-types",
         "worker:test": "pnpm --dir workers/postmark-inbound test",
         "worker:deploy": "pnpm --dir workers/postmark-inbound deploy",
+        "pics-guard:install": "pnpm --dir workers/pics-guard install --frozen-lockfile",
+        "pics-guard:check-types": "pnpm --dir workers/pics-guard check-types",
+        "pics-guard:test": "pnpm --dir workers/pics-guard test",
+        "pics-guard:deploy": "pnpm --dir workers/pics-guard deploy",
         "format": "biome check --write"
     },
     "dependencies": {

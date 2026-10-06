@@ -68,6 +68,12 @@ jobs:
           pnpm worker:check-types
           pnpm worker:test
 
+      - name: Pics guard Worker (types + tests)
+        run: |
+          pnpm pics-guard:install
+          pnpm pics-guard:check-types
+          pnpm pics-guard:test
+
       - name: Build
         run: pnpm build
         env:
