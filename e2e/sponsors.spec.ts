@@ -22,6 +22,18 @@ test.beforeAll(async () => {
         .select({ id: users.id })
         .from(users)
         .where(eq(users.email, PERSONAS.player.email))
+    // A failed test makes Playwright restart the worker and run this hook
+    // again, so clear any Bravo Bakery left by the previous attempt first:
+    // the dashboard shows the newest sponsorship for the contact, and a
+    // second, unpaid one would hide the paid card (CI, 2026-10-06).
+    const stale = await db
+        .select({ id: sponsors.id })
+        .from(sponsors)
+        .where(eq(sponsors.name, "Bravo Bakery"))
+    for (const row of stale) {
+        await db.delete(sponsorships).where(eq(sponsorships.sponsor_id, row.id))
+        await db.delete(sponsors).where(eq(sponsors.id, row.id))
+    }
     const [sponsor] = await db
         .insert(sponsors)
         .values({

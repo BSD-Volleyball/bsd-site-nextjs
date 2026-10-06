@@ -2,11 +2,12 @@
 
 import { SignedIn, SignedOut } from "@daveyplate/better-auth-ui"
 import Link from "next/link"
+import { Hydrated } from "@/components/hydrated"
 import { Button } from "@/components/ui/button"
 
 export function NavDesktopAuthButtons() {
     return (
-        <>
+        <Hydrated>
             <SignedOut>
                 <Button asChild size="sm" variant="outline" className="ml-2">
                     <Link href="/auth/sign-in?redirectTo=/dashboard">
@@ -28,7 +29,7 @@ export function NavDesktopAuthButtons() {
                     <Link href="/dashboard">Dashboard</Link>
                 </Button>
             </SignedIn>
-        </>
+        </Hydrated>
     )
 }
 
@@ -38,7 +39,7 @@ export function NavMobileAuthButtons({
     onNavigate: () => void
 }) {
     return (
-        <>
+        <Hydrated>
             <SignedOut>
                 <Button
                     asChild
@@ -70,6 +71,6 @@ export function NavMobileAuthButtons({
                     <Link href="/dashboard">Dashboard</Link>
                 </Button>
             </SignedIn>
-        </>
+        </Hydrated>
     )
 }

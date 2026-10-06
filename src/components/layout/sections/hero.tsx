@@ -7,6 +7,7 @@ import {
     RiTrophyLine
 } from "@remixicon/react"
 import Link from "next/link"
+import { Hydrated } from "@/components/hydrated"
 import { Button } from "@/components/ui/button"
 
 interface HeroSectionProps {
@@ -35,19 +36,21 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
                         new people, and have fun!
                     </p>
 
-                    <SignedOut>
-                        <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
-                            <p className="mb-3 font-bold text-lg">
-                                Played with us before? You already have an
-                                account!
-                            </p>
-                            <Button asChild size="lg">
-                                <Link href="/auth/forgot-password">
-                                    Set Password
-                                </Link>
-                            </Button>
-                        </div>
-                    </SignedOut>
+                    <Hydrated>
+                        <SignedOut>
+                            <div className="mx-auto max-w-xl rounded-lg border-2 border-primary/30 bg-primary/5 px-6 py-4 text-center">
+                                <p className="mb-3 font-bold text-lg">
+                                    Played with us before? You already have an
+                                    account!
+                                </p>
+                                <Button asChild size="lg">
+                                    <Link href="/auth/forgot-password">
+                                        Set Password
+                                    </Link>
+                                </Button>
+                            </div>
+                        </SignedOut>
+                    </Hydrated>
 
                     <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
                         <Button
@@ -62,18 +65,20 @@ export const HeroSection = ({ seasonLabel }: HeroSectionProps) => {
                             </Link>
                         </Button>
 
-                        <SignedOut>
-                            <Button
-                                asChild
-                                size="lg"
-                                className="group/arrow rounded-full"
-                            >
-                                <Link href="/auth/sign-up">
-                                    Register Now
-                                    <RiArrowRightLine className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
-                                </Link>
-                            </Button>
-                        </SignedOut>
+                        <Hydrated>
+                            <SignedOut>
+                                <Button
+                                    asChild
+                                    size="lg"
+                                    className="group/arrow rounded-full"
+                                >
+                                    <Link href="/auth/sign-up">
+                                        Register Now
+                                        <RiArrowRightLine className="ml-2 size-5 transition-transform group-hover/arrow:translate-x-1" />
+                                    </Link>
+                                </Button>
+                            </SignedOut>
+                        </Hydrated>
 
                         <Button
                             asChild
