@@ -18,10 +18,7 @@ import {
     requireSeasonConfig
 } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
-import {
-    hasPermissionBySession,
-    isAdminOrDirectorBySession
-} from "@/next/session"
+import { hasPermissionBySession } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 
 type MatchWorked = {
@@ -60,11 +57,7 @@ export const getRefCompensationData = withAction(
     async (): Promise<ActionResult<CompensationData>> => {
         await requireSession()
 
-        const [canManage, isAdmin] = await Promise.all([
-            hasPermissionBySession("schedule:manage"),
-            isAdminOrDirectorBySession()
-        ])
-        if (!canManage && !isAdmin) {
+        if (!(await hasPermissionBySession("schedule:manage"))) {
             return ok({
                 seasonLabel: "",
                 certifiedRate: "0",

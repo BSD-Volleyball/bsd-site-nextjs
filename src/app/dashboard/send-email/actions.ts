@@ -20,7 +20,10 @@ import {
     isCommissionerBySession,
     getSessionUserId
 } from "@/next/session"
-import { getCommissionerDivisionScope } from "@/lib/rbac"
+import {
+    commissionerCanWriteDivision,
+    getCommissionerDivisionScope
+} from "@/lib/rbac"
 import { site } from "@/config/site"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
@@ -342,6 +345,43 @@ function shouldCcDirectors(
     return isAdmin ? input.ccDirectors === true : true
 }
 
+/**
+ * A commissioner may only send to a division or team they oversee this
+ * season. getEmailFormData filters the dropdowns the same way, but the
+ * action is callable directly with any ids. Returns an error message, or
+ * null when the target is allowed.
+ */
+async function commissionerTargetError(
+    userId: string,
+    seasonId: number | null,
+    input: SendBroadcastInput
+): Promise<string | null> {
+    if (input.sendToType === "just_me") return null
+    if (!seasonId) return "No active season."
+
+    let divisionId: number | undefined
+    if (input.sendToType === "division") {
+        divisionId = input.divisionId
+    } else if (input.sendToType === "team") {
+        if (!input.teamId) return "Team is required."
+        const [teamRow] = await db
+            .select({ division: teams.division, season: teams.season })
+            .from(teams)
+            .where(eq(teams.id, input.teamId))
+            .limit(1)
+        if (!teamRow || teamRow.season !== seasonId) return "Team not found."
+        divisionId = teamRow.division
+    } else {
+        return "Unauthorized."
+    }
+
+    if (!divisionId) return "Division is required."
+    if (!(await commissionerCanWriteDivision(userId, seasonId, divisionId))) {
+        return "Unauthorized: you can only email your own divisions."
+    }
+    return null
+}
+
 /** Resolves/creates the recipient group and infers the stream from sendToType. */
 async function resolveGroup(
     sendToType: SendToType,
@@ -529,11 +569,13 @@ async function resolveGroup(
     // team
     if (!teamId) throw new Error("Team is required.")
     const [teamRow] = await db
-        .select({ name: teams.name })
+        .select({ name: teams.name, season: teams.season })
         .from(teams)
         .where(eq(teams.id, teamId))
         .limit(1)
-    if (!teamRow) throw new Error("Team not found.")
+    if (!teamRow || teamRow.season !== seasonId) {
+        throw new Error("Team not found.")
+    }
     const groupId = await ensureRecipientGroup("season_team", {
         seasonId,
         teamId,
@@ -648,6 +690,15 @@ export const createAndSendBroadcast = withAction(
         }
 
         const config = await getSeasonConfig()
+
+        if (!isAdmin) {
+            const targetError = await commissionerTargetError(
+                session.user.id,
+                config.seasonId ?? null,
+                input
+            )
+            if (targetError) return fail(targetError)
+        }
 
         const resolved = await resolveBroadcastTemplate(config, input)
         if ("error" in resolved) return fail(resolved.error)
@@ -789,7 +840,7 @@ export const previewBroadcast = withAction(
     async (
         input: SendBroadcastInput
     ): Promise<ActionResult<BroadcastPreview>> => {
-        await requireSession()
+        const session = await requireSession()
         const isAdmin = await isAdminOrDirectorBySession()
         const isCommissioner = await isCommissionerBySession()
         if (!isAdmin && !isCommissioner) return fail("Unauthorized.")
@@ -810,6 +861,15 @@ export const previewBroadcast = withAction(
         }
 
         const config = await getSeasonConfig()
+
+        if (!isAdmin) {
+            const targetError = await commissionerTargetError(
+                session.user.id,
+                config.seasonId ?? null,
+                input
+            )
+            if (targetError) return fail(targetError)
+        }
 
         const resolved = await resolveBroadcastTemplate(config, input)
         if ("error" in resolved) return fail(resolved.error)

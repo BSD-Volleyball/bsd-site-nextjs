@@ -1,7 +1,5 @@
-import { requireSessionOrRedirect } from "@/next/page-guards"
-import { redirect } from "next/navigation"
+import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { hasPermission, isAdminOrDirector } from "@/lib/rbac"
 import { getRefCompensationData } from "./actions"
 import { RefCompensationClient } from "./ref-compensation-client"
 import type { Metadata } from "next"
@@ -11,16 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function RefCompensationPage() {
-    const session = await requireSessionOrRedirect()
-
-    const [canManage, isAdmin] = await Promise.all([
-        hasPermission(session.user.id, "schedule:manage"),
-        isAdminOrDirector(session.user.id)
-    ])
-
-    if (!canManage && !isAdmin) {
-        redirect("/dashboard")
-    }
+    await requirePermissionOrRedirect("schedule:manage")
 
     const result = await getRefCompensationData()
 

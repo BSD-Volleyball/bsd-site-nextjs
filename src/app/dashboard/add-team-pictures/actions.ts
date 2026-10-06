@@ -29,17 +29,26 @@ function teamPhotoObjectKey(seasonId: number, teamId: number): string {
     return `${TEAM_PHOTO_PREFIX}/${seasonId}/team${teamId}.jpg`
 }
 
-// Confirm a team exists and belongs to the active season before mutating it.
-async function teamBelongsToSeason(
+// Confirm a team exists in the season and that the caller's pictures:manage
+// covers its division (a division-scoped commissioner may only touch their
+// own teams). Returns false when the team is not in the season; throws
+// ActionError("Unauthorized.") when it is out of the caller's scope.
+async function canManageTeamPhoto(
     teamId: number,
-    seasonId: number
+    seasonId: number,
+    currentSeasonId: number
 ): Promise<boolean> {
     const [row] = await db
-        .select({ id: teams.id })
+        .select({ division: teams.division })
         .from(teams)
         .where(and(eq(teams.id, teamId), eq(teams.season, seasonId)))
         .limit(1)
-    return !!row
+    if (!row) return false
+    await requirePermission("pictures:manage", {
+        seasonId: currentSeasonId,
+        divisionId: row.division
+    })
+    return true
 }
 
 /**
@@ -209,7 +218,9 @@ export async function createTeamPhotoUpload(
             }
         }
 
-        if (!(await teamBelongsToSeason(validTeamId, seasonId))) {
+        if (
+            !(await canManageTeamPhoto(validTeamId, seasonId, config.seasonId))
+        ) {
             return {
                 status: false,
                 message: "Team not found for this season."
@@ -255,7 +266,9 @@ export async function finalizeTeamPhotoUpload(
             return { status: false, message: "Invalid upload reference." }
         }
 
-        if (!(await teamBelongsToSeason(validTeamId, seasonId))) {
+        if (
+            !(await canManageTeamPhoto(validTeamId, seasonId, config.seasonId))
+        ) {
             return {
                 status: false,
                 message: "Team not found for this season."

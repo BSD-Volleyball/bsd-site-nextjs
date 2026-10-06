@@ -42,7 +42,10 @@ const getUserRoleRows = cache(
 /**
  * Returns true if the user holds any role that grants the requested permission.
  *
- * context.seasonId — when provided, role rows must match this season (or be global).
+ * context.seasonId — season-bound role rows must match this season; global
+ *                    rows (season_id IS NULL) always match. Defaults to the
+ *                    current season: a role granted for one season must not
+ *                    keep granting its permissions in every later one.
  * context.divisionId — when provided, role rows must be league-wide (division_id IS NULL)
  *                      OR match this specific division.
  */
@@ -53,12 +56,16 @@ export async function hasPermission(
 ): Promise<boolean> {
     const rows = await getUserRoleRows(userId)
 
+    let seasonId = context?.seasonId
+    if (seasonId === undefined && rows.some((r) => r.season_id !== null)) {
+        seasonId = (await getSeasonConfig()).seasonId || undefined
+    }
+
     for (const row of rows) {
         // Season filter: global roles (season_id = null) always match;
-        // season-bound roles only match the requested season.
-        if (context?.seasonId !== undefined && row.season_id !== null) {
-            if (row.season_id !== context.seasonId) continue
-        }
+        // season-bound roles only match the requested (or current) season,
+        // and match nothing when there is no current season.
+        if (row.season_id !== null && row.season_id !== seasonId) continue
 
         // Division filter: league-wide roles (division_id = null) always match;
         // division-bound roles only match the requested division.

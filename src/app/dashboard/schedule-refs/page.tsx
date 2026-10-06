@@ -1,11 +1,6 @@
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
-import {
-    isAdminOrDirectorBySession,
-    hasPermissionBySession
-} from "@/next/session"
 import { getScheduleRefsData, getMatchesAndRefsForDate } from "./actions"
 import { ScheduleRefsClient } from "./schedule-refs-client"
 import type { Metadata } from "next"
@@ -17,16 +12,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function ScheduleRefsPage() {
-    await requireSessionOrRedirect()
-
-    const [hasPermission, isAdmin] = await Promise.all([
-        hasPermissionBySession("schedule:manage"),
-        isAdminOrDirectorBySession()
-    ])
-
-    if (!hasPermission && !isAdmin) {
-        redirect("/dashboard")
-    }
+    await requirePermissionOrRedirect("schedule:manage")
 
     const result = await getScheduleRefsData()
 

@@ -1068,3 +1068,87 @@ describe("createAndSendBroadcast — CC directors", () => {
         ).toBe(1)
     })
 })
+
+describe("createAndSendBroadcast — commissioner division scope", () => {
+    it("lets a division commissioner email their own division", async () => {
+        const season = await createSeason()
+        const mine = await createDivision({ name: "Mine" })
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: mine.id }
+        ])
+
+        const result = await previewBroadcast({
+            sendToType: "division",
+            divisionId: mine.id,
+            subject: "Hello",
+            lexicalContent: EMPTY_BODY
+        })
+        expect(result.status).toBe(true)
+    })
+
+    it("refuses another division", async () => {
+        const season = await createSeason()
+        const mine = await createDivision({ name: "Mine" })
+        const theirs = await createDivision({ name: "Theirs", level: 2 })
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: mine.id }
+        ])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "division",
+            divisionId: theirs.id,
+            subject: "Hello",
+            lexicalContent: EMPTY_BODY
+        })
+        expect(result).toMatchObject({
+            status: false,
+            message: "Unauthorized: you can only email your own divisions."
+        })
+        expect(sendBatchEmails).not.toHaveBeenCalled()
+    })
+
+    it("refuses a team in another division", async () => {
+        const season = await createSeason()
+        const mine = await createDivision({ name: "Mine" })
+        const theirs = await createDivision({ name: "Theirs", level: 2 })
+        const captain = await createUser()
+        const team = await createTeam({
+            season: season.id,
+            captain: captain.id,
+            division: theirs.id
+        })
+        await createUserWithRoles([
+            { role: "commissioner", seasonId: season.id, divisionId: mine.id }
+        ])
+
+        const result = await previewBroadcast({
+            sendToType: "team",
+            teamId: team.id,
+            subject: "Hello",
+            lexicalContent: EMPTY_BODY
+        })
+        expect(result.status).toBe(false)
+    })
+
+    it("refuses a team from a past season, even for admins", async () => {
+        const past = await createSeason({ year: 2024 })
+        await createSeason({ year: 2026 })
+        const division = await createDivision()
+        const captain = await createUser()
+        const oldTeam = await createTeam({
+            season: past.id,
+            captain: captain.id,
+            division: division.id
+        })
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await createAndSendBroadcast({
+            sendToType: "team",
+            teamId: oldTeam.id,
+            subject: "Hello",
+            lexicalContent: EMPTY_BODY
+        })
+        expect(result.status).toBe(false)
+        expect(sendBatchEmails).not.toHaveBeenCalled()
+    })
+})
