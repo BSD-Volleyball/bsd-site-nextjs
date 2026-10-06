@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -388,6 +389,7 @@ export const writeRegularSeasonSchedule = withAction(
             }
 
             revalidatePath("/dashboard/create-schedule")
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Successfully created ${allMatches.length} regular season matches across ${data.divisions.length} divisions!`
@@ -502,6 +504,7 @@ export const writePlayoffSchedule = withAction(
             }
 
             revalidatePath("/dashboard/create-schedule")
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Successfully created ${totalMatchesCreated} playoff matches across ${data.divisions.length} divisions!`

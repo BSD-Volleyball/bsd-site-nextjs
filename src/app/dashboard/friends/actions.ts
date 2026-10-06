@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { friendships, users } from "@/database/schema"
 import { and, eq } from "drizzle-orm"
 import {
@@ -156,6 +157,7 @@ export const sendFriendRequest = withAction(
                     )
                 )
             await notifyFriendAccepted(self, edge.requester)
+            revalidateCalendarFeeds()
             return ok({ autoAccepted: true }, "You're now friends!")
         }
 
@@ -169,6 +171,7 @@ export const sendFriendRequest = withAction(
             return fail("Request already pending.")
         }
         await notifyFriendRequest(self, target)
+        revalidateCalendarFeeds()
         return ok({ autoAccepted: false }, "Friend request sent.")
     }
 )
@@ -205,6 +208,7 @@ export const respondToFriendRequest = withAction(
         if (updated.length === 0) {
             return fail("Request not found.")
         }
+        revalidateCalendarFeeds()
 
         if (decision === "accept") {
             const self = await findUser(session.user.id)
@@ -237,6 +241,7 @@ export const cancelFriendRequest = withAction(
         if (updated.length === 0) {
             return fail("Request not found.")
         }
+        revalidateCalendarFeeds()
         return ok(undefined, "Friend request cancelled.")
     }
 )
@@ -267,6 +272,7 @@ export const removeFriend = withAction(
         if (updated.length === 0) {
             return fail("Friend not found.")
         }
+        revalidateCalendarFeeds()
         return ok(undefined, "Friend removed.")
     }
 )

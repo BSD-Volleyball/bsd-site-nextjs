@@ -1,6 +1,7 @@
 "use server"
 
 import { and, eq, inArray } from "drizzle-orm"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { db } from "@/database/db"
 import { seasonEvents, signups, userUnavailability } from "@/database/schema"
 import {
@@ -94,6 +95,9 @@ export const updatePlayerAvailability = withAction(
                 )
             }
         })
+        // Right after the commit, before the notifications: the feeds must
+        // refresh even if a notification below throws.
+        revalidateCalendarFeeds()
 
         await logAvailabilityChange({
             userId: session.user.id,
@@ -176,6 +180,7 @@ export const updateRefAvailability = withAction(
             context: "Ref availability"
         })
 
+        revalidateCalendarFeeds()
         return ok(undefined, "Your availability has been updated.")
     }
 )

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
 
 import { db } from "@/database/db"
@@ -458,6 +459,7 @@ export const assignVolunteer = withAction(
 
         revalidatePath("/dashboard/assign-tryout-jobs")
         revalidatePath("/dashboard")
+        revalidateCalendarFeeds()
         return ok()
     }
 )
@@ -501,6 +503,7 @@ export const unassignVolunteer = withAction(
 
         revalidatePath("/dashboard/assign-tryout-jobs")
         revalidatePath("/dashboard")
+        revalidateCalendarFeeds()
         return ok()
     }
 )

@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
     accounts,
     drafts,
@@ -424,6 +425,7 @@ export const mergeUsers = withAction(
             })
 
             revalidatePath("/dashboard/merge-users")
+            revalidateCalendarFeeds()
             return ok(undefined, "Users merged successfully.")
         } catch (error) {
             console.error("Error merging users:", error)

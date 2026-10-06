@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { logAuditEntry } from "@/lib/audit-log"
 import {
     matches,
@@ -938,6 +939,7 @@ export const saveRefAssignments = withAction(
 
         revalidatePath("/dashboard/schedule-refs")
         revalidatePath("/dashboard/reffing-schedule")
+        revalidateCalendarFeeds()
         return ok()
     }
 )

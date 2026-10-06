@@ -6,6 +6,7 @@ import {
     renderCalendarFromSnapshot
 } from "@/lib/calendar-snapshot"
 import { findUserIdByCalendarToken } from "@/lib/calendar-token"
+import { CALENDAR_FEED_TAG } from "@/next/calendar-invalidation"
 import { logger } from "@/lib/logger"
 import { getSeasonConfig } from "@/lib/site-config"
 
@@ -14,14 +15,23 @@ import { getSeasonConfig } from "@/lib/site-config"
 // cache keyed per feed proved useless here (2026-10-02): with twenty-odd
 // feeds each missing once an hour the Neon compute was still woken every
 // few minutes. The whole feed set is now served from ONE cached snapshot
-// (src/lib/calendar-snapshot.ts), rebuilt hourly, so all feeds together cost
-// one database read an hour. Rotating a token revalidates the tag so an old
+// (src/lib/calendar-snapshot.ts), rebuilt daily or on a tagged write, so all
+// feeds together cost one database read a day. Rotating a token revalidates the tag so an old
 // URL stops resolving at once. Lives in src/next because src/lib must not
 // import next/cache.
 // ---------------------------------------------------------------------------
 
-export const CALENDAR_FEED_TAG = "calendar-feeds"
+export { CALENDAR_FEED_TAG }
+
+/** CDN lifetime of a feed response (s-maxage); the CDN cannot be tagged. */
 export const CALENDAR_FEED_MAX_AGE_SECONDS = 3600
+/**
+ * Data-cache lifetime of the snapshot. In season the schedule barely moves
+ * day to day, and every write that changes a feed calls
+ * revalidateCalendarFeeds() (enforced by calendar-invalidation.test.ts), so
+ * the lifetime is a backstop rather than the refresh mechanism.
+ */
+export const CALENDAR_SNAPSHOT_TTL_SECONDS = 86400
 
 export interface CachedCalendarFeed {
     ics: string
@@ -46,7 +56,7 @@ export const getCachedCalendarSnapshot = unstable_cache(
         return snapshot
     },
     ["calendar-snapshot"],
-    { revalidate: CALENDAR_FEED_MAX_AGE_SECONDS, tags: [CALENDAR_FEED_TAG] }
+    { revalidate: CALENDAR_SNAPSHOT_TTL_SECONDS, tags: [CALENDAR_FEED_TAG] }
 )
 
 /** The pre-snapshot path: one live build for exactly this feed. */

@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { db } from "@/database/db"
 import {
@@ -339,6 +340,7 @@ export const saveDraftOrder = withAction(
                 summary: `Locked draft order for ${assignments.length} teams (division ${divisionId}, season ${seasonId})`
             })
 
+            revalidateCalendarFeeds()
             return ok(undefined, "Draft order locked.")
         } catch (error) {
             console.error("Error saving draft order:", error)

@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -587,6 +588,7 @@ export const saveWeek1Rosters = withAction(
                 })
             }
 
+            revalidateCalendarFeeds()
             return ok(undefined, "Week 1 rosters saved successfully.")
         } catch (error) {
             console.error("Error saving week 1 rosters:", error)

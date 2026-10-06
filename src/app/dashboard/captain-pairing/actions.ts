@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { signups } from "@/database/schema"
 import { eq, and } from "drizzle-orm"
 import {
@@ -101,6 +102,7 @@ export const updateSignupPreferences = withAction(
             summary: `Updated season preferences (captain=${preferences.captain}, pair=${pair}, ref=${refInterest}, tryoutHelp=${tryoutHelp})`
         })
 
+        revalidateCalendarFeeds()
         return ok(undefined, "Your preferences have been updated.")
     }
 )

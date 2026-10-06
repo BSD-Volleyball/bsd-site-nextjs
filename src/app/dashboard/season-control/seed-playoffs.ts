@@ -8,6 +8,7 @@ import {
 import { and, eq, isNotNull, or } from "drizzle-orm"
 import { rankDivision } from "@/lib/team-ranking"
 import { FOUR_TEAM_PLAYOFF, SIX_TEAM_PLAYOFF } from "@/lib/schedule-constants"
+// calendar-invalidation: handled by caller
 
 export interface SeedPlayoffsResult {
     status: boolean

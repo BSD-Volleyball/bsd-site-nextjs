@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { headers } from "next/headers"
 import { and, asc, desc, eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
@@ -278,6 +279,7 @@ export async function finalizeTeamPhotoUpload(
         }
 
         revalidatePath("/dashboard/add-team-pictures")
+        revalidateCalendarFeeds()
         return {
             status: true,
             message: "Team photo uploaded.",

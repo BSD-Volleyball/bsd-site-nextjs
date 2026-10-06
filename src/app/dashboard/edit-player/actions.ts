@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
     withAction,
     ok,
@@ -470,6 +471,7 @@ export const updateUser = withAction(
             }
 
             revalidatePath("/dashboard/edit-player")
+            revalidateCalendarFeeds()
             return ok(undefined, "User updated successfully.")
         } catch (error) {
             console.error("Error updating user:", error)
@@ -640,6 +642,7 @@ export const updateSignup = withAction(
             }
 
             revalidatePath("/dashboard/edit-player")
+            revalidateCalendarFeeds()
             return ok(undefined, "Signup updated successfully.")
         } catch (error) {
             console.error("Error updating signup:", error)
@@ -872,6 +875,7 @@ export const saveUserAvailability = withAction(
         )
 
         revalidatePath("/dashboard/edit-player")
+        revalidateCalendarFeeds()
         return ok(undefined, "Availability updated.")
     }
 )

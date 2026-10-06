@@ -1,6 +1,7 @@
 "use server"
 
 import { auth } from "@/lib/auth"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
@@ -1118,6 +1119,7 @@ export const submitDraft = withAction(
 
             await sendDraftResultNotifications(picks, config, divisionIds[0])
 
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Successfully submitted ${picks.length} draft picks!`

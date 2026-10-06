@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, fail } from "@/next/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getSessionUserId } from "@/next/session"
@@ -141,6 +142,10 @@ export const saveWeek3Rosters = withAction(
             return fail("Not authenticated.")
         }
 
-        return savePreseasonWeekRosters(3, assignments, userId)
+        const result = await savePreseasonWeekRosters(3, assignments, userId)
+        if (result.status) {
+            revalidateCalendarFeeds()
+        }
+        return result
     }
 )

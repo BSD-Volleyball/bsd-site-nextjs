@@ -17,7 +17,11 @@ import {
 // Lives in src/next because src/lib must not import next/cache.
 // ---------------------------------------------------------------------------
 
-export const PUBLIC_CACHE_SECONDS = 3600
+// A day, not an hour: every action that changes these rows revalidates the
+// tag, so the lifetime is only a backstop, and each expiry is a database
+// wake-up (measured 2026-10-06: the hourly expiries of these entries were the
+// bulk of the overnight starts once the calendar feeds were fixed).
+export const PUBLIC_CACHE_SECONDS = 86400
 
 export const SEASON_CONFIG_TAG = "season-config"
 export const TOURNAMENT_CONFIG_TAG = "tournament-config"

@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { formatPlayerName } from "@/lib/utils"
 import { db } from "@/database/db"
@@ -370,6 +371,7 @@ export const bustMatchedPair = withAction(
             })
 
             revalidatePath("/dashboard/review-pairs")
+            revalidateCalendarFeeds()
             return ok(undefined, "Pair has been split.")
         } catch (error) {
             console.error("Error busting matched pair:", error)
@@ -421,6 +423,7 @@ export const bustUnmatchedPair = withAction(
             })
 
             revalidatePath("/dashboard/review-pairs")
+            revalidateCalendarFeeds()
             return ok(undefined, "Pair request has been removed.")
         } catch (error) {
             console.error("Error busting unmatched pair:", error)
@@ -523,6 +526,7 @@ export const completeUnmatchedPair = withAction(
             })
 
             revalidatePath("/dashboard/review-pairs")
+            revalidateCalendarFeeds()
             return ok(undefined, "Pair has been completed.")
         } catch (error) {
             console.error("Error completing unmatched pair:", error)
@@ -636,6 +640,7 @@ export const assignPairPartner = withAction(
             })
 
             revalidatePath("/dashboard/review-pairs")
+            revalidateCalendarFeeds()
             return ok(undefined, "Pair has been assigned.")
         } catch (error) {
             console.error("Error assigning pair partner:", error)

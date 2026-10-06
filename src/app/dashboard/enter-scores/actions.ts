@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -909,6 +910,7 @@ export async function saveScoresForDivision(
         revalidatePath("/dashboard/schedule-refs")
         revalidatePath("/dashboard/reffing-schedule")
         revalidatePath("/dashboard/playoffs", "layout")
+        revalidateCalendarFeeds()
         return {
             status: true,
             message: `Saved scores for ${matchScores.length} match(es).`

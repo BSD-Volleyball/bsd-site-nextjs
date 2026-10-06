@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -185,6 +186,7 @@ export const createTeams = withAction(
             }
 
             revalidatePath("/dashboard/admin-create-teams")
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Successfully created ${teamsToCreate.length} teams!`

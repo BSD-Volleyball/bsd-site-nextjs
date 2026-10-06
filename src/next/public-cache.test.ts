@@ -51,19 +51,22 @@ describe("public-cache", () => {
             expect.arrayContaining([
                 {
                     keyParts: ["season-config"],
-                    options: { revalidate: 3600, tags: [mod.SEASON_CONFIG_TAG] }
+                    options: {
+                        revalidate: 86400,
+                        tags: [mod.SEASON_CONFIG_TAG]
+                    }
                 },
                 {
                     keyParts: ["tournament-config"],
                     options: {
-                        revalidate: 3600,
+                        revalidate: 86400,
                         tags: [mod.TOURNAMENT_CONFIG_TAG]
                     }
                 },
                 {
                     keyParts: ["public-sponsors"],
                     options: {
-                        revalidate: 3600,
+                        revalidate: 86400,
                         tags: [mod.PUBLIC_SPONSORS_TAG]
                     }
                 }

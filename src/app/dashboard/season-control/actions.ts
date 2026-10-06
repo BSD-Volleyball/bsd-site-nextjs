@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { playerPicBaseUrl } from "@/config/env"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath, revalidateTag } from "next/cache"
@@ -245,6 +246,7 @@ export const advanceSeasonPhase = withAction(
 
             revalidatePath("/dashboard/season-control")
             revalidateTag(SEASON_CONFIG_TAG, "max")
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Season advanced to "${PHASE_CONFIG[targetPhase].label}".${seedingSummary ?? ""}${championsSummary ?? ""}${resetSummary ?? ""}`
@@ -301,6 +303,7 @@ export const revertSeasonPhase = withAction(
 
             revalidatePath("/dashboard/season-control")
             revalidateTag(SEASON_CONFIG_TAG, "max")
+            revalidateCalendarFeeds()
             return ok(
                 undefined,
                 `Season reverted to "${PHASE_CONFIG[targetPhase].label}"`
@@ -476,6 +479,7 @@ export const createSeason = withAction(
             revalidatePath("/season-info")
             revalidatePath("/")
             revalidateTag(SEASON_CONFIG_TAG, "max")
+            revalidateCalendarFeeds()
 
             return ok(
                 { seasonId: newSeasonId },

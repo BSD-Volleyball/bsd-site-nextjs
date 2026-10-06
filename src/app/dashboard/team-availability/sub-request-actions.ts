@@ -13,6 +13,7 @@
  */
 
 import { and, eq, inArray, lt, ne, or, aliasedTable } from "drizzle-orm"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { db } from "@/database/db"
 import {
     matchSubstitutions,
@@ -556,6 +557,10 @@ export const respondToSubRequest = withAction(
             if (error instanceof ActionError) return fail(error.message)
             throw error
         }
+
+        // The substitution is committed; refresh the calendar feeds before
+        // the notifications so a mail failure cannot leave them stale.
+        revalidateCalendarFeeds()
 
         await logAuditEntry({
             userId: session.user.id,

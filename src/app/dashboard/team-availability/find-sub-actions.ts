@@ -1,6 +1,7 @@
 "use server"
 
 import { db } from "@/database/db"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
     users,
     teams,
@@ -1067,6 +1068,7 @@ export async function lockInPermanentSub(input: {
         summary: `Locked in permanent sub: ${subName} replaces ${originalName} on ${teamRow.name}${teamRow.number != null ? ` (#${teamRow.number})` : ""} for season ${config.seasonId} (performed by ${sessionUser.name ?? sessionUser.id})`
     })
 
+    revalidateCalendarFeeds()
     return ok({ substitutionId: insertedId })
 }
 
@@ -1114,6 +1116,7 @@ export async function lockInRegularSub(input: {
     })
     if (!result.ok) return fail(result.message)
 
+    revalidateCalendarFeeds()
     return ok({ matchSubstitutionId: result.id })
 }
 

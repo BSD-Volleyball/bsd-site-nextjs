@@ -1,6 +1,7 @@
 "use server"
 
 import { randomUUID } from "node:crypto"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { getSessionUser } from "@/next/session"
 import { db } from "@/database/db"
 import { signups, users, waitlist, userUnavailability } from "@/database/schema"
@@ -416,6 +417,7 @@ export async function submitSeasonPayment(
                 )
             }
 
+            revalidateCalendarFeeds()
             return {
                 status: true,
                 message:
@@ -618,6 +620,7 @@ export async function submitFreeSignup(
             }
         )
 
+        revalidateCalendarFeeds()
         return {
             status: true,
             message:

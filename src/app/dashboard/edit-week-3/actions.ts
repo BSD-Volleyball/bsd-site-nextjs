@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, fail } from "@/next/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getSessionUserId } from "@/next/session"
@@ -51,7 +52,11 @@ export const updateWeek3Rosters = withAction(
             return fail("Not authenticated.")
         }
 
-        return updateEditWeekRosters(EDIT_WEEK_3, slots, userId)
+        const result = await updateEditWeekRosters(EDIT_WEEK_3, slots, userId)
+        if (result.status) {
+            revalidateCalendarFeeds()
+        }
+        return result
     }
 )
 

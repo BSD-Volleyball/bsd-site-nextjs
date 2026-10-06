@@ -1,6 +1,7 @@
 "use server"
 
 import type { ActionResult } from "@/next/action-helpers"
+import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import {
     withAction,
     ok,
@@ -544,6 +545,7 @@ export const dropSignup = withAction(
                 })
 
                 revalidatePath("/dashboard/admin-view-signups")
+                revalidateCalendarFeeds()
                 return ok(
                     { stage: "post_draft" },
                     "Player marked as dropped. Their signup and roster slot are kept until a permanent sub is locked in."
@@ -611,6 +613,7 @@ export const dropSignup = withAction(
             })
 
             revalidatePath("/dashboard/admin-view-signups")
+            revalidateCalendarFeeds()
             return ok({ stage: "pre_draft" }, "Signup dropped.")
         } catch (error) {
             console.error("Error dropping signup:", error)
@@ -680,6 +683,7 @@ export const restoreDrop = withAction(
                 })
 
                 revalidatePath("/dashboard/admin-view-signups")
+                revalidateCalendarFeeds()
                 return ok(undefined, "Drop restored.")
             }
 
@@ -783,6 +787,7 @@ export const restoreDrop = withAction(
             })
 
             revalidatePath("/dashboard/admin-view-signups")
+            revalidateCalendarFeeds()
             return ok(undefined, "Drop restored. The signup is live again.")
         } catch (error) {
             console.error("Error restoring drop:", error)
