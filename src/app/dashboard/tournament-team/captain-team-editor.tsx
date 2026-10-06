@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useId, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,13 +20,30 @@ interface Props {
 }
 
 export function CaptainTeamEditor({ view }: Props) {
-    const router = useRouter()
-    const [busy, setBusy] = useState(false)
+    const uid = useId()
     const [division, setDivision] = useState<number>(
         view.team.preferredDivisionId
     )
     const [search, setSearch] = useState("")
     const [teamName, setTeamName] = useState(view.team.name)
+
+    const saveName = useAction(updateTeamName, {
+        success: "Team name updated.",
+        onError: () => setTeamName(view.team.name)
+    })
+    const saveDivision = useAction(updatePreferredDivision, {
+        success: "Preferred division updated.",
+        onError: () => setDivision(view.team.preferredDivisionId)
+    })
+    const remove = useAction(removePlayerFromRoster, {
+        success: "Player removed."
+    })
+    const add = useAction(addPlayerToRoster, { success: "Player added." })
+    const busy =
+        saveName.pending ||
+        saveDivision.pending ||
+        remove.pending ||
+        add.pending
 
     const locked = view.rosterLocked
     const males = view.roster.filter((r) => r.male === true).length
@@ -41,54 +58,20 @@ export function CaptainTeamEditor({ view }: Props) {
             return
         }
         if (trimmed === view.team.name) return
-        setBusy(true)
-        const result = await updateTeamName(trimmed)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            setTeamName(view.team.name)
-            return
-        }
-        toast.success("Team name updated.")
-        router.refresh()
+        await saveName.run(trimmed)
     }
 
     async function handleDivisionChange(newId: number) {
         setDivision(newId)
-        setBusy(true)
-        const result = await updatePreferredDivision(newId)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            setDivision(view.team.preferredDivisionId)
-            return
-        }
-        toast.success("Preferred division updated.")
-        router.refresh()
+        await saveDivision.run(newId)
     }
 
     async function handleRemove(userId: string) {
-        setBusy(true)
-        const result = await removePlayerFromRoster(userId)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success("Player removed.")
-        router.refresh()
+        await remove.run(userId)
     }
 
     async function handleAdd(userId: string) {
-        setBusy(true)
-        const result = await addPlayerToRoster(userId)
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success("Player added.")
-        router.refresh()
+        await add.run(userId)
     }
 
     const nameDirty = teamName.trim() !== view.team.name
@@ -100,10 +83,10 @@ export function CaptainTeamEditor({ view }: Props) {
                     <CardTitle>Team Name</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    <Label htmlFor="team-name">Name</Label>
+                    <Label htmlFor={`${uid}-team-name`}>Name</Label>
                     <div className="flex gap-2">
                         <Input
-                            id="team-name"
+                            id={`${uid}-team-name`}
                             value={teamName}
                             disabled={locked || busy}
                             maxLength={80}
@@ -129,9 +112,9 @@ export function CaptainTeamEditor({ view }: Props) {
                     <CardTitle>Preferred Division</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                    <Label htmlFor="div-select">Division</Label>
+                    <Label htmlFor={`${uid}-div-select`}>Division</Label>
                     <select
-                        id="div-select"
+                        id={`${uid}-div-select`}
                         className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                         value={division}
                         disabled={locked || busy}

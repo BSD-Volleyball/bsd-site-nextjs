@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -66,14 +66,20 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
     } | null>(null)
     const [responseNote, setResponseNote] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const uid = useId()
 
     const load = useCallback(async () => {
-        const result = await getSubRequestsForTeam(teamId)
-        if (result.status) {
-            setIncoming(result.data.incoming)
-            setOutgoing(result.data.outgoing)
+        try {
+            const result = await getSubRequestsForTeam(teamId)
+            if (result.status) {
+                setIncoming(result.data.incoming)
+                setOutgoing(result.data.outgoing)
+            }
+        } catch {
+            // Leave the lists as they were; the card stays hidden when empty.
+        } finally {
+            setIsLoading(false)
         }
-        setIsLoading(false)
     }, [teamId])
 
     useEffect(() => {
@@ -99,6 +105,8 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
             } else {
                 toast.error(result.message)
             }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
         } finally {
             setIsSubmitting(false)
         }
@@ -114,6 +122,8 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
             } else {
                 toast.error(result.message)
             }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
         } finally {
             setIsSubmitting(false)
         }
@@ -219,7 +229,7 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
                                     {respondingTo?.id === request.id && (
                                         <div className="mt-3 space-y-2 border-t pt-3">
                                             <label
-                                                htmlFor={`response-note-${request.id}`}
+                                                htmlFor={`${uid}-response-note-${request.id}`}
                                                 className="block font-medium text-sm"
                                             >
                                                 {respondingTo.decision ===
@@ -230,7 +240,7 @@ export function SubRequestsCard({ teamId }: { teamId: number }) {
                                                 captain:
                                             </label>
                                             <textarea
-                                                id={`response-note-${request.id}`}
+                                                id={`${uid}-response-note-${request.id}`}
                                                 value={responseNote}
                                                 onChange={(e) =>
                                                     setResponseNote(

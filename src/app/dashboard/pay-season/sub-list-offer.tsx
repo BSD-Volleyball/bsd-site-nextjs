@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ export function SubListOffer({ seasonId, activeWaiver }: SubListOfferProps) {
     const [open, setOpen] = useState(false)
     const [waiverAgreed, setWaiverAgreed] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const waiverAgreeId = useId()
 
     // Without a published waiver there is no way to capture consent. The
     // waivers tab already tells the player to contact an administrator.
@@ -40,18 +41,24 @@ export function SubListOffer({ seasonId, activeWaiver }: SubListOfferProps) {
     const handleJoin = async () => {
         setIsSubmitting(true)
 
-        const result = await expressWaitlistInterest(
-            seasonId,
-            activeWaiver.id,
-            waiverAgreed
-        )
+        try {
+            const result = await expressWaitlistInterest(
+                seasonId,
+                activeWaiver.id,
+                waiverAgreed
+            )
 
-        if (result.status) {
-            toast.success(result.message)
-            router.push("/dashboard")
-            router.refresh()
-        } else {
-            toast.error(result.message)
+            if (result.status) {
+                // Stays "Submitting..." while the page navigates away.
+                toast.success(result.message)
+                router.push("/dashboard")
+                router.refresh()
+            } else {
+                toast.error(result.message)
+                setIsSubmitting(false)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
             setIsSubmitting(false)
         }
     }
@@ -89,14 +96,14 @@ export function SubListOffer({ seasonId, activeWaiver }: SubListOfferProps) {
                         <WaiverContent content={activeWaiver.content} />
                         <div className="flex items-center gap-2">
                             <Checkbox
-                                id="sub-list-waiver-agree"
+                                id={waiverAgreeId}
                                 checked={waiverAgreed}
                                 onCheckedChange={(
                                     checked: boolean | "indeterminate"
                                 ) => setWaiverAgreed(checked === true)}
                             />
                             <Label
-                                htmlFor="sub-list-waiver-agree"
+                                htmlFor={waiverAgreeId}
                                 className="cursor-pointer font-medium"
                             >
                                 I Agree

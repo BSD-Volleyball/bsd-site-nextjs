@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -57,11 +57,9 @@ export function DiscountsManager({
     users,
     scope
 }: DiscountsManagerProps) {
-    const router = useRouter()
     const [search, setSearch] = useState("")
     const [showAddForm, setShowAddForm] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
-    const [isLoading, setIsLoading] = useState(false)
     const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
 
     // Add form state
@@ -90,35 +88,34 @@ export function DiscountsManager({
         [filteredDiscounts]
     )
 
+    const { run: runCreate, pending: creating } = useAction(createDiscount, {
+        onSuccess: () => {
+            setShowAddForm(false)
+            setNewUserId(null)
+            setNewPercentage("")
+            setNewExpiration("")
+            setNewReason("")
+        }
+    })
+    const { run: runUpdate, pending: updating } = useAction(updateDiscount, {
+        onSuccess: () => setEditingId(null)
+    })
+    const { run: runDelete, pending: deleting } = useAction(deleteDiscount)
+    const isLoading = creating || updating || deleting
+
     const handleAddDiscount = async () => {
         if (!newUserId || !newPercentage) {
             toast.error("Please select a user and enter a percentage.")
             return
         }
 
-        setIsLoading(true)
-
-        const result = await createDiscount({
+        await runCreate({
             userId: newUserId,
             percentage: newPercentage,
             expiration: newExpiration || null,
             reason: newReason || null,
             scope
         })
-
-        setIsLoading(false)
-
-        if (result.status) {
-            toast.success(result.message)
-            setShowAddForm(false)
-            setNewUserId(null)
-            setNewPercentage("")
-            setNewExpiration("")
-            setNewReason("")
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     const handleStartEdit = (discount: DiscountEntry) => {
@@ -145,40 +142,17 @@ export function DiscountsManager({
             return
         }
 
-        setIsLoading(true)
-
-        const result = await updateDiscount({
+        await runUpdate({
             id,
             percentage: editPercentage,
             expiration: editExpiration || null,
             reason: editReason || null
         })
-
-        setIsLoading(false)
-
-        if (result.status) {
-            toast.success(result.message)
-            setEditingId(null)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     const handleDelete = async (id: number) => {
-        setIsLoading(true)
-
-        const result = await deleteDiscount(id)
-
-        setIsLoading(false)
+        await runDelete(id)
         setDeleteTargetId(null)
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     const formatDate = (date: Date | null) => {

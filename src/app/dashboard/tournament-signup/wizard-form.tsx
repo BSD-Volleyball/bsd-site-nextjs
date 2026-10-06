@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
 import { useTheme } from "next-themes"
@@ -78,6 +78,7 @@ export function TournamentSignupWizard({
         "info"
     )
     const [teamName, setTeamName] = useState("")
+    const uid = useId()
     // Lookup for capacity by tournament_divisions.id
     const availabilityById = useMemo(
         () => new Map(divisionAvailability.map((d) => [d.divisionId, d])),
@@ -198,17 +199,21 @@ export function TournamentSignupWizard({
 
                     <TabsContent value="info" className="space-y-4 pt-4">
                         <div className="space-y-2">
-                            <Label htmlFor="team-name">Team Name</Label>
+                            <Label htmlFor={`${uid}-team-name`}>
+                                Team Name
+                            </Label>
                             <Input
-                                id="team-name"
+                                id={`${uid}-team-name`}
                                 value={teamName}
                                 onChange={(e) => setTeamName(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="pref-div">Preferred Division</Label>
+                            <Label htmlFor={`${uid}-pref-div`}>
+                                Preferred Division
+                            </Label>
                             <select
-                                id="pref-div"
+                                id={`${uid}-pref-div`}
                                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                                 value={preferredDivisionId}
                                 onChange={(e) =>
@@ -303,14 +308,14 @@ export function TournamentSignupWizard({
                         <WaiverContent content={activeWaiver.content} />
                         <div className="flex items-start gap-2">
                             <Checkbox
-                                id="waiver"
+                                id={`${uid}-waiver`}
                                 checked={waiverAgreed}
                                 onCheckedChange={(c) =>
                                     setWaiverAgreed(c === true)
                                 }
                             />
                             <Label
-                                htmlFor="waiver"
+                                htmlFor={`${uid}-waiver`}
                                 className="font-normal text-sm"
                             >
                                 I have read and agree to the waiver on behalf of
@@ -375,6 +380,10 @@ export function TournamentSignupWizard({
                                         } else {
                                             toast.error(result.message)
                                         }
+                                    } catch {
+                                        toast.error(
+                                            "Something went wrong. Please try again."
+                                        )
                                     } finally {
                                         setIsProcessing(false)
                                     }
@@ -422,6 +431,10 @@ export function TournamentSignupWizard({
                                         } else {
                                             toast.error(result.message)
                                         }
+                                    } catch {
+                                        toast.error(
+                                            "Something went wrong. Please try again."
+                                        )
                                     } finally {
                                         setIsProcessing(false)
                                     }

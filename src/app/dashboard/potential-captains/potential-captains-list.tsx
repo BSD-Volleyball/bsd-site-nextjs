@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useCallback, useEffect, useMemo } from "react"
-import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
+import { useState, useCallback, useMemo } from "react"
+import { RiArrowDownSLine } from "@remixicon/react"
 import {
     Collapsible,
     CollapsibleTrigger,
@@ -11,6 +11,12 @@ import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
 import {
     usePlayerDetailModal,
     PlayerDetailPopup
@@ -285,16 +291,6 @@ export function PotentialCaptainsList({
         setShowEmailModal(false)
     }, [])
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && showEmailModal) {
-                handleCloseEmailModal()
-            }
-        }
-        document.addEventListener("keydown", handleKeyDown)
-        return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [showEmailModal, handleCloseEmailModal])
-
     return (
         <div className="space-y-4">
             {divisions.map((division) => (
@@ -427,109 +423,100 @@ export function PotentialCaptainsList({
             />
 
             {/* Email Modal */}
-            {showEmailModal && currentDivisionId && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                    onClick={handleCloseEmailModal}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCloseEmailModal()
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
+            <Dialog
+                open={showEmailModal && !!currentDivisionId}
+                onOpenChange={(open) => {
+                    if (!open) handleCloseEmailModal()
+                }}
+            >
+                <DialogContent
+                    className="max-h-[85vh] overflow-y-auto"
+                    aria-describedby={undefined}
                 >
-                    <div
-                        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="document"
-                    >
-                        <button
-                            type="button"
-                            onClick={handleCloseEmailModal}
-                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                        >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-                        <h3 className="mb-4 font-semibold text-lg">
-                            Email Recipients
-                        </h3>
-                        <Card className="mb-4 p-4">
-                            <p className="mb-2 text-sm">
-                                {formatEmailList(
-                                    getSelectedPlayersForDivision(
-                                        currentDivisionId
-                                    )
-                                )}
-                            </p>
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={handleCopyToClipboard}
-                                variant="outline"
-                            >
-                                {copySuccess
-                                    ? "Copied!"
-                                    : "Copy Email Addresses"}
-                            </Button>
-                        </Card>
-                        {resolvedEmailSubject && (
+                    <DialogHeader>
+                        <DialogTitle>Email Recipients</DialogTitle>
+                    </DialogHeader>
+                    {currentDivisionId && (
+                        <div>
                             <Card className="mb-4 p-4">
-                                <h4 className="mb-2 font-medium text-sm">
-                                    Subject
-                                </h4>
                                 <p className="mb-2 text-sm">
-                                    {resolvedEmailSubject}
+                                    {formatEmailList(
+                                        getSelectedPlayersForDivision(
+                                            currentDivisionId
+                                        )
+                                    )}
                                 </p>
                                 <Button
                                     type="button"
                                     size="sm"
-                                    onClick={handleCopySubject}
+                                    onClick={handleCopyToClipboard}
                                     variant="outline"
                                 >
-                                    {copySubjectSuccess
+                                    {copySuccess
                                         ? "Copied!"
-                                        : "Copy Subject"}
+                                        : "Copy Email Addresses"}
                                 </Button>
                             </Card>
-                        )}
-                        {emailTemplate && (
-                            <Card className="p-4">
-                                <h4 className="mb-2 font-medium text-sm">
-                                    Email Template
-                                </h4>
-                                <div className="mb-2">
-                                    <LexicalEmailPreview
-                                        content={resolvedEmailTemplateContent}
-                                    />
-                                </div>
-                                <div className="flex gap-2">
+                            {resolvedEmailSubject && (
+                                <Card className="mb-4 p-4">
+                                    <h4 className="mb-2 font-medium text-sm">
+                                        Subject
+                                    </h4>
+                                    <p className="mb-2 text-sm">
+                                        {resolvedEmailSubject}
+                                    </p>
                                     <Button
                                         type="button"
                                         size="sm"
-                                        onClick={handleCopyEmailTemplate}
+                                        onClick={handleCopySubject}
                                         variant="outline"
                                     >
-                                        {copyEmailSuccess
+                                        {copySubjectSuccess
                                             ? "Copied!"
-                                            : "Copy Plain Text"}
+                                            : "Copy Subject"}
                                     </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={handleCopyRichText}
-                                        variant="outline"
-                                    >
-                                        {copyRichTextSuccess
-                                            ? "Copied!"
-                                            : "Copy Rich Text"}
-                                    </Button>
-                                </div>
-                            </Card>
-                        )}
-                    </div>
-                </div>
-            )}
+                                </Card>
+                            )}
+                            {emailTemplate && (
+                                <Card className="p-4">
+                                    <h4 className="mb-2 font-medium text-sm">
+                                        Email Template
+                                    </h4>
+                                    <div className="mb-2">
+                                        <LexicalEmailPreview
+                                            content={
+                                                resolvedEmailTemplateContent
+                                            }
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleCopyEmailTemplate}
+                                            variant="outline"
+                                        >
+                                            {copyEmailSuccess
+                                                ? "Copied!"
+                                                : "Copy Plain Text"}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleCopyRichText}
+                                            variant="outline"
+                                        >
+                                            {copyRichTextSuccess
+                                                ? "Copied!"
+                                                : "Copy Rich Text"}
+                                        </Button>
+                                    </div>
+                                </Card>
+                            )}
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

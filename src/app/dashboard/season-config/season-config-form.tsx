@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useId, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -123,8 +123,7 @@ function buildInitialEvents(data: SeasonConfigData): EventState[] {
 }
 
 export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
-    const router = useRouter()
-    const [saving, setSaving] = useState(false)
+    const uid = useId()
 
     const [seasonAmount, setSeasonAmount] = useState(
         initialData.season_amount || ""
@@ -147,6 +146,12 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
         null
     )
     const [confirmedDeletions, setConfirmedDeletions] = useState(false)
+
+    // Refreshes on success so event ids and availability counts match the DB
+    // again.
+    const { run: runSave, pending: saving } = useAction(saveSeasonConfig, {
+        onSuccess: () => setConfirmedDeletions(false)
+    })
 
     const getEventsByType = useCallback(
         (type: EventType) =>
@@ -278,8 +283,6 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             return
         }
 
-        setSaving(true)
-
         // Reassign sort_order based on current position
         const eventData: EventData[] = []
         for (const type of EVENT_TYPE_ORDER) {
@@ -304,7 +307,7 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             })
         }
 
-        const result = await saveSeasonConfig(
+        await runSave(
             initialData.seasonId,
             {
                 season_amount: seasonAmount,
@@ -318,17 +321,6 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
             eventData,
             { confirmDeletions: confirmedDeletions }
         )
-
-        if (result.status) {
-            toast.success(result.message)
-            // Reload so event ids and availability counts match the DB again.
-            setConfirmedDeletions(false)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-
-        setSaving(false)
     }
 
     const seasonLabel = `${initialData.seasonName.charAt(0).toUpperCase() + initialData.seasonName.slice(1)} ${initialData.year}`
@@ -354,11 +346,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                     <Separator />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="season-amount">
+                            <Label htmlFor={`${uid}-season-amount`}>
                                 Season Amount ($)
                             </Label>
                             <Input
-                                id="season-amount"
+                                id={`${uid}-season-amount`}
                                 type="text"
                                 inputMode="decimal"
                                 value={seasonAmount}
@@ -369,9 +361,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="late-amount">Late Amount ($)</Label>
+                            <Label htmlFor={`${uid}-late-amount`}>
+                                Late Amount ($)
+                            </Label>
                             <Input
-                                id="late-amount"
+                                id={`${uid}-late-amount`}
                                 type="text"
                                 inputMode="decimal"
                                 value={lateAmount}
@@ -380,9 +374,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="max-players">Max Players</Label>
+                            <Label htmlFor={`${uid}-max-players`}>
+                                Max Players
+                            </Label>
                             <Input
-                                id="max-players"
+                                id={`${uid}-max-players`}
                                 type="number"
                                 value={maxPlayers}
                                 onChange={(e) => setMaxPlayers(e.target.value)}
@@ -396,11 +392,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                     </p>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="certified-ref-rate">
+                            <Label htmlFor={`${uid}-certified-ref-rate`}>
                                 Certified Ref Rate ($)
                             </Label>
                             <Input
-                                id="certified-ref-rate"
+                                id={`${uid}-certified-ref-rate`}
                                 type="text"
                                 inputMode="decimal"
                                 value={certifiedRefRate}
@@ -411,11 +407,11 @@ export function SeasonConfigForm({ initialData }: SeasonConfigFormProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="uncertified-ref-rate">
+                            <Label htmlFor={`${uid}-uncertified-ref-rate`}>
                                 Uncertified Ref Rate ($)
                             </Label>
                             <Input
-                                id="uncertified-ref-rate"
+                                id={`${uid}-uncertified-ref-rate`}
                                 type="text"
                                 inputMode="decimal"
                                 value={uncertifiedRefRate}

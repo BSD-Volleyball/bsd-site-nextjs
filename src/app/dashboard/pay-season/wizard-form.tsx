@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
@@ -104,6 +104,7 @@ export function WizardForm({
     const { resolvedTheme } = useTheme()
     const _isDark = resolvedTheme === "dark"
     const [activeTab, setActiveTab] = useState<TabValue>("info")
+    const uid = useId()
 
     const tryoutEvents = getEventsByType(config, "tryout")
     const seasonEvents = getEventsByType(config, "regular_season")
@@ -239,12 +240,12 @@ export function WizardForm({
             {isOptInAudience ? (
                 <div className="flex items-center gap-2">
                     <Checkbox
-                        id={`event-${week1Tryout.id}`}
+                        id={`${uid}-event-${week1Tryout.id}`}
                         checked={!selectedEvents.has(week1Tryout.id)}
                         onCheckedChange={() => toggleEvent(week1Tryout.id)}
                     />
                     <Label
-                        htmlFor={`event-${week1Tryout.id}`}
+                        htmlFor={`${uid}-event-${week1Tryout.id}`}
                         className="cursor-pointer font-normal"
                     >
                         Opt-in to Evaluations
@@ -253,12 +254,12 @@ export function WizardForm({
             ) : (
                 <div className="flex items-center gap-2">
                     <Checkbox
-                        id={`event-${week1Tryout.id}`}
+                        id={`${uid}-event-${week1Tryout.id}`}
                         checked={selectedEvents.has(week1Tryout.id)}
                         onCheckedChange={() => toggleEvent(week1Tryout.id)}
                     />
                     <Label
-                        htmlFor={`event-${week1Tryout.id}`}
+                        htmlFor={`${uid}-event-${week1Tryout.id}`}
                         className="cursor-pointer font-normal"
                     >
                         I will <strong>NOT</strong> be able to attend the Week 1
@@ -406,7 +407,7 @@ export function WizardForm({
                     <TabsContent value="info" className="space-y-6 pt-4">
                         {!isKnownAdult && (
                             <div className="space-y-2">
-                                <Label htmlFor="age">
+                                <Label htmlFor={`${uid}-age`}>
                                     Age at beginning of the season:
                                 </Label>
                                 <Select
@@ -423,7 +424,7 @@ export function WizardForm({
                                         }))
                                     }
                                 >
-                                    <SelectTrigger id="age">
+                                    <SelectTrigger id={`${uid}-age`}>
                                         <SelectValue placeholder="Select your age range" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -473,10 +474,10 @@ export function WizardForm({
                                 <div className="flex items-center gap-2">
                                     <RadioGroupItem
                                         value="yes"
-                                        id="captain-yes"
+                                        id={`${uid}-captain-yes`}
                                     />
                                     <Label
-                                        htmlFor="captain-yes"
+                                        htmlFor={`${uid}-captain-yes`}
                                         className="cursor-pointer font-normal"
                                     >
                                         Yes
@@ -485,10 +486,10 @@ export function WizardForm({
                                 <div className="flex items-center gap-2">
                                     <RadioGroupItem
                                         value="only_if_needed"
-                                        id="captain-only"
+                                        id={`${uid}-captain-only`}
                                     />
                                     <Label
-                                        htmlFor="captain-only"
+                                        htmlFor={`${uid}-captain-only`}
                                         className="cursor-pointer font-normal"
                                     >
                                         Only if Needed
@@ -497,10 +498,10 @@ export function WizardForm({
                                 <div className="flex items-center gap-2">
                                     <RadioGroupItem
                                         value="no"
-                                        id="captain-no"
+                                        id={`${uid}-captain-no`}
                                     />
                                     <Label
-                                        htmlFor="captain-no"
+                                        htmlFor={`${uid}-captain-no`}
                                         className="cursor-pointer font-normal"
                                     >
                                         No
@@ -570,13 +571,13 @@ export function WizardForm({
 
                         <div className="flex items-center justify-between">
                             <Label
-                                htmlFor="pair-toggle"
+                                htmlFor={`${uid}-pair-toggle`}
                                 className="cursor-pointer"
                             >
                                 Request to pair for the season:
                             </Label>
                             <Switch
-                                id="pair-toggle"
+                                id={`${uid}-pair-toggle`}
                                 checked={formData.pair}
                                 disabled={pairRequired}
                                 onCheckedChange={(checked: boolean) =>
@@ -613,11 +614,11 @@ export function WizardForm({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="pair-reason">
+                                    <Label htmlFor={`${uid}-pair-reason`}>
                                         Reason for pairing
                                     </Label>
                                     <Textarea
-                                        id="pair-reason"
+                                        id={`${uid}-pair-reason`}
                                         value={formData.pairReason}
                                         onChange={(e) =>
                                             setFormData((prev) => ({
@@ -671,7 +672,7 @@ export function WizardForm({
                                                         className="flex items-center gap-2"
                                                     >
                                                         <Checkbox
-                                                            id={`event-${event.id}`}
+                                                            id={`${uid}-event-${event.id}`}
                                                             checked={selectedEvents.has(
                                                                 event.id
                                                             )}
@@ -682,7 +683,7 @@ export function WizardForm({
                                                             }
                                                         />
                                                         <Label
-                                                            htmlFor={`event-${event.id}`}
+                                                            htmlFor={`${uid}-event-${event.id}`}
                                                             className="cursor-pointer font-normal"
                                                         >
                                                             {formatEventDate(
@@ -707,7 +708,7 @@ export function WizardForm({
                                                     className="flex items-center gap-2"
                                                 >
                                                     <Checkbox
-                                                        id={`event-${event.id}`}
+                                                        id={`${uid}-event-${event.id}`}
                                                         checked={selectedEvents.has(
                                                             event.id
                                                         )}
@@ -718,7 +719,7 @@ export function WizardForm({
                                                         }
                                                     />
                                                     <Label
-                                                        htmlFor={`event-${event.id}`}
+                                                        htmlFor={`${uid}-event-${event.id}`}
                                                         className="cursor-pointer font-normal"
                                                     >
                                                         {formatEventDate(
@@ -743,7 +744,7 @@ export function WizardForm({
                                                     className="flex items-center gap-2"
                                                 >
                                                     <Checkbox
-                                                        id={`event-${event.id}`}
+                                                        id={`${uid}-event-${event.id}`}
                                                         checked={selectedEvents.has(
                                                             event.id
                                                         )}
@@ -754,7 +755,7 @@ export function WizardForm({
                                                         }
                                                     />
                                                     <Label
-                                                        htmlFor={`event-${event.id}`}
+                                                        htmlFor={`${uid}-event-${event.id}`}
                                                         className="cursor-pointer font-normal"
                                                     >
                                                         {formatEventDate(
@@ -822,14 +823,14 @@ export function WizardForm({
 
                                 <div className="flex items-center gap-2">
                                     <Checkbox
-                                        id="waiver-agree"
+                                        id={`${uid}-waiver-agree`}
                                         checked={waiverAgreed}
                                         onCheckedChange={(
                                             checked: boolean | "indeterminate"
                                         ) => setWaiverAgreed(checked === true)}
                                     />
                                     <Label
-                                        htmlFor="waiver-agree"
+                                        htmlFor={`${uid}-waiver-agree`}
                                         className="cursor-pointer font-medium"
                                     >
                                         I Agree

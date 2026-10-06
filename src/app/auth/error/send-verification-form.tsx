@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth-client"
 
 export function SendVerificationForm() {
+    const emailId = useId()
     const [email, setEmail] = useState("")
     const [sending, setSending] = useState(false)
     const [sent, setSent] = useState(false)
@@ -38,9 +39,9 @@ export function SendVerificationForm() {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-2">
-            <Label htmlFor="verify-email">Email address</Label>
+            <Label htmlFor={emailId}>Email address</Label>
             <Input
-                id="verify-email"
+                id={emailId}
                 type="email"
                 required
                 autoComplete="email"

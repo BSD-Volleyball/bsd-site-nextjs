@@ -85,6 +85,9 @@ export function FriendsPageClient({ data }: { data: FriendsPageData }) {
                 toast.error(result.message ?? "Something went wrong.")
             }
             return result.status
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+            return false
         } finally {
             setBusy(false)
         }

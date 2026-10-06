@@ -4,6 +4,14 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
+import {
     RiCloseLine,
     RiMailSendLine,
     RiUserStarLine,
@@ -159,24 +167,16 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
         setShowContactDetails(false)
     }, [])
 
+    // The contact-details overlay stays hand-built: it opens the player
+    // detail popup on top of itself, which a modal Dialog would block.
     useEffect(() => {
+        if (!showContactDetails) return
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                if (showContactDetails) handleCloseContactDetails()
-                else if (showContactWarning) handleCloseContactWarning()
-                else if (showEmailModal) handleCloseEmailModal()
-            }
+            if (e.key === "Escape") handleCloseContactDetails()
         }
         document.addEventListener("keydown", handleKeyDown)
         return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [
-        showEmailModal,
-        showContactWarning,
-        showContactDetails,
-        handleCloseEmailModal,
-        handleCloseContactWarning,
-        handleCloseContactDetails
-    ])
+    }, [showContactDetails, handleCloseContactDetails])
 
     const handleCopyEmailList = async () => {
         try {
@@ -396,33 +396,22 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                 </CardContent>
             </Card>
 
-            {showEmailModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                    onClick={handleCloseEmailModal}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCloseEmailModal()
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
+            <Dialog
+                open={showEmailModal}
+                onOpenChange={(open) => {
+                    if (!open) handleCloseEmailModal()
+                }}
+            >
+                <DialogContent
+                    className="max-h-[85vh] overflow-y-auto"
+                    aria-describedby={undefined}
                 >
-                    <div
-                        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="document"
-                    >
-                        <button
-                            type="button"
-                            onClick={handleCloseEmailModal}
-                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                        >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-                        <h3 className="mb-4 font-semibold text-lg">
+                    <DialogHeader>
+                        <DialogTitle>
                             Welcome Email — {data.teamName}
-                        </h3>
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div>
                         <Card className="mb-4 p-4">
                             <h4 className="mb-2 font-medium text-sm">
                                 Recipients ({data.members.length} players)
@@ -496,67 +485,48 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                             </Card>
                         )}
                     </div>
-                </div>
-            )}
+                </DialogContent>
+            </Dialog>
 
-            {showContactWarning && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                    onClick={handleCloseContactWarning}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCloseContactWarning()
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
-                >
-                    <div
-                        className="relative w-full max-w-md rounded-lg bg-background p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="document"
-                    >
-                        <button
+            <Dialog
+                open={showContactWarning}
+                onOpenChange={(open) => {
+                    if (!open) handleCloseContactWarning()
+                }}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogHeader className="flex-row items-start gap-3 space-y-0">
+                        <RiAlertLine className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />
+                        <div className="space-y-2">
+                            <DialogTitle>
+                                Contact Information Notice
+                            </DialogTitle>
+                            <DialogDescription>
+                                This contact information should only be used
+                                exclusively for BSD Volleyball League purposes.
+                                If you would like to contact someone for any
+                                other purpose, please ask them for their contact
+                                details directly in person.
+                            </DialogDescription>
+                        </div>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2">
+                        <Button
                             type="button"
+                            variant="outline"
                             onClick={handleCloseContactWarning}
-                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-                        <div className="mb-5 flex items-start gap-3">
-                            <RiAlertLine className="mt-0.5 h-6 w-6 shrink-0 text-amber-500" />
-                            <div>
-                                <h3 className="mb-2 font-semibold text-lg">
-                                    Contact Information Notice
-                                </h3>
-                                <p className="text-muted-foreground text-sm">
-                                    This contact information should only be used
-                                    exclusively for BSD Volleyball League
-                                    purposes. If you would like to contact
-                                    someone for any other purpose, please ask
-                                    them for their contact details directly in
-                                    person.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleCloseContactWarning}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={handleAcknowledgeWarning}
-                            >
-                                Acknowledge &amp; View Details
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleAcknowledgeWarning}
+                        >
+                            Acknowledge &amp; View Details
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {showContactDetails && (
                 <div

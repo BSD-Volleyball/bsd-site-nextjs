@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { toast } from "sonner"
 import {
     Card,
@@ -11,6 +11,13 @@ import {
     CardDescription
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle
+} from "@/components/ui/dialog"
+import { useAction } from "@/components/hooks/use-action"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -20,7 +27,6 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { RiCloseLine } from "@remixicon/react"
 import {
     createTeams,
     type DivisionOption,
@@ -80,7 +86,10 @@ export function SelectCaptainsForm({
     divisionCommissioners,
     existingTeamsByDivision
 }: SelectCaptainsFormProps) {
-    const [isLoading, setIsLoading] = useState(false)
+    const uid = useId()
+    const { run: runCreateTeams, pending: isLoading } = useAction(createTeams, {
+        refresh: false
+    })
     const [copyReminder, setCopyReminder] = useState(false)
     const [showEmailModal, setShowEmailModal] = useState(false)
     const [copySuccess, setCopySuccess] = useState(false)
@@ -296,16 +305,6 @@ export function SelectCaptainsForm({
         setShowEmailModal(false)
     }, [])
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && showEmailModal) {
-                handleCloseEmailModal()
-            }
-        }
-        document.addEventListener("keydown", handleKeyDown)
-        return () => document.removeEventListener("keydown", handleKeyDown)
-    }, [showEmailModal, handleCloseEmailModal])
-
     const handleCopyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(
@@ -449,20 +448,7 @@ export function SelectCaptainsForm({
             }
         }
 
-        setIsLoading(true)
-
-        const result = await createTeams(
-            parseInt(divisionId, 10),
-            teamsToCreate
-        )
-
-        if (result.status) {
-            toast.success(result.message ?? "Teams saved.")
-        } else {
-            toast.error(result.message)
-        }
-
-        setIsLoading(false)
+        await runCreateTeams(parseInt(divisionId, 10), teamsToCreate)
     }
 
     return (
@@ -478,9 +464,11 @@ export function SelectCaptainsForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label htmlFor="current-season">Current Season</Label>
+                        <Label htmlFor={`${uid}-current-season`}>
+                            Current Season
+                        </Label>
                         <Input
-                            id="current-season"
+                            id={`${uid}-current-season`}
                             value={seasonLabel ?? ""}
                             readOnly
                             className="bg-muted"
@@ -489,7 +477,7 @@ export function SelectCaptainsForm({
 
                     {divisions.length > 1 ? (
                         <div className="space-y-2">
-                            <Label htmlFor="division">
+                            <Label htmlFor={`${uid}-division`}>
                                 Division{" "}
                                 <span className="text-destructive">*</span>
                             </Label>
@@ -497,7 +485,7 @@ export function SelectCaptainsForm({
                                 value={divisionId}
                                 onValueChange={setDivisionId}
                             >
-                                <SelectTrigger id="division">
+                                <SelectTrigger id={`${uid}-division`}>
                                     <SelectValue placeholder="Select a division" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -540,12 +528,12 @@ export function SelectCaptainsForm({
                                     >
                                         <div className="space-y-2">
                                             <Label
-                                                htmlFor={`team-name-${index}`}
+                                                htmlFor={`${uid}-team-name-${index}`}
                                             >
                                                 Team {index + 1} Name
                                             </Label>
                                             <Input
-                                                id={`team-name-${index}`}
+                                                id={`${uid}-team-name-${index}`}
                                                 value={captains[index].teamName}
                                                 onChange={(e) =>
                                                     handleTeamNameChange(
@@ -615,7 +603,7 @@ export function SelectCaptainsForm({
                                         <div className="grid grid-cols-2 items-end gap-4">
                                             <div className="space-y-2">
                                                 <Label
-                                                    htmlFor={`captain-${index}`}
+                                                    htmlFor={`${uid}-captain-${index}`}
                                                 >
                                                     Captain {index + 1}{" "}
                                                     <span className="text-muted-foreground text-sm">
@@ -623,6 +611,7 @@ export function SelectCaptainsForm({
                                                     </span>
                                                 </Label>
                                                 <PlayerOptionCombobox
+                                                    id={`${uid}-captain-${index}`}
                                                     users={users}
                                                     value={
                                                         captains[index]
@@ -644,7 +633,7 @@ export function SelectCaptainsForm({
                                             </div>
                                             <div className="space-y-2">
                                                 <Label
-                                                    htmlFor={`team-name-${index}`}
+                                                    htmlFor={`${uid}-team-name-${index}`}
                                                 >
                                                     Team Name{" "}
                                                     <span className="text-destructive">
@@ -652,7 +641,7 @@ export function SelectCaptainsForm({
                                                     </span>
                                                 </Label>
                                                 <Input
-                                                    id={`team-name-${index}`}
+                                                    id={`${uid}-team-name-${index}`}
                                                     value={
                                                         captains[index].teamName
                                                     }
@@ -718,33 +707,20 @@ export function SelectCaptainsForm({
                 </CardFooter>
             </Card>
 
-            {showEmailModal && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                    onClick={handleCloseEmailModal}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") handleCloseEmailModal()
-                    }}
-                    role="dialog"
-                    aria-modal="true"
-                    tabIndex={-1}
+            <Dialog
+                open={showEmailModal}
+                onOpenChange={(open) => {
+                    if (!open) handleCloseEmailModal()
+                }}
+            >
+                <DialogContent
+                    className="max-h-[85vh] overflow-y-auto"
+                    aria-describedby={undefined}
                 >
-                    <div
-                        className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background p-6 shadow-xl"
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        role="document"
-                    >
-                        <button
-                            type="button"
-                            onClick={handleCloseEmailModal}
-                            className="absolute top-3 right-3 z-10 rounded-full p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                        >
-                            <RiCloseLine className="h-5 w-5" />
-                        </button>
-                        <h3 className="mb-4 font-semibold text-lg">
-                            Email Recipients
-                        </h3>
+                    <DialogHeader>
+                        <DialogTitle>Email Recipients</DialogTitle>
+                    </DialogHeader>
+                    <div>
                         <Card className="mb-4 p-4">
                             <p className="mb-2 text-sm">
                                 {formatEmailList(selectedCaptains)}
@@ -815,8 +791,8 @@ export function SelectCaptainsForm({
                             </Card>
                         )}
                     </div>
-                </div>
-            )}
+                </DialogContent>
+            </Dialog>
         </form>
     )
 }

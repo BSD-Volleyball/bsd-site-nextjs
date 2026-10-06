@@ -1,8 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useId, useState } from "react"
+import { useAction } from "@/components/hooks/use-action"
 import {
     Card,
     CardContent,
@@ -31,8 +30,8 @@ interface VolleyballProfileFormProps {
 export function VolleyballProfileForm({
     initialData
 }: VolleyballProfileFormProps) {
-    const router = useRouter()
-    const [isLoading, setIsLoading] = useState(false)
+    const uid = useId()
+    const { run, pending: isLoading } = useAction(updateVolleyballProfile)
 
     const [formData, setFormData] = useState<VolleyballProfileData>({
         experience: initialData?.experience ?? null,
@@ -46,17 +45,7 @@ export function VolleyballProfileForm({
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setIsLoading(true)
-
-        const result = await updateVolleyballProfile(formData)
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setIsLoading(false)
+        await run(formData)
     }
 
     return (
@@ -70,9 +59,9 @@ export function VolleyballProfileForm({
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
-                        <Label htmlFor="experience">Experience</Label>
+                        <Label htmlFor={`${uid}-experience`}>Experience</Label>
                         <Textarea
-                            id="experience"
+                            id={`${uid}-experience`}
                             placeholder="Describe your volleyball experience..."
                             value={formData.experience ?? ""}
                             onChange={(e) =>
@@ -86,9 +75,11 @@ export function VolleyballProfileForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="assessment">Self Assessment</Label>
+                        <Label htmlFor={`${uid}-assessment`}>
+                            Self Assessment
+                        </Label>
                         <Textarea
-                            id="assessment"
+                            id={`${uid}-assessment`}
                             placeholder="How would you rate your overall skill level?"
                             value={formData.assessment ?? ""}
                             onChange={(e) =>
@@ -102,7 +93,7 @@ export function VolleyballProfileForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="height">Height</Label>
+                        <Label htmlFor={`${uid}-height`}>Height</Label>
                         <Select
                             value={formData.height?.toString() ?? ""}
                             onValueChange={(value) =>
@@ -112,7 +103,7 @@ export function VolleyballProfileForm({
                                 })
                             }
                         >
-                            <SelectTrigger id="height">
+                            <SelectTrigger id={`${uid}-height`}>
                                 <SelectValue placeholder="Select your height" />
                             </SelectTrigger>
                             <SelectContent>
@@ -142,7 +133,7 @@ export function VolleyballProfileForm({
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_passer"
+                                    id={`${uid}-skill_passer`}
                                     checked={formData.skill_passer ?? false}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -152,7 +143,7 @@ export function VolleyballProfileForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_passer"
+                                    htmlFor={`${uid}-skill_passer`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Passer
@@ -160,7 +151,7 @@ export function VolleyballProfileForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_setter"
+                                    id={`${uid}-skill_setter`}
                                     checked={formData.skill_setter ?? false}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -170,7 +161,7 @@ export function VolleyballProfileForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_setter"
+                                    htmlFor={`${uid}-skill_setter`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Setter
@@ -178,7 +169,7 @@ export function VolleyballProfileForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_hitter"
+                                    id={`${uid}-skill_hitter`}
                                     checked={formData.skill_hitter ?? false}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -188,7 +179,7 @@ export function VolleyballProfileForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_hitter"
+                                    htmlFor={`${uid}-skill_hitter`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Hitter
@@ -196,7 +187,7 @@ export function VolleyballProfileForm({
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Checkbox
-                                    id="skill_other"
+                                    id={`${uid}-skill_other`}
                                     checked={formData.skill_other ?? false}
                                     onCheckedChange={(checked) =>
                                         setFormData({
@@ -206,7 +197,7 @@ export function VolleyballProfileForm({
                                     }
                                 />
                                 <Label
-                                    htmlFor="skill_other"
+                                    htmlFor={`${uid}-skill_other`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Other
