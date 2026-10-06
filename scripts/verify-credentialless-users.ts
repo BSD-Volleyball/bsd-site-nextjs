@@ -61,7 +61,9 @@ async function main() {
         const rows = await db
             .update(users)
             .set({ emailVerified: true })
-            .where(and(inArray(users.id, batch), eq(users.emailVerified, false)))
+            .where(
+                and(inArray(users.id, batch), eq(users.emailVerified, false))
+            )
             .returning({ id: users.id })
         updated += rows.length
     }
