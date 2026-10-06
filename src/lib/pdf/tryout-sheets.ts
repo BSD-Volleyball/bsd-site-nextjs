@@ -18,8 +18,12 @@ import {
     formatGeneratedTimestamp,
     getGenderLabel,
     getPositionsLabel,
-    getSheetDisplayName,
+    buildTryoutSheetRow,
+    compareTryoutSheetRows,
+    createColumnWidthMeasurer,
     loadTryoutSheetEnrichment,
+    sheetCellHighlight,
+    type TryoutSheetRow,
     pdfDownloadResponse,
     pdfErrorResponse,
     seasonFileSlug,
@@ -27,19 +31,7 @@ import {
 } from "./tryout-sheet-shared"
 import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
-interface TryoutSheetRow {
-    idLabel: string
-    name: string
-    lastName: string
-    isMale: boolean
-    pairName: string
-    hasPair: boolean
-    positionsLabel: string
-    heightLabel: string
-    genderLabel: string
-    lastSeasonLabel: string
-    lastDivisionLabel: string
-    hasBlankHistory: boolean
+interface TeamSheetRow extends TryoutSheetRow {
     teamNumber: number
 }
 
@@ -53,8 +45,8 @@ interface GroupDescriptor {
 
 interface GroupData {
     descriptor: GroupDescriptor
-    homeRows: TryoutSheetRow[]
-    awayRows: TryoutSheetRow[]
+    homeRows: TeamSheetRow[]
+    awayRows: TeamSheetRow[]
 }
 
 const PAGE_DIVISIONS: [string[], string[]] = [
@@ -157,43 +149,15 @@ export async function generateTryoutSheetsPdf(
             )
         }
 
-        const userIds = [...new Set(rosterRows.map((row) => row.userId))]
-        const pairIds = [
-            ...new Set(
-                rosterRows
-                    .map((row) => row.pairPickId)
-                    .filter((pairId): pairId is string => !!pairId)
-            )
-        ]
+        const enrichment = await loadTryoutSheetEnrichment(rosterRows)
+        const { pairNameById, latestDraftByUser } = enrichment
 
-        const { pairNameById, latestDraftByUser } =
-            await loadTryoutSheetEnrichment({ userIds, pairIds })
-
-        const rowsByDivisionTeam = new Map<string, TryoutSheetRow[]>()
+        const rowsByDivisionTeam = new Map<string, TeamSheetRow[]>()
         for (const row of rosterRows) {
             const key = `${row.divisionName}-${row.teamNumber}`
             const currentRows = rowsByDivisionTeam.get(key) || []
-            const latestDraft = latestDraftByUser.get(row.userId)
-
             currentRows.push({
-                idLabel: row.oldId === null ? "—" : String(row.oldId),
-                name: getSheetDisplayName(row),
-                lastName: row.lastName,
-                isMale: !!row.male,
-                pairName: row.pairPickId
-                    ? (pairNameById.get(row.pairPickId) ?? "—")
-                    : "",
-                hasPair: !!row.pairPickId,
-                positionsLabel: getPositionsLabel({
-                    skillSetter: row.skillSetter,
-                    skillHitter: row.skillHitter,
-                    skillPasser: row.skillPasser
-                }),
-                heightLabel: formatHeight(row.height),
-                genderLabel: getGenderLabel(row.male),
-                lastSeasonLabel: latestDraft?.seasonLabel ?? "",
-                lastDivisionLabel: latestDraft?.divisionLabel ?? "",
-                hasBlankHistory: !latestDraft,
+                ...buildTryoutSheetRow(row, enrichment),
                 teamNumber: row.teamNumber
             })
 
@@ -201,21 +165,10 @@ export async function generateTryoutSheetsPdf(
         }
 
         for (const rows of rowsByDivisionTeam.values()) {
-            rows.sort((a, b) => {
-                if (a.teamNumber !== b.teamNumber) {
-                    return a.teamNumber - b.teamNumber
-                }
-                // New players (no draft history) before returning players
-                const aNew = a.hasBlankHistory ? 0 : 1
-                const bNew = b.hasBlankHistory ? 0 : 1
-                if (aNew !== bNew) return aNew - bNew
-                // Male players before non-male
-                const aMale = a.isMale ? 0 : 1
-                const bMale = b.isMale ? 0 : 1
-                if (aMale !== bMale) return aMale - bMale
-                // Alphabetical by last name
-                return a.lastName.localeCompare(b.lastName)
-            })
+            rows.sort(
+                (a, b) =>
+                    a.teamNumber - b.teamNumber || compareTryoutSheetRows(a, b)
+            )
         }
 
         const groupsBySessionPage = new Map<string, GroupData[]>()
@@ -284,29 +237,11 @@ export async function generateTryoutSheetsPdf(
             fontSize: number
         ) => topY - (cellHeight + fontSize) / 2
 
-        const getColumnWidth = ({
-            header,
-            values,
-            minWidth
-        }: {
-            header: string
-            values: string[]
-            minWidth: number
-        }) => {
-            const headerWidth = boldFont.widthOfTextAtSize(header, cellFontSize)
-            const valueWidth = values.length
-                ? Math.max(
-                      ...values.map((value) =>
-                          regularFont.widthOfTextAtSize(value, cellFontSize)
-                      )
-                  )
-                : 0
-
-            return Math.max(
-                minWidth,
-                Math.ceil(Math.max(headerWidth, valueWidth)) + 8
-            )
-        }
+        const getColumnWidth = createColumnWidthMeasurer({
+            regularFont,
+            boldFont,
+            fontSize: cellFontSize
+        })
 
         const ldWidth = Math.min(
             30,
@@ -420,9 +355,6 @@ export async function generateTryoutSheetsPdf(
             3: formatEventTime(weekSlots[2]?.startTime ?? "")
         }
 
-        const highlightYellow = rgb(1, 0.98, 0.8)
-        const highlightGreen = rgb(0.88, 0.97, 0.88)
-
         for (const sessionNumber of sessions) {
             for (
                 let pageIndex = 0;
@@ -480,7 +412,7 @@ export async function generateTryoutSheetsPdf(
                         rows
                     }: {
                         startX: number
-                        rows: TryoutSheetRow[]
+                        rows: TeamSheetRow[]
                     }) => {
                         let tableTopY = sectionTopY
                         let currentX = startX
@@ -583,27 +515,18 @@ export async function generateTryoutSheetsPdf(
                                 const column = columns[index]
                                 const value = values[index]
 
-                                const shouldHighlight =
-                                    (column.key === "positions" &&
-                                        row.positionsLabel.includes("S")) ||
-                                    (column.key === "gender" &&
-                                        row.genderLabel === "NM") ||
-                                    (column.key === "pair" && row.hasPair) ||
-                                    ((column.key === "lastSeason" ||
-                                        column.key === "lastDivision") &&
-                                        row.hasBlankHistory)
+                                const highlight = sheetCellHighlight(
+                                    column.key,
+                                    row
+                                )
 
-                                if (shouldHighlight) {
+                                if (highlight) {
                                     page.drawRectangle({
                                         x: currentX + 1,
                                         y: tableTopY - rowHeight + 1,
                                         width: column.width - 2,
                                         height: rowHeight - 2,
-                                        color:
-                                            column.key === "positions" ||
-                                            column.key === "gender"
-                                                ? highlightYellow
-                                                : highlightGreen
+                                        color: highlight
                                     })
                                 }
 

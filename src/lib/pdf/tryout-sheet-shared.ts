@@ -4,9 +4,10 @@
 // the text formatting, roster enrichment, and response plumbing are common.
 
 import { desc, eq, inArray } from "drizzle-orm"
-import type { PDFFont } from "pdf-lib"
+import { type PDFFont, type RGB, rgb } from "pdf-lib"
 import { db } from "@/database/db"
 import { drafts, divisions, seasons, teams, users } from "@/database/schema"
+import { formatHeight } from "@/lib/format-height"
 import { formatDisplayName } from "@/lib/utils"
 
 export function capitalize(value: string): string {
@@ -167,20 +168,58 @@ interface LatestDraftInfo {
     divisionLabel: string
 }
 
-/**
- * Loads pair-pick display names and each user's latest draft record
- * (compressed to "F26"-style season + division labels).
- */
-export async function loadTryoutSheetEnrichment({
-    userIds,
-    pairIds
-}: {
-    userIds: string[]
-    pairIds: string[]
-}): Promise<{
+/** The user and signup columns both generators select per roster row. */
+export interface TryoutSheetSourceRow {
+    userId: string
+    oldId: number | null
+    firstName: string
+    lastName: string
+    preferredName: string | null
+    pairPickId: string | null
+    height: number | null
+    male: boolean | null
+    skillSetter: boolean | null
+    skillHitter: boolean | null
+    skillPasser: boolean | null
+}
+
+/** One player line on a tryout sheet, as both generators print it. */
+export interface TryoutSheetRow {
+    idLabel: string
+    name: string
+    lastName: string
+    isMale: boolean
+    pairName: string
+    hasPair: boolean
+    positionsLabel: string
+    heightLabel: string
+    genderLabel: string
+    lastSeasonLabel: string
+    lastDivisionLabel: string
+    hasBlankHistory: boolean
+}
+
+interface TryoutSheetEnrichment {
     pairNameById: Map<string, string>
     latestDraftByUser: Map<string, LatestDraftInfo>
-}> {
+}
+
+/**
+ * Loads pair-pick display names and each roster player's latest draft
+ * record (compressed to "F26"-style season + division labels).
+ */
+export async function loadTryoutSheetEnrichment(
+    rosterRows: TryoutSheetSourceRow[]
+): Promise<TryoutSheetEnrichment> {
+    const userIds = [...new Set(rosterRows.map((row) => row.userId))]
+    const pairIds = [
+        ...new Set(
+            rosterRows
+                .map((row) => row.pairPickId)
+                .filter((pairId): pairId is string => !!pairId)
+        )
+    ]
+
     const [pairRows, draftRows] = await Promise.all([
         pairIds.length > 0
             ? db
@@ -229,6 +268,110 @@ export async function loadTryoutSheetEnrichment({
     }
 
     return { pairNameById, latestDraftByUser }
+}
+
+export function buildTryoutSheetRow(
+    row: TryoutSheetSourceRow,
+    { pairNameById, latestDraftByUser }: TryoutSheetEnrichment
+): TryoutSheetRow {
+    const latestDraft = latestDraftByUser.get(row.userId)
+    return {
+        idLabel: row.oldId === null ? "—" : String(row.oldId),
+        name: getSheetDisplayName(row),
+        lastName: row.lastName,
+        isMale: !!row.male,
+        pairName: row.pairPickId
+            ? (pairNameById.get(row.pairPickId) ?? "—")
+            : "",
+        hasPair: !!row.pairPickId,
+        positionsLabel: getPositionsLabel(row),
+        heightLabel: formatHeight(row.height),
+        genderLabel: getGenderLabel(row.male),
+        lastSeasonLabel: latestDraft?.seasonLabel ?? "",
+        lastDivisionLabel: latestDraft?.divisionLabel ?? "",
+        hasBlankHistory: !latestDraft
+    }
+}
+
+/** New players (no draft history) first, then male players, then by last name. */
+export function compareTryoutSheetRows(
+    a: TryoutSheetRow,
+    b: TryoutSheetRow
+): number {
+    const aNew = a.hasBlankHistory ? 0 : 1
+    const bNew = b.hasBlankHistory ? 0 : 1
+    if (aNew !== bNew) return aNew - bNew
+    const aMale = a.isMale ? 0 : 1
+    const bMale = b.isMale ? 0 : 1
+    if (aMale !== bMale) return aMale - bMale
+    return a.lastName.localeCompare(b.lastName)
+}
+
+const HIGHLIGHT_YELLOW = rgb(1, 0.98, 0.8)
+const HIGHLIGHT_GREEN = rgb(0.88, 0.97, 0.88)
+
+/**
+ * Background fill for a cell, or null when it is plain: setters and
+ * non-male players in yellow (team balance), pair requests and players
+ * with no draft history in green (worth a closer look).
+ */
+export function sheetCellHighlight(
+    columnKey: string,
+    row: TryoutSheetRow
+): RGB | null {
+    if (columnKey === "positions" && row.positionsLabel.includes("S")) {
+        return HIGHLIGHT_YELLOW
+    }
+    if (columnKey === "gender" && row.genderLabel === "NM") {
+        return HIGHLIGHT_YELLOW
+    }
+    if (columnKey === "pair" && row.hasPair) {
+        return HIGHLIGHT_GREEN
+    }
+    if (
+        (columnKey === "lastSeason" || columnKey === "lastDivision") &&
+        row.hasBlankHistory
+    ) {
+        return HIGHLIGHT_GREEN
+    }
+    return null
+}
+
+/**
+ * Returns a column-width measurer: the widest of the bold header and the
+ * regular-weight values at fontSize, plus 8pt padding, never under minWidth.
+ */
+export function createColumnWidthMeasurer({
+    regularFont,
+    boldFont,
+    fontSize
+}: {
+    regularFont: PDFFont
+    boldFont: PDFFont
+    fontSize: number
+}) {
+    return ({
+        header,
+        values,
+        minWidth
+    }: {
+        header: string
+        values: string[]
+        minWidth: number
+    }): number => {
+        const headerWidth = boldFont.widthOfTextAtSize(header, fontSize)
+        const valueWidth = values.length
+            ? Math.max(
+                  ...values.map((value) =>
+                      regularFont.widthOfTextAtSize(value, fontSize)
+                  )
+              )
+            : 0
+        return Math.max(
+            minWidth,
+            Math.ceil(Math.max(headerWidth, valueWidth)) + 8
+        )
+    }
 }
 
 export function formatGeneratedTimestamp(): string {

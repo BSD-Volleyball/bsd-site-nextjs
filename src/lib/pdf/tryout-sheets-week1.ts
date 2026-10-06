@@ -22,28 +22,17 @@ import {
     getGenderLabel,
     getPositionsLabel,
     getSheetDisplayName,
+    buildTryoutSheetRow,
+    compareTryoutSheetRows,
+    createColumnWidthMeasurer,
     loadTryoutSheetEnrichment,
+    sheetCellHighlight,
+    type TryoutSheetRow,
     pdfDownloadResponse,
     pdfErrorResponse,
     seasonFileSlug,
     truncateToFit
 } from "./tryout-sheet-shared"
-
-interface TryoutSheetRow {
-    idLabel: string
-    name: string
-    lastName: string
-    isMale: boolean
-    pairName: string
-    hasPair: boolean
-    positionsLabel: string
-    heightLabel: string
-    genderLabel: string
-    lastSeasonLabel: string
-    lastDivisionLabel: string
-    hasBlankHistory: boolean
-    lastSeasonId: number | null
-}
 
 export async function generateWeek1TryoutSheetsPdf(
     userId: string
@@ -127,45 +116,14 @@ export async function generateWeek1TryoutSheetsPdf(
             )
         }
 
-        const userIds = [...new Set(rosterRows.map((row) => row.userId))]
-        const pairIds = [
-            ...new Set(
-                rosterRows
-                    .map((row) => row.pairPickId)
-                    .filter((pairId): pairId is string => !!pairId)
-            )
-        ]
-
-        const { pairNameById, latestDraftByUser } =
-            await loadTryoutSheetEnrichment({ userIds, pairIds })
+        const enrichment = await loadTryoutSheetEnrichment(rosterRows)
+        const { pairNameById, latestDraftByUser } = enrichment
 
         const pageRowsBySessionCourt = new Map<string, TryoutSheetRow[]>()
         for (const row of rosterRows) {
             const key = `${row.sessionNumber}-${row.courtNumber}`
             const currentRows = pageRowsBySessionCourt.get(key) || []
-            const latestDraft = latestDraftByUser.get(row.userId)
-
-            currentRows.push({
-                idLabel: row.oldId === null ? "—" : String(row.oldId),
-                name: getSheetDisplayName(row),
-                lastName: row.lastName,
-                isMale: !!row.male,
-                pairName: row.pairPickId
-                    ? (pairNameById.get(row.pairPickId) ?? "—")
-                    : "",
-                hasPair: !!row.pairPickId,
-                positionsLabel: getPositionsLabel({
-                    skillSetter: row.skillSetter,
-                    skillHitter: row.skillHitter,
-                    skillPasser: row.skillPasser
-                }),
-                heightLabel: formatHeight(row.height),
-                genderLabel: getGenderLabel(row.male),
-                lastSeasonLabel: latestDraft?.seasonLabel ?? "",
-                lastDivisionLabel: latestDraft?.divisionLabel ?? "",
-                hasBlankHistory: !latestDraft,
-                lastSeasonId: latestDraft?.seasonId ?? null
-            })
+            currentRows.push(buildTryoutSheetRow(row, enrichment))
 
             pageRowsBySessionCourt.set(key, currentRows)
         }
@@ -173,18 +131,7 @@ export async function generateWeek1TryoutSheetsPdf(
         for (const [key, rows] of pageRowsBySessionCourt) {
             pageRowsBySessionCourt.set(
                 key,
-                [...rows].sort((a, b) => {
-                    // New players (no draft history) before returning players
-                    const aNew = a.hasBlankHistory ? 0 : 1
-                    const bNew = b.hasBlankHistory ? 0 : 1
-                    if (aNew !== bNew) return aNew - bNew
-                    // Male players before non-male
-                    const aMale = a.isMale ? 0 : 1
-                    const bMale = b.isMale ? 0 : 1
-                    if (aMale !== bMale) return aMale - bMale
-                    // Alphabetical by last name
-                    return a.lastName.localeCompare(b.lastName)
-                })
+                [...rows].sort(compareTryoutSheetRows)
             )
         }
 
@@ -208,29 +155,11 @@ export async function generateWeek1TryoutSheetsPdf(
             fontSize: number
         ) => topY - (cellHeight + fontSize) / 2 + 2
 
-        const getColumnWidth = ({
-            header,
-            values,
-            minWidth
-        }: {
-            header: string
-            values: string[]
-            minWidth: number
-        }) => {
-            const headerWidth = boldFont.widthOfTextAtSize(header, cellFontSize)
-            const valueWidth = values.length
-                ? Math.max(
-                      ...values.map((value) =>
-                          regularFont.widthOfTextAtSize(value, cellFontSize)
-                      )
-                  )
-                : 0
-
-            return Math.max(
-                minWidth,
-                Math.ceil(Math.max(headerWidth, valueWidth)) + 8
-            )
-        }
+        const getColumnWidth = createColumnWidthMeasurer({
+            regularFont,
+            boldFont,
+            fontSize: cellFontSize
+        })
 
         const ldWidth = getColumnWidth({
             header: "LD",
@@ -369,8 +298,6 @@ export async function generateWeek1TryoutSheetsPdf(
             Math.min(44, Math.floor(availableRowsHeight / maxRowsPerPage))
         )
         const notesFontSize = Math.max(7, cellFontSize - 2)
-        const highlightYellow = rgb(1, 0.98, 0.8)
-        const highlightGreen = rgb(0.88, 0.97, 0.88)
 
         for (const sessionNumber of sessions) {
             for (const courtNumber of [1, 2, 3, 4]) {
@@ -559,27 +486,15 @@ export async function generateWeek1TryoutSheetsPdf(
                         const column = columns[index]
                         const value = values[index]
 
-                        const shouldHighlight =
-                            (column.key === "positions" &&
-                                row.positionsLabel.includes("S")) ||
-                            (column.key === "gender" &&
-                                row.genderLabel === "NM") ||
-                            (column.key === "pair" && row.hasPair) ||
-                            ((column.key === "lastSeason" ||
-                                column.key === "lastDivision") &&
-                                row.hasBlankHistory)
+                        const highlight = sheetCellHighlight(column.key, row)
 
-                        if (shouldHighlight) {
+                        if (highlight) {
                             page.drawRectangle({
                                 x: currentX + 1,
                                 y: currentY - rowHeight + 1,
                                 width: column.width - 2,
                                 height: rowHeight - 2,
-                                color:
-                                    column.key === "positions" ||
-                                    column.key === "gender"
-                                        ? highlightYellow
-                                        : highlightGreen
+                                color: highlight
                             })
                         }
 
