@@ -1,8 +1,7 @@
 "use server"
 
 import { formatPlayerName } from "@/lib/utils"
-import { getSquareClient } from "@/lib/square"
-import { randomUUID } from "node:crypto"
+import { chargeIdempotencyKey, getSquareClient } from "@/lib/square"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -29,6 +28,8 @@ import {
 } from "@/lib/tournament-config"
 import { getActiveWaiver, recordWaiverAcceptance } from "@/lib/waivers"
 import { logAuditEntry } from "@/lib/audit-log"
+import { logger } from "@/lib/logger"
+import { withTransientRetry } from "@/lib/db-retry"
 import {
     calculateDiscountedAmount,
     getActiveDiscountForUser,
@@ -279,7 +280,13 @@ export const submitTournamentSignup = withAction(
             try {
                 const client = getSquareClient()
                 const response = await client.payments.create({
-                    idempotencyKey: randomUUID(),
+                    idempotencyKey: chargeIdempotencyKey(
+                        "tournament",
+                        userId,
+                        config.tournamentId,
+                        sourceId,
+                        amountCents
+                    ),
                     sourceId,
                     amountMoney: { currency: "USD", amount: amountCents },
                     buyerEmailAddress: session.user.email,
@@ -294,45 +301,78 @@ export const submitTournamentSignup = withAction(
             }
         }
 
-        await recordWaiverAcceptance(userId, activeWaiver.id)
-
-        const [team] = await db
-            .insert(tournamentTeams)
-            .values({
-                tournament_id: config.tournamentId,
-                preferred_division_id: formData.preferredDivisionId,
-                captain_user_id: userId,
-                name: formData.teamName.trim(),
-                order_id: paymentId ?? null,
-                amount_paid: finalAmount
-            })
-            .returning({ id: tournamentTeams.id })
-
         const rosterIds = [userId, ...formData.rosterUserIds]
-        await db.insert(tournamentRoster).values(
-            rosterIds.map((rid) => ({
-                tournament_id: config.tournamentId,
-                team_id: team.id,
-                user_id: rid,
-                added_by_user_id: userId
-            }))
-        )
+        // A charged card must never leave half a registration, so every
+        // write after the payment happens in one transaction, retried on
+        // transient failures like the season flow.
+        try {
+            await withTransientRetry(() =>
+                db.transaction(async (tx) => {
+                    await recordWaiverAcceptance(
+                        userId,
+                        activeWaiver.id,
+                        undefined,
+                        tx
+                    )
 
-        // Mark any waitlist row for rostered users as placed on this team —
-        // we keep the row (it's the historical record of the player's
-        // pre-acceptance of the waiver) rather than delete it.
-        await db
-            .update(tournamentWaitlist)
-            .set({ placed_team_id: team.id, approved: true })
-            .where(
-                and(
-                    eq(tournamentWaitlist.tournament_id, config.tournamentId),
-                    inArray(tournamentWaitlist.user_id, rosterIds)
-                )
+                    const [team] = await tx
+                        .insert(tournamentTeams)
+                        .values({
+                            tournament_id: config.tournamentId,
+                            preferred_division_id: formData.preferredDivisionId,
+                            captain_user_id: userId,
+                            name: formData.teamName.trim(),
+                            order_id: paymentId ?? null,
+                            amount_paid: finalAmount
+                        })
+                        .returning({ id: tournamentTeams.id })
+
+                    await tx.insert(tournamentRoster).values(
+                        rosterIds.map((rid) => ({
+                            tournament_id: config.tournamentId,
+                            team_id: team.id,
+                            user_id: rid,
+                            added_by_user_id: userId
+                        }))
+                    )
+
+                    // Mark any waitlist row for rostered users as placed on
+                    // this team — we keep the row (it's the historical
+                    // record of the player's pre-acceptance of the waiver)
+                    // rather than delete it.
+                    await tx
+                        .update(tournamentWaitlist)
+                        .set({ placed_team_id: team.id, approved: true })
+                        .where(
+                            and(
+                                eq(
+                                    tournamentWaitlist.tournament_id,
+                                    config.tournamentId
+                                ),
+                                inArray(tournamentWaitlist.user_id, rosterIds)
+                            )
+                        )
+
+                    if (discountInfo) {
+                        await markDiscountAsUsed(discountInfo.id, tx)
+                    }
+                })
             )
-
-        if (discountInfo) {
-            await markDiscountAsUsed(discountInfo.id)
+        } catch (dbError) {
+            if (!paymentId) throw dbError
+            logger.error(
+                "CRITICAL: Square tournament payment succeeded but the team registration failed — manual reconciliation required.",
+                {
+                    paymentId,
+                    userId,
+                    tournamentId: config.tournamentId,
+                    amount: finalAmount
+                },
+                dbError
+            )
+            return fail(
+                "Your payment went through, but we hit a problem finishing your registration. Please contact us and do NOT pay again — we'll complete your signup manually."
+            )
         }
 
         await logAuditEntry({

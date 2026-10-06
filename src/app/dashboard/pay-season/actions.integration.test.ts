@@ -489,3 +489,156 @@ describe("submitFreeSignup", () => {
         expect(remaining).toHaveLength(0)
     })
 })
+
+describe("season signup gating and charge safety", () => {
+    let waiverId: number
+
+    beforeEach(async () => {
+        await seedBaselineSeason()
+        waiverId = (await createWaiver()).id
+        paymentsCreate.mockResolvedValue({
+            payment: { id: "PAY-123", receiptUrl: "https://square.test/r/1" }
+        })
+    })
+
+    it("refuses a paid signup once registration has closed, without charging", async () => {
+        await createSeason({ phase: "regular_season", year: 2027 })
+        await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            formData,
+            waiverId
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toBe("Registration for this season is closed.")
+        expect(paymentsCreate).not.toHaveBeenCalled()
+    })
+
+    it("refuses a free signup once registration has closed", async () => {
+        await createSeason({ phase: "draft", year: 2027 })
+        const player = await createUserWithRoles([])
+        const discount = await createDiscount({ user: player.id })
+
+        const result = await submitFreeSignup(formData, discount.id, waiverId)
+        expect(result.status).toBe(false)
+        expect(result.message).toBe("Registration for this season is closed.")
+    })
+
+    it("still admits a waitlist-approved player after registration closes", async () => {
+        const closed = await createSeason({ phase: "draft", year: 2027 })
+        const player = await createUserWithRoles([])
+        await addToWaitlist({
+            season: closed.id,
+            user: player.id,
+            approved: true
+        })
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            formData,
+            waiverId
+        )
+        expect(result.status).toBe(true)
+    })
+
+    it("rejects an unknown captain answer without charging", async () => {
+        await createUserWithRoles([])
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, captain: "definitely" },
+            waiverId
+        )
+        expect(result).toMatchObject({
+            status: false,
+            message: "Invalid captain selection."
+        })
+        expect(paymentsCreate).not.toHaveBeenCalled()
+    })
+
+    it("rejects unavailability dates from another season without charging", async () => {
+        const other = await createSeason({ phase: "complete", year: 2020 })
+        const foreignEvent = await createSeasonEvent(other.id)
+        await createSeason({ year: 2027 })
+        await createUserWithRoles([])
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            { ...formData, unavailableEventIds: [foreignEvent.id] },
+            waiverId
+        )
+        expect(result).toMatchObject({
+            status: false,
+            message: "Invalid unavailability selection."
+        })
+        expect(paymentsCreate).not.toHaveBeenCalled()
+    })
+
+    it("derives the Square idempotency key from the card token", async () => {
+        await createUserWithRoles([])
+        // First card is declined (no payment), so the player retries.
+        paymentsCreate.mockResolvedValueOnce({})
+        await submitSeasonPayment("token-A", formData, waiverId)
+        const keyA = paymentsCreate.mock.calls[0][0].idempotencyKey
+        expect(keyA).toHaveLength(45)
+
+        // A different token (a retry after a decline) needs a different key.
+        await submitSeasonPayment("token-B", formData, waiverId)
+        const keyB = paymentsCreate.mock.calls[1][0].idempotencyKey
+        expect(keyB).not.toBe(keyA)
+    })
+
+    it("treats a replay of the same payment as success", async () => {
+        const player = await createUserWithRoles([])
+        const seasonId = (await createSeason({ year: 2027 })).id
+        // Square answers the idempotent replay with the payment whose signup
+        // the first request already wrote.
+        paymentsCreate.mockImplementation(async () => {
+            await createSignup({
+                season: seasonId,
+                player: player.id,
+                order_id: "PAY-123"
+            })
+            return {
+                payment: {
+                    id: "PAY-123",
+                    receiptUrl: "https://square.test/r/1"
+                }
+            }
+        })
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            formData,
+            waiverId
+        )
+        expect(result.status).toBe(true)
+    })
+
+    it("flags a racing second charge for refund instead of a generic failure", async () => {
+        const player = await createUserWithRoles([])
+        const season = await createSeason({ year: 2027 })
+        paymentsCreate.mockImplementation(async () => {
+            await createSignup({
+                season: season.id,
+                player: player.id,
+                order_id: "PAY-FIRST"
+            })
+            return {
+                payment: {
+                    id: "PAY-SECOND",
+                    receiptUrl: "https://square.test/r/2"
+                }
+            }
+        })
+
+        const result = await submitSeasonPayment(
+            "src-token",
+            formData,
+            waiverId
+        )
+        expect(result.status).toBe(false)
+        expect(result.message).toContain("will be refunded")
+        expect(result.paymentId).toBe("PAY-SECOND")
+    })
+})

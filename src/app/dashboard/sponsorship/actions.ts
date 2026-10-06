@@ -1,6 +1,5 @@
 "use server"
 
-import { randomUUID } from "node:crypto"
 import { and, eq } from "drizzle-orm"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { PUBLIC_SPONSORS_TAG } from "@/next/public-cache"
@@ -28,7 +27,7 @@ import {
     normalizeSponsorDetails,
     notifyAdminsSponsorshipPaid
 } from "@/lib/sponsors"
-import { getSquareClient } from "@/lib/square"
+import { chargeIdempotencyKey, getSquareClient } from "@/lib/square"
 
 // Same shape as the season/tournament payment actions so the client can
 // share its result handling (and the "do NOT pay again" path can carry the
@@ -128,7 +127,13 @@ export async function submitSponsorshipPayment(
 
         const seasonLabel = formatSeasonLabel(config)
         const response = await getSquareClient().payments.create({
-            idempotencyKey: randomUUID(),
+            idempotencyKey: chargeIdempotencyKey(
+                "sponsorship",
+                sessionUser.id,
+                own.sponsorshipId,
+                sourceId,
+                amountCents
+            ),
             sourceId,
             amountMoney: { currency: "USD", amount: amountCents },
             buyerEmailAddress: sessionUser.email,
