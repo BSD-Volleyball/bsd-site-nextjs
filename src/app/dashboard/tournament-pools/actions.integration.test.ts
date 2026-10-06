@@ -12,11 +12,8 @@ import {
 import { createDivision } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { seedTournamentBracket } from "@/lib/tournament-brackets"
-import {
-    getTournamentBracketEditorView,
-    revertBracketSeeding,
-    saveBracketPlacements
-} from "./actions"
+import { revertBracketSeeding, saveBracketPlacements } from "./actions"
+import { getTournamentBracketEditorView } from "./data"
 
 // Builds a tournament with two divisions, each with two pools of three teams,
 // advancing two per pool → a clean four-team bracket (two round-1 winners games)

@@ -1,4 +1,4 @@
-import type { DraftHomeworkData } from "./actions"
+import type { DraftHomeworkData } from "./data"
 
 // Key format: `${m|f}-${round}-${slot}`
 export type Selections = Record<string, string | null>

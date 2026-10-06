@@ -1,6 +1,6 @@
 "use client"
 
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 import { CONSIDERING_ROUND, type Selections } from "./homework-selections"
 import { buildPlayerPictureUrl, formatDisplayName } from "@/lib/utils"
 

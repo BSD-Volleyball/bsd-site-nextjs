@@ -11,7 +11,8 @@ import {
 } from "@/database/schema"
 import { createSignup, seedBaselineSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getSeasonConfigData, saveSeasonConfig } from "./actions"
+import { saveSeasonConfig } from "./actions"
+import { getSeasonConfigData } from "./data"
 
 /** A player who has marked themselves unavailable for `eventId`. */
 async function markPlayerUnavailable(seasonId: number, eventId: number) {

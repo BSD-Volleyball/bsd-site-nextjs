@@ -1,6 +1,6 @@
 import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getRefCompensationData } from "./actions"
+import { getRefCompensationData } from "./data"
 import { RefCompensationClient } from "./ref-compensation-client"
 import type { Metadata } from "next"
 

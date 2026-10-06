@@ -27,13 +27,13 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import {
-    createTeams,
-    type DivisionOption,
-    type UserOption,
-    type DivisionCommissioner,
-    type ExistingTeam
-} from "./actions"
+import { createTeams } from "./actions"
+import type {
+    DivisionOption,
+    UserOption,
+    DivisionCommissioner,
+    ExistingTeam
+} from "./data"
 import { LexicalEmailPreview } from "@/components/email-template/lexical-email-preview"
 import { PlayerOptionCombobox } from "@/components/user-combobox"
 import {

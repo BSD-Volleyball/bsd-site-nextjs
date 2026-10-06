@@ -1,12 +1,8 @@
 "use client"
 
 import { EditWeek1RosterForm } from "@/components/edit-week-roster/edit-week-1-roster-form"
-import {
-    updateWeek1Rosters,
-    sendWeek1RosterNotifications,
-    type Week1EditablePlayer,
-    type Week1EditableSlot
-} from "./actions"
+import { updateWeek1Rosters, sendWeek1RosterNotifications } from "./actions"
+import type { Week1EditablePlayer, Week1EditableSlot } from "./data"
 
 interface EditWeek1FormProps {
     players: Week1EditablePlayer[]

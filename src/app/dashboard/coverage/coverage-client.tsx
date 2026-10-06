@@ -43,7 +43,8 @@ import type {
 } from "@/lib/coverage/types"
 import { cn } from "@/lib/utils"
 
-import { type CoverageView, addPresence, removePresence } from "./actions"
+import { addPresence, removePresence } from "./actions"
+import type { CoverageView } from "./data"
 
 const STATUS_BORDER: Record<CoverageStatus, string> = {
     green: "border-l-green-500",

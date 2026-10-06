@@ -16,11 +16,11 @@ import {
     createSponsorship as createSponsorshipAction,
     deleteSponsorship,
     finalizeSponsorLogoUpload,
-    getSponsorships,
     markSponsorshipPaidManually,
     updateSponsor,
     updateSponsorshipAmount
 } from "./actions"
+import { getSponsorships } from "./data"
 
 const UNAUTHORIZED = { status: false, message: "Unauthorized." }
 

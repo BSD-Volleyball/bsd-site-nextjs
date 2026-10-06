@@ -19,7 +19,8 @@ import {
 import { sentMessages } from "@/test/email"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
 import { sendCoverageDigestForDate } from "@/lib/notifications/coverage-digest"
-import { addPresence, getCoverageView, removePresence } from "./actions"
+import { addPresence, removePresence } from "./actions"
+import { getCoverageView } from "./data"
 
 const DATE = "2099-10-06"
 const DATE2 = "2099-10-13"

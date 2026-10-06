@@ -12,7 +12,7 @@ import {
     removeKeyAndShiftUp,
     type TabShape
 } from "./homework-board"
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 
 interface TabContentProps {
     tabKey: "m" | "f"

@@ -2,7 +2,7 @@ import { requireAdminOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditPlayerForm } from "./edit-player-form"
-import { getUsers } from "./actions"
+import { getUsers } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

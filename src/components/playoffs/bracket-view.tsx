@@ -14,7 +14,7 @@ import type {
     SingleEliminationBracketProps,
     SvgWrapperProps
 } from "@/components/playoff-brackets"
-import type { BracketMatch } from "@/app/dashboard/playoffs/[seasonId]/actions"
+import type { BracketMatch } from "@/app/dashboard/playoffs/[seasonId]/data"
 
 const DoubleEliminationBracket = dynamic<
     DoubleEliminationBracketProps<BracketMatch>

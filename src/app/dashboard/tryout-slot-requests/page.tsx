@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
 import { TryoutSlotRequestsManager } from "./tryout-slot-requests-manager"
-import { getTryoutSlotRequests, getUsers } from "./actions"
+import { getTryoutSlotRequests, getUsers } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

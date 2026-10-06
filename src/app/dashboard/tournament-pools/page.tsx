@@ -2,10 +2,7 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getTournamentConfig } from "@/lib/tournament-config"
-import {
-    getTournamentBracketEditorView,
-    getTournamentPoolsView
-} from "./actions"
+import { getTournamentBracketEditorView, getTournamentPoolsView } from "./data"
 import { TournamentPoolsManager } from "./pools-manager"
 import { TournamentBracketEditor } from "./bracket-editor"
 

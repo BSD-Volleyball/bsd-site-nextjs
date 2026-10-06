@@ -8,9 +8,9 @@ import { createUser, createUserWithRoles, logout } from "@/test/session"
 import {
     createTryoutSlotRequest,
     deleteTryoutSlotRequest,
-    getTryoutSlotRequests,
     updateTryoutSlotRequest
 } from "./actions"
+import { getTryoutSlotRequests } from "./data"
 
 function requestData(
     userId: string,

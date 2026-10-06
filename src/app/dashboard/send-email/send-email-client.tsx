@@ -44,15 +44,14 @@ import {
 import { site } from "@/config/site"
 import { formatShortDate } from "@/lib/season-utils"
 import { createAndSendBroadcast, previewBroadcast } from "./actions"
+import type { BroadcastPreview, SendToType } from "./actions"
 import type {
-    BroadcastPreview,
     DivisionOption,
     TeamOption,
     TemplateOption,
     TryoutOption,
-    BroadcastHistoryItem,
-    SendToType
-} from "./actions"
+    BroadcastHistoryItem
+} from "./data"
 
 interface SendEmailClientProps {
     canSendToAll: boolean

@@ -18,11 +18,8 @@ import {
 import { WaiverContent } from "@/components/waiver-content"
 import { useAction } from "@/components/hooks/use-action"
 import { formatFullTimestamp } from "@/lib/date-utils"
-import {
-    createWaiverVersion,
-    publishWaiverVersion,
-    type WaiverRow
-} from "./actions"
+import { createWaiverVersion, publishWaiverVersion } from "./actions"
+import type { WaiverRow } from "./data"
 
 interface Props {
     waivers: WaiverRow[]

@@ -30,13 +30,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import {
-    createDiscount,
-    updateDiscount,
-    deleteDiscount,
-    type DiscountEntry,
-    type DiscountScope
-} from "./actions"
+import { createDiscount, updateDiscount, deleteDiscount } from "./actions"
+import type { DiscountEntry, DiscountScope } from "./data"
 
 interface DiscountsManagerProps {
     discounts: DiscountEntry[]

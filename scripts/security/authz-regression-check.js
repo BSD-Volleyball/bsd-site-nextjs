@@ -36,6 +36,13 @@ const callerAuthenticatedLoaders = new Set([
     "src/app/dashboard/tournament-team/data.ts:loadTeamForCaptain"
 ])
 
+// data.ts internals exported only so a sibling actions file can share them.
+// They are not loaders: every caller (a guarded loader in the same data.ts or
+// a guarded server action) has already run its access check.
+const sharedDataHelpers = new Set([
+    "src/app/dashboard/season-config/data.ts:countUnavailablePlayersByEvent"
+])
+
 const strictExpectations = [
     {
         key: "src/app/dashboard/view-signups/data.ts:getSignupsData",
@@ -63,7 +70,7 @@ const strictExpectations = [
         description: "must require an authenticated session via requireSession"
     },
     {
-        key: "src/app/dashboard/playoffs/[seasonId]/actions.ts:getPlayoffData",
+        key: "src/app/dashboard/playoffs/[seasonId]/data.ts:getPlayoffData",
         pattern: /requireSession\s*\(/,
         description: "must require an authenticated session via requireSession"
     },
@@ -203,7 +210,8 @@ function main() {
 
             if (
                 publicAllowlist.has(key) ||
-                callerAuthenticatedLoaders.has(key)
+                callerAuthenticatedLoaders.has(key) ||
+                sharedDataHelpers.has(key)
             ) {
                 continue
             }

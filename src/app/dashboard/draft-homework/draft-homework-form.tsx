@@ -20,7 +20,7 @@ import {
     PlayerDetailPopup
 } from "@/components/player-detail"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
-import type { DraftHomeworkData } from "./actions"
+import type { DraftHomeworkData } from "./data"
 import {
     CONSIDERING_ROUND,
     buildInitialSelections,

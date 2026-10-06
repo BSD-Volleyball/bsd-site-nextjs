@@ -2,7 +2,7 @@ import { requireAdminOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { DiscountsManager } from "./discounts-manager"
-import { getDiscounts, getUsers } from "./actions"
+import { getDiscounts, getUsers } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

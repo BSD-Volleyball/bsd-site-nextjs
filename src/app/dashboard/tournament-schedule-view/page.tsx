@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
-import { getTournamentScheduleView } from "./actions"
+import { getTournamentScheduleView } from "./data"
 import { ScheduleView } from "./schedule-view"
 
 export const metadata: Metadata = {

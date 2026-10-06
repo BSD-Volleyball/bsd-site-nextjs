@@ -1,7 +1,7 @@
 import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { SendEmailClient } from "./send-email-client"
-import { getEmailFormData, getBroadcastHistory } from "./actions"
+import { getEmailFormData, getBroadcastHistory } from "./data"
 
 export const metadata = { title: "Send Email" }
 export const dynamic = "force-dynamic"

@@ -1,7 +1,7 @@
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
-import { getPlayoffData } from "./actions"
+import { getPlayoffData } from "./data"
 import { DivisionSection } from "@/components/playoffs/division-section"
 import type { Metadata } from "next"
 

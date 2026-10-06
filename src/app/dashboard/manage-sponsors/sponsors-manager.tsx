@@ -43,9 +43,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { UserCombobox } from "@/components/user-combobox"
 import { SponsorLogoUploader } from "@/components/sponsors/sponsor-logo-uploader"
+import type { ManageSponsorsData, SponsorshipRow } from "./data"
 import {
-    type ManageSponsorsData,
-    type SponsorshipRow,
     createSponsorLogoUpload,
     createSponsorship,
     deleteSponsorship,

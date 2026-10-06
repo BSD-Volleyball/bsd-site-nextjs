@@ -13,10 +13,10 @@ import {
     sendEmailReplyAndAssign,
     sendEmailReplyAndClose,
     unmarkInboundEmailAsSpam,
-    type AssignableAdmin,
     type ThreadItem,
     type InboundEmailRow
 } from "./actions"
+import type { AssignableAdmin } from "./data"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"

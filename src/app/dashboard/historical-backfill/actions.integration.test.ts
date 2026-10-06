@@ -4,7 +4,8 @@ import { drafts } from "@/database/schema"
 import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import { createDivision, createSeason, createTeam } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getLegacyAccounts, getMergeTargets } from "./actions"
+import { getMergeTargets } from "./actions"
+import { getLegacyAccounts } from "./data"
 
 let legacyCounter = 0
 

@@ -7,7 +7,6 @@ import { coveragePresence } from "@/database/schema"
 import { logAuditEntry } from "@/lib/audit-log"
 import { normalizeTime } from "@/lib/coverage/format"
 import { listPresencePool, loadCoverage } from "@/lib/coverage/load"
-import type { CoverageAdmin, CoverageDate } from "@/lib/coverage/types"
 import { getLeagueDateString } from "@/lib/date-utils"
 import {
     ActionError,
@@ -20,24 +19,6 @@ import {
     requireSession,
     withAction
 } from "@/next/action-helpers"
-
-export interface CoverageView {
-    dates: CoverageDate[]
-    pool: CoverageAdmin[]
-    today: string
-}
-
-export const getCoverageView = withAction(
-    async (): Promise<ActionResult<CoverageView>> => {
-        await requireAdmin()
-        const today = getLeagueDateString()
-        const [dates, pool] = await Promise.all([
-            loadCoverage({ fromDate: today }),
-            listPresencePool()
-        ])
-        return ok({ dates, pool, today })
-    }
-)
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 

@@ -3,7 +3,8 @@ import { playerPicBaseUrl } from "@/config/env"
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { getSeasonConfig } from "@/lib/site-config"
 import { hasPermissionBySession } from "@/next/session"
-import { getSeasonOptionsForPictures, getTeamsForPicturePage } from "./actions"
+import { getTeamsForPicturePage } from "./actions"
+import { getSeasonOptionsForPictures } from "./data"
 import { AddTeamPicturesClient } from "./add-team-pictures-client"
 
 export default async function AddTeamPicturesPage() {

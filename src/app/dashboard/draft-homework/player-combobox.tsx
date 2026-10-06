@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { Combobox } from "@/components/ui/combobox"
 import { cn, formatPlayerLabel } from "@/lib/utils"
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 
 interface PlayerComboboxProps {
     players: DraftHomeworkPlayer[]

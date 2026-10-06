@@ -9,7 +9,7 @@ import {
     drafts,
     users
 } from "@/database/schema"
-import { eq, and, asc, desc, inArray } from "drizzle-orm"
+import { eq, and, asc, inArray } from "drizzle-orm"
 import { isAdminOrDirectorBySession } from "@/next/session"
 import {
     withAction,
@@ -18,18 +18,6 @@ import {
     requirePositiveInt
 } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
-
-export async function getAvailableYears(): Promise<number[]> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return []
-
-    const rows = await db
-        .selectDistinct({ year: seasons.year })
-        .from(seasons)
-        .orderBy(desc(seasons.year))
-
-    return rows.map((r) => r.year)
-}
 
 export type SeasonOption = { id: number; code: string; season: string }
 

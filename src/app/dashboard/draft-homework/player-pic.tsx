@@ -1,6 +1,6 @@
 "use client"
 
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 
 interface PlayerPicProps {

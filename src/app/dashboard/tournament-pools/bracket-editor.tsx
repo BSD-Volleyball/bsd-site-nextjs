@@ -24,12 +24,8 @@ import {
     AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
-import {
-    revertBracketSeeding,
-    saveBracketPlacements,
-    type BracketEditorView,
-    type PlaceableTeam
-} from "./actions"
+import { revertBracketSeeding, saveBracketPlacements } from "./actions"
+import type { BracketEditorView, PlaceableTeam } from "./data"
 
 interface Props {
     view: BracketEditorView

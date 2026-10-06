@@ -3,7 +3,7 @@ import { db } from "@/database/db"
 import { matchReferees, seasonRefs } from "@/database/schema"
 import { createDivision, createMatch, createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getRefCompensationData } from "./actions"
+import { getRefCompensationData } from "./data"
 
 describe("getRefCompensationData", () => {
     it("rejects unauthenticated callers", async () => {

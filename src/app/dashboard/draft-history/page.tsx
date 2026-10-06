@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
-import { getAvailableYears } from "./actions"
+import { getAvailableYears } from "./data"
 import { DraftHistoryClient } from "./draft-history-client"
 import type { Metadata } from "next"
 

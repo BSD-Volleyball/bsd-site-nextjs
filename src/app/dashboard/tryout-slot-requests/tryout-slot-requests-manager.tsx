@@ -37,9 +37,9 @@ import { UserCombobox } from "@/components/user-combobox"
 import {
     createTryoutSlotRequest,
     deleteTryoutSlotRequest,
-    updateTryoutSlotRequest,
-    type TryoutSlotRequestEntry
+    updateTryoutSlotRequest
 } from "./actions"
+import type { TryoutSlotRequestEntry } from "./data"
 
 interface TryoutSlotRequestsManagerProps {
     requests: TryoutSlotRequestEntry[]

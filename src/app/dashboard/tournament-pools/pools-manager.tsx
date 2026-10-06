@@ -11,9 +11,9 @@ import {
     assignTeamToDivision,
     createPool,
     deletePool,
-    removeTeamFromPool,
-    type TournamentPoolsView
+    removeTeamFromPool
 } from "./actions"
+import type { TournamentPoolsView } from "./data"
 
 interface Props {
     view: TournamentPoolsView

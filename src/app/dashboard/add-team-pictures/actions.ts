@@ -3,7 +3,7 @@
 import { logger } from "@/lib/logger"
 import { revalidatePath } from "next/cache"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
-import { and, asc, desc, eq } from "drizzle-orm"
+import { and, asc, eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { divisions, seasons, teams } from "@/database/schema"
 import {
@@ -17,7 +17,7 @@ import {
     requireSeasonConfig,
     withAction
 } from "@/next/action-helpers"
-import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId } from "@/next/session"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
@@ -79,32 +79,6 @@ async function resolvePictureSeason(
         .limit(1)
     if (!row) throw new ActionError("Season not found.")
     return seasonId
-}
-
-export interface PictureSeasonOption {
-    seasonId: number
-    label: string
-}
-
-/** Season list for the admin-only selector; empty for non-admins. */
-export async function getSeasonOptionsForPictures(): Promise<
-    PictureSeasonOption[]
-> {
-    if (!(await isAdminOrDirectorBySession())) return []
-
-    const rows = await db
-        .select({
-            id: seasons.id,
-            year: seasons.year,
-            season: seasons.season
-        })
-        .from(seasons)
-        .orderBy(desc(seasons.id))
-
-    return rows.map((row) => ({
-        seasonId: row.id,
-        label: `${row.season.charAt(0).toUpperCase()}${row.season.slice(1)} ${row.year}`
-    }))
 }
 
 export interface TeamPhotoItem {

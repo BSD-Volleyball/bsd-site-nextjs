@@ -50,7 +50,6 @@ import * as manageEmails from "@/app/dashboard/manage-emails/actions"
 import * as myAvailability from "@/app/dashboard/my-availability/actions"
 import * as playerLookup from "@/app/dashboard/player-lookup/actions"
 import * as playerLookupSignups from "@/app/dashboard/player-lookup-signups/actions"
-import * as playoffs from "@/app/dashboard/playoffs/[seasonId]/actions"
 import * as ratePlayer from "@/app/dashboard/rate-player/actions"
 import * as reffingSchedule from "@/app/dashboard/reffing-schedule/actions"
 import * as reviewPairs from "@/app/dashboard/review-pairs/actions"
@@ -64,7 +63,6 @@ import * as tournamentControl from "@/app/dashboard/tournament-control/actions"
 import * as tournamentOverview from "@/app/dashboard/tournament-overview/actions"
 import * as tournamentRosters from "@/app/dashboard/tournament-rosters/[tournamentId]/actions"
 import * as tournamentSchedule from "@/app/dashboard/tournament-schedule/actions"
-import * as tournamentScheduleView from "@/app/dashboard/tournament-schedule-view/actions"
 import * as viewSignups from "@/app/dashboard/view-signups/actions"
 import * as viewTournamentWaitlist from "@/app/dashboard/view-tournament-waitlist/actions"
 import * as viewWaitlist from "@/app/dashboard/view-waitlist/actions"
@@ -76,14 +74,20 @@ import * as adminViewSignupsData from "@/app/dashboard/admin-view-signups/data"
 import * as attritionData from "@/app/dashboard/attrition/data"
 import * as createWeek3Data from "@/app/dashboard/create-week-3/data"
 import * as draftDayData from "@/app/dashboard/draft-setup/order/data"
+import * as draftHistoryData from "@/app/dashboard/draft-history/data"
+import * as draftHomeworkData from "@/app/dashboard/draft-homework/data"
 import * as editEmailsData from "@/app/dashboard/edit-emails/data"
+import * as editPlayerData from "@/app/dashboard/edit-player/data"
+import * as editWeek1Data from "@/app/dashboard/edit-week-1/data"
 import * as editWeek2Data from "@/app/dashboard/edit-week-2/data"
 import * as editWeek3Data from "@/app/dashboard/edit-week-3/data"
 import * as evaluatePlayersData from "@/app/dashboard/evaluate-players/data"
 import * as googleMembershipData from "@/app/dashboard/google-membership/data"
 import * as homeworkStatusData from "@/app/dashboard/homework-status/data"
+import * as manageEmailsData from "@/app/dashboard/manage-emails/data"
 import * as nextMatchData from "@/app/dashboard/next-match-data"
 import * as playerLookupSignupsData from "@/app/dashboard/player-lookup-signups/data"
+import * as playoffsData from "@/app/dashboard/playoffs/[seasonId]/data"
 import * as potentialCaptainsData from "@/app/dashboard/potential-captains/data"
 import * as ratePlayerData from "@/app/dashboard/rate-player/data"
 import * as reviewPairsData from "@/app/dashboard/review-pairs/data"
@@ -94,6 +98,8 @@ import * as tournamentControlData from "@/app/dashboard/tournament-control/data"
 import * as tournamentOverviewData from "@/app/dashboard/tournament-overview/data"
 import * as tournamentPlayoffsData from "@/app/dashboard/tournament-playoffs/[tournamentId]/data"
 import * as tournamentPoolPlayData from "@/app/dashboard/tournament-pool-play/[tournamentId]/data"
+import * as tournamentScheduleData from "@/app/dashboard/tournament-schedule/data"
+import * as tournamentScheduleViewData from "@/app/dashboard/tournament-schedule-view/data"
 import * as viewSignupsData from "@/app/dashboard/view-signups/data"
 import * as viewTournamentWaitlistData from "@/app/dashboard/view-tournament-waitlist/data"
 import * as viewWaitlistData from "@/app/dashboard/view-waitlist/data"
@@ -184,7 +190,7 @@ const cases: SmokeCase[] = [
     c("draftDay.getDraftSheetData", "fail", () => draftDay.getDraftSheetData()),
     // draft-history — admin-only getters return [] unauth
     c("draftHistory.getAvailableYears", "emptyArray", () =>
-        draftHistory.getAvailableYears()
+        draftHistoryData.getAvailableYears()
     ),
     c("draftHistory.getSeasonsForYear", "emptyArray", () =>
         draftHistory.getSeasonsForYear(2026)
@@ -197,7 +203,7 @@ const cases: SmokeCase[] = [
     ),
     // draft-homework
     c("draftHomework.getDraftHomeworkData", "fail", () =>
-        draftHomework.getDraftHomeworkData()
+        draftHomeworkData.getDraftHomeworkData()
     ),
     c("draftHomework.saveDraftHomework", "fail", () =>
         draftHomework.saveDraftHomework({} as never)
@@ -213,7 +219,7 @@ const cases: SmokeCase[] = [
         editEmails.createEmailTemplate("n")
     ),
     // edit-player
-    c("editPlayer.getUsers", "emptyArray", () => editPlayer.getUsers()),
+    c("editPlayer.getUsers", "emptyArray", () => editPlayerData.getUsers()),
     c("editPlayer.getUserDetails", "fail", () =>
         editPlayer.getUserDetails("u")
     ),
@@ -233,7 +239,9 @@ const cases: SmokeCase[] = [
         editPlayer.updateSignup(1, {} as never)
     ),
     // edit-week-*
-    c("editWeek1.getEditWeek1Data", "fail", () => editWeek1.getEditWeek1Data()),
+    c("editWeek1.getEditWeek1Data", "fail", () =>
+        editWeek1Data.getEditWeek1Data()
+    ),
     c("editWeek1.updateWeek1Rosters", "fail", () =>
         editWeek1.updateWeek1Rosters([])
     ),
@@ -313,7 +321,7 @@ const cases: SmokeCase[] = [
         manageEmails.unmarkInboundEmailAsSpam(1)
     ),
     c("manageEmails.getAssignableAdmins", "emptyArray", () =>
-        manageEmails.getAssignableAdmins()
+        manageEmailsData.getAssignableAdmins()
     ),
     // my-availability
     c("myAvailability.updatePlayerAvailability", "fail", () =>
@@ -346,7 +354,7 @@ const cases: SmokeCase[] = [
         playerLookupSignups.getPlayerDetailsForSignups("u")
     ),
     // playoffs / potential-captains
-    c("playoffs.getPlayoffData", "fail", () => playoffs.getPlayoffData(1)),
+    c("playoffs.getPlayoffData", "fail", () => playoffsData.getPlayoffData(1)),
     c("potentialCaptains.getPotentialCaptainsData", "fail", () =>
         potentialCaptainsData.getPotentialCaptainsData()
     ),
@@ -459,7 +467,7 @@ const cases: SmokeCase[] = [
         tournamentRosters.getTournamentRosters(1)
     ),
     c("tournamentSchedule.getScheduleView", "fail", () =>
-        tournamentSchedule.getScheduleView()
+        tournamentScheduleData.getScheduleView()
     ),
     c("tournamentSchedule.updateScheduleRow", "fail", () =>
         tournamentSchedule.updateScheduleRow(1, {
@@ -469,7 +477,7 @@ const cases: SmokeCase[] = [
         })
     ),
     c("tournamentScheduleView.getTournamentScheduleView", "fail", () =>
-        tournamentScheduleView.getTournamentScheduleView()
+        tournamentScheduleViewData.getTournamentScheduleView()
     ),
     // view-*
     c("viewSignups.getSignupsCsvData", "fail", () =>

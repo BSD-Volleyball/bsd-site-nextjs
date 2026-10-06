@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils"
 import { PlayerCombobox } from "./player-combobox"
 import { PlayerPic } from "./player-pic"
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 import type { Selections } from "./homework-selections"
 
 interface RoundGroupProps {

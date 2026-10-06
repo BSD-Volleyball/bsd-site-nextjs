@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { getSessionUserId } from "@/next/session"
 
-import { getCoverageView } from "./actions"
+import { getCoverageView } from "./data"
 import { CoverageClient } from "./coverage-client"
 
 export const metadata: Metadata = {

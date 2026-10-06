@@ -16,9 +16,9 @@ import {
     createTeamPhotoUpload,
     finalizeTeamPhotoUpload,
     getTeamsForPicturePage,
-    type DivisionTeamGroup,
-    type PictureSeasonOption
+    type DivisionTeamGroup
 } from "./actions"
+import type { PictureSeasonOption } from "./data"
 
 // Reject before doing any work — compression also enforces this server-side.
 function isSupportedImageFile(file: File): boolean {

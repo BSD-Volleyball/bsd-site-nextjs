@@ -1,7 +1,7 @@
 "use client"
 
 import { PlayerPic } from "./player-pic"
-import type { DraftHomeworkPlayer } from "./actions"
+import type { DraftHomeworkPlayer } from "./data"
 import { formatDisplayName } from "@/lib/utils"
 
 interface SuggestedPlayerListProps {

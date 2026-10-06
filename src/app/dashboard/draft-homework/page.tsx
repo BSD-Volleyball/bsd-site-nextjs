@@ -1,7 +1,7 @@
 import { requireSessionOrRedirect } from "@/next/page-guards"
 import { playerPicBaseUrl } from "@/config/env"
 import { PageHeader } from "@/components/layout/page-header"
-import { getDraftHomeworkData } from "./actions"
+import { getDraftHomeworkData } from "./data"
 import { DraftHomeworkForm } from "./draft-homework-form"
 import type { Metadata } from "next"
 

@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getUsers } from "@/app/dashboard/manage-discounts/actions"
-import { getSponsorships } from "./actions"
+import { getUsers } from "@/app/dashboard/manage-discounts/data"
+import { getSponsorships } from "./data"
 import { SponsorsManager } from "./sponsors-manager"
 
 export const metadata: Metadata = {

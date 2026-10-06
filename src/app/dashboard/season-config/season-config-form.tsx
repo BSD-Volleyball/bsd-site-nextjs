@@ -20,11 +20,11 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import {
     saveSeasonConfig,
-    type SeasonConfigData,
     type EventType,
     type EventData,
     type TimeSlotData
 } from "./actions"
+import type { SeasonConfigData } from "./data"
 
 interface TimeSlotState {
     key: string

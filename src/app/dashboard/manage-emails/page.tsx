@@ -3,7 +3,8 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageEmailsClient } from "./manage-emails-client"
-import { getInboundEmails, getAssignableAdmins } from "./actions"
+import { getInboundEmails } from "./actions"
+import { getAssignableAdmins } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

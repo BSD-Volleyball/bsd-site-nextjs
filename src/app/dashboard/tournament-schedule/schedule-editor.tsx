@@ -6,11 +6,8 @@ import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-    updateScheduleRow,
-    type ScheduleRow,
-    type ScheduleView
-} from "./actions"
+import { updateScheduleRow } from "./actions"
+import type { ScheduleRow, ScheduleView } from "./data"
 
 interface Props {
     view: ScheduleView

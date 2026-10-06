@@ -1,6 +1,6 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { listWaivers } from "./actions"
+import { listWaivers } from "./data"
 import { ManageWaiversClient } from "./manage-waivers-client"
 import type { Metadata } from "next"
 

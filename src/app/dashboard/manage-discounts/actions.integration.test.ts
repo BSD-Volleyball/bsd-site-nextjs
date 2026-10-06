@@ -7,9 +7,9 @@ import { createUser, createUserWithRoles } from "@/test/session"
 import {
     createDiscount as createDiscountAction,
     deleteDiscount,
-    getDiscounts,
     updateDiscount
 } from "./actions"
+import { getDiscounts } from "./data"
 
 describe("createDiscount", () => {
     it("rejects non-admin callers", async () => {

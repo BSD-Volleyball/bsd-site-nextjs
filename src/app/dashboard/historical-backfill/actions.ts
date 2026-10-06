@@ -6,38 +6,7 @@ import {
     requireAdmin,
     withAction
 } from "@/next/action-helpers"
-import {
-    type HistoricalCoverage,
-    fetchHistoricalCoverage
-} from "@/lib/historical-coverage"
-import {
-    type LegacyAccount,
-    type MergeTarget,
-    fetchLegacyAccounts,
-    fetchMergeTargets
-} from "@/lib/legacy-accounts"
-
-/**
- * Live coverage of the historical backfill. Read-only, but admin-gated like
- * every other exported action: it exposes the full season roster/match census.
- */
-export const getHistoricalCoverage = withAction(
-    async (): Promise<ActionResult<HistoricalCoverage>> => {
-        await requireAdmin()
-        return ok(await fetchHistoricalCoverage())
-    }
-)
-
-/**
- * The `legacy-*` placeholder accounts the archive backfill minted for players
- * it could not bind to a real member, each with a suggested match.
- */
-export const getLegacyAccounts = withAction(
-    async (): Promise<ActionResult<LegacyAccount[]>> => {
-        await requireAdmin()
-        return ok(await fetchLegacyAccounts())
-    }
-)
+import { type MergeTarget, fetchMergeTargets } from "@/lib/legacy-accounts"
 
 /**
  * Every real member account, for the "map to" picker. Fetched on demand rather
