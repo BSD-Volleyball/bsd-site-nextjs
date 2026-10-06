@@ -57,7 +57,7 @@
         "@remixicon/react": "^4.9.0",
         "@vercel/analytics": "^2.0.1",
         "@vercel/speed-insights": "^2.0.0",
-        "better-auth": "1.6.33",
+        "better-auth": "1.7.7",
         "botid": "^1.5.11",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -82,7 +82,7 @@
         "sonner": "^2.0.8",
         "square": "^44.2.1",
         "tailwind-merge": "^3.7.0",
-        "zod": "4.3.6"
+        "zod": "4.6.5"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.15",
@@ -112,7 +112,7 @@
         "overrides": {
             "tar": ">=7.5.7",
             "lodash": ">=4.17.23",
-            "better-auth": "1.6.33",
+            "better-auth": "1.7.7",
             "esbuild": ">=0.28.0"
         }
     }
