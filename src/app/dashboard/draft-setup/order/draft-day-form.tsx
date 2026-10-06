@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn, reorder } from "@/lib/utils"
-import type { CaptainRow, DivisionData } from "./actions"
+import type { CaptainRow, DivisionData } from "./data"
 import { saveDraftOrder, getDraftSheetData } from "./actions"
 import {
     generateBlankDraftSheet,

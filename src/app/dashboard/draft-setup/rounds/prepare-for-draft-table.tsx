@@ -3,7 +3,7 @@
 import { useState, useCallback, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import type { PrepareForDraftData } from "./actions"
+import type { PrepareForDraftData } from "./data"
 import { lockDraftRounds, setCaptainRound, setPairDiff } from "./actions"
 import type { DraftHomeworkDetailResult } from "@/app/dashboard/homework-status/actions"
 import { getDraftHomeworkDetail } from "@/app/dashboard/homework-status/actions"

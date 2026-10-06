@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest"
 import { db } from "@/database/db"
 import { auditLog, sessions, userRoles } from "@/database/schema"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { addUserRole, getSeasonOptions, removeUserRole } from "./actions"
+import { addUserRole, removeUserRole } from "./actions"
+import { getSeasonOptions } from "./data"
 
 describe("addUserRole", () => {
     it("rejects unauthenticated callers", async () => {

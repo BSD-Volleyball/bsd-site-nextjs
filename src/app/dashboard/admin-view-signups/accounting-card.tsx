@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { SignupEntry } from "./actions"
+import type { SignupEntry } from "./data"
 import { getDisplayName } from "./signup-display-name"
 
 interface AccountingCardProps {

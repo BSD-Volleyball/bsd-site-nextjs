@@ -2,7 +2,7 @@ import Link from "next/link"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import type { Metadata } from "next"
-import { getAvailableDivisions, getTournamentConfigData } from "./actions"
+import { getAvailableDivisions, getTournamentConfigData } from "./data"
 import { TournamentConfigForm } from "./tournament-config-form"
 
 export const metadata: Metadata = {

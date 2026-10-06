@@ -1,7 +1,7 @@
 import { formatHeight } from "@/components/player-detail"
 import { buildCsvContent } from "@/lib/csv-download"
 import { buildPlayerPictureUrl } from "@/lib/utils"
-import type { SignupEntry } from "./actions"
+import type { SignupEntry } from "./data"
 
 export function generateCsvContent(
     signups: SignupEntry[],

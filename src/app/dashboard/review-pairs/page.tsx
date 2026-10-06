@@ -3,7 +3,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { PairsList } from "./pairs-list"
-import { getSeasonPairs } from "./actions"
+import { getSeasonPairs } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

@@ -21,13 +21,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
-import {
-    getCommissionersForSeason,
-    saveCommissioners,
-    type Season,
-    type User,
-    type Division
-} from "./actions"
+import { getCommissionersForSeason, saveCommissioners } from "./actions"
+import type { Season, User, Division } from "./data"
 
 interface CommissionersFormProps {
     seasons: Season[]

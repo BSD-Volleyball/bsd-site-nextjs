@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 
-import { getConfigureTryoutJobsView } from "./actions"
+import { getConfigureTryoutJobsView } from "./data"
 import { ConfigureTryoutJobsForm } from "./configure-tryout-jobs-form"
 
 export const metadata: Metadata = {

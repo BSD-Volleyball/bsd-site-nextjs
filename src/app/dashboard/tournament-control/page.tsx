@@ -1,10 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import type { Metadata } from "next"
-import {
-    getCurrentTournamentPhaseData,
-    getTournamentPlacements
-} from "./actions"
+import { getCurrentTournamentPhaseData, getTournamentPlacements } from "./data"
 import { TournamentPhaseControl } from "./tournament-phase-control"
 import { EndTournamentEarlyCard } from "./end-tournament-early-card"
 import { CreateTournamentCard } from "./create-tournament-card"

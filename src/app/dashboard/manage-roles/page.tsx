@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageRolesClient } from "./manage-roles-client"
-import { getSeasonOptions, getDivisionOptions } from "./actions"
+import { getSeasonOptions, getDivisionOptions } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

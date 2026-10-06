@@ -13,10 +13,10 @@ import {
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
 import {
     addPlayerToRoster,
-    getCaptainTeamView,
     removePlayerFromRoster,
     updateTeamName
 } from "./actions"
+import { getCaptainTeamView } from "./data"
 
 async function seedCaptainTeam(tournamentOverrides = {}) {
     const tournament = await createTournament(tournamentOverrides)

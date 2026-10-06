@@ -3,7 +3,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { SignupsList } from "./signups-list"
-import { getSeasonSignups, getSeasonDrops } from "./actions"
+import { getSeasonSignups, getSeasonDrops } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

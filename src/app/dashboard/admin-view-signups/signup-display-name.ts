@@ -1,5 +1,5 @@
 import { formatPlayerName } from "@/lib/utils"
-import type { SignupEntry } from "./actions"
+import type { SignupEntry } from "./data"
 
 export function getDisplayName(entry: SignupEntry): string {
     return formatPlayerName(

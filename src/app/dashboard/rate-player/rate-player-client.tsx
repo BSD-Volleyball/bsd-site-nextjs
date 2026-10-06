@@ -20,7 +20,7 @@ import type {
     SeasonTeamDivisionGroup,
     TryoutDivisionGroup,
     TryoutSessionGroup
-} from "./actions"
+} from "./data"
 import {
     ByTeamAccordion,
     TryoutDivisionAccordion,

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { SignupEntry } from "./actions"
+import type { SignupEntry } from "./data"
 import { getDisplayName } from "./signup-display-name"
 
 // Signup answers added after the fact are NULL for older rows — show those as

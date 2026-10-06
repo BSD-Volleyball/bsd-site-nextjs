@@ -2,7 +2,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
-import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
+import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./data"
 
 import type { Metadata } from "next"
 

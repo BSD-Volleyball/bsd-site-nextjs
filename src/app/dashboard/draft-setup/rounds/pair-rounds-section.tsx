@@ -1,6 +1,6 @@
 "use client"
 
-import type { PairDifferential, PrepareForDraftData } from "./actions"
+import type { PairDifferential, PrepareForDraftData } from "./data"
 import { clampRound } from "./draft-round-utils"
 
 function PairDifferentialRow({

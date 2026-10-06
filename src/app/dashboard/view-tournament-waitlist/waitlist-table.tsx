@@ -5,12 +5,8 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-    placeWaitlistPlayerOnTeam,
-    removeWaitlistPlayer,
-    type PlacementTarget,
-    type WaitlistEntry
-} from "./actions"
+import { placeWaitlistPlayerOnTeam, removeWaitlistPlayer } from "./actions"
+import type { PlacementTarget, WaitlistEntry } from "./data"
 
 interface Props {
     tournamentName: string

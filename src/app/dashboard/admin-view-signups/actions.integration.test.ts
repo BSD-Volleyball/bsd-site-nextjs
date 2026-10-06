@@ -19,12 +19,8 @@ import {
     seedBaselineSeason
 } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import {
-    dropSignup,
-    getSeasonDrops,
-    getSeasonSignups,
-    restoreDrop
-} from "./actions"
+import { dropSignup, restoreDrop } from "./actions"
+import { getSeasonDrops, getSeasonSignups } from "./data"
 
 describe("getSeasonSignups discount reporting", () => {
     let previousSeasonId: number

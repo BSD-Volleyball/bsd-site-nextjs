@@ -5,7 +5,7 @@ import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
-import { desc, eq, asc } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { grantRole, invalidateAllSessionsForUser } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
@@ -22,51 +22,11 @@ export interface UserRoleAssignment {
     granted_by_name: string | null
 }
 
-export interface SeasonOption {
-    id: number
-    label: string
-}
-
-export interface DivisionOption {
-    id: number
-    name: string
-}
-
 export interface UserSearchResult {
     id: string
     first_name: string
     last_name: string
     email: string
-}
-
-export async function getSeasonOptions(): Promise<SeasonOption[]> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return []
-
-    const rows = await db
-        .select({
-            id: seasons.id,
-            code: seasons.code,
-            year: seasons.year,
-            season: seasons.season
-        })
-        .from(seasons)
-        .orderBy(desc(seasons.id))
-
-    return rows.map((s) => ({
-        id: s.id,
-        label: `${s.code} ${s.year} ${s.season}`
-    }))
-}
-
-export async function getDivisionOptions(): Promise<DivisionOption[]> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) return []
-
-    return db
-        .select({ id: divisions.id, name: divisions.name })
-        .from(divisions)
-        .orderBy(asc(divisions.name))
 }
 
 export async function searchUsers(query: string): Promise<UserSearchResult[]> {

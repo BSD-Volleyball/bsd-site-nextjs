@@ -8,12 +8,8 @@ import {
 } from "@/database/schema"
 import { createDivision, createSeason, createTeam } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import {
-    getPrepareForDraftData,
-    lockDraftRounds,
-    setCaptainRound,
-    setPairDiff
-} from "./actions"
+import { lockDraftRounds, setCaptainRound, setPairDiff } from "./actions"
+import { getPrepareForDraftData } from "./data"
 
 async function seedSeasonWithDivisions() {
     const season = await createSeason()

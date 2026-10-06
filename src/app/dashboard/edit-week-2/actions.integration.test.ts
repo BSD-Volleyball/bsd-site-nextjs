@@ -15,11 +15,8 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import {
-    getEditWeek2Data,
-    sendWeek2RosterNotifications,
-    updateWeek2Rosters
-} from "./actions"
+import { sendWeek2RosterNotifications, updateWeek2Rosters } from "./actions"
+import { getEditWeek2Data } from "./data"
 
 const mockedSendBatch = vi.mocked(sendBatchEmails)
 

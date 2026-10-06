@@ -10,7 +10,7 @@ import {
     DraftSetupDivisionPicker,
     DraftSetupStepper
 } from "../draft-setup-stepper"
-import { getPrepareForDraftData } from "./actions"
+import { getPrepareForDraftData } from "./data"
 import { PrepareForDraftTable } from "./prepare-for-draft-table"
 
 export const dynamic = "force-dynamic"

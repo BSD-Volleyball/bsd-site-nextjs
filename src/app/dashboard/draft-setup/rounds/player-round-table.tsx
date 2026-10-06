@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import type { PlayerRow, PrepareForDraftData } from "./actions"
+import type { PlayerRow, PrepareForDraftData } from "./data"
 import { clampRound, getRoundClass } from "./draft-round-utils"
 
 function PlayerTableRow({

@@ -2,15 +2,13 @@
 
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
-import { withAction, ok, fail } from "@/next/action-helpers"
+import { withAction, fail } from "@/next/action-helpers"
 
 import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import {
     EDIT_WEEK_2,
-    getEditWeekData,
     sendEditWeekRosterNotifications,
-    updateEditWeekRosters,
-    type EditWeekData
+    updateEditWeekRosters
 } from "@/lib/preseason/edit-week-actions"
 import type {
     EditWeekAssignment,
@@ -22,23 +20,6 @@ export type {
     EditWeekSlot as Week2EditableSlot,
     EditWeekRosterEntry as Week2RosterEntry
 } from "@/components/edit-week-roster/edit-week-roster-form"
-
-export const getEditWeek2Data = withAction(
-    async (): Promise<
-        ActionResult<Omit<EditWeekData, "status" | "message">>
-    > => {
-        const hasAccess = await isAdminOrDirectorBySession()
-        if (!hasAccess) {
-            return fail("You don't have permission to access this page.")
-        }
-
-        const { status, message, ...data } = await getEditWeekData(EDIT_WEEK_2)
-        if (!status) {
-            return fail(message ?? "Something went wrong while loading data.")
-        }
-        return ok(data)
-    }
-)
 
 export const updateWeek2Rosters = withAction(
     async (slots: EditWeekRosterEntry[]): Promise<ActionResult> => {

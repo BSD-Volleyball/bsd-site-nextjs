@@ -28,12 +28,8 @@ import {
     type TryoutJobScope
 } from "@/lib/tryout-volunteer-types"
 
-import {
-    importJobsFromLastSeason,
-    saveTryoutJobs,
-    type ConfigureTryoutJobsView,
-    type TryoutNightView
-} from "./actions"
+import { importJobsFromLastSeason, saveTryoutJobs } from "./actions"
+import type { ConfigureTryoutJobsView, TryoutNightView } from "./data"
 
 interface JobState {
     /** Stable React key; unrelated to the database id. */

@@ -3,7 +3,7 @@
 import { formatHeight } from "@/components/player-detail"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import type { RatePlayerEntry, RatedPlayerEntry } from "./actions"
+import type { RatePlayerEntry, RatedPlayerEntry } from "./data"
 import { getDisplayName, getGenderLabel } from "./rate-player-helpers"
 
 interface RatedPlayerTableProps {

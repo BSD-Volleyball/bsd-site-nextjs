@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import type { RatedPlayerEntry } from "./actions"
+import type { RatedPlayerEntry } from "./data"
 import {
     resolveDefaultLookupType,
     sortRatedPlayers
@@ -117,7 +117,7 @@ describe("resolveDefaultLookupType", () => {
 })
 
 import { buildTryoutTimeSlotGroups } from "./rate-player-helpers"
-import type { RatePlayerEntry } from "./actions"
+import type { RatePlayerEntry } from "./data"
 
 function makePlayer(
     id: string,

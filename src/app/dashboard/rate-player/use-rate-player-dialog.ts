@@ -5,10 +5,9 @@ import { toast } from "sonner"
 import {
     savePlayerRatingNote,
     savePlayerSkillRatings,
-    type PlayerRatingValues,
-    type RatePlayerEntry,
     type RatingSkill
 } from "./actions"
+import type { PlayerRatingValues, RatePlayerEntry } from "./data"
 import { getEmptyRating } from "./rate-player-helpers"
 
 export type RatePlayerDialogController = ReturnType<typeof useRatePlayerDialog>

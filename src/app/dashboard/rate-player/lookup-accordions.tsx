@@ -13,7 +13,7 @@ import type {
     SeasonTeamDivisionGroup,
     TryoutDivisionGroup,
     TryoutSessionGroup
-} from "./actions"
+} from "./data"
 import type { TryoutTimeSlotGroup } from "./rate-player-helpers"
 import { PlayerTable } from "./player-table"
 

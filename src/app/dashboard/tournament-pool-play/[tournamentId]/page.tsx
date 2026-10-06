@@ -9,7 +9,7 @@ import {
 } from "@/app/dashboard/tournament-schedule-view/schedule-view"
 import { PoolStandingsTable } from "@/components/tournament/pool-standings-table"
 import type { PoolStandingRow } from "@/lib/tournament-standings"
-import { getTournamentPoolPlay } from "./actions"
+import { getTournamentPoolPlay } from "./data"
 
 export const metadata: Metadata = {
     title: "Tournament Pool Play"

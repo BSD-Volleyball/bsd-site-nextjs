@@ -2,7 +2,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requireCaptainAccessOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getRatePlayerData } from "./actions"
+import { getRatePlayerData } from "./data"
 import { RatePlayerClient } from "./rate-player-client"
 import type { Metadata } from "next"
 

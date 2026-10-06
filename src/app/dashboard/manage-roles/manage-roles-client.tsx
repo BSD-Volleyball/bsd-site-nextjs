@@ -19,12 +19,8 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import type {
-    UserRoleAssignment,
-    SeasonOption,
-    DivisionOption,
-    UserSearchResult
-} from "./actions"
+import type { UserRoleAssignment, UserSearchResult } from "./actions"
+import type { SeasonOption, DivisionOption } from "./data"
 import {
     searchUsers,
     getUserRoleAssignments,

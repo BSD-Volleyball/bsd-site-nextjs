@@ -11,9 +11,9 @@ import {
     addPlayerToRoster,
     removePlayerFromRoster,
     updatePreferredDivision,
-    updateTeamName,
-    type CaptainTeamView
+    updateTeamName
 } from "./actions"
+import type { CaptainTeamView } from "./data"
 
 interface Props {
     view: CaptainTeamView

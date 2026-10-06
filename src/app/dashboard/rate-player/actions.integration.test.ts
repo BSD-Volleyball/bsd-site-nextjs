@@ -3,7 +3,7 @@ import { db } from "@/database/db"
 import { playerRatings } from "@/database/schema"
 import { createSeason, createSignup } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getRatePlayerData } from "./actions"
+import { getRatePlayerData } from "./data"
 
 async function rate(
     evaluator: string,

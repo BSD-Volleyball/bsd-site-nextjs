@@ -11,11 +11,8 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
-import {
-    logAdminCsvDownload,
-    type SignupEntry,
-    type SignupDropEntry
-} from "./actions"
+import { logAdminCsvDownload } from "./actions"
+import type { SignupEntry, SignupDropEntry } from "./data"
 import { AccountingCard } from "./accounting-card"
 import { DroppedSignupsCard } from "./dropped-signups-card"
 import { SignupDropDialog } from "./signup-drop-dialog"

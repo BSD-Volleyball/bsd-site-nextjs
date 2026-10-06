@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
     createMissingPictureUpload,
-    finalizeMissingPictureUpload,
-    type MissingPicturePlayer
+    finalizeMissingPictureUpload
 } from "./actions"
+import type { MissingPicturePlayer } from "./data"
 import { compressImageForUpload } from "@/lib/image-compression"
 
 interface AddPicturesListProps {

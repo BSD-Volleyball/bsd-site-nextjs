@@ -26,7 +26,8 @@ import {
     type SignupDropCategory
 } from "@/lib/signup-drops-display"
 import { createDiscount } from "../manage-discounts/actions"
-import { dropSignup, type SignupEntry } from "./actions"
+import { dropSignup } from "./actions"
+import type { SignupEntry } from "./data"
 import { getDisplayName } from "./signup-display-name"
 
 interface DropResult {

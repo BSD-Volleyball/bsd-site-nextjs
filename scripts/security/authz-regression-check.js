@@ -32,7 +32,8 @@ const publicAllowlist = new Set([])
 // resolved the session and passes session.user.id), like src/lib functions.
 // They are not endpoints; the page's guard is the access check.
 const callerAuthenticatedLoaders = new Set([
-    "src/app/dashboard/friends/data.ts:getFriendsPageData"
+    "src/app/dashboard/friends/data.ts:getFriendsPageData",
+    "src/app/dashboard/tournament-team/data.ts:loadTeamForCaptain"
 ])
 
 const strictExpectations = [

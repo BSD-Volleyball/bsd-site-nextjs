@@ -16,11 +16,11 @@ import {
 import { createUser, createUserWithRoles } from "@/test/session"
 
 import {
-    getConfigureTryoutJobsView,
     importJobsFromLastSeason,
     saveTryoutJobs,
     type TryoutJobInput
 } from "./actions"
+import { getConfigureTryoutJobsView } from "./data"
 
 function job(overrides: Partial<TryoutJobInput> = {}): TryoutJobInput {
     return {

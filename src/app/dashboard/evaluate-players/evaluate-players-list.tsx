@@ -16,11 +16,8 @@ import {
     TooltipContent,
     TooltipTrigger
 } from "@/components/ui/tooltip"
-import {
-    saveEvaluations,
-    type NewPlayerEntry,
-    type DivisionOption
-} from "./actions"
+import { saveEvaluations } from "./actions"
+import type { NewPlayerEntry, DivisionOption } from "./data"
 import { formatHeight } from "@/components/player-detail"
 import { useAction } from "@/components/hooks/use-action"
 import { formatPlayerName } from "@/lib/utils"

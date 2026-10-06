@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import type { PrepareForDraftData, CaptainInfo } from "./actions"
+import type { PrepareForDraftData, CaptainInfo } from "./data"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {

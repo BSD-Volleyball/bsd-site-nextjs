@@ -11,7 +11,7 @@ import {
     draftSetupStepHref
 } from "../draft-setup-stepper"
 import { DraftDayForm } from "./draft-day-form"
-import { getDraftDayData } from "./actions"
+import { getDraftDayData } from "./data"
 
 export const metadata: Metadata = { title: "Draft Setup — Draft Order" }
 

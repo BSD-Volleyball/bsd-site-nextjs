@@ -6,7 +6,7 @@ import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { AddPicturesList } from "./add-pictures-list"
-import { getPlayersNeedingPictures } from "./actions"
+import { getPlayersNeedingPictures } from "./data"
 
 export const metadata: Metadata = {
     title: "Add Pictures"

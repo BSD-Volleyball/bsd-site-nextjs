@@ -1,9 +1,6 @@
 "use client"
 
-import type {
-    ConsideredButUndraftedPlayer,
-    PrepareForDraftData
-} from "./actions"
+import type { ConsideredButUndraftedPlayer, PrepareForDraftData } from "./data"
 
 function ConsideredButUndraftedRow({
     player,

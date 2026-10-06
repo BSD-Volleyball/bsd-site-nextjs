@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
-import { getTournamentWaitlist } from "./actions"
+import { getTournamentWaitlist } from "./data"
 import { TournamentWaitlistTable } from "./waitlist-table"
 
 export const metadata: Metadata = {

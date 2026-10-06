@@ -21,12 +21,11 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import type { SetsMode } from "@/lib/tournament-sets"
 import {
-    type AvailableDivision,
     saveTournamentConfig,
-    type TournamentConfigData,
     type TournamentDivisionInput,
     type TournamentMetadataInput
 } from "./actions"
+import type { AvailableDivision, TournamentConfigData } from "./data"
 
 interface Props {
     initialData: TournamentConfigData

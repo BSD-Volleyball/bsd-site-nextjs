@@ -20,12 +20,14 @@ import {
     assignPairPartner,
     bustMatchedPair,
     bustUnmatchedPair,
-    completeUnmatchedPair,
-    type MatchedPair,
-    type PairCandidate,
-    type PairUser,
-    type UnmatchedPair
+    completeUnmatchedPair
 } from "./actions"
+import type {
+    MatchedPair,
+    PairCandidate,
+    PairUser,
+    UnmatchedPair
+} from "./data"
 
 interface PairsListProps {
     matched: MatchedPair[]

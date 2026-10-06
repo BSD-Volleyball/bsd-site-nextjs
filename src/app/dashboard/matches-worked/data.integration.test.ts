@@ -8,7 +8,7 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getMatchesWorkedData } from "./actions"
+import { getMatchesWorkedData } from "./data"
 
 async function seedSchedule() {
     const season = await createSeason({

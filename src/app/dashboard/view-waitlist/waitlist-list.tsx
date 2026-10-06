@@ -7,7 +7,8 @@ import {
     usePlayerDetailModal,
     AdminPlayerDetailPopup
 } from "@/components/player-detail"
-import { setWaitlistApproval, type WaitlistEntry } from "./actions"
+import { setWaitlistApproval } from "./actions"
+import type { WaitlistEntry } from "./data"
 import { useRouter } from "next/navigation"
 import { formatPlayerName } from "@/lib/utils"
 

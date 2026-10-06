@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/next/page-guards"
-import { getCaptainTeamView } from "./actions"
+import { getCaptainTeamView } from "./data"
 import { CaptainTeamEditor } from "./captain-team-editor"
 
 export const metadata: Metadata = {

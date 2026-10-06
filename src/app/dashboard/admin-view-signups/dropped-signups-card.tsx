@@ -16,7 +16,8 @@ import {
 import { formatFullTimestamp } from "@/lib/date-utils"
 import { dropCategoryLabel, dropStageLabel } from "@/lib/signup-drops-display"
 import { formatPlayerName } from "@/lib/utils"
-import { restoreDrop, type SignupDropEntry } from "./actions"
+import { restoreDrop } from "./actions"
+import type { SignupDropEntry } from "./data"
 
 interface DroppedSignupsCardProps {
     drops: SignupDropEntry[]

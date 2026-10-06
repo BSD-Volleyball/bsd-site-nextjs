@@ -3,7 +3,7 @@ import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { CreateWeek3Form } from "./create-week-3-form"
-import { getCreateWeek3Data } from "./actions"
+import { getCreateWeek3Data } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

@@ -9,7 +9,7 @@ import type {
     PlayerRatingValues,
     RatePlayerEntry,
     RatedPlayerEntry
-} from "./actions"
+} from "./data"
 
 export function getDisplayName(player: RatePlayerEntry): string {
     return formatDisplayName(
