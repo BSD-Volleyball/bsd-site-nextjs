@@ -9,7 +9,11 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { type MatchScoreInput, saveScoresForDivision } from "./actions"
+import {
+    finalizeScoreSheetUpload,
+    type MatchScoreInput,
+    saveScoresForDivision
+} from "./actions"
 
 const MATCH_DATE = "2026-09-12"
 
@@ -166,5 +170,39 @@ describe("saveScoresForDivision", () => {
 
         expect(result.status).toBe(false)
         expect(result.message).toContain("Invalid winner")
+    })
+})
+
+describe("finalizeScoreSheetUpload", () => {
+    it("rejects an object key it did not issue for that night and division", async () => {
+        const season = await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        for (const key of [
+            "email-attachments/abc/0-secret.pdf",
+            `scoresheets/${season.id}/2026-10-05/div1_123.jpg/../../x`,
+            `scoresheets/${season.id}/2026-10-06/div1_123.jpg`
+        ]) {
+            const result = await finalizeScoreSheetUpload(1, "2026-10-05", key)
+            expect(result).toMatchObject({
+                status: false,
+                message: "Invalid upload reference."
+            })
+        }
+    })
+
+    it("rejects a malformed date before touching storage", async () => {
+        await createSeason()
+        await createUserWithRoles([{ role: "admin" }])
+
+        const result = await finalizeScoreSheetUpload(
+            1,
+            "2026-10-05/../x",
+            "scoresheets/1/2026-10-05/div1_1.jpg"
+        )
+        expect(result).toMatchObject({
+            status: false,
+            message: "Invalid date."
+        })
     })
 })

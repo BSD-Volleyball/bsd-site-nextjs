@@ -606,8 +606,27 @@ export const updateSignup = withAction(
             return fail("Unauthorized")
         }
 
+        // The parameter type is erased at runtime, so copy only the editable
+        // columns; a crafted payload must not reach season, player, order_id…
+        const editable = [
+            "age",
+            "captain",
+            "pair",
+            "pair_pick",
+            "pair_reason",
+            "ref_interest",
+            "tryout_help",
+            "amount_paid"
+        ] as const
+        const update = Object.fromEntries(
+            editable.filter((key) => key in data).map((key) => [key, data[key]])
+        ) as typeof data
+        if (Object.keys(update).length === 0) {
+            return fail("Nothing to update.")
+        }
+
         try {
-            await db.update(signups).set(data).where(eq(signups.id, signupId))
+            await db.update(signups).set(update).where(eq(signups.id, signupId))
 
             const session = await auth.api.getSession({
                 headers: await headers()

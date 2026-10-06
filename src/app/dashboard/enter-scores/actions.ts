@@ -932,6 +932,20 @@ export async function saveScoresForDivision(
 }
 
 const SCORE_SHEET_PREFIX = "scoresheets"
+const SHEET_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Input checks shared by the two score-sheet upload steps: a real date and
+ * division, since both end up in the R2 key and the score_sheets row.
+ * Returns an error message, or null. Authorization stays in each action.
+ */
+function scoreSheetInputError(divisionId: number, date: string): string | null {
+    if (!Number.isInteger(divisionId) || divisionId <= 0) {
+        return "Invalid division."
+    }
+    if (!SHEET_DATE_RE.test(date)) return "Invalid date."
+    return null
+}
 
 export async function createScoreSheetUpload(
     divisionId: number,
@@ -945,11 +959,13 @@ export async function createScoreSheetUpload(
 }> {
     const seasonId = await getEnterScoresSeasonId()
     const hasAccess = seasonId
-        ? await hasPermissionBySession("scores:enter", { seasonId })
+        ? await hasPermissionBySession("scores:enter", { seasonId, divisionId })
         : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }
+    const inputError = scoreSheetInputError(divisionId, date)
+    if (inputError) return { status: false, message: inputError }
 
     if (
         !Number.isInteger(contentLength) ||
@@ -986,11 +1002,28 @@ export async function finalizeScoreSheetUpload(
 ): Promise<{ status: boolean; message: string; scoreSheet?: ScoreSheetData }> {
     const seasonId = await getEnterScoresSeasonId()
     const hasAccess = seasonId
-        ? await hasPermissionBySession("scores:enter", { seasonId })
+        ? await hasPermissionBySession("scores:enter", { seasonId, divisionId })
         : false
     if (!hasAccess || !seasonId) {
         return { status: false, message: "Unauthorized" }
     }
+    const inputError = scoreSheetInputError(divisionId, date)
+    if (inputError) return { status: false, message: inputError }
+
+    // The key is client-supplied; it must be one createScoreSheetUpload
+    // could have issued for this season, night and division, since the
+    // stored path is later fetched by the sheet reader.
+    const expectedPrefix = `${SCORE_SHEET_PREFIX}/${seasonId}/${date}/div${divisionId}_`
+    if (
+        typeof objectKey !== "string" ||
+        !objectKey.startsWith(expectedPrefix) ||
+        !/^\d+\.jpg$/.test(objectKey.slice(expectedPrefix.length))
+    ) {
+        return { status: false, message: "Invalid upload reference." }
+    }
+
+    const session = await auth.api.getSession({ headers: await headers() })
+    if (!session) return { status: false, message: "Unauthorized" }
 
     try {
         const [inserted] = await db
@@ -1000,12 +1033,7 @@ export async function finalizeScoreSheetUpload(
                 division_id: divisionId,
                 match_date: date,
                 image_path: objectKey,
-                uploaded_by:
-                    (
-                        await auth.api.getSession({
-                            headers: await headers()
-                        })
-                    )?.user.id ?? ""
+                uploaded_by: session.user.id
             })
             .returning({
                 id: scoreSheets.id,
@@ -1013,18 +1041,13 @@ export async function finalizeScoreSheetUpload(
                 imagePath: scoreSheets.image_path
             })
 
-        const session = await auth.api.getSession({
-            headers: await headers()
+        await logAuditEntry({
+            userId: session.user.id,
+            action: "create",
+            entityType: "score_sheets",
+            entityId: String(inserted.id),
+            summary: `Uploaded score sheet for division ${divisionId} on ${date}`
         })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "create",
-                entityType: "score_sheets",
-                entityId: String(inserted.id),
-                summary: `Uploaded score sheet for division ${divisionId} on ${date}`
-            })
-        }
 
         revalidatePath("/dashboard/enter-scores")
         return {

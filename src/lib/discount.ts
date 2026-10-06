@@ -1,6 +1,7 @@
 import { db, type DbExecutor } from "@/database/db"
 import { discounts } from "@/database/schema"
 import { eq, and, or, isNull, gt } from "drizzle-orm"
+import { logger } from "@/lib/logger"
 
 export interface UserDiscount {
     id: number
@@ -54,14 +55,25 @@ export async function markDiscountAsUsed(
     executor: DbExecutor = db,
     signupId?: number
 ): Promise<void> {
-    await executor
+    // Conditional on used=false so a second redemption can never overwrite
+    // the first one's used_signup_id (the reporting join key). It does not
+    // throw: this runs after a card is charged, and the callers' unique
+    // indexes already stop the same holder registering twice.
+    const consumed = await executor
         .update(discounts)
         .set({
             used: true,
             used_at: new Date(),
             used_signup_id: signupId ?? null
         })
-        .where(eq(discounts.id, discountId))
+        .where(and(eq(discounts.id, discountId), eq(discounts.used, false)))
+        .returning({ id: discounts.id })
+    if (consumed.length === 0) {
+        logger.warn("[discount] Discount was already used", {
+            discountId,
+            signupId
+        })
+    }
 }
 
 export function calculateDiscountedAmount(
