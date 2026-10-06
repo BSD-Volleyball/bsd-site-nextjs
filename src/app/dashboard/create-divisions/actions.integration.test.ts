@@ -11,7 +11,6 @@ describe("getDivisionsPageData", () => {
         const result = await getDivisionsPageData()
         expect(result.status).toBe(false)
         expect(result.message).toBe("Unauthorized")
-        expect(result.activeDivisions).toEqual([])
     })
 
     it("rejects authenticated non-admins", async () => {
@@ -35,13 +34,14 @@ describe("getDivisionsPageData", () => {
         const result = await getDivisionsPageData()
 
         expect(result.status).toBe(true)
-        expect(result.seasonId).toBe(season.id)
-        expect(result.activeDivisions.map((d) => d.id)).toContain(divA.id)
-        expect(result.activeDivisions.some((d) => d.name === "Retired")).toBe(
-            false
-        )
-        expect(result.totalMales).toBe(1)
-        expect(result.totalNonMales).toBe(1)
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.seasonId).toBe(season.id)
+        expect(result.data.activeDivisions.map((d) => d.id)).toContain(divA.id)
+        expect(
+            result.data.activeDivisions.some((d) => d.name === "Retired")
+        ).toBe(false)
+        expect(result.data.totalMales).toBe(1)
+        expect(result.data.totalNonMales).toBe(1)
     })
 })
 

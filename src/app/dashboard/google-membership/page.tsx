@@ -60,12 +60,12 @@ export default async function GoogleMembershipPage({
                 description="Edit list membership values for each user."
             />
             <GoogleMembershipTable
-                users={result.users}
-                initialQuery={result.query}
-                initialFilter={result.filter}
-                page={result.page}
-                totalPages={result.totalPages}
-                total={result.total}
+                users={result.data.users}
+                initialQuery={result.data.query}
+                initialFilter={result.data.filter}
+                page={result.data.page}
+                totalPages={result.data.totalPages}
+                total={result.data.total}
             />
         </div>
     )

@@ -44,13 +44,13 @@ export default async function CreateDivisionsPage() {
                 description="Configure which divisions are active, how many teams each will have, the gender split, and whether coaches are used."
             />
             <CreateDivisionsClient
-                seasonId={result.seasonId}
-                activeDivisions={result.activeDivisions}
-                totalMales={result.totalMales}
-                totalNonMales={result.totalNonMales}
-                existingConfig={result.existingConfig}
-                returningByDivision={result.returningByDivision}
-                evaluatedByDivision={result.evaluatedByDivision}
+                seasonId={result.data.seasonId}
+                activeDivisions={result.data.activeDivisions}
+                totalMales={result.data.totalMales}
+                totalNonMales={result.data.totalNonMales}
+                existingConfig={result.data.existingConfig}
+                returningByDivision={result.data.returningByDivision}
+                evaluatedByDivision={result.data.evaluatedByDivision}
             />
         </div>
     )

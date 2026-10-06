@@ -34,20 +34,20 @@ export default async function EditWeek2Page() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Edit Week 2`}
+                title={`${result.data.seasonLabel} Edit Week 2`}
                 description="Edit player assignments by division/team, then save changes."
             />
-            {result.slots.length === 0 ? (
+            {result.data.slots.length === 0 ? (
                 <div className="rounded-md bg-muted p-8 text-center text-muted-foreground">
                     No week 2 roster slots found for this season.
                 </div>
             ) : (
                 <EditWeek2Form
-                    players={result.players}
-                    slots={result.slots}
-                    slotLabels={result.slotLabels}
+                    players={result.data.players}
+                    slots={result.data.slots}
+                    slotLabels={result.data.slotLabels}
                     playerPicUrl={playerPicBaseUrl()}
-                    seasonLabel={result.seasonLabel}
+                    seasonLabel={result.data.seasonLabel}
                 />
             )}
         </div>

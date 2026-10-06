@@ -34,15 +34,15 @@ export default async function EditWeek1Page() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`${result.seasonLabel} Edit Week 1`}
+                title={`${result.data.seasonLabel} Edit Week 1`}
                 description="Edit player assignments for each session and court, then save changes."
             />
             <EditWeek1Form
-                players={result.players}
-                slots={result.slots}
-                slotLabels={result.slotLabels}
+                players={result.data.players}
+                slots={result.data.slots}
+                slotLabels={result.data.slotLabels}
                 playerPicUrl={playerPicBaseUrl()}
-                seasonLabel={result.seasonLabel}
+                seasonLabel={result.data.seasonLabel}
             />
         </div>
     )

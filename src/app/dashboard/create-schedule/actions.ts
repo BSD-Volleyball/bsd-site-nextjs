@@ -4,8 +4,6 @@ import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail, requirePositiveInt } from "@/next/action-helpers"
 import { revalidatePath } from "next/cache"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { db } from "@/database/db"
 import {
     divisions,
@@ -15,7 +13,7 @@ import {
     individual_divisions
 } from "@/database/schema"
 import { eq, asc } from "drizzle-orm"
-import { isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { logAuditEntry } from "@/lib/audit-log"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import {
@@ -80,141 +78,109 @@ export interface CreateScheduleData {
     playoffPreview: Map<number, PlayoffPreviewMatch[]> | null
 }
 
-export async function getCreateScheduleData(): Promise<{
-    status: boolean
-    message?: string
-    seasonId: number
-    seasonLabel: string
-    seasonName: string
-    phase: string
-    divisions: DivisionWithTeams[]
-    seasonDates: string[]
-    seasonTimes: string[]
-    playoffDates: string[]
-}> {
-    const hasAccess = await isAdminOrDirectorBySession()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            seasonId: 0,
-            seasonLabel: "",
-            seasonName: "",
-            phase: "",
-            divisions: [],
-            seasonDates: [],
-            seasonTimes: [],
-            playoffDates: []
+export const getCreateScheduleData = withAction(
+    async (): Promise<
+        ActionResult<{
+            seasonId: number
+            seasonLabel: string
+            seasonName: string
+            phase: string
+            divisions: DivisionWithTeams[]
+            seasonDates: string[]
+            seasonTimes: string[]
+            playoffDates: string[]
+        }>
+    > => {
+        const hasAccess = await isAdminOrDirectorBySession()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    try {
-        const config = await getSeasonConfig()
-        if (!config.seasonId) {
-            return {
-                status: false,
-                message: "No active season found.",
-                seasonId: 0,
-                seasonLabel: "",
-                seasonName: "",
-                phase: "",
-                divisions: [],
-                seasonDates: [],
-                seasonTimes: [],
-                playoffDates: []
+        try {
+            const config = await getSeasonConfig()
+            if (!config.seasonId) {
+                return fail("No active season found.")
             }
-        }
 
-        const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
+            const seasonLabel = `${config.seasonName.charAt(0).toUpperCase() + config.seasonName.slice(1)} ${config.seasonYear}`
 
-        // Get divisions for this season via individual_divisions
-        const indivDivs = await db
-            .select({
-                divisionId: individual_divisions.division,
-                teams: individual_divisions.teams,
-                divName: divisions.name,
-                divLevel: divisions.level
-            })
-            .from(individual_divisions)
-            .innerJoin(
-                divisions,
-                eq(individual_divisions.division, divisions.id)
+            // Get divisions for this season via individual_divisions
+            const indivDivs = await db
+                .select({
+                    divisionId: individual_divisions.division,
+                    teams: individual_divisions.teams,
+                    divName: divisions.name,
+                    divLevel: divisions.level
+                })
+                .from(individual_divisions)
+                .innerJoin(
+                    divisions,
+                    eq(individual_divisions.division, divisions.id)
+                )
+                .where(eq(individual_divisions.season, config.seasonId))
+                .orderBy(asc(divisions.level))
+
+            // Get teams for this season grouped by division
+            const allTeams = await db
+                .select({
+                    id: teams.id,
+                    division: teams.division,
+                    number: teams.number,
+                    name: teams.name
+                })
+                .from(teams)
+                .where(eq(teams.season, config.seasonId))
+                .orderBy(asc(teams.number))
+
+            const teamsByDivision = new Map<
+                number,
+                { id: number; number: number | null; name: string }[]
+            >()
+            for (const t of allTeams) {
+                if (!teamsByDivision.has(t.division)) {
+                    teamsByDivision.set(t.division, [])
+                }
+                teamsByDivision.get(t.division)!.push({
+                    id: t.id,
+                    number: t.number,
+                    name: t.name
+                })
+            }
+
+            const divisionsData: DivisionWithTeams[] = indivDivs.map((d) => ({
+                divisionId: d.divisionId,
+                divisionName: d.divName,
+                level: d.divLevel,
+                teamCount: d.teams,
+                teams: teamsByDivision.get(d.divisionId) || []
+            }))
+
+            const regularSeason = getEventsByType(config, "regular_season")
+            const seasonDates = regularSeason.map((e) => e.eventDate)
+
+            const seasonTimes =
+                regularSeason[0]?.timeSlots.map((ts) => ts.startTime) ?? []
+
+            const playoffDates = getEventsByType(config, "playoff").map(
+                (e) => e.eventDate
             )
-            .where(eq(individual_divisions.season, config.seasonId))
-            .orderBy(asc(divisions.level))
 
-        // Get teams for this season grouped by division
-        const allTeams = await db
-            .select({
-                id: teams.id,
-                division: teams.division,
-                number: teams.number,
-                name: teams.name
+            return ok({
+                seasonId: config.seasonId,
+                seasonLabel,
+                seasonName: config.seasonName,
+                phase: config.phase,
+                divisions: divisionsData,
+                seasonDates,
+                seasonTimes,
+                playoffDates
             })
-            .from(teams)
-            .where(eq(teams.season, config.seasonId))
-            .orderBy(asc(teams.number))
-
-        const teamsByDivision = new Map<
-            number,
-            { id: number; number: number | null; name: string }[]
-        >()
-        for (const t of allTeams) {
-            if (!teamsByDivision.has(t.division)) {
-                teamsByDivision.set(t.division, [])
-            }
-            teamsByDivision.get(t.division)!.push({
-                id: t.id,
-                number: t.number,
-                name: t.name
-            })
-        }
-
-        const divisionsData: DivisionWithTeams[] = indivDivs.map((d) => ({
-            divisionId: d.divisionId,
-            divisionName: d.divName,
-            level: d.divLevel,
-            teamCount: d.teams,
-            teams: teamsByDivision.get(d.divisionId) || []
-        }))
-
-        const regularSeason = getEventsByType(config, "regular_season")
-        const seasonDates = regularSeason.map((e) => e.eventDate)
-
-        const seasonTimes =
-            regularSeason[0]?.timeSlots.map((ts) => ts.startTime) ?? []
-
-        const playoffDates = getEventsByType(config, "playoff").map(
-            (e) => e.eventDate
-        )
-
-        return {
-            status: true,
-            seasonId: config.seasonId,
-            seasonLabel,
-            seasonName: config.seasonName,
-            phase: config.phase,
-            divisions: divisionsData,
-            seasonDates,
-            seasonTimes,
-            playoffDates
-        }
-    } catch (error) {
-        console.error("Error fetching create schedule data:", error)
-        return {
-            status: false,
-            message: "Something went wrong loading schedule data.",
-            seasonId: 0,
-            seasonLabel: "",
-            seasonName: "",
-            phase: "",
-            divisions: [],
-            seasonDates: [],
-            seasonTimes: [],
-            playoffDates: []
+        } catch (error) {
+            console.error("Error fetching create schedule data:", error)
+            return fail("Something went wrong loading schedule data.")
         }
     }
-}
+)
 
 function buildRegularSeasonMatches(
     divisionIndex: number,
@@ -303,10 +269,11 @@ export const writeRegularSeasonSchedule = withAction(
         requirePositiveInt(seasonId, "season ID")
 
         try {
-            const data = await getCreateScheduleData()
-            if (!data.status) {
-                return fail(data.message || "Failed to load schedule data.")
+            const loaded = await getCreateScheduleData()
+            if (!loaded.status) {
+                return fail(loaded.message || "Failed to load schedule data.")
             }
+            const data = loaded.data
 
             // The schedule is always built from the CURRENT season's teams, so
             // a stale seasonId from the client must not tag the rows with a
@@ -376,12 +343,10 @@ export const writeRegularSeasonSchedule = withAction(
 
             await db.insert(matches).values(allMatches)
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const actorId = await getSessionUserId()
+            if (actorId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId: actorId,
                     action: "create",
                     entityType: "schedule",
                     summary: `Created ${allMatches.length} regular season matches for season ${seasonId}`
@@ -411,10 +376,11 @@ export const writePlayoffSchedule = withAction(
         requirePositiveInt(seasonId, "season ID")
 
         try {
-            const data = await getCreateScheduleData()
-            if (!data.status) {
-                return fail(data.message || "Failed to load schedule data.")
+            const loaded = await getCreateScheduleData()
+            if (!loaded.status) {
+                return fail(loaded.message || "Failed to load schedule data.")
             }
+            const data = loaded.data
 
             // The schedule is always built from the CURRENT season's teams, so
             // a stale seasonId from the client must not tag the rows with a
@@ -491,12 +457,10 @@ export const writePlayoffSchedule = withAction(
                 }
             })
 
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const actorId = await getSessionUserId()
+            if (actorId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId: actorId,
                     action: "create",
                     entityType: "playoff_schedule",
                     summary: `Created ${totalMatchesCreated} playoff matches for season ${seasonId}`

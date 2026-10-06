@@ -13,7 +13,6 @@ describe("getCreateTeamsData", () => {
         expect(result.message).toBe(
             "You don't have permission to access this page."
         )
-        expect(result.seasons).toEqual([])
     })
 
     it("rejects authenticated non-admins", async () => {
@@ -29,9 +28,10 @@ describe("getCreateTeamsData", () => {
 
         const result = await getCreateTeamsData()
         expect(result.status).toBe(true)
-        expect(result.seasons.map((s) => s.id)).toContain(season.id)
-        expect(result.divisions.map((d) => d.id)).toContain(division.id)
-        expect(result.users.map((u) => u.id)).toContain(admin.id)
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.seasons.map((s) => s.id)).toContain(season.id)
+        expect(result.data.divisions.map((d) => d.id)).toContain(division.id)
+        expect(result.data.users.map((u) => u.id)).toContain(admin.id)
     })
 })
 

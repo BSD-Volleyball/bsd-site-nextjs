@@ -14,9 +14,9 @@ export const revalidate = 300
 export default async function CreateSchedulePage() {
     await requireAdminOrRedirect()
 
-    const data = await getCreateScheduleData()
+    const result = await getCreateScheduleData()
 
-    if (!data.status) {
+    if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader
@@ -24,11 +24,13 @@ export default async function CreateSchedulePage() {
                     description="Generate regular season and playoff schedules."
                 />
                 <StatusBanner variant="error">
-                    {data.message || "Failed to load data."}
+                    {result.message || "Failed to load data."}
                 </StatusBanner>
             </div>
         )
     }
+
+    const { data } = result
 
     return (
         <div className="space-y-6">

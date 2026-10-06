@@ -33,12 +33,12 @@ export default async function EvaluatePlayersPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Evaluate New Players — ${result.seasonLabel}`}
+                title={`Evaluate New Players — ${result.data.seasonLabel}`}
                 description="Assign division evaluations to new players who have not been previously drafted."
             />
             <EvaluatePlayersList
-                players={result.players}
-                divisions={result.divisions}
+                players={result.data.players}
+                divisions={result.data.divisions}
             />
         </div>
     )

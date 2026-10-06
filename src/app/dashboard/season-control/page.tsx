@@ -25,7 +25,7 @@ export default async function SeasonControlPage() {
 
     const result = await getCurrentSeasonPhaseData()
 
-    if (!result.status || !result.data) {
+    if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader

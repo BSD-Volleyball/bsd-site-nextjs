@@ -2,7 +2,7 @@
 
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
-import { withAction, fail } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getSessionUserId } from "@/next/session"
 import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
@@ -17,8 +17,6 @@ import type {
 } from "@/lib/preseason/types"
 
 interface CreateWeek2Data {
-    status: boolean
-    message?: string
     seasonId: number
     seasonLabel: string
     divisions: PreseasonDivision[]
@@ -26,66 +24,55 @@ interface CreateWeek2Data {
     excludedPlayers: ExcludedPlayer[]
 }
 
-function emptyResult(message: string): CreateWeek2Data {
-    return {
-        status: false,
-        message,
-        seasonId: 0,
-        seasonLabel: "",
-        divisions: [],
-        candidates: [],
-        excludedPlayers: []
-    }
-}
-
-export async function getCreateWeek2Data(): Promise<CreateWeek2Data> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return emptyResult("You don't have permission to access this page.")
-    }
-
-    try {
-        const result = await loadPreseasonBaseData({
-            tryoutEventIndex: 1
-        })
-
-        if (!result.ok) {
-            return emptyResult(result.message)
+export const getCreateWeek2Data = withAction(
+    async (): Promise<ActionResult<CreateWeek2Data>> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
 
-        const base = result.data
-        const slotRequests = await loadTryoutSlotRequests(base.seasonId, 2)
+        try {
+            const result = await loadPreseasonBaseData({
+                tryoutEventIndex: 1
+            })
 
-        const candidates: Week2Candidate[] = base.candidates.map(
-            (candidate) => {
-                const slotRequest = slotRequests.get(candidate.userId)
-                return {
-                    ...candidate,
-                    lastDivisionName:
-                        base.draftsByUser.get(candidate.userId)?.[0]
-                            ?.divisionName ?? null,
-                    availableSlots: resolveAvailableSlots(
-                        candidate,
-                        slotRequest
-                    ),
-                    slotRequestComment: slotRequest?.comment ?? null
-                }
+            if (!result.ok) {
+                return fail(result.message)
             }
-        )
 
-        return {
-            status: true,
-            seasonId: base.seasonId,
-            seasonLabel: base.seasonLabel,
-            divisions: base.divisions,
-            candidates,
-            excludedPlayers: base.excludedPlayers
+            const base = result.data
+            const slotRequests = await loadTryoutSlotRequests(base.seasonId, 2)
+
+            const candidates: Week2Candidate[] = base.candidates.map(
+                (candidate) => {
+                    const slotRequest = slotRequests.get(candidate.userId)
+                    return {
+                        ...candidate,
+                        lastDivisionName:
+                            base.draftsByUser.get(candidate.userId)?.[0]
+                                ?.divisionName ?? null,
+                        availableSlots: resolveAvailableSlots(
+                            candidate,
+                            slotRequest
+                        ),
+                        slotRequestComment: slotRequest?.comment ?? null
+                    }
+                }
+            )
+
+            return ok({
+                seasonId: base.seasonId,
+                seasonLabel: base.seasonLabel,
+                divisions: base.divisions,
+                candidates,
+                excludedPlayers: base.excludedPlayers
+            })
+        } catch (error) {
+            console.error("Error loading create week 2 data:", error)
+            return fail("Something went wrong while loading data.")
         }
-    } catch (error) {
-        console.error("Error loading create week 2 data:", error)
-        return emptyResult("Something went wrong while loading data.")
     }
-}
+)
 
 export const saveWeek2Rosters = withAction(
     async (assignments: SavedAssignment[]): Promise<ActionResult> => {

@@ -97,82 +97,80 @@ export interface SeasonConfigData {
     }[]
 }
 
-export async function getSeasonConfigData(): Promise<{
-    status: boolean
-    message?: string
-    data?: SeasonConfigData
-}> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const [season] = await db
-            .select()
-            .from(seasons)
-            .orderBy(desc(seasons.id))
-            .limit(1)
-
-        if (!season) {
-            return { status: false, message: "No seasons found" }
+export const getSeasonConfigData = withAction(
+    async (): Promise<ActionResult<SeasonConfigData>> => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
         }
 
-        const eventRows = await db
-            .select()
-            .from(seasonEvents)
-            .where(eq(seasonEvents.season_id, season.id))
-            .orderBy(asc(seasonEvents.event_type), asc(seasonEvents.sort_order))
+        try {
+            const [season] = await db
+                .select()
+                .from(seasons)
+                .orderBy(desc(seasons.id))
+                .limit(1)
 
-        const eventIds = eventRows.map((e) => e.id)
-        let timeSlotRows: (typeof eventTimeSlots.$inferSelect)[] = []
-        let unavailableCounts = new Map<number, number>()
-        if (eventIds.length > 0) {
-            const [slots, counts] = await Promise.all([
-                db
-                    .select()
-                    .from(eventTimeSlots)
-                    .where(inArray(eventTimeSlots.event_id, eventIds))
-                    .orderBy(asc(eventTimeSlots.sort_order)),
-                countUnavailablePlayersByEvent(eventIds)
-            ])
-            timeSlotRows = slots
-            unavailableCounts = counts
-        }
+            if (!season) {
+                return fail("No seasons found")
+            }
 
-        const slotsByEvent = new Map<
-            number,
-            {
-                id: number
-                start_time: string
-                slot_label: string | null
-                sort_order: number
-            }[]
-        >()
-        for (const ts of timeSlotRows) {
-            const slots = slotsByEvent.get(ts.event_id) || []
-            slots.push({
-                id: ts.id,
-                start_time: ts.start_time,
-                slot_label: ts.slot_label,
-                sort_order: ts.sort_order
-            })
-            slotsByEvent.set(ts.event_id, slots)
-        }
+            const eventRows = await db
+                .select()
+                .from(seasonEvents)
+                .where(eq(seasonEvents.season_id, season.id))
+                .orderBy(
+                    asc(seasonEvents.event_type),
+                    asc(seasonEvents.sort_order)
+                )
 
-        const events = eventRows.map((e) => ({
-            id: e.id,
-            event_type: e.event_type as EventType,
-            event_date: e.event_date,
-            sort_order: e.sort_order,
-            label: e.label,
-            unavailable_player_count: unavailableCounts.get(e.id) ?? 0,
-            time_slots: slotsByEvent.get(e.id) || []
-        }))
+            const eventIds = eventRows.map((e) => e.id)
+            let timeSlotRows: (typeof eventTimeSlots.$inferSelect)[] = []
+            let unavailableCounts = new Map<number, number>()
+            if (eventIds.length > 0) {
+                const [slots, counts] = await Promise.all([
+                    db
+                        .select()
+                        .from(eventTimeSlots)
+                        .where(inArray(eventTimeSlots.event_id, eventIds))
+                        .orderBy(asc(eventTimeSlots.sort_order)),
+                    countUnavailablePlayersByEvent(eventIds)
+                ])
+                timeSlotRows = slots
+                unavailableCounts = counts
+            }
 
-        return {
-            status: true,
-            data: {
+            const slotsByEvent = new Map<
+                number,
+                {
+                    id: number
+                    start_time: string
+                    slot_label: string | null
+                    sort_order: number
+                }[]
+            >()
+            for (const ts of timeSlotRows) {
+                const slots = slotsByEvent.get(ts.event_id) || []
+                slots.push({
+                    id: ts.id,
+                    start_time: ts.start_time,
+                    slot_label: ts.slot_label,
+                    sort_order: ts.sort_order
+                })
+                slotsByEvent.set(ts.event_id, slots)
+            }
+
+            const events = eventRows.map((e) => ({
+                id: e.id,
+                event_type: e.event_type as EventType,
+                event_date: e.event_date,
+                sort_order: e.sort_order,
+                label: e.label,
+                unavailable_player_count: unavailableCounts.get(e.id) ?? 0,
+                time_slots: slotsByEvent.get(e.id) || []
+            }))
+
+            return ok({
                 seasonId: season.id,
                 year: season.year,
                 seasonName: season.season,
@@ -184,13 +182,13 @@ export async function getSeasonConfigData(): Promise<{
                 certified_ref_rate: season.certified_ref_rate,
                 uncertified_ref_rate: season.uncertified_ref_rate,
                 events
-            }
+            })
+        } catch (error) {
+            console.error("Failed to load season config:", error)
+            return fail("Failed to load season configuration")
         }
-    } catch (error) {
-        console.error("Failed to load season config:", error)
-        return { status: false, message: "Failed to load season configuration" }
     }
-}
+)
 
 /**
  * How many distinct players have marked themselves unavailable for each of

@@ -21,7 +21,7 @@ export default async function SeasonConfigPage() {
 
     const result = await getSeasonConfigData()
 
-    if (!result.status || !result.data) {
+    if (!result.status) {
         return (
             <div className="space-y-6">
                 <PageHeader

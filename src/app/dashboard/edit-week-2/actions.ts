@@ -2,7 +2,7 @@
 
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
-import { withAction, fail } from "@/next/action-helpers"
+import { withAction, ok, fail } from "@/next/action-helpers"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { getSessionUserId } from "@/next/session"
 import {
@@ -23,22 +23,22 @@ export type {
     EditWeekRosterEntry as Week2RosterEntry
 } from "@/components/edit-week-roster/edit-week-roster-form"
 
-export async function getEditWeek2Data(): Promise<EditWeekData> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return {
-            status: false,
-            message: "You don't have permission to access this page.",
-            seasonId: 0,
-            seasonLabel: "",
-            players: [],
-            slots: [],
-            slotLabels: []
+export const getEditWeek2Data = withAction(
+    async (): Promise<
+        ActionResult<Omit<EditWeekData, "status" | "message">>
+    > => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("You don't have permission to access this page.")
         }
-    }
 
-    return getEditWeekData(EDIT_WEEK_2)
-}
+        const { status, message, ...data } = await getEditWeekData(EDIT_WEEK_2)
+        if (!status) {
+            return fail(message ?? "Something went wrong while loading data.")
+        }
+        return ok(data)
+    }
+)
 
 export const updateWeek2Rosters = withAction(
     async (slots: EditWeekRosterEntry[]): Promise<ActionResult> => {

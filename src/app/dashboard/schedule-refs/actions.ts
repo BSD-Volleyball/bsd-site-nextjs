@@ -25,8 +25,7 @@ import {
     fail,
     requireSession,
     requireSeasonConfig,
-    requirePermission,
-    ActionError
+    requirePermission
 } from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
 import { getSessionUserId } from "@/next/session"
@@ -109,10 +108,8 @@ export interface MatchesAndRefsData {
 // 1. getScheduleRefsData — match dates for current season
 // ---------------------------------------------------------------------------
 
-export async function getScheduleRefsData(): Promise<
-    ActionResult<ScheduleRefsData>
-> {
-    try {
+export const getScheduleRefsData = withAction(
+    async (): Promise<ActionResult<ScheduleRefsData>> => {
         await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
 
@@ -157,21 +154,15 @@ export async function getScheduleRefsData(): Promise<
         }
 
         return ok({ seasonId: config.seasonId, seasonLabel, matchDates })
-    } catch (error) {
-        if (error instanceof ActionError) return fail(error.message)
-        console.error("getScheduleRefsData error:", error)
-        return fail("Something went wrong.")
     }
-}
+)
 
 // ---------------------------------------------------------------------------
 // 2. getMatchesAndRefsForDate — main data action
 // ---------------------------------------------------------------------------
 
-export async function getMatchesAndRefsForDate(
-    date: string
-): Promise<ActionResult<MatchesAndRefsData>> {
-    try {
+export const getMatchesAndRefsForDate = withAction(
+    async (date: string): Promise<ActionResult<MatchesAndRefsData>> => {
         await requirePermission("schedule:manage")
         const config = await requireSeasonConfig()
         const seasonId = config.seasonId
@@ -855,12 +846,8 @@ export async function getMatchesAndRefsForDate(
             refs: refStatusList,
             eligibleRefsByMatch
         })
-    } catch (error) {
-        if (error instanceof ActionError) return fail(error.message)
-        console.error("getMatchesAndRefsForDate error:", error)
-        return fail("Something went wrong.")
     }
-}
+)
 
 // ---------------------------------------------------------------------------
 // 3. saveRefAssignments — save all ref assignments for a date

@@ -131,10 +131,11 @@ describe("getEditWeek3Data", () => {
         const result = await getEditWeek3Data()
 
         expect(result.status).toBe(true)
-        expect(result.players.map((p) => p.id)).toContain(player.id)
-        expect(result.slots).toHaveLength(1)
-        expect(result.slots[0].userId).toBe(player.id)
-        expect(result.slots[0].teamNumber).toBe(3)
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.players.map((p) => p.id)).toContain(player.id)
+        expect(result.data.slots).toHaveLength(1)
+        expect(result.data.slots[0].userId).toBe(player.id)
+        expect(result.data.slots[0].teamNumber).toBe(3)
     })
 
     it("rejects non-admins", async () => {

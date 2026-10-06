@@ -61,13 +61,14 @@ describe("getPrepareForDraftData", () => {
 
         const result = await getPrepareForDraftData()
         expect(result.status).toBe(true)
-        expect(result.data?.isLeagueWide).toBe(true)
-        expect(result.data?.availableDivisions.map((d) => d.id)).toEqual([
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.isLeagueWide).toBe(true)
+        expect(result.data.availableDivisions.map((d) => d.id)).toEqual([
             divA.id,
             divBB.id
         ])
         // Defaults to the lowest-level division
-        expect(result.data?.divisionId).toBe(divA.id)
+        expect(result.data.divisionId).toBe(divA.id)
     })
 
     it("restricts a division-scoped commissioner to their own division", async () => {
@@ -83,11 +84,12 @@ describe("getPrepareForDraftData", () => {
         // Requesting the other division must be ignored
         const result = await getPrepareForDraftData(divA.id)
         expect(result.status).toBe(true)
-        expect(result.data?.isLeagueWide).toBe(false)
-        expect(result.data?.availableDivisions.map((d) => d.id)).toEqual([
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.isLeagueWide).toBe(false)
+        expect(result.data.availableDivisions.map((d) => d.id)).toEqual([
             divBB.id
         ])
-        expect(result.data?.divisionId).toBe(divBB.id)
+        expect(result.data.divisionId).toBe(divBB.id)
     })
 })
 

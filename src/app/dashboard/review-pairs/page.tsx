@@ -34,14 +34,14 @@ export default async function ReviewPairsPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title={`Review Pairs — ${result.seasonLabel}`}
+                title={`Review Pairs — ${result.data.seasonLabel}`}
                 description="Review pair requests for the current season."
             />
             <PairsList
-                matched={result.matched}
-                unmatched={result.unmatched}
-                incomplete={result.incomplete}
-                candidates={result.candidates}
+                matched={result.data.matched}
+                unmatched={result.data.unmatched}
+                incomplete={result.data.incomplete}
+                candidates={result.data.candidates}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>

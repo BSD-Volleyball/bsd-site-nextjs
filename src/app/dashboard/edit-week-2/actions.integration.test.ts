@@ -139,10 +139,11 @@ describe("getEditWeek2Data", () => {
         const result = await getEditWeek2Data()
 
         expect(result.status).toBe(true)
-        expect(result.players.map((p) => p.id)).toContain(player.id)
-        expect(result.slots).toHaveLength(1)
-        expect(result.slots[0].userId).toBe(player.id)
-        expect(result.slots[0].teamNumber).toBe(3)
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.players.map((p) => p.id)).toContain(player.id)
+        expect(result.data.slots).toHaveLength(1)
+        expect(result.data.slots[0].userId).toBe(player.id)
+        expect(result.data.slots[0].teamNumber).toBe(3)
     })
 
     it("keeps roster occupants who are no longer eligible, flagged with a reason", async () => {
@@ -206,8 +207,9 @@ describe("getEditWeek2Data", () => {
 
         const result = await getEditWeek2Data()
         expect(result.status).toBe(true)
+        if (!result.status) throw new Error("expected ok")
 
-        const byId = new Map(result.players.map((p) => [p.id, p]))
+        const byId = new Map(result.data.players.map((p) => [p.id, p]))
         expect(byId.get(available.id)?.unavailableReason).toBeNull()
         expect(byId.get(optedOut.id)?.unavailableReason).toMatch(/Tryout #2/)
         expect(byId.get(optedOut.id)?.firstName).toBe(optedOut.first_name)
@@ -216,7 +218,7 @@ describe("getEditWeek2Data", () => {
         )
         expect(byId.get(unsignedUp.id)?.firstName).toBe(unsignedUp.first_name)
         // Every roster occupant resolves to a name.
-        for (const slot of result.slots) {
+        for (const slot of result.data.slots) {
             expect(byId.has(slot.userId)).toBe(true)
         }
     })

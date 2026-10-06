@@ -107,13 +107,18 @@ describe("getCreateScheduleData", () => {
 
         const result = await getCreateScheduleData()
         expect(result.status).toBe(true)
-        expect(result.seasonId).toBe(season.id)
-        expect(result.divisions).toHaveLength(1)
-        expect(result.divisions[0].divisionId).toBe(division.id)
-        expect(result.divisions[0].teams).toHaveLength(4)
-        expect(result.seasonDates).toEqual(REGULAR_DATES)
+        if (!result.status) throw new Error("expected ok")
+        expect(result.data.seasonId).toBe(season.id)
+        expect(result.data.divisions).toHaveLength(1)
+        expect(result.data.divisions[0].divisionId).toBe(division.id)
+        expect(result.data.divisions[0].teams).toHaveLength(4)
+        expect(result.data.seasonDates).toEqual(REGULAR_DATES)
         // Postgres time columns round-trip as HH:MM:SS
-        expect(result.seasonTimes).toEqual(["19:00:00", "20:10:00", "21:20:00"])
+        expect(result.data.seasonTimes).toEqual([
+            "19:00:00",
+            "20:10:00",
+            "21:20:00"
+        ])
     })
 })
 

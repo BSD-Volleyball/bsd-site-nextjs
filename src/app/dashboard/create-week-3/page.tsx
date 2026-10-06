@@ -38,10 +38,10 @@ export default async function CreateWeek3Page() {
                 description="Place players into division buckets, then generate balanced teams per division."
             />
             <CreateWeek3Form
-                seasonLabel={result.seasonLabel}
-                divisions={result.divisions}
-                candidates={result.candidates}
-                excludedPlayers={result.excludedPlayers}
+                seasonLabel={result.data.seasonLabel}
+                divisions={result.data.divisions}
+                candidates={result.data.candidates}
+                excludedPlayers={result.data.excludedPlayers}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>

@@ -38,9 +38,9 @@ export default async function CreateWeek1Page() {
                 description="Prioritize week 1 candidates, select the top 96, and assign them to sessions/courts."
             />
             <CreateWeek1Form
-                seasonLabel={result.seasonLabel}
-                candidates={result.candidates}
-                groups={result.groups}
+                seasonLabel={result.data.seasonLabel}
+                candidates={result.data.candidates}
+                groups={result.data.groups}
                 playerPicUrl={playerPicBaseUrl()}
             />
         </div>

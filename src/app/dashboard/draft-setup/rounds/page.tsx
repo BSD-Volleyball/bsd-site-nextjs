@@ -38,7 +38,7 @@ export default async function DraftSetupRoundsPage({
             .orderBy(asc(seasons.year))
     ])
 
-    if (!result.status || !result.data) {
+    if (!result.status) {
         return (
             <StatusBanner variant="error">
                 {result.message || "Failed to load data."}

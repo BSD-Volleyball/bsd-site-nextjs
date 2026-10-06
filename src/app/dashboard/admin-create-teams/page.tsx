@@ -37,9 +37,9 @@ export default async function AdminCreateTeamsPage() {
                 description="Create teams for a season by selecting captains."
             />
             <CreateTeamsForm
-                seasons={result.seasons}
-                divisions={result.divisions}
-                users={result.users}
+                seasons={result.data.seasons}
+                divisions={result.data.divisions}
+                users={result.data.users}
             />
         </div>
     )

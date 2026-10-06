@@ -492,46 +492,43 @@ export const createSeason = withAction(
     }
 )
 
-export async function getCurrentSeasonPhaseData(): Promise<{
-    status: boolean
-    message?: string
-    data?: {
-        seasonId: number
-        seasonLabel: string
-        phase: SeasonPhase
-    }
-}> {
-    const isAdmin = await isAdminOrDirectorBySession()
-    if (!isAdmin) {
-        return { status: false, message: "Unauthorized" }
-    }
-
-    try {
-        const [season] = await db
-            .select({
-                id: seasons.id,
-                year: seasons.year,
-                season: seasons.season,
-                phase: seasons.phase
-            })
-            .from(seasons)
-            .orderBy(desc(seasons.id))
-            .limit(1)
-
-        if (!season) {
-            return { status: false, message: "No seasons found" }
+export const getCurrentSeasonPhaseData = withAction(
+    async (): Promise<
+        ActionResult<{
+            seasonId: number
+            seasonLabel: string
+            phase: SeasonPhase
+        }>
+    > => {
+        const isAdmin = await isAdminOrDirectorBySession()
+        if (!isAdmin) {
+            return fail("Unauthorized")
         }
 
-        return {
-            status: true,
-            data: {
+        try {
+            const [season] = await db
+                .select({
+                    id: seasons.id,
+                    year: seasons.year,
+                    season: seasons.season,
+                    phase: seasons.phase
+                })
+                .from(seasons)
+                .orderBy(desc(seasons.id))
+                .limit(1)
+
+            if (!season) {
+                return fail("No seasons found")
+            }
+
+            return ok({
                 seasonId: season.id,
                 seasonLabel: `${season.season.charAt(0).toUpperCase() + season.season.slice(1)} ${season.year}`,
                 phase: season.phase as SeasonPhase
-            }
+            })
+        } catch (error) {
+            console.error("Failed to get season phase:", error)
+            return fail("Failed to load season data")
         }
-    } catch (error) {
-        console.error("Failed to get season phase:", error)
-        return { status: false, message: "Failed to load season data" }
     }
-}
+)
