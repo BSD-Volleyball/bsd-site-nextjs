@@ -1,8 +1,7 @@
-import { headers } from "next/headers"
-import { auth } from "@/lib/auth"
 import type { Permission } from "@/lib/permissions"
 import { ActionError } from "@/lib/action-result"
 import {
+    getRequestSession,
     hasCaptainPagesAccessBySession,
     hasPermissionBySession,
     isAdminOrDirectorBySession
@@ -20,7 +19,7 @@ export * from "@/lib/action-result"
 // ---------------------------------------------------------------------------
 
 export async function requireSession() {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await getRequestSession()
     if (!session?.user) {
         throw new ActionError("Not authenticated.")
     }

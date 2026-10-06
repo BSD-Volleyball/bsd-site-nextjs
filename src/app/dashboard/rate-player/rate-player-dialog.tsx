@@ -1,6 +1,7 @@
 "use client"
 
 import { formatHeight } from "@/components/player-detail"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -73,7 +74,10 @@ export function RatePlayerDialog({
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                             {playerPicUrl && selectedPlayer.picture ? (
                                 <img
-                                    src={`${playerPicUrl}${selectedPlayer.picture}`}
+                                    src={buildPlayerPictureUrl(
+                                        playerPicUrl,
+                                        selectedPlayer.picture
+                                    )}
                                     alt={getDisplayName(selectedPlayer)}
                                     className="h-40 w-28 rounded-md object-cover"
                                 />

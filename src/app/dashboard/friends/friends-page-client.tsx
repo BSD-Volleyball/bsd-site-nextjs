@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -43,7 +44,7 @@ function FriendThumbnail({
     if (picture) {
         return (
             <img
-                src={`${playerPicUrl}${picture}`}
+                src={buildPlayerPictureUrl(playerPicUrl, picture)}
                 alt={name}
                 className="h-12 w-9 shrink-0 rounded-md object-cover"
             />

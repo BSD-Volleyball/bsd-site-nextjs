@@ -2,7 +2,7 @@
 
 import type { DraftHomeworkPlayer } from "./actions"
 import { CONSIDERING_ROUND, type Selections } from "./homework-selections"
-import { formatDisplayName } from "@/lib/utils"
+import { buildPlayerPictureUrl, formatDisplayName } from "@/lib/utils"
 
 function getPlayersForRound(
     tabKey: "m" | "f",
@@ -28,7 +28,9 @@ function PrintPlayerCard({
     player: DraftHomeworkPlayer
     playerPicUrl: string
 }) {
-    const src = player.picture ? `${playerPicUrl}${player.picture}` : null
+    const src = player.picture
+        ? buildPlayerPictureUrl(playerPicUrl, player.picture)
+        : null
     const displayName = formatDisplayName(
         player.firstName,
         player.lastName,

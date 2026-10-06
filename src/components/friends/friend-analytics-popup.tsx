@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { CareerStatTiles } from "@/components/analytics/career-stat-tiles"
@@ -50,7 +51,7 @@ export function FriendAnalyticsPopup({
     }, [onClose])
 
     const pictureSrc = analytics?.profile.picture
-        ? `${playerPicUrl}${analytics.profile.picture}`
+        ? buildPlayerPictureUrl(playerPicUrl, analytics.profile.picture)
         : null
 
     return (

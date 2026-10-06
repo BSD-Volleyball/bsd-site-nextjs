@@ -22,13 +22,13 @@
     "linter": {
         "rules": {
             "a11y": {
-                "noSvgWithoutTitle": "off",
+                "noSvgWithoutTitle": "error",
                 "useGenericFontNames": "off",
-                "useSemanticElements": "off",
-                "noLabelWithoutControl": "off"
+                "useSemanticElements": "error",
+                "noLabelWithoutControl": "error"
             },
             "performance": {
-                "noImgElement": "off"
+                "noImgElement": "warn"
             },
             "correctness": {
                 "noUnusedImports": {
@@ -38,7 +38,7 @@
                 "useUniqueElementIds": "off"
             },
             "suspicious": {
-                "noArrayIndexKey": "off",
+                "noArrayIndexKey": "warn",
                 "noDoubleEquals": {
                     "fix": "safe",
                     "level": "warn",

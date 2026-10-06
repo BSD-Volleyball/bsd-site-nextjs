@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Combobox } from "@/components/ui/combobox"
-import { cn, formatPlayerName } from "@/lib/utils"
+import { cn, formatPlayerLabel } from "@/lib/utils"
 import type { DraftHomeworkPlayer } from "./actions"
 
 interface PlayerComboboxProps {
@@ -16,8 +16,7 @@ interface PlayerComboboxProps {
 }
 
 function getDisplayName(p: DraftHomeworkPlayer) {
-    const oldIdPart = p.oldId ? `[${p.oldId}] ` : ""
-    return `${oldIdPart}${formatPlayerName(p.firstName, p.lastName, p.preferredName)}`
+    return formatPlayerLabel(p.firstName, p.lastName, p.preferredName, p.oldId)
 }
 
 export function PlayerCombobox({

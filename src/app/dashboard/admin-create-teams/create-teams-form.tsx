@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { PlayerOptionCombobox } from "@/components/user-combobox"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -23,13 +24,6 @@ import {
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover"
-import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn, formatPlayerName } from "@/lib/utils"
-import {
     createTeams,
     type SeasonOption,
     type DivisionOption,
@@ -45,139 +39,6 @@ interface CreateTeamsFormProps {
 interface CaptainSelection {
     captainId: string | null
     teamName: string
-}
-
-function UserCombobox({
-    users,
-    value,
-    onChange,
-    placeholder = "Select a captain...",
-    excludeIds = []
-}: {
-    users: UserOption[]
-    value: string | null
-    onChange: (userId: string | null, user: UserOption | null) => void
-    placeholder?: string
-    excludeIds?: string[]
-}) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState("")
-
-    const selectedUser = useMemo(
-        () => users.find((u) => u.id === value),
-        [users, value]
-    )
-
-    const filteredUsers = useMemo(() => {
-        const filtered = users.filter(
-            (u) => !excludeIds.includes(u.id) || u.id === value
-        )
-        if (!search) return filtered
-        const lowerSearch = search.toLowerCase()
-        return filtered.filter((u) => {
-            const fullName = `${u.first_name} ${u.last_name}`.toLowerCase()
-            const preferredName = u.preferred_name?.toLowerCase() || ""
-            const oldIdStr = u.old_id?.toString() || ""
-            return (
-                fullName.includes(lowerSearch) ||
-                preferredName.includes(lowerSearch) ||
-                oldIdStr.includes(lowerSearch)
-            )
-        })
-    }, [users, search, excludeIds, value])
-
-    const getDisplayName = (user: UserOption) => {
-        const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        return `${oldIdPart}${formatPlayerName(user.first_name, user.last_name, user.preferred_name)}`
-    }
-
-    const handleSelect = (userId: string) => {
-        const user = users.find((u) => u.id === userId) || null
-        onChange(userId, user)
-        setOpen(false)
-        setSearch("")
-    }
-
-    const handleClear = () => {
-        onChange(null, null)
-        setSearch("")
-    }
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between font-normal"
-                >
-                    <span
-                        className={cn(!selectedUser && "text-muted-foreground")}
-                    >
-                        {selectedUser
-                            ? getDisplayName(selectedUser)
-                            : placeholder}
-                    </span>
-                    <div className="flex items-center gap-1">
-                        {selectedUser && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleClear()
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                        )}
-                        <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                className="w-(--radix-popover-trigger-width) p-2"
-                align="start"
-            >
-                <Input
-                    placeholder="Search players..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    autoCorrect="off"
-                    className="mb-2"
-                />
-                <div className="max-h-60 overflow-y-auto">
-                    {filteredUsers.length === 0 ? (
-                        <p className="py-2 text-center text-muted-foreground text-sm">
-                            No players found
-                        </p>
-                    ) : (
-                        filteredUsers.map((user) => (
-                            <button
-                                key={user.id}
-                                type="button"
-                                className={cn(
-                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                    value === user.id && "bg-accent"
-                                )}
-                                onClick={() => handleSelect(user.id)}
-                            >
-                                {getDisplayName(user)}
-                            </button>
-                        ))
-                    )}
-                </div>
-            </PopoverContent>
-        </Popover>
-    )
 }
 
 export function CreateTeamsForm({
@@ -418,7 +279,8 @@ export function CreateTeamsForm({
                                                     *
                                                 </span>
                                             </Label>
-                                            <UserCombobox
+                                            <PlayerOptionCombobox
+                                                id={`captain-${index}`}
                                                 users={users}
                                                 value={
                                                     captains[index].captainId

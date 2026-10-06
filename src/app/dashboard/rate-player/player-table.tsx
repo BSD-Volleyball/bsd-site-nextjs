@@ -1,6 +1,7 @@
 "use client"
 
 import { formatHeight } from "@/components/player-detail"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import type { RatePlayerEntry } from "./actions"
 import { getDisplayName, getGenderLabel } from "./rate-player-helpers"
@@ -68,7 +69,10 @@ export function PlayerTable({
                                 <td className="px-4 py-2">
                                     {playerPicUrl && player.picture ? (
                                         <img
-                                            src={`${playerPicUrl}${player.picture}`}
+                                            src={buildPlayerPictureUrl(
+                                                playerPicUrl,
+                                                player.picture
+                                            )}
                                             alt={getDisplayName(player)}
                                             className="h-12 w-9 rounded object-cover"
                                         />

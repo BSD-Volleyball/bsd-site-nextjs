@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import type {
     MergeAccountSnapshot,
     MergeCandidates,
@@ -104,6 +104,7 @@ export function MergeUsersForm({
     initialUserAId?: string
     initialUserBId?: string
 }) {
+    const pickerId = useId()
     const [userAId, setUserAId] = useState<string>(initialUserAId)
     const [userBId, setUserBId] = useState<string>(initialUserBId)
     const [candidates, setCandidates] = useState<MergeCandidates | null>(null)
@@ -315,10 +316,14 @@ export function MergeUsersForm({
 
                     <div className="grid gap-6 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <label className="font-medium text-sm">
+                            <label
+                                htmlFor={`${pickerId}-a`}
+                                className="font-medium text-sm"
+                            >
                                 Player A
                             </label>
                             <UserEmailCombobox
+                                id={`${pickerId}-a`}
                                 users={users}
                                 value={userAId}
                                 onChange={setUserAId}
@@ -330,10 +335,14 @@ export function MergeUsersForm({
                         </div>
 
                         <div className="space-y-2">
-                            <label className="font-medium text-sm">
+                            <label
+                                htmlFor={`${pickerId}-b`}
+                                className="font-medium text-sm"
+                            >
                                 Player B
                             </label>
                             <UserEmailCombobox
+                                id={`${pickerId}-b`}
                                 users={users}
                                 value={userBId}
                                 onChange={setUserBId}

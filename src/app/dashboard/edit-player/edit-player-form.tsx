@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useTransition } from "react"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { toast } from "sonner"
 import { UserCombobox } from "@/components/user-combobox"
 import {
@@ -488,7 +489,10 @@ export function EditPlayerForm({ users, playerPicUrl }: EditPlayerFormProps) {
                             <div>
                                 {playerPicUrl && formData.picture ? (
                                     <img
-                                        src={`${playerPicUrl}${formData.picture}`}
+                                        src={buildPlayerPictureUrl(
+                                            playerPicUrl,
+                                            formData.picture
+                                        )}
                                         alt={formData.name || "Player"}
                                         className="h-44 w-32 rounded-md border object-cover"
                                     />

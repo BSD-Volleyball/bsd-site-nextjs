@@ -1,15 +1,9 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger
-} from "@/components/ui/popover"
-import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn, formatPlayerName } from "@/lib/utils"
+import { PlayerOptionCombobox } from "@/components/user-combobox"
+import { RiCloseLine } from "@remixicon/react"
+import { buildPlayerPictureUrl, cn, formatPlayerName } from "@/lib/utils"
 import {
     useStorage,
     useMutation,
@@ -81,138 +75,6 @@ function findAvailablePairSlot(
             return down
     }
     return null
-}
-
-function UserCombobox({
-    users,
-    value,
-    onChange,
-    placeholder = "Select a player...",
-    excludeIds = []
-}: {
-    users: UserOption[]
-    value: string | null
-    onChange: (userId: string | null) => void
-    placeholder?: string
-    excludeIds?: string[]
-}) {
-    const [open, setOpen] = useState(false)
-    const [search, setSearch] = useState("")
-
-    const selectedUser = useMemo(
-        () => users.find((u) => u.id === value),
-        [users, value]
-    )
-
-    const filteredUsers = useMemo(() => {
-        const filtered = users.filter(
-            (u) => !excludeIds.includes(u.id) || u.id === value
-        )
-        if (!search) return filtered
-        const lowerSearch = search.toLowerCase()
-        return filtered.filter((u) => {
-            const fullName = `${u.first_name} ${u.last_name}`.toLowerCase()
-            const preferredName = u.preferred_name?.toLowerCase() || ""
-            const oldIdStr = u.old_id?.toString() || ""
-            return (
-                fullName.includes(lowerSearch) ||
-                preferredName.includes(lowerSearch) ||
-                oldIdStr.includes(lowerSearch)
-            )
-        })
-    }, [users, search, excludeIds, value])
-
-    const getDisplayName = (user: UserOption) => {
-        const oldIdPart = user.old_id ? `[${user.old_id}] ` : ""
-        return `${oldIdPart}${formatPlayerName(user.first_name, user.last_name, user.preferred_name)}`
-    }
-
-    const handleSelect = (userId: string) => {
-        onChange(userId)
-        setOpen(false)
-        setSearch("")
-    }
-
-    const handleClear = () => {
-        onChange(null)
-        setSearch("")
-    }
-
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="h-8 w-full justify-between border-0 bg-transparent font-normal text-xs shadow-none hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                    <span
-                        className={cn(
-                            "truncate",
-                            !selectedUser && "text-muted-foreground"
-                        )}
-                    >
-                        {selectedUser
-                            ? getDisplayName(selectedUser)
-                            : placeholder}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                        {selectedUser && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleClear()
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className="h-3 w-3 text-muted-foreground" />
-                            </span>
-                        )}
-                        <RiArrowDownSLine className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-                <Input
-                    placeholder="Search players..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    autoCorrect="off"
-                    className="mb-2 h-8 text-sm"
-                />
-                <div className="max-h-60 overflow-y-auto">
-                    {filteredUsers.length === 0 ? (
-                        <p className="py-2 text-center text-muted-foreground text-sm">
-                            No players found
-                        </p>
-                    ) : (
-                        filteredUsers.map((user) => (
-                            <button
-                                key={user.id}
-                                type="button"
-                                className={cn(
-                                    "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
-                                    value === user.id && "bg-accent"
-                                )}
-                                onClick={() => handleSelect(user.id)}
-                            >
-                                {getDisplayName(user)}
-                            </button>
-                        ))
-                    )}
-                </div>
-            </PopoverContent>
-        </Popover>
-    )
 }
 
 export function DraftBoard({
@@ -300,6 +162,16 @@ export function DraftBoard({
             onPicksChange(picks as Record<string, string | null>)
         }
     }, [picks, onPicksChange])
+
+    // Escape closes the enlarged photo wherever focus is
+    useEffect(() => {
+        if (!enlargedPlayer) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setEnlargedPlayer(null)
+        }
+        document.addEventListener("keydown", onKeyDown)
+        return () => document.removeEventListener("keydown", onKeyDown)
+    }, [enlargedPlayer])
 
     const handlePickChange = (
         round: number,
@@ -579,7 +451,10 @@ export function DraftBoard({
                                                 )}
                                             >
                                                 {editable ? (
-                                                    <UserCombobox
+                                                    <PlayerOptionCombobox
+                                                        size="sm"
+                                                        triggerClassName="h-8 border-0 bg-transparent text-xs shadow-none hover:bg-black/5 dark:hover:bg-white/5"
+                                                        popoverClassName="w-64"
                                                         users={users}
                                                         value={userId}
                                                         onChange={(newUserId) =>
@@ -705,7 +580,10 @@ export function DraftBoard({
                                                 >
                                                     {player.picture ? (
                                                         <img
-                                                            src={`${playerPicUrl}${player.picture}`}
+                                                            src={buildPlayerPictureUrl(
+                                                                playerPicUrl,
+                                                                player.picture
+                                                            )}
                                                             alt={`${player.first_name} ${player.last_name}`}
                                                             className="h-18 w-12 rounded object-cover"
                                                         />
@@ -739,15 +617,13 @@ export function DraftBoard({
 
             {/* Enlarged Player Image Modal */}
             {enlargedPlayer && playerPicUrl && (
-                <div
-                    className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => setEnlargedPlayer(null)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") setEnlargedPlayer(null)
-                    }}
-                    role="button"
-                    tabIndex={0}
-                >
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                    <button
+                        type="button"
+                        aria-label="Close photo"
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setEnlargedPlayer(null)}
+                    />
                     <div
                         className={cn(
                             "relative rounded-xl p-4",
@@ -755,9 +631,9 @@ export function DraftBoard({
                                 ? "bg-blue-50 dark:bg-blue-900/40"
                                 : "bg-pink-50 dark:bg-pink-900/40"
                         )}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
                         role="dialog"
+                        aria-modal="true"
+                        aria-label={`${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
                     >
                         <button
                             type="button"
@@ -768,7 +644,10 @@ export function DraftBoard({
                         </button>
                         {enlargedPlayer.picture ? (
                             <img
-                                src={`${playerPicUrl}${enlargedPlayer.picture}`}
+                                src={buildPlayerPictureUrl(
+                                    playerPicUrl,
+                                    enlargedPlayer.picture
+                                )}
                                 alt={`${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
                                 className="max-h-[80vh] w-auto rounded-lg object-contain"
                             />

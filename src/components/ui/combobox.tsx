@@ -12,6 +12,8 @@ import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 
 interface ComboboxProps<T> {
+    /** Put on the trigger so a <Label htmlFor> can point at it. */
+    id?: string
     items: T[]
     value: string | null
     onChange: (id: string | null) => void
@@ -29,6 +31,7 @@ interface ComboboxProps<T> {
 }
 
 export function Combobox<T>({
+    id,
     items,
     value,
     onChange,
@@ -79,48 +82,54 @@ export function Combobox<T>({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className={cn(
-                        "w-full justify-between font-normal",
-                        triggerClassName
-                    )}
-                >
-                    <span
+            {/* The clear button sits beside the trigger, not inside it: a
+                button nested in a button is invalid and confuses assistive
+                tech. A spacer inside the trigger keeps room for it. */}
+            <div className="relative">
+                <PopoverTrigger asChild>
+                    <Button
+                        id={id}
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
                         className={cn(
-                            "truncate",
-                            !selectedItem && "text-muted-foreground"
+                            "w-full justify-between font-normal",
+                            triggerClassName
                         )}
                     >
-                        {selectedItem ? getLabel(selectedItem) : placeholder}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                        {selectedItem && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleClear()
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className={iconClass} />
-                            </span>
+                        <span
+                            className={cn(
+                                "truncate",
+                                !selectedItem && "text-muted-foreground"
+                            )}
+                        >
+                            {selectedItem ? getLabel(selectedItem) : placeholder}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                            {selectedItem && (
+                                <span
+                                    aria-hidden="true"
+                                    className={size === "sm" ? "size-4" : "size-5"}
+                                />
+                            )}
+                            <RiArrowDownSLine className={iconClass} />
+                        </div>
+                    </Button>
+                </PopoverTrigger>
+                {selectedItem && (
+                    <button
+                        type="button"
+                        aria-label="Clear selection"
+                        className={cn(
+                            "absolute top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent",
+                            size === "sm" ? "right-8" : "right-9"
                         )}
-                        <RiArrowDownSLine className={iconClass} />
-                    </div>
-                </Button>
-            </PopoverTrigger>
+                        onClick={handleClear}
+                    >
+                        <RiCloseLine className={iconClass} />
+                    </button>
+                )}
+            </div>
             <PopoverContent
                 className={cn(
                     "w-(--radix-popover-trigger-width) p-2",

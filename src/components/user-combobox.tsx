@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Combobox } from "@/components/ui/combobox"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import {
     PopoverContent,
     PopoverTrigger
 } from "@/components/ui/popover"
+import { formatPlayerLabel } from "@/lib/utils"
 
 interface User {
     id: string
@@ -42,6 +43,94 @@ export function UserCombobox({
     )
 }
 
+/** The player shape most admin pickers load from their actions. */
+export interface PlayerOption {
+    id: string
+    old_id: number | null
+    first_name: string
+    last_name: string
+    preferred_name: string | null
+}
+
+function playerLabel(p: PlayerOption): string {
+    return formatPlayerLabel(
+        p.first_name,
+        p.last_name,
+        p.preferred_name,
+        p.old_id
+    )
+}
+
+function playerMatches(p: PlayerOption, lowerSearch: string): boolean {
+    return (
+        `${p.first_name} ${p.last_name}`.toLowerCase().includes(lowerSearch) ||
+        (p.preferred_name?.toLowerCase().includes(lowerSearch) ?? false) ||
+        (p.old_id?.toString().includes(lowerSearch) ?? false)
+    )
+}
+
+interface PlayerOptionComboboxProps<T extends PlayerOption> {
+    id?: string
+    users: T[]
+    value: string | null
+    onChange: (userId: string | null, user: T | null) => void
+    placeholder?: string
+    /** Hidden from the list (e.g. already picked elsewhere), unless selected. */
+    excludeIds?: readonly string[]
+    size?: "default" | "sm"
+    triggerClassName?: string
+    popoverClassName?: string
+}
+
+/**
+ * Player picker for admin forms: labels with the legacy id and preferred
+ * name, searches name, preferred name and legacy id, and can hide players
+ * already chosen elsewhere on the page.
+ */
+export function PlayerOptionCombobox<T extends PlayerOption>({
+    id,
+    users,
+    value,
+    onChange,
+    placeholder = "Select a player...",
+    excludeIds,
+    size,
+    triggerClassName,
+    popoverClassName
+}: PlayerOptionComboboxProps<T>) {
+    const items = useMemo(
+        () =>
+            excludeIds?.length
+                ? users.filter(
+                      (u) => !excludeIds.includes(u.id) || u.id === value
+                  )
+                : users,
+        [users, excludeIds, value]
+    )
+    return (
+        <Combobox
+            id={id}
+            items={items}
+            value={value}
+            onChange={(id) =>
+                onChange(
+                    id,
+                    id ? (users.find((u) => u.id === id) ?? null) : null
+                )
+            }
+            getKey={(u) => u.id}
+            getLabel={playerLabel}
+            matchesSearch={playerMatches}
+            placeholder={placeholder}
+            searchPlaceholder="Search players..."
+            emptyText="No players found"
+            size={size}
+            triggerClassName={triggerClassName}
+            popoverClassName={popoverClassName}
+        />
+    )
+}
+
 interface EmailUser {
     id: string
     name: string
@@ -50,6 +139,8 @@ interface EmailUser {
 }
 
 interface UserEmailComboboxProps {
+    /** Put on the trigger so a <Label htmlFor> can point at it. */
+    id?: string
     users: EmailUser[]
     value: string | null
     onChange: (userId: string) => void
@@ -68,6 +159,7 @@ interface UserEmailComboboxProps {
 const MAX_RENDERED = 100
 
 export function UserEmailCombobox({
+    id,
     users,
     value,
     onChange,
@@ -108,6 +200,7 @@ export function UserEmailCombobox({
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button
+                    id={id}
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}

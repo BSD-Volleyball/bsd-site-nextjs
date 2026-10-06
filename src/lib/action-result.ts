@@ -67,6 +67,23 @@ export class ActionError extends Error {
 }
 
 /**
+ * Frameworks signal redirect(), notFound() and "this render must be
+ * dynamic" by throwing errors tagged with a digest. Those must reach the
+ * framework untouched: caught here they became "Something went wrong." (and
+ * an error log line for every prerendered page that calls a read action).
+ * Matched by shape, since this module must not import next/*.
+ */
+function isFrameworkControlFlow(error: unknown): boolean {
+    const digest = (error as { digest?: unknown } | null)?.digest
+    return (
+        typeof digest === "string" &&
+        (digest.startsWith("NEXT_") ||
+            digest === "DYNAMIC_SERVER_USAGE" ||
+            digest === "BAILOUT_TO_CLIENT_SIDE_RENDERING")
+    )
+}
+
+/**
  * Wraps an async server action body, converting ActionError into fail()
  * and logging unexpected errors through the structured logger.
  *
@@ -85,6 +102,7 @@ export function withAction<T, A extends unknown[]>(
         try {
             return await fn(...args)
         } catch (error) {
+            if (isFrameworkControlFlow(error)) throw error
             if (error instanceof ActionError) {
                 return fail(error.message)
             }

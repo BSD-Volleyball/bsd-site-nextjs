@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 import { RiCloseLine } from "@remixicon/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -163,7 +164,7 @@ export function AdminPlayerDetailPopup({
     if (!open) return null
 
     const pictureSrc = playerDetails?.picture
-        ? `${playerPicUrl}${playerDetails.picture}`
+        ? buildPlayerPictureUrl(playerPicUrl, playerDetails.picture)
         : null
     const playerAlt = playerDetails
         ? `${playerDetails.first_name} ${playerDetails.last_name}`

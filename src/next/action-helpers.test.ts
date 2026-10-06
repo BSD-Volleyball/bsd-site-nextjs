@@ -94,6 +94,18 @@ describe("withAction", () => {
         })
     })
 
+    it.each([
+        "NEXT_REDIRECT;replace;/dashboard;307;",
+        "NEXT_HTTP_ERROR_FALLBACK;404",
+        "DYNAMIC_SERVER_USAGE"
+    ])("rethrows the framework's control-flow error %s", async (digest) => {
+        const signal = Object.assign(new Error("control flow"), { digest })
+        const action = withAction(async () => {
+            throw signal
+        })
+        await expect(action()).rejects.toBe(signal)
+    })
+
     it("hides unexpected errors behind a generic message", async () => {
         const consoleSpy = vi
             .spyOn(console, "error")

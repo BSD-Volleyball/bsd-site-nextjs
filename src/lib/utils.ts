@@ -30,6 +30,20 @@ export function formatPlayerName(
     return `${firstName}${preferred} ${lastName}`
 }
 
+/**
+ * Picker label: the legacy id in brackets (how long-time admins identify
+ * players) followed by formatPlayerName, e.g. "[1042] Patricia (Pat) Smith".
+ */
+export function formatPlayerLabel(
+    firstName: string,
+    lastName: string,
+    preferredName?: string | null,
+    oldId?: number | null
+): string {
+    const name = formatPlayerName(firstName, lastName, preferredName)
+    return oldId ? `[${oldId}] ${name}` : name
+}
+
 export function formatDisplayName(
     firstName: string,
     lastName: string,

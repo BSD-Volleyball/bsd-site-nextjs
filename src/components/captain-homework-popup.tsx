@@ -11,7 +11,7 @@ import type {
     DraftHomeworkDetailPlayer,
     DraftHomeworkDetailResult
 } from "@/app/dashboard/homework-status/actions"
-import { formatDisplayName } from "@/lib/utils"
+import { buildPlayerPictureUrl, formatDisplayName } from "@/lib/utils"
 
 interface CaptainHomeworkPopupProps {
     open: boolean
@@ -28,7 +28,9 @@ function PlayerCard({
     player: DraftHomeworkDetailPlayer
     playerPicUrl: string
 }) {
-    const src = player.picture ? `${playerPicUrl}${player.picture}` : null
+    const src = player.picture
+        ? buildPlayerPictureUrl(playerPicUrl, player.picture)
+        : null
     const displayName = formatDisplayName(
         player.firstName,
         player.lastName,

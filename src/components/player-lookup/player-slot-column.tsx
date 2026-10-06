@@ -9,7 +9,7 @@ import {
     PopoverTrigger
 } from "@/components/ui/popover"
 import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
-import { cn, formatPlayerName } from "@/lib/utils"
+import { cn, formatPlayerLabel } from "@/lib/utils"
 import type {
     LookupPlayerItem,
     PlayerSlot,
@@ -17,8 +17,12 @@ import type {
 } from "./use-player-slots"
 
 function getLookupDisplayName(player: LookupPlayerItem): string {
-    const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
-    return `${oldIdPart}${formatPlayerName(player.first_name, player.last_name, player.preferred_name)}`
+    return formatPlayerLabel(
+        player.first_name,
+        player.last_name,
+        player.preferred_name,
+        player.old_id
+    )
 }
 
 export type LoadDetailResult<TDetail> =
@@ -99,49 +103,47 @@ export function PlayerSlotColumn<TDetail>({
                         dispatch({ type: "SET_OPEN", slotId: slot.id, open })
                     }
                 >
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={slot.open}
-                            className="w-full justify-between font-normal"
-                        >
-                            <span
-                                className={cn(
-                                    !selectedPlayer && "text-muted-foreground"
-                                )}
+                    <div className="relative w-full">
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={slot.open}
+                                className="w-full justify-between font-normal"
                             >
-                                {selectedPlayer
-                                    ? getLookupDisplayName(selectedPlayer)
-                                    : "Search for a player..."}
-                            </span>
-                            <div className="flex items-center gap-1">
-                                {selectedPlayer && (
-                                    <span
-                                        role="button"
-                                        tabIndex={0}
-                                        className="rounded-sm p-0.5 hover:bg-accent"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleClear()
-                                        }}
-                                        onKeyDown={(e) => {
-                                            if (
-                                                e.key === "Enter" ||
-                                                e.key === " "
-                                            ) {
-                                                e.stopPropagation()
-                                                handleClear()
-                                            }
-                                        }}
-                                    >
-                                        <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                                    </span>
-                                )}
-                                <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                        </Button>
-                    </PopoverTrigger>
+                                <span
+                                    className={cn(
+                                        !selectedPlayer &&
+                                            "text-muted-foreground"
+                                    )}
+                                >
+                                    {selectedPlayer
+                                        ? getLookupDisplayName(selectedPlayer)
+                                        : "Search for a player..."}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                    {/* Room for the clear button, which sits outside the trigger */}
+                                    {selectedPlayer && (
+                                        <span
+                                            aria-hidden="true"
+                                            className="size-5"
+                                        />
+                                    )}
+                                    <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                            </Button>
+                        </PopoverTrigger>
+                        {selectedPlayer && (
+                            <button
+                                type="button"
+                                aria-label="Clear selection"
+                                className="absolute top-1/2 right-9 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent"
+                                onClick={handleClear}
+                            >
+                                <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                        )}
+                    </div>
                     <PopoverContent
                         className="w-(--radix-popover-trigger-width) p-2"
                         align="start"

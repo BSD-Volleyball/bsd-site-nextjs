@@ -1,4 +1,5 @@
 import { headers } from "next/headers"
+import { cache } from "react"
 import { auth } from "@/lib/auth"
 import type { Permission } from "@/lib/permissions"
 import {
@@ -14,8 +15,18 @@ import {
 // request through next/headers, which is why it lives outside src/lib.
 // ---------------------------------------------------------------------------
 
+/**
+ * The request's session, looked up once per request. Every helper below,
+ * requireSession() and the page guards read it from here, so an action that
+ * checks a role and then needs the user id for an audit row pays for one
+ * session lookup, not several.
+ */
+export const getRequestSession = cache(async () =>
+    auth.api.getSession({ headers: await headers() })
+)
+
 export async function getSessionUserId(): Promise<string | null> {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await getRequestSession()
     return session?.user?.id ?? null
 }
 
@@ -26,7 +37,7 @@ export async function getSessionUserId(): Promise<string | null> {
  * instead of a bare auth.api.getSession() fetch.
  */
 export async function getSessionUser() {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await getRequestSession()
     return session?.user ?? null
 }
 

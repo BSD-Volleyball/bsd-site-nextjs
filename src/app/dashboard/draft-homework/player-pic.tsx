@@ -1,6 +1,7 @@
 "use client"
 
 import type { DraftHomeworkPlayer } from "./actions"
+import { buildPlayerPictureUrl } from "@/lib/utils"
 
 interface PlayerPicProps {
     player: DraftHomeworkPlayer
@@ -15,7 +16,9 @@ export function PlayerPic({
     height,
     onOpen
 }: PlayerPicProps) {
-    const src = player.picture ? `${playerPicUrl}${player.picture}` : null
+    const src = player.picture
+        ? buildPlayerPictureUrl(playerPicUrl, player.picture)
+        : null
     const displayName = `${player.firstName} ${player.lastName}`
     return src ? (
         <button

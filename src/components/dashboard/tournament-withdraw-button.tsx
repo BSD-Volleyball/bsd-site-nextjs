@@ -1,8 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -22,22 +21,11 @@ interface Props {
 // silently drop them, then refreshes the dashboard so the card returns to its
 // "sign up" state.
 export function TournamentWithdrawButton({ tournamentName }: Props) {
-    const router = useRouter()
     const [open, setOpen] = useState(false)
-    const [busy, setBusy] = useState(false)
-
-    async function handleWithdraw() {
-        setBusy(true)
-        const result = await withdrawTournamentInterest()
-        setBusy(false)
-        if (!result.status) {
-            toast.error(result.message)
-            return
-        }
-        toast.success(result.message ?? "Your interest has been withdrawn.")
-        setOpen(false)
-        router.refresh()
-    }
+    const { run: withdraw, pending: busy } = useAction(
+        withdrawTournamentInterest,
+        { onSuccess: () => setOpen(false) }
+    )
 
     return (
         <>
@@ -66,7 +54,7 @@ export function TournamentWithdrawButton({ tournamentName }: Props) {
                         </Button>
                         <Button
                             variant="destructive"
-                            onClick={handleWithdraw}
+                            onClick={() => withdraw()}
                             disabled={busy}
                         >
                             {busy ? "Withdrawing..." : "Withdraw"}

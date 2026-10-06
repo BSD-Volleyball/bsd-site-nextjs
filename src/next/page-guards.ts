@@ -1,9 +1,8 @@
 import "server-only"
 
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { auth } from "@/lib/auth"
 import {
+    getRequestSession,
     isAdminOrDirectorBySession,
     isCommissionerBySession,
     hasPermissionBySession,
@@ -18,7 +17,7 @@ import type { Permission } from "@/lib/permissions"
 // ---------------------------------------------------------------------------
 
 export async function requireSessionOrRedirect(to = "/auth/sign-in") {
-    const session = await auth.api.getSession({ headers: await headers() })
+    const session = await getRequestSession()
     if (!session?.user) {
         redirect(to)
     }
