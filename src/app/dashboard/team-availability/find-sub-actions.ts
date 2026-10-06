@@ -730,6 +730,17 @@ export async function getSubContactDetails(
         return { status: false, error: "Not authorized." }
     }
 
+    if (
+        !(await isSubContactTarget(teamId, config.seasonId, targetUserId)) &&
+        !(await canManageTeamAsElevated(
+            sessionUser.id,
+            teamId,
+            config.seasonId
+        ))
+    ) {
+        return { status: false, error: "Not authorized." }
+    }
+
     const [row] = await db
         .select({ email: users.email, phone: users.phone })
         .from(users)
@@ -738,7 +749,66 @@ export async function getSubContactDetails(
 
     if (!row) return { status: false, error: "User not found" }
 
+    // Logged here rather than by a separate client call, so a caller cannot
+    // read contact details without leaving an audit row.
+    const targetName = await findUserName(targetUserId)
+    await logAuditEntry({
+        userId: sessionUser.id,
+        action: "view",
+        entityType: "users",
+        entityId: targetUserId,
+        summary: `Captain (${sessionUser.name ?? sessionUser.id}) viewed sub contact details for "${targetName}" while finding a sub for team ${teamId}`
+    })
+
     return { status: true, contact: { email: row.email, phone: row.phone } }
+}
+
+/**
+ * Could this user be offered to the team as a sub? The union of both finder
+ * pools: the season's permanent-sub pool (waitlist plus undrafted signups)
+ * and anyone active on a roster in the team's division or the one below it,
+ * which is where regular-sub candidates come from. Contact details are only
+ * handed out for these players, never for an arbitrary user id.
+ */
+async function isSubContactTarget(
+    teamId: number,
+    seasonId: number,
+    targetUserId: string
+): Promise<boolean> {
+    const pool = await getPermanentSubPool(seasonId)
+    if (pool.some((p) => p.userId === targetUserId)) return true
+
+    const [teamRow] = await db
+        .select({ division: teams.division })
+        .from(teams)
+        .where(eq(teams.id, teamId))
+        .limit(1)
+    if (!teamRow) return false
+
+    const activeDivisions = await db
+        .select({ id: divisions.id })
+        .from(divisions)
+        .where(eq(divisions.active, true))
+        .orderBy(asc(divisions.level))
+    const ourIdx = activeDivisions.findIndex((d) => d.id === teamRow.division)
+    const divisionIds = new Set([teamRow.division])
+    if (ourIdx >= 0 && ourIdx < activeDivisions.length - 1) {
+        divisionIds.add(activeDivisions[ourIdx + 1].id)
+    }
+
+    const seasonTeams = await db
+        .select({ id: teams.id, division: teams.division })
+        .from(teams)
+        .where(eq(teams.season, seasonId))
+    const teamIds = new Set(
+        seasonTeams.filter((t) => divisionIds.has(t.division)).map((t) => t.id)
+    )
+
+    const roster = await getTeamRosterWithSubs(seasonId)
+    return roster.some(
+        (slot) =>
+            slot.activeUser.id === targetUserId && teamIds.has(slot.teamId)
+    )
 }
 
 // True if the user is an admin/director or commissioner of the team's division.
@@ -1118,27 +1188,4 @@ export async function lockInRegularSub(input: {
 
     revalidateCalendarFeeds()
     return ok({ matchSubstitutionId: result.id })
-}
-
-export async function logSubContactViewed(
-    captainTeamId: number,
-    targetUserId: string,
-    targetName: string
-): Promise<void> {
-    const sessionUser = await getSessionUser()
-    if (!sessionUser) return
-
-    const config = await getSeasonConfig()
-    if (!config.seasonId) return
-
-    if (!(await canAccessTeam(sessionUser.id, captainTeamId, config.seasonId)))
-        return
-
-    await logAuditEntry({
-        userId: sessionUser.id,
-        action: "view",
-        entityType: "users",
-        entityId: targetUserId,
-        summary: `Captain (${sessionUser.name ?? sessionUser.id}) viewed sub contact details for "${targetName}" while finding a sub for team ${captainTeamId}`
-    })
 }

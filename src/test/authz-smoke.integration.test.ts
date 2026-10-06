@@ -422,9 +422,6 @@ const cases: SmokeCase[] = [
     c("findSub.lockInRegularSub", "fail", () =>
         findSub.lockInRegularSub({} as never)
     ),
-    c("findSub.logSubContactViewed", "void", () =>
-        findSub.logSubContactViewed(1, "u", "name")
-    ),
     // tournaments
     c("tournamentControl.getCurrentTournamentPhaseData", "fail", () =>
         tournamentControl.getCurrentTournamentPhaseData()

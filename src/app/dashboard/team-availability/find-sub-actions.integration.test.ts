@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { and, eq, isNull } from "drizzle-orm"
 import { db } from "@/database/db"
-import { drafts, signupDrops, signups, waitlist } from "@/database/schema"
+import {
+    auditLog,
+    drafts,
+    signupDrops,
+    signups,
+    waitlist
+} from "@/database/schema"
 import {
     addToWaitlist,
     createDivision,
@@ -10,9 +16,10 @@ import {
     createTeam,
     seedBaselineSeason
 } from "@/test/factories"
-import { createUser, createUserWithRoles } from "@/test/session"
+import { createUser, createUserWithRoles, loginAs } from "@/test/session"
 import {
     getPermanentSubCandidates,
+    getSubContactDetails,
     lockInPermanentSub
 } from "./find-sub-actions"
 
@@ -283,5 +290,105 @@ describe("permanent sub pool includes undrafted signups", () => {
         expect(result.status).toBe(false)
         if (result.status) return
         expect(result.message).toContain("did not sign up")
+    })
+})
+
+describe("getSubContactDetails authorization", () => {
+    let currentSeasonId: number
+    let pastSeasonId: number
+    let divisionId: number
+    let currentTeamId: number
+    let pastTeamId: number
+
+    beforeEach(async () => {
+        await seedBaselineSeason()
+        pastSeasonId = (await createSeason()).id
+        currentSeasonId = (await createSeason()).id
+        divisionId = (await createDivision()).id
+        const someone = await createUser()
+        currentTeamId = (
+            await createTeam({
+                season: currentSeasonId,
+                captain: someone.id,
+                division: divisionId
+            })
+        ).id
+        pastTeamId = (
+            await createTeam({
+                season: pastSeasonId,
+                captain: someone.id,
+                division: divisionId
+            })
+        ).id
+    })
+
+    it("refuses a captain whose team is from a past season", async () => {
+        const oldCaptain = await createUserWithRoles([{ role: "captain" }])
+        pastTeamId = (
+            await createTeam({
+                season: pastSeasonId,
+                captain: oldCaptain.id,
+                division: divisionId
+            })
+        ).id
+        const target = await createUser({ phone: "555-0100" })
+        await addToWaitlist({ season: currentSeasonId, user: target.id })
+
+        const result = await getSubContactDetails(target.id, pastTeamId)
+        expect(result).toEqual({ status: false, error: "Not authorized." })
+    })
+
+    it("refuses a target who is not a sub candidate", async () => {
+        const captain = await createUserWithRoles([{ role: "captain" }])
+        const team = await createTeam({
+            season: currentSeasonId,
+            captain: captain.id,
+            division: divisionId
+        })
+        const stranger = await createUser({ phone: "555-0101" })
+
+        const result = await getSubContactDetails(stranger.id, team.id)
+        expect(result).toEqual({ status: false, error: "Not authorized." })
+    })
+
+    it("returns a candidate's contact details and audits the view", async () => {
+        const captain = await createUserWithRoles([{ role: "captain" }])
+        const team = await createTeam({
+            season: currentSeasonId,
+            captain: captain.id,
+            division: divisionId
+        })
+        const target = await createUser({ phone: "555-0102" })
+        await addToWaitlist({ season: currentSeasonId, user: target.id })
+
+        const result = await getSubContactDetails(target.id, team.id)
+        expect(result).toEqual({
+            status: true,
+            contact: { email: target.email, phone: "555-0102" }
+        })
+
+        const audits = await db
+            .select()
+            .from(auditLog)
+            .where(
+                and(
+                    eq(auditLog.user, captain.id),
+                    eq(auditLog.entity_id, target.id)
+                )
+            )
+        expect(audits).toHaveLength(1)
+    })
+
+    it("lets an admin look up any player for a current team", async () => {
+        const admin = await createUserWithRoles([{ role: "admin" }])
+        const target = await createUser()
+        loginAs(admin)
+
+        const result = await getSubContactDetails(target.id, currentTeamId)
+        expect(result.status).toBe(true)
+
+        // ...but not through a past season's team id.
+        const stale = await getSubContactDetails(target.id, pastTeamId)
+        expect(stale.status).toBe(false)
     })
 })

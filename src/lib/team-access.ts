@@ -1,6 +1,6 @@
 import "server-only"
 
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { db } from "@/database/db"
 import { teams } from "@/database/schema"
 import { getCommissionerDivisionScope, isAdminOrDirector } from "@/lib/rbac"
@@ -10,14 +10,16 @@ import { getCommissionerDivisionScope, isAdminOrDirector } from "@/lib/rbac"
  * admins/directors, and commissioners whose scope covers the team's division.
  * Extracted from team-availability/find-sub-actions.ts so non-action modules
  * (sub requests) can share it.
+ *
+ * The team must belong to `seasonId`: captaincy is per season, and without
+ * this check anyone who ever captained a team kept access through that old
+ * team's id.
  */
 export async function canAccessTeam(
     userId: string,
     teamId: number,
     seasonId: number
 ): Promise<boolean> {
-    if (await isAdminOrDirector(userId)) return true
-
     const [teamRow] = await db
         .select({
             captain: teams.captain,
@@ -25,10 +27,11 @@ export async function canAccessTeam(
             division: teams.division
         })
         .from(teams)
-        .where(eq(teams.id, teamId))
+        .where(and(eq(teams.id, teamId), eq(teams.season, seasonId)))
         .limit(1)
 
     if (!teamRow) return false
+    if (await isAdminOrDirector(userId)) return true
     if (teamRow.captain === userId || teamRow.captain2 === userId) return true
 
     const scope = await getCommissionerDivisionScope(userId, seasonId)

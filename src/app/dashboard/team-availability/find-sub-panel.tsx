@@ -11,7 +11,6 @@ import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import {
     getPermanentSubCandidates,
     getSubContactDetails,
-    logSubContactViewed,
     lockInPermanentSub,
     lockInRegularSub,
     getSubPoolOptions
@@ -89,11 +88,6 @@ export function FindSubPanel({
         if (!contactWarningTarget) return
         setIsLoadingContact(true)
         try {
-            await logSubContactViewed(
-                teamId,
-                contactWarningTarget.userId,
-                contactWarningTarget.name
-            )
             const result = await getSubContactDetails(
                 contactWarningTarget.userId,
                 teamId
