@@ -24,8 +24,6 @@ import { db } from "@/database/db"
 import {
     signups,
     users,
-    week2Rosters,
-    week3Rosters,
     teams,
     divisions,
     individual_divisions,
@@ -56,6 +54,7 @@ import type {
     EditWeekRosterEntry,
     EditWeekSlot
 } from "@/lib/preseason/edit-week-types"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 interface EditWeekActionConfig {
     week: 2 | 3
@@ -81,12 +80,6 @@ export const EDIT_WEEK_3: EditWeekActionConfig = {
     validateCaptains: false
 }
 
-// week2Rosters and week3Rosters share an identical column set; the cast
-// gives us one code path (same trick as src/lib/pdf/*).
-function rosterTableFor(week: 2 | 3) {
-    return (week === 2 ? week2Rosters : week3Rosters) as typeof week2Rosters
-}
-
 export interface EditWeekData {
     status: boolean
     message?: string
@@ -102,7 +95,7 @@ export interface EditWeekData {
 export async function getEditWeekData(
     actionConfig: EditWeekActionConfig
 ): Promise<EditWeekData> {
-    const rosterTable = rosterTableFor(actionConfig.week)
+    const rosterTable = weekRosterTable(actionConfig.week)
 
     try {
         const config = await getSeasonConfig()
@@ -346,7 +339,7 @@ export async function updateEditWeekRosters(
     slots: EditWeekRosterEntry[],
     actorUserId: string
 ): Promise<ActionResult> {
-    const rosterTable = rosterTableFor(actionConfig.week)
+    const rosterTable = weekRosterTable(actionConfig.week)
     const config = await requireSeasonConfig()
 
     const filledSlots = slots.filter((s) => s.userId)
@@ -468,7 +461,7 @@ export async function sendEditWeekRosterNotifications(
     seasonLabel: string,
     actorUserId: string
 ): Promise<ActionResult> {
-    const rosterTable = rosterTableFor(actionConfig.week)
+    const rosterTable = weekRosterTable(actionConfig.week)
     const weekLabel = `Week ${actionConfig.week}`
 
     const allUserIds = [

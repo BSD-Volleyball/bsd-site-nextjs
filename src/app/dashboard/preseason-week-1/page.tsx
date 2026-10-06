@@ -9,7 +9,7 @@ import {
 } from "@/lib/site-config"
 import { db } from "@/database/db"
 import { week1Rosters, users } from "@/database/schema"
-import { and, eq } from "drizzle-orm"
+import { eq } from "drizzle-orm"
 import { PrintButton } from "@/components/preseason/print-button"
 import { PlayerHighlightLegend } from "@/components/player-highlight-legend"
 import type { Metadata } from "next"
@@ -83,87 +83,38 @@ export default async function DraftPreseasonWeek1Page() {
         })
         .from(week1Rosters)
         .innerJoin(users, eq(week1Rosters.user, users.id))
-        .where(
-            and(
-                eq(week1Rosters.season, config.seasonId),
-                eq(week1Rosters.session_number, 1)
-            )
+        .where(eq(week1Rosters.season, config.seasonId))
+
+    const toRosterPlayer = (
+        row: (typeof rosterRows)[number]
+    ): RosterPlayer => ({
+        userId: row.userId,
+        oldId: row.oldId,
+        displayName: formatDisplayName(
+            row.firstName,
+            row.lastName,
+            row.preferredName
+        ),
+        lastName: row.lastName,
+        sessionNumber: row.sessionNumber,
+        courtNumber: row.courtNumber
+    })
+
+    // Sessions 1 and 2 are the two playing sessions; session 3 holds the
+    // alternates.
+    const players = rosterRows
+        .filter((row) => row.sessionNumber === 1 || row.sessionNumber === 2)
+        .map(toRosterPlayer)
+        .sort(
+            (a, b) =>
+                a.sessionNumber - b.sessionNumber ||
+                a.courtNumber - b.courtNumber ||
+                a.lastName.localeCompare(b.lastName)
         )
 
-    const session2Rows = await db
-        .select({
-            userId: week1Rosters.user,
-            oldId: users.old_id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            sessionNumber: week1Rosters.session_number,
-            courtNumber: week1Rosters.court_number
-        })
-        .from(week1Rosters)
-        .innerJoin(users, eq(week1Rosters.user, users.id))
-        .where(
-            and(
-                eq(week1Rosters.season, config.seasonId),
-                eq(week1Rosters.session_number, 2)
-            )
-        )
-
-    const alternateRows = await db
-        .select({
-            userId: week1Rosters.user,
-            oldId: users.old_id,
-            firstName: users.first_name,
-            lastName: users.last_name,
-            preferredName: users.preferred_name,
-            sessionNumber: week1Rosters.session_number,
-            courtNumber: week1Rosters.court_number
-        })
-        .from(week1Rosters)
-        .innerJoin(users, eq(week1Rosters.user, users.id))
-        .where(
-            and(
-                eq(week1Rosters.season, config.seasonId),
-                eq(week1Rosters.session_number, 3)
-            )
-        )
-
-    const players: RosterPlayer[] = [...rosterRows, ...session2Rows]
-        .map((row) => ({
-            userId: row.userId,
-            oldId: row.oldId,
-            displayName: formatDisplayName(
-                row.firstName,
-                row.lastName,
-                row.preferredName
-            ),
-            lastName: row.lastName,
-            sessionNumber: row.sessionNumber,
-            courtNumber: row.courtNumber
-        }))
-        .sort((a, b) => {
-            if (a.sessionNumber !== b.sessionNumber) {
-                return a.sessionNumber - b.sessionNumber
-            }
-            if (a.courtNumber !== b.courtNumber) {
-                return a.courtNumber - b.courtNumber
-            }
-            return a.lastName.localeCompare(b.lastName)
-        })
-
-    const alternates: RosterPlayer[] = alternateRows
-        .map((row) => ({
-            userId: row.userId,
-            oldId: row.oldId,
-            displayName: formatDisplayName(
-                row.firstName,
-                row.lastName,
-                row.preferredName
-            ),
-            lastName: row.lastName,
-            sessionNumber: row.sessionNumber,
-            courtNumber: row.courtNumber
-        }))
+    const alternates = rosterRows
+        .filter((row) => row.sessionNumber === 3)
+        .map(toRosterPlayer)
         .sort((a, b) => a.lastName.localeCompare(b.lastName))
 
     const getPlayers = (sessionNumber: 1 | 2, courtNumber: 1 | 2 | 3 | 4) =>

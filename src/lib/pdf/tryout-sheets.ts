@@ -2,13 +2,7 @@ import { logger } from "@/lib/logger"
 import { and, eq } from "drizzle-orm"
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib"
 import { db } from "@/database/db"
-import {
-    divisions,
-    signups,
-    users,
-    week2Rosters,
-    week3Rosters
-} from "@/database/schema"
+import { divisions, signups, users } from "@/database/schema"
 import {
     getSeasonConfig,
     getEventsByType,
@@ -31,6 +25,7 @@ import {
     seasonFileSlug,
     truncateToFit
 } from "./tryout-sheet-shared"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 interface TryoutSheetRow {
     idLabel: string
@@ -96,11 +91,7 @@ export async function generateTryoutSheetsPdf(
         return pdfErrorResponse("Access denied", 403)
     }
 
-    // The two tables are structurally identical; the cast keeps the query
-    // builder happy about the nominal table-name difference.
-    const rosterTable = (
-        week === 2 ? week2Rosters : week3Rosters
-    ) as typeof week2Rosters
+    const rosterTable = weekRosterTable(week)
     const requiredPhase =
         week === 2 ? "prep_tryout_week_2" : "prep_tryout_week_3"
 

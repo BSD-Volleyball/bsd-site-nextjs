@@ -13,13 +13,12 @@ import {
     signups,
     divisions,
     teams,
-    individual_divisions,
-    week2Rosters,
-    week3Rosters
+    individual_divisions
 } from "@/database/schema"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
 import type { SavedAssignment } from "./types"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 export async function savePreseasonWeekRosters(
     week: 2 | 3,
@@ -123,11 +122,7 @@ export async function savePreseasonWeekRosters(
         }
     }
 
-    // week2Rosters and week3Rosters share an identical column set; the cast
-    // gives us one code path (same trick as src/lib/pdf/*).
-    const rosterTable = (
-        week === 2 ? week2Rosters : week3Rosters
-    ) as typeof week2Rosters
+    const rosterTable = weekRosterTable(week)
 
     try {
         await db.transaction(async (tx) => {

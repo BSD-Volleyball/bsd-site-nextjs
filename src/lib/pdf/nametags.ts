@@ -8,13 +8,7 @@ import {
     rgb
 } from "pdf-lib"
 import { db } from "@/database/db"
-import {
-    divisions,
-    users,
-    week1Rosters,
-    week2Rosters,
-    week3Rosters
-} from "@/database/schema"
+import { divisions, users, week1Rosters } from "@/database/schema"
 import {
     getSeasonConfig,
     getEventsByType,
@@ -27,6 +21,7 @@ import {
     LEGACY_COURT_BY_DIVISION,
     getSessionNumberFromTeam
 } from "@/lib/courts"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 interface CourtEntry {
     courtNumber: number
@@ -470,11 +465,7 @@ async function fetchDivisionWeekNametagEntries(
     week: 2 | 3,
     seasonId: number
 ): Promise<NametagSourceEntry[]> {
-    // The two tables are structurally identical; the cast keeps the query
-    // builder happy about the nominal table-name difference.
-    const rosterTable = (
-        week === 2 ? week2Rosters : week3Rosters
-    ) as typeof week2Rosters
+    const rosterTable = weekRosterTable(week)
 
     const rawRows = await db
         .select({

@@ -8,12 +8,7 @@
  */
 
 import { db } from "@/database/db"
-import {
-    divisions,
-    week1Rosters,
-    week2Rosters,
-    week3Rosters
-} from "@/database/schema"
+import { divisions, week1Rosters } from "@/database/schema"
 import { and, eq, inArray } from "drizzle-orm"
 import { getSeasonConfig } from "@/lib/site-config"
 import { getEventsByType, formatEventTime } from "@/lib/season-utils"
@@ -22,6 +17,7 @@ import {
     LEGACY_COURT_BY_DIVISION,
     getSessionNumberFromTeam
 } from "@/lib/courts"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 export interface PreseasonAssignment {
     week: number
@@ -111,7 +107,7 @@ export async function getPreseasonAssignmentsForUsers(
         return result
     }
 
-    const table = week === 2 ? week2Rosters : week3Rosters
+    const table = weekRosterTable(week)
     const rows = await db
         .select({
             user: table.user,

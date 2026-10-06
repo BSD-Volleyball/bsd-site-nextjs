@@ -12,9 +12,7 @@ import {
     teams,
     userUnavailability,
     users,
-    week1Rosters,
-    week2Rosters,
-    week3Rosters
+    week1Rosters
 } from "@/database/schema"
 import {
     buildAvailabilityChangeHtml,
@@ -26,6 +24,7 @@ import { getRecipientsWithRole } from "@/lib/rbac"
 import { findActiveTeamForUser } from "@/lib/roster"
 import { formatEventDate } from "@/lib/site-config"
 import { formatDisplayName } from "@/lib/utils"
+import { weekRosterTable } from "@/lib/preseason/roster-tables"
 
 /**
  * Resolves the submitted ids to this season's events, or null if any of them
@@ -222,7 +221,7 @@ export async function notifyAdminsOfTryoutRosterConflict(
                 placements.push(`Session ${r.session}, Court ${r.court}`)
             }
         } else {
-            const table = week === 2 ? week2Rosters : week3Rosters
+            const table = weekRosterTable(week === 2 ? 2 : 3)
             const rows = await db
                 .select({
                     divisionName: divisions.name,
