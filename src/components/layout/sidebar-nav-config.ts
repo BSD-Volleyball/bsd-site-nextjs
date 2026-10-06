@@ -161,7 +161,7 @@ export const signupNavItem: NavItem = {
 /**
  * Admin pages tied to running the current season: registration, tryouts,
  * pairing, evaluation and gym coverage. Several are phase-gated in
- * app-sidebar.tsx.
+ * sidebar-sections.ts.
  */
 export const adminSeasonNavItems: NavItem[] = [
     {
@@ -470,6 +470,32 @@ export const tournamentScoresNavItem: NavItem = {
     title: "Enter Tournament Scores",
     url: "/dashboard/tournament-scores",
     icon: RiEditLine
+}
+
+// Player-facing tournament items; which ones show depends on the viewer's
+// tournament status (see buildSidebarSections).
+export const tournamentSignupNavItem: NavItem = {
+    title: "Sign Up for Tournament",
+    url: "/dashboard/tournament-signup",
+    icon: RiTrophyLine
+}
+
+export const tournamentPlayerSignupNavItem: NavItem = {
+    title: "Sign Up as a Player",
+    url: "/dashboard/tournament-waitlist",
+    icon: RiGroupLine
+}
+
+export const myTournamentTeamNavItem: NavItem = {
+    title: "My Tournament Team",
+    url: "/dashboard/tournament-team",
+    icon: RiTeamLine
+}
+
+export const tournamentScheduleViewNavItem: NavItem = {
+    title: "Schedule & Bracket",
+    url: "/dashboard/tournament-schedule-view",
+    icon: RiCalendarLine
 }
 
 export const commissionerNavItems: NavItem[] = [
