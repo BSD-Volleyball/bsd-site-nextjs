@@ -19,9 +19,9 @@
 
 import "dotenv/config"
 import { and, eq } from "drizzle-orm"
-import { db } from "../src/database/db"
-import { userRoles, users } from "../src/database/schema"
-import { logAuditEntry } from "../src/lib/audit-log"
+import { db } from "../../src/database/db"
+import { userRoles, users } from "../../src/database/schema"
+import { logAuditEntry } from "../../src/lib/audit-log"
 
 const TARGET_ID = "7mAgPZJxRyUrxxMsjnr2ywVF4j232ZnD"
 const TARGET_EMAIL = "joann423@gmail.com"

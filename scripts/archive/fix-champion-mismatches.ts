@@ -36,8 +36,8 @@ import { Client } from "pg"
 import {
     buildSurnameIndex,
     resolveSurname
-} from "../src/lib/wayback/html-table"
-import { loadInventory, loadSlice } from "./backfill/lib/load-slice"
+} from "../../src/lib/wayback/html-table"
+import { loadInventory, loadSlice } from "../backfill/lib/load-slice"
 
 const apply = process.argv.includes("--apply")
 const norm = (s: string) =>

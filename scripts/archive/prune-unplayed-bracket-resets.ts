@@ -28,12 +28,12 @@ import {
     playoffMatchesMeta,
     seasons,
     teams
-} from "../src/database/schema"
-import { db } from "../src/database/db"
+} from "../../src/database/schema"
+import { db } from "../../src/database/db"
 import {
     findUnplayedBracketResets,
     pruneUnplayedBracketResets
-} from "../src/lib/playoff-bracket-cleanup"
+} from "../../src/lib/playoff-bracket-cleanup"
 
 const APPLY = process.argv.includes("--apply")
 

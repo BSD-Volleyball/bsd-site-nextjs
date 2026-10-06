@@ -149,7 +149,7 @@ export const advanceSeasonPhase = withAction(
                 // as a missing result rather than a match that never happened.
                 // Non-fatal -- a cosmetic cleanup must not block completion,
                 // and the season can be re-swept with
-                // scripts/prune-unplayed-bracket-resets.ts.
+                // scripts/archive/prune-unplayed-bracket-resets.ts.
                 try {
                     const { pruned, skipped } =
                         await pruneUnplayedBracketResets(seasonId)

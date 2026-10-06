@@ -51,7 +51,7 @@ import {
     HISTORICAL_ROUND,
     divisionBand,
     historicalOverall
-} from "../src/lib/wayback/historical-pick"
+} from "../../src/lib/wayback/historical-pick"
 
 const apply = process.argv.includes("--apply")
 

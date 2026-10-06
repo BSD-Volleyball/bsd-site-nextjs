@@ -23,9 +23,9 @@ import {
     playoffMatchesMeta,
     seasons,
     teams
-} from "../src/database/schema"
-import { db } from "../src/database/db"
-import { parseFilename } from "../src/lib/wayback/identify"
+} from "../../src/database/schema"
+import { db } from "../../src/database/db"
+import { parseFilename } from "../../src/lib/wayback/identify"
 
 const CACHE = path.join(process.cwd(), "scripts", "data", "local")
 

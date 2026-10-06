@@ -43,7 +43,7 @@ import "dotenv/config"
 import fs from "node:fs"
 import path from "node:path"
 import { Client } from "pg"
-import { loadInventory, loadSlice } from "./backfill/lib/load-slice"
+import { loadInventory, loadSlice } from "../backfill/lib/load-slice"
 
 const SEASONS = ["F12", "S13", "U13", "F13", "S14", "F14", "S15", "U15"]
 const DIV_AA = 1

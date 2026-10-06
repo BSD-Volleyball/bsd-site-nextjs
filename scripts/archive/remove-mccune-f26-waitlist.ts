@@ -21,9 +21,9 @@
 
 import "dotenv/config"
 import { and, eq } from "drizzle-orm"
-import { db } from "../src/database/db"
-import { userRoles, users, waitlist } from "../src/database/schema"
-import { logAuditEntry } from "../src/lib/audit-log"
+import { db } from "../../src/database/db"
+import { userRoles, users, waitlist } from "../../src/database/schema"
+import { logAuditEntry } from "../../src/lib/audit-log"
 
 const TARGET_ID = "U345jkfQv7ML47xuBq2bTCms8XrHUruk"
 const TARGET_EMAIL = "connormccune3@gmail.com"

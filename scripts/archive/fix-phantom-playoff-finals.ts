@@ -43,8 +43,8 @@ import {
     seasons,
     subRequests,
     teams
-} from "../src/database/schema"
-import { db } from "../src/database/db"
+} from "../../src/database/schema"
+import { db } from "../../src/database/db"
 
 const APPLY = process.argv.includes("--apply")
 

@@ -7,7 +7,7 @@
  * instead and their history never reached their profile.
  *
  * Pure logic, deliberately free of any database import so it can be unit
- * tested and reused by scripts/link-legacy-players.ts.
+ * tested and reused by scripts/archive/link-legacy-players.ts.
  */
 
 export const LEGACY_EMAIL_PREFIX = "legacy-"

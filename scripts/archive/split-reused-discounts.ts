@@ -23,8 +23,8 @@
 //   DOTENV_CONFIG_PATH=.env.local npx tsx scripts/split-reused-discounts.ts --apply
 import "dotenv/config"
 import { eq } from "drizzle-orm"
-import { db } from "../src/database/db"
-import { discounts, seasons, signups } from "../src/database/schema"
+import { db } from "../../src/database/db"
+import { discounts, seasons, signups } from "../../src/database/schema"
 
 const APPLY = process.argv.includes("--apply")
 

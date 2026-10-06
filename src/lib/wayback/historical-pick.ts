@@ -18,7 +18,7 @@
  * filed every historical player into the AA band. It went unnoticed because the
  * offset is zero for AA, so the formula was correct for the one division
  * anybody was likely to spot-check. 2,635 rows had to be repaired
- * (scripts/fix-draft-overall.ts).
+ * (scripts/archive/fix-draft-overall.ts).
  *
  * Mirrors `submitDraft` in src/app/dashboard/draft-division/actions.ts, with
  * positionValue pinned to 1 -- that is what "first pick of the round" means.

@@ -23,20 +23,20 @@ import "dotenv/config"
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { and, eq } from "drizzle-orm"
-import { db } from "../src/database/db"
+import { db } from "../../src/database/db"
 import {
     divisions,
     drafts,
     seasons,
     teams,
     users
-} from "../src/database/schema"
-import { GHOST_CAPTAIN_ID } from "../src/lib/ghost-captain"
-import { loadInventory, loadSlice } from "./backfill/lib/load-slice"
+} from "../../src/database/schema"
+import { GHOST_CAPTAIN_ID } from "../../src/lib/ghost-captain"
+import { loadInventory, loadSlice } from "../backfill/lib/load-slice"
 import {
     HISTORICAL_ROUND,
     historicalOverall
-} from "../src/lib/wayback/historical-pick"
+} from "../../src/lib/wayback/historical-pick"
 
 const TARGETS = [
     { seasonCode: "S12", divisionCode: "b" },

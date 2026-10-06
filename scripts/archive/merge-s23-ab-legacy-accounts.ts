@@ -32,9 +32,9 @@
 
 import "dotenv/config"
 import { eq, inArray } from "drizzle-orm"
-import { db } from "../src/database/db"
-import { drafts, teams, users } from "../src/database/schema"
-import { mergeUserRecords } from "../src/lib/merge-users"
+import { db } from "../../src/database/db"
+import { drafts, teams, users } from "../../src/database/schema"
+import { mergeUserRecords } from "../../src/lib/merge-users"
 
 const MERGES = [
     {
