@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-export interface PhaseControlConfigEntry<P extends string> {
+interface PhaseControlConfigEntry<P extends string> {
     label: string
     description: string
     adminHint: string
@@ -14,7 +14,7 @@ export interface PhaseControlConfigEntry<P extends string> {
     previousPhase: P | null
 }
 
-export interface PhaseTransitionResult {
+interface PhaseTransitionResult {
     status: boolean
     message?: string
 }

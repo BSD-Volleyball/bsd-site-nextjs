@@ -31,9 +31,9 @@ export const CALENDAR_FEED_MAX_AGE_SECONDS = 3600
  * revalidateCalendarFeeds() (enforced by calendar-invalidation.test.ts), so
  * the lifetime is a backstop rather than the refresh mechanism.
  */
-export const CALENDAR_SNAPSHOT_TTL_SECONDS = 86400
+const CALENDAR_SNAPSHOT_TTL_SECONDS = 86400
 
-export interface CachedCalendarFeed {
+interface CachedCalendarFeed {
     ics: string
     filename: string
 }

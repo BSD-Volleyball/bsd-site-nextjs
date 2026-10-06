@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import type { RatePlayerEntry, RatedPlayerEntry } from "./actions"
 import { getDisplayName, getGenderLabel } from "./rate-player-helpers"
 
-export interface RatedPlayerTableProps {
+interface RatedPlayerTableProps {
     rows: RatedPlayerEntry[]
     emptyMessage: string
     onRate: (player: RatePlayerEntry) => void
@@ -100,7 +100,7 @@ export function RatedPlayerTable({
                                 <td className="px-4 py-2">
                                     {row.overall ?? "—"}
                                 </td>
-                                <td className="px-4 py-2 whitespace-nowrap">
+                                <td className="whitespace-nowrap px-4 py-2">
                                     {formatRatedAt(row.ratedAt)}
                                 </td>
                                 <td className="px-4 py-2">

@@ -6,9 +6,9 @@ import { RiCheckLine, RiLockLine, RiLockUnlockLine } from "@remixicon/react"
 import { cn } from "@/lib/utils"
 import type { DraftSetupStatus, DraftSetupStepState } from "@/lib/draft-setup"
 
-export type DraftSetupStep = "rounds" | "order"
+type DraftSetupStep = "rounds" | "order"
 
-export const DRAFT_SETUP_STEP_PATHS: Record<DraftSetupStep, string> = {
+const DRAFT_SETUP_STEP_PATHS: Record<DraftSetupStep, string> = {
     rounds: "/dashboard/draft-setup/rounds",
     order: "/dashboard/draft-setup/order"
 }

@@ -20,7 +20,7 @@ export interface PlayerSlot<TDetail> {
     error: string | null
 }
 
-export type SlotAction<TDetail> =
+type SlotAction<TDetail> =
     | { type: "ADD_SLOT" }
     | { type: "REMOVE_SLOT"; slotId: string }
     | { type: "SET_OPEN"; slotId: string; open: boolean }

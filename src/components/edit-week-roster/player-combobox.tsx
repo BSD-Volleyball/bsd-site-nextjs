@@ -41,7 +41,7 @@ export interface ComboboxPlayer {
     requestedSlots?: number[] | null
 }
 
-export function getComboboxPlayerLabel(player: ComboboxPlayer) {
+function getComboboxPlayerLabel(player: ComboboxPlayer) {
     const name = formatDisplayName(
         player.firstName,
         player.lastName,

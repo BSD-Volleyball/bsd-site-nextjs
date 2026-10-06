@@ -29,18 +29,18 @@ interface LowerBracketPositionOptions extends UpperBracketPositionOptions {
     firstRoundMatchCount?: number
 }
 
-export const calculateVerticalStartingPoint = (
+const calculateVerticalStartingPoint = (
     columnIndex: number,
     height: number
 ): number => 2 ** columnIndex * (height / 2) - height / 2
-export const columnIncrement = (columnIndex: number, height: number): number =>
+const columnIncrement = (columnIndex: number, height: number): number =>
     2 ** columnIndex * height
-export const calculateHeightIncrease = (
+const calculateHeightIncrease = (
     columnIndex: number,
     rowIndex: number,
     height: number
 ): number => columnIncrement(columnIndex, height) * rowIndex
-export const calculateVerticalPositioning = ({
+const calculateVerticalPositioning = ({
     rowIndex,
     columnIndex,
     rowHeight: height
@@ -93,7 +93,7 @@ export const calculatePositionOfMatchUpperBracket = (
         y: yResult + canvasPadding + offsetY
     }
 }
-export const returnLowerBracketColumnIndex = (columnIndex: number): number =>
+const returnLowerBracketColumnIndex = (columnIndex: number): number =>
     Math.ceil(columnIndex / 2)
 export const calculatePositionOfMatchLowerBracket = (
     rowIndex: number,

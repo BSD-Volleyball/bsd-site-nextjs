@@ -98,7 +98,7 @@ function EventColumn({
     )
 }
 
-export interface AvailabilityEventPickerProps {
+interface AvailabilityEventPickerProps {
     config: SeasonConfig
     /** Event ids currently marked unavailable. */
     selectedEvents: Set<number>

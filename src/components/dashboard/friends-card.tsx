@@ -8,7 +8,7 @@ import { FriendAnalyticsPopup } from "@/components/friends/friend-analytics-popu
 import { friendScheduleLine } from "@/lib/friends-display"
 import type { FriendNextMatchEntry } from "@/lib/friends"
 
-export interface FriendsCardData {
+interface FriendsCardData {
     playerPicUrl: string
     /** Only friends with something scheduled; the card is hidden when empty. */
     friends: FriendNextMatchEntry[]

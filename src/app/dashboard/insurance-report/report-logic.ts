@@ -4,7 +4,7 @@ import { AGE_GROUPS, youngestAgeGroup } from "@/lib/age-groups"
 // be unit-tested without a database. (A "use server" module may only export
 // async server actions, so sync helpers live here.)
 
-export type InsuranceReportUser = {
+type InsuranceReportUser = {
     userId: string
     name: string
     events: string[]

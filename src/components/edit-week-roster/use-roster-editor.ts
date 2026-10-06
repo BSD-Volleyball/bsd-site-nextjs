@@ -8,12 +8,12 @@ import { useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import type { RosterChangeEntry } from "@/components/roster-notification"
 
-export interface RosterEditorSlot {
+interface RosterEditorSlot {
     localKey: string
     userId: string
 }
 
-export interface RosterEditorOptions<TSlot extends RosterEditorSlot> {
+interface RosterEditorOptions<TSlot extends RosterEditorSlot> {
     initialSlots: TSlot[]
     /** Returns an error message to toast, or null to proceed with saving. */
     validate?: (filledSlots: TSlot[]) => string | null

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 
-export interface DivisionStanding {
+interface DivisionStanding {
     id: number
     number: number | null
     name: string

@@ -2,14 +2,13 @@
 
 import {
     DecoratorNode,
-    type LexicalNode,
     type NodeKey,
     type SerializedLexicalNode,
     type Spread
 } from "lexical"
 import { getTemplateVariable } from "@/lib/email-template-variables"
 
-export type SerializedTemplateVariableNode = Spread<
+type SerializedTemplateVariableNode = Spread<
     {
         variableKey: string
     },
@@ -86,10 +85,4 @@ export function $createTemplateVariableNode(
     variableKey: string
 ): TemplateVariableNode {
     return new TemplateVariableNode(variableKey)
-}
-
-export function $isTemplateVariableNode(
-    node: LexicalNode | null | undefined
-): node is TemplateVariableNode {
-    return node instanceof TemplateVariableNode
 }

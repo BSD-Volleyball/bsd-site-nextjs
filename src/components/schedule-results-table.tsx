@@ -1,7 +1,7 @@
 import { formatMatchTime, formatShortDate } from "@/lib/season-utils"
 import { cn } from "@/lib/utils"
 
-export interface ScheduleResultsMatch {
+interface ScheduleResultsMatch {
     id: number
     time: string | null
     court: number | null

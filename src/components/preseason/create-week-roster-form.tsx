@@ -46,14 +46,14 @@ import type {
  * Candidate shape the form can render. Week-specific display fields are
  * optional; each week's loader provides the ones its annotation mode uses.
  */
-export interface RosterFormCandidate extends PreseasonCandidate {
+interface RosterFormCandidate extends PreseasonCandidate {
     oldId?: number | null
     lastDivisionName?: string | null
     recommendationUpCount?: number
     recommendationDownCount?: number
 }
 
-export interface RosterExcludedPlayer {
+interface RosterExcludedPlayer {
     userId: string
     oldId?: number | null
     firstName: string

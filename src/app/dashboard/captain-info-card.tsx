@@ -305,7 +305,7 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                                     Team Availability for Next Match
                                 </h3>
                             </div>
-                            <p className="text-teal-600 text-sm dark:text-teal-400">
+                            <p className="text-sm text-teal-600 dark:text-teal-400">
                                 {new Date(
                                     `${data.nextMatchAvailability.eventDate}T00:00:00`
                                 ).toLocaleDateString("en-US", {
@@ -368,7 +368,7 @@ export function WelcomeTeamCard({ data }: { data: CaptainWelcomeData }) {
                             )}
                             <Link
                                 href="/dashboard/team-availability"
-                                className="inline-flex items-center gap-1 text-teal-700 text-sm underline underline-offset-2 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
+                                className="inline-flex items-center gap-1 text-sm text-teal-700 underline underline-offset-2 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-200"
                             >
                                 View full season availability →
                             </Link>

@@ -21,7 +21,7 @@ interface SeasonInfo {
  * Structural on purpose: draft-history rows come from several actions, and
  * the record fields are optional so callers that don't load them still work.
  */
-export interface DivisionHistoryEntry {
+interface DivisionHistoryEntry {
     seasonId: number
     seasonYear: number
     seasonName: string

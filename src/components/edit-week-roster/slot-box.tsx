@@ -15,7 +15,7 @@ import {
 import { RiAddLine, RiDeleteBinLine, RiUserLine } from "@remixicon/react"
 import { PlayerCombobox, type ComboboxPlayer } from "./player-combobox"
 
-export interface SlotBoxSlot {
+interface SlotBoxSlot {
     localKey: string
     userId: string
 }

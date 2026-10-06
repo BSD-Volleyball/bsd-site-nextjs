@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export interface CareerStatTotals {
+interface CareerStatTotals {
     matchWins: number
     matchLosses: number
     setWins: number
@@ -10,7 +10,7 @@ export interface CareerStatTotals {
     pointDiff: number
 }
 
-export interface CareerChampionship {
+interface CareerChampionship {
     seasonLabel: string
     divisionName: string
 }

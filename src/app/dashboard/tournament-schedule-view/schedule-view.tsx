@@ -184,7 +184,7 @@ function DivisionRoundRobin({
     )
 }
 
-export function DivisionBracket({
+function DivisionBracket({
     groups,
     myTeamId
 }: {

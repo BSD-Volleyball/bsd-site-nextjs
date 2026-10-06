@@ -24,7 +24,7 @@ import { SlotRequestNote } from "./slot-request-note"
 import { slotFitsRequest } from "@/lib/preseason/slots"
 import { useRosterEditor } from "./use-roster-editor"
 
-export interface Week1RosterPlayer {
+interface Week1RosterPlayer {
     id: string
     firstName: string
     lastName: string
@@ -39,20 +39,20 @@ export interface Week1RosterPlayer {
     slotRequestComment: string | null
 }
 
-export interface Week1RosterSlot {
+interface Week1RosterSlot {
     id: number
     sessionNumber: number
     courtNumber: number
     userId: string
 }
 
-export interface Week1RosterEntryPayload {
+interface Week1RosterEntryPayload {
     sessionNumber: number
     courtNumber: number
     userId: string
 }
 
-export interface Week1NotificationAssignment {
+interface Week1NotificationAssignment {
     userId: string
     sessionNumber: number
     courtNumber: number

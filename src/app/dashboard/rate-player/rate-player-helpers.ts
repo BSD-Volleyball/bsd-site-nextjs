@@ -52,7 +52,7 @@ export function getEmptyRating(): PlayerRatingValues {
     }
 }
 
-export interface DefaultLookupContext {
+interface DefaultLookupContext {
     phase: SeasonPhase
     /** Tryout event dates (YYYY-MM-DD) in week order: [tryout 1, tryout 2, tryout 3]. */
     tryoutDates: string[]
@@ -133,7 +133,7 @@ export function sortRatedPlayers(
     return a.player.firstName.localeCompare(b.player.firstName)
 }
 
-export interface TryoutTimeSlotDivision {
+interface TryoutTimeSlotDivision {
     divisionName: string
     courtNumber: number
     teams: { teamNumber: number; players: RatePlayerEntry[] }[]

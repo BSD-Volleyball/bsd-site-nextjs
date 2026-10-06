@@ -31,7 +31,7 @@ import {
 } from "@/next/session"
 import type { SeasonPhase } from "@/lib/season-phases"
 
-export interface SeasonNavDivision {
+interface SeasonNavDivision {
     id: number
     name: string
     level: number
@@ -160,7 +160,7 @@ async function getRecentTournamentsNav(): Promise<
     }
 }
 
-export type HistoricalNavEntry =
+type HistoricalNavEntry =
     | { kind: "season"; season: SeasonNavItem }
     | { kind: "tournament"; tournament: TournamentNavItem }
 
@@ -200,7 +200,7 @@ async function getHistoricalNav(): Promise<HistoricalNavEntry[]> {
         .map(({ entry }) => entry)
 }
 
-export interface TournamentSidebarInfo {
+interface TournamentSidebarInfo {
     tournamentId: number
     name: string
     phase: string

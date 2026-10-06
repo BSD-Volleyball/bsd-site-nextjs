@@ -57,7 +57,7 @@ function isNumericCondition(
 }
 
 /** The pickable answers of a dependency: yes/no, or its option list. */
-export function conditionChoices(question: SurveyQuestionDef): SurveyOption[] {
+function conditionChoices(question: SurveyQuestionDef): SurveyOption[] {
     if (question.type === "yes_no") {
         return [
             { key: "yes", label: "Yes" },
@@ -72,7 +72,7 @@ export function conditionChoices(question: SurveyQuestionDef): SurveyOption[] {
  * comparison at the bottom of its scale, everything else an `in` seeded with
  * its first answer, so a freshly added rule is never unsatisfiable.
  */
-export function defaultConditionFor(
+function defaultConditionFor(
     question: SurveyQuestionDef
 ): SurveyAnswerCondition {
     if (question.type === "rating" && question.config.type === "rating") {

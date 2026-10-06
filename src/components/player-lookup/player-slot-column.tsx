@@ -16,7 +16,7 @@ import type {
     SlotDispatch
 } from "./use-player-slots"
 
-export function getLookupDisplayName(player: LookupPlayerItem): string {
+function getLookupDisplayName(player: LookupPlayerItem): string {
     const oldIdPart = player.old_id ? `[${player.old_id}] ` : ""
     return `${oldIdPart}${formatPlayerName(player.first_name, player.last_name, player.preferred_name)}`
 }
