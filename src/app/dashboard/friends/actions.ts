@@ -3,7 +3,7 @@
 import { db } from "@/database/db"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { friendships, users } from "@/database/schema"
-import { and, eq } from "drizzle-orm"
+import { and, eq, gt, sql } from "drizzle-orm"
 import {
     withAction,
     requireSession,
@@ -114,6 +114,10 @@ async function notifyFriendAccepted(
  * Send a friend request. If the target already has a pending request TO the
  * caller, adding them back auto-accepts it instead of creating a duplicate.
  */
+const FRIEND_REQUEST_WINDOW = "24 hours"
+const FRIEND_REQUESTS_PER_WINDOW = 30
+const FRIEND_REQUESTS_PER_PERSON_PER_WINDOW = 3
+
 export const sendFriendRequest = withAction(
     async (
         targetUserId: string
@@ -159,6 +163,32 @@ export const sendFriendRequest = withAction(
             await notifyFriendAccepted(self, edge.requester)
             revalidateCalendarFeeds()
             return ok({ autoAccepted: true }, "You're now friends!")
+        }
+
+        // Each request emails the addressee from the league's account, and a
+        // request can be cancelled and re-sent, so cap how often that can
+        // happen. Cancelled rows are kept, so they still count.
+        // Window computed by Postgres (created_at is a naive now() stamp).
+        const recent = await db
+            .select({ addressee: friendships.addressee })
+            .from(friendships)
+            .where(
+                and(
+                    eq(friendships.requester, me),
+                    gt(
+                        friendships.created_at,
+                        sql`now() - ${FRIEND_REQUEST_WINDOW}::interval`
+                    )
+                )
+            )
+        if (
+            recent.length >= FRIEND_REQUESTS_PER_WINDOW ||
+            recent.filter((r) => r.addressee === targetId).length >=
+                FRIEND_REQUESTS_PER_PERSON_PER_WINDOW
+        ) {
+            return fail(
+                "You've sent a lot of friend requests today. Please try again tomorrow."
+            )
         }
 
         try {

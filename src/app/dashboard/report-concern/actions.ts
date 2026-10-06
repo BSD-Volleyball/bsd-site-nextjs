@@ -1,8 +1,10 @@
 "use server"
 
 import { db } from "@/database/db"
-import { concerns, userRoles, users } from "@/database/schema"
-import { eq } from "drizzle-orm"
+import { concerns } from "@/database/schema"
+import { count, gt, sql } from "drizzle-orm"
+import { logger } from "@/lib/logger"
+import { getRecipientsWithRole } from "@/lib/rbac"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
 import { buildConcernNotificationHtml } from "@/lib/email-html"
@@ -27,6 +29,9 @@ export interface SubmitConcernInput {
     team_match?: string
     description: string
 }
+
+const CONCERN_ALERT_WINDOW = "1 hour"
+const CONCERN_ALERTS_PER_WINDOW = 10
 
 export const submitConcern = withAction(
     async (input: SubmitConcernInput): Promise<ActionResult> => {
@@ -53,20 +58,40 @@ export const submitConcern = withAction(
             status: "new"
         })
 
-        const ombudsmenRows = await db
-            .select({ id: users.id, email: users.email })
-            .from(userRoles)
-            .innerJoin(users, eq(userRoles.user_id, users.id))
-            .where(eq(userRoles.role, "ombudsman"))
+        // Every concern is stored, but a flood (an account scripting this
+        // action) must not become a flood of ombudsman email. Counted
+        // league-wide because anonymous concerns deliberately record no user.
+        const [recent] = await db
+            .select({ total: count() })
+            .from(concerns)
+            // Window computed by Postgres: created_at is a naive timestamp
+            // filled by now(), so comparing it with a JS Date would skew by
+            // the server's UTC offset.
+            .where(
+                gt(
+                    concerns.created_at,
+                    sql`now() - ${CONCERN_ALERT_WINDOW}::interval`
+                )
+            )
+        const alertsPaused = (recent?.total ?? 0) > CONCERN_ALERTS_PER_WINDOW
+        if (alertsPaused) {
+            logger.warn("[report-concern] Concern alerts paused by volume", {
+                lastHour: recent?.total
+            })
+        }
 
-        if (ombudsmenRows.length > 0) {
+        const ombudsmen = alertsPaused
+            ? []
+            : await getRecipientsWithRole("ombudsman")
+        if (ombudsmen.length > 0) {
             // Staff mode: no preference covers operational mail, but a
             // hard-bounced ombudsman address is still unreachable.
             await sendMail({
                 mode: { kind: "staff", category: "concern_submitted" },
-                recipients: ombudsmenRows
-                    .filter((r) => r.email)
-                    .map((r) => ({ userId: r.id, email: r.email })),
+                recipients: ombudsmen.map((r) => ({
+                    userId: r.userId,
+                    email: r.email
+                })),
                 subject: "New Concern Submitted",
                 htmlBody: buildConcernNotificationHtml(site.publicUrl),
                 tag: "concern-notification"

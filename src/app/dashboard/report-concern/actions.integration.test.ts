@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { concerns, userRoles } from "@/database/schema"
 import { sentMessages } from "@/test/email"
+import { createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 import { type SubmitConcernInput, submitConcern } from "./actions"
 
@@ -100,5 +101,42 @@ describe("submitConcern", () => {
         expect(rows[0].user_id).toBeNull()
         expect(rows[0].anonymous).toBe(true)
         expect(sentMessages()).toHaveLength(0)
+    })
+})
+
+describe("submitConcern alert volume and recipients", () => {
+    it("keeps storing concerns but pauses ombudsman alerts during a flood", async () => {
+        const ombudsman = await createUser()
+        await db
+            .insert(userRoles)
+            .values({ user_id: ombudsman.id, role: "ombudsman" })
+        await createUserWithRoles([])
+
+        for (let i = 0; i < 12; i++) {
+            const result = await submitConcern(baseInput({ anonymous: true }))
+            expect(result.status).toBe(true)
+        }
+
+        expect(await db.select().from(concerns)).toHaveLength(12)
+        // The first ten notify; after that the hour's alerts are paused.
+        expect(sentMessages()).toHaveLength(10)
+    })
+
+    it("does not mail last season's ombudsman", async () => {
+        const past = await createSeason({ year: 2024 })
+        await createSeason({ year: 2026 })
+        const former = await createUser()
+        await db.insert(userRoles).values({
+            user_id: former.id,
+            role: "ombudsman",
+            season_id: past.id
+        })
+        await createUserWithRoles([])
+
+        await submitConcern(baseInput())
+
+        expect(
+            sentMessages().some((m) => JSON.stringify(m).includes(former.email))
+        ).toBe(false)
     })
 })

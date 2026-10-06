@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm"
+import { and, eq, isNull, or } from "drizzle-orm"
 import { cache } from "react"
 import { db } from "@/database/db"
 import { sessions, userRoles, users } from "@/database/schema"
@@ -294,7 +294,13 @@ export async function getUserRolesForUser(
  * come along so the send funnel can honour suppressions and dead-address
  * state for staff too. Used for operational notices to admins/ombudsmen.
  */
+/**
+ * Everyone who holds `role` now: global grants plus grants for the current
+ * season (the same rule hasPermission applies), so last season's ombudsman
+ * is not still mailed about new concerns.
+ */
 export async function getRecipientsWithRole(role: Role) {
+    const { seasonId } = await getSeasonConfig()
     const rows = await db
         .select({
             id: users.id,
@@ -304,7 +310,17 @@ export async function getRecipientsWithRole(role: Role) {
         })
         .from(userRoles)
         .innerJoin(users, eq(userRoles.user_id, users.id))
-        .where(eq(userRoles.role, role))
+        .where(
+            and(
+                eq(userRoles.role, role),
+                seasonId
+                    ? or(
+                          isNull(userRoles.season_id),
+                          eq(userRoles.season_id, seasonId)
+                      )
+                    : isNull(userRoles.season_id)
+            )
+        )
 
     const seen = new Set<string>()
     return rows

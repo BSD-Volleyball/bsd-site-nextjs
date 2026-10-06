@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm"
 import { describe, expect, it } from "vitest"
 import { db } from "@/database/db"
 import { drafts, friendships } from "@/database/schema"
@@ -420,5 +421,26 @@ describe("getLastMatchResultForUser", () => {
         const nobody = await createUser()
         const season = await createSeason()
         expect(await getLastMatchResultForUser(nobody.id, season.id)).toBeNull()
+    })
+})
+
+describe("sendFriendRequest throttling", () => {
+    it("stops a send/cancel loop at three requests to the same person a day", async () => {
+        const target = await createUser()
+        await createUserWithRoles([])
+
+        for (let i = 0; i < 3; i++) {
+            const sent = await sendFriendRequest(target.id)
+            expect(sent.status).toBe(true)
+            const [pending] = await db
+                .select({ id: friendships.id })
+                .from(friendships)
+                .where(eq(friendships.status, "pending"))
+            await cancelFriendRequest(pending.id)
+        }
+
+        const fourth = await sendFriendRequest(target.id)
+        expect(fourth.status).toBe(false)
+        expect(sentMessages()).toHaveLength(3)
     })
 })
