@@ -56,7 +56,10 @@ const contentSecurityPolicy = [
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "object-src 'none'"
+    "object-src 'none'",
+    // Violations are logged by /api/csp-report (structured warnings in the
+    // Vercel logs) so the policy can be enforced once production is clean.
+    "report-uri /api/csp-report"
 ].join("; ")
 
 // Parse PLAYER_PIC_URL to extract hostname for next/image remotePatterns
