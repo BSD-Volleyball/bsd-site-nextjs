@@ -65,6 +65,35 @@ const strictExpectations = [
         key: "src/app/dashboard/edit-player/actions.ts:updateUser",
         pattern: /invalidateAllSessionsForUser\s*\(/,
         description: "must invalidate sessions when privilege changes occur"
+    },
+    // Ownership/scope checks a session guard alone would not catch. Each one
+    // closed a real hole; keep them from being refactored away.
+    {
+        key: "src/app/dashboard/team-availability/find-sub-actions.ts:getSubContactDetails",
+        pattern: /await\s+isSubContactTarget\s*\(/,
+        description:
+            "must limit contact details to actual sub candidates (isSubContactTarget)"
+    },
+    {
+        key: "src/app/dashboard/pay-season/actions.ts:submitSeasonPayment",
+        pattern: /await\s+validateFinalSignupAvailability\s*\(/,
+        description:
+            "must check the registration window and capacity before charging"
+    },
+    {
+        key: "src/app/dashboard/pay-season/actions.ts:submitFreeSignup",
+        pattern: /await\s+validateFinalSignupAvailability\s*\(/,
+        description: "must check the registration window and capacity"
+    },
+    {
+        key: "src/app/dashboard/send-email/actions.ts:createAndSendBroadcast",
+        pattern: /await\s+commissionerTargetError\s*\(/,
+        description: "must scope commissioner sends to their own divisions"
+    },
+    {
+        key: "src/app/dashboard/send-email/actions.ts:previewBroadcast",
+        pattern: /await\s+commissionerTargetError\s*\(/,
+        description: "must scope commissioner previews to their own divisions"
     }
 ]
 
@@ -96,6 +125,15 @@ function toRepoRelative(filePath) {
     return path.relative(repoRoot, filePath).split(path.sep).join("/")
 }
 
+function stripComments(source) {
+    return source
+        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+        .replace(
+            /(^|[^:"'`\\])\/\/[^\n]*/g,
+            (m, lead) => lead + " ".repeat(m.length - lead.length)
+        )
+}
+
 function getLineNumber(content, index) {
     return content.slice(0, index).split("\n").length
 }
@@ -114,15 +152,21 @@ function extractExportedAsyncFunctions(content) {
         }))
         .sort((a, b) => a.start - b.start)
 
+    // A block ends at the next top-level declaration of any kind, not just
+    // the next export: otherwise a helper defined below an action (and any
+    // guard call inside it) would be credited to the action.
+    const declarationStarts = [
+        ...content.matchAll(
+            /^(?:export\s+)?(?:async\s+function|function|const|let|type|interface|class)\b/gm
+        )
+    ].map((match) => match.index ?? 0)
+
     const functions = []
-    for (let i = 0; i < matches.length; i++) {
-        const current = matches[i]
-        const next = matches[i + 1]
-        functions.push({
-            name: current.name,
-            start: current.start,
-            end: next ? next.start : content.length
-        })
+    for (const current of matches) {
+        const end =
+            declarationStarts.find((start) => start > current.start) ??
+            content.length
+        functions.push({ name: current.name, start: current.start, end })
     }
 
     return functions
@@ -135,7 +179,9 @@ function main() {
 
     for (const filePath of actionFiles) {
         const relPath = toRepoRelative(filePath)
-        const content = fs.readFileSync(filePath, "utf8")
+        // Comments are blanked (same length, so line numbers hold): a guard
+        // that is only mentioned in a comment must not count as a guard.
+        const content = stripComments(fs.readFileSync(filePath, "utf8"))
         const functions = extractExportedAsyncFunctions(content)
 
         for (const fn of functions) {
