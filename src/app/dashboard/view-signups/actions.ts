@@ -5,9 +5,7 @@ import { db } from "@/database/db"
 import {
     users,
     signups,
-    teams,
     seasons,
-    divisions,
     playerRatings,
     userUnavailability,
     seasonEvents
@@ -36,14 +34,19 @@ import type {
     PlayerViewerRating
 } from "@/lib/player-ratings-shared"
 import { getPlayerRatingsSectionData } from "@/lib/player-ratings-summary"
-import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
+import {
+    getCaptainDivisionsByUser,
+    getCurrentDraftDivisions,
+    getLastDraftInfoByUser,
+    getPlayerNamesById,
+    getUnavailableDatesBySignup
+} from "@/lib/roster"
 import { getSeasonHistoryForUser } from "@/lib/player-season-history"
 import type {
     PlayerDetails as AdminPlayerDetails,
     PlayerDraftHistory,
     PlayerSignup
 } from "@/app/dashboard/player-lookup/actions"
-import { formatPlayerName } from "@/lib/utils"
 
 export interface SignupCsvEntry {
     oldId: number
@@ -131,58 +134,9 @@ export const getSignupsCsvData = withAction(
             captainDivisionMap
         ] = await Promise.all([
             // Player unavailability per signup
-            (async () => {
-                const map = new Map<number, string>()
-                if (signupIds.length === 0) return map
-                const unavailRows = await db
-                    .select({
-                        signupId: userUnavailability.signup_id,
-                        eventDate: seasonEvents.event_date
-                    })
-                    .from(userUnavailability)
-                    .innerJoin(
-                        seasonEvents,
-                        eq(seasonEvents.id, userUnavailability.event_id)
-                    )
-                    .where(inArray(userUnavailability.signup_id, signupIds))
-
-                const bySignup = new Map<number, string[]>()
-                for (const row of unavailRows) {
-                    const dates = bySignup.get(row.signupId!) || []
-                    dates.push(formatEventDate(row.eventDate))
-                    bySignup.set(row.signupId!, dates)
-                }
-                for (const [sid, dates] of bySignup) {
-                    map.set(sid, dates.join(", "))
-                }
-                return map
-            })(),
+            getUnavailableDatesBySignup(signupIds),
             // Pair pick user names
-            (async () => {
-                const map = new Map<string, string>()
-                if (pairPickIds.length === 0) return map
-                const pairPickUsers = await db
-                    .select({
-                        id: users.id,
-                        firstName: users.first_name,
-                        lastName: users.last_name,
-                        preferredName: users.preferred_name
-                    })
-                    .from(users)
-                    .where(inArray(users.id, pairPickIds))
-
-                for (const u of pairPickUsers) {
-                    map.set(
-                        u.id,
-                        formatPlayerName(
-                            u.firstName,
-                            u.lastName,
-                            u.preferredName
-                        )
-                    )
-                }
-                return map
-            })(),
+            getPlayerNamesById(pairPickIds),
             // Last draft info (season label, division, captain name)
             getLastDraftInfoByUser(userIds),
             // Current-season draft assignments
@@ -239,28 +193,7 @@ export const getSignupsCsvData = withAction(
                 return map
             })(),
             // Current-season captain roles
-            (async () => {
-                const map = new Map<string, string>()
-                if (userIds.length === 0) return map
-                const captainTeams = await db
-                    .select({
-                        captainId: teams.captain,
-                        divisionName: divisions.name
-                    })
-                    .from(teams)
-                    .innerJoin(divisions, eq(teams.division, divisions.id))
-                    .where(
-                        and(
-                            eq(teams.season, config.seasonId),
-                            inArray(teams.captain, userIds)
-                        )
-                    )
-
-                for (const team of captainTeams) {
-                    map.set(team.captainId, team.divisionName)
-                }
-                return map
-            })()
+            getCaptainDivisionsByUser(config.seasonId, userIds)
         ])
 
         const entries: SignupCsvEntry[] = signupRows.map((row) => {

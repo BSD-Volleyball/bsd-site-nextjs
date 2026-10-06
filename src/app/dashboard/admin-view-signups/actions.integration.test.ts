@@ -65,6 +65,52 @@ describe("getSeasonSignups discount reporting", () => {
         expect(entry?.discountCodeName).toBe("Credit for injury")
     })
 
+    it("reports unavailable dates, pair pick names and captain roles", async () => {
+        await createUserWithRoles([{ role: "admin" }])
+        const pair = await createUser({
+            first_name: "Pat",
+            last_name: "Partner"
+        })
+        const player = await createUser()
+        const signup = await createSignup({
+            season: currentSeasonId,
+            player: player.id,
+            pair_pick: pair.id
+        })
+        await createSignup({ season: currentSeasonId, player: pair.id })
+        for (const date of ["2026-10-01", "2026-10-08"]) {
+            const event = await createSeasonEvent(currentSeasonId, {
+                event_type: "regular_season",
+                event_date: date
+            })
+            await db.insert(userUnavailability).values({
+                user_id: player.id,
+                signup_id: signup.id,
+                event_id: event.id
+            })
+        }
+        const division = await createDivision({ name: "BB", level: 5 })
+        await createTeam({
+            season: currentSeasonId,
+            captain: pair.id,
+            division: division.id
+        })
+
+        const result = await getSeasonSignups()
+        expect(result.status).toBe(true)
+        const entries = result.status ? result.data.signups : []
+        const entry = entries.find((s) => s.userId === player.id)
+        expect(entry?.pairPickName).toBe("Pat Partner")
+        // Each date is itself "Thursday, October 1, 2026", so the joined
+        // list cannot be split back apart on ", "; check each is present.
+        expect(entry?.unavailableDates).toContain("Thursday, October 1, 2026")
+        expect(entry?.unavailableDates).toContain("Thursday, October 8, 2026")
+        expect(entry?.captainIn).toBeNull()
+        const pairEntry = entries.find((s) => s.userId === pair.id)
+        expect(pairEntry?.captainIn).toBe("BB")
+        expect(pairEntry?.unavailableDates).toBeNull()
+    })
+
     it("ignores a discount the player redeemed in an earlier season", async () => {
         await createUserWithRoles([{ role: "admin" }])
         const player = await createUser()

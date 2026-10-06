@@ -1,6 +1,6 @@
-import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import type { ActionResult } from "@/next/action-helpers"
 import { withAction, ok, fail } from "@/next/action-helpers"
@@ -11,19 +11,20 @@ import {
     signupDrops,
     substitutions,
     drafts,
-    teams,
-    divisions,
-    discounts,
-    userUnavailability,
-    seasonEvents
+    discounts
 } from "@/database/schema"
 import { and, desc, eq, inArray, isNull } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
-import { getSeasonConfig, formatEventDate } from "@/lib/site-config"
+import { getSeasonConfig } from "@/lib/site-config"
 import { isAdminOrDirectorBySession } from "@/next/session"
 import type { SignupDropCategory } from "@/lib/signup-drops-display"
-import { formatPlayerName } from "@/lib/utils"
-import { getLastDraftInfoByUser, getCurrentDraftDivisions } from "@/lib/roster"
+import {
+    getCaptainDivisionsByUser,
+    getCurrentDraftDivisions,
+    getLastDraftInfoByUser,
+    getPlayerNamesById,
+    getUnavailableDatesBySignup
+} from "@/lib/roster"
 
 export interface SignupEntry {
     signupId: number
@@ -155,32 +156,7 @@ export const getSeasonSignups = withAction(
                     return new Set(draftedUsers.map((d) => d.user))
                 })(),
                 // Player unavailability per signup
-                (async () => {
-                    const map = new Map<number, string>()
-                    if (signupIds.length === 0) return map
-                    const unavailRows = await db
-                        .select({
-                            signupId: userUnavailability.signup_id,
-                            eventDate: seasonEvents.event_date
-                        })
-                        .from(userUnavailability)
-                        .innerJoin(
-                            seasonEvents,
-                            eq(seasonEvents.id, userUnavailability.event_id)
-                        )
-                        .where(inArray(userUnavailability.signup_id, signupIds))
-
-                    const bySignup = new Map<number, string[]>()
-                    for (const row of unavailRows) {
-                        const dates = bySignup.get(row.signupId!) || []
-                        dates.push(formatEventDate(row.eventDate))
-                        bySignup.set(row.signupId!, dates)
-                    }
-                    for (const [sid, dates] of bySignup) {
-                        map.set(sid, dates.join(", "))
-                    }
-                    return map
-                })(),
+                getUnavailableDatesBySignup(signupIds),
                 // Discounts consumed against *these* signups. Keying on
                 // discounts.used alone would surface codes a player redeemed in an
                 // earlier season, since `used` is a lifetime flag.
@@ -210,57 +186,13 @@ export const getSeasonSignups = withAction(
                     return map
                 })(),
                 // Pair pick user names
-                (async () => {
-                    if (pairPickIds.length === 0)
-                        return new Map<string, string>()
-                    const pairPickUsers = await db
-                        .select({
-                            id: users.id,
-                            firstName: users.first_name,
-                            lastName: users.last_name,
-                            preferredName: users.preferred_name
-                        })
-                        .from(users)
-                        .where(inArray(users.id, pairPickIds))
-
-                    return new Map(
-                        pairPickUsers.map((u) => [
-                            u.id,
-                            formatPlayerName(
-                                u.firstName,
-                                u.lastName,
-                                u.preferredName
-                            )
-                        ])
-                    )
-                })(),
+                getPlayerNamesById(pairPickIds),
                 // Last draft information for each user
                 getLastDraftInfoByUser(userIds),
                 // Current-season draft assignments
                 getCurrentDraftDivisions(config.seasonId, userIds),
                 // Current-season captain roles
-                (async () => {
-                    const map = new Map<string, string>()
-                    if (userIds.length === 0) return map
-                    const captainTeams = await db
-                        .select({
-                            captainId: teams.captain,
-                            divisionName: divisions.name
-                        })
-                        .from(teams)
-                        .innerJoin(divisions, eq(teams.division, divisions.id))
-                        .where(
-                            and(
-                                eq(teams.season, config.seasonId),
-                                inArray(teams.captain, userIds)
-                            )
-                        )
-
-                    for (const team of captainTeams) {
-                        map.set(team.captainId, team.divisionName)
-                    }
-                    return map
-                })(),
+                getCaptainDivisionsByUser(config.seasonId, userIds),
                 // Un-restored drops for these signups (post-draft drops keep the
                 // signup row alive, so they surface here as a badge)
                 (async () => {

@@ -1,4 +1,3 @@
-import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
 import { db } from "@/database/db"
@@ -7,12 +6,15 @@ import {
     drafts,
     matchSubstitutions,
     matches,
+    seasonEvents,
     seasons,
     substitutions,
     teams,
+    userUnavailability,
     users
 } from "@/database/schema"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import { formatEventDate, formatSeasonLabel } from "@/lib/season-utils"
 import { formatDisplayName, formatPlayerName } from "@/lib/utils"
 
 type PlayerSummary = {
@@ -481,6 +483,84 @@ export async function getDraftHistoryForUser(
         .innerJoin(divisions, eq(teams.division, divisions.id))
         .where(eq(drafts.user, userId))
         .orderBy(seasons.year, seasons.id)
+}
+
+/**
+ * Event dates each signup marked unavailable, formatted and comma-joined
+ * ("Sep 5, Sep 12"). Signups with none are absent from the map.
+ */
+export async function getUnavailableDatesBySignup(
+    signupIds: number[]
+): Promise<Map<number, string>> {
+    const map = new Map<number, string>()
+    if (signupIds.length === 0) return map
+
+    const rows = await db
+        .select({
+            signupId: userUnavailability.signup_id,
+            eventDate: seasonEvents.event_date
+        })
+        .from(userUnavailability)
+        .innerJoin(
+            seasonEvents,
+            eq(seasonEvents.id, userUnavailability.event_id)
+        )
+        .where(inArray(userUnavailability.signup_id, signupIds))
+
+    const bySignup = new Map<number, string[]>()
+    for (const row of rows) {
+        const dates = bySignup.get(row.signupId!) || []
+        dates.push(formatEventDate(row.eventDate))
+        bySignup.set(row.signupId!, dates)
+    }
+    for (const [signupId, dates] of bySignup) {
+        map.set(signupId, dates.join(", "))
+    }
+    return map
+}
+
+/** Display name (formatPlayerName) for each of the given users. */
+export async function getPlayerNamesById(
+    userIds: string[]
+): Promise<Map<string, string>> {
+    if (userIds.length === 0) return new Map()
+
+    const rows = await db
+        .select({
+            id: users.id,
+            firstName: users.first_name,
+            lastName: users.last_name,
+            preferredName: users.preferred_name
+        })
+        .from(users)
+        .where(inArray(users.id, userIds))
+
+    return new Map(
+        rows.map((u) => [
+            u.id,
+            formatPlayerName(u.firstName, u.lastName, u.preferredName)
+        ])
+    )
+}
+
+/** Division name for each of the given users who captains a team this season. */
+export async function getCaptainDivisionsByUser(
+    seasonId: number,
+    userIds: string[]
+): Promise<Map<string, string>> {
+    const map = new Map<string, string>()
+    if (userIds.length === 0) return map
+
+    const rows = await db
+        .select({ captainId: teams.captain, divisionName: divisions.name })
+        .from(teams)
+        .innerJoin(divisions, eq(teams.division, divisions.id))
+        .where(and(eq(teams.season, seasonId), inArray(teams.captain, userIds)))
+
+    for (const row of rows) {
+        map.set(row.captainId, row.divisionName)
+    }
+    return map
 }
 
 /**
