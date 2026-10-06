@@ -21,7 +21,7 @@ export async function proxy(request: NextRequest) {
 
     // Protected routes: optimistic redirect when there is no session cookie.
     if (!sessionCookie) {
-        const redirectTo = pathname + search
+        const redirectTo = encodeURIComponent(pathname + search)
         return NextResponse.redirect(
             new URL(`/auth/sign-in?redirectTo=${redirectTo}`, request.url)
         )

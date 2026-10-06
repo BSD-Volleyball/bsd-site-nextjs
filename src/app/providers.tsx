@@ -8,9 +8,14 @@ import type { ReactNode } from "react"
 import NextTopLoader from "nextjs-toploader"
 import { Toaster } from "sonner"
 import { authClient } from "@/lib/auth-client"
+import { safeRedirectPath } from "@/lib/safe-redirect"
 
 export function Providers({ children }: { children: ReactNode }) {
     const router = useRouter()
+    // better-auth-ui navigates to ?redirectTo= after sign-in without checking
+    // it, which made the sign-in page an open redirect to any site.
+    const toSafePath = (href: string) =>
+        safeRedirectPath(href, window.location.origin)
 
     return (
         <ThemeProvider
@@ -21,8 +26,8 @@ export function Providers({ children }: { children: ReactNode }) {
         >
             <AuthUIProvider
                 authClient={authClient}
-                navigate={router.push}
-                replace={router.replace}
+                navigate={(href) => router.push(toSafePath(href))}
+                replace={(href) => router.replace(toSafePath(href))}
                 redirectTo="/onboarding/account"
                 onSessionChange={() => {
                     router.refresh()

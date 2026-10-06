@@ -40,4 +40,13 @@ describe("proxy", () => {
             "/dashboard/rosters?week=2"
         )
     })
+
+    it("keeps every query parameter of the page in redirectTo", async () => {
+        const res = await proxy(request("/dashboard/rosters?week=2&division=3"))
+        const location = new URL(res.headers.get("location") ?? "")
+        expect(location.searchParams.get("redirectTo")).toBe(
+            "/dashboard/rosters?week=2&division=3"
+        )
+        expect(location.searchParams.get("division")).toBeNull()
+    })
 })

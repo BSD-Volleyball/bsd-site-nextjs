@@ -28,3 +28,18 @@ test("a wrong password is rejected", async ({ page }) => {
     await page.goto("/dashboard")
     await expect(page).toHaveURL(/\/auth\/sign-in/)
 })
+
+test("sign-in ignores a redirectTo pointing at another site", async ({
+    page
+}) => {
+    await page.goto("/auth/sign-in?redirectTo=https://evil.example/login")
+
+    await page.getByLabel("Email").fill(PERSONAS.player.email)
+    await page
+        .getByLabel("Password", { exact: true })
+        .fill(PERSONAS.player.password)
+    await page.getByRole("button", { name: /^(login|sign in)$/i }).click()
+
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth"))
+    expect(page.url()).not.toContain("evil.example")
+})
