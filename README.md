@@ -79,7 +79,7 @@ pnpm test:watch        # Watch mode
 pnpm test:unit         # Unit tests only (no database needed)
 pnpm test:integration  # Integration tests only (needs local Postgres)
 pnpm test:coverage     # Full run with V8 coverage report
-pnpm test:e2e          # Playwright end-to-end tests (local only)
+pnpm test:e2e          # Playwright end-to-end tests (also run in CI)
 ```
 
 Layout:
@@ -98,7 +98,7 @@ Layout:
   session in as that admin so `requireAdmin()`/`requirePermission()` pass for
   real. Non-admin and unauthenticated cases are just `createUserWithRoles([{ role: "captain" }])` or no login at all.
 - **E2E tests** (`e2e/*.spec.ts`) drive the real app with Playwright against
-  a dedicated `bsd_e2e` database. Local-only; not run in CI. The setup project
+  a dedicated `bsd_e2e` database, locally and in the `e2e` CI job. The setup project
   (`e2e/setup/auth.setup.ts`) creates three **email/password personas** —
   `admin`, `captain`, and `player` (see `e2e/helpers.ts`) — through the real
   better-auth signup endpoint and saves each one's signed-in storage state.

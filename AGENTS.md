@@ -23,14 +23,14 @@ pnpm check-authz
 pnpm test              # unit + integration (Vitest)
 pnpm test:unit         # pure logic, no database
 pnpm test:integration  # real server actions against local Postgres
-pnpm test:e2e          # Playwright end-to-end (local only)
+pnpm test:e2e          # Playwright end-to-end (also runs in CI)
 ```
 
 Database and auth schema workflows:
 
 ```bash
-npx drizzle-kit generate
-npx drizzle-kit migrate
+pnpm db:generate       # drizzle-kit generate, reading .env.local
+pnpm db:migrate        # scripts/run-migration.ts (never drizzle-kit migrate; see below)
 pnpm dlx auth@<better-auth version> generate   # the old @better-auth/cli is deprecated
 ```
 
@@ -121,8 +121,8 @@ pnpm dlx auth@<better-auth version> generate   # the old @better-auth/cli is dep
 - **Default conversions are breaking**: moving a column default from app-side (`$defaultFn`) to DB-side (`.default()`/`.defaultNow()`) changes generated inserts to emit `DEFAULT` — code deployed before the migration runs will violate NOT NULL constraints (this stranded three paid signups on 2026-07-27). Apply the migration to prod BEFORE deploying such schema.ts changes, or make the change expand–contract.
 - For schema changes:
   1. Update `src/database/schema.ts`.
-  2. Generate migration with `npx drizzle-kit generate`.
-  3. Apply with `npx drizzle-kit migrate`.
+  2. Generate the migration with `pnpm db:generate`.
+  3. Apply with `pnpm db:migrate` (`scripts/run-migration.ts`), to prod before deploying code that depends on it.
 
 ## UI and Styling Conventions
 
@@ -154,7 +154,7 @@ pnpm dlx auth@<better-auth version> generate   # the old @better-auth/cli is dep
 - **Unit** (`*.test.ts`): pure logic; the db singleton is aliased to a guard that throws, so unit tests never touch a database.
 - **Integration** (`*.integration.test.ts`, colocated): run the real server action against a per-worker clone of a migrated Postgres template. `better-auth` is mocked so `auth.api.getSession()` returns the session set by `loginAs()`, but **role checks stay real** (they query the `user_roles` rows the helpers insert).
 - **Admin-gated actions:** open the test with `createUserWithRoles([{ role: "admin" }])` from `src/test/session.ts` — it creates a user, inserts the role rows, and logs the fabricated session in as that admin, so `requireAdmin()`/`requirePermission()` pass genuinely. Cover the negative cases with `createUserWithRoles([{ role: "captain" }])` (authenticated non-admin) and no login at all (unauthenticated); both should return `{ status: false, message: "Unauthorized." }`. See `src/app/dashboard/tournament-pools/actions.integration.test.ts` for a full example (admin loads/saves/reverts the playoff bracket editor).
-- **E2E** (`e2e/*.spec.ts`, Playwright, local-only): `e2e/setup/auth.setup.ts` seeds the `bsd_e2e` database and creates **email/password personas** — `admin`, `captain`, `player` (`e2e/helpers.ts`) — via the real signup endpoint, saving each one's storage state. Admin accounts sign in with email/password (not only Google OAuth), so an admin-only flow runs pre-authenticated via `test.use({ storageState: PERSONAS.admin.storageState })`.
+- **E2E** (`e2e/*.spec.ts`, Playwright; runs locally and as the `e2e` CI job): `e2e/setup/auth.setup.ts` seeds the `bsd_e2e` database and creates **email/password personas** — `admin`, `captain`, `player` (`e2e/helpers.ts`) — via the real signup endpoint, saving each one's storage state. Admin accounts sign in with email/password (not only Google OAuth), so an admin-only flow runs pre-authenticated via `test.use({ storageState: PERSONAS.admin.storageState })`.
 
 ## Environment Notes
 
