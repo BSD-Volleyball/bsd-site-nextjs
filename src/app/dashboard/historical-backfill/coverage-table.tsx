@@ -328,7 +328,8 @@ export function CoverageTable({ coverage }: { coverage: HistoricalCoverage }) {
                 </Table>
             </div>
 
-            <p className="text-muted-foreground text-sm">
+            {/* A div, not a p: Badge renders a div, which a p cannot contain. */}
+            <div className="text-muted-foreground text-sm">
                 Showing {rows.length} of {coverage.seasons.length} seasons.{" "}
                 <Badge variant="secondary">
                     {totals.regular.toLocaleString()}
@@ -342,7 +343,7 @@ export function CoverageTable({ coverage }: { coverage: HistoricalCoverage }) {
                     {totals.players.toLocaleString()}
                 </Badge>{" "}
                 roster spots in total.
-            </p>
+            </div>
         </div>
     )
 }
