@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/next/page-guards"
-import { getScoreEntryRows } from "./actions"
+import { getScoreEntryRows } from "./data"
 import { ScoreEntryList } from "./score-entry-list"
 
 export const metadata: Metadata = {

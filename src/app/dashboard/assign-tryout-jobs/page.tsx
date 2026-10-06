@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { getLeagueDateString } from "@/lib/date-utils"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 
-import { getAssignTryoutJobsView } from "./actions"
+import { getAssignTryoutJobsView } from "./data"
 import { AssignTryoutJobsClient } from "./assign-tryout-jobs-client"
 
 export const metadata: Metadata = {

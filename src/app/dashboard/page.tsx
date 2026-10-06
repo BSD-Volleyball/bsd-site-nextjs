@@ -53,7 +53,7 @@ import {
     getPlayerTeamAssignment,
     type CaptainWelcomeData,
     type PlayerTeamAssignment
-} from "./roster-actions"
+} from "./roster-data"
 import {
     getNextMatch,
     getPlayoffNextMatches,

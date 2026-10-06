@@ -21,10 +21,10 @@ import { createUser, createUserWithRoles } from "@/test/session"
 
 import {
     assignVolunteer,
-    getAssignTryoutJobsView,
     sendVolunteerAssignmentEmails,
     unassignVolunteer
 } from "./actions"
+import { getAssignTryoutJobsView } from "./data"
 
 const mockedSendBatch = vi.mocked(sendBatchEmails)
 

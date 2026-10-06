@@ -31,12 +31,14 @@ import { cn } from "@/lib/utils"
 import {
     assignVolunteer,
     sendVolunteerAssignmentEmails,
-    unassignVolunteer,
-    type AssignJobView,
-    type AssignNightView,
-    type AssignTryoutJobsView,
-    type JobSlotView
+    unassignVolunteer
 } from "./actions"
+import type {
+    AssignJobView,
+    AssignNightView,
+    AssignTryoutJobsView,
+    JobSlotView
+} from "./data"
 
 /** Key identifying one job+slot+court picker, since slot/court can be null. */
 function slotKey(

@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import { db } from "@/database/db"
 import { matchReferees, matches, teams, divisions } from "@/database/schema"

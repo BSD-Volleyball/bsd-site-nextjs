@@ -1,4 +1,4 @@
-"use server"
+import "server-only"
 
 import { parseTimeForSort } from "@/lib/season-utils"
 import { db } from "@/database/db"

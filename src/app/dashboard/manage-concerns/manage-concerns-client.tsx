@@ -10,10 +10,10 @@ import {
     reopenConcern,
     sendConcernReply,
     unmarkConcernAsSpam,
-    type AssignableUser,
     type ConcernRow,
     type ConcernThreadItem
 } from "./actions"
+import type { AssignableUser } from "./data"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"

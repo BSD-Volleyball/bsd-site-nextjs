@@ -15,7 +15,8 @@ import {
     DialogContent,
     DialogTitle
 } from "@/components/ui/dialog"
-import type { WatchlistPlayer, UserOption } from "./actions"
+import type { WatchlistPlayer } from "./actions"
+import type { UserOption } from "./data"
 
 interface DraftWatchlistProps {
     malePlayers: WatchlistPlayer[] // full ranked list, sorted best-first

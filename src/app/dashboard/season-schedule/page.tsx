@@ -7,7 +7,7 @@ import { DivisionSection } from "@/components/division-section"
 import {
     type CurrentSeasonScheduleDivision,
     getCurrentSeasonScheduleData
-} from "./actions"
+} from "./data"
 import { CalendarLinksDialog } from "@/components/calendar/calendar-links-dialog"
 import { SEASON_PHASES } from "@/lib/season-phases"
 import type { Metadata } from "next"

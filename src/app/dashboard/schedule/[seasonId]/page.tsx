@@ -2,7 +2,7 @@ import { requireSessionOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
 import { DivisionSection } from "@/components/division-section"
-import { getSeasonScheduleData } from "./actions"
+import { getSeasonScheduleData } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

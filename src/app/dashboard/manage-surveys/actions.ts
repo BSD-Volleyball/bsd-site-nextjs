@@ -11,9 +11,7 @@ import {
 import { logAuditEntry } from "@/lib/audit-log"
 import type { DispatchResult } from "@/lib/notifications/dispatch"
 import {
-    buildTrend,
     aggregateSurvey,
-    type QuestionTrend,
     type ReportResponse,
     type SegmentFilter,
     type SurveyReport
@@ -21,8 +19,7 @@ import {
 import { questionsForSurvey } from "@/lib/surveys/questions-for-survey"
 import {
     loadSurveyResponses,
-    loadRawResponses,
-    loadTemplateInstances
+    loadRawResponses
 } from "@/lib/surveys/results-data"
 import { resolveAudience } from "@/lib/surveys/audience"
 import {
@@ -34,14 +31,7 @@ import {
 } from "@/lib/surveys/lifecycle"
 import { sendSurveyReminder } from "@/lib/surveys/reminders"
 import {
-    getEditorOptions,
-    getSurveyEditorData,
     labelAudienceGroups,
-    listCurrentSeasonDivisions,
-    listSurveys,
-    type SurveyEditorData,
-    type SurveyEditorOptions,
-    type SurveyListRow,
     type SurveySettingsInput
 } from "@/lib/surveys/surveys"
 import {
@@ -53,12 +43,10 @@ import {
     assertVisibilityGraphSound,
     getTemplateEditorData,
     getTemplateQuestions,
-    listTemplates,
     lockTemplate,
     rowToQuestionDef,
     saveTemplateQuestions as saveTemplateQuestionRows,
-    type TemplateEditorData,
-    type TemplateSummary
+    type TemplateEditorData
 } from "@/lib/surveys/templates"
 import {
     SURVEY_GROUP_TYPES,
@@ -71,7 +59,6 @@ import {
     type SurveyStatus,
     validateAudience
 } from "@/lib/surveys/types"
-import { listUserNames } from "@/lib/user-directory"
 import { formatPlayerName } from "@/lib/utils"
 import {
     ActionError,
@@ -102,14 +89,6 @@ export interface TemplateFields {
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
-
-export const getSurveyTemplates = withAction(
-    async (): Promise<ActionResult<TemplateSummary[]>> => {
-        await requirePermission("surveys:manage")
-        await requireSession()
-        return ok(await listTemplates())
-    }
-)
 
 export const createSurveyTemplate = withAction(
     async (
@@ -406,43 +385,11 @@ export interface CreateSurveyInput {
     title: string
 }
 
-export interface SurveyEditorOptionsPayload extends SurveyEditorOptions {
-    users: { id: string; name: string }[]
-}
-
 export interface AudiencePreview {
     total: number
     groupCounts: { label: string; count: number }[]
     names: string[]
 }
-
-export const getSurveys = withAction(
-    async (): Promise<ActionResult<SurveyListRow[]>> => {
-        await requirePermission("surveys:manage")
-        await requireSession()
-        return ok(await listSurveys())
-    }
-)
-
-export const getSurveyEditorOptions = withAction(
-    async (): Promise<ActionResult<SurveyEditorOptionsPayload>> => {
-        await requirePermission("surveys:manage")
-        const session = await requireSession()
-        const options = await getEditorOptions()
-        return ok({ ...options, users: await listUserNames(session.user.id) })
-    }
-)
-
-export const getSurveyEditor = withAction(
-    async (
-        surveyId: number
-    ): Promise<ActionResult<SurveyEditorData | null>> => {
-        await requirePermission("surveys:manage")
-        await requireSession()
-        const id = requirePositiveInt(surveyId, "survey ID")
-        return ok(await getSurveyEditorData(id))
-    }
-)
 
 export const createSurvey = withAction(
     async (
@@ -995,22 +942,6 @@ export interface SurveyResultsSurveySummary {
     templateId: number
 }
 
-/**
- * The narrow set of filter options the results page's Select controls need.
- * Deliberately separate from `getSurveyEditorOptions` (gated on
- * `surveys:manage`) so a `surveys:view_results`-only viewer can load the
- * results page's division filter without an editor-level permission.
- */
-export const getSurveyFilterOptions = withAction(
-    async (): Promise<
-        ActionResult<{ divisions: { id: number; name: string }[] }>
-    > => {
-        await requirePermission("surveys:view_results")
-        await requireSession()
-        return ok({ divisions: await listCurrentSeasonDivisions() })
-    }
-)
-
 export const getSurveyResults = withAction(
     async (
         surveyId: number,
@@ -1085,45 +1016,6 @@ export const getSurveyRawResponses = withAction(
         const responses = await loadRawResponses(id, includeIdentity)
 
         return ok({ questions, responses, anonymous: survey.is_anonymous })
-    }
-)
-
-export const getTemplateTrends = withAction(
-    async (
-        templateId: number
-    ): Promise<
-        ActionResult<{
-            template: { id: number; name: string }
-            questions: SurveyQuestionDef[]
-            trends: QuestionTrend[]
-        }>
-    > => {
-        await requirePermission("surveys:view_results")
-        await requireSession()
-        const id = requirePositiveInt(templateId, "template ID")
-
-        const [template] = await db
-            .select({ id: surveyTemplates.id, name: surveyTemplates.name })
-            .from(surveyTemplates)
-            .where(eq(surveyTemplates.id, id))
-            .limit(1)
-        if (!template) return fail("Survey template not found.")
-
-        const instances = await loadTemplateInstances(id)
-        const appearingIds = new Set<number>()
-        for (const instance of instances) {
-            for (const key of Object.keys(instance.aggregates)) {
-                appearingIds.add(Number(key))
-            }
-        }
-
-        const allQuestions = await getTemplateQuestions(id)
-        const questions = allQuestions.filter((question) =>
-            appearingIds.has(question.id)
-        )
-        const trends = buildTrend(questions, instances)
-
-        return ok({ template, questions, trends })
     }
 )
 

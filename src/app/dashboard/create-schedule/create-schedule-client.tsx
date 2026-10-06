@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { writeRegularSeasonSchedule, writePlayoffSchedule } from "./actions"
-import type { DivisionWithTeams } from "./actions"
+import type { DivisionWithTeams } from "./data"
 import {
     SIX_TEAM_ROUNDS,
     SIX_TEAM_ROTATIONS,

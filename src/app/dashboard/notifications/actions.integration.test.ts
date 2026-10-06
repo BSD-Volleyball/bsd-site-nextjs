@@ -12,11 +12,8 @@ import {
     deleteStreamSuppression
 } from "@/lib/postmark"
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
-import {
-    getNotificationSettings,
-    reactivateStream,
-    saveNotificationPreferences
-} from "./actions"
+import { reactivateStream, saveNotificationPreferences } from "./actions"
+import { getNotificationSettings } from "./data"
 
 const mockedCreate = vi.mocked(createStreamSuppression)
 const mockedDelete = vi.mocked(deleteStreamSuppression)

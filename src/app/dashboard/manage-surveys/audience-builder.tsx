@@ -17,7 +17,8 @@ import {
 } from "@/components/ui/select"
 import { StatusBanner } from "@/components/ui/status-banner"
 import type { RecipientGroupType } from "@/lib/email-recipients"
-import type { SurveyEditorOptionsPayload, AudiencePreview } from "./actions"
+import type { AudiencePreview } from "./actions"
+import type { SurveyEditorOptionsPayload } from "./data"
 import {
     SURVEY_GROUP_TYPES,
     type SurveyAudienceDefinition,

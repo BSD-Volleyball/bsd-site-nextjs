@@ -14,11 +14,8 @@ import {
     createTeam
 } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import {
-    getCreateScheduleData,
-    writePlayoffSchedule,
-    writeRegularSeasonSchedule
-} from "./actions"
+import { writePlayoffSchedule, writeRegularSeasonSchedule } from "./actions"
+import { getCreateScheduleData } from "./data"
 import {
     FOUR_TEAM_PLAYOFF,
     REGULAR_SEASON_WEEKS

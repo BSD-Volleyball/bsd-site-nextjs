@@ -2,11 +2,8 @@
 
 import { PlayerLookupColumns } from "@/components/player-lookup/player-lookup-columns"
 import { AdminPlayerDetailPopup } from "@/components/player-detail"
-import {
-    getPlayerDetails,
-    type PlayerDetailsResult,
-    type PlayerListItem
-} from "./actions"
+import { getPlayerDetails, type PlayerDetailsResult } from "./actions"
+import type { PlayerListItem } from "./data"
 
 interface PlayerLookupFormProps {
     players: PlayerListItem[]

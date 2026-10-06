@@ -1,5 +1,5 @@
 import { RiStarLine } from "@remixicon/react"
-import type { PlayerTeamAssignment } from "../roster-actions"
+import type { PlayerTeamAssignment } from "../roster-data"
 
 export function TeamAssignmentDisplay({
     assignment

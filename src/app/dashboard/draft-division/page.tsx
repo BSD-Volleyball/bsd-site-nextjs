@@ -4,7 +4,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { DraftDivisionForm } from "./draft-division-form"
-import { getDraftDivisionData, hasDraftPageAccess } from "./actions"
+import { getDraftDivisionData, hasDraftPageAccess } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

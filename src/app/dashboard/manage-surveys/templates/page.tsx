@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getSurveyTemplates } from "../actions"
+import { getSurveyTemplates } from "../data"
 import { TemplatesList } from "../templates-list"
 
 export const metadata: Metadata = {

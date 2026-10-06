@@ -23,12 +23,8 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import {
-    createTeams,
-    type SeasonOption,
-    type DivisionOption,
-    type UserOption
-} from "./actions"
+import { createTeams } from "./actions"
+import type { SeasonOption, DivisionOption, UserOption } from "./data"
 
 interface CreateTeamsFormProps {
     seasons: SeasonOption[]

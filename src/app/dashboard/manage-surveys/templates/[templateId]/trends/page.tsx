@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getTemplateTrends } from "../../../actions"
+import { getTemplateTrends } from "../../../data"
 import { TrendsClient } from "./trends-client"
 
 export const metadata: Metadata = {

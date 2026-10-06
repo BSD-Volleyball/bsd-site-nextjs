@@ -21,9 +21,9 @@ import { WaiverContent } from "@/components/waiver-content"
 import { UserCombobox } from "@/components/user-combobox"
 import {
     submitTournamentSignup,
-    type EligiblePlayer,
     type TournamentSignupFormData
 } from "./actions"
+import type { EligiblePlayer } from "./data"
 import type {
     DivisionAvailability,
     TournamentDivisionConfig

@@ -2,7 +2,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 
-import { getDivisionsPageData } from "./actions"
+import { getDivisionsPageData } from "./data"
 import { CreateDivisionsClient } from "./create-divisions-client"
 import type { Metadata } from "next"
 

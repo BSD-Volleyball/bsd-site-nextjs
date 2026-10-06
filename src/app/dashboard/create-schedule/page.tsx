@@ -1,7 +1,7 @@
 import { requireAdminOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { PageHeader } from "@/components/layout/page-header"
-import { getCreateScheduleData } from "./actions"
+import { getCreateScheduleData } from "./data"
 import { CreateScheduleClient } from "./create-schedule-client"
 import type { Metadata } from "next"
 

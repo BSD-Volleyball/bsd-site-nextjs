@@ -12,7 +12,8 @@ import {
 } from "@/database/schema"
 import { createDivision } from "@/test/factories"
 import { createUser, createUserWithRoles, logout } from "@/test/session"
-import { getScoreEntryRows, saveTournamentMatchScore } from "./actions"
+import { saveTournamentMatchScore } from "./actions"
+import { getScoreEntryRows } from "./data"
 
 async function winnerOf(matchId: number): Promise<number | null> {
     const [m] = await db

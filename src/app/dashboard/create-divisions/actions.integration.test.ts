@@ -4,7 +4,8 @@ import { db } from "@/database/db"
 import { auditLog, individual_divisions } from "@/database/schema"
 import { createDivision, createSeason, createSignup } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { getDivisionsPageData, saveDivisionSelections } from "./actions"
+import { saveDivisionSelections } from "./actions"
+import { getDivisionsPageData } from "./data"
 
 describe("getDivisionsPageData", () => {
     it("rejects unauthenticated callers", async () => {

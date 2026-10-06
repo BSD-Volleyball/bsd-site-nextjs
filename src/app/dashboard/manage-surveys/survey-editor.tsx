@@ -46,9 +46,9 @@ import {
     publishSurvey,
     sendSurveyReminderNow,
     updateSurveySettings,
-    type AudiencePreview,
-    type SurveyEditorOptionsPayload
+    type AudiencePreview
 } from "./actions"
+import type { SurveyEditorOptionsPayload } from "./data"
 import { AudienceBuilder } from "./audience-builder"
 import { isoToLeagueLocal, leagueLocalToIso } from "./league-datetime"
 import { RecipientsTable } from "./recipients-table"

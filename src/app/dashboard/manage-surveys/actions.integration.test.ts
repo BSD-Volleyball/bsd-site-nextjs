@@ -34,15 +34,9 @@ import {
     createSurvey as createSurveyAction,
     createSurveyTemplate as createSurveyTemplateAction,
     deleteSurvey,
-    getSurveyEditor,
-    getSurveyEditorOptions,
-    getSurveyFilterOptions,
     getSurveyRawResponses,
     getSurveyResults,
     getSurveyTemplateEditor,
-    getSurveyTemplates,
-    getSurveys,
-    getTemplateTrends,
     previewSurveyAudience,
     publishSurvey as publishSurveyAction,
     removeSurveyRecipient,
@@ -55,6 +49,14 @@ import {
     updateSurveySettings,
     updateSurveyTemplate
 } from "./actions"
+import {
+    getSurveyEditor,
+    getSurveyEditorOptions,
+    getSurveyFilterOptions,
+    getSurveyTemplates,
+    getSurveys,
+    getTemplateTrends
+} from "./data"
 
 // --- helpers ---------------------------------------------------------------
 

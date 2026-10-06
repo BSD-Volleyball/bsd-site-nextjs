@@ -18,7 +18,7 @@ import {
     divisions,
     notificationLog
 } from "@/database/schema"
-import { asc, eq, desc, ne, or, and, isNull, inArray } from "drizzle-orm"
+import { asc, eq, desc, or, and, isNull, inArray } from "drizzle-orm"
 import { alias } from "drizzle-orm/pg-core"
 import {
     getSessionUserId,
@@ -31,7 +31,6 @@ import {
     getEventsByType,
     formatEventDate
 } from "@/lib/site-config"
-import { GHOST_CAPTAIN_ID } from "@/lib/ghost-captain"
 import type {
     PlayerRatingAverages,
     PlayerRatingPrivateNote,
@@ -61,14 +60,6 @@ import {
     type PlayerScheduleEntry
 } from "@/lib/player-schedule-types"
 import { getPlayoffNextMatches } from "@/app/dashboard/next-match-data"
-
-export interface PlayerListItem {
-    id: string
-    old_id: number | null
-    first_name: string
-    last_name: string
-    preferred_name: string | null
-}
 
 export interface PlayerDetails {
     id: string
@@ -172,29 +163,6 @@ export interface PlayerSubHistoryEntry {
     reason?: string | null
     notes?: string | null
 }
-
-export const getPlayersForLookup = withAction(
-    async (): Promise<ActionResult<PlayerListItem[]>> => {
-        const hasAccess = await isCommissionerBySession()
-        if (!hasAccess) {
-            return fail("You don't have permission to access this page.")
-        }
-
-        const allUsers = await db
-            .select({
-                id: users.id,
-                old_id: users.old_id,
-                first_name: users.first_name,
-                last_name: users.last_name,
-                preferred_name: users.preferred_name
-            })
-            .from(users)
-            .where(ne(users.id, GHOST_CAPTAIN_ID))
-            .orderBy(users.last_name, users.first_name)
-
-        return ok(allUsers)
-    }
-)
 
 export interface PlayerDetailsResult {
     player: PlayerDetails

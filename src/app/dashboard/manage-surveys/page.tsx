@@ -3,11 +3,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import {
-    getSurveyEditorOptions,
-    getSurveys,
-    getSurveyTemplates
-} from "./actions"
+import { getSurveyEditorOptions, getSurveys, getSurveyTemplates } from "./data"
 import { SurveysList } from "./surveys-list"
 import { TemplatesList } from "./templates-list"
 

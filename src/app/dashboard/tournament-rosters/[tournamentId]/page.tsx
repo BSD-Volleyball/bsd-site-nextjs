@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/layout/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DivisionLabel } from "@/app/dashboard/tournament-schedule-view/schedule-view"
-import { getTournamentRosters } from "./actions"
+import { getTournamentRosters } from "./data"
 
 export const metadata: Metadata = {
     title: "Tournament Rosters"

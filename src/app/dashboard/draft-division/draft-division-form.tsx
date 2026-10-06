@@ -26,13 +26,11 @@ import {
     getDraftInitData,
     getDraftWatchlistData,
     submitDraft,
-    type DivisionOption,
     type TeamOption,
-    type UserOption,
-    type DivisionSplitConfig,
     type PairEntry,
     type WatchlistData
 } from "./actions"
+import type { DivisionOption, UserOption, DivisionSplitConfig } from "./data"
 import { DraftRoomProvider } from "./draft-room-provider"
 import {
     useBroadcastEvent,

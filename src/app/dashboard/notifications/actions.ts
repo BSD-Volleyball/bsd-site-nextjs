@@ -23,28 +23,6 @@ import {
 } from "@/lib/notifications/types"
 import type { MessageStream } from "@/lib/postmark"
 
-export interface NotificationSettings {
-    optedOut: NotificationType[]
-    suppressions: Array<{
-        streamId: string
-        reason: string
-        origin: string
-        suppressedAt: Date
-        canReactivate: boolean
-    }>
-}
-
-export const getNotificationSettings = withAction(
-    async (): Promise<ActionResult<NotificationSettings>> => {
-        const session = await requireSession()
-        const [optedOut, suppressions] = await Promise.all([
-            getOptedOutTypes(session.user.id),
-            getUserSuppressionState(session.user.email)
-        ])
-        return ok({ optedOut: [...optedOut], suppressions })
-    }
-)
-
 export const saveNotificationPreferences = withAction(
     async (optedOut: string[]): Promise<ActionResult> => {
         const session = await requireSession()

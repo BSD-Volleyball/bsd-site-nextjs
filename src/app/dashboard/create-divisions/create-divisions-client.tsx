@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { saveDivisionSelections } from "./actions"
+import type { GenderSplit } from "./actions"
 import type {
     ActiveDivision,
     DivisionPlayerCounts,
-    ExistingDivisionConfig,
-    GenderSplit
-} from "./actions"
+    ExistingDivisionConfig
+} from "./data"
 
 // Maximum player deficit that can be absorbed by 7-player teams in the
 // lowest division (which has 4 teams in every tier) before the default

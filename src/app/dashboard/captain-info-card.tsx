@@ -32,7 +32,7 @@ import {
     resolveSubjectVariables
 } from "@/lib/email-template-variables"
 import { copyRichHtmlToClipboard } from "@/lib/clipboard"
-import type { CaptainWelcomeData } from "./roster-actions"
+import type { CaptainWelcomeData } from "./roster-data"
 import { logContactDetailsViewed } from "./roster-actions"
 import {
     usePlayerDetailModal,

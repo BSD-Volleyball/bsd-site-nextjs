@@ -51,17 +51,13 @@ import * as myAvailability from "@/app/dashboard/my-availability/actions"
 import * as playerLookup from "@/app/dashboard/player-lookup/actions"
 import * as playerLookupSignups from "@/app/dashboard/player-lookup-signups/actions"
 import * as ratePlayer from "@/app/dashboard/rate-player/actions"
-import * as reffingSchedule from "@/app/dashboard/reffing-schedule/actions"
 import * as reviewPairs from "@/app/dashboard/review-pairs/actions"
 import * as scheduleRefs from "@/app/dashboard/schedule-refs/actions"
-import * as seasonScheduleById from "@/app/dashboard/schedule/[seasonId]/actions"
-import * as seasonSchedule from "@/app/dashboard/season-schedule/actions"
 import * as settings from "@/app/dashboard/settings/actions"
 import * as teamAvailability from "@/app/dashboard/team-availability/actions"
 import * as findSub from "@/app/dashboard/team-availability/find-sub-actions"
 import * as tournamentControl from "@/app/dashboard/tournament-control/actions"
 import * as tournamentOverview from "@/app/dashboard/tournament-overview/actions"
-import * as tournamentRosters from "@/app/dashboard/tournament-rosters/[tournamentId]/actions"
 import * as tournamentSchedule from "@/app/dashboard/tournament-schedule/actions"
 import * as viewSignups from "@/app/dashboard/view-signups/actions"
 import * as viewTournamentWaitlist from "@/app/dashboard/view-tournament-waitlist/actions"
@@ -72,10 +68,12 @@ import * as onboardingVolleyball from "@/app/onboarding/volleyball-profile/actio
 import * as addPicturesData from "@/app/dashboard/add-pictures/data"
 import * as adminViewSignupsData from "@/app/dashboard/admin-view-signups/data"
 import * as attritionData from "@/app/dashboard/attrition/data"
+import * as createWeek1Data from "@/app/dashboard/create-week-1/data"
+import * as createWeek2Data from "@/app/dashboard/create-week-2/data"
 import * as createWeek3Data from "@/app/dashboard/create-week-3/data"
-import * as draftDayData from "@/app/dashboard/draft-setup/order/data"
 import * as draftHistoryData from "@/app/dashboard/draft-history/data"
 import * as draftHomeworkData from "@/app/dashboard/draft-homework/data"
+import * as draftDayData from "@/app/dashboard/draft-setup/order/data"
 import * as editEmailsData from "@/app/dashboard/edit-emails/data"
 import * as editPlayerData from "@/app/dashboard/edit-player/data"
 import * as editWeek1Data from "@/app/dashboard/edit-week-1/data"
@@ -87,22 +85,28 @@ import * as homeworkStatusData from "@/app/dashboard/homework-status/data"
 import * as manageEmailsData from "@/app/dashboard/manage-emails/data"
 import * as nextMatchData from "@/app/dashboard/next-match-data"
 import * as playerLookupSignupsData from "@/app/dashboard/player-lookup-signups/data"
+import * as playerLookupData from "@/app/dashboard/player-lookup/data"
 import * as playoffsData from "@/app/dashboard/playoffs/[seasonId]/data"
 import * as potentialCaptainsData from "@/app/dashboard/potential-captains/data"
 import * as ratePlayerData from "@/app/dashboard/rate-player/data"
+import * as reffingScheduleData from "@/app/dashboard/reffing-schedule/data"
 import * as reviewPairsData from "@/app/dashboard/review-pairs/data"
 import * as rostersData from "@/app/dashboard/rosters/[seasonId]/data"
 import * as scheduleRefsData from "@/app/dashboard/schedule-refs/data"
+import * as seasonScheduleByIdData from "@/app/dashboard/schedule/[seasonId]/data"
+import * as seasonScheduleData from "@/app/dashboard/season-schedule/data"
 import * as settingsData from "@/app/dashboard/settings/data"
 import * as tournamentControlData from "@/app/dashboard/tournament-control/data"
 import * as tournamentOverviewData from "@/app/dashboard/tournament-overview/data"
 import * as tournamentPlayoffsData from "@/app/dashboard/tournament-playoffs/[tournamentId]/data"
 import * as tournamentPoolPlayData from "@/app/dashboard/tournament-pool-play/[tournamentId]/data"
-import * as tournamentScheduleData from "@/app/dashboard/tournament-schedule/data"
+import * as tournamentRostersData from "@/app/dashboard/tournament-rosters/[tournamentId]/data"
 import * as tournamentScheduleViewData from "@/app/dashboard/tournament-schedule-view/data"
+import * as tournamentScheduleData from "@/app/dashboard/tournament-schedule/data"
 import * as viewSignupsData from "@/app/dashboard/view-signups/data"
 import * as viewTournamentWaitlistData from "@/app/dashboard/view-tournament-waitlist/data"
 import * as viewWaitlistData from "@/app/dashboard/view-waitlist/data"
+import * as volleyballProfileData from "@/app/dashboard/volleyball-profile/data"
 import * as week2HomeworkData from "@/app/dashboard/week-2-homework/data"
 
 type Kind = "fail" | "null" | "emptyArray" | "false" | "void"
@@ -167,13 +171,13 @@ const cases: SmokeCase[] = [
     ),
     // create-week-*
     c("createWeek1.getCreateWeek1Data", "fail", () =>
-        createWeek1.getCreateWeek1Data()
+        createWeek1Data.getCreateWeek1Data()
     ),
     c("createWeek1.saveWeek1Rosters", "fail", () =>
         createWeek1.saveWeek1Rosters([])
     ),
     c("createWeek2.getCreateWeek2Data", "fail", () =>
-        createWeek2.getCreateWeek2Data()
+        createWeek2Data.getCreateWeek2Data()
     ),
     c("createWeek2.saveWeek2Rosters", "fail", () =>
         createWeek2.saveWeek2Rosters([])
@@ -339,7 +343,7 @@ const cases: SmokeCase[] = [
     ),
     // player-lookup
     c("playerLookup.getPlayersForLookup", "fail", () =>
-        playerLookup.getPlayersForLookup()
+        playerLookupData.getPlayersForLookup()
     ),
     c("playerLookup.getPlayerDetails", "fail", () =>
         playerLookup.getPlayerDetails("u")
@@ -370,7 +374,7 @@ const cases: SmokeCase[] = [
     ),
     // reffing-schedule / review-pairs
     c("reffingSchedule.getReffingScheduleData", "fail", () =>
-        reffingSchedule.getReffingScheduleData()
+        reffingScheduleData.getReffingScheduleData()
     ),
     c("reviewPairs.getSeasonPairs", "fail", () =>
         reviewPairsData.getSeasonPairs()
@@ -396,10 +400,10 @@ const cases: SmokeCase[] = [
         scheduleRefs.saveRefAssignments("2026-01-01", [])
     ),
     c("scheduleById.getSeasonScheduleData", "fail", () =>
-        seasonScheduleById.getSeasonScheduleData(1)
+        seasonScheduleByIdData.getSeasonScheduleData(1)
     ),
     c("seasonSchedule.getCurrentSeasonScheduleData", "fail", () =>
-        seasonSchedule.getCurrentSeasonScheduleData(1)
+        seasonScheduleData.getCurrentSeasonScheduleData(1)
     ),
     // settings
     c("settings.getAccountProfile", "fail", () =>
@@ -464,7 +468,7 @@ const cases: SmokeCase[] = [
         tournamentPlayoffsData.getTournamentPlayoffs(1)
     ),
     c("tournamentRosters.getTournamentRosters", "fail", () =>
-        tournamentRosters.getTournamentRosters(1)
+        tournamentRostersData.getTournamentRosters(1)
     ),
     c("tournamentSchedule.getScheduleView", "fail", () =>
         tournamentScheduleData.getScheduleView()
@@ -512,7 +516,7 @@ const cases: SmokeCase[] = [
     ),
     // volleyball-profile / week-2 homework / onboarding
     c("volleyballProfile.getVolleyballProfile", "fail", () =>
-        volleyballProfile.getVolleyballProfile()
+        volleyballProfileData.getVolleyballProfile()
     ),
     c("volleyballProfile.updateVolleyballProfile", "fail", () =>
         volleyballProfile.updateVolleyballProfile({} as never)

@@ -4,7 +4,8 @@ import { db } from "@/database/db"
 import { teams, userRoles } from "@/database/schema"
 import { createDivision, createSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
-import { createTeams, getCreateTeamsData } from "./actions"
+import { createTeams } from "./actions"
+import { getCreateTeamsData } from "./data"
 
 describe("getCreateTeamsData", () => {
     it("rejects unauthenticated callers", async () => {

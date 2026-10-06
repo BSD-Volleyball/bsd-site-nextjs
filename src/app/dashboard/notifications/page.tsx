@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/next/page-guards"
-import { getNotificationSettings } from "./actions"
+import { getNotificationSettings } from "./data"
 import { NotificationsForm } from "./notifications-form"
 
 export const metadata = {

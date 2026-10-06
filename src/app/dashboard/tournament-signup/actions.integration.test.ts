@@ -17,7 +17,8 @@ import {
     createWaiver
 } from "@/test/factories"
 import { createUser, createUserWithRoles, loginAs } from "@/test/session"
-import { getEligibleTournamentPlayers, submitTournamentSignup } from "./actions"
+import { submitTournamentSignup } from "./actions"
+import { getEligibleTournamentPlayers } from "./data"
 
 async function seedTournament(
     divisionOverrides: {

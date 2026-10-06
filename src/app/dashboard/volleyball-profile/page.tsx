@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/page-header"
-import { getVolleyballProfile } from "./actions"
+import { getVolleyballProfile } from "./data"
 import { VolleyballProfileForm } from "./volleyball-profile-form"
 
 export const metadata = {

@@ -11,7 +11,7 @@ import {
     TableRow
 } from "@/components/ui/table"
 import { formatEventDate, formatMatchTime } from "@/lib/date-utils"
-import { getReffingScheduleData } from "./actions"
+import { getReffingScheduleData } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

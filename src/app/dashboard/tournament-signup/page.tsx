@@ -13,7 +13,7 @@ import {
     isRegistrationClosed,
     isUserOnTournamentRoster
 } from "@/lib/tournament-config"
-import { getEligibleTournamentPlayers } from "./actions"
+import { getEligibleTournamentPlayers } from "./data"
 import { TournamentSignupWizard } from "./wizard-form"
 import {
     calculateDiscountedAmount,

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { requirePermissionOrRedirect } from "@/next/page-guards"
-import { getSurveyFilterOptions, getSurveyResults } from "../../actions"
+import { getSurveyResults } from "../../actions"
+import { getSurveyFilterOptions } from "../../data"
 import { ResultsClient } from "./results-client"
 
 export const metadata: Metadata = {

@@ -21,7 +21,8 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select"
-import { updateVolleyballProfile, type VolleyballProfileData } from "./actions"
+import { updateVolleyballProfile } from "./actions"
+import type { VolleyballProfileData } from "./data"
 
 interface VolleyballProfileFormProps {
     initialData: VolleyballProfileData | null

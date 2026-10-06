@@ -8,11 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { UserEmailCombobox } from "@/components/user-combobox"
 
-import {
-    setTryoutVolunteer,
-    type PickTryoutVolunteersView,
-    type VolunteerCandidate
-} from "./actions"
+import { setTryoutVolunteer } from "./actions"
+import type { PickTryoutVolunteersView, VolunteerCandidate } from "./data"
 
 export function PickTryoutVolunteersClient({
     view

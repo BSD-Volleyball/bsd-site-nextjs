@@ -23,12 +23,8 @@ import {
     PlayerDetailPopup
 } from "@/components/player-detail"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
-import type {
-    TeamOption,
-    UserOption,
-    DivisionSplitConfig,
-    PairEntry
-} from "./actions"
+import type { TeamOption, PairEntry } from "./actions"
+import type { UserOption, DivisionSplitConfig } from "./data"
 
 const ROUNDS = 8
 

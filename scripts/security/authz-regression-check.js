@@ -50,7 +50,7 @@ const strictExpectations = [
         description: "must gate access via hasCaptainPagesAccessBySession"
     },
     {
-        key: "src/app/dashboard/player-lookup/actions.ts:getPlayersForLookup",
+        key: "src/app/dashboard/player-lookup/data.ts:getPlayersForLookup",
         pattern: /isCommissionerBySession\s*\(/,
         description: "must gate access via isCommissionerBySession"
     },
@@ -65,7 +65,7 @@ const strictExpectations = [
         description: "must require an authenticated session via requireSession"
     },
     {
-        key: "src/app/dashboard/schedule/[seasonId]/actions.ts:getSeasonScheduleData",
+        key: "src/app/dashboard/schedule/[seasonId]/data.ts:getSeasonScheduleData",
         pattern: /requireSession\s*\(/,
         description: "must require an authenticated session via requireSession"
     },
@@ -115,9 +115,10 @@ const strictExpectations = [
 // live in any filename).
 function isServerActionFile(fullPath, name) {
     if (name.endsWith("actions.ts")) return true
-    // Server-only data loaders (data.ts) are not endpoints, but they are the
-    // reads pages render from; their exported functions must still guard
-    // access, so they are held to the same rule.
+    // Server-only data loaders (data.ts, or foo-data.ts beside foo-actions.ts)
+    // are not endpoints, but they are the reads pages render from; their
+    // exported functions must still guard access, so they are held to the
+    // same rule.
     if (name === "data.ts" || name.endsWith("-data.ts")) return true
     if (!name.endsWith(".ts")) return false
     const content = fs.readFileSync(fullPath, "utf8")

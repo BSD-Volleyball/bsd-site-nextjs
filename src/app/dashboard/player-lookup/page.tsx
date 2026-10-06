@@ -4,7 +4,7 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { PlayerLookupForm } from "./player-lookup-form"
-import { getPlayersForLookup } from "./actions"
+import { getPlayersForLookup } from "./data"
 import type { Metadata } from "next"
 import { isAdminOrDirector, isCommissionerForCurrentSeason } from "@/lib/rbac"
 

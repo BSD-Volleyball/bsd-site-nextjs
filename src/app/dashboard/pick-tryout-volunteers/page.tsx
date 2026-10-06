@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireAdminOrRedirect } from "@/next/page-guards"
 
-import { getPickTryoutVolunteersView } from "./actions"
+import { getPickTryoutVolunteersView } from "./data"
 import { PickTryoutVolunteersClient } from "./pick-tryout-volunteers-client"
 
 export const metadata: Metadata = {

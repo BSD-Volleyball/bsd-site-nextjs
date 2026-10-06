@@ -6,7 +6,8 @@ import { userRoles } from "@/database/schema"
 import { createSignup, seedBaselineSeason } from "@/test/factories"
 import { createUser, createUserWithRoles } from "@/test/session"
 
-import { getPickTryoutVolunteersView, setTryoutVolunteer } from "./actions"
+import { setTryoutVolunteer } from "./actions"
+import { getPickTryoutVolunteersView } from "./data"
 
 async function volunteerRows(userId: string, seasonId: number) {
     return db

@@ -4,7 +4,8 @@ import { StatusBanner } from "@/components/ui/status-banner"
 import { getSeasonConfig } from "@/lib/site-config"
 import { PageHeader } from "@/components/layout/page-header"
 import { ManageConcernsClient } from "./manage-concerns-client"
-import { getConcerns, getAssignableUsers } from "./actions"
+import { getConcerns } from "./actions"
+import { getAssignableUsers } from "./data"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {

@@ -13,12 +13,8 @@ import {
     setCaptainRound
 } from "@/app/dashboard/draft-setup/rounds/actions"
 import { saveDraftOrder } from "@/app/dashboard/draft-setup/order/actions"
-import {
-    getDraftDivisionData,
-    getDraftInitData,
-    getDraftWatchlistData,
-    submitDraft
-} from "./actions"
+import { getDraftInitData, getDraftWatchlistData, submitDraft } from "./actions"
+import { getDraftDivisionData } from "./data"
 
 async function seedDraftSeason() {
     const season = await createSeason()
