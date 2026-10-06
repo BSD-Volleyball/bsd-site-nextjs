@@ -24,7 +24,6 @@ export function Providers({ children }: { children: ReactNode }) {
                 navigate={router.push}
                 replace={router.replace}
                 redirectTo="/onboarding/account"
-                apiKey={true}
                 onSessionChange={() => {
                     router.refresh()
                 }}

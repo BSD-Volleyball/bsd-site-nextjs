@@ -10,7 +10,7 @@ import * as schema from "@/database/schema"
 import { site } from "@/config/site"
 import { sendMail } from "@/lib/email/send"
 
-// Read lazily (first password-reset send), not at module load: this module
+// Read lazily (first account-email send), not at module load: this module
 // is imported by every session check, and a filesystem read at import time
 // is the one thing here that would not survive a runtime without node:fs.
 let logoBase64: string | null = null
@@ -19,6 +19,68 @@ function getLogoBase64(): string {
         join(process.cwd(), "public", "logo.png")
     ).toString("base64")
     return logoBase64
+}
+
+/**
+ * Account emails (password reset, email verification). Transactional:
+ * deliberately unfiltered, because a wrong bounce record must never be able
+ * to lock someone out of their account.
+ */
+async function sendAuthEmail({
+    user,
+    url,
+    subject,
+    heading,
+    paragraphs,
+    action,
+    category,
+    tag
+}: {
+    user: { id: string; email: string; first_name?: string }
+    url: string
+    subject: string
+    heading: string
+    paragraphs: string[]
+    action: string
+    category: string
+    tag: string
+}) {
+    const name = user.first_name || user.email.split("@")[0]
+
+    const htmlBody = await render(
+        EmailTemplate({
+            heading,
+            content: React.createElement(
+                React.Fragment,
+                null,
+                React.createElement("p", null, `Hi ${name},`),
+                ...paragraphs.map((text) =>
+                    React.createElement("p", { key: text }, text)
+                )
+            ),
+            action,
+            url,
+            siteName: site.name,
+            baseUrl: site.url,
+            imageUrl: "cid:logo"
+        })
+    )
+
+    await sendMail({
+        mode: { kind: "transactional", category },
+        recipients: [{ userId: user.id, email: user.email }],
+        subject,
+        htmlBody,
+        tag,
+        attachments: [
+            {
+                name: "logo.png",
+                content: getLogoBase64(),
+                contentType: "image/png",
+                contentId: "cid:logo"
+            }
+        ]
+    })
 }
 
 export const auth = betterAuth({
@@ -68,9 +130,6 @@ export const auth = betterAuth({
                         }
                     }
                 }
-            },
-            after: async (_user: { id: string }) => {
-                // No external contact sync needed with Postmark
             }
         }
     },
@@ -105,56 +164,50 @@ export const auth = betterAuth({
         minPasswordLength: 8,
         maxPasswordLength: 128,
         autoSignIn: true,
+        // Signing in with a new password proves nothing about the inbox, so
+        // a reset ends every other session (including one an attacker holds).
+        revokeSessionsOnPasswordReset: true,
         sendResetPassword: async ({ user, url }) => {
-            const name =
-                (user as { first_name?: string }).first_name ||
-                user.email.split("@")[0]
-
-            const htmlBody = await render(
-                EmailTemplate({
-                    heading: "Reset your password",
-                    content: React.createElement(
-                        React.Fragment,
-                        null,
-                        React.createElement("p", null, `Hi ${name},`),
-                        React.createElement(
-                            "p",
-                            null,
-                            "Someone requested a password reset for your account. If this was you, ",
-                            "click the button below to reset your password."
-                        ),
-                        React.createElement(
-                            "p",
-                            null,
-                            "If you didn't request this, you can safely ignore this email."
-                        )
-                    ),
-                    action: "Reset Password",
-                    url,
-                    siteName: site.name,
-                    baseUrl: site.url,
-                    imageUrl: "cid:logo"
-                })
-            )
-
-            // Transactional: deliberately unfiltered. A wrong bounce record
-            // must never be able to lock someone out of account recovery.
-            await sendMail({
-                mode: { kind: "transactional", category: "password_reset" },
-                recipients: [{ userId: user.id, email: user.email }],
+            await sendAuthEmail({
+                user,
+                url,
                 subject: "Reset your password",
-                htmlBody,
-                tag: "password-reset",
-                attachments: [
-                    {
-                        name: "logo.png",
-                        content: getLogoBase64(),
-                        contentType: "image/png",
-                        contentId: "cid:logo"
-                    }
-                ]
+                heading: "Reset your password",
+                paragraphs: [
+                    "Someone requested a password reset for your account. If this was you, click the button below to reset your password.",
+                    "If you didn't request this, you can safely ignore this email."
+                ],
+                action: "Reset Password",
+                category: "password_reset",
+                tag: "password-reset"
             })
         }
+    },
+    // Google sign-in only links into an existing account whose email is
+    // verified (better-auth's default since 1.6.11; it closes OAuth
+    // pre-account hijacking). Password sign-ups therefore get a verification
+    // link, and /auth/error offers one to anyone the gate turns away.
+    emailVerification: {
+        sendOnSignUp: true,
+        autoSignInAfterVerification: true,
+        sendVerificationEmail: async ({ user, url }) => {
+            await sendAuthEmail({
+                user,
+                url,
+                subject: "Verify your email address",
+                heading: "Verify your email address",
+                paragraphs: [
+                    "Please confirm this is your email address by clicking the button below. Once it's verified you can also sign in with Google.",
+                    "If you didn't create an account, you can safely ignore this email."
+                ],
+                action: "Verify Email",
+                category: "email_verification",
+                tag: "email-verification"
+            })
+        }
+    },
+    onAPIError: {
+        errorURL: "/auth/error"
     },
     socialProviders: {
         google: {
