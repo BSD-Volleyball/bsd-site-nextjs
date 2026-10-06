@@ -1,10 +1,11 @@
 "use client"
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 
-import { useMemo } from "react"
+import { useId, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { formatDisplayName } from "@/lib/utils"
 import {
     findSameTimeConflicts,
@@ -166,6 +167,7 @@ export function EditWeekRosterForm({
     sendNotifications
 }: EditWeekRosterFormProps) {
     const modal = usePlayerDetailModal()
+    const captainCheckboxIdPrefix = useId()
 
     const initialSlots = useMemo(
         () =>
@@ -379,8 +381,12 @@ export function EditWeekRosterForm({
                                                         ))}
                                                 {captainMode === "editable" &&
                                                     slot.userId && (
-                                                        <label className="flex cursor-pointer items-center gap-1.5 text-sm">
+                                                        <Label
+                                                            htmlFor={`${captainCheckboxIdPrefix}-${slot.localKey}`}
+                                                            className="flex cursor-pointer items-center gap-1.5 font-normal text-sm"
+                                                        >
                                                             <Checkbox
+                                                                id={`${captainCheckboxIdPrefix}-${slot.localKey}`}
                                                                 checked={
                                                                     slot.isCaptain
                                                                 }
@@ -395,7 +401,7 @@ export function EditWeekRosterForm({
                                                                 }
                                                             />
                                                             Captain
-                                                        </label>
+                                                        </Label>
                                                     )}
                                             </>
                                         )}

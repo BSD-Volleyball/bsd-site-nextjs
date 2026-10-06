@@ -75,50 +75,47 @@ function CommissionerSelect({
         <div className="space-y-2">
             <Label htmlFor={id}>{label}</Label>
             <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        id={id}
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className="w-full justify-between font-normal"
-                    >
-                        <span
-                            className={cn(
-                                !selectedUser && "text-muted-foreground"
-                            )}
+                <div className="relative">
+                    <PopoverTrigger asChild>
+                        <Button
+                            id={id}
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className="w-full justify-between font-normal"
                         >
-                            {selectedUser
-                                ? selectedUser.name
-                                : "Select a commissioner..."}
-                        </span>
-                        <div className="flex items-center gap-1">
-                            {selectedUser && (
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    className="rounded-sm p-0.5 hover:bg-accent"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleSelect(null)
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (
-                                            e.key === "Enter" ||
-                                            e.key === " "
-                                        ) {
-                                            e.stopPropagation()
-                                            handleSelect(null)
-                                        }
-                                    }}
-                                >
-                                    <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                                </span>
-                            )}
-                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                    </Button>
-                </PopoverTrigger>
+                            <span
+                                className={cn(
+                                    !selectedUser && "text-muted-foreground"
+                                )}
+                            >
+                                {selectedUser
+                                    ? selectedUser.name
+                                    : "Select a commissioner..."}
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {/* Room for the clear button, which sits outside the trigger */}
+                                {selectedUser && (
+                                    <span
+                                        aria-hidden="true"
+                                        className="size-5"
+                                    />
+                                )}
+                                <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </Button>
+                    </PopoverTrigger>
+                    {selectedUser && (
+                        <button
+                            type="button"
+                            aria-label="Clear selection"
+                            className="absolute top-1/2 right-9 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent"
+                            onClick={() => handleSelect(null)}
+                        >
+                            <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                    )}
+                </div>
                 <PopoverContent
                     className="w-(--radix-popover-trigger-width) p-2"
                     align="start"

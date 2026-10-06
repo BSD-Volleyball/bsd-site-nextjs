@@ -171,50 +171,47 @@ function PlayerCombobox({
     return (
         <div className="flex items-center gap-2">
             <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className="w-72 justify-between font-normal"
-                    >
-                        <span
-                            className={cn(
-                                "truncate",
-                                !selectedPlayer && "text-muted-foreground"
-                            )}
+                <div className="relative w-72 min-w-0">
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className="w-full justify-between font-normal"
                         >
-                            {selectedPlayer
-                                ? getDisplayName(selectedPlayer)
-                                : placeholder}
-                        </span>
-                        <div className="flex shrink-0 items-center gap-1">
-                            {selectedPlayer && (
-                                <span
-                                    role="button"
-                                    tabIndex={0}
-                                    className="rounded-sm p-0.5 hover:bg-accent"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleClear()
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (
-                                            e.key === "Enter" ||
-                                            e.key === " "
-                                        ) {
-                                            e.stopPropagation()
-                                            handleClear()
-                                        }
-                                    }}
-                                >
-                                    <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                                </span>
-                            )}
-                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                    </Button>
-                </PopoverTrigger>
+                            <span
+                                className={cn(
+                                    "truncate",
+                                    !selectedPlayer && "text-muted-foreground"
+                                )}
+                            >
+                                {selectedPlayer
+                                    ? getDisplayName(selectedPlayer)
+                                    : placeholder}
+                            </span>
+                            <div className="flex shrink-0 items-center gap-1">
+                                {/* Room for the clear button, which sits outside the trigger */}
+                                {selectedPlayer && (
+                                    <span
+                                        aria-hidden="true"
+                                        className="size-5"
+                                    />
+                                )}
+                                <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </Button>
+                    </PopoverTrigger>
+                    {selectedPlayer && (
+                        <button
+                            type="button"
+                            aria-label="Clear selection"
+                            className="absolute top-1/2 right-9 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent"
+                            onClick={handleClear}
+                        >
+                            <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                    )}
+                </div>
                 <PopoverContent
                     className="w-(--radix-popover-trigger-width) p-2"
                     align="start"

@@ -7,7 +7,7 @@ import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 // captain opt-in, and step-1 annotation style.
 
 import { RiDeleteBinLine, RiFileCopyLine } from "@remixicon/react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,6 +81,7 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
     saveAction
 }: CreateWeekRosterFormProps<C>) {
     const [step, setStep] = useState<1 | 2>(1)
+    const optInCaptainIdPrefix = useId()
     const [isSaving, setIsSaving] = useState(false)
     const modal = usePlayerDetailModal()
     const duplicateCounterRef = useRef(0)
@@ -591,9 +592,11 @@ export function CreateWeekRosterForm<C extends RosterFormCandidate>({
                             {optInCaptains.map((captain) => (
                                 <label
                                     key={captain.userId}
+                                    htmlFor={`${optInCaptainIdPrefix}-${captain.userId}`}
                                     className="flex cursor-pointer items-center gap-2"
                                 >
                                     <Checkbox
+                                        id={`${optInCaptainIdPrefix}-${captain.userId}`}
                                         checked={includedOptInCaptainIds.has(
                                             captain.userId
                                         )}

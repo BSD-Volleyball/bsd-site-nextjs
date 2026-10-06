@@ -1,7 +1,8 @@
 "use client"
 
 import { StatusBanner } from "@/components/ui/status-banner"
-import { useCallback, useEffect, useState } from "react"
+import { Label } from "@/components/ui/label"
+import { useCallback, useEffect, useId, useState } from "react"
 import {
     Select,
     SelectContent,
@@ -134,6 +135,9 @@ export function DraftHistoryClient({
     const [draftTeams, setDraftTeams] = useState<DraftTeam[]>([])
 
     const [loadingSeasons, setLoadingSeasons] = useState(false)
+    const yearSelectId = useId()
+    const seasonSelectId = useId()
+    const divisionSelectId = useId()
     const [loadingDivisions, setLoadingDivisions] = useState(false)
     const [loadingDraft, setLoadingDraft] = useState(false)
     const [errorMessage, setErrorMessage] = useState("")
@@ -211,14 +215,17 @@ export function DraftHistoryClient({
         <div className="space-y-6">
             <div className="flex flex-wrap gap-4">
                 <div className="w-40">
-                    <label className="mb-1 block font-medium text-muted-foreground text-sm">
+                    <Label
+                        htmlFor={yearSelectId}
+                        className="mb-1 block font-medium text-muted-foreground text-sm"
+                    >
                         Year
-                    </label>
+                    </Label>
                     <Select
                         value={selectedYear}
                         onValueChange={handleYearChange}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger id={yearSelectId}>
                             <SelectValue placeholder="Select year" />
                         </SelectTrigger>
                         <SelectContent>
@@ -232,15 +239,18 @@ export function DraftHistoryClient({
                 </div>
 
                 <div className="w-48">
-                    <label className="mb-1 block font-medium text-muted-foreground text-sm">
+                    <Label
+                        htmlFor={seasonSelectId}
+                        className="mb-1 block font-medium text-muted-foreground text-sm"
+                    >
                         Season
-                    </label>
+                    </Label>
                     <Select
                         value={selectedSeason}
                         onValueChange={handleSeasonChange}
                         disabled={!selectedYear || loadingSeasons}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger id={seasonSelectId}>
                             <SelectValue
                                 placeholder={
                                     loadingSeasons
@@ -260,15 +270,18 @@ export function DraftHistoryClient({
                 </div>
 
                 <div className="w-48">
-                    <label className="mb-1 block font-medium text-muted-foreground text-sm">
+                    <Label
+                        htmlFor={divisionSelectId}
+                        className="mb-1 block font-medium text-muted-foreground text-sm"
+                    >
                         Division
-                    </label>
+                    </Label>
                     <Select
                         value={selectedDivision}
                         onValueChange={setSelectedDivision}
                         disabled={!selectedSeason || loadingDivisions}
                     >
-                        <SelectTrigger>
+                        <SelectTrigger id={divisionSelectId}>
                             <SelectValue
                                 placeholder={
                                     loadingDivisions

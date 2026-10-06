@@ -182,69 +182,67 @@ export function DraftDayForm({
                             No captains found for this division.
                         </p>
                     ) : (
-                        <div role="list" className="space-y-1">
+                        <ul className="space-y-1">
                             {captains.map((captain, index) => (
-                                <motion.div
+                                <li
                                     key={captain.teamId}
-                                    layout
-                                    layoutId={String(captain.teamId)}
-                                    transition={{ duration: 0.15 }}
+                                    draggable={!isAnimating}
+                                    onDragStart={(e) => {
+                                        setDraggedIndex(index)
+                                        const el = e.currentTarget.cloneNode(
+                                            true
+                                        ) as HTMLElement
+                                        el.style.borderRadius = "6px"
+                                        el.style.width = `${e.currentTarget.offsetWidth}px`
+                                        el.style.position = "fixed"
+                                        el.style.top = "-1000px"
+                                        document.body.appendChild(el)
+                                        e.dataTransfer.setDragImage(
+                                            el,
+                                            e.nativeEvent.offsetX,
+                                            e.nativeEvent.offsetY
+                                        )
+                                        setTimeout(
+                                            () => document.body.removeChild(el),
+                                            0
+                                        )
+                                    }}
+                                    onDragEnd={() => setDraggedIndex(null)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={() => handleDrop(index)}
                                 >
-                                    <div
-                                        role="listitem"
-                                        draggable={!isAnimating}
-                                        onDragStart={(e) => {
-                                            setDraggedIndex(index)
-                                            const el =
-                                                e.currentTarget.cloneNode(
-                                                    true
-                                                ) as HTMLElement
-                                            el.style.borderRadius = "6px"
-                                            el.style.width = `${e.currentTarget.offsetWidth}px`
-                                            el.style.position = "fixed"
-                                            el.style.top = "-1000px"
-                                            document.body.appendChild(el)
-                                            e.dataTransfer.setDragImage(
-                                                el,
-                                                e.nativeEvent.offsetX,
-                                                e.nativeEvent.offsetY
-                                            )
-                                            setTimeout(
-                                                () =>
-                                                    document.body.removeChild(
-                                                        el
-                                                    ),
-                                                0
-                                            )
-                                        }}
-                                        onDragEnd={() => setDraggedIndex(null)}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={() => handleDrop(index)}
-                                        className={cn(
-                                            "flex cursor-grab items-center gap-3 rounded-md border px-3 py-2 active:cursor-grabbing",
-                                            draggedIndex === index
-                                                ? "border-primary/60 border-dashed bg-primary/10"
-                                                : ""
-                                        )}
+                                    <motion.div
+                                        layout
+                                        layoutId={String(captain.teamId)}
+                                        transition={{ duration: 0.15 }}
                                     >
-                                        <span className="w-6 text-center font-semibold text-muted-foreground text-sm">
-                                            {index + 1}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                            ⣿
-                                        </span>
-                                        <div className="flex min-w-0 flex-1 items-center gap-2">
-                                            <span className="font-medium">
-                                                {captain.captainName}
+                                        <div
+                                            className={cn(
+                                                "flex cursor-grab items-center gap-3 rounded-md border px-3 py-2 active:cursor-grabbing",
+                                                draggedIndex === index
+                                                    ? "border-primary/60 border-dashed bg-primary/10"
+                                                    : ""
+                                            )}
+                                        >
+                                            <span className="w-6 text-center font-semibold text-muted-foreground text-sm">
+                                                {index + 1}
                                             </span>
-                                            <span className="text-muted-foreground text-sm">
-                                                ({captain.teamName})
+                                            <span className="text-muted-foreground">
+                                                ⣿
                                             </span>
+                                            <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                <span className="font-medium">
+                                                    {captain.captainName}
+                                                </span>
+                                                <span className="text-muted-foreground text-sm">
+                                                    ({captain.teamName})
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                </motion.div>
+                                    </motion.div>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     )}
                 </CardContent>
             </Card>

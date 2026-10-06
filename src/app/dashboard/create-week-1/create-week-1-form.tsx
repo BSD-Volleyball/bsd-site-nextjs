@@ -322,152 +322,158 @@ export function CreateWeek1Form({
                             Ordered Candidate List (drag to reorder)
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-1">
-                        {orderedPlayers.map((player, index) => {
-                            const isAboveCutoff = index < CUTOFF_COUNT
-                            return (
-                                <div key={player.userId}>
-                                    <div
-                                        role="listitem"
+                    <CardContent>
+                        <ul className="space-y-1">
+                            {orderedPlayers.map((player, index) => {
+                                const isAboveCutoff = index < CUTOFF_COUNT
+                                return (
+                                    <li
+                                        key={player.userId}
                                         onDragOver={(event) => {
                                             event.preventDefault()
                                         }}
                                         onDrop={() => handleDrop(index)}
-                                        className={cn(
-                                            "flex items-center gap-3 rounded-md border px-3 py-2",
-                                            GROUP_COLORS[player.group],
-                                            draggedIndex === index &&
-                                                "opacity-60"
-                                        )}
                                     >
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            draggable
-                                            onDragStart={() =>
-                                                setDraggedIndex(index)
-                                            }
-                                            onDragEnd={() =>
-                                                setDraggedIndex(null)
-                                            }
-                                        >
-                                            Drag
-                                        </Button>
-                                        <span className="w-12 font-semibold text-sm">
-                                            {index + 1}
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                            <button
-                                                type="button"
-                                                className="truncate text-left font-medium text-sm underline-offset-2 hover:underline"
-                                                onClick={() =>
-                                                    modal.openPlayerDetail(
-                                                        player.userId
-                                                    )
-                                                }
-                                            >
-                                                {displayName(player)}
-                                                {player.oldId !== null && (
-                                                    <span className="ml-2 text-muted-foreground text-sm">
-                                                        [{player.oldId}]
-                                                    </span>
-                                                )}
-                                            </button>
-                                            <p className="truncate text-muted-foreground text-sm">
-                                                {cleanGroupLabel(
-                                                    player.groupLabel
-                                                )}{" "}
-                                                | seasons:{" "}
-                                                {player.seasonsPlayedCount} |
-                                                last:{" "}
-                                                {player.lastDraftSeasonLabel ||
-                                                    "none"}
-                                                {player.lastDraftDivisionName
-                                                    ? ` (${player.lastDraftDivisionName})`
-                                                    : ""}
-                                                | previous:{" "}
-                                                {player.previousDraftSeasonLabel ||
-                                                    "none"}
-                                                {player.previousDraftDivisionName
-                                                    ? ` (${player.previousDraftDivisionName})`
-                                                    : ""}
-                                                {player.overallMostRecent !==
-                                                null
-                                                    ? ` | overall ${player.overallMostRecent}`
-                                                    : ""}
-                                                {player.pairWithName
-                                                    ? ` | paired: ${player.pairWithName}`
-                                                    : ""}
-                                                {player.availableSlots && (
-                                                    <span
-                                                        className="ml-2 font-semibold text-amber-700 dark:text-amber-300"
-                                                        title={
-                                                            player.slotRequestComment ??
-                                                            undefined
-                                                        }
-                                                    >
-                                                        session{" "}
-                                                        {player.availableSlots.join(
-                                                            ","
-                                                        )}
-                                                    </span>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <span className="text-xs">
-                                            {player.male === true
-                                                ? "M"
-                                                : player.male === false
-                                                  ? "NM"
-                                                  : "?"}
-                                        </span>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    moveBy(index, -1)
-                                                }
-                                                disabled={index === 0}
-                                            >
-                                                Up
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => moveBy(index, 1)}
-                                                disabled={
-                                                    index ===
-                                                    orderedPlayers.length - 1
-                                                }
-                                            >
-                                                Down
-                                            </Button>
-                                        </div>
-                                        <span
+                                        <div
                                             className={cn(
-                                                "rounded px-2 py-1 font-semibold text-xs",
-                                                isAboveCutoff
-                                                    ? "bg-green-100 text-green-800"
-                                                    : "bg-muted text-muted-foreground"
+                                                "flex items-center gap-3 rounded-md border px-3 py-2",
+                                                GROUP_COLORS[player.group],
+                                                draggedIndex === index &&
+                                                    "opacity-60"
                                             )}
                                         >
-                                            {isAboveCutoff ? "IN" : "OUT"}
-                                        </span>
-                                    </div>
-
-                                    {index === CUTOFF_COUNT - 1 && (
-                                        <div className="my-2 rounded bg-red-600 px-3 py-2 text-center font-bold text-white text-xs">
-                                            Cutoff line after player #
-                                            {CUTOFF_COUNT}
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                draggable
+                                                onDragStart={() =>
+                                                    setDraggedIndex(index)
+                                                }
+                                                onDragEnd={() =>
+                                                    setDraggedIndex(null)
+                                                }
+                                            >
+                                                Drag
+                                            </Button>
+                                            <span className="w-12 font-semibold text-sm">
+                                                {index + 1}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <button
+                                                    type="button"
+                                                    className="truncate text-left font-medium text-sm underline-offset-2 hover:underline"
+                                                    onClick={() =>
+                                                        modal.openPlayerDetail(
+                                                            player.userId
+                                                        )
+                                                    }
+                                                >
+                                                    {displayName(player)}
+                                                    {player.oldId !== null && (
+                                                        <span className="ml-2 text-muted-foreground text-sm">
+                                                            [{player.oldId}]
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                <p className="truncate text-muted-foreground text-sm">
+                                                    {cleanGroupLabel(
+                                                        player.groupLabel
+                                                    )}{" "}
+                                                    | seasons:{" "}
+                                                    {player.seasonsPlayedCount}{" "}
+                                                    | last:{" "}
+                                                    {player.lastDraftSeasonLabel ||
+                                                        "none"}
+                                                    {player.lastDraftDivisionName
+                                                        ? ` (${player.lastDraftDivisionName})`
+                                                        : ""}
+                                                    | previous:{" "}
+                                                    {player.previousDraftSeasonLabel ||
+                                                        "none"}
+                                                    {player.previousDraftDivisionName
+                                                        ? ` (${player.previousDraftDivisionName})`
+                                                        : ""}
+                                                    {player.overallMostRecent !==
+                                                    null
+                                                        ? ` | overall ${player.overallMostRecent}`
+                                                        : ""}
+                                                    {player.pairWithName
+                                                        ? ` | paired: ${player.pairWithName}`
+                                                        : ""}
+                                                    {player.availableSlots && (
+                                                        <span
+                                                            className="ml-2 font-semibold text-amber-700 dark:text-amber-300"
+                                                            title={
+                                                                player.slotRequestComment ??
+                                                                undefined
+                                                            }
+                                                        >
+                                                            session{" "}
+                                                            {player.availableSlots.join(
+                                                                ","
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <span className="text-xs">
+                                                {player.male === true
+                                                    ? "M"
+                                                    : player.male === false
+                                                      ? "NM"
+                                                      : "?"}
+                                            </span>
+                                            <div className="flex gap-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        moveBy(index, -1)
+                                                    }
+                                                    disabled={index === 0}
+                                                >
+                                                    Up
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        moveBy(index, 1)
+                                                    }
+                                                    disabled={
+                                                        index ===
+                                                        orderedPlayers.length -
+                                                            1
+                                                    }
+                                                >
+                                                    Down
+                                                </Button>
+                                            </div>
+                                            <span
+                                                className={cn(
+                                                    "rounded px-2 py-1 font-semibold text-xs",
+                                                    isAboveCutoff
+                                                        ? "bg-green-100 text-green-800"
+                                                        : "bg-muted text-muted-foreground"
+                                                )}
+                                            >
+                                                {isAboveCutoff ? "IN" : "OUT"}
+                                            </span>
                                         </div>
-                                    )}
-                                </div>
-                            )
-                        })}
+
+                                        {index === CUTOFF_COUNT - 1 && (
+                                            <div className="my-2 rounded bg-red-600 px-3 py-2 text-center font-bold text-white text-xs">
+                                                Cutoff line after player #
+                                                {CUTOFF_COUNT}
+                                            </div>
+                                        )}
+                                    </li>
+                                )
+                            })}
+                        </ul>
                     </CardContent>
                 </Card>
             )}

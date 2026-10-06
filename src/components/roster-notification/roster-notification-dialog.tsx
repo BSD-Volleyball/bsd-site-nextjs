@@ -1,7 +1,7 @@
 "use client"
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import {
     Dialog,
     DialogContent,
@@ -52,6 +52,7 @@ export function RosterNotificationDialog({
     onClose
 }: RosterNotificationDialogProps) {
     const [checked, setChecked] = useState<Set<string>>(new Set())
+    const checkboxIdPrefix = useId()
 
     useEffect(() => {
         if (open) {
@@ -94,9 +95,11 @@ export function RosterNotificationDialog({
                     {changes.map((entry) => (
                         <label
                             key={entry.userId}
+                            htmlFor={`${checkboxIdPrefix}-${entry.userId}`}
                             className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 hover:bg-muted"
                         >
                             <Checkbox
+                                id={`${checkboxIdPrefix}-${entry.userId}`}
                                 checked={checked.has(entry.userId)}
                                 onCheckedChange={() => toggleOne(entry.userId)}
                                 className="mt-0.5"

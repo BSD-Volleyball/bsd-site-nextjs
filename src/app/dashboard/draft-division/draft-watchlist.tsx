@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useStorage } from "@/lib/liveblocks.config"
 import { cn, formatPlayerName } from "@/lib/utils"
 import {
@@ -106,6 +106,16 @@ export function DraftWatchlist({
     const [enlargedUser, setEnlargedUser] = useState<UserOption | null>(null)
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
 
+    // Escape closes the enlarged photo wherever focus is
+    useEffect(() => {
+        if (!enlargedUser) return
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setEnlargedUser(null)
+        }
+        document.addEventListener("keydown", onKeyDown)
+        return () => document.removeEventListener("keydown", onKeyDown)
+    }, [enlargedUser])
+
     const usersMap = useMemo(
         () => new Map(users.map((u) => [u.id, u])),
         [users]
@@ -206,15 +216,13 @@ export function DraftWatchlist({
 
             {/* Enlarged Player Image Modal */}
             {enlargedUser && playerPicUrl && (
-                <div
-                    className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 p-4"
-                    onClick={() => setEnlargedUser(null)}
-                    onKeyDown={(e) => {
-                        if (e.key === "Escape") setEnlargedUser(null)
-                    }}
-                    role="button"
-                    tabIndex={0}
-                >
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                    <button
+                        type="button"
+                        aria-label="Close photo"
+                        className="absolute inset-0 bg-black/70"
+                        onClick={() => setEnlargedUser(null)}
+                    />
                     <div
                         className={cn(
                             "relative rounded-xl p-4",
@@ -222,9 +230,9 @@ export function DraftWatchlist({
                                 ? "bg-blue-50 dark:bg-blue-900/40"
                                 : "bg-pink-50 dark:bg-pink-900/40"
                         )}
-                        onClick={(e) => e.stopPropagation()}
-                        onKeyDown={(e) => e.stopPropagation()}
                         role="dialog"
+                        aria-modal="true"
+                        aria-label={`${enlargedUser.first_name} ${enlargedUser.last_name}`}
                     >
                         <button
                             type="button"

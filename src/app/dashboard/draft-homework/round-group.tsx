@@ -107,7 +107,7 @@ export function RoundGroup({
         onDragOverKeyChange(null)
     }
 
-    const handleDrop = (e: DragEvent<HTMLDivElement>, key: string) => {
+    const handleDrop = (e: DragEvent<HTMLLIElement>, key: string) => {
         e.preventDefault()
         if (draggingKey && draggingKey !== key) {
             onMove(draggingKey, key)
@@ -124,8 +124,7 @@ export function RoundGroup({
                     style={{ minWidth: "max-content" }}
                 >
                     {/* Player selectors */}
-                    <div
-                        role="list"
+                    <ul
                         className="flex min-w-48 flex-col gap-1 rounded-md border bg-muted/30"
                         style={{ width: "236px" }}
                     >
@@ -139,9 +138,8 @@ export function RoundGroup({
                                 dragOverKey === key &&
                                 !isDragging
                             return (
-                                <div
+                                <li
                                     key={key}
-                                    role="listitem"
                                     className={cn(
                                         "flex items-center rounded-sm",
                                         isDragging &&
@@ -213,19 +211,21 @@ export function RoundGroup({
                                             <RiDeleteBin2Line className="h-3.5 w-3.5" />
                                         </button>
                                     )}
-                                </div>
+                                </li>
                             )
                         })}
                         {isDynamic && onAddSlot && (
-                            <button
-                                type="button"
-                                onClick={onAddSlot}
-                                className="px-2 py-1 text-left text-muted-foreground text-sm hover:text-foreground"
-                            >
-                                + Add player
-                            </button>
+                            <li>
+                                <button
+                                    type="button"
+                                    onClick={onAddSlot}
+                                    className="w-full px-2 py-1 text-left text-muted-foreground text-sm hover:text-foreground"
+                                >
+                                    + Add player
+                                </button>
+                            </li>
                         )}
-                    </div>
+                    </ul>
 
                     {/* Player pictures */}
                     {isDynamic ? (

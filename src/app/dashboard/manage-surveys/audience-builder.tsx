@@ -1,12 +1,13 @@
 "use client"
 
 import { RiAddLine, RiCloseLine } from "@remixicon/react"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { toast } from "sonner"
 import { UserCombobox } from "@/components/user-combobox"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import {
     Select,
     SelectContent,
@@ -53,6 +54,7 @@ export function AudienceBuilder({
     editable,
     onSaved
 }: AudienceBuilderProps) {
+    const checkboxIdPrefix = useId()
     const [groups, setGroups] = useState<SurveyAudienceGroup[]>(audience.groups)
     const [addUserIds, setAddUserIds] = useState<string[]>(audience.addUserIds)
     const [removeUserIds, setRemoveUserIds] = useState<string[]>(
@@ -152,11 +154,13 @@ export function AudienceBuilder({
 
             <div className="space-y-2">
                 {SIMPLE_TYPES.map((spec) => (
-                    <label
+                    <Label
                         key={spec.type}
-                        className="flex items-center gap-2 text-sm"
+                        htmlFor={`${checkboxIdPrefix}-${spec.type}`}
+                        className="flex items-center gap-2 font-normal text-sm"
                     >
                         <Checkbox
+                            id={`${checkboxIdPrefix}-${spec.type}`}
                             checked={simpleSelected.has(spec.type)}
                             disabled={!editable}
                             onCheckedChange={(checked) =>
@@ -164,7 +168,7 @@ export function AudienceBuilder({
                             }
                         />
                         {spec.label}
-                    </label>
+                    </Label>
                 ))}
             </div>
 

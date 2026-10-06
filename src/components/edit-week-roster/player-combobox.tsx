@@ -163,27 +163,9 @@ export function PlayerCombobox({
                     </span>
                 )}
                 <div className="flex shrink-0 items-center">
+                    {/* Room for the clear button, which sits outside the trigger */}
                     {selectedPlayer && !disabled && (
-                        <span
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Clear player"
-                            className="rounded-sm p-0.5 hover:bg-accent"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                setOpen(false)
-                                onChange("")
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                    e.stopPropagation()
-                                    setOpen(false)
-                                    onChange("")
-                                }
-                            }}
-                        >
-                            <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                        </span>
+                        <span aria-hidden="true" className="size-5" />
                     )}
                     <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -193,19 +175,34 @@ export function PlayerCombobox({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            {selectedPlayer ? (
-                <Tooltip>
-                    <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-                    <TooltipContent side="top">
-                        {getComboboxPlayerLabel(selectedPlayer)}
-                        {selectedPlayer.unavailableReason
-                            ? ` — ${selectedPlayer.unavailableReason}`
-                            : ""}
-                    </TooltipContent>
-                </Tooltip>
-            ) : (
-                trigger
-            )}
+            <div className="relative">
+                {selectedPlayer ? (
+                    <Tooltip>
+                        <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+                        <TooltipContent side="top">
+                            {getComboboxPlayerLabel(selectedPlayer)}
+                            {selectedPlayer.unavailableReason
+                                ? ` — ${selectedPlayer.unavailableReason}`
+                                : ""}
+                        </TooltipContent>
+                    </Tooltip>
+                ) : (
+                    trigger
+                )}
+                {selectedPlayer && !disabled && (
+                    <button
+                        type="button"
+                        aria-label="Clear player"
+                        className="absolute top-1/2 right-6 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent"
+                        onClick={() => {
+                            setOpen(false)
+                            onChange("")
+                        }}
+                    >
+                        <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                )}
+            </div>
             <PopoverContent
                 className="w-(--radix-popover-trigger-width) min-w-64 p-2"
                 align="start"

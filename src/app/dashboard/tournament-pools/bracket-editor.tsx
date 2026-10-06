@@ -337,55 +337,53 @@ function SlotPicker({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    disabled={disabled}
-                    className="w-full justify-between font-normal"
-                >
-                    <span
-                        className={cn(
-                            "truncate",
-                            !selected && "text-muted-foreground"
-                        )}
+            <div className="relative">
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={open}
+                        disabled={disabled}
+                        className="w-full justify-between font-normal"
                     >
-                        {selected ? (
-                            <>
-                                {selected.name}{" "}
-                                <span className="text-muted-foreground">
-                                    ({selected.annotation})
-                                </span>
-                            </>
-                        ) : (
-                            "Empty — pick a team"
-                        )}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                        {selected && (
-                            <span
-                                role="button"
-                                tabIndex={0}
-                                className="rounded-sm p-0.5 hover:bg-accent"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    onClear()
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.stopPropagation()
-                                        onClear()
-                                    }
-                                }}
-                            >
-                                <RiCloseLine className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                        )}
-                        <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                </Button>
-            </PopoverTrigger>
+                        <span
+                            className={cn(
+                                "truncate",
+                                !selected && "text-muted-foreground"
+                            )}
+                        >
+                            {selected ? (
+                                <>
+                                    {selected.name}{" "}
+                                    <span className="text-muted-foreground">
+                                        ({selected.annotation})
+                                    </span>
+                                </>
+                            ) : (
+                                "Empty — pick a team"
+                            )}
+                        </span>
+                        <div className="flex shrink-0 items-center gap-1">
+                            {/* Room for the clear button, which sits outside the trigger */}
+                            {selected && (
+                                <span aria-hidden="true" className="size-5" />
+                            )}
+                            <RiArrowDownSLine className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                    </Button>
+                </PopoverTrigger>
+                {selected && (
+                    <button
+                        type="button"
+                        aria-label="Clear selection"
+                        disabled={disabled}
+                        className="absolute top-1/2 right-9 -translate-y-1/2 rounded-sm p-0.5 hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                        onClick={onClear}
+                    >
+                        <RiCloseLine className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                )}
+            </div>
             <PopoverContent
                 className="w-(--radix-popover-trigger-width) p-2"
                 align="start"

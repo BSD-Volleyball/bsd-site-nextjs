@@ -86,6 +86,7 @@ const SingleEliminationBracket = <M extends Match>({
             bracketHeight={gameHeight}
             startAt={startPosition}
         >
+            {/* biome-ignore lint/a11y/noSvgWithoutTitle: layout canvas, not an image; its round headers and match cards are real text that screen readers read, which role="img" would hide and a <title> would turn into a tooltip over the whole bracket */}
             <svg
                 height={gameHeight}
                 width={gameWidth}

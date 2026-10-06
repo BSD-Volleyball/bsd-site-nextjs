@@ -1,0 +1,37 @@
+# Weekly dependency PRs. Minor and patch updates arrive grouped in one PR per
+# ecosystem; majors come one per package so each can be read and tested on
+# its own (they have breaking changes by definition).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Pinned to the Node 24 runtime (engines.node); bump with the runtime.
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: npm
+    directory: /workers/postmark-inbound
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # @cloudflare/vitest-plugin peers vitest ^4; move together when it does.
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
