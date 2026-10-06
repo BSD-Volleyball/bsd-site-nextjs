@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { RiArrowDownSLine, RiAddLine } from "@remixicon/react"
@@ -52,6 +52,7 @@ interface TemplateFormData {
 
 export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const router = useRouter()
+    const id = useId()
     const subjectInputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
     const [formData, setFormData] = useState<Record<number, TemplateFormData>>(
         templates.reduce<Record<number, TemplateFormData>>((acc, template) => {
@@ -89,14 +90,20 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
         setLoading((prev) => ({ ...prev, [templateId]: true }))
 
         const data = formData[templateId]
-        const result = await updateEmailTemplate(
-            templateId,
-            data.name,
-            data.subject || null,
-            data.content
-        )
-
-        setLoading((prev) => ({ ...prev, [templateId]: false }))
+        let result: Awaited<ReturnType<typeof updateEmailTemplate>>
+        try {
+            result = await updateEmailTemplate(
+                templateId,
+                data.name,
+                data.subject || null,
+                data.content
+            )
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+            return
+        } finally {
+            setLoading((prev) => ({ ...prev, [templateId]: false }))
+        }
 
         if (result.status) {
             toast.success(
@@ -143,8 +150,15 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
     const handleCreate = async () => {
         setCreateLoading(true)
         setCreateError(null)
-        const result = await createEmailTemplate(newTemplateName)
-        setCreateLoading(false)
+        let result: Awaited<ReturnType<typeof createEmailTemplate>>
+        try {
+            result = await createEmailTemplate(newTemplateName)
+        } catch {
+            setCreateError("Something went wrong. Please try again.")
+            return
+        } finally {
+            setCreateLoading(false)
+        }
         if (result.status) {
             setCreateDialogOpen(false)
             setNewTemplateName("")
@@ -182,9 +196,11 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2 py-2">
-                        <Label htmlFor="new-template-name">Template Name</Label>
+                        <Label htmlFor={`${id}-new-template-name`}>
+                            Template Name
+                        </Label>
                         <Input
-                            id="new-template-name"
+                            id={`${id}-new-template-name`}
                             value={newTemplateName}
                             onChange={(e) => setNewTemplateName(e.target.value)}
                             onKeyDown={(e) => {
@@ -230,11 +246,13 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                         <CollapsibleContent>
                             <div className="space-y-4 border-t p-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor={`name-${template.id}`}>
+                                    <Label
+                                        htmlFor={`${id}-name-${template.id}`}
+                                    >
                                         Template Name
                                     </Label>
                                     <Input
-                                        id={`name-${template.id}`}
+                                        id={`${id}-name-${template.id}`}
                                         value={
                                             formData[template.id]?.name || ""
                                         }
@@ -244,12 +262,14 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor={`subject-${template.id}`}>
+                                    <Label
+                                        htmlFor={`${id}-subject-${template.id}`}
+                                    >
                                         Subject (Optional)
                                     </Label>
                                     <div className="flex gap-2">
                                         <Input
-                                            id={`subject-${template.id}`}
+                                            id={`${id}-subject-${template.id}`}
                                             ref={(el) => {
                                                 if (el) {
                                                     subjectInputRefs.current.set(
@@ -307,10 +327,12 @@ export function EditEmailsForm({ templates }: { templates: EmailTemplate[] }) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor={`content-${template.id}`}>
+                                    <Label
+                                        htmlFor={`${id}-content-${template.id}`}
+                                    >
                                         Content
                                     </Label>
-                                    <div id={`content-${template.id}`}>
+                                    <div id={`${id}-content-${template.id}`}>
                                         <LexicalEmailEditor
                                             content={
                                                 formData[template.id]

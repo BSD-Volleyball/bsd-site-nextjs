@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useId, useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -65,6 +65,7 @@ export function ScoreSheetInboxClient({
     initialRows: SheetInboxRow[]
     picBaseUrl: string
 }) {
+    const id = useId()
     const [date, setDate] = useState(defaultDate)
     const [rows, setRows] = useState<SheetInboxRow[]>(initialRows)
     const [busy, setBusy] = useState<string | null>(null)
@@ -161,13 +162,18 @@ export function ScoreSheetInboxClient({
 
     const retry = async (row: SheetInboxRow, court?: number) => {
         setBusy("Reading…")
-        const result = await readUploadedSheet({
-            scoreSheetId: row.scoreSheetId,
-            court
-        })
-        if (!result.status) toast.error(result.message)
-        await refresh()
-        setBusy(null)
+        try {
+            const result = await readUploadedSheet({
+                scoreSheetId: row.scoreSheetId,
+                court
+            })
+            if (!result.status) toast.error(result.message)
+            await refresh()
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setBusy(null)
+        }
     }
 
     const remove = async (row: SheetInboxRow) => {
@@ -179,11 +185,14 @@ export function ScoreSheetInboxClient({
     return (
         <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-3">
-                <label htmlFor="sheet-date" className="font-medium text-sm">
+                <label
+                    htmlFor={`${id}-sheet-date`}
+                    className="font-medium text-sm"
+                >
                     Match night:
                 </label>
                 <Select value={date} onValueChange={changeDate}>
-                    <SelectTrigger className="w-56" id="sheet-date">
+                    <SelectTrigger className="w-56" id={`${id}-sheet-date`}>
                         <SelectValue placeholder="Select a date" />
                     </SelectTrigger>
                     <SelectContent>

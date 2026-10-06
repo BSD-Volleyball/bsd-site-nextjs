@@ -1,8 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import { useId, useState } from "react"
 import {
     Card,
     CardContent,
@@ -17,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { UserCombobox } from "@/components/user-combobox"
+import { useAction } from "@/components/hooks/use-action"
 import {
     REF_INTEREST_LABEL,
     SeasonVolunteerQuestions,
@@ -49,8 +48,10 @@ export function CaptainPairingForm({
     canEdit,
     pairRequired
 }: CaptainPairingFormProps) {
-    const router = useRouter()
-    const [isLoading, setIsLoading] = useState(false)
+    const id = useId()
+    const { run: savePreferences, pending: isLoading } = useAction(
+        updateSignupPreferences
+    )
 
     const [captain, setCaptain] = useState(initial.captain || "no")
     const [pair, setPair] = useState(initial.pair || pairRequired)
@@ -59,11 +60,9 @@ export function CaptainPairingForm({
     const [refInterest, setRefInterest] = useState(initial.refInterest)
     const [tryoutHelp, setTryoutHelp] = useState(initial.tryoutHelp)
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setIsLoading(true)
-
-        const result = await updateSignupPreferences(signupId, {
+        savePreferences(signupId, {
             captain,
             pair,
             pairPick,
@@ -71,14 +70,6 @@ export function CaptainPairingForm({
             refInterest,
             tryoutHelp
         })
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setIsLoading(false)
     }
 
     if (!canEdit) {
@@ -150,9 +141,12 @@ export function CaptainPairingForm({
                             className="flex flex-col gap-2"
                         >
                             <div className="flex items-center gap-2">
-                                <RadioGroupItem value="yes" id="captain-yes" />
+                                <RadioGroupItem
+                                    value="yes"
+                                    id={`${id}-captain-yes`}
+                                />
                                 <Label
-                                    htmlFor="captain-yes"
+                                    htmlFor={`${id}-captain-yes`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Yes
@@ -161,19 +155,22 @@ export function CaptainPairingForm({
                             <div className="flex items-center gap-2">
                                 <RadioGroupItem
                                     value="only_if_needed"
-                                    id="captain-only"
+                                    id={`${id}-captain-only`}
                                 />
                                 <Label
-                                    htmlFor="captain-only"
+                                    htmlFor={`${id}-captain-only`}
                                     className="cursor-pointer font-normal"
                                 >
                                     Only if Needed
                                 </Label>
                             </div>
                             <div className="flex items-center gap-2">
-                                <RadioGroupItem value="no" id="captain-no" />
+                                <RadioGroupItem
+                                    value="no"
+                                    id={`${id}-captain-no`}
+                                />
                                 <Label
-                                    htmlFor="captain-no"
+                                    htmlFor={`${id}-captain-no`}
                                     className="cursor-pointer font-normal"
                                 >
                                     No
@@ -222,13 +219,13 @@ export function CaptainPairingForm({
 
                         <div className="flex items-center justify-between">
                             <Label
-                                htmlFor="pair-toggle"
+                                htmlFor={`${id}-pair-toggle`}
                                 className="cursor-pointer"
                             >
                                 Request to pair for the season:
                             </Label>
                             <Switch
-                                id="pair-toggle"
+                                id={`${id}-pair-toggle`}
                                 checked={pair}
                                 disabled={pairRequired}
                                 onCheckedChange={(checked: boolean) => {
@@ -254,11 +251,11 @@ export function CaptainPairingForm({
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="pair-reason">
+                                    <Label htmlFor={`${id}-pair-reason`}>
                                         Reason for pairing
                                     </Label>
                                     <Textarea
-                                        id="pair-reason"
+                                        id={`${id}-pair-reason`}
                                         value={pairReason}
                                         onChange={(e) =>
                                             setPairReason(e.target.value)

@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { CreditCard, PaymentForm } from "react-square-web-payments-sdk"
-import { toast } from "sonner"
 import { RiCheckLine } from "@remixicon/react"
 import {
     Card,
@@ -20,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { StatusBanner } from "@/components/ui/status-banner"
 import { SponsorLogoUploader } from "@/components/sponsors/sponsor-logo-uploader"
+import { useAction } from "@/components/hooks/use-action"
 import type { UserSponsorship } from "@/lib/sponsors"
 import {
     type SponsorshipPaymentResult,
@@ -48,26 +48,21 @@ export function SponsorshipView({
     const [name, setName] = useState(sponsorship.name)
     const [website, setWebsite] = useState(sponsorship.website ?? "")
     const [blurb, setBlurb] = useState(sponsorship.blurb ?? "")
-    const [saving, setSaving] = useState(false)
+    const id = useId()
+    const { run: saveDetails, pending: saving } = useAction(
+        updateMySponsorDetails
+    )
 
     const [processing, setProcessing] = useState(false)
     const [paymentResult, setPaymentResult] =
         useState<SponsorshipPaymentResult | null>(null)
 
-    async function handleSaveDetails() {
-        setSaving(true)
-        const result = await updateMySponsorDetails({
+    function handleSaveDetails() {
+        saveDetails({
             name,
             website: website || null,
             blurb: blurb || null
         })
-        setSaving(false)
-        if (result.status) {
-            toast.success(result.message ?? "Details saved.")
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     const isPaid = sponsorship.status === "paid" || paymentResult?.status
@@ -96,32 +91,32 @@ export function SponsorshipView({
                         onUploaded={() => router.refresh()}
                     />
                     <div className="space-y-2">
-                        <Label htmlFor="sp-name">Business name</Label>
+                        <Label htmlFor={`${id}-sp-name`}>Business name</Label>
                         <Input
-                            id="sp-name"
+                            id={`${id}-sp-name`}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             maxLength={120}
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="sp-website">Website</Label>
+                        <Label htmlFor={`${id}-sp-website`}>Website</Label>
                         <Input
-                            id="sp-website"
+                            id={`${id}-sp-website`}
                             placeholder="https://yourbusiness.com"
                             value={website}
                             onChange={(e) => setWebsite(e.target.value)}
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="sp-blurb">
+                        <Label htmlFor={`${id}-sp-blurb`}>
                             Short blurb{" "}
                             <span className="text-muted-foreground">
                                 ({blurb.length}/500)
                             </span>
                         </Label>
                         <Textarea
-                            id="sp-blurb"
+                            id={`${id}-sp-blurb`}
                             rows={3}
                             maxLength={500}
                             placeholder="A sentence or two about your business."

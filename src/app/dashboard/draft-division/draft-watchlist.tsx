@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useStorage } from "@/lib/liveblocks.config"
 import { cn, formatPlayerName } from "@/lib/utils"
 import {
@@ -9,6 +9,12 @@ import {
 } from "@/components/player-detail"
 import { getPlayerDetailsPublic } from "@/app/dashboard/view-signups/actions"
 import { RiCloseLine } from "@remixicon/react"
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogTitle
+} from "@/components/ui/dialog"
 import type { WatchlistPlayer, UserOption } from "./actions"
 
 interface DraftWatchlistProps {
@@ -105,16 +111,6 @@ export function DraftWatchlist({
 
     const [enlargedUser, setEnlargedUser] = useState<UserOption | null>(null)
     const modal = usePlayerDetailModal({ fetchFn: getPlayerDetailsPublic })
-
-    // Escape closes the enlarged photo wherever focus is
-    useEffect(() => {
-        if (!enlargedUser) return
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") setEnlargedUser(null)
-        }
-        document.addEventListener("keydown", onKeyDown)
-        return () => document.removeEventListener("keydown", onKeyDown)
-    }, [enlargedUser])
 
     const usersMap = useMemo(
         () => new Map(users.map((u) => [u.id, u])),
@@ -215,32 +211,32 @@ export function DraftWatchlist({
             </div>
 
             {/* Enlarged Player Image Modal */}
-            {enlargedUser && playerPicUrl && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-                    <button
-                        type="button"
-                        aria-label="Close photo"
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setEnlargedUser(null)}
-                    />
-                    <div
+            <Dialog
+                open={!!enlargedUser && !!playerPicUrl}
+                onOpenChange={(open) => {
+                    if (!open) setEnlargedUser(null)
+                }}
+            >
+                {enlargedUser && playerPicUrl && (
+                    <DialogContent
+                        showCloseButton={false}
+                        aria-describedby={undefined}
                         className={cn(
-                            "relative rounded-xl p-4",
+                            "block w-max max-w-[calc(100vw-2rem)] gap-0 rounded-xl border-0 p-4 shadow-none sm:rounded-xl",
                             enlargedUser.male === true
                                 ? "bg-blue-50 dark:bg-blue-900/40"
                                 : "bg-pink-50 dark:bg-pink-900/40"
                         )}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label={`${enlargedUser.first_name} ${enlargedUser.last_name}`}
                     >
-                        <button
-                            type="button"
+                        <DialogTitle className="sr-only">
+                            {`${enlargedUser.first_name} ${enlargedUser.last_name}`}
+                        </DialogTitle>
+                        <DialogClose
                             className="absolute -top-2 -right-2 rounded-full bg-background p-1 shadow-lg hover:bg-accent"
-                            onClick={() => setEnlargedUser(null)}
+                            aria-label="Close photo"
                         >
                             <RiCloseLine className="h-5 w-5" />
-                        </button>
+                        </DialogClose>
                         {enlargedUser.picture ? (
                             <img
                                 src={`${playerPicUrl}${enlargedUser.picture}`}
@@ -264,9 +260,9 @@ export function DraftWatchlist({
                                 ID: {enlargedUser.old_id}
                             </p>
                         )}
-                    </div>
-                </div>
-            )}
+                    </DialogContent>
+                )}
+            </Dialog>
 
             {/* Player Detail Popup */}
             <PlayerDetailPopup

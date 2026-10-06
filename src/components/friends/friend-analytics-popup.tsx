@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { buildPlayerPictureUrl } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { EloTrendChart } from "@/components/analytics/elo-trend-chart"
 import { CareerStatTiles } from "@/components/analytics/career-stat-tiles"
 import { DivisionHistoryChart } from "@/components/player-detail/division-history-chart"
@@ -29,48 +30,44 @@ export function FriendAnalyticsPopup({
         let cancelled = false
         setAnalytics(null)
         setError(null)
-        getFriendAnalytics(friendId).then((result) => {
-            if (cancelled) return
-            if (result.status) {
-                setAnalytics(result.data)
-            } else {
-                setError(result.message)
-            }
-        })
+        getFriendAnalytics(friendId)
+            .then((result) => {
+                if (cancelled) return
+                if (result.status) {
+                    setAnalytics(result.data)
+                } else {
+                    setError(result.message)
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setError("Something went wrong. Please try again.")
+                }
+            })
         return () => {
             cancelled = true
         }
     }, [friendId])
-
-    useEffect(() => {
-        function onKeyDown(event: KeyboardEvent) {
-            if (event.key === "Escape") onClose()
-        }
-        document.addEventListener("keydown", onKeyDown)
-        return () => document.removeEventListener("keydown", onKeyDown)
-    }, [onClose])
 
     const pictureSrc = analytics?.profile.picture
         ? buildPlayerPictureUrl(playerPicUrl, analytics.profile.picture)
         : null
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-            onClick={onClose}
-            onKeyDown={(event) => {
-                if (event.key === "Escape") onClose()
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open) onClose()
             }}
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
         >
-            <div
-                className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-background shadow-xl"
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-                role="document"
+            <DialogContent
+                showCloseButton={false}
+                aria-describedby={undefined}
+                className="block max-h-[90vh] w-[calc(100%-2rem)] max-w-lg gap-0 overflow-y-auto rounded-lg border-0 p-0 shadow-xl sm:rounded-lg"
             >
+                <DialogTitle className="sr-only">
+                    {analytics?.profile.name ?? "Player analytics"}
+                </DialogTitle>
                 <Card className="border-0 shadow-none">
                     <CardHeader>
                         <div className="flex items-start justify-between gap-4">
@@ -132,7 +129,7 @@ export function FriendAnalyticsPopup({
                         )}
                     </CardContent>
                 </Card>
-            </div>
-        </div>
+            </DialogContent>
+        </Dialog>
     )
 }

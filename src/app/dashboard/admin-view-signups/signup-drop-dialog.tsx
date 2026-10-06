@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -51,6 +51,7 @@ export function SignupDropDialog({
     seasonLabel,
     onDropped
 }: SignupDropDialogProps) {
+    const id = useId()
     const [isDropping, setIsDropping] = useState(false)
     const [dropCategory, setDropCategory] = useState<SignupDropCategory | "">(
         ""
@@ -76,16 +77,26 @@ export function SignupDropDialog({
 
         setIsDropping(true)
 
-        const result = await dropSignup(
-            signupToDrop.signupId,
-            dropCategory,
-            dropNote
-        )
+        let result: Awaited<ReturnType<typeof dropSignup>>
+        try {
+            result = await dropSignup(
+                signupToDrop.signupId,
+                dropCategory,
+                dropNote
+            )
+        } catch {
+            setDropResult({
+                status: false,
+                message: "Something went wrong. Please try again."
+            })
+            return
+        } finally {
+            setIsDropping(false)
+        }
         setDropResult({
             status: result.status,
             message: result.message ?? ""
         })
-        setIsDropping(false)
 
         if (result.status) {
             const expirationDate = new Date()
@@ -110,18 +121,28 @@ export function SignupDropDialog({
     const handleCreateDiscount = async () => {
         if (!postDropUser) return
         setIsCreatingDiscount(true)
-        const result = await createDiscount({
-            userId: postDropUser.userId,
-            percentage: discountPercentage,
-            expiration: discountExpiration || null,
-            reason: discountReason || null,
-            scope: "season"
-        })
+        let result: Awaited<ReturnType<typeof createDiscount>>
+        try {
+            result = await createDiscount({
+                userId: postDropUser.userId,
+                percentage: discountPercentage,
+                expiration: discountExpiration || null,
+                reason: discountReason || null,
+                scope: "season"
+            })
+        } catch {
+            setDiscountCreateResult({
+                status: false,
+                message: "Something went wrong. Please try again."
+            })
+            return
+        } finally {
+            setIsCreatingDiscount(false)
+        }
         setDiscountCreateResult({
             status: result.status,
             message: result.message ?? ""
         })
-        setIsCreatingDiscount(false)
         if (result.status) {
             setPostDropUser(null)
         }
@@ -201,7 +222,7 @@ export function SignupDropDialog({
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label htmlFor="drop-category">
+                                <Label htmlFor={`${id}-drop-category`}>
                                     Reason{" "}
                                     <span className="text-red-600">*</span>
                                 </Label>
@@ -214,7 +235,7 @@ export function SignupDropDialog({
                                     }
                                     disabled={isDropping}
                                 >
-                                    <SelectTrigger id="drop-category">
+                                    <SelectTrigger id={`${id}-drop-category`}>
                                         <SelectValue placeholder="Select a reason" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -237,11 +258,11 @@ export function SignupDropDialog({
                             </div>
 
                             <div className="space-y-1.5">
-                                <Label htmlFor="drop-note">
+                                <Label htmlFor={`${id}-drop-note`}>
                                     Note (optional)
                                 </Label>
                                 <Textarea
-                                    id="drop-note"
+                                    id={`${id}-drop-note`}
                                     value={dropNote}
                                     onChange={(e) =>
                                         setDropNote(e.target.value)

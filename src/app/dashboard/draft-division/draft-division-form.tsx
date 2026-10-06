@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
     Card,
@@ -20,6 +20,7 @@ import {
     SelectValue
 } from "@/components/ui/select"
 import { RiFullscreenLine, RiFullscreenExitLine } from "@remixicon/react"
+import { useAction } from "@/components/hooks/use-action"
 import { cn } from "@/lib/utils"
 import {
     getDraftInitData,
@@ -68,7 +69,7 @@ export function DraftDivisionForm({
     hasLeagueWideCommissionerAccess,
     defaultDivisionId
 }: DraftDivisionFormProps) {
-    const [isLoading, setIsLoading] = useState(false)
+    const id = useId()
     const [isLoadingTeams, setIsLoadingTeams] = useState(false)
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -151,23 +152,28 @@ export function DraftDivisionForm({
 
     const loadDraftInitData = async (season: number, division: number) => {
         setIsLoadingTeams(true)
-        const [result, watchlistResult] = await Promise.all([
-            getDraftInitData(season, division),
-            getDraftWatchlistData(season, division)
-        ])
-        if (result.status) {
-            setTeamsList(result.data.teams)
-            setInitialPicks(result.data.initialPicks)
-            setPairMap(result.data.pairMap)
-            setSetupStatus(result.data.setupStatus)
-            setAlreadySubmitted(result.data.alreadySubmitted)
-        } else {
-            toast.error(result.message || "Failed to load teams.")
+        try {
+            const [result, watchlistResult] = await Promise.all([
+                getDraftInitData(season, division),
+                getDraftWatchlistData(season, division)
+            ])
+            if (result.status) {
+                setTeamsList(result.data.teams)
+                setInitialPicks(result.data.initialPicks)
+                setPairMap(result.data.pairMap)
+                setSetupStatus(result.data.setupStatus)
+                setAlreadySubmitted(result.data.alreadySubmitted)
+            } else {
+                toast.error(result.message || "Failed to load teams.")
+            }
+            if (watchlistResult.status) {
+                setWatchlistData(watchlistResult.data)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setIsLoadingTeams(false)
         }
-        if (watchlistResult.status) {
-            setWatchlistData(watchlistResult.data)
-        }
-        setIsLoadingTeams(false)
     }
 
     // Load default division teams on mount if captain has a pre-selected division
@@ -177,7 +183,20 @@ export function DraftDivisionForm({
         }
     })
 
-    async function handleSubmit(e: React.FormEvent) {
+    const { run: runSubmitDraft, pending: isLoading } = useAction(submitDraft, {
+        refresh: false,
+        onSuccess: () => {
+            setAlreadySubmitted(true)
+            broadcastSubmittedRef.current?.()
+        },
+        onError: (message) => {
+            if (/already been submitted/i.test(message ?? "")) {
+                setAlreadySubmitted(true)
+            }
+        }
+    })
+
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
 
         if (!divisionId || !selectedDivision) {
@@ -215,22 +234,7 @@ export function DraftDivisionForm({
             return
         }
 
-        setIsLoading(true)
-
-        const result = await submitDraft(selectedDivision.level, picks)
-
-        if (result.status) {
-            toast.success(result.message ?? "Draft submitted.")
-            setAlreadySubmitted(true)
-            broadcastSubmittedRef.current?.()
-        } else {
-            toast.error(result.message)
-            if (/already been submitted/i.test(result.message ?? "")) {
-                setAlreadySubmitted(true)
-            }
-        }
-
-        setIsLoading(false)
+        runSubmitDraft(selectedDivision.level, picks)
     }
 
     const handleRemoteSubmit = useCallback(
@@ -287,7 +291,7 @@ export function DraftDivisionForm({
                     <CardContent className="space-y-6">
                         <div className="flex max-w-2xl gap-6">
                             <div className="flex-1 space-y-2">
-                                <Label htmlFor="division">
+                                <Label htmlFor={`${id}-division`}>
                                     Division{" "}
                                     {currentRole === "commissioner" && (
                                         <span className="text-destructive">
@@ -300,7 +304,7 @@ export function DraftDivisionForm({
                                     onValueChange={handleDivisionChange}
                                     disabled={divisions.length <= 1}
                                 >
-                                    <SelectTrigger id="division">
+                                    <SelectTrigger id={`${id}-division`}>
                                         <SelectValue placeholder="Select a division" />
                                     </SelectTrigger>
                                     <SelectContent>

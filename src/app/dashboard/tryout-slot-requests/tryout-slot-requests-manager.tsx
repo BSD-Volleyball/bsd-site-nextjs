@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useId, useMemo, useState } from "react"
 import { toast } from "sonner"
+import { useAction } from "@/components/hooks/use-action"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -114,11 +114,10 @@ export function TryoutSlotRequestsManager({
     users,
     slotLabelsByWeek
 }: TryoutSlotRequestsManagerProps) {
-    const router = useRouter()
+    const id = useId()
     const [search, setSearch] = useState("")
     const [showAddForm, setShowAddForm] = useState(false)
     const [editingId, setEditingId] = useState<number | null>(null)
-    const [isLoading, setIsLoading] = useState(false)
     const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null)
 
     // Add form state
@@ -166,29 +165,40 @@ export function TryoutSlotRequestsManager({
         setNewComment("")
     }
 
-    const handleCreate = async () => {
+    const { run: runCreate, pending: isCreating } = useAction(
+        createTryoutSlotRequest,
+        {
+            onSuccess: () => {
+                resetAddForm()
+                setShowAddForm(false)
+            }
+        }
+    )
+    const { run: runUpdate, pending: isUpdating } = useAction(
+        updateTryoutSlotRequest,
+        { onSuccess: () => setEditingId(null) }
+    )
+    const { run: runDelete, pending: isDeleting } = useAction(
+        deleteTryoutSlotRequest,
+        {
+            onSuccess: () => setDeleteTargetId(null),
+            onError: () => setDeleteTargetId(null)
+        }
+    )
+    const isLoading = isCreating || isUpdating || isDeleting
+
+    const handleCreate = () => {
         if (!newUserId) {
             toast.error("Select a player.")
             return
         }
 
-        setIsLoading(true)
-        const result = await createTryoutSlotRequest({
+        runCreate({
             userId: newUserId,
             week: newWeek,
             ...newSlots,
             comment: newComment || null
         })
-
-        if (result.status) {
-            toast.success(result.message ?? "Request created.")
-            resetAddForm()
-            setShowAddForm(false)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setIsLoading(false)
     }
 
     const startEdit = (request: TryoutSlotRequestEntry) => {
@@ -201,40 +211,20 @@ export function TryoutSlotRequestsManager({
         setEditComment(request.comment ?? "")
     }
 
-    const handleUpdate = async (id: number) => {
-        setIsLoading(true)
-        const result = await updateTryoutSlotRequest({
-            id,
+    const handleUpdate = (requestId: number) => {
+        runUpdate({
+            id: requestId,
             ...editSlots,
             comment: editComment || null
         })
-
-        if (result.status) {
-            toast.success(result.message ?? "Request updated.")
-            setEditingId(null)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setIsLoading(false)
     }
 
-    const handleDelete = async () => {
+    const handleDelete = () => {
         if (deleteTargetId === null) {
             return
         }
 
-        setIsLoading(true)
-        const result = await deleteTryoutSlotRequest(deleteTargetId)
-
-        if (result.status) {
-            toast.success(result.message ?? "Request deleted.")
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
-        setDeleteTargetId(null)
-        setIsLoading(false)
+        runDelete(deleteTargetId)
     }
 
     return (
@@ -301,7 +291,7 @@ export function TryoutSlotRequestsManager({
                                 slots={newSlots}
                                 onChange={setNewSlots}
                                 slotLabelsByWeek={slotLabelsByWeek}
-                                idPrefix="new"
+                                idPrefix={`${id}-new`}
                             />
                         </div>
                         <div className="space-y-1.5">
@@ -372,7 +362,7 @@ export function TryoutSlotRequestsManager({
                                                         slotLabelsByWeek={
                                                             slotLabelsByWeek
                                                         }
-                                                        idPrefix={`edit-${request.id}`}
+                                                        idPrefix={`${id}-edit-${request.id}`}
                                                     />
                                                     <Textarea
                                                         value={editComment}

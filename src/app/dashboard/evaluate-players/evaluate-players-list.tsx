@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,6 +22,7 @@ import {
     type DivisionOption
 } from "./actions"
 import { formatHeight } from "@/components/player-detail"
+import { useAction } from "@/components/hooks/use-action"
 import { formatPlayerName } from "@/lib/utils"
 
 interface EvaluatePlayersListProps {
@@ -211,10 +211,10 @@ export function EvaluatePlayersList({
     players,
     divisions
 }: EvaluatePlayersListProps) {
-    const router = useRouter()
     const [search, setSearch] = useState("")
     const [showAverages, setShowAverages] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
+    const { run: runSaveEvaluations, pending: isLoading } =
+        useAction(saveEvaluations)
 
     // Track division selections per player (string IDs for Select compatibility)
     const [selections, setSelections] = useState<Record<string, string>>(() => {
@@ -264,25 +264,14 @@ export function EvaluatePlayersList({
 
     const evaluatedCount = Object.keys(selections).length
 
-    const handleSelectionChange = async (userId: string, division: string) => {
+    const handleSelectionChange = (userId: string, division: string) => {
         setSelections((prev) => ({ ...prev, [userId]: division }))
-        setIsLoading(true)
-
-        const result = await saveEvaluations([
+        runSaveEvaluations([
             {
                 playerId: userId,
                 division: parseInt(division, 10)
             }
         ])
-
-        setIsLoading(false)
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
     }
 
     const _handleClearSelection = (userId: string) => {
@@ -293,7 +282,7 @@ export function EvaluatePlayersList({
         })
     }
 
-    const handleSubmit = async () => {
+    const handleSubmit = () => {
         const data = Object.entries(selections).map(
             ([playerId, divisionId]) => ({
                 playerId,
@@ -306,18 +295,7 @@ export function EvaluatePlayersList({
             return
         }
 
-        setIsLoading(true)
-
-        const result = await saveEvaluations(data)
-
-        setIsLoading(false)
-
-        if (result.status) {
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
+        runSaveEvaluations(data)
     }
 
     return (

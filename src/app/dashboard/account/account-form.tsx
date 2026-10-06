@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import { toast } from "sonner"
+import { useId, useState } from "react"
 import {
     Card,
     CardContent,
@@ -13,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useAction } from "@/components/hooks/use-action"
 import {
     updateAccountProfile,
     type AccountProfileData
@@ -33,7 +33,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
         pronouns: profile?.pronouns ?? null,
         emergency_contact: profile?.emergency_contact ?? null
     })
-    const [isLoading, setIsLoading] = useState(false)
+    const id = useId()
+    const { run: saveProfile, pending: isLoading } = useAction(
+        updateAccountProfile,
+        { refresh: false }
+    )
 
     const handleChange = (field: keyof AccountProfileData, value: string) => {
         setFormData((prev) => ({
@@ -42,18 +46,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
         }))
     }
 
-    async function handleSubmit(e: React.FormEvent) {
+    function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setIsLoading(true)
-
-        const result = await updateAccountProfile(formData)
-
-        if (result.status) {
-            toast.success(result.message)
-        } else {
-            toast.error(result.message)
-        }
-        setIsLoading(false)
+        saveProfile(formData)
     }
 
     return (
@@ -69,9 +64,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                     {/* Name Section */}
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="first_name">First Name</Label>
+                            <Label htmlFor={`${id}-first_name`}>
+                                First Name
+                            </Label>
                             <Input
-                                id="first_name"
+                                id={`${id}-first_name`}
                                 value={formData.first_name ?? ""}
                                 onChange={(e) =>
                                     handleChange("first_name", e.target.value)
@@ -80,9 +77,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="last_name">Last Name</Label>
+                            <Label htmlFor={`${id}-last_name`}>Last Name</Label>
                             <Input
-                                id="last_name"
+                                id={`${id}-last_name`}
                                 value={formData.last_name ?? ""}
                                 onChange={(e) =>
                                     handleChange("last_name", e.target.value)
@@ -93,11 +90,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="preferred_name">
+                        <Label htmlFor={`${id}-preferred_name`}>
                             Preferred First Name (if different than above)
                         </Label>
                         <Input
-                            id="preferred_name"
+                            id={`${id}-preferred_name`}
                             value={formData.preferred_name ?? ""}
                             onChange={(e) =>
                                 handleChange("preferred_name", e.target.value)
@@ -116,9 +113,9 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                         </h3>
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
+                                <Label htmlFor={`${id}-email`}>Email</Label>
                                 <Input
-                                    id="email"
+                                    id={`${id}-email`}
                                     type="email"
                                     value={formData.email ?? ""}
                                     onChange={(e) =>
@@ -129,9 +126,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="phone">Phone Number</Label>
+                                <Label htmlFor={`${id}-phone`}>
+                                    Phone Number
+                                </Label>
                                 <Input
-                                    id="phone"
+                                    id={`${id}-phone`}
                                     value={formData.phone ?? ""}
                                     onChange={(e) =>
                                         handleChange("phone", e.target.value)
@@ -149,9 +148,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                         </h3>
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="pronouns">Pronouns</Label>
+                                <Label htmlFor={`${id}-pronouns`}>
+                                    Pronouns
+                                </Label>
                                 <Input
-                                    id="pronouns"
+                                    id={`${id}-pronouns`}
                                     value={formData.pronouns ?? ""}
                                     onChange={(e) =>
                                         handleChange("pronouns", e.target.value)
@@ -161,11 +162,11 @@ export function AccountForm({ profile, email }: AccountFormProps) {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="emergency_contact">
+                                <Label htmlFor={`${id}-emergency_contact`}>
                                     Emergency Contact
                                 </Label>
                                 <Input
-                                    id="emergency_contact"
+                                    id={`${id}-emergency_contact`}
                                     value={formData.emergency_contact ?? ""}
                                     onChange={(e) =>
                                         handleChange(

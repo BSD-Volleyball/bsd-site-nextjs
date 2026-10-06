@@ -129,13 +129,18 @@ export function ScheduleRefsClient({
 
     const fetchDateData = useCallback(async (date: string) => {
         setLoading(true)
-        const result = await getMatchesAndRefsForDate(date)
-        if (result.status) {
-            setMatchData(result.data)
-        } else {
-            toast.error(result.message)
+        try {
+            const result = await getMatchesAndRefsForDate(date)
+            if (result.status) {
+                setMatchData(result.data)
+            } else {
+                toast.error(result.message)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }, [])
 
     const handleDateChange = useCallback(
@@ -257,10 +262,13 @@ export function ScheduleRefsClient({
         )
 
         setSaving(async () => {
-            const result = await saveRefAssignments(
-                selectedDate,
-                assignmentList
-            )
+            let result: Awaited<ReturnType<typeof saveRefAssignments>>
+            try {
+                result = await saveRefAssignments(selectedDate, assignmentList)
+            } catch {
+                toast.error("Something went wrong. Please try again.")
+                return
+            }
             if (result.status) {
                 toast.success("Ref assignments saved")
                 await fetchDateData(selectedDate)

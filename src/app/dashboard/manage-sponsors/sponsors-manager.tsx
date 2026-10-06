@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -71,6 +71,7 @@ function formatDate(date: Date | null) {
 
 export function SponsorsManager({ data, users }: Props) {
     const router = useRouter()
+    const id = useId()
     const [busy, setBusy] = useState(false)
 
     // Add form
@@ -117,8 +118,15 @@ export function SponsorsManager({ data, users }: Props) {
         after?: () => void
     ) {
         setBusy(true)
-        const result = await action()
-        setBusy(false)
+        let result: { status: boolean; message?: string }
+        try {
+            result = await action()
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+            return
+        } finally {
+            setBusy(false)
+        }
         if (result.status) {
             toast.success(result.message ?? "Saved.")
             after?.()
@@ -189,33 +197,36 @@ export function SponsorsManager({ data, users }: Props) {
     async function handleSaveEdit() {
         if (!editing || !editContact) return
         setBusy(true)
-        const detail = await updateSponsor(editing.sponsorId, {
-            name: editName,
-            website: editWebsite || null,
-            blurb: editBlurb || null,
-            contactUserId: editContact
-        })
-        if (!detail.status) {
-            setBusy(false)
-            toast.error(detail.message)
-            return
-        }
-        if (editing.status === "pending" && editAmount !== editing.amount) {
-            const amt = await updateSponsorshipAmount(
-                editing.sponsorshipId,
-                editAmount
-            )
-            if (!amt.status) {
-                setBusy(false)
-                toast.error(amt.message)
-                router.refresh()
+        try {
+            const detail = await updateSponsor(editing.sponsorId, {
+                name: editName,
+                website: editWebsite || null,
+                blurb: editBlurb || null,
+                contactUserId: editContact
+            })
+            if (!detail.status) {
+                toast.error(detail.message)
                 return
             }
+            if (editing.status === "pending" && editAmount !== editing.amount) {
+                const amt = await updateSponsorshipAmount(
+                    editing.sponsorshipId,
+                    editAmount
+                )
+                if (!amt.status) {
+                    toast.error(amt.message)
+                    router.refresh()
+                    return
+                }
+            }
+            toast.success("Sponsor updated.")
+            setEditing(null)
+            router.refresh()
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setBusy(false)
         }
-        setBusy(false)
-        toast.success("Sponsor updated.")
-        setEditing(null)
-        router.refresh()
     }
 
     function openPay(row: SponsorshipRow) {
@@ -264,16 +275,18 @@ export function SponsorsManager({ data, users }: Props) {
                         <div className="flex items-center gap-2">
                             <RadioGroupItem
                                 value="existing"
-                                id="mode-existing"
+                                id={`${id}-mode-existing`}
                                 disabled={renewable.length === 0}
                             />
-                            <Label htmlFor="mode-existing">
+                            <Label htmlFor={`${id}-mode-existing`}>
                                 Returning sponsor
                             </Label>
                         </div>
                         <div className="flex items-center gap-2">
-                            <RadioGroupItem value="new" id="mode-new" />
-                            <Label htmlFor="mode-new">New sponsor</Label>
+                            <RadioGroupItem value="new" id={`${id}-mode-new`} />
+                            <Label htmlFor={`${id}-mode-new`}>
+                                New sponsor
+                            </Label>
                         </div>
                     </RadioGroup>
 
@@ -301,9 +314,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="renew-amount">Amount ($)</Label>
+                                <Label htmlFor={`${id}-renew-amount`}>
+                                    Amount ($)
+                                </Label>
                                 <Input
-                                    id="renew-amount"
+                                    id={`${id}-renew-amount`}
                                     inputMode="decimal"
                                     placeholder="500"
                                     value={newAmount}
@@ -316,9 +331,11 @@ export function SponsorsManager({ data, users }: Props) {
                     ) : (
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="new-name">Business name</Label>
+                                <Label htmlFor={`${id}-new-name`}>
+                                    Business name
+                                </Label>
                                 <Input
-                                    id="new-name"
+                                    id={`${id}-new-name`}
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
                                 />
@@ -333,9 +350,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="new-website">Website</Label>
+                                <Label htmlFor={`${id}-new-website`}>
+                                    Website
+                                </Label>
                                 <Input
-                                    id="new-website"
+                                    id={`${id}-new-website`}
                                     placeholder="https://"
                                     value={newWebsite}
                                     onChange={(e) =>
@@ -344,9 +363,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="new-amount">Amount ($)</Label>
+                                <Label htmlFor={`${id}-new-amount`}>
+                                    Amount ($)
+                                </Label>
                                 <Input
-                                    id="new-amount"
+                                    id={`${id}-new-amount`}
                                     inputMode="decimal"
                                     placeholder="500"
                                     value={newAmount}
@@ -356,11 +377,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="new-blurb">
+                                <Label htmlFor={`${id}-new-blurb`}>
                                     Blurb (shown on the sponsors page)
                                 </Label>
                                 <Textarea
-                                    id="new-blurb"
+                                    id={`${id}-new-blurb`}
                                     rows={2}
                                     maxLength={500}
                                     value={newBlurb}
@@ -590,9 +611,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 size="sm"
                             />
                             <div className="space-y-2">
-                                <Label htmlFor="edit-name">Business name</Label>
+                                <Label htmlFor={`${id}-edit-name`}>
+                                    Business name
+                                </Label>
                                 <Input
-                                    id="edit-name"
+                                    id={`${id}-edit-name`}
                                     value={editName}
                                     onChange={(e) =>
                                         setEditName(e.target.value)
@@ -600,9 +623,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="edit-website">Website</Label>
+                                <Label htmlFor={`${id}-edit-website`}>
+                                    Website
+                                </Label>
                                 <Input
-                                    id="edit-website"
+                                    id={`${id}-edit-website`}
                                     value={editWebsite}
                                     onChange={(e) =>
                                         setEditWebsite(e.target.value)
@@ -610,9 +635,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="edit-blurb">Blurb</Label>
+                                <Label htmlFor={`${id}-edit-blurb`}>
+                                    Blurb
+                                </Label>
                                 <Textarea
-                                    id="edit-blurb"
+                                    id={`${id}-edit-blurb`}
                                     rows={3}
                                     maxLength={500}
                                     value={editBlurb}
@@ -630,13 +657,13 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="edit-amount">
+                                <Label htmlFor={`${id}-edit-amount`}>
                                     Amount ($)
                                     {editing.status === "paid" &&
                                         " — locked after payment"}
                                 </Label>
                                 <Input
-                                    id="edit-amount"
+                                    id={`${id}-edit-amount`}
                                     inputMode="decimal"
                                     value={editAmount}
                                     disabled={editing.status === "paid"}
@@ -681,11 +708,11 @@ export function SponsorsManager({ data, users }: Props) {
                                 {paying.amount}.
                             </p>
                             <div className="space-y-2">
-                                <Label htmlFor="pay-amount">
+                                <Label htmlFor={`${id}-pay-amount`}>
                                     Amount received ($)
                                 </Label>
                                 <Input
-                                    id="pay-amount"
+                                    id={`${id}-pay-amount`}
                                     inputMode="decimal"
                                     value={payAmount}
                                     onChange={(e) =>
@@ -694,9 +721,9 @@ export function SponsorsManager({ data, users }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="pay-note">Note</Label>
+                                <Label htmlFor={`${id}-pay-note`}>Note</Label>
                                 <Input
-                                    id="pay-note"
+                                    id={`${id}-pay-note`}
                                     placeholder='e.g. "check #1042"'
                                     value={payNote}
                                     onChange={(e) => setPayNote(e.target.value)}

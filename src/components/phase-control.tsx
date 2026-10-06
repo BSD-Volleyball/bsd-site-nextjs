@@ -51,15 +51,20 @@ export function PhaseControl<P extends string>({
         run: (target: P) => Promise<PhaseTransitionResult>
     ) {
         setLoading(true)
-        const result = await run(target)
-        if (result.status) {
-            setPhase(target)
-            toast.success(result.message)
-            router.refresh()
-        } else {
-            toast.error(result.message)
+        try {
+            const result = await run(target)
+            if (result.status) {
+                setPhase(target)
+                toast.success(result.message)
+                router.refresh()
+            } else {
+                toast.error(result.message)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     return (

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAction } from "@/components/hooks/use-action"
 import { cn } from "@/lib/utils"
 import { saveWeek1Rosters } from "./actions"
 import {
@@ -49,7 +50,10 @@ export function CreateWeek1Form({
     )
     const [step, setStep] = useState<1 | 2>(1)
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
-    const [isSaving, setIsSaving] = useState(false)
+    const { run: saveRosters, pending: isSaving } = useAction(
+        saveWeek1Rosters,
+        { refresh: false }
+    )
 
     const modal = usePlayerDetailModal()
 
@@ -239,7 +243,7 @@ export function CreateWeek1Form({
         setOrderedPlayers((prev) => reorder(prev, index, target))
     }
 
-    const handleSave = async () => {
+    const handleSave = () => {
         if (assignments.length !== CUTOFF_COUNT) {
             toast.error("You need exactly 96 players above the cutoff line.")
             return
@@ -251,17 +255,7 @@ export function CreateWeek1Form({
             return
         }
 
-        setIsSaving(true)
-
-        const result = await saveWeek1Rosters(saveAssignments)
-
-        if (result.status) {
-            toast.success(result.message ?? "Week 1 rosters saved.")
-        } else {
-            toast.error(result.message)
-        }
-
-        setIsSaving(false)
+        saveRosters(saveAssignments)
     }
 
     return (

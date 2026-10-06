@@ -11,6 +11,12 @@ import {
     useEventListener
 } from "@/lib/liveblocks.config"
 import { PresenceBar } from "./presence-bar"
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogTitle
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import {
     usePlayerDetailModal,
@@ -162,16 +168,6 @@ export function DraftBoard({
             onPicksChange(picks as Record<string, string | null>)
         }
     }, [picks, onPicksChange])
-
-    // Escape closes the enlarged photo wherever focus is
-    useEffect(() => {
-        if (!enlargedPlayer) return
-        const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") setEnlargedPlayer(null)
-        }
-        document.addEventListener("keydown", onKeyDown)
-        return () => document.removeEventListener("keydown", onKeyDown)
-    }, [enlargedPlayer])
 
     const handlePickChange = (
         round: number,
@@ -616,32 +612,32 @@ export function DraftBoard({
             )}
 
             {/* Enlarged Player Image Modal */}
-            {enlargedPlayer && playerPicUrl && (
-                <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
-                    <button
-                        type="button"
-                        aria-label="Close photo"
-                        className="absolute inset-0 bg-black/70"
-                        onClick={() => setEnlargedPlayer(null)}
-                    />
-                    <div
+            <Dialog
+                open={!!enlargedPlayer && !!playerPicUrl}
+                onOpenChange={(open) => {
+                    if (!open) setEnlargedPlayer(null)
+                }}
+            >
+                {enlargedPlayer && playerPicUrl && (
+                    <DialogContent
+                        showCloseButton={false}
+                        aria-describedby={undefined}
                         className={cn(
-                            "relative rounded-xl p-4",
+                            "block w-max max-w-[calc(100vw-2rem)] gap-0 rounded-xl border-0 p-4 shadow-none sm:rounded-xl",
                             enlargedPlayer.male === true
                                 ? "bg-blue-50 dark:bg-blue-900/40"
                                 : "bg-pink-50 dark:bg-pink-900/40"
                         )}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label={`${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
                     >
-                        <button
-                            type="button"
+                        <DialogTitle className="sr-only">
+                            {`${enlargedPlayer.first_name} ${enlargedPlayer.last_name}`}
+                        </DialogTitle>
+                        <DialogClose
                             className="absolute -top-2 -right-2 rounded-full bg-background p-1 shadow-lg hover:bg-accent"
-                            onClick={() => setEnlargedPlayer(null)}
+                            aria-label="Close photo"
                         >
                             <RiCloseLine className="h-5 w-5" />
-                        </button>
+                        </DialogClose>
                         {enlargedPlayer.picture ? (
                             <img
                                 src={buildPlayerPictureUrl(
@@ -668,9 +664,9 @@ export function DraftBoard({
                                 ID: {enlargedPlayer.old_id}
                             </p>
                         )}
-                    </div>
-                </div>
-            )}
+                    </DialogContent>
+                )}
+            </Dialog>
 
             <PlayerDetailPopup
                 open={!!modal.selectedUserId}

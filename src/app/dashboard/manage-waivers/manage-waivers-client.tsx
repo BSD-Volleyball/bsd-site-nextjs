@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,7 @@ import {
     CardTitle
 } from "@/components/ui/card"
 import { WaiverContent } from "@/components/waiver-content"
+import { useAction } from "@/components/hooks/use-action"
 import { formatFullTimestamp } from "@/lib/date-utils"
 import {
     createWaiverVersion,
@@ -31,39 +32,45 @@ export function ManageWaiversClient({ waivers }: Props) {
     const router = useRouter()
     const [content, setContent] = useState("")
     const [publishImmediately, setPublishImmediately] = useState(false)
-    const [isSubmitting, setIsSubmitting] = useState(false)
     const [publishingId, setPublishingId] = useState<number | null>(null)
+    const id = useId()
 
-    const handleCreate = async () => {
+    const { run: runCreate, pending: isSubmitting } = useAction(
+        createWaiverVersion,
+        {
+            success: (data) =>
+                publishImmediately
+                    ? `Created and published waiver #${data.id}.`
+                    : `Created waiver #${data.id} (not yet published).`,
+            onSuccess: () => {
+                setContent("")
+                setPublishImmediately(false)
+            }
+        }
+    )
+
+    const handleCreate = () => {
         if (content.trim().length === 0) {
             toast.error("Waiver content cannot be empty.")
             return
         }
-        setIsSubmitting(true)
-        const result = await createWaiverVersion(content, publishImmediately)
-        setIsSubmitting(false)
-
-        if (result.status) {
-            toast.success(
-                publishImmediately
-                    ? `Created and published waiver #${result.data.id}.`
-                    : `Created waiver #${result.data.id} (not yet published).`
-            )
-            setContent("")
-            setPublishImmediately(false)
-            router.refresh()
-        } else {
-            toast.error(result.message)
-        }
+        runCreate(content, publishImmediately)
     }
 
-    const handlePublish = async (id: number) => {
-        setPublishingId(id)
-        const result = await publishWaiverVersion(id)
-        setPublishingId(null)
+    const handlePublish = async (waiverId: number) => {
+        setPublishingId(waiverId)
+        let result: Awaited<ReturnType<typeof publishWaiverVersion>>
+        try {
+            result = await publishWaiverVersion(waiverId)
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+            return
+        } finally {
+            setPublishingId(null)
+        }
 
         if (result.status) {
-            toast.success(`Published waiver #${id}.`)
+            toast.success(`Published waiver #${waiverId}.`)
             router.refresh()
         } else {
             toast.error(result.message)
@@ -90,14 +97,14 @@ export function ManageWaiversClient({ waivers }: Props) {
                     />
                     <div className="flex items-center gap-2">
                         <Checkbox
-                            id="publish-immediately"
+                            id={`${id}-publish-immediately`}
                             checked={publishImmediately}
                             onCheckedChange={(c: boolean | "indeterminate") =>
                                 setPublishImmediately(c === true)
                             }
                         />
                         <Label
-                            htmlFor="publish-immediately"
+                            htmlFor={`${id}-publish-immediately`}
                             className="cursor-pointer"
                         >
                             Publish immediately (replaces the current active

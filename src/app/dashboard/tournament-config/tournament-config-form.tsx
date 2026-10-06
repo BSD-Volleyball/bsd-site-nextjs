@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useId, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -129,6 +129,7 @@ export function TournamentConfigForm({
     availableDivisions
 }: Props) {
     const router = useRouter()
+    const id = useId()
     const [saving, setSaving] = useState(false)
     const [pendingDeletion, setPendingDeletion] = useState<string | null>(null)
 
@@ -279,6 +280,8 @@ export function TournamentConfigForm({
             setPendingDeletion(null)
             toast.success("Tournament configuration saved.")
             router.refresh()
+        } catch {
+            toast.error("Something went wrong. Please try again.")
         } finally {
             setSaving(false)
         }
@@ -293,26 +296,30 @@ export function TournamentConfigForm({
                 <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="t-name">Tournament Name</Label>
+                            <Label htmlFor={`${id}-t-name`}>
+                                Tournament Name
+                            </Label>
                             <Input
-                                id="t-name"
+                                id={`${id}-t-name`}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-code">Code (URL slug)</Label>
+                            <Label htmlFor={`${id}-t-code`}>
+                                Code (URL slug)
+                            </Label>
                             <Input
-                                id="t-code"
+                                id={`${id}-t-code`}
                                 value={code}
                                 onChange={(e) => setCode(e.target.value)}
                                 placeholder="summer-2026-open"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-year">Year</Label>
+                            <Label htmlFor={`${id}-t-year`}>Year</Label>
                             <Input
-                                id="t-year"
+                                id={`${id}-t-year`}
                                 type="number"
                                 value={year}
                                 onChange={(e) =>
@@ -324,9 +331,11 @@ export function TournamentConfigForm({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="t-date">Tournament Date</Label>
+                            <Label htmlFor={`${id}-t-date`}>
+                                Tournament Date
+                            </Label>
                             <Input
-                                id="t-date"
+                                id={`${id}-t-date`}
                                 type="date"
                                 value={tournamentDate}
                                 onChange={(e) =>
@@ -335,18 +344,22 @@ export function TournamentConfigForm({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-checkin">Check-in Time</Label>
+                            <Label htmlFor={`${id}-t-checkin`}>
+                                Check-in Time
+                            </Label>
                             <Input
-                                id="t-checkin"
+                                id={`${id}-t-checkin`}
                                 type="time"
                                 value={checkinTime}
                                 onChange={(e) => setCheckinTime(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-first">First Serve Time</Label>
+                            <Label htmlFor={`${id}-t-first`}>
+                                First Serve Time
+                            </Label>
                             <Input
-                                id="t-first"
+                                id={`${id}-t-first`}
                                 type="time"
                                 value={firstServeTime}
                                 onChange={(e) =>
@@ -357,9 +370,11 @@ export function TournamentConfigForm({
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="t-addr">Tournament Address</Label>
+                        <Label htmlFor={`${id}-t-addr`}>
+                            Tournament Address
+                        </Label>
                         <Input
-                            id="t-addr"
+                            id={`${id}-t-addr`}
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                         />
@@ -369,27 +384,33 @@ export function TournamentConfigForm({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="t-cost">Tournament Cost ($)</Label>
+                            <Label htmlFor={`${id}-t-cost`}>
+                                Tournament Cost ($)
+                            </Label>
                             <Input
-                                id="t-cost"
+                                id={`${id}-t-cost`}
                                 inputMode="decimal"
                                 value={cost}
                                 onChange={(e) => setCost(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-late-cost">Late Cost ($)</Label>
+                            <Label htmlFor={`${id}-t-late-cost`}>
+                                Late Cost ($)
+                            </Label>
                             <Input
-                                id="t-late-cost"
+                                id={`${id}-t-late-cost`}
                                 inputMode="decimal"
                                 value={lateCost}
                                 onChange={(e) => setLateCost(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-late-date">Late Date</Label>
+                            <Label htmlFor={`${id}-t-late-date`}>
+                                Late Date
+                            </Label>
                             <Input
-                                id="t-late-date"
+                                id={`${id}-t-late-date`}
                                 type="date"
                                 value={lateDate}
                                 onChange={(e) => setLateDate(e.target.value)}
@@ -399,11 +420,11 @@ export function TournamentConfigForm({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="t-reg-close">
+                            <Label htmlFor={`${id}-t-reg-close`}>
                                 Registration Close Date
                             </Label>
                             <Input
-                                id="t-reg-close"
+                                id={`${id}-t-reg-close`}
                                 type="date"
                                 value={registrationCloseDate}
                                 onChange={(e) =>
@@ -412,11 +433,11 @@ export function TournamentConfigForm({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-roster-lock">
+                            <Label htmlFor={`${id}-t-roster-lock`}>
                                 Roster Lock Date
                             </Label>
                             <Input
-                                id="t-roster-lock"
+                                id={`${id}-t-roster-lock`}
                                 type="date"
                                 value={rosterLockDate}
                                 onChange={(e) =>
@@ -430,9 +451,11 @@ export function TournamentConfigForm({
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
-                            <Label htmlFor="t-type">Tournament Type</Label>
+                            <Label htmlFor={`${id}-t-type`}>
+                                Tournament Type
+                            </Label>
                             <select
-                                id="t-type"
+                                id={`${id}-t-type`}
                                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                                 value={tournamentType}
                                 onChange={(e) =>
@@ -450,9 +473,11 @@ export function TournamentConfigForm({
                             </select>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-pool-size">Pool Size</Label>
+                            <Label htmlFor={`${id}-t-pool-size`}>
+                                Pool Size
+                            </Label>
                             <Input
-                                id="t-pool-size"
+                                id={`${id}-t-pool-size`}
                                 type="number"
                                 min={2}
                                 value={poolSize}
@@ -462,9 +487,11 @@ export function TournamentConfigForm({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="t-elim">Elimination Format</Label>
+                            <Label htmlFor={`${id}-t-elim`}>
+                                Elimination Format
+                            </Label>
                             <select
-                                id="t-elim"
+                                id={`${id}-t-elim`}
                                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                                 value={eliminationFormat}
                                 onChange={(e) =>
@@ -507,13 +534,15 @@ export function TournamentConfigForm({
                     <Separator />
 
                     <div className="space-y-2">
-                        <Label htmlFor="t-addl">Additional Information</Label>
+                        <Label htmlFor={`${id}-t-addl`}>
+                            Additional Information
+                        </Label>
                         <p className="text-muted-foreground text-sm">
                             Shown on the public tournament info page. Blank
                             lines start a new paragraph.
                         </p>
                         <textarea
-                            id="t-addl"
+                            id={`${id}-t-addl`}
                             className="min-h-32 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                             value={additionalInfo}
                             onChange={(e) => setAdditionalInfo(e.target.value)}

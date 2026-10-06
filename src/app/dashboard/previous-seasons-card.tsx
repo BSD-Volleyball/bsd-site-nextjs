@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import type { PreviousSeason } from "./page"
 import type { TeamRosterPlayer } from "./roster-actions"
 import { getTeamRoster } from "./roster-actions"
@@ -40,12 +41,17 @@ export function PreviousSeasonsCard({
         setOpen(true)
         setLoading(true)
 
-        const result = await getTeamRoster(ps.teamId)
-        if (result.status) {
-            setTeamName(result.data.teamName)
-            setPlayers(result.data.players)
+        try {
+            const result = await getTeamRoster(ps.teamId)
+            if (result.status) {
+                setTeamName(result.data.teamName)
+                setPlayers(result.data.players)
+            }
+        } catch {
+            toast.error("Something went wrong. Please try again.")
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
 
     return (
