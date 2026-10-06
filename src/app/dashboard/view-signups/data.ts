@@ -1,6 +1,6 @@
-import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import { users, signups, seasons } from "@/database/schema"
 import { eq, inArray, desc } from "drizzle-orm"

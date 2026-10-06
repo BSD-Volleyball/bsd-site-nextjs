@@ -1,6 +1,6 @@
-import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import {
     matchReferees,

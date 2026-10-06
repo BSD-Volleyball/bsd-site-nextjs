@@ -1,6 +1,6 @@
-import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import { playerPicBaseUrl } from "@/config/env"
 import { auth } from "@/lib/auth"

@@ -1,6 +1,6 @@
-import { formatSeasonRowLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonRowLabel } from "@/lib/season-utils"
 import { desc } from "drizzle-orm"
 import { db } from "@/database/db"
 import { seasons } from "@/database/schema"

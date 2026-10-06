@@ -16,7 +16,7 @@ import {
     withAction,
     type ActionResult
 } from "@/next/action-helpers"
-import { type TournamentPhase } from "@/lib/tournament-phases"
+import type { TournamentPhase } from "@/lib/tournament-phases"
 import type { DivisionPlacements } from "@/components/tournament/tournament-placements-card"
 
 export interface TournamentPhaseData {

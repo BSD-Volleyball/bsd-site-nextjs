@@ -3,10 +3,10 @@
 // resolve the acting user, and delegate here with their week's config.
 // Server-only.
 
-import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import "server-only"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { formatTryoutTeamLabel } from "@/lib/tryout-team-names"
 import { and, desc, eq, inArray } from "drizzle-orm"
 import type { ActionResult } from "@/lib/action-result"

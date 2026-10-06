@@ -15,9 +15,9 @@ import {
 } from "@/next/action-helpers"
 import { formatSeasonLabel, getEventsByType } from "@/lib/season-utils"
 import { getTryoutCourtNumbersByEvent } from "@/lib/tryout-volunteer-schedule"
-import {
-    type TryoutJobCourtScope,
-    type TryoutJobScope
+import type {
+    TryoutJobCourtScope,
+    TryoutJobScope
 } from "@/lib/tryout-volunteer-types"
 
 export interface TryoutJobRow {

@@ -2,9 +2,9 @@
 // actions) are responsible for authorization; these helpers only assemble
 // data. Server-only: never import from client components.
 
-import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { db } from "@/database/db"
 import {
     users,

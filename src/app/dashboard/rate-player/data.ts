@@ -1,6 +1,6 @@
-import { formatSeasonLabel } from "@/lib/season-utils"
 import "server-only"
 
+import { formatSeasonLabel } from "@/lib/season-utils"
 import { logger } from "@/lib/logger"
 import { db } from "@/database/db"
 import {
