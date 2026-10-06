@@ -98,29 +98,6 @@ export type TeamAvailabilityData = {
     canSeeFullPool: boolean
 }
 
-export const getAllSeasonTeams = withAction(
-    async (): Promise<ActionResult<TeamOption[]>> => {
-        await requireSession()
-
-        const config = await getSeasonConfig()
-        if (!config.seasonId) return ok([])
-
-        const rows = await db
-            .select({
-                id: teams.id,
-                name: teams.name,
-                number: teams.number,
-                divisionName: divisions.name
-            })
-            .from(teams)
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(eq(teams.season, config.seasonId))
-            .orderBy(asc(divisions.level), asc(teams.number))
-
-        return ok(rows)
-    }
-)
-
 export const getTeamAvailabilityData = withAction(
     async (teamId?: number): Promise<ActionResult<TeamAvailabilityData>> => {
         const session = await requireSession()

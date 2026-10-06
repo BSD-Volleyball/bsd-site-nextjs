@@ -107,6 +107,38 @@ const nextConfig: NextConfig = {
                 source: "/spring-2026-season-info",
                 destination: "/season-info",
                 permanent: true
+            },
+            // Retired dashboard routes, kept so old links and bookmarks still
+            // resolve. Query strings (e.g. ?divisionId=) carry over.
+            {
+                source: "/dashboard/create-teams",
+                destination: "/dashboard/select-captains",
+                permanent: false
+            },
+            {
+                // Prepare for Draft is now Draft Setup, Step 1.
+                source: "/dashboard/prepare-for-draft",
+                destination: "/dashboard/draft-setup/rounds",
+                permanent: false
+            },
+            {
+                // Draft Day is now Draft Setup, Step 2.
+                source: "/dashboard/draft-day",
+                destination: "/dashboard/draft-setup/order",
+                permanent: false
+            },
+            {
+                // Now part of the combined Schedule & Bracket page.
+                source: "/dashboard/tournament-bracket",
+                destination: "/dashboard/tournament-schedule-view",
+                permanent: false
+            },
+            {
+                // Results split into Roster / Pool Play / Playoffs (2026-08);
+                // the Playoffs page carries the final rankings.
+                source: "/dashboard/tournament-results/:tournamentId",
+                destination: "/dashboard/tournament-playoffs/:tournamentId",
+                permanent: false
             }
         ]
     }

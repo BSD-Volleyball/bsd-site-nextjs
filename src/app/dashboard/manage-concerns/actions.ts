@@ -198,40 +198,6 @@ export const getConcerns = withAction(
     }
 )
 
-export const getConcernComments = withAction(
-    async (concernId: number): Promise<ActionResult<ConcernComment[]>> => {
-        const config = await requireSeasonConfig()
-        await requirePermission("concerns:view", {
-            seasonId: config.seasonId
-        })
-
-        const rows = await db
-            .select({
-                id: concernComments.id,
-                concern_id: concernComments.concern_id,
-                author_id: concernComments.author_id,
-                author_name: users.name,
-                content: concernComments.content,
-                created_at: concernComments.created_at
-            })
-            .from(concernComments)
-            .leftJoin(users, eq(concernComments.author_id, users.id))
-            .where(eq(concernComments.concern_id, concernId))
-            .orderBy(desc(concernComments.created_at))
-
-        return ok(
-            rows.map((r) => ({
-                id: r.id,
-                concern_id: r.concern_id,
-                author_id: r.author_id,
-                author_name: r.author_name ?? r.author_id,
-                content: r.content,
-                created_at: r.created_at
-            }))
-        )
-    }
-)
-
 export const getConcernThread = withAction(
     async (concernId: number): Promise<ActionResult<ConcernThreadItem[]>> => {
         const config = await requireSeasonConfig()

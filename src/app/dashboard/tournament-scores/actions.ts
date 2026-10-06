@@ -233,7 +233,7 @@ export const saveTournamentMatchScore = withAction(
         })
 
         revalidatePath("/dashboard/tournament-scores")
-        revalidatePath("/dashboard/tournament-bracket")
+        revalidatePath("/dashboard/tournament-schedule-view")
         return ok()
     }
 )

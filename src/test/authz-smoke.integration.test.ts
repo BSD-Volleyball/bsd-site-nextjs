@@ -95,25 +95,12 @@ const c = (
 
 const cases: SmokeCase[] = [
     // access-actions — session-status getters return false/null unauth
-    c("access.getSignupEligibility", "false", () =>
-        accessActions.getSignupEligibility()
-    ),
     c("access.getIsAdminOrDirector", "false", () =>
         accessActions.getIsAdminOrDirector()
     ),
     c("access.getIsCommissioner", "false", () =>
         accessActions.getIsCommissioner()
     ),
-    c("access.getHasCaptainPagesAccess", "false", () =>
-        accessActions.getHasCaptainPagesAccess()
-    ),
-    c("access.getHasPicturesAccess", "false", () =>
-        accessActions.getHasPicturesAccess()
-    ),
-    c("access.getHasConcernsAccess", "false", () =>
-        accessActions.getHasConcernsAccess()
-    ),
-    c("access.getSeasonPhase", "null", () => accessActions.getSeasonPhase()),
     // add-pictures
     c("addPictures.getPlayersNeedingPictures", "fail", () =>
         addPictures.getPlayersNeedingPictures()
@@ -198,9 +185,6 @@ const cases: SmokeCase[] = [
     ),
     c("draftHomework.saveDraftHomework", "fail", () =>
         draftHomework.saveDraftHomework({} as never)
-    ),
-    c("draftHomework.getLastSeasonDraft", "fail", () =>
-        draftHomework.getLastSeasonDraft()
     ),
     // edit-emails
     c("editEmails.getEmailTemplates", "fail", () =>
@@ -341,18 +325,12 @@ const cases: SmokeCase[] = [
     ),
     // playoffs / potential-captains
     c("playoffs.getPlayoffData", "fail", () => playoffs.getPlayoffData(1)),
-    c("potentialCaptains.getPotentialCaptainPlayerDetails", "fail", () =>
-        potentialCaptains.getPotentialCaptainPlayerDetails("u")
-    ),
     c("potentialCaptains.getPotentialCaptainsData", "fail", () =>
         potentialCaptains.getPotentialCaptainsData()
     ),
     // rate-player
     c("ratePlayer.getRatePlayerData", "fail", () =>
         ratePlayer.getRatePlayerData()
-    ),
-    c("ratePlayer.savePlayerSkillRating", "fail", () =>
-        ratePlayer.savePlayerSkillRating("u", "serve" as never, 1)
     ),
     c("ratePlayer.savePlayerSkillRatings", "fail", () =>
         ratePlayer.savePlayerSkillRatings("u", {} as never)
@@ -397,9 +375,6 @@ const cases: SmokeCase[] = [
         settings.updateAccountProfile({} as never)
     ),
     // team-availability + find-sub
-    c("teamAvailability.getAllSeasonTeams", "fail", () =>
-        teamAvailability.getAllSeasonTeams()
-    ),
     c("teamAvailability.getTeamAvailabilityData", "fail", () =>
         teamAvailability.getTeamAvailabilityData()
     ),

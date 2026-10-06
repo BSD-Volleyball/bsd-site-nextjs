@@ -355,40 +355,6 @@ export const getDraftDivisionData = withAction(
     }
 )
 
-export const getTeamsForSeasonAndDivision = withAction(
-    async (
-        seasonId: number,
-        divisionId: number
-    ): Promise<ActionResult<TeamOption[]>> => {
-        requirePositiveInt(seasonId, "season or division")
-        requirePositiveInt(divisionId, "season or division")
-
-        const hasAccess = await checkDraftReadAccess()
-        if (!hasAccess) {
-            return fail("You don't have permission to access this page.")
-        }
-
-        const access = await hasDraftPageAccess()
-        if (!canReadDraftDivision(access, divisionId)) {
-            return fail("You don't have permission to access this division.")
-        }
-
-        const teamsList = await db
-            .select({
-                id: teams.id,
-                name: teams.name,
-                number: teams.number
-            })
-            .from(teams)
-            .where(
-                and(eq(teams.season, seasonId), eq(teams.division, divisionId))
-            )
-            .orderBy(teams.number)
-
-        return ok(teamsList)
-    }
-)
-
 export interface DraftInitData {
     /** True once any drafts rows exist for this division's teams. */
     alreadySubmitted: boolean

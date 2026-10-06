@@ -152,15 +152,6 @@ export interface SkillRatingsInput {
     blocking: number
 }
 
-const validSkills = new Set<RatingSkill>([
-    "overall",
-    "passing",
-    "setting",
-    "hitting",
-    "serving",
-    "blocking"
-])
-
 const validNoteTypes = new Set<RatingNoteType>(["shared", "private"])
 
 function buildSeasonLabel(seasonName: string, seasonYear: number): string {
@@ -219,35 +210,6 @@ function buildDivisionGroups(
 
 function toNullableRating(value: number): number | null {
     return value === 0 ? null : value
-}
-
-function getRatingSkillUpdate(
-    skill: RatingSkill,
-    value: number
-): Partial<typeof playerRatings.$inferInsert> {
-    const nullableValue = toNullableRating(value)
-
-    if (skill === "overall") {
-        return { overall: nullableValue }
-    }
-
-    if (skill === "passing") {
-        return { passing: nullableValue }
-    }
-
-    if (skill === "setting") {
-        return { setting: nullableValue }
-    }
-
-    if (skill === "hitting") {
-        return { hitting: nullableValue }
-    }
-
-    if (skill === "serving") {
-        return { serving: nullableValue }
-    }
-
-    return { blocking: nullableValue }
 }
 
 function getRatingNoteUpdate(
@@ -801,86 +763,6 @@ export async function getRatePlayerData(): Promise<{
         }
     }
 }
-
-export const savePlayerSkillRating = withAction(
-    async (
-        playerId: string,
-        skill: RatingSkill,
-        value: number
-    ): Promise<ActionResult> => {
-        if (!playerId.trim()) {
-            return fail("Player ID is required.")
-        }
-
-        if (!validSkills.has(skill)) {
-            return fail("Invalid skill type.")
-        }
-
-        const session = await requireSession()
-        const config = await requireSeasonConfig()
-        await requirePermission("players:rate", { seasonId: config.seasonId })
-        const context = {
-            seasonId: config.seasonId,
-            evaluatorId: session.user.id
-        }
-
-        if (playerId === context.evaluatorId) {
-            return fail("You cannot rate yourself.")
-        }
-
-        if (!Number.isFinite(value) || value < 0 || value > 6) {
-            return fail("Skill values must be between 0 and 6.")
-        }
-
-        try {
-            const playerIsSignedUp = await ensurePlayerIsActiveSeasonSignup(
-                playerId,
-                context.seasonId
-            )
-
-            if (!playerIsSignedUp) {
-                return fail("Player is not signed up for the active season.")
-            }
-
-            const now = new Date()
-            const skillUpdate = getRatingSkillUpdate(skill, value)
-
-            await db
-                .insert(playerRatings)
-                .values({
-                    season: context.seasonId,
-                    player: playerId,
-                    evaluator: context.evaluatorId,
-                    updated_at: now,
-                    ...skillUpdate
-                })
-                .onConflictDoUpdate({
-                    target: [
-                        playerRatings.season,
-                        playerRatings.player,
-                        playerRatings.evaluator
-                    ],
-                    set: {
-                        ...skillUpdate,
-                        updated_at: now
-                    }
-                })
-
-            await logAuditEntry({
-                userId: context.evaluatorId,
-                action: "update",
-                entityType: "player_rating",
-                entityId: playerId,
-                summary: `Saved ${skill} rating (${value}) for player ${playerId} in season ${context.seasonId}`
-            })
-
-            return ok(undefined, "Rating saved.")
-        } catch (error) {
-            console.error("Error saving player skill rating:", error)
-            return fail("Failed to save rating.")
-        }
-    }
-)
 
 export const savePlayerSkillRatings = withAction(
     async (

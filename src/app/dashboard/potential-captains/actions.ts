@@ -28,7 +28,6 @@ import {
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
 import { isCommissionerBySession } from "@/next/session"
 import { getCommissionerDivisionAccess } from "@/lib/rbac"
-import { getSeasonHistoryForUser } from "@/lib/player-season-history"
 
 export interface PotentialCaptainPlayerDetails {
     id: string
@@ -102,90 +101,6 @@ interface PotentialCaptainsData {
     seasonConfig?: SeasonConfig
     divisionCommissioners: DivisionCommissioner[]
 }
-
-export const getPotentialCaptainPlayerDetails = withAction(
-    async (
-        playerId: string
-    ): Promise<
-        ActionResult<{
-            player: PotentialCaptainPlayerDetails
-            draftHistory: PotentialCaptainDraftHistory[]
-            pairPickName: string | null
-            pairReason: string | null
-        }>
-    > => {
-        const hasAccess = await isCommissionerBySession()
-        if (!hasAccess) {
-            return fail("You don't have permission to access this page.")
-        }
-
-        const [player] = await db
-            .select({
-                id: users.id,
-                first_name: users.first_name,
-                last_name: users.last_name,
-                preferred_name: users.preferred_name,
-                pronouns: users.pronouns,
-                male: users.male,
-                experience: users.experience,
-                assessment: users.assessment,
-                height: users.height,
-                skill_setter: users.skill_setter,
-                skill_hitter: users.skill_hitter,
-                skill_passer: users.skill_passer,
-                skill_other: users.skill_other,
-                picture: users.picture
-            })
-            .from(users)
-            .where(eq(users.id, playerId))
-            .limit(1)
-
-        if (!player) {
-            return fail("Player not found.")
-        }
-
-        const draftHistory = await getSeasonHistoryForUser(playerId)
-
-        let pairPickName: string | null = null
-        let pairReason: string | null = null
-
-        const [mostRecentSignup] = await db
-            .select({
-                pairPickId: signups.pair_pick,
-                pairReason: signups.pair_reason
-            })
-            .from(signups)
-            .where(eq(signups.player, playerId))
-            .orderBy(desc(signups.season), desc(signups.id))
-            .limit(1)
-
-        if (mostRecentSignup) {
-            pairReason = mostRecentSignup.pairReason
-
-            if (mostRecentSignup.pairPickId) {
-                const [pairUser] = await db
-                    .select({
-                        first_name: users.first_name,
-                        last_name: users.last_name
-                    })
-                    .from(users)
-                    .where(eq(users.id, mostRecentSignup.pairPickId))
-                    .limit(1)
-
-                if (pairUser) {
-                    pairPickName = `${pairUser.first_name} ${pairUser.last_name}`
-                }
-            }
-        }
-
-        return ok({
-            player,
-            draftHistory,
-            pairPickName,
-            pairReason
-        })
-    }
-)
 
 export const getPotentialCaptainsData = withAction(
     async (): Promise<ActionResult<PotentialCaptainsData>> => {
