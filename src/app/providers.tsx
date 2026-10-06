@@ -9,6 +9,13 @@ import NextTopLoader from "nextjs-toploader"
 import { Toaster } from "sonner"
 import { authClient } from "@/lib/auth-client"
 import { safeRedirectPath } from "@/lib/safe-redirect"
+import { z } from "zod"
+
+// zod probes for eval support with a caught `new Function("")` before it
+// compiles fast object parsers. Under our CSP (no 'unsafe-eval') the probe
+// fails harmlessly but still files a violation report on every sign-in form.
+// The client's schemas are small, so the interpreted parser costs nothing.
+z.config({ jitless: true })
 
 export function Providers({ children }: { children: ReactNode }) {
     const router = useRouter()
