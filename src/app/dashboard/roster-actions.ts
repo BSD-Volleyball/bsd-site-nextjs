@@ -45,120 +45,100 @@ export interface TeamRosterPlayer {
 }
 
 export interface TeamRosterData {
-    status: boolean
-    message?: string
     teamName: string
     players: TeamRosterPlayer[]
 }
 
-export async function getTeamRoster(teamId: number): Promise<TeamRosterData> {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session?.user) {
-        return {
-            status: false,
-            message: "Not authenticated.",
-            teamName: "",
-            players: []
+export const getTeamRoster = withAction(
+    async (teamId: number): Promise<ActionResult<TeamRosterData>> => {
+        const sessionUser = await getSessionUser()
+        if (!sessionUser) {
+            return fail("Not authenticated.")
         }
-    }
 
-    try {
-        const [team] = await db
-            .select({
-                id: teams.id,
-                name: teams.name,
-                captain: teams.captain,
-                captain2: teams.captain2,
-                season: teams.season
-            })
-            .from(teams)
-            .where(eq(teams.id, teamId))
-            .limit(1)
+        try {
+            const [team] = await db
+                .select({
+                    id: teams.id,
+                    name: teams.name,
+                    captain: teams.captain,
+                    captain2: teams.captain2,
+                    season: teams.season
+                })
+                .from(teams)
+                .where(eq(teams.id, teamId))
+                .limit(1)
 
-        if (!team) {
-            return {
-                status: false,
-                message: "Team not found.",
-                teamName: "",
-                players: []
+            if (!team) {
+                return fail("Team not found.")
             }
-        }
 
-        // Access rule: admins see everything; past-season rosters are
-        // league-visible (they're shown in the Historical section anyway);
-        // current-season rosters are limited to that team's own players.
-        const isElevated = await isAdminOrDirectorBySession()
-        if (!isElevated) {
-            const config = await getSeasonConfig()
-            if (config.seasonId === team.season) {
-                const isCaptain =
-                    team.captain === session.user.id ||
-                    team.captain2 === session.user.id
-                const [membership] = await db
-                    .select({ id: drafts.id })
-                    .from(drafts)
-                    .where(
-                        and(
-                            eq(drafts.team, teamId),
-                            eq(drafts.user, session.user.id)
+            // Access rule: admins see everything; past-season rosters are
+            // league-visible (they're shown in the Historical section anyway);
+            // current-season rosters are limited to that team's own players.
+            const isElevated = await isAdminOrDirectorBySession()
+            if (!isElevated) {
+                const config = await getSeasonConfig()
+                if (config.seasonId === team.season) {
+                    const isCaptain =
+                        team.captain === sessionUser.id ||
+                        team.captain2 === sessionUser.id
+                    const [membership] = await db
+                        .select({ id: drafts.id })
+                        .from(drafts)
+                        .where(
+                            and(
+                                eq(drafts.team, teamId),
+                                eq(drafts.user, sessionUser.id)
+                            )
                         )
-                    )
-                    .limit(1)
-                if (!isCaptain && !membership) {
-                    return {
-                        status: false,
-                        message:
-                            "Current-season rosters are only visible to that team's players.",
-                        teamName: "",
-                        players: []
+                        .limit(1)
+                    if (!isCaptain && !membership) {
+                        return fail(
+                            "Current-season rosters are only visible to that team's players."
+                        )
                     }
                 }
             }
-        }
 
-        const draftRows = await db
-            .select({
-                userId: drafts.user,
-                firstName: users.first_name,
-                lastName: users.last_name,
-                preferredName: users.preferred_name
+            const draftRows = await db
+                .select({
+                    userId: drafts.user,
+                    firstName: users.first_name,
+                    lastName: users.last_name,
+                    preferredName: users.preferred_name
+                })
+                .from(drafts)
+                .innerJoin(users, eq(drafts.user, users.id))
+                .where(eq(drafts.team, teamId))
+
+            const players: TeamRosterPlayer[] = draftRows.map((row) => ({
+                id: row.userId,
+                displayName: row.preferredName || row.firstName,
+                lastName: row.lastName,
+                isCaptain: row.userId === team.captain
+            }))
+
+            players.sort((a, b) => {
+                const lastCmp = a.lastName
+                    .toLowerCase()
+                    .localeCompare(b.lastName.toLowerCase())
+                if (lastCmp !== 0) return lastCmp
+                return a.displayName
+                    .toLowerCase()
+                    .localeCompare(b.displayName.toLowerCase())
             })
-            .from(drafts)
-            .innerJoin(users, eq(drafts.user, users.id))
-            .where(eq(drafts.team, teamId))
 
-        const players: TeamRosterPlayer[] = draftRows.map((row) => ({
-            id: row.userId,
-            displayName: row.preferredName || row.firstName,
-            lastName: row.lastName,
-            isCaptain: row.userId === team.captain
-        }))
-
-        players.sort((a, b) => {
-            const lastCmp = a.lastName
-                .toLowerCase()
-                .localeCompare(b.lastName.toLowerCase())
-            if (lastCmp !== 0) return lastCmp
-            return a.displayName
-                .toLowerCase()
-                .localeCompare(b.displayName.toLowerCase())
-        })
-
-        return {
-            status: true,
-            teamName: team.name,
-            players
-        }
-    } catch (error) {
-        console.error("Error fetching team roster:", error)
-        return {
-            status: false,
-            message: "Something went wrong.",
-            teamName: "",
-            players: []
+            return ok({
+                teamName: team.name,
+                players
+            })
+        } catch (error) {
+            console.error("Error fetching team roster:", error)
+            return fail("Something went wrong.")
         }
     }
-}
+)
 
 export interface CaptainWelcomeMember {
     userId: string

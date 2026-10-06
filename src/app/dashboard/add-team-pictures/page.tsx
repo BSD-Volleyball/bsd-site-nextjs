@@ -31,7 +31,7 @@ export default async function AddTeamPicturesPage() {
         <div className="space-y-6">
             <h1 className="font-bold text-2xl">Add Team Pictures</h1>
             <AddTeamPicturesClient
-                divisions={result.divisions}
+                divisions={result.status ? result.data : []}
                 picBaseUrl={playerPicUrl}
                 seasonOptions={seasonOptions}
                 currentSeasonId={config.seasonId}

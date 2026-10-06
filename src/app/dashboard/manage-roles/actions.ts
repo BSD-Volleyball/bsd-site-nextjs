@@ -6,11 +6,9 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, userRoles, users } from "@/database/schema"
 import { desc, eq, asc } from "drizzle-orm"
-import { isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { grantRole, invalidateAllSessionsForUser } from "@/lib/rbac"
 import { logAuditEntry } from "@/lib/audit-log"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
 import { isValidRole, type Role } from "@/lib/permissions"
 
 export interface UserRoleAssignment {
@@ -180,17 +178,15 @@ export const addUserRole = withAction(
                 ? requirePositiveInt(data.divisionId, "division ID")
                 : undefined
 
-        const session = await auth.api.getSession({
-            headers: await headers()
-        })
+        const sessionUserId = await getSessionUserId()
         await grantRole(data.userId, data.role, {
             seasonId,
             divisionId,
-            grantedBy: session?.user?.id
+            grantedBy: sessionUserId ?? undefined
         })
 
         await logAuditEntry({
-            userId: session?.user?.id ?? "unknown",
+            userId: sessionUserId ?? "unknown",
             action: "create",
             entityType: "user_roles",
             entityId: data.userId,
@@ -233,11 +229,9 @@ export const removeUserRole = withAction(
 
         await db.delete(userRoles).where(eq(userRoles.id, roleRowId))
 
-        const session = await auth.api.getSession({
-            headers: await headers()
-        })
+        const sessionUserId = await getSessionUserId()
         await logAuditEntry({
-            userId: session?.user?.id ?? "unknown",
+            userId: sessionUserId ?? "unknown",
             action: "delete",
             entityType: "user_roles",
             entityId: row.user_id,

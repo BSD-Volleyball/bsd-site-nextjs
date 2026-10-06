@@ -8,8 +8,7 @@ import { seasons, divisions, users, userRoles } from "@/database/schema"
 import { eq, desc, inArray, notInArray, and, isNotNull } from "drizzle-orm"
 import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
 import { logAuditEntry } from "@/lib/audit-log"
-import { auth } from "@/lib/auth"
-import { headers } from "next/headers"
+import { getSessionUserId } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 
 export interface Season {
@@ -36,84 +35,73 @@ export interface CommissionerAssignment {
     commissioner2: string | null
 }
 
-export async function getSeasons(): Promise<{
-    status: boolean
-    message?: string
-    seasons: Season[]
-}> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized", seasons: [] }
-    }
-
-    try {
-        const allSeasons = await db
-            .select({
-                id: seasons.id,
-                code: seasons.code,
-                year: seasons.year,
-                season: seasons.season
-            })
-            .from(seasons)
-            .orderBy(desc(seasons.year), desc(seasons.id))
-
-        return { status: true, seasons: allSeasons }
-    } catch (error) {
-        console.error("Error fetching seasons:", error)
-        return {
-            status: false,
-            message: "Failed to load seasons.",
-            seasons: []
-        }
-    }
-}
-
-export async function getCurrentSeason(): Promise<{
-    status: boolean
-    seasonId: number | null
-}> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return { status: false, seasonId: null }
-    }
-
-    try {
-        const [currentSeason] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .where(notInArray(seasons.phase, ["off_season", "complete"]))
-            // Deterministic when more than one season exists: prefer the
-            // newest in-progress season (matches the max-id "current season"
-            // convention used elsewhere).
-            .orderBy(desc(seasons.year), desc(seasons.id))
-            .limit(1)
-
-        if (currentSeason) {
-            return { status: true, seasonId: currentSeason.id }
+export const getSeasons = withAction(
+    async (): Promise<ActionResult<Season[]>> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
 
-        // If no season has registration open, return the most recent season
-        const [mostRecentSeason] = await db
-            .select({ id: seasons.id })
-            .from(seasons)
-            .orderBy(desc(seasons.year), desc(seasons.id))
-            .limit(1)
+        try {
+            const allSeasons = await db
+                .select({
+                    id: seasons.id,
+                    code: seasons.code,
+                    year: seasons.year,
+                    season: seasons.season
+                })
+                .from(seasons)
+                .orderBy(desc(seasons.year), desc(seasons.id))
 
-        return { status: true, seasonId: mostRecentSeason?.id ?? null }
-    } catch (error) {
-        console.error("Error fetching current season:", error)
-        return { status: false, seasonId: null }
+            return ok(allSeasons)
+        } catch (error) {
+            console.error("Error fetching seasons:", error)
+            return fail("Failed to load seasons.")
+        }
     }
-}
+)
 
-export async function getUsers(): Promise<{
-    status: boolean
-    message?: string
-    users: User[]
-}> {
+export const getCurrentSeason = withAction(
+    async (): Promise<ActionResult<number | null>> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
+
+        try {
+            const [currentSeason] = await db
+                .select({ id: seasons.id })
+                .from(seasons)
+                .where(notInArray(seasons.phase, ["off_season", "complete"]))
+                // Deterministic when more than one season exists: prefer the
+                // newest in-progress season (matches the max-id "current season"
+                // convention used elsewhere).
+                .orderBy(desc(seasons.year), desc(seasons.id))
+                .limit(1)
+
+            if (currentSeason) {
+                return ok(currentSeason.id)
+            }
+
+            // If no season has registration open, return the most recent season
+            const [mostRecentSeason] = await db
+                .select({ id: seasons.id })
+                .from(seasons)
+                .orderBy(desc(seasons.year), desc(seasons.id))
+                .limit(1)
+
+            return ok(mostRecentSeason?.id ?? null)
+        } catch (error) {
+            console.error("Error fetching current season:", error)
+            return fail("Failed to load current season.")
+        }
+    }
+)
+
+export const getUsers = withAction(async (): Promise<ActionResult<User[]>> => {
     const hasAccess = await getIsAdminOrDirector()
     if (!hasAccess) {
-        return { status: false, message: "Unauthorized", users: [] }
+        return fail("Unauthorized")
     }
 
     try {
@@ -132,119 +120,103 @@ export async function getUsers(): Promise<{
             name: formatPlayerName(u.first_name, u.last_name, u.preferred_name)
         }))
 
-        return { status: true, users: userList }
+        return ok(userList)
     } catch (error) {
         console.error("Error fetching users:", error)
-        return {
-            status: false,
-            message: "Failed to load users.",
-            users: []
+        return fail("Failed to load users.")
+    }
+})
+
+export const getDivisions = withAction(
+    async (): Promise<ActionResult<Division[]>> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("Unauthorized")
         }
-    }
-}
 
-export async function getDivisions(): Promise<{
-    status: boolean
-    message?: string
-    divisions: Division[]
-}> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized", divisions: [] }
-    }
+        try {
+            const divisionNames = ["AA", "A", "ABA", "ABB", "BBB", "BB"]
+            const divisionsList = await db
+                .select({
+                    id: divisions.id,
+                    name: divisions.name
+                })
+                .from(divisions)
+                .where(inArray(divisions.name, divisionNames))
 
-    try {
-        const divisionNames = ["AA", "A", "ABA", "ABB", "BBB", "BB"]
-        const divisionsList = await db
-            .select({
-                id: divisions.id,
-                name: divisions.name
+            // Sort by the order we want them displayed
+            const sortedDivisions = divisionsList.sort((a, b) => {
+                const aIndex = divisionNames.indexOf(a.name)
+                const bIndex = divisionNames.indexOf(b.name)
+                return aIndex - bIndex
             })
-            .from(divisions)
-            .where(inArray(divisions.name, divisionNames))
 
-        // Sort by the order we want them displayed
-        const sortedDivisions = divisionsList.sort((a, b) => {
-            const aIndex = divisionNames.indexOf(a.name)
-            const bIndex = divisionNames.indexOf(b.name)
-            return aIndex - bIndex
-        })
-
-        return { status: true, divisions: sortedDivisions }
-    } catch (error) {
-        console.error("Error fetching divisions:", error)
-        return {
-            status: false,
-            message: "Failed to load divisions.",
-            divisions: []
+            return ok(sortedDivisions)
+        } catch (error) {
+            console.error("Error fetching divisions:", error)
+            return fail("Failed to load divisions.")
         }
     }
-}
+)
 
-export async function getCommissionersForSeason(seasonId: number): Promise<{
-    status: boolean
-    message?: string
-    assignments: CommissionerAssignment[]
-}> {
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        return { status: false, message: "Unauthorized", assignments: [] }
-    }
+export const getCommissionersForSeason = withAction(
+    async (
+        seasonId: number
+    ): Promise<ActionResult<CommissionerAssignment[]>> => {
+        const hasAccess = await getIsAdminOrDirector()
+        if (!hasAccess) {
+            return fail("Unauthorized")
+        }
 
-    if (!Number.isInteger(seasonId) || seasonId <= 0) {
-        return { status: false, message: "Invalid season.", assignments: [] }
-    }
+        if (!Number.isInteger(seasonId) || seasonId <= 0) {
+            return fail("Invalid season.")
+        }
 
-    try {
-        // Get the divisions first
-        const divisionsResult = await getDivisions()
-        if (!divisionsResult.status) {
-            return {
-                status: false,
-                message: divisionsResult.message,
-                assignments: []
+        try {
+            // Get the divisions first
+            const divisionsResult = await getDivisions()
+            if (!divisionsResult.status) {
+                return fail(divisionsResult.message)
             }
-        }
 
-        // Get all division-scoped commissioners for this season
-        const seasonCommissioners = await db
-            .select({
-                divisionId: userRoles.division_id,
-                commissionerId: userRoles.user_id
-            })
-            .from(userRoles)
-            .where(
-                and(
-                    eq(userRoles.role, "commissioner"),
-                    eq(userRoles.season_id, seasonId),
-                    isNotNull(userRoles.division_id)
+            // Get all division-scoped commissioners for this season
+            const seasonCommissioners = await db
+                .select({
+                    divisionId: userRoles.division_id,
+                    commissionerId: userRoles.user_id
+                })
+                .from(userRoles)
+                .where(
+                    and(
+                        eq(userRoles.role, "commissioner"),
+                        eq(userRoles.season_id, seasonId),
+                        isNotNull(userRoles.division_id)
+                    )
                 )
-            )
 
-        // Build assignments for each division
-        const assignments: CommissionerAssignment[] =
-            divisionsResult.divisions.map((div) => {
-                const divCommissioners = seasonCommissioners.filter(
-                    (c) => c.divisionId === div.id
-                )
-                return {
-                    divisionName: div.name,
-                    divisionId: div.id,
-                    commissioner1: divCommissioners[0]?.commissionerId ?? null,
-                    commissioner2: divCommissioners[1]?.commissionerId ?? null
-                }
-            })
+            // Build assignments for each division
+            const assignments: CommissionerAssignment[] =
+                divisionsResult.data.map((div) => {
+                    const divCommissioners = seasonCommissioners.filter(
+                        (c) => c.divisionId === div.id
+                    )
+                    return {
+                        divisionName: div.name,
+                        divisionId: div.id,
+                        commissioner1:
+                            divCommissioners[0]?.commissionerId ?? null,
+                        commissioner2:
+                            divCommissioners[1]?.commissionerId ?? null
+                    }
+                })
 
-        return { status: true, assignments }
-    } catch (error) {
-        console.error("Error fetching commissioners for season:", error)
-        return {
-            status: false,
-            message: "Failed to load commissioners.",
-            assignments: []
+            return ok(assignments)
+        } catch (error) {
+            console.error("Error fetching commissioners for season:", error)
+            return fail("Failed to load commissioners.")
         }
     }
-}
+)
 
 export const saveCommissioners = withAction(
     async (data: {
@@ -308,12 +280,10 @@ export const saveCommissioners = withAction(
             }
 
             // Log the action
-            const session = await auth.api.getSession({
-                headers: await headers()
-            })
-            if (session) {
+            const sessionUserId = await getSessionUserId()
+            if (sessionUserId) {
                 await logAuditEntry({
-                    userId: session.user.id,
+                    userId: sessionUserId,
                     action: "update",
                     entityType: "commissioners",
                     summary: `Updated commissioners for season ${data.seasonId}`

@@ -51,17 +51,14 @@ describe("getTeamRoster", () => {
         const result = await getTeamRoster(1)
         expect(result).toEqual({
             status: false,
-            message: "Not authenticated.",
-            teamName: "",
-            players: []
+            message: "Not authenticated."
         })
     })
 
     it("returns Team not found for an unknown team", async () => {
         await createUserWithRoles([])
         const result = await getTeamRoster(999999)
-        expect(result.status).toBe(false)
-        expect(result.message).toBe("Team not found.")
+        expect(result).toEqual({ status: false, message: "Team not found." })
     })
 
     it("lets an admin view any current-season roster", async () => {
@@ -70,8 +67,9 @@ describe("getTeamRoster", () => {
 
         const result = await getTeamRoster(currentTeam.id)
         expect(result.status).toBe(true)
-        expect(result.teamName).toBe("Current Team")
-        expect(result.players.map((p) => p.id)).toEqual([member.id])
+        if (!result.status) return
+        expect(result.data.teamName).toBe("Current Team")
+        expect(result.data.players.map((p) => p.id)).toEqual([member.id])
     })
 
     it("lets any logged-in user view a past-season roster", async () => {
@@ -80,8 +78,9 @@ describe("getTeamRoster", () => {
 
         const result = await getTeamRoster(pastTeam.id)
         expect(result.status).toBe(true)
-        expect(result.teamName).toBe("Past Team")
-        expect(result.players).toHaveLength(2)
+        if (!result.status) return
+        expect(result.data.teamName).toBe("Past Team")
+        expect(result.data.players).toHaveLength(2)
     })
 
     it("denies a current-season roster to a non-member", async () => {
@@ -92,9 +91,7 @@ describe("getTeamRoster", () => {
         expect(result).toEqual({
             status: false,
             message:
-                "Current-season rosters are only visible to that team's players.",
-            teamName: "",
-            players: []
+                "Current-season rosters are only visible to that team's players."
         })
     })
 
@@ -104,7 +101,8 @@ describe("getTeamRoster", () => {
 
         const result = await getTeamRoster(currentTeam.id)
         expect(result.status).toBe(true)
-        expect(result.players.map((p) => p.id)).toEqual([member.id])
+        if (!result.status) return
+        expect(result.data.players.map((p) => p.id)).toEqual([member.id])
     })
 
     it("allows the captain to view their current-season roster", async () => {
@@ -113,7 +111,8 @@ describe("getTeamRoster", () => {
 
         const result = await getTeamRoster(currentTeam.id)
         expect(result.status).toBe(true)
-        expect(result.teamName).toBe("Current Team")
+        if (!result.status) return
+        expect(result.data.teamName).toBe("Current Team")
     })
 })
 

@@ -180,7 +180,9 @@ describe("permanent sub pool includes undrafted signups", () => {
         const result = await getPermanentSubCandidates(teamId, outgoingId)
         expect(result.status).toBe(true)
         if (!result.status) return
-        const match = result.candidates.find((c) => c.userId === undrafted.id)
+        const match = result.data.candidates.find(
+            (c) => c.userId === undrafted.id
+        )
         expect(match).toBeDefined()
         expect(match?.source).toBe("undrafted_signup")
     })
@@ -203,9 +205,9 @@ describe("permanent sub pool includes undrafted signups", () => {
         const result = await getPermanentSubCandidates(teamId, outgoingId)
         expect(result.status).toBe(true)
         if (!result.status) return
-        expect(result.candidates.some((c) => c.userId === drafted.id)).toBe(
-            false
-        )
+        expect(
+            result.data.candidates.some((c) => c.userId === drafted.id)
+        ).toBe(false)
     })
 
     it("omits undrafted signups with an un-restored drop", async () => {
@@ -227,9 +229,9 @@ describe("permanent sub pool includes undrafted signups", () => {
         const result = await getPermanentSubCandidates(teamId, outgoingId)
         expect(result.status).toBe(true)
         if (!result.status) return
-        expect(result.candidates.some((c) => c.userId === dropped.id)).toBe(
-            false
-        )
+        expect(
+            result.data.candidates.some((c) => c.userId === dropped.id)
+        ).toBe(false)
     })
 
     it("lists a waitlisted-and-signed-up player once, as waitlist", async () => {
@@ -240,7 +242,9 @@ describe("permanent sub pool includes undrafted signups", () => {
         const result = await getPermanentSubCandidates(teamId, outgoingId)
         expect(result.status).toBe(true)
         if (!result.status) return
-        const matches = result.candidates.filter((c) => c.userId === both.id)
+        const matches = result.data.candidates.filter(
+            (c) => c.userId === both.id
+        )
         expect(matches).toHaveLength(1)
         expect(matches[0].source).toBe("waitlist")
     })
@@ -335,7 +339,7 @@ describe("getSubContactDetails authorization", () => {
         await addToWaitlist({ season: currentSeasonId, user: target.id })
 
         const result = await getSubContactDetails(target.id, pastTeamId)
-        expect(result).toEqual({ status: false, error: "Not authorized." })
+        expect(result).toEqual({ status: false, message: "Not authorized." })
     })
 
     it("refuses a target who is not a sub candidate", async () => {
@@ -348,7 +352,7 @@ describe("getSubContactDetails authorization", () => {
         const stranger = await createUser({ phone: "555-0101" })
 
         const result = await getSubContactDetails(stranger.id, team.id)
-        expect(result).toEqual({ status: false, error: "Not authorized." })
+        expect(result).toEqual({ status: false, message: "Not authorized." })
     })
 
     it("returns a candidate's contact details and audits the view", async () => {
@@ -364,7 +368,7 @@ describe("getSubContactDetails authorization", () => {
         const result = await getSubContactDetails(target.id, team.id)
         expect(result).toEqual({
             status: true,
-            contact: { email: target.email, phone: "555-0102" }
+            data: { email: target.email, phone: "555-0102" }
         })
 
         const audits = await db

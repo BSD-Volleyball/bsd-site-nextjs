@@ -84,9 +84,9 @@ export function AddTeamPicturesClient({
         try {
             const result = await getTeamsForPicturePage(seasonId)
             if (!result.status) {
-                toast.error(result.message ?? "Failed to load teams.")
+                toast.error(result.message)
             }
-            setTeamGroups(result.divisions)
+            setTeamGroups(result.status ? result.data : [])
         } finally {
             setLoadingTeams(false)
         }
@@ -130,16 +130,13 @@ export function AddTeamPicturesClient({
                 processedImage.blob.size,
                 selectedSeasonId
             )
-            if (
-                !uploadStart.status ||
-                !uploadStart.uploadUrl ||
-                !uploadStart.objectKey
-            ) {
-                toast.error(uploadStart.message ?? "Failed to start upload.")
+            if (!uploadStart.status) {
+                toast.error(uploadStart.message)
                 return
             }
+            const { uploadUrl, objectKey } = uploadStart.data
 
-            const uploadResponse = await fetch(uploadStart.uploadUrl, {
+            const uploadResponse = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "image/jpeg",
@@ -155,7 +152,7 @@ export function AddTeamPicturesClient({
 
             const finalizeResult = await finalizeTeamPhotoUpload(
                 teamId,
-                uploadStart.objectKey,
+                objectKey,
                 selectedSeasonId
             )
 

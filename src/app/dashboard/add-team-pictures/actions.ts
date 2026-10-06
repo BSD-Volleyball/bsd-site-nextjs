@@ -2,19 +2,21 @@
 
 import { revalidatePath } from "next/cache"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
-import { headers } from "next/headers"
 import { and, asc, desc, eq } from "drizzle-orm"
-import { auth } from "@/lib/auth"
 import { db } from "@/database/db"
 import { divisions, seasons, teams } from "@/database/schema"
 import {
     ActionError,
+    type ActionResult,
+    fail,
+    ok,
     requireAdmin,
     requirePermission,
     requirePositiveInt,
-    requireSeasonConfig
+    requireSeasonConfig,
+    withAction
 } from "@/next/action-helpers"
-import { isAdminOrDirectorBySession } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import {
     createPlayerPictureUploadPresignedUrl,
     PLAYER_PICTURE_MAX_BYTES
@@ -118,191 +120,186 @@ export interface DivisionTeamGroup {
     teams: TeamPhotoItem[]
 }
 
-export async function getTeamsForPicturePage(
-    requestedSeasonId?: number
-): Promise<{
-    status: boolean
-    message?: string
-    divisions: DivisionTeamGroup[]
-}> {
-    try {
-        const config = await requireSeasonConfig()
-        await requirePermission("pictures:manage", {
-            seasonId: config.seasonId
-        })
-        const seasonId = await resolvePictureSeason(
-            requestedSeasonId,
-            config.seasonId
-        )
-
-        const rows = await db
-            .select({
-                divisionId: divisions.id,
-                divisionName: divisions.name,
-                teamId: teams.id,
-                teamName: teams.name,
-                teamNumber: teams.number,
-                pictureUrl: teams.picture_url
+export const getTeamsForPicturePage = withAction(
+    async (
+        requestedSeasonId?: number
+    ): Promise<ActionResult<DivisionTeamGroup[]>> => {
+        try {
+            const config = await requireSeasonConfig()
+            await requirePermission("pictures:manage", {
+                seasonId: config.seasonId
             })
-            .from(teams)
-            .innerJoin(divisions, eq(teams.division, divisions.id))
-            .where(eq(teams.season, seasonId))
-            .orderBy(asc(divisions.level), asc(teams.number))
+            const seasonId = await resolvePictureSeason(
+                requestedSeasonId,
+                config.seasonId
+            )
 
-        // Group flat rows into one entry per division, preserving order.
-        const groups: DivisionTeamGroup[] = []
-        const groupByDivision = new Map<number, DivisionTeamGroup>()
-        for (const row of rows) {
-            let group = groupByDivision.get(row.divisionId)
-            if (!group) {
-                group = {
-                    divisionId: row.divisionId,
-                    divisionName: row.divisionName,
-                    teams: []
+            const rows = await db
+                .select({
+                    divisionId: divisions.id,
+                    divisionName: divisions.name,
+                    teamId: teams.id,
+                    teamName: teams.name,
+                    teamNumber: teams.number,
+                    pictureUrl: teams.picture_url
+                })
+                .from(teams)
+                .innerJoin(divisions, eq(teams.division, divisions.id))
+                .where(eq(teams.season, seasonId))
+                .orderBy(asc(divisions.level), asc(teams.number))
+
+            // Group flat rows into one entry per division, preserving order.
+            const groups: DivisionTeamGroup[] = []
+            const groupByDivision = new Map<number, DivisionTeamGroup>()
+            for (const row of rows) {
+                let group = groupByDivision.get(row.divisionId)
+                if (!group) {
+                    group = {
+                        divisionId: row.divisionId,
+                        divisionName: row.divisionName,
+                        teams: []
+                    }
+                    groupByDivision.set(row.divisionId, group)
+                    groups.push(group)
                 }
-                groupByDivision.set(row.divisionId, group)
-                groups.push(group)
+                group.teams.push({
+                    teamId: row.teamId,
+                    teamName: row.teamName,
+                    teamNumber: row.teamNumber,
+                    pictureUrl: row.pictureUrl
+                })
             }
-            group.teams.push({
-                teamId: row.teamId,
-                teamName: row.teamName,
-                teamNumber: row.teamNumber,
-                pictureUrl: row.pictureUrl
+
+            return ok(groups)
+        } catch (error) {
+            if (error instanceof ActionError) {
+                return fail(error.message)
+            }
+            console.error("Error loading teams for picture page:", error)
+            return fail("Failed to load teams.")
+        }
+    }
+)
+
+export interface TeamPhotoUploadStart {
+    uploadUrl: string
+    objectKey: string
+}
+
+export const createTeamPhotoUpload = withAction(
+    async (
+        teamId: number,
+        contentLength: number,
+        requestedSeasonId?: number
+    ): Promise<ActionResult<TeamPhotoUploadStart>> => {
+        try {
+            const config = await requireSeasonConfig()
+            await requirePermission("pictures:manage", {
+                seasonId: config.seasonId
             })
-        }
+            const seasonId = await resolvePictureSeason(
+                requestedSeasonId,
+                config.seasonId
+            )
 
-        return { status: true, divisions: groups }
-    } catch (error) {
-        if (error instanceof ActionError) {
-            return { status: false, message: error.message, divisions: [] }
-        }
-        console.error("Error loading teams for picture page:", error)
-        return {
-            status: false,
-            message: "Failed to load teams.",
-            divisions: []
-        }
-    }
-}
+            const validTeamId = requirePositiveInt(teamId, "team")
 
-export async function createTeamPhotoUpload(
-    teamId: number,
-    contentLength: number,
-    requestedSeasonId?: number
-): Promise<{
-    status: boolean
-    message?: string
-    uploadUrl?: string
-    objectKey?: string
-}> {
-    try {
-        const config = await requireSeasonConfig()
-        await requirePermission("pictures:manage", {
-            seasonId: config.seasonId
-        })
-        const seasonId = await resolvePictureSeason(
-            requestedSeasonId,
-            config.seasonId
-        )
-
-        const validTeamId = requirePositiveInt(teamId, "team")
-
-        if (
-            !Number.isInteger(contentLength) ||
-            contentLength <= 0 ||
-            contentLength > PLAYER_PICTURE_MAX_BYTES
-        ) {
-            return {
-                status: false,
-                message: `Upload must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+            if (
+                !Number.isInteger(contentLength) ||
+                contentLength <= 0 ||
+                contentLength > PLAYER_PICTURE_MAX_BYTES
+            ) {
+                return fail(
+                    `Upload must be between 1 byte and ${PLAYER_PICTURE_MAX_BYTES} bytes.`
+                )
             }
-        }
 
-        if (
-            !(await canManageTeamPhoto(validTeamId, seasonId, config.seasonId))
-        ) {
-            return {
-                status: false,
-                message: "Team not found for this season."
+            if (
+                !(await canManageTeamPhoto(
+                    validTeamId,
+                    seasonId,
+                    config.seasonId
+                ))
+            ) {
+                return fail("Team not found for this season.")
             }
-        }
 
-        const objectKey = teamPhotoObjectKey(seasonId, validTeamId)
-        const uploadUrl = await createPlayerPictureUploadPresignedUrl({
-            key: objectKey,
-            contentType: "image/jpeg",
-            contentLength
-        })
-        return { status: true, uploadUrl, objectKey }
-    } catch (error) {
-        if (error instanceof ActionError) {
-            return { status: false, message: error.message }
-        }
-        console.error("Error creating team photo upload URL:", error)
-        return { status: false, message: "Failed to start upload." }
-    }
-}
-
-export async function finalizeTeamPhotoUpload(
-    teamId: number,
-    objectKey: string,
-    requestedSeasonId?: number
-): Promise<{ status: boolean; message: string; pictureUrl?: string }> {
-    try {
-        const config = await requireSeasonConfig()
-        await requirePermission("pictures:manage", {
-            seasonId: config.seasonId
-        })
-        const seasonId = await resolvePictureSeason(
-            requestedSeasonId,
-            config.seasonId
-        )
-
-        const validTeamId = requirePositiveInt(teamId, "team")
-
-        // Never trust the client-supplied key — recompute and compare.
-        const expectedKey = teamPhotoObjectKey(seasonId, validTeamId)
-        if (objectKey !== expectedKey) {
-            return { status: false, message: "Invalid upload reference." }
-        }
-
-        if (
-            !(await canManageTeamPhoto(validTeamId, seasonId, config.seasonId))
-        ) {
-            return {
-                status: false,
-                message: "Team not found for this season."
-            }
-        }
-
-        await db
-            .update(teams)
-            .set({ picture_url: expectedKey })
-            .where(eq(teams.id, validTeamId))
-
-        const session = await auth.api.getSession({ headers: await headers() })
-        if (session) {
-            await logAuditEntry({
-                userId: session.user.id,
-                action: "update",
-                entityType: "teams",
-                entityId: String(validTeamId),
-                summary: `Uploaded team photo for team ${validTeamId}`
+            const objectKey = teamPhotoObjectKey(seasonId, validTeamId)
+            const uploadUrl = await createPlayerPictureUploadPresignedUrl({
+                key: objectKey,
+                contentType: "image/jpeg",
+                contentLength
             })
+            return ok({ uploadUrl, objectKey })
+        } catch (error) {
+            if (error instanceof ActionError) {
+                return fail(error.message)
+            }
+            console.error("Error creating team photo upload URL:", error)
+            return fail("Failed to start upload.")
         }
-
-        revalidatePath("/dashboard/add-team-pictures")
-        revalidateCalendarFeeds()
-        return {
-            status: true,
-            message: "Team photo uploaded.",
-            pictureUrl: expectedKey
-        }
-    } catch (error) {
-        if (error instanceof ActionError) {
-            return { status: false, message: error.message }
-        }
-        console.error("Error finalizing team photo upload:", error)
-        return { status: false, message: "Failed to save team photo." }
     }
-}
+)
+
+export const finalizeTeamPhotoUpload = withAction(
+    async (
+        teamId: number,
+        objectKey: string,
+        requestedSeasonId?: number
+    ): Promise<ActionResult<{ pictureUrl: string }>> => {
+        try {
+            const config = await requireSeasonConfig()
+            await requirePermission("pictures:manage", {
+                seasonId: config.seasonId
+            })
+            const seasonId = await resolvePictureSeason(
+                requestedSeasonId,
+                config.seasonId
+            )
+
+            const validTeamId = requirePositiveInt(teamId, "team")
+
+            // Never trust the client-supplied key — recompute and compare.
+            const expectedKey = teamPhotoObjectKey(seasonId, validTeamId)
+            if (objectKey !== expectedKey) {
+                return fail("Invalid upload reference.")
+            }
+
+            if (
+                !(await canManageTeamPhoto(
+                    validTeamId,
+                    seasonId,
+                    config.seasonId
+                ))
+            ) {
+                return fail("Team not found for this season.")
+            }
+
+            await db
+                .update(teams)
+                .set({ picture_url: expectedKey })
+                .where(eq(teams.id, validTeamId))
+
+            const sessionUserId = await getSessionUserId()
+            if (sessionUserId) {
+                await logAuditEntry({
+                    userId: sessionUserId,
+                    action: "update",
+                    entityType: "teams",
+                    entityId: String(validTeamId),
+                    summary: `Uploaded team photo for team ${validTeamId}`
+                })
+            }
+
+            revalidatePath("/dashboard/add-team-pictures")
+            revalidateCalendarFeeds()
+            return ok({ pictureUrl: expectedKey }, "Team photo uploaded.")
+        } catch (error) {
+            if (error instanceof ActionError) {
+                return fail(error.message)
+            }
+            console.error("Error finalizing team photo upload:", error)
+            return fail("Failed to save team photo.")
+        }
+    }
+)

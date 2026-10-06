@@ -169,8 +169,7 @@ describe("getCommissionersForSeason", () => {
         const result = await getCommissionersForSeason(1)
         expect(result).toEqual({
             status: false,
-            message: "Unauthorized",
-            assignments: []
+            message: "Unauthorized"
         })
     })
 
@@ -179,8 +178,7 @@ describe("getCommissionersForSeason", () => {
         const result = await getCommissionersForSeason(-5)
         expect(result).toEqual({
             status: false,
-            message: "Invalid season.",
-            assignments: []
+            message: "Invalid season."
         })
     })
 
@@ -213,16 +211,14 @@ describe("getCommissionersForSeason", () => {
         const result = await getCommissionersForSeason(season.id)
 
         expect(result.status).toBe(true)
+        if (!result.status) return
         // getDivisions only surfaces the known division names, AA first.
-        expect(result.assignments.map((a) => a.divisionName)).toEqual([
-            "AA",
-            "BB"
-        ])
-        const aa = result.assignments.find((a) => a.divisionName === "AA")
+        expect(result.data.map((a) => a.divisionName)).toEqual(["AA", "BB"])
+        const aa = result.data.find((a) => a.divisionName === "AA")
         expect([aa?.commissioner1, aa?.commissioner2].sort()).toEqual(
             [c1.id, c2.id].sort()
         )
-        const bb = result.assignments.find((a) => a.divisionName === "BB")
+        const bb = result.data.find((a) => a.divisionName === "BB")
         expect(bb?.commissioner1).toBeNull()
         expect(bb?.commissioner2).toBeNull()
     })

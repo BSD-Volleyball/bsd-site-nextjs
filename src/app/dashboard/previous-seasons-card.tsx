@@ -42,8 +42,8 @@ export function PreviousSeasonsCard({
 
         const result = await getTeamRoster(ps.teamId)
         if (result.status) {
-            setTeamName(result.teamName)
-            setPlayers(result.players)
+            setTeamName(result.data.teamName)
+            setPlayers(result.data.players)
         }
         setLoading(false)
     }

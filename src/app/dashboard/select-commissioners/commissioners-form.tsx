@@ -190,7 +190,7 @@ export function CommissionersForm({
                 }
             > = {}
 
-            for (const assignment of result.assignments) {
+            for (const assignment of result.data) {
                 assignmentsMap[assignment.divisionId] = {
                     commissioner1: assignment.commissioner1,
                     commissioner2: assignment.commissioner2

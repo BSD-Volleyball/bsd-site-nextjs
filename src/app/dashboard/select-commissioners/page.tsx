@@ -79,10 +79,12 @@ export default async function SelectCommissionersPage() {
                 description="Assign commissioners to divisions for each season."
             />
             <CommissionersForm
-                seasons={seasonsResult.seasons}
-                users={usersResult.users}
-                divisions={divisionsResult.divisions}
-                initialSeasonId={currentSeasonResult.seasonId}
+                seasons={seasonsResult.data}
+                users={usersResult.data}
+                divisions={divisionsResult.data}
+                initialSeasonId={
+                    currentSeasonResult.status ? currentSeasonResult.data : null
+                }
             />
         </div>
     )

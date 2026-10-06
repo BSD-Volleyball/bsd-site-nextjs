@@ -96,7 +96,7 @@ export function FindSubPanel({
                 setContactDetails({
                     userId: contactWarningTarget.userId,
                     name: contactWarningTarget.name,
-                    data: result.contact
+                    data: result.data
                 })
             }
         } catch (err) {
@@ -270,10 +270,7 @@ export function FindSubPanel({
         startPermanentTransition(async () => {
             const result = await getPermanentSubCandidates(teamId, userId)
             if (result.status) {
-                setPermanentResult({
-                    candidates: result.candidates,
-                    replacedPlayerName: result.replacedPlayerName
-                })
+                setPermanentResult(result.data)
             } else {
                 setPermanentError(result.message)
             }

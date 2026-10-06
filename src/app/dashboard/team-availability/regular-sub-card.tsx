@@ -173,12 +173,7 @@ export function RegularSubCard({
                 Array.from(selectedMissingUserIds)
             )
             if (result.status) {
-                setRegularResult({
-                    candidates: result.candidates,
-                    nonMaleNeeded: result.nonMaleNeeded,
-                    missingCount: result.missingCount,
-                    missingPlayers: result.missingPlayers
-                })
+                setRegularResult(result.data)
             } else {
                 setRegularError(result.message)
             }
