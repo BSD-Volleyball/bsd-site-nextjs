@@ -72,7 +72,7 @@
         "nextjs-toploader": "^3.9.17",
         "pdf-lib": "^1.17.1",
         "pg": "^8.23.1",
-        "postmark": "^4.0.7",
+        "postmark": "^5.1.0",
         "qrcode": "^1.5.4",
         "react": "19.3.0",
         "react-dom": "19.3.0",
