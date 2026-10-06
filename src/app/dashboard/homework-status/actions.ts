@@ -13,7 +13,7 @@ import {
 } from "@/database/schema"
 import { buildHomeworkRoundMaps } from "@/lib/draft-round-maps"
 import { eq, and, notInArray, desc, count, inArray, or } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { getCommissionerDivisionScope } from "@/lib/rbac"
@@ -24,6 +24,7 @@ import {
     requirePositiveInt,
     withAction
 } from "@/next/action-helpers"
+import { isCommissionerBySession } from "@/next/session"
 
 export interface CaptainStatus {
     captainId: string
@@ -81,7 +82,7 @@ export const getHomeworkStatusData = withAction(
     async (
         requestedDivisionId?: number
     ): Promise<ActionResult<HomeworkStatusData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
 
         if (!hasAccess) {
             return fail("Unauthorized")
@@ -455,7 +456,7 @@ export const getRatePlayersDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<RatePlayersDetailData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -509,7 +510,7 @@ export const getMovingDayDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<MovingDayDetailData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -623,7 +624,7 @@ export const getDraftHomeworkDetail = withAction(
         captainId: string,
         seasonId: number
     ): Promise<ActionResult<DraftHomeworkDetailData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }

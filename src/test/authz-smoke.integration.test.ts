@@ -27,7 +27,6 @@ import { createSeason } from "@/test/factories"
 //   null / emptyArray / false / void → the getter's documented empty payload
 // ---------------------------------------------------------------------------
 
-import * as accessActions from "@/app/dashboard/access-actions"
 import * as addPictures from "@/app/dashboard/add-pictures/actions"
 import * as addTeamPictures from "@/app/dashboard/add-team-pictures/actions"
 import * as adminViewSignups from "@/app/dashboard/admin-view-signups/actions"
@@ -95,12 +94,6 @@ const c = (
 
 const cases: SmokeCase[] = [
     // access-actions — session-status getters return false/null unauth
-    c("access.getIsAdminOrDirector", "false", () =>
-        accessActions.getIsAdminOrDirector()
-    ),
-    c("access.getIsCommissioner", "false", () =>
-        accessActions.getIsCommissioner()
-    ),
     // add-pictures
     c("addPictures.getPlayersNeedingPictures", "fail", () =>
         addPictures.getPlayersNeedingPictures()

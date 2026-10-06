@@ -1,11 +1,10 @@
-import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { HomeworkStatusView } from "./homework-status-view"
 import { getHomeworkStatusData } from "./actions"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -19,13 +18,7 @@ export default async function HomeworkStatusPage({
 }: {
     searchParams: Promise<{ divisionId?: string }>
 }) {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsCommissioner()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrCommissionerOrRedirect()
 
     const params = await searchParams
     const parsed = params.divisionId

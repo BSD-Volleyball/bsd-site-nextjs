@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { requireSessionOrRedirect } from "@/next/page-guards"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+import { isCommissionerBySession } from "@/next/session"
 
 export const dynamic = "force-dynamic"
 
@@ -17,7 +17,7 @@ export default async function DraftSetupLayout({
     children: ReactNode
 }) {
     await requireSessionOrRedirect()
-    if (!(await getIsCommissioner())) {
+    if (!(await isCommissionerBySession())) {
         redirect("/dashboard")
     }
 

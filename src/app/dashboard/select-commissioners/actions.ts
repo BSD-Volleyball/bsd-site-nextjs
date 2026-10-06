@@ -6,9 +6,9 @@ import { revalidatePath } from "next/cache"
 import { db } from "@/database/db"
 import { seasons, divisions, users, userRoles } from "@/database/schema"
 import { eq, desc, inArray, notInArray, and, isNotNull } from "drizzle-orm"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUserId } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { formatPlayerName } from "@/lib/utils"
 
 export interface Season {
@@ -37,7 +37,7 @@ export interface CommissionerAssignment {
 
 export const getSeasons = withAction(
     async (): Promise<ActionResult<Season[]>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -63,7 +63,7 @@ export const getSeasons = withAction(
 
 export const getCurrentSeason = withAction(
     async (): Promise<ActionResult<number | null>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -99,7 +99,7 @@ export const getCurrentSeason = withAction(
 )
 
 export const getUsers = withAction(async (): Promise<ActionResult<User[]>> => {
-    const hasAccess = await getIsAdminOrDirector()
+    const hasAccess = await isAdminOrDirectorBySession()
     if (!hasAccess) {
         return fail("Unauthorized")
     }
@@ -129,7 +129,7 @@ export const getUsers = withAction(async (): Promise<ActionResult<User[]>> => {
 
 export const getDivisions = withAction(
     async (): Promise<ActionResult<Division[]>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -163,7 +163,7 @@ export const getCommissionersForSeason = withAction(
     async (
         seasonId: number
     ): Promise<ActionResult<CommissionerAssignment[]>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }
@@ -228,7 +228,7 @@ export const saveCommissioners = withAction(
             commissioner2: string | null
         }>
     }): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }

@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireCaptainAccessOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { hasCaptainPagesAccessBySession } from "@/next/session"
 import { getRatePlayerData } from "./actions"
 import { RatePlayerClient } from "./rate-player-client"
 import type { Metadata } from "next"
@@ -15,13 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function RatePlayerPage() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await hasCaptainPagesAccessBySession()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireCaptainAccessOrRedirect()
 
     const result = await getRatePlayerData()
 

@@ -1,8 +1,5 @@
-import { requireSessionOrRedirect } from "@/next/page-guards"
-import { redirect } from "next/navigation"
+import { requirePermissionOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { hasPermissionBySession } from "@/next/session"
-import { isAdminOrDirector } from "@/lib/rbac"
 import type { Metadata } from "next"
 import { SelectRefsClient } from "./select-refs-client"
 import { getSelectRefsData } from "./actions"
@@ -12,16 +9,7 @@ export const metadata: Metadata = {
 }
 
 export default async function SelectRefsPage() {
-    const session = await requireSessionOrRedirect()
-
-    const [hasSchedule, isAdmin] = await Promise.all([
-        hasPermissionBySession("schedule:manage"),
-        isAdminOrDirector(session.user.id)
-    ])
-
-    if (!hasSchedule && !isAdmin) {
-        redirect("/dashboard")
-    }
+    await requirePermissionOrRedirect("schedule:manage")
 
     const data = await getSelectRefsData()
 

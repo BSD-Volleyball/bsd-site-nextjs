@@ -3,8 +3,8 @@
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { getSessionUserId } from "@/next/session"
+
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import {
     EDIT_WEEK_3,
     getEditWeekData,
@@ -27,7 +27,7 @@ export const getEditWeek3Data = withAction(
     async (): Promise<
         ActionResult<Omit<EditWeekData, "status" | "message">>
     > => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -42,7 +42,7 @@ export const getEditWeek3Data = withAction(
 
 export const updateWeek3Rosters = withAction(
     async (slots: EditWeekRosterEntry[]): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }
@@ -66,7 +66,7 @@ export const sendWeek3RosterNotifications = withAction(
         removedUserIds: string[],
         seasonLabel: string
     ): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

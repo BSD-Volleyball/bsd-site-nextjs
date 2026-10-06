@@ -1,10 +1,9 @@
-import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { EditEmailsForm } from "./edit-emails-form"
 import { getEmailTemplates } from "./actions"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,13 +13,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function EditEmailsPage() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsAdminOrDirector()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getEmailTemplates()
 

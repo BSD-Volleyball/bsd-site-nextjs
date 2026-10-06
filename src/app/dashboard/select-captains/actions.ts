@@ -16,9 +16,9 @@ import {
 } from "@/database/schema"
 import { eq, and, inArray, asc, ne, isNotNull } from "drizzle-orm"
 import { logAuditEntry } from "@/lib/audit-log"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+
 import { getSeasonConfig, type SeasonConfig } from "@/lib/site-config"
-import { getSessionUserId } from "@/next/session"
+import { getSessionUserId, isCommissionerBySession } from "@/next/session"
 import {
     commissionerCanWriteDivision,
     getCommissionerDivisionAccess,
@@ -79,7 +79,7 @@ export interface CreateTeamsData {
 
 export const getCreateTeamsData = withAction(
     async (): Promise<ActionResult<CreateTeamsData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -283,7 +283,7 @@ export const createTeams = withAction(
         divisionId: number,
         teamsToCreate: TeamToCreate[]
     ): Promise<ActionResult> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

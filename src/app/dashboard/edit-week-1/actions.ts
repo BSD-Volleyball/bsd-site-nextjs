@@ -38,9 +38,9 @@ import { fetchPlayerScores } from "@/lib/player-score"
 import { getUnavailableSignupIdsForEvent } from "@/lib/week-rosters"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
 import { getTryoutSlotLabels } from "@/lib/tryout-slot-labels"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUserId } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 
 export interface Week1EditablePlayer {
     id: string
@@ -81,7 +81,7 @@ export const getEditWeek1Data = withAction(
             slotLabels: string[]
         }>
     > => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -201,7 +201,7 @@ export const getEditWeek1Data = withAction(
 
 export const updateWeek1Rosters = withAction(
     async (slots: Array<Week1RosterEntry>): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }
@@ -284,7 +284,7 @@ export const sendWeek1RosterNotifications = withAction(
         removedUserIds: string[],
         seasonLabel: string
     ): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

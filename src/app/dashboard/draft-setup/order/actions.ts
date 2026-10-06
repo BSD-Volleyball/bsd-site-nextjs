@@ -14,8 +14,8 @@ import {
     signups
 } from "@/database/schema"
 import { eq, and, sql, inArray } from "drizzle-orm"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
-import { getSessionUserId } from "@/next/session"
+
+import { getSessionUserId, isCommissionerBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
     commissionerCanWriteDivision,
@@ -48,7 +48,7 @@ export interface DraftDayData {
 
 export const getDraftDayData = withAction(
     async (divisionId?: number): Promise<ActionResult<DraftDayData>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
 
         if (!hasAccess) {
             return fail("Unauthorized")
@@ -202,7 +202,7 @@ export const saveDraftOrder = withAction(
         divisionId: number,
         assignments: { teamId: number; number: number }[]
     ): Promise<ActionResult> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
 
         if (!hasAccess) {
             return fail("Unauthorized")
@@ -348,7 +348,7 @@ export interface DraftSheetPayload {
 
 export const getDraftSheetData = withAction(
     async (divisionId?: number): Promise<ActionResult<DraftSheetPayload>> => {
-        const hasAccess = await getIsCommissioner()
+        const hasAccess = await isCommissionerBySession()
         if (!hasAccess) {
             return fail("Unauthorized")
         }

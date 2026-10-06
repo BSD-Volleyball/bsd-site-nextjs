@@ -1,11 +1,10 @@
-import { redirect } from "next/navigation"
 import { playerPicBaseUrl } from "@/config/env"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { PotentialCaptainsList } from "./potential-captains-list"
 import { getPotentialCaptainsData } from "./actions"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -15,13 +14,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function PotentialCaptainsPage() {
-    const session = await requireSessionOrRedirect()
-
-    const hasAccess = await getIsCommissioner()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    const session = await requireAdminOrCommissionerOrRedirect()
 
     const result = await getPotentialCaptainsData()
 

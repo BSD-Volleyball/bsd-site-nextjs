@@ -1,8 +1,7 @@
-import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import { getDivisionsPageData } from "./actions"
 import { CreateDivisionsClient } from "./create-divisions-client"
 import type { Metadata } from "next"
@@ -14,12 +13,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function CreateDivisionsPage() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsAdminOrDirector()
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getDivisionsPageData()
 

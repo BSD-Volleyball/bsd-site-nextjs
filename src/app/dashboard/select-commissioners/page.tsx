@@ -1,10 +1,9 @@
-import { redirect } from "next/navigation"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
 import { CommissionersForm } from "./commissioners-form"
 import { getSeasons, getCurrentSeason, getUsers, getDivisions } from "./actions"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,13 +13,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function SelectCommissionersPage() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsAdminOrDirector()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const [seasonsResult, currentSeasonResult, usersResult, divisionsResult] =
         await Promise.all([

@@ -19,9 +19,9 @@ import { and, desc, eq, inArray, lt, ne } from "drizzle-orm"
 import { getSeasonConfig, getEventsByType } from "@/lib/site-config"
 import { fetchPlayerScores } from "@/lib/player-score"
 import { loadTryoutSlotRequests } from "@/lib/tryout-slot-requests"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import { logAuditEntry } from "@/lib/audit-log"
-import { getSessionUserId } from "@/next/session"
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { formatDisplayName } from "@/lib/utils"
 import {
     GROUP_COLORS,
@@ -59,7 +59,7 @@ export const getCreateWeek1Data = withAction(
             groups: Week1GroupSummary[]
         }>
     > => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -473,7 +473,7 @@ export const getCreateWeek1Data = withAction(
 
 export const saveWeek1Rosters = withAction(
     async (assignments: Week1RosterAssignment[]): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

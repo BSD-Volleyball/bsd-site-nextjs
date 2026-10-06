@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation"
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrRedirect } from "@/next/page-guards"
 import { PageHeader } from "@/components/layout/page-header"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 import { getCurrentSeasonPhaseData } from "./actions"
 import { SeasonPhaseControl } from "./season-phase-control"
@@ -15,13 +14,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function SeasonControlPage() {
-    await requireSessionOrRedirect()
-
-    const hasAccess = await getIsAdminOrDirector()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    await requireAdminOrRedirect()
 
     const result = await getCurrentSeasonPhaseData()
 

@@ -13,8 +13,6 @@ const guardPatterns = [
     /checkAdminOrCommissionerAccess\s*\(/,
     /checkDraftReadAccess\s*\(/,
     /hasDraftPageAccess\s*\(/,
-    /getIsAdminOrDirector\s*\(/,
-    /getIsCommissioner\s*\(/,
     /isAdminOrDirectorBySession\s*\(/,
     /isCommissionerBySession\s*\(/,
     /hasCaptainPagesAccessBySession\s*\(/,

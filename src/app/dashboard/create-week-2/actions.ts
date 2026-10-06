@@ -3,8 +3,8 @@
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { getSessionUserId } from "@/next/session"
+
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import { loadPreseasonBaseData } from "@/lib/preseason/load-week-roster-data"
 import { savePreseasonWeekRosters } from "@/lib/preseason/save-week-rosters"
 import { resolveAvailableSlots } from "@/lib/preseason/slots"
@@ -26,7 +26,7 @@ interface CreateWeek2Data {
 
 export const getCreateWeek2Data = withAction(
     async (): Promise<ActionResult<CreateWeek2Data>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -76,7 +76,7 @@ export const getCreateWeek2Data = withAction(
 
 export const saveWeek2Rosters = withAction(
     async (assignments: SavedAssignment[]): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

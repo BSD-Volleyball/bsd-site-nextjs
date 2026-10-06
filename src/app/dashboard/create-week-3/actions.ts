@@ -3,8 +3,8 @@
 import type { ActionResult } from "@/next/action-helpers"
 import { revalidateCalendarFeeds } from "@/next/calendar-invalidation"
 import { withAction, ok, fail } from "@/next/action-helpers"
-import { getIsAdminOrDirector } from "@/app/dashboard/access-actions"
-import { getSessionUserId } from "@/next/session"
+
+import { getSessionUserId, isAdminOrDirectorBySession } from "@/next/session"
 import {
     loadConsecutiveTopDivSeasons,
     loadDraftNightLeavers,
@@ -33,7 +33,7 @@ interface CreateWeek3Data {
 
 export const getCreateWeek3Data = withAction(
     async (): Promise<ActionResult<CreateWeek3Data>> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to access this page.")
         }
@@ -121,7 +121,7 @@ export const getCreateWeek3Data = withAction(
 
 export const saveWeek3Rosters = withAction(
     async (assignments: SavedAssignment[]): Promise<ActionResult> => {
-        const hasAccess = await getIsAdminOrDirector()
+        const hasAccess = await isAdminOrDirectorBySession()
         if (!hasAccess) {
             return fail("You don't have permission to perform this action.")
         }

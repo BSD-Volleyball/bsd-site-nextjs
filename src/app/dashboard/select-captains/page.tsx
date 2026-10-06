@@ -1,10 +1,9 @@
-import { requireSessionOrRedirect } from "@/next/page-guards"
+import { requireAdminOrCommissionerOrRedirect } from "@/next/page-guards"
 import { StatusBanner } from "@/components/ui/status-banner"
-import { redirect } from "next/navigation"
 import { PageHeader } from "@/components/layout/page-header"
 import { SelectCaptainsForm } from "./select-captains-form"
 import { getCreateTeamsData } from "./actions"
-import { getIsCommissioner } from "@/app/dashboard/access-actions"
+
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -14,13 +13,7 @@ export const metadata: Metadata = {
 export const revalidate = 300
 
 export default async function SelectCaptainsPage() {
-    const session = await requireSessionOrRedirect()
-
-    const hasAccess = await getIsCommissioner()
-
-    if (!hasAccess) {
-        redirect("/dashboard")
-    }
+    const session = await requireAdminOrCommissionerOrRedirect()
 
     const result = await getCreateTeamsData()
 
