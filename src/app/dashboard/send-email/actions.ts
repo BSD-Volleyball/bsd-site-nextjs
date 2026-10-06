@@ -12,7 +12,13 @@ import {
     seasonEvents
 } from "@/database/schema"
 import { and, asc, eq, desc } from "drizzle-orm"
-import { withAction, requireSession, ok, fail } from "@/next/action-helpers"
+import {
+    ActionError,
+    withAction,
+    requireSession,
+    ok,
+    fail
+} from "@/next/action-helpers"
 import type { ActionResult } from "@/next/action-helpers"
 import { getSeasonConfig } from "@/lib/site-config"
 import {
@@ -428,7 +434,7 @@ async function resolveGroup(
         }
     }
 
-    if (!seasonId) throw new Error("No active season configured.")
+    if (!seasonId) throw new ActionError("No active season configured.")
 
     // Load season label once
     const [seasonRow] = await db
@@ -535,7 +541,9 @@ async function resolveGroup(
 
         const ordinal = tryoutEvents.findIndex((e) => e.id === tryoutEventId)
         if (ordinal < 0) {
-            throw new Error("Tryout date not found in the current season.")
+            throw new ActionError(
+                "Tryout date not found in the current season."
+            )
         }
 
         const name = `${seasonLabel} – Tryout ${ordinal + 1} Volunteers`
@@ -547,13 +555,13 @@ async function resolveGroup(
     }
 
     if (sendToType === "division") {
-        if (!divisionId) throw new Error("Division is required.")
+        if (!divisionId) throw new ActionError("Division is required.")
         const [divRow] = await db
             .select({ name: divisions.name })
             .from(divisions)
             .where(eq(divisions.id, divisionId))
             .limit(1)
-        if (!divRow) throw new Error("Division not found.")
+        if (!divRow) throw new ActionError("Division not found.")
         const groupId = await ensureRecipientGroup("season_division", {
             seasonId,
             divisionId,
@@ -567,14 +575,14 @@ async function resolveGroup(
     }
 
     // team
-    if (!teamId) throw new Error("Team is required.")
+    if (!teamId) throw new ActionError("Team is required.")
     const [teamRow] = await db
         .select({ name: teams.name, season: teams.season })
         .from(teams)
         .where(eq(teams.id, teamId))
         .limit(1)
     if (!teamRow || teamRow.season !== seasonId) {
-        throw new Error("Team not found.")
+        throw new ActionError("Team not found.")
     }
     const groupId = await ensureRecipientGroup("season_team", {
         seasonId,
@@ -718,7 +726,9 @@ export const createAndSendBroadcast = withAction(
             )
         } catch (err) {
             return fail(
-                err instanceof Error ? err.message : "Failed to resolve group."
+                err instanceof ActionError
+                    ? err.message
+                    : "Failed to resolve group."
             )
         }
 
@@ -889,7 +899,9 @@ export const previewBroadcast = withAction(
             )
         } catch (err) {
             return fail(
-                err instanceof Error ? err.message : "Failed to resolve group."
+                err instanceof ActionError
+                    ? err.message
+                    : "Failed to resolve group."
             )
         }
 

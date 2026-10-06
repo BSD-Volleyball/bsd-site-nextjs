@@ -14,6 +14,7 @@ import { eq, desc, or, asc } from "drizzle-orm"
 import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { escapeHtml } from "@/lib/email-html"
 import { sendMail } from "@/lib/email/send"
 import { site } from "@/config/site"
 import {
@@ -316,7 +317,7 @@ export const sendEmailReply = withAction(
         const cleanSubject = email.subject.replace(/^(Re:\s*)+/i, "").trim()
         const replySubject = `Re: Email #${emailId}: ${cleanSubject}`
 
-        const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${body.trim().replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`
+        const bodyHtml = `<div style="font-family:sans-serif;font-size:14px;white-space:pre-wrap">${escapeHtml(body.trim())}</div>`
 
         // Reply mode: goes to an arbitrary external address, keeps the
         // "Re: …" subject unprefixed so threading is not broken, and returns
@@ -484,13 +485,13 @@ export const assignInboundEmail = withAction(
             ].join("\n")
             const htmlBody = `
                 <div style="font-family:sans-serif;font-size:14px;line-height:1.5">
-                    <p>Hi ${assigneeName ?? "there"},</p>
-                    <p><strong>${actorName}</strong> has assigned an email to you.</p>
+                    <p>Hi ${escapeHtml(assigneeName ?? "there")},</p>
+                    <p><strong>${escapeHtml(actorName)}</strong> has assigned an email to you.</p>
                     <p>
-                        <strong>Subject:</strong> ${existing.subject}<br/>
-                        <strong>From:</strong> ${senderLabel}
+                        <strong>Subject:</strong> ${escapeHtml(existing.subject)}<br/>
+                        <strong>From:</strong> ${escapeHtml(senderLabel)}
                     </p>
-                    <p><a href="${link}">Open Manage Emails</a></p>
+                    <p><a href="${escapeHtml(link)}">Open Manage Emails</a></p>
                 </div>
             `
             await sendMail({

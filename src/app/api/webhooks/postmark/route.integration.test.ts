@@ -8,6 +8,7 @@ import {
     emailAttachments,
     emailSuppressions,
     inboundEmails,
+    concernReceived,
     inboundEmailReceived,
     users
 } from "@/database/schema"
@@ -867,10 +868,8 @@ describe("spooled inbound", () => {
     })
 
     it("keeps the spool object when processing throws", async () => {
-        // A spooled inbound whose To is missing makes handleInboundEmail throw.
-        const length = spool(
-            inboundPayload({ To: undefined, ToFull: undefined })
-        )
+        // A spooled inbound with a malformed From fails payload parsing.
+        const length = spool(inboundPayload({ From: 42 as unknown as string }))
         const response = await POST(
             webhookRequest(envelope({ ContentLength: length }))
         )
@@ -959,5 +958,115 @@ describe("concurrent redelivery", () => {
         ])
         expect(responses.map((r) => r.status)).toEqual([200, 200])
         expect(await db.select().from(inboundEmailReceived)).toHaveLength(1)
+    })
+})
+
+describe("thread matching by guessable ticket id", () => {
+    async function seedClosedConcern() {
+        const [seeded] = await db
+            .insert(concerns)
+            .values({
+                anonymous: false,
+                contact_name: "The Reporter",
+                contact_email: "reporter@example.test",
+                want_followup: true,
+                incident_date: "2026-07-01",
+                location: "Gym",
+                person_involved: "Someone",
+                description: "A sensitive concern",
+                status: "closed",
+                source: "web"
+            })
+            .returning({ id: concerns.id })
+        return seeded.id
+    }
+
+    function message(from: string, subject: string, id: string) {
+        return {
+            MessageID: id,
+            From: from,
+            FromName: "Sender",
+            To: "info@bumpsetdrink.com",
+            Subject: subject,
+            TextBody: "Please send the details to my new address.",
+            HtmlBody: "<p>Please send the details to my new address.</p>"
+        }
+    }
+
+    it("does not let a stranger post into a concern by quoting its number", async () => {
+        await createUser()
+        const concernId = await seedClosedConcern()
+
+        const response = await POST(
+            webhookRequest(
+                message(
+                    "stranger@example.test",
+                    `Re: Concern #${concernId}`,
+                    "stranger-1"
+                )
+            )
+        )
+        expect(response.status).toBe(200)
+
+        const [concern] = await db
+            .select({ status: concerns.status })
+            .from(concerns)
+            .where(eq(concerns.id, concernId))
+        expect(concern.status).toBe("closed")
+        expect(
+            await db
+                .select()
+                .from(concernReceived)
+                .where(eq(concernReceived.concern_id, concernId))
+        ).toHaveLength(0)
+        // The mail is kept, as a new ticket rather than dropped.
+        const [created] = await db
+            .select({ id: inboundEmails.id })
+            .from(inboundEmails)
+            .where(eq(inboundEmails.email_id, "stranger-1"))
+        expect(created).toBeDefined()
+    })
+
+    it("does not honor a forged X-BSD-Ticket-ID from a stranger", async () => {
+        await createUser()
+        const concernId = await seedClosedConcern()
+
+        await POST(
+            webhookRequest({
+                ...message("stranger@example.test", "Hello", "stranger-2"),
+                Headers: [
+                    { Name: "X-BSD-Ticket-ID", Value: `concern-${concernId}` }
+                ]
+            })
+        )
+
+        expect(
+            await db
+                .select()
+                .from(concernReceived)
+                .where(eq(concernReceived.concern_id, concernId))
+        ).toHaveLength(0)
+    })
+
+    it("still threads the reporter's reply by subject (any casing)", async () => {
+        await createUser()
+        const concernId = await seedClosedConcern()
+
+        await POST(
+            webhookRequest(
+                message(
+                    "Reporter@Example.test",
+                    `Re: Concern #${concernId}`,
+                    "reporter-1"
+                )
+            )
+        )
+
+        expect(
+            await db
+                .select()
+                .from(concernReceived)
+                .where(eq(concernReceived.concern_id, concernId))
+        ).toHaveLength(1)
     })
 })

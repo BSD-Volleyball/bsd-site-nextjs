@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { timingSafeEqual } from "node:crypto"
+import { z } from "zod"
 import { db } from "@/database/db"
 import {
     type AttachmentParentType,
@@ -29,7 +30,6 @@ import {
 import { recomputeEmailStatus } from "@/lib/notifications/suppressions"
 import {
     listAttachmentsFor,
-    type PostmarkAttachment,
     storeInboundAttachments
 } from "@/lib/email-attachments"
 import { deleteR2Object, getR2Object } from "@/lib/r2"
@@ -43,70 +43,82 @@ export const maxDuration = 300
 // https://postmarkapp.com/developer/webhooks/inbound-webhook
 // ---------------------------------------------------------------------------
 
-interface PostmarkHeader {
-    Name: string
-    Value: string
-}
+// Payloads are parsed, not cast. The schemas are deliberately lenient (only
+// fields this route reads, extra fields kept, blanks tolerated) because a
+// rejected inbound message is a lost email; a payload that still fails is
+// answered 400 so it stays in Postmark's activity for a manual retry.
+const postmarkHeaderSchema = z.object({ Name: z.string(), Value: z.string() })
+type PostmarkHeader = z.infer<typeof postmarkHeaderSchema>
 
-interface PostmarkInboundPayload {
-    MessageID: string
-    From: string
-    FromName: string
-    FromFull: { Email: string; Name: string }
-    To: string
-    ToFull: Array<{ Email: string; Name: string }>
-    Subject: string
-    TextBody: string
-    HtmlBody: string
-    Tag: string
-    MessageStream: string
-    Headers: PostmarkHeader[]
+const postmarkAddressSchema = z.looseObject({
+    Email: z.string(),
+    Name: z.string().nullish()
+})
+
+const postmarkInboundSchema = z.looseObject({
+    MessageID: z.string().min(1),
+    From: z.string(),
+    FromName: z.string().nullish(),
+    FromFull: postmarkAddressSchema.nullish(),
+    To: z
+        .string()
+        .nullish()
+        .transform((to) => to ?? ""),
+    ToFull: z.array(postmarkAddressSchema).nullish(),
+    Subject: z.string().nullish(),
+    TextBody: z.string().nullish(),
+    HtmlBody: z.string().nullish(),
+    Headers: z.array(postmarkHeaderSchema).nullish(),
     /** Base64-encoded raw RFC 2822 email. Present when "Include raw email" is enabled on the inbound stream. */
-    RawEmail?: string
+    RawEmail: z.string().nullish(),
     /** Base64-inline attachments; empty array when the message has none. */
-    Attachments?: PostmarkAttachment[]
-}
+    Attachments: z
+        .array(
+            z.looseObject({
+                Name: z.string(),
+                Content: z.string(),
+                ContentType: z.string(),
+                ContentLength: z.number(),
+                ContentID: z.string().nullish()
+            })
+        )
+        .nullish()
+})
+type PostmarkInboundPayload = z.infer<typeof postmarkInboundSchema>
 
-// ---------------------------------------------------------------------------
-// Postmark Subscription Change Payload
 // https://postmarkapp.com/developer/webhooks/subscription-change-webhook
-// ---------------------------------------------------------------------------
+const postmarkSubscriptionChangeSchema = z.looseObject({
+    RecordType: z.literal("SubscriptionChange"),
+    MessageStream: z.string(),
+    Recipient: z.string(),
+    SuppressSending: z.boolean(),
+    SuppressionReason: z.string().nullish(),
+    Origin: z.string().nullish(),
+    Timestamp: z.string().nullish()
+})
+type PostmarkSubscriptionChangePayload = z.infer<
+    typeof postmarkSubscriptionChangeSchema
+>
 
-interface PostmarkSubscriptionChangePayload {
-    RecordType: "SubscriptionChange"
-    MessageStream: string
-    Recipient: string
-    SuppressSending: boolean
-    SuppressionReason: string | null
-    Origin: string
-    Timestamp: string
-}
-
-// ---------------------------------------------------------------------------
-// Postmark Bounce Payload
 // https://postmarkapp.com/developer/webhooks/bounce-webhook
-// ---------------------------------------------------------------------------
+const postmarkBounceSchema = z.looseObject({
+    RecordType: z.literal("Bounce"),
+    MessageStream: z.string(),
+    Type: z.string(), // e.g. 'HardBounce', 'SoftBounce', 'Transient'
+    Email: z.string(),
+    BouncedAt: z.string().nullish(),
+    Description: z.string().nullish()
+})
+type PostmarkBouncePayload = z.infer<typeof postmarkBounceSchema>
 
-interface PostmarkBouncePayload {
-    RecordType: "Bounce"
-    MessageStream: string
-    Type: string // e.g. 'HardBounce', 'SoftBounce', 'Transient'
-    Email: string
-    BouncedAt: string
-    Description: string
-}
-
-// ---------------------------------------------------------------------------
-// Postmark Spam Complaint Payload
 // https://postmarkapp.com/developer/webhooks/spam-complaint-webhook
-// ---------------------------------------------------------------------------
-
-interface PostmarkSpamComplaintPayload {
-    RecordType: "SpamComplaint"
-    MessageStream: string
-    Email: string
-    BouncedAt: string
-}
+const postmarkSpamComplaintSchema = z.looseObject({
+    RecordType: z.literal("SpamComplaint"),
+    MessageStream: z.string(),
+    Email: z.string(),
+    BouncedAt: z.string().nullish()
+})
+type PostmarkSpamComplaintPayload = z.infer<typeof postmarkSpamComplaintSchema>
 
 // ---------------------------------------------------------------------------
 // Spooled inbound envelope (our own, not Postmark's)
@@ -362,36 +374,99 @@ function mergeHeaders(
  *      original ticket email IDs
  *   3. Subject-based detection (fallback when headers are stripped by relays)
  */
+/**
+ * Has this address already taken part in the thread? A ticket id in a header
+ * or subject is guessable (ids are sequential), so a match on it only counts
+ * when the sender is the original sender/reporter or has written into the
+ * thread before. Otherwise anyone could append mail to, and reopen, any
+ * concern by sending "Re: Concern #12". Message-ID matches need no such check:
+ * those ids are ones we issued and cannot be guessed.
+ */
+async function senderOnThread(
+    thread: { type: "email" | "concern"; id: number },
+    senderEmail: string
+): Promise<boolean> {
+    const sender = senderEmail.trim().toLowerCase()
+    if (!sender) return false
+    const known: (string | null | undefined)[] = []
+
+    if (thread.type === "email") {
+        const [original] = await db
+            .select({ from: inboundEmails.from_address })
+            .from(inboundEmails)
+            .where(eq(inboundEmails.id, thread.id))
+            .limit(1)
+        known.push(original?.from)
+        const replies = await db
+            .select({ from: inboundEmailReceived.from_address })
+            .from(inboundEmailReceived)
+            .where(eq(inboundEmailReceived.email_id, thread.id))
+        known.push(...replies.map((r) => r.from))
+    } else {
+        const [concern] = await db
+            .select({
+                contact: concerns.contact_email,
+                userEmail: users.email
+            })
+            .from(concerns)
+            .leftJoin(users, eq(concerns.user_id, users.id))
+            .where(eq(concerns.id, thread.id))
+            .limit(1)
+        known.push(concern?.contact, concern?.userEmail)
+        const replies = await db
+            .select({ from: concernReceived.from_address })
+            .from(concernReceived)
+            .where(eq(concernReceived.concern_id, thread.id))
+        known.push(...replies.map((r) => r.from))
+    }
+
+    return known.some((address) => address?.trim().toLowerCase() === sender)
+}
+
 async function detectExistingThread(
     headers: PostmarkHeader[],
-    subject?: string
+    subject: string | undefined,
+    senderEmail: string
 ): Promise<
     { type: "email"; id: number } | { type: "concern"; id: number } | null
 > {
+    // Header and subject matches are only trusted from a thread participant.
+    const fromParticipant = async (
+        thread: { type: "email"; id: number } | { type: "concern"; id: number },
+        via: string
+    ) => {
+        if (await senderOnThread(thread, senderEmail)) {
+            logger.info(`[postmark-webhook] Thread detected via ${via}`, {
+                threadType: thread.type,
+                ticketId: thread.id
+            })
+            return thread
+        }
+        logger.warn(
+            `[postmark-webhook] Ignored ${via} match from a non-participant`,
+            { threadType: thread.type, ticketId: thread.id }
+        )
+        return null
+    }
+
     // 1. Custom header (forwarded by some clients)
     const ticketId = getHeader(headers, "X-BSD-Ticket-ID")
     if (ticketId) {
         const emailMatch = ticketId.match(/^email-(\d+)$/)
         if (emailMatch) {
-            logger.info(
-                "[postmark-webhook] Thread detected via X-BSD-Ticket-ID",
-                {
-                    threadType: "email",
-                    ticketId: parseInt(emailMatch[1], 10)
-                }
+            const thread = await fromParticipant(
+                { type: "email", id: parseInt(emailMatch[1], 10) },
+                "X-BSD-Ticket-ID"
             )
-            return { type: "email", id: parseInt(emailMatch[1], 10) }
+            if (thread) return thread
         }
         const concernMatch = ticketId.match(/^concern-(\d+)$/)
         if (concernMatch) {
-            logger.info(
-                "[postmark-webhook] Thread detected via X-BSD-Ticket-ID",
-                {
-                    threadType: "concern",
-                    ticketId: parseInt(concernMatch[1], 10)
-                }
+            const thread = await fromParticipant(
+                { type: "concern", id: parseInt(concernMatch[1], 10) },
+                "X-BSD-Ticket-ID"
             )
-            return { type: "concern", id: parseInt(concernMatch[1], 10) }
+            if (thread) return thread
         }
     }
 
@@ -499,11 +574,11 @@ async function detectExistingThread(
                 .where(eq(concerns.id, id))
                 .limit(1)
             if (ticket) {
-                logger.info("[postmark-webhook] Thread detected via subject", {
-                    threadType: "concern",
-                    ticketId: id
-                })
-                return { type: "concern", id }
+                const thread = await fromParticipant(
+                    { type: "concern", id },
+                    "subject"
+                )
+                if (thread) return thread
             }
         }
 
@@ -516,11 +591,11 @@ async function detectExistingThread(
                 .where(eq(inboundEmails.id, id))
                 .limit(1)
             if (ticket) {
-                logger.info("[postmark-webhook] Thread detected via subject", {
-                    threadType: "email",
-                    ticketId: id
-                })
-                return { type: "email", id }
+                const thread = await fromParticipant(
+                    { type: "email", id },
+                    "subject"
+                )
+                if (thread) return thread
             }
         }
     }
@@ -668,7 +743,11 @@ async function handleInboundEmail(payload: PostmarkInboundPayload) {
     const appUrl = site.publicUrl
 
     // Check if this is a reply to an existing thread
-    const existingThread = await detectExistingThread(headers, subject)
+    const existingThread = await detectExistingThread(
+        headers,
+        subject,
+        fromEmail
+    )
 
     if (existingThread) {
         if (existingThread.type === "email") {
@@ -1174,26 +1253,24 @@ async function dispatchPostmarkPayload(payload: Record<string, unknown>) {
     // Postmark uses RecordType to distinguish webhook types
     if (payload.RecordType === "SubscriptionChange") {
         await handleSubscriptionChange(
-            payload as unknown as PostmarkSubscriptionChangePayload
+            postmarkSubscriptionChangeSchema.parse(payload)
         )
         return
     }
 
     if (payload.RecordType === "Bounce") {
-        await handleBounce(payload as unknown as PostmarkBouncePayload)
+        await handleBounce(postmarkBounceSchema.parse(payload))
         return
     }
 
     if (payload.RecordType === "SpamComplaint") {
-        await handleSpamComplaint(
-            payload as unknown as PostmarkSpamComplaintPayload
-        )
+        await handleSpamComplaint(postmarkSpamComplaintSchema.parse(payload))
         return
     }
 
     // Inbound emails have no RecordType but have MessageID + From + To
     if (payload.MessageID && payload.From && !payload.RecordType) {
-        await handleInboundEmail(payload as unknown as PostmarkInboundPayload)
+        await handleInboundEmail(postmarkInboundSchema.parse(payload))
         return
     }
 

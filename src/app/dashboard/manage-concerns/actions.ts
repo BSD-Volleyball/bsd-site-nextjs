@@ -14,6 +14,7 @@ import { eq, desc, or } from "drizzle-orm"
 import { hasPermissionBySession } from "@/next/session"
 import { getSeasonConfig } from "@/lib/site-config"
 import { logAuditEntry } from "@/lib/audit-log"
+import { escapeHtml } from "@/lib/email-html"
 import { sendMail } from "@/lib/email/send"
 import { site } from "@/config/site"
 import {
@@ -419,7 +420,7 @@ export const sendConcernReply = withAction(
             from: fromAddress,
             fromName: fromName || undefined,
             subject,
-            htmlBody: `<p>${body.trim().replace(/\n/g, "<br>")}</p>`,
+            htmlBody: `<p>${escapeHtml(body.trim()).replace(/\n/g, "<br>")}</p>`,
             textBody: body.trim(),
             inReplyTo,
             tag: "concern-reply",
@@ -618,13 +619,13 @@ export const assignConcern = withAction(
             ].join("\n")
             const htmlBody = `
                 <div style="font-family:sans-serif;font-size:14px;line-height:1.5">
-                    <p>Hi ${assigneeName ?? "there"},</p>
-                    <p><strong>${actorName}</strong> has assigned a concern to you.</p>
+                    <p>Hi ${escapeHtml(assigneeName ?? "there")},</p>
+                    <p><strong>${escapeHtml(actorName)}</strong> has assigned a concern to you.</p>
                     <p>
-                        <strong>Subject:</strong> ${conciseSubject}<br/>
-                        <strong>From:</strong> ${submitterLabel} (${sourceLabel})
+                        <strong>Subject:</strong> ${escapeHtml(conciseSubject)}<br/>
+                        <strong>From:</strong> ${escapeHtml(submitterLabel)} (${sourceLabel})
                     </p>
-                    <p><a href="${link}">Open Manage Concerns</a></p>
+                    <p><a href="${escapeHtml(link)}">Open Manage Concerns</a></p>
                 </div>
             `
             await sendMail({
