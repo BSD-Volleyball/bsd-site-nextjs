@@ -146,6 +146,23 @@ test.describe("while payment is pending", () => {
 })
 
 test.describe("once paid", () => {
+    // Normally the admin test above has just marked it paid. But a failed
+    // test restarts the worker and the file-level beforeAll re-seeds an
+    // unpaid sponsorship, so a single flaky assertion used to fail every
+    // test below it. Make the precondition explicit (and idempotent).
+    test.beforeAll(async () => {
+        await db
+            .update(sponsorships)
+            .set({
+                status: "paid",
+                payment_method: "manual",
+                amount_paid: "500.00",
+                paid_at: new Date(),
+                paid_note: "check #1042"
+            })
+            .where(eq(sponsorships.id, sponsorshipId))
+    })
+
     test("the sponsor appears on /sponsors and the homepage strip", async ({
         page
     }) => {
@@ -160,11 +177,18 @@ test.describe("once paid", () => {
             page.getByRole("link", { name: /Visit website/ })
         ).toHaveAttribute("href", "https://bravo.example")
 
-        await page.goto("/?stay=1")
-        await expect(page.getByText(/Thanks to our .* sponsors/)).toBeVisible()
-        await expect(
-            page.getByRole("link", { name: "Bravo Bakery" })
-        ).toBeVisible()
+        // The homepage is statically generated: after the sponsor list
+        // changes, the next request may still get the previous copy while it
+        // regenerates (stale-while-revalidate). Reload until it catches up.
+        await expect(async () => {
+            await page.goto("/?stay=1")
+            await expect(
+                page.getByText(/Thanks to our .* sponsors/)
+            ).toBeVisible({ timeout: 2_000 })
+            await expect(
+                page.getByRole("link", { name: "Bravo Bakery" })
+            ).toBeVisible({ timeout: 2_000 })
+        }).toPass({ timeout: 20_000 })
     })
 
     test.describe("as the sponsor contact", () => {
